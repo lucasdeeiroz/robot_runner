@@ -879,7 +879,7 @@ def check_and_download_scrcpy() -> Optional[Path]:
 class RobotRunnerApp:
     def __init__(self, root: ttk.Window):
         self.root = root
-        self.root.title("ADB & Scrcpy Runner")
+        self.root.title("Robot Framework Test Runner")
         self.root.geometry("900x750")
 
         self.root.protocol("WM_DELETE_WINDOW", self._on_closing)
