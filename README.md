@@ -1,54 +1,53 @@
-# Robot Runner - ADB & Scrcpy GUI
+# Robot Runner - A GUI for Robot Framework Automation
 
-A comprehensive desktop application built with Python and Tkinter for managing and executing Robot Framework tests on Android devices. It integrates ADB, Scrcpy, and Appium into a single, user-friendly interface.
+A comprehensive desktop application, built with Python and Tkinter, for managing and running Robot Framework tests on Android devices. It integrates ADB, Scrcpy, and Appium into a single, user-friendly interface.
 
 ## Key Features
 
-*   **Device Management**:
-    *   Automatically detect and list connected Android devices (USB & Wireless).
-    *   Display device information (Model, Android Version, UDID).
-    *   One-click refresh to update the device list.
+* **Device Management**:
+    * Automatically detects and lists connected Android devices (USB & Wireless).
+    * Displays device information (Model, Android Version, UDID).
+    * Tools to pair, connect, and disconnect devices over Wi-Fi.
+    * Execute manual ADB commands with output display.
 
-*   **Live Screen Mirroring (Windows Only)**:
-    *   Embeds a live Scrcpy mirror of the selected device directly into the application window.
-    *   Automatically downloads the latest version of Scrcpy if not found.
-    *   Maintains the device's aspect ratio when resizing the window.
-    *   In-app controls to take screenshots and record the screen during test execution or mirroring.
-    *   View or hide the Scrcpy console output.
+* **Live Screen Mirroring (Windows Only)**:
+    * Embeds a live Scrcpy screen mirror directly into the application window.
+    * Automatically downloads the latest version of Scrcpy if it's not found.
+    * Maintains the device's aspect ratio when resizing the window.
+    * Integrated controls to take screenshots and record the screen during test execution or mirroring.
 
-*   **Robot Framework Test Runner**:
-    *   Integrated file browser to navigate and select test suites (`.txt`) or individual test files (`.robot`).
-    *   Run tests against any connected device.
-    *   View live test execution output directly in the app.
-    *   Forcefully stop a running test and automatically generate the final report using `rebot`.
-    *   Option to run tests with or without the live screen mirror.
+* **Robot Framework Test Execution**:
+    * Integrated file browser to select test suites (`.txt`) or individual test files (`.robot`).
+    * Run tests on any connected device.
+    * View live test execution output directly in the app, with syntax highlighting for status (PASS/FAIL).
+    * Button to forcefully stop a running test.
+    * Automatic final report generation using `rebot` after test completion.
+    * Option to run tests with or without the live screen mirror.
 
-*   **Test Log Dashboard**:
-    *   A dedicated tab to view a summary of all historical test runs.
-    *   Parses `output.xml` files to display pass/fail statistics.
-    *   Group and aggregate results by Device, Suite, or a combined view.
+* **Test Logs Dashboard**:
+    * A dedicated tab to view a summary of all historical test runs.
+    * Parses all `output.xml` files to build the dashboard.
+    * Groups results by **Device**, **Suite**, or **Status**.
+    * Presents data in a hierarchical, indented format for better readability.
+    * Allows opening the full HTML report with a double-click.
 
-*   **Appium Server Control**:
-    *   Start and stop the Appium server from within the application.
-    *   Automatically clears the port (4723) before starting to prevent conflicts.
-    *   View live Appium server logs.
-    *   Automatically detects and displays the server's listener addresses.
-
-*   **Wireless Debugging**:
-    *   A simple interface to pair and connect to devices over Wi-Fi using ADB's wireless debugging feature.
+* **Settings & Tools**:
+    * Start and stop the Appium server directly from the GUI.
+    * Configure paths for the Scrcpy executable and project directories (suites, tests, logs, etc.).
+    * Customize the application theme (light or dark).
 
 ## Prerequisites
 
-Before running the application, ensure you have the following software installed and configured in your system's PATH:
+Before installing, make sure you have the following software installed and configured in your system's PATH:
 
-1.  **Python 3.8+**: The application is built on Python.
-2.  **Android SDK Platform-Tools (ADB)**: Required for all device communication. Make sure `adb.exe` is in your system's PATH.
+1.  **Python**: Version 3.8 or higher.
+2.  **Android Debug Bridge (ADB)**: Required for all device communication.
 3.  **Appium Server**: The `appium` command must be executable from your terminal. It's typically installed via npm:
     ```sh
     npm install -g appium
     ```
 
-## Setup and Installation
+## Installation and Setup
 
 1.  **Clone the repository:**
     ```sh
@@ -72,11 +71,12 @@ Before running the application, ensure you have the following software installed
 
 4.  **Directory Structure:**
     The application expects the following directories in its root folder. They will be created automatically if they don't exist.
-    *   `suites/`: Place your Robot Framework suite files (`.txt`) here.
-    *   `tests/`: Place your individual Robot Framework test case files (`.robot`) here.
-    *   `logs/`: Test reports and logs will be generated here.
-    *   `screenshots/`: Screenshots taken from the app are saved here.
-    *   `recordings/`: Screen recordings are saved here.
+    * `config/`: Stores the `settings.json` file.
+    * `suites/`: Place your Robot Framework suite files (`.txt`) here.
+    * `tests/`: Place your individual Robot Framework test case files (`.robot`) here.
+    * `logs/`: Test reports and logs will be generated here.
+    * `screenshots/`: Screenshots taken from the app are saved here.
+    * `recordings/`: Screen recordings are saved here.
 
 ## How to Use
 
@@ -84,8 +84,12 @@ Before running the application, ensure you have the following software installed
     ```sh
     python robot_runner.py
     ```
-2.  Follow the on-screen instructions in the various tabs to connect to devices, manage the Appium server, and run your tests.
+2.  **Configure the paths** in the "Settings" tab, if necessary, and save.
+3.  **Start the Appium server** in the "Settings" tab.
+4.  **Select a device** and a test/suite file in the "Run Tests" tab and click **Run Test**.
 
 ## License
 
 This project is licensed under the MIT License.
+
+**Copyright (c) 2025 Lucas de Eiroz Rodrigues**
