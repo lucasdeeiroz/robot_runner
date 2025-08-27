@@ -84,9 +84,20 @@ class ScrcpyFrame(ttk.Frame):
         self.scrcpy_output_is_visible = False
         self._is_closing = False
 
+        # --- Performance Monitor Attributes ---
+        self.performance_monitor_is_visible = False
+        self.is_monitoring = False
+        self.performance_thread = None
+        self.stop_monitoring_event = threading.Event()
+        self.performance_output_queue = Queue()
+        self.performance_log_file = None
+
+
         self._setup_widgets()
         self._start_scrcpy()
         self.after(100, self._check_scrcpy_output_queue)
+        # --- Performance Monitor ---
+        self.after(100, self._check_performance_output_queue)
         self.bind("<Configure>", self._on_window_resize)
 
     def _setup_widgets(self):
@@ -122,11 +133,40 @@ class ScrcpyFrame(ttk.Frame):
         self.toggle_output_button.pack(fill=X, pady=5, padx=5)
         ToolTip(self.toggle_output_button, "Shows or hides the scrcpy output console.")
 
+        # --- Performance Monitor Widgets ---
+        self.toggle_performance_button = ttk.Button(commands_frame, text="Monitor Performance", command=self._toggle_performance_monitor_visibility, bootstyle="info")
+        self.toggle_performance_button.pack(fill=X, pady=5, padx=5)
+        ToolTip(self.toggle_performance_button, "Shows or hides the performance monitor.")
+
+        self.performance_output_frame = ttk.LabelFrame(self.left_paned_window, text="Performance Monitor", padding=5)
+        
+        self.performance_output_text = ScrolledText(self.performance_output_frame, wrap=WORD, state=DISABLED, autohide=True)
+        self.performance_output_text.pack(fill=BOTH, expand=YES, padx=5, pady=5)
+        
+        monitor_controls_frame = ttk.Frame(self.performance_output_frame)
+        monitor_controls_frame.pack(fill=X, pady=5, padx=5)
+        monitor_controls_frame.columnconfigure(0, weight=1)
+
+        ttk.Label(monitor_controls_frame, text="App Package:").grid(row=0, column=0, columnspan=2, sticky=W, pady=(0,2))
+        self.app_package_combo = ttk.Combobox(monitor_controls_frame, values=self.parent_app.app_packages_var.get().split(','))
+        self.app_package_combo.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 5))
+        if self.app_package_combo['values']:
+            self.app_package_combo.set(self.app_package_combo['values'][0])
+
+        self.start_monitor_button = ttk.Button(monitor_controls_frame, text="Start Monitoring", command=self._start_performance_monitor, bootstyle="success")
+        self.start_monitor_button.grid(row=2, column=0, sticky="ew", padx=(0, 2))
+        self.stop_monitor_button = ttk.Button(monitor_controls_frame, text="Stop Monitoring", command=self._stop_performance_monitor, bootstyle="danger", state=DISABLED)
+        self.stop_monitor_button.grid(row=2, column=1, sticky="ew", padx=(2, 0))
+        # --- End of Performance Monitor Widgets ---
+
         self.embed_frame = ttk.LabelFrame(self.main_paned_window, text="Screen Mirror", padding=5)
         self.main_paned_window.add(self.embed_frame)
         
         self.left_paned_window.add(self.scrcpy_output_frame)
         self.left_paned_window.forget(self.scrcpy_output_frame)
+        # --- Performance Monitor ---
+        self.left_paned_window.add(self.performance_output_frame)
+        self.left_paned_window.forget(self.performance_output_frame)
 
 
     def _start_scrcpy(self):
@@ -433,12 +473,100 @@ class ScrcpyFrame(ttk.Frame):
         else:
             self.record_button.config(text="Start Recording", bootstyle="primary")
         self.record_button.config(state=NORMAL)
+    
+    # --- Performance Monitor Methods ---
+    def _toggle_performance_monitor_visibility(self):
+        """Shows or hides the Performance Monitor frame."""
+        if self.performance_monitor_is_visible:
+            self.left_paned_window.forget(self.performance_output_frame)
+            self.toggle_performance_button.config(text="Monitor Performance")
+        else:
+            self.left_paned_window.add(self.performance_output_frame, weight=2)
+            self.toggle_performance_button.config(text="Hide Monitor")
+        self.performance_monitor_is_visible = not self.performance_monitor_is_visible
+
+    def _start_performance_monitor(self):
+        """Starts the performance monitoring thread."""
+        app_package = self.app_package_combo.get()
+        if not app_package:
+            messagebox.showwarning("Input Error", "Please select an application package to monitor.", parent=self.winfo_toplevel())
+            return
+
+        self.is_monitoring = True
+        self.stop_monitoring_event.clear()
+        self.start_monitor_button.config(state=DISABLED)
+        self.stop_monitor_button.config(state=NORMAL)
+        self.app_package_combo.config(state=DISABLED)
+
+        self.performance_output_text.text.config(state=NORMAL)
+        self.performance_output_text.delete("1.0", END)
+        self.performance_output_text.text.config(state=DISABLED)
+        
+        log_dir = self.parent_app.logs_dir
+        log_dir.mkdir(exist_ok=True)
+        app_name = app_package.split('.')[-1]
+        self.performance_log_file = log_dir / f"performance_log_{app_name}_{self.udid.replace(':', '-')}.txt"
+
+        self.performance_thread = threading.Thread(
+            target=run_performance_monitor, 
+            args=(self.udid, app_package, self.performance_output_queue, self.stop_monitoring_event)
+        )
+        self.performance_thread.daemon = True
+        self.performance_thread.start()
+        
+    def _stop_performance_monitor(self):
+        """Stops the performance monitoring thread gracefully."""
+        if self.is_monitoring:
+            self.stop_monitoring_event.set() # Signal the thread to stop
+            self.is_monitoring = False
+            self.start_monitor_button.config(state=NORMAL)
+            self.stop_monitor_button.config(state=DISABLED)
+            self.app_package_combo.config(state="readonly")
+            self.performance_output_queue.put("\n--- Monitoring stopped by user. ---\n")
+
+    def _check_performance_output_queue(self):
+        """Periodically checks the performance queue and updates the GUI."""
+        while not self.performance_output_queue.empty():
+            try:
+                line = self.performance_output_queue.get_nowait()
+                
+                # Update the ScrolledText widget
+                self.performance_output_text.text.config(state=NORMAL)
+                self.performance_output_text.insert(END, line)
+                self.performance_output_text.see(END)
+                self.performance_output_text.text.config(state=DISABLED)
+
+                # Write to the log file
+                if self.performance_log_file:
+                    try:
+                        # Overwrite file on first line, append otherwise
+                        mode = 'w' if "Starting monitoring" in line else 'a'
+                        with open(self.performance_log_file, mode, encoding='utf-8') as f:
+                            f.write(line)
+                    except Exception as e:
+                        # If file writing fails, put an error in the queue to display it
+                        error_msg = f"\nERROR: Could not write to log file {self.performance_log_file}. Error: {e}\n"
+                        self.performance_output_queue.put(error_msg)
+
+            except Empty:
+                pass
+        
+        # Check if the thread has finished running
+        if self.is_monitoring and (self.performance_thread is None or not self.performance_thread.is_alive()):
+             self._stop_performance_monitor()
+
+        self.after(100, self._check_performance_output_queue)
+
 
     def close(self):
         """Public method to safely close the scrcpy process."""
         if self._is_closing:
             return
         self._is_closing = True
+
+        # --- Stop Performance Monitor if it's running ---
+        if self.is_monitoring:
+            self._stop_performance_monitor()
 
         def final_close_actions():
             if self.scrcpy_process and self.scrcpy_process.poll() is None:
@@ -602,11 +730,6 @@ class TestRunnerWindow(tk.Toplevel):
                 creationflags=creationflags
             )
             
-            # --- FIX STARTS HERE ---
-            # REMOVED: self.parent_app.robot_process = self.robot_process
-            # This line was the source of the leak, as it only tracked the last process.
-            # --- FIX ENDS HERE ---
-            
             for line in iter(self.robot_process.stdout.readline, ''):
                 self.output_queue.put(line)
             self.robot_process.stdout.close()
@@ -703,11 +826,8 @@ class TestRunnerWindow(tk.Toplevel):
         if self.scrcpy_frame_widget:
             self.scrcpy_frame_widget.close()
 
-        # --- FIX STARTS HERE ---
-        # Remove self from the parent's list of active windows
         if self in self.parent_app.active_test_windows:
             self.parent_app.active_test_windows.remove(self)
-        # --- FIX ENDS HERE ---
 
         self.destroy()
 
@@ -721,10 +841,7 @@ class RobotRunnerApp:
 
         self.devices: List[Dict[str, str]] = []
         self.appium_process: Optional[subprocess.Popen] = None
-        # --- FIX STARTS HERE ---
-        # Replaced self.robot_process with a list to track all active test windows
         self.active_test_windows: List[TestRunnerWindow] = []
-        # --- FIX ENDS HERE ---
         self.active_scrcpy_windows: Dict[str, ScrcpyEmbedWindow] = {}
         self.parsed_logs_data: Optional[List[Dict]] = None
         self.logs_tab_initialized = False
@@ -754,6 +871,8 @@ class RobotRunnerApp:
         self.recordings_dir_var = tk.StringVar()
         self.theme_var = tk.StringVar()
         self.group_by_var = tk.StringVar(value="Device")
+        # --- Performance Monitor ---
+        self.app_packages_var = tk.StringVar()
 
     def _update_paths_from_settings(self):
         """Updates Path objects from the StringVars."""
@@ -1008,15 +1127,11 @@ class RobotRunnerApp:
         self.progress_bar = ttk.Progressbar(self.progress_frame, mode='determinate')
         ToolTip(self.progress_bar, "Parsing logs... This may take a while depending on the number of logs.")
         
-        # --- FIX STARTS HERE ---
-        # Create a frame to hold the Treeview and its scrollbar
         logs_tree_frame = ttk.Frame(self.logs_tab)
         logs_tree_frame.pack(fill=BOTH, expand=YES, pady=5)
 
-        # Create the scrollbar
         scrollbar = ttk.Scrollbar(logs_tree_frame, orient=VERTICAL)
         
-        # Create the Treeview and link it to the scrollbar
         self.logs_tree = ttk.Treeview(logs_tree_frame, columns=("suite", "status", "time"), show="headings", yscrollcommand=scrollbar.set)
         scrollbar.config(command=self.logs_tree.yview)
         
@@ -1024,12 +1139,10 @@ class RobotRunnerApp:
         self.logs_tree.heading("status", text="Status")
         self.logs_tree.heading("time", text="Execution Time")
         
-        # Pack the scrollbar and Treeview
         scrollbar.pack(side=RIGHT, fill=Y)
         self.logs_tree.pack(side=LEFT, fill=BOTH, expand=YES)
         
         self.logs_tree.bind("<Double-1>", self._on_log_double_click)
-        # --- FIX ENDS HERE ---
         
     def _setup_settings_tab(self):
         """Configures the 'Settings' tab."""
@@ -1071,6 +1184,13 @@ class RobotRunnerApp:
         
         ttk.Label(dir_settings_frame, text="Scrcpy Path:").grid(row=5, column=0, padx=5, pady=5, sticky=W)
         ttk.Entry(dir_settings_frame, textvariable=self.scrcpy_path_var).grid(row=5, column=1, padx=5, pady=5, sticky=EW)
+        
+        # --- Performance Monitor Settings ---
+        ttk.Label(dir_settings_frame, text="App Packages:").grid(row=6, column=0, padx=5, pady=5, sticky=W)
+        app_packages_entry = ttk.Entry(dir_settings_frame, textvariable=self.app_packages_var)
+        app_packages_entry.grid(row=6, column=1, padx=5, pady=5, sticky=EW)
+        ToolTip(app_packages_entry, "Comma-separated list of app package names for the performance monitor.")
+
 
         bottom_frame = ttk.Frame(settings_frame)
         bottom_frame.pack(fill=X, pady=0, padx=0)
@@ -1169,6 +1289,8 @@ class RobotRunnerApp:
         self.screenshots_dir_var.set(settings.get("screenshots_dir", "screenshots"))
         self.recordings_dir_var.set(settings.get("recordings_dir", "recordings"))
         self.theme_var.set(settings.get("theme", "darkly"))
+        # --- Performance Monitor ---
+        self.app_packages_var.set(settings.get("app_packages", "com.android.chrome"))
         
         self.initial_theme = self.theme_var.get()
 
@@ -1183,7 +1305,9 @@ class RobotRunnerApp:
             "logs_dir": self.logs_dir_var.get(),
             "screenshots_dir": self.screenshots_dir_var.get(),
             "recordings_dir": self.recordings_dir_var.get(),
-            "theme": self.theme_var.get()
+            "theme": self.theme_var.get(),
+            # --- Performance Monitor ---
+            "app_packages": self.app_packages_var.get()
         }
         try:
             with open(SETTINGS_FILE, 'w') as f:
@@ -1210,12 +1334,9 @@ class RobotRunnerApp:
                 self.root.update_idletasks()
                 self._terminate_process_tree(self.appium_process.pid, "Appium")
             
-            # --- FIX STARTS HERE ---
-            # Replace the old logic with a loop to close all tracked windows properly
             for window in list(self.active_test_windows):
                 if window.winfo_exists():
                     window._on_close()
-            # --- FIX ENDS HERE ---
 
             for window in list(self.active_scrcpy_windows.values()):
                 if window.winfo_exists():
@@ -1281,11 +1402,8 @@ class RobotRunnerApp:
                 return
 
             use_scrcpy = self.use_scrcpy_var.get()
-            # --- FIX STARTS HERE ---
-            # Create the window and add it to our tracking list
             test_win = TestRunnerWindow(self, udid, str(path_to_run), use_scrcpy, run_mode)
             self.active_test_windows.append(test_win)
-            # --- FIX ENDS HERE ---
 
         except Exception as e:
             messagebox.showerror("Execution Error", f"An error occurred: {e}")
@@ -1652,7 +1770,6 @@ class RobotRunnerApp:
         for group, results in grouped_data.items():
             parent_id = self.logs_tree.insert("", END, text=group, values=(group, "", ""), open=True)
 
-            # --- FIX STARTS HERE ---
             if group_by == "Device":
                 suites_in_group = {}
                 for res in results:
@@ -1683,7 +1800,6 @@ class RobotRunnerApp:
                     indented_val = f"    {first_col_val}"
                     self.logs_tree.insert(parent_id, END, values=(indented_val, result["status"], result["time"]),
                                           tags=(result["status"], result["log_path"]))
-            # --- FIX ENDS HERE ---
         
         self.logs_tree.tag_configure("PASS", foreground="green")
         self.logs_tree.tag_configure("FAIL", foreground="red")
@@ -1786,6 +1902,106 @@ def get_device_properties(udid: str) -> Optional[Dict[str, str]]:
         return None
     except Exception:
         return None
+
+# --- Performance Monitor Helper Functions (Integrated) ---
+
+def execute_monitor_command(command: str) -> str:
+    """Executes a shell command for monitoring and returns its output."""
+    try:
+        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                   creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
+        output, err = process.communicate(timeout=10)
+        if err and "daemon not running" in err.decode('utf-8', errors='ignore'):
+            time.sleep(2)
+            return execute_monitor_command(command)
+        if err:
+            return f"Error: {err.decode('utf-8', errors='ignore').strip()}"
+        return output.decode("utf-8", errors='ignore').strip()
+    except subprocess.TimeoutExpired:
+        return "Error: Command timed out"
+    except Exception as e:
+        return f"Unexpected Error: {e}"
+
+def get_surface_view_name(udid: str, app_package: str) -> str:
+    """Finds the full name of the SurfaceView layer for the app package."""
+    output = execute_monitor_command(f"adb -s {udid} shell dumpsys SurfaceFlinger --list")
+    blast_match = re.search(r'(SurfaceView\[.*?{}\S*?\(BLAST\)#\d+)'.format(re.escape(app_package)), output)
+    if blast_match:
+        return blast_match.group(1)
+    match = re.search(r'(SurfaceView\[.*?{}.*?#\d+)'.format(re.escape(app_package)), output)
+    return match.group(1) if match else ""
+
+def get_surface_fps(udid: str, surface_name: str, last_timestamps: set) -> tuple[str, set]:
+    """Calculates FPS by comparing frame timestamps."""
+    if not surface_name:
+        return "N/A", last_timestamps
+    output = execute_monitor_command(f"adb -s {udid} shell dumpsys SurfaceFlinger --latency '{surface_name}'")
+    lines = output.splitlines()
+    current_timestamps = {int(parts[2]) for line in lines[1:] if len(parts := line.split()) == 3 and parts[0] != '0'}
+    if not last_timestamps:
+        return "0.00", current_timestamps
+    new_frames_count = len(current_timestamps - last_timestamps)
+    return f"{float(new_frames_count):.2f}", current_timestamps
+
+def run_performance_monitor(udid: str, app_package: str, output_queue: Queue, stop_event: threading.Event):
+    """Continuously monitors app performance and puts the output in a queue."""
+    output_queue.put(f"Starting monitoring for app '{app_package}' on device '{udid}'...\n")
+    header = f"{'Timestamp':<10} | {'Elapsed':<10} | {'CPU':<5} | {'RAM':<7} | {'GPU':<10} | {'Missed Vsync':<1} | {'Janky':<15} | {'FPS':<4}\n"
+    output_queue.put(header)
+    output_queue.put("-" * len(header) + "\n")
+
+    execute_monitor_command(f"adb -s {udid} shell dumpsys gfxinfo {app_package} reset")
+    time.sleep(0.2)
+
+    last_timestamps = set()
+    start_time = time.time()
+
+    while not stop_event.is_set():
+        try:
+            elapsed_seconds = time.time() - start_time
+            elapsed_time_str = time.strftime("%M:%S", time.gmtime(elapsed_seconds))
+            ts = time.strftime("%H:%M:%S")
+
+            ram_output = execute_monitor_command(f"adb -s {udid} shell dumpsys meminfo {app_package}")
+            ram_mb = "N/A"
+            if "TOTAL" in ram_output and (match := re.search(r"TOTAL\s+(\d+)", ram_output)):
+                ram_mb = f"{int(match.group(1)) / 1024:.2f}"
+
+            cpu_output = execute_monitor_command(f"adb -s {udid} shell dumpsys cpuinfo")
+            cpu_percent = "N/A"
+            if "Error" not in cpu_output:
+                for line in cpu_output.splitlines():
+                    if app_package in line:
+                        parts = line.strip().split()
+                        if parts and '%' in parts[0]:
+                            cpu_percent = parts[0].replace('%', '')
+                            break
+            
+            gfx_output = execute_monitor_command(f"adb -s {udid} shell dumpsys gfxinfo {app_package}")
+            jank_info = "0.00% (0/0)"
+            if jank_match := re.search(r"Janky frames: (\d+) \(([\d.]+)%\)", gfx_output):
+                total_frames = (re.search(r"Total frames rendered: (\d+)", gfx_output) or '?').group(1)
+                jank_info = f"{jank_match.group(2)}% ({jank_match.group(1)}/{total_frames})"
+
+            gpu_mem_kb = "N/A"
+            if gpu_mem_match := re.search(r"Total GPU memory usage:\s+\d+ bytes, ([\d.]+) (KB|MB)", gfx_output):
+                value, unit = float(gpu_mem_match.group(1)), gpu_mem_match.group(2)
+                gpu_mem_kb = f"{value * 1024:.2f}" if unit == "MB" else f"{value:.2f}"
+
+            missed_vsync = (re.search(r"Number Missed Vsync: (\d+)", gfx_output) or "N/A").group(1)
+
+            surface_name = get_surface_view_name(udid, app_package)
+            surface_fps, last_timestamps = get_surface_fps(udid, surface_name, last_timestamps)
+
+            output_line = f"{ts:<10} | {elapsed_time_str:<10} | CPU: {cpu_percent:<5} | RAM: {ram_mb:<7} | GPU: {gpu_mem_kb:<10} | Missed Vsync: {missed_vsync:<1} | Janky: {jank_info:<15} | FPS: {surface_fps:<4}\n"
+            output_queue.put(output_line)
+            
+            # This loop runs roughly every second, driven by the ADB command delays
+        
+        except Exception as e:
+            output_queue.put(f"ERROR in monitoring loop: {e}. Retrying...\n")
+            time.sleep(2)
+
 
 def find_scrcpy() -> Optional[Path]:
     """Tries to find scrcpy.exe in common locations or PATH."""
