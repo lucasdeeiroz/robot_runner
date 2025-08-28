@@ -180,7 +180,7 @@ class ScrcpyFrame(ttk.Frame):
         try:
             self.unique_title = f"scrcpy_{int(time.time() * 1000)}"
             command_with_udid = self.command_template.format(udid=self.udid)
-            command_to_run = f'{command_with_udid} --window-title="{self.unique_title}"'
+            command_to_run = f'{command_with_udid} -m 1024 -b 2M --max-fps=30 --no-audio --window-title="{self.unique_title}"'
 
             creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
             
