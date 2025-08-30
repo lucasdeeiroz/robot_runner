@@ -7,5 +7,5 @@
     "screenshots_dir": "screenshots",
     "recordings_dir": "recordings",
     "theme": "darkly",
-    "app_packages": "com.android.chrome"
+    "app_packages": "com.android.chrome, com.chrome.beta"
 }

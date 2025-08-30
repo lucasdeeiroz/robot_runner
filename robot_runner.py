@@ -61,15 +61,31 @@ class ConsoleRedirector:
         """Flush method is required for stream-like objects."""
         pass
 
-# --- Scrcpy Frame Class (Refactored for reusability) ---
-class ScrcpyFrame(ttk.Frame):
-    """A Frame containing all scrcpy functionality, embeddable in any window."""
-    def __init__(self, parent, parent_app, command_template: str, udid: str, parent_paned_window: Optional[ttk.PanedWindow] = None):
-        super().__init__(parent)
-        self.parent_app = parent_app
-        self.command_template = command_template
+# --- Run Command Window Class (Unified) ---
+class RunCommandWindow(tk.Toplevel):
+    """
+    A unified Toplevel window for running tests and mirroring devices.
+    Features a three-pane layout: Outputs, Controls, and Screen Mirror.
+    """
+    def __init__(self, parent, udid: str, mode: str, run_path: Optional[str] = None, title: Optional[str] = None, run_mode: Optional[str] = None):
+        super().__init__(parent.root)
+        self.parent_app = parent
         self.udid = udid
-        self.parent_paned_window = parent_paned_window
+        self.mode = mode  # 'test' or 'mirror'
+        self.run_path = run_path
+        self.run_mode = run_mode
+
+        # --- State Attributes ---
+        self._is_closing = False
+        self.is_mirroring = False
+
+        # --- Robot Test Attributes ---
+        self.robot_process = None
+        self.robot_output_queue = Queue()
+        self.robot_output_is_visible = (self.mode == 'test')
+
+        # --- Scrcpy Attributes ---
+        self.command_template = self.parent_app.scrcpy_path_var.get() + " -s {udid}"
         self.scrcpy_process = None
         self.scrcpy_hwnd = None
         self.original_style = None
@@ -77,12 +93,10 @@ class ScrcpyFrame(ttk.Frame):
         self.scrcpy_output_queue = Queue()
         self.aspect_ratio = None
         self.resize_job = None
-
         self.is_recording = False
         self.recording_process = None
         self.recording_device_path = ""
         self.scrcpy_output_is_visible = False
-        self._is_closing = False
 
         # --- Performance Monitor Attributes ---
         self.performance_monitor_is_visible = False
@@ -92,88 +106,245 @@ class ScrcpyFrame(ttk.Frame):
         self.performance_output_queue = Queue()
         self.performance_log_file = None
 
+        # --- Window Setup ---
+        window_title = title if title else f"Running: {Path(run_path).name}"
+        self.title(window_title)
+        self.geometry("1200x800")
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         self._setup_widgets()
-        self._start_scrcpy()
+
+        # --- Start Processes ---
+        if self.mode == 'test':
+            self._start_test()
+
+        self.after(100, self._check_robot_output_queue)
         self.after(100, self._check_scrcpy_output_queue)
-        # --- Performance Monitor ---
         self.after(100, self._check_performance_output_queue)
+
         self.bind("<Configure>", self._on_window_resize)
 
+    # --- UI Setup ------------------------------------------------------------------
     def _setup_widgets(self):
-        """Creates the layout for the scrcpy frame."""
-        if hasattr(self.master, 'main_paned_window') and isinstance(self.master.main_paned_window, ttk.PanedWindow):
-             self.main_paned_window = self.master.main_paned_window
-        else:
-            self.main_paned_window = ttk.PanedWindow(self, orient=HORIZONTAL)
-            self.main_paned_window.pack(fill=BOTH, expand=YES)
+        """Sets up the 3-pane widget layout for the window."""
+        self.main_paned_window = ttk.PanedWindow(self, orient=HORIZONTAL)
+        self.main_paned_window.pack(fill=BOTH, expand=YES)
 
-        left_pane_container = ttk.Frame(self.main_paned_window)
-        self.main_paned_window.add(left_pane_container)
+        # --- 1. Left Pane (Outputs) ---
+        self.left_pane_container = ttk.Frame(self.main_paned_window, padding=5)
+        self.output_paned_window = ttk.PanedWindow(self.left_pane_container, orient=VERTICAL)
+        self.output_paned_window.pack(fill=BOTH, expand=YES)
 
-        self.left_paned_window = ttk.PanedWindow(left_pane_container, orient=VERTICAL)
-        self.left_paned_window.pack(fill=BOTH, expand=YES)
+        # Robot Output (only for test mode)
+        if self.mode == 'test':
+            self.robot_output_frame = ttk.LabelFrame(self.output_paned_window, text="Test Output", padding=5)
+            self.robot_output_text = ScrolledText(self.robot_output_frame, wrap=WORD, state=DISABLED, autohide=True)
+            self.robot_output_text.pack(fill=BOTH, expand=YES)
+            self.robot_output_text.text.tag_config("PASS", foreground="green")
+            self.robot_output_text.text.tag_config("FAIL", foreground="red")
+            self.robot_output_text.text.tag_config("INFO", foreground="yellow")
+            self.output_paned_window.add(self.robot_output_frame, weight=1)
 
-        commands_frame = ttk.LabelFrame(self.left_paned_window, text="Scrcpy Controls", padding=10)
-        self.left_paned_window.add(commands_frame, weight=1)
-
-        self.scrcpy_output_frame = ttk.LabelFrame(self.left_paned_window, text="Scrcpy Output", padding=5)
+        # Scrcpy Output
+        self.scrcpy_output_frame = ttk.LabelFrame(self.output_paned_window, text="Scrcpy Output", padding=5)
         self.scrcpy_output_text = ScrolledText(self.scrcpy_output_frame, wrap=WORD, state=DISABLED, autohide=True)
         self.scrcpy_output_text.pack(fill=BOTH, expand=YES)
 
-        self.screenshot_button = ttk.Button(commands_frame, text="Take Screenshot", command=self._take_screenshot)
-        self.screenshot_button.pack(fill=X, pady=5, padx=5)
-        ToolTip(self.screenshot_button, "Takes a screenshot and saves it to the 'screenshots' folder.")
+        # Performance Monitor Output & Controls
+        self.performance_output_frame = ttk.LabelFrame(self.output_paned_window, text="Performance Monitor", padding=5)
 
-        self.record_button = ttk.Button(commands_frame, text="Start Recording", command=self._toggle_recording, bootstyle="primary")
-        self.record_button.pack(fill=X, pady=5, padx=5)
-        ToolTip(self.record_button, "Starts or stops screen recording. Recordings are saved to the 'recordings' folder.")
-
-        self.toggle_output_button = ttk.Button(commands_frame, text="Show Scrcpy Output", command=self._toggle_scrcpy_output_visibility, bootstyle="secondary")
-        self.toggle_output_button.pack(fill=X, pady=5, padx=5)
-        ToolTip(self.toggle_output_button, "Shows or hides the scrcpy output console.")
-
-        # --- Performance Monitor Widgets ---
-        self.toggle_performance_button = ttk.Button(commands_frame, text="Monitor Performance", command=self._toggle_performance_monitor_visibility, bootstyle="info")
-        self.toggle_performance_button.pack(fill=X, pady=5, padx=5)
-        ToolTip(self.toggle_performance_button, "Shows or hides the performance monitor.")
-
-        self.performance_output_frame = ttk.LabelFrame(self.left_paned_window, text="Performance Monitor", padding=5)
-        
-        self.performance_output_text = ScrolledText(self.performance_output_frame, wrap=WORD, state=DISABLED, autohide=True)
-        self.performance_output_text.pack(fill=BOTH, expand=YES, padx=5, pady=5)
-        
         monitor_controls_frame = ttk.Frame(self.performance_output_frame)
-        monitor_controls_frame.pack(fill=X, pady=5, padx=5)
+        monitor_controls_frame.pack(side=TOP, fill=X, pady=(0, 5), padx=5)
         monitor_controls_frame.columnconfigure(0, weight=1)
+        monitor_controls_frame.columnconfigure(1, weight=1)
 
+        self.performance_output_text = ScrolledText(self.performance_output_frame, wrap=WORD, state=DISABLED, autohide=True)
+        self.performance_output_text.pack(fill=BOTH, expand=YES, padx=5, pady=(0,5))
+        
         ttk.Label(monitor_controls_frame, text="App Package:").grid(row=0, column=0, columnspan=2, sticky=W, pady=(0,2))
         self.app_package_combo = ttk.Combobox(monitor_controls_frame, values=self.parent_app.app_packages_var.get().split(','))
         self.app_package_combo.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 5))
         if self.app_package_combo['values']:
             self.app_package_combo.set(self.app_package_combo['values'][0])
-
         self.start_monitor_button = ttk.Button(monitor_controls_frame, text="Start Monitoring", command=self._start_performance_monitor, bootstyle="success")
         self.start_monitor_button.grid(row=2, column=0, sticky="ew", padx=(0, 2))
         self.stop_monitor_button = ttk.Button(monitor_controls_frame, text="Stop Monitoring", command=self._stop_performance_monitor, bootstyle="danger", state=DISABLED)
         self.stop_monitor_button.grid(row=2, column=1, sticky="ew", padx=(2, 0))
-        # --- End of Performance Monitor Widgets ---
 
-        self.embed_frame = ttk.LabelFrame(self.main_paned_window, text="Screen Mirror", padding=5)
-        self.main_paned_window.add(self.embed_frame)
+        # --- 2. Center Pane (Controls) ---
+        self.center_pane_container = ttk.LabelFrame(self.main_paned_window, text="Controls", padding=10)
         
-        self.left_paned_window.add(self.scrcpy_output_frame)
-        self.left_paned_window.forget(self.scrcpy_output_frame)
-        # --- Performance Monitor ---
-        self.left_paned_window.add(self.performance_output_frame)
-        self.left_paned_window.forget(self.performance_output_frame)
+        # Mirroring controls
+        self.mirror_button = ttk.Button(self.center_pane_container, text="Start Mirroring", command=self._toggle_mirroring, bootstyle="info")
+        self.mirror_button.pack(fill=X, pady=5, padx=5)
+        ToolTip(self.mirror_button, "Starts or stops the device screen mirror.")
 
+        # Scrcpy-dependent controls
+        self.screenshot_button = ttk.Button(self.center_pane_container, text="Take Screenshot", command=self._take_screenshot, state=DISABLED)
+        self.screenshot_button.pack(fill=X, pady=5, padx=5)
+        ToolTip(self.screenshot_button, "Takes a screenshot and saves it to the 'screenshots' folder.")
+        
+        self.record_button = ttk.Button(self.center_pane_container, text="Start Recording", command=self._toggle_recording, bootstyle="primary", state=DISABLED)
+        self.record_button.pack(fill=X, pady=5, padx=5)
+        ToolTip(self.record_button, "Starts or stops screen recording.")
+        
+        # Visibility toggles
+        if self.mode == 'test':
+            self.toggle_robot_button = ttk.Button(self.center_pane_container, text="Hide Test Output", command=lambda: self._toggle_output_visibility('robot'), bootstyle="secondary")
+            self.toggle_robot_button.pack(fill=X, pady=5, padx=5)
+
+        self.toggle_scrcpy_out_button = ttk.Button(self.center_pane_container, text="Show Scrcpy Output", command=lambda: self._toggle_output_visibility('scrcpy'), bootstyle="secondary")
+        self.toggle_scrcpy_out_button.pack(fill=X, pady=5, padx=5)
+        
+        self.toggle_perf_button = ttk.Button(self.center_pane_container, text="Show Performance", command=lambda: self._toggle_output_visibility('performance'), bootstyle="secondary")
+        self.toggle_perf_button.pack(fill=X, pady=5, padx=5)
+
+        # Test controls (only for test mode)
+        if self.mode == 'test':
+            separator = ttk.Separator(self.center_pane_container, orient=HORIZONTAL)
+            separator.pack(fill=X, pady=10, padx=5)
+            self.stop_test_button = ttk.Button(self.center_pane_container, text="Stop Test", bootstyle="danger", command=self._stop_test)
+            self.stop_test_button.pack(fill=X, pady=5, padx=5)
+
+        # --- 3. Right Pane (Screen Mirror) ---
+        self.right_pane_container = ttk.LabelFrame(self.main_paned_window, text="Screen Mirror", padding=5)
+        self.embed_frame = self.right_pane_container # for compatibility with old code
+
+        # --- Add panes and set initial state ---
+        self.main_paned_window.add(self.left_pane_container, weight=3)
+        self.main_paned_window.add(self.center_pane_container, weight=1)
+
+        if self.mode != 'test':
+             self.after(100, lambda: self.main_paned_window.sashpos(0, 0)) # Hide left pane
+
+    # --- Visibility & Layout Toggles ---------------------------------------------
+    def _update_left_pane_visibility(self):
+        """Automatically shows or hides the left output pane based on visible content."""
+        is_any_output_visible = self.scrcpy_output_is_visible or self.performance_monitor_is_visible
+        if self.mode == 'test':
+            is_any_output_visible = is_any_output_visible or self.robot_output_is_visible
+
+        try:
+            sash_pos = self.main_paned_window.sashpos(0)
+            is_pane_visible = sash_pos > 10
+
+            if is_any_output_visible and not is_pane_visible:
+                restore_width = getattr(self, '_left_pane_width', 300)
+                self.main_paned_window.sashpos(0, restore_width)
+            elif not is_any_output_visible and is_pane_visible:
+                self._left_pane_width = sash_pos
+                self.main_paned_window.sashpos(0, 0)
+        except tk.TclError:
+            pass # Sash may not exist yet
+
+    def _toggle_output_visibility(self, output_type: str):
+        """Shows or hides a specific output frame in the left pane."""
+        frame_map = {
+            'scrcpy': (self.scrcpy_output_frame, self.toggle_scrcpy_out_button, "Scrcpy Output", self.scrcpy_output_is_visible),
+            'performance': (self.performance_output_frame, self.toggle_perf_button, "Performance", self.performance_monitor_is_visible)
+        }
+        if self.mode == 'test':
+            frame_map['robot'] = (self.robot_output_frame, self.toggle_robot_button, "Test Output", self.robot_output_is_visible)
+
+        if output_type not in frame_map: return
+        
+        frame, button, name, is_visible = frame_map[output_type]
+
+        if is_visible:
+            self.output_paned_window.forget(frame)
+            button.config(text=f"Show {name}")
+        else:
+            self.output_paned_window.add(frame, weight=1)
+            button.config(text=f"Hide {name}")
+
+        # Update state variable
+        if output_type == 'robot': self.robot_output_is_visible = not is_visible
+        elif output_type == 'scrcpy': self.scrcpy_output_is_visible = not is_visible
+        elif output_type == 'performance': self.performance_monitor_is_visible = not is_visible
+
+        self._update_left_pane_visibility()
+
+    def _on_window_resize(self, event=None):
+        """Debounces resize events to adjust aspect ratio."""
+        if self.aspect_ratio:
+            if self.resize_job:
+                self.after_cancel(self.resize_job)
+            self.resize_job = self.after(100, self._adjust_aspect_ratio)
+
+    def _adjust_aspect_ratio(self):
+        """Adjusts paned window sashes to match the device's aspect ratio."""
+        self.resize_job = None
+        if not self.aspect_ratio or not self.is_mirroring: return
+
+        self.update_idletasks()
+        
+        pane_height = self.embed_frame.winfo_height()
+        if pane_height <= 1:
+            self.after(100, self._adjust_aspect_ratio)
+            return
+        
+        ideal_mirror_width = int(pane_height * self.aspect_ratio)
+        try:
+            total_width = self.main_paned_window.winfo_width()
+
+            # Position of sash between center and right panes
+            sash1_pos = total_width - ideal_mirror_width
+            
+            # Enforce minimum width for other panes.
+            min_other_panes_width = 300
+            if sash1_pos < min_other_panes_width:
+                sash1_pos = min_other_panes_width
+            
+            if sash1_pos >= total_width: # prevent error
+                sash1_pos = total_width - 50 # keep mirror visible a bit
+
+            self.main_paned_window.sashpos(1, sash1_pos)
+        except (tk.TclError, AttributeError):
+            pass
+
+    # --- Scrcpy Core Methods -----------------------------------------------------
+    def _toggle_mirroring(self):
+        if self.is_mirroring:
+            self._stop_scrcpy()
+        else:
+            self._start_scrcpy()
 
     def _start_scrcpy(self):
-        """Starts the scrcpy process and management threads in the background."""
+        """Starts the scrcpy process and adds the mirror pane."""
+        if self.is_mirroring: return
+        self.is_mirroring = True
+        
+        self.main_paned_window.add(self.right_pane_container, weight=5)
+        self.update_idletasks()
+        try:
+            # Set an initial position for the new sash to make the pane visible
+            total_width = self.main_paned_window.winfo_width()
+            self.main_paned_window.sashpos(1, int(total_width * 0.6))
+        except tk.TclError:
+            pass # Window may not be fully realized yet. Aspect ratio will fix it later.
+
+        self.mirror_button.config(text="Stop Mirroring", bootstyle="danger")
+        self.screenshot_button.config(state=NORMAL)
+        self.record_button.config(state=NORMAL)
+        
         thread = threading.Thread(target=self._run_and_embed_scrcpy)
         thread.daemon = True
         thread.start()
+
+    def _stop_scrcpy(self):
+        """Stops the scrcpy process and removes the mirror pane."""
+        if not self.is_mirroring: return
+        self.is_mirroring = False
+
+        self.main_paned_window.forget(self.right_pane_container)
+        self.mirror_button.config(text="Start Mirroring", bootstyle="info")
+        self.screenshot_button.config(state=DISABLED)
+        self.record_button.config(state=DISABLED)
+        
+        if self.scrcpy_process and self.scrcpy_process.poll() is None:
+            self._terminate_process_tree(self.scrcpy_process.pid, "scrcpy")
+            self.scrcpy_process = None
+            self.scrcpy_output_queue.put("INFO: Scrcpy stopped by user.\n")
 
     def _run_and_embed_scrcpy(self):
         """Runs scrcpy, captures its output, and embeds its window."""
@@ -181,38 +352,34 @@ class ScrcpyFrame(ttk.Frame):
             self.unique_title = f"scrcpy_{int(time.time() * 1000)}"
             command_with_udid = self.command_template.format(udid=self.udid)
             command_to_run = f'{command_with_udid} -m 1024 -b 2M --max-fps=30 --no-audio --window-title="{self.unique_title}"'
-
             creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
             
             self.scrcpy_process = subprocess.Popen(
-                command_to_run,
-                shell=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                encoding='utf-8',
-                errors='replace',
-                creationflags=creationflags
+                command_to_run, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, encoding='utf-8', errors='replace', creationflags=creationflags
             )
-
             output_thread = threading.Thread(target=self._pipe_scrcpy_output_to_queue)
             output_thread.daemon = True
             output_thread.start()
-
             self._find_and_embed_window()
-
         except Exception as e:
             self.scrcpy_output_queue.put(f"FATAL ERROR: Failed to start scrcpy process.\n{e}\n")
+            self.after(0, self._stop_scrcpy)
 
     def _pipe_scrcpy_output_to_queue(self):
-        """Reads output from the process line-by-line and puts it in a thread-safe queue."""
-        if not self.scrcpy_process: return
-        for line in iter(self.scrcpy_process.stdout.readline, ''):
+        local_scrcpy_process = self.scrcpy_process
+        if not local_scrcpy_process or not local_scrcpy_process.stdout:
+            return
+
+        for line in iter(local_scrcpy_process.stdout.readline, ''):
             self.scrcpy_output_queue.put(line)
-        self.scrcpy_process.stdout.close()
+        
+        try:
+            local_scrcpy_process.stdout.close()
+        except (IOError, AttributeError):
+            pass # Pipe may already be closed or process object gone
 
     def _check_scrcpy_output_queue(self):
-        """Periodically checks the queue and updates the GUI text widget."""
         while not self.scrcpy_output_queue.empty():
             try:
                 line = self.scrcpy_output_queue.get_nowait()
@@ -220,7 +387,6 @@ class ScrcpyFrame(ttk.Frame):
                 self.scrcpy_output_text.insert(END, line)
                 self.scrcpy_output_text.see(END)
                 self.scrcpy_output_text.text.config(state=DISABLED)
-
                 if "INFO: Texture:" in line and not self.aspect_ratio:
                     try:
                         resolution = line.split(":")[-1].strip()
@@ -232,281 +398,167 @@ class ScrcpyFrame(ttk.Frame):
                         pass
             except Empty:
                 pass
+        if self.is_mirroring and self.scrcpy_process and self.scrcpy_process.poll() is not None:
+             self.scrcpy_output_queue.put("\n--- Scrcpy process terminated unexpectedly. ---\n")
+             self._stop_scrcpy()
         self.after(100, self._check_scrcpy_output_queue)
 
-    def _on_window_resize(self, event=None):
-        """Callback for when the main Toplevel window is resized. Debounces events."""
-        if self.aspect_ratio:
-            if self.resize_job:
-                self.after_cancel(self.resize_job)
-            self.resize_job = self.after(100, self._adjust_aspect_ratio)
-
-    def _adjust_aspect_ratio(self):
-        """Adjusts the paned window sash to match the device's aspect ratio."""
-        self.resize_job = None
-        if not self.aspect_ratio:
-            return
-
-        self.update_idletasks()
-
-        pane_height = self.embed_frame.winfo_height()
-        if pane_height <= 1:
-            self.after(100, self._adjust_aspect_ratio)
-            return
-
-        ideal_mirror_width = int(pane_height * self.aspect_ratio)
-
-        try:
-            if self.parent_paned_window:
-                # --- TestRunnerWindow Logic (3 virtual panes) ---
-                total_window_width = self.parent_paned_window.winfo_width()
-                
-                remaining_width = total_window_width - ideal_mirror_width
-                if remaining_width < 300: remaining_width = 300
-                
-                ideal_test_output_width = int(remaining_width * 0.80)
-                ideal_scrcpy_controls_width = int(remaining_width * 0.20)
-
-                self.parent_paned_window.sashpos(0, ideal_test_output_width)
-                self.main_paned_window.sashpos(0, ideal_scrcpy_controls_width)
-
-            else:
-                # --- Standalone ScrcpyEmbedWindow Logic (2 panes) ---
-                total_scrcpy_width = self.main_paned_window.winfo_width()
-                new_sash_pos = total_scrcpy_width - ideal_mirror_width
-                
-                min_controls_width = 150 
-                if new_sash_pos < min_controls_width:
-                    new_sash_pos = min_controls_width
-                
-                self.main_paned_window.sashpos(0, new_sash_pos)
-
-        except tk.TclError:
-            pass
-
     def _find_and_embed_window(self):
-        """Finds the scrcpy window by its unique title, then embeds it."""
         start_time = time.time()
-        
         while time.time() - start_time < 15:
+            if not self.is_mirroring: return # Stop if user cancelled
             hwnd = win32gui.FindWindow(None, self.unique_title)
             if hwnd:
                 self.scrcpy_hwnd = hwnd
                 self.after(0, self._embed_window)
                 return
             time.sleep(0.2)
-        
-        self.scrcpy_output_queue.put(f"ERROR: Could not find scrcpy window with title '{self.unique_title}' in time.\n")
+        self.scrcpy_output_queue.put(f"ERROR: Could not find scrcpy window '{self.unique_title}'.\n")
 
     def _embed_window(self):
-        """Uses pywin32 to embed the found window into a Tkinter frame."""
-        if not self.scrcpy_hwnd: return
-
+        if not self.scrcpy_hwnd or not self.is_mirroring: return
         try:
             if not win32gui.IsWindow(self.scrcpy_hwnd):
-                self.scrcpy_output_queue.put("ERROR: Scrcpy window handle became invalid before embedding.\n")
+                self.scrcpy_output_queue.put("ERROR: Scrcpy handle invalid before embedding.\n")
                 return
-
             container_id = self.embed_frame.winfo_id()
             self.original_parent = win32gui.SetParent(self.scrcpy_hwnd, container_id)
-            
             self.original_style = win32gui.GetWindowLong(self.scrcpy_hwnd, win32con.GWL_STYLE)
             new_style = self.original_style & ~win32con.WS_CAPTION & ~win32con.WS_THICKFRAME
             win32gui.SetWindowLong(self.scrcpy_hwnd, win32con.GWL_STYLE, new_style)
-
             self.embed_frame.update_idletasks()
-            width = self.embed_frame.winfo_width()
-            height = self.embed_frame.winfo_height()
+            width, height = self.embed_frame.winfo_width(), self.embed_frame.winfo_height()
             win32gui.MoveWindow(self.scrcpy_hwnd, 0, 0, width, height, True)
-
             self.embed_frame.bind("<Configure>", self._resize_child)
             self.scrcpy_output_queue.put(f"INFO: Embedded scrcpy window (HWND: {self.scrcpy_hwnd})\n")
         except win32gui.error as e:
-            if e.winerror == 1400: # Invalid window handle
-                self.scrcpy_output_queue.put("ERROR: Failed to embed scrcpy window. The window handle is invalid. Scrcpy might have crashed on startup.\n")
-            else:
-                self.scrcpy_output_queue.put(f"ERROR: A win32 error occurred during embedding: {e}\n")
+            self.scrcpy_output_queue.put(f"ERROR: A win32 error occurred during embedding: {e}\n")
 
     def _resize_child(self, event):
-        """Resizes the embedded scrcpy window when its container frame is resized."""
         if self.scrcpy_hwnd:
-            win32gui.MoveWindow(self.scrcpy_hwnd, 0, 0, event.width, event.height, True)
+            try:
+                win32gui.MoveWindow(self.scrcpy_hwnd, 0, 0, event.width, event.height, True)
+            except win32gui.error as e:
+                if e.winerror == 1400: # Invalid window handle
+                    self.scrcpy_hwnd = None
+                    self.embed_frame.unbind("<Configure>") # Stop listening for resize events
+                else:
+                    raise # Re-raise other unexpected errors
 
-    def _toggle_scrcpy_output_visibility(self):
-        """Shows or hides the Scrcpy Output console."""
-        if self.scrcpy_output_is_visible:
-            self.left_paned_window.forget(self.scrcpy_output_frame)
-            self.toggle_output_button.config(text="Show Scrcpy Output")
-        else:
-            self.left_paned_window.add(self.scrcpy_output_frame, weight=1)
-            self.toggle_output_button.config(text="Hide Scrcpy Output")
-        self.scrcpy_output_is_visible = not self.scrcpy_output_is_visible
-
+    # --- Scrcpy Feature Methods --------------------------------------------------
     def _take_screenshot(self):
-        """Takes a screenshot and saves it locally in a non-blocking thread."""
         self.screenshot_button.config(state=DISABLED)
-        thread = threading.Thread(target=self._take_screenshot_thread)
-        thread.daemon = True
-        thread.start()
+        threading.Thread(target=self._take_screenshot_thread, daemon=True).start()
 
     def _take_screenshot_thread(self):
-        """The actual logic for taking a screenshot."""
         self.scrcpy_output_queue.put("INFO: Taking screenshot...\n")
-        
         screenshots_dir = self.parent_app.screenshots_dir
         screenshots_dir.mkdir(exist_ok=True)
-        
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         device_filename = "/sdcard/screenshot.png"
         local_filename = f"screenshot_{self.udid.replace(':', '-')}_{timestamp}.png"
         local_filepath = screenshots_dir / local_filename
-
         try:
             capture_cmd = f"adb -s {self.udid} shell screencap -p {device_filename}"
             success_cap, out_cap = execute_command(capture_cmd)
             if not success_cap:
                 self.scrcpy_output_queue.put(f"ERROR: Failed to capture screenshot.\n{out_cap}\n")
                 return
-
             pull_cmd = f"adb -s {self.udid} pull {device_filename} \"{local_filepath}\""
             success_pull, out_pull = execute_command(pull_cmd)
             if not success_pull:
                 self.scrcpy_output_queue.put(f"ERROR: Failed to pull screenshot.\n{out_pull}\n")
             else:
                 self.scrcpy_output_queue.put(f"SUCCESS: Screenshot saved to {local_filepath}\n")
-
-            rm_cmd = f"adb -s {self.udid} shell rm {device_filename}"
-            execute_command(rm_cmd)
+            execute_command(f"adb -s {self.udid} shell rm {device_filename}")
         finally:
-            self.master.after(0, lambda: self.screenshot_button.config(state=NORMAL))
+            self.after(0, lambda: self.screenshot_button.config(state=NORMAL))
 
     def _toggle_recording(self):
-        """Starts or stops the screen recording."""
-        if not self.is_recording:
-            self._start_recording()
-        else:
-            self._stop_recording()
+        if not self.is_recording: self._start_recording()
+        else: self._stop_recording()
 
     def _start_recording(self):
-        """Starts a screen recording in a separate thread."""
         self.record_button.config(state=DISABLED)
-        thread = threading.Thread(target=self._start_recording_thread)
-        thread.daemon = True
-        thread.start()
+        threading.Thread(target=self._start_recording_thread, daemon=True).start()
 
     def _start_recording_thread(self):
-        """The actual logic for starting a recording."""
         recordings_dir = self.parent_app.recordings_dir
         recordings_dir.mkdir(exist_ok=True)
-
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         device_filename = f"recording_{timestamp}.mp4"
         self.recording_device_path = f"/sdcard/{device_filename}"
-
         command_list = ["adb", "-s", self.udid, "shell", "screenrecord", self.recording_device_path]
         self.scrcpy_output_queue.put(f"INFO: Starting recording...\n> {' '.join(command_list)}\n")
         try:
             self.recording_process = subprocess.Popen(
-                command_list,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                encoding='utf-8',
-                errors='replace',
+                command_list, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                encoding='utf-8', errors='replace',
                 creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
             )
-            self.master.after(0, self._update_recording_ui, True)
+            self.after(0, self._update_recording_ui, True)
         except Exception as e:
             self.scrcpy_output_queue.put(f"ERROR: Failed to start recording process.\n{e}\n")
-            self.master.after(0, lambda: self.record_button.config(state=NORMAL))
+            self.after(0, lambda: self.record_button.config(state=NORMAL))
 
     def _stop_recording(self):
-        """Stops the screen recording in a separate thread."""
         self.record_button.config(state=DISABLED)
-        thread = threading.Thread(target=self._stop_recording_thread)
-        thread.daemon = True
-        thread.start()
+        threading.Thread(target=self._stop_recording_thread, daemon=True).start()
 
     def _stop_recording_thread(self):
-        """The actual logic for stopping a recording and saving the file."""
         self.scrcpy_output_queue.put("INFO: Stopping recording...\n")
         if not self.recording_process or self.recording_process.poll() is not None:
             self.scrcpy_output_queue.put("ERROR: No active recording process found to stop.\n")
-            self.master.after(0, self._update_recording_ui, False)
+            self.after(0, self._update_recording_ui, False)
             return
-
         try:
-            self.recording_process.send_signal(signal.CTRL_C_EVENT if sys.platform == "win32" else signal.SIGINT)
-            self.recording_process.wait(timeout=10)
-            self.scrcpy_output_queue.put("INFO: Recording process stopped.\n")
-            self.scrcpy_output_queue.put("INFO: Now trying to save the file...\n")
+            self.recording_process.kill()
+            self.scrcpy_output_queue.put("INFO: Recording stopped. Saving file...\n")
         except subprocess.TimeoutExpired:
-            self.scrcpy_output_queue.put("WARNING: Recording process did not stop in time, killing it forcefully.\n")
+            self.scrcpy_output_queue.put("WARNING: Recording process unresponsive, killing it.\n")
             self.recording_process.kill()
         except Exception as e:
-            self.scrcpy_output_queue.put(f"ERROR: An error occurred while stopping the recording: {e}\n")
+            self.scrcpy_output_queue.put(f"ERROR stopping recording: {e}\n")
             self.recording_process.kill()
-
         time.sleep(2)
-
         recordings_dir = self.parent_app.recordings_dir
         local_filename = Path(self.recording_device_path).name
         local_filepath = recordings_dir / f"{self.udid.replace(':', '-')}_{local_filename}"
-
         pull_cmd = f"adb -s {self.udid} pull {self.recording_device_path} \"{local_filepath}\""
         success_pull, out_pull = execute_command(pull_cmd)
         if not success_pull:
             self.scrcpy_output_queue.put(f"ERROR: Failed to pull recording.\n{out_pull}\n")
         else:
             self.scrcpy_output_queue.put(f"SUCCESS: Recording saved to {local_filepath}\n")
-
-        rm_cmd = f"adb -s {self.udid} shell rm {self.recording_device_path}"
-        execute_command(rm_cmd)
-        
-        self.master.after(0, self._update_recording_ui, False)
+        execute_command(f"adb -s {self.udid} shell rm {self.recording_device_path}")
+        self.after(0, self._update_recording_ui, False)
 
     def _update_recording_ui(self, is_recording: bool):
-        """Updates the recording button and state."""
         self.is_recording = is_recording
         if is_recording:
             self.record_button.config(text="Stop Recording", bootstyle="danger")
         else:
             self.record_button.config(text="Start Recording", bootstyle="primary")
         self.record_button.config(state=NORMAL)
-    
-    # --- Performance Monitor Methods ---
-    def _toggle_performance_monitor_visibility(self):
-        """Shows or hides the Performance Monitor frame."""
-        if self.performance_monitor_is_visible:
-            self.left_paned_window.forget(self.performance_output_frame)
-            self.toggle_performance_button.config(text="Monitor Performance")
-        else:
-            self.left_paned_window.add(self.performance_output_frame, weight=2)
-            self.toggle_performance_button.config(text="Hide Monitor")
-        self.performance_monitor_is_visible = not self.performance_monitor_is_visible
 
+    # --- Performance Monitor Methods ---------------------------------------------
     def _start_performance_monitor(self):
-        """Starts the performance monitoring thread."""
         app_package = self.app_package_combo.get()
         if not app_package:
-            messagebox.showwarning("Input Error", "Please select an application package to monitor.", parent=self.winfo_toplevel())
+            messagebox.showwarning("Input Error", "Please select an app package to monitor.", parent=self)
             return
-
         self.is_monitoring = True
         self.stop_monitoring_event.clear()
         self.start_monitor_button.config(state=DISABLED)
         self.stop_monitor_button.config(state=NORMAL)
         self.app_package_combo.config(state=DISABLED)
-
         self.performance_output_text.text.config(state=NORMAL)
         self.performance_output_text.delete("1.0", END)
         self.performance_output_text.text.config(state=DISABLED)
-        
         log_dir = self.parent_app.logs_dir
         log_dir.mkdir(exist_ok=True)
         app_name = app_package.split('.')[-1]
         self.performance_log_file = log_dir / f"performance_log_{app_name}_{self.udid.replace(':', '-')}.txt"
-
         self.performance_thread = threading.Thread(
             target=run_performance_monitor, 
             args=(self.udid, app_package, self.performance_output_queue, self.stop_monitoring_event)
@@ -515,9 +567,8 @@ class ScrcpyFrame(ttk.Frame):
         self.performance_thread.start()
         
     def _stop_performance_monitor(self):
-        """Stops the performance monitoring thread gracefully."""
         if self.is_monitoring:
-            self.stop_monitoring_event.set() # Signal the thread to stop
+            self.stop_monitoring_event.set()
             self.is_monitoring = False
             self.start_monitor_button.config(state=NORMAL)
             self.stop_monitor_button.config(state=DISABLED)
@@ -525,175 +576,36 @@ class ScrcpyFrame(ttk.Frame):
             self.performance_output_queue.put("\n--- Monitoring stopped by user. ---\n")
 
     def _check_performance_output_queue(self):
-        """Periodically checks the performance queue and updates the GUI."""
         while not self.performance_output_queue.empty():
             try:
                 line = self.performance_output_queue.get_nowait()
-                
-                # Update the ScrolledText widget
                 self.performance_output_text.text.config(state=NORMAL)
                 self.performance_output_text.insert(END, line)
                 self.performance_output_text.see(END)
                 self.performance_output_text.text.config(state=DISABLED)
-
-                # Write to the log file
                 if self.performance_log_file:
                     try:
-                        # Overwrite file on first line, append otherwise
                         mode = 'w' if "Starting monitoring" in line else 'a'
-                        with open(self.performance_log_file, mode, encoding='utf-8') as f:
-                            f.write(line)
+                        with open(self.performance_log_file, mode, encoding='utf-8') as f: f.write(line)
                     except Exception as e:
-                        # If file writing fails, put an error in the queue to display it
-                        error_msg = f"\nERROR: Could not write to log file {self.performance_log_file}. Error: {e}\n"
-                        self.performance_output_queue.put(error_msg)
-
+                        self.performance_output_queue.put(f"\nERROR: Could not write to log file. Error: {e}\n")
             except Empty:
                 pass
-        
-        # Check if the thread has finished running
         if self.is_monitoring and (self.performance_thread is None or not self.performance_thread.is_alive()):
              self._stop_performance_monitor()
-
         self.after(100, self._check_performance_output_queue)
 
-
-    def close(self):
-        """Public method to safely close the scrcpy process."""
-        if self._is_closing:
-            return
-        self._is_closing = True
-
-        # --- Stop Performance Monitor if it's running ---
-        if self.is_monitoring:
-            self._stop_performance_monitor()
-
-        def final_close_actions():
-            if self.scrcpy_process and self.scrcpy_process.poll() is None:
-                pid = self.scrcpy_process.pid
-                self.scrcpy_output_queue.put(f"INFO: Terminating scrcpy process tree (Parent PID: {pid})...\n")
-                if sys.platform == "win32":
-                    try:
-                        subprocess.run(
-                            f"taskkill /PID {pid} /T /F",
-                            check=True,
-                            capture_output=True,
-                            creationflags=subprocess.CREATE_NO_WINDOW
-                        )
-                    except (subprocess.CalledProcessError, FileNotFoundError):
-                        self.scrcpy_process.terminate()
-                else:
-                    self.scrcpy_process.terminate()
-
-        if self.is_recording:
-            self.scrcpy_output_queue.put("INFO: Stopping active recording before closing...\n")
-            self.record_button.config(state=DISABLED)
-            self.screenshot_button.config(state=DISABLED)
-
-            def stop_and_close_thread():
-                self._stop_recording_thread()
-                self.master.after(0, final_close_actions)
-
-            threading.Thread(target=stop_and_close_thread, daemon=True).start()
-        else:
-            final_close_actions()
-
-# --- Scrcpy Toplevel Window ---
-class ScrcpyEmbedWindow(tk.Toplevel):
-    """A Toplevel window to display the ScrcpyFrame."""
-    def __init__(self, parent, command_template: str, udid: str, title: str):
-        super().__init__(parent.root)
-        self.title(title)
-        self.geometry("1200x800")
-        
-        self.scrcpy_frame = ScrcpyFrame(self, parent, command_template, udid)
-        self.scrcpy_frame.pack(fill=BOTH, expand=YES)
-        
-        self.protocol("WM_DELETE_WINDOW", self._on_close)
-
-    def _on_close(self):
-        self.scrcpy_frame.close()
-        self.destroy()
-
-# --- Test Runner Window Class ---
-class TestRunnerWindow(tk.Toplevel):
-    """A Toplevel window for running a test and viewing its output."""
-    def __init__(self, parent, udid: str, run_path: str, use_scrcpy: bool, run_mode: str):
-        super().__init__(parent.root)
-        self.parent_app = parent
-        self.udid = udid
-        self.run_path = run_path
-        self.use_scrcpy = use_scrcpy
-        self.run_mode = run_mode
-        self.robot_process = None
-        self.scrcpy_frame_widget = None
-        self.output_queue = Queue()
-        self._is_closing = False
-
-        self.title(f"Running: {Path(run_path).name}")
-        self.geometry("1200x800")
-        self.protocol("WM_DELETE_WINDOW", self._on_close)
-
-        self._setup_widgets()
-        self._start_test()
-        self.after(100, self._check_output_queue)
-        
-        if self.use_scrcpy and self.scrcpy_frame_widget:
-            self.bind("<Configure>", self.scrcpy_frame_widget._on_window_resize)
-
-    def _setup_widgets(self):
-        """Sets up the widgets for the test runner window."""
-        main_frame = ttk.Frame(self, padding=5)
-        main_frame.pack(fill=BOTH, expand=YES)
-
-        self.main_paned_window = ttk.PanedWindow(main_frame, orient=HORIZONTAL)
-        self.main_paned_window.pack(fill=BOTH, expand=YES)
-
-        left_pane_container = ttk.Frame(self.main_paned_window)
-        self.main_paned_window.add(left_pane_container) 
-        left_pane_container.rowconfigure(0, weight=1)
-        left_pane_container.columnconfigure(0, weight=1)
-
-        output_frame = ttk.LabelFrame(left_pane_container, text="Test Output", padding=5)
-        output_frame.grid(row=0, column=0, sticky="nsew")
-        output_frame.rowconfigure(0, weight=1)
-        output_frame.columnconfigure(0, weight=1)
-
-        self.output_text = ScrolledText(output_frame, wrap=WORD, state=DISABLED, autohide=True)
-        self.output_text.grid(row=0, column=0, sticky="nsew")
-        self.output_text.text.tag_config("PASS", foreground="green")
-        self.output_text.text.tag_config("FAIL", foreground="red")
-        self.output_text.text.tag_config("INFO", foreground="yellow")
-
-        controls_frame = ttk.LabelFrame(left_pane_container, text="Test Controls", padding=5)
-        controls_frame.grid(row=1, column=0, sticky="ew", pady=(5, 0))
-        controls_frame.columnconfigure(0, weight=1)
-
-        self.stop_button = ttk.Button(controls_frame, text="Stop Test", bootstyle="danger", command=self._stop_test)
-        self.stop_button.grid(row=0, column=0, sticky="ew")
-
-        if self.use_scrcpy and sys.platform == "win32":
-            scrcpy_command = self.parent_app.scrcpy_path_var.get() + " -s {udid}"
-            
-            scrcpy_container = ttk.Frame(self.main_paned_window)
-            
-            self.scrcpy_frame_widget = ScrcpyFrame(scrcpy_container, self.parent_app, scrcpy_command, self.udid, parent_paned_window=self.main_paned_window)
-            self.scrcpy_frame_widget.pack(fill=BOTH, expand=YES)
-            
-            self.main_paned_window.add(scrcpy_container)
-
+    # --- Robot Test Methods ------------------------------------------------------
     def _start_test(self):
-        """Starts the Robot Framework test."""
         robot_thread = threading.Thread(target=self._run_robot_test)
         robot_thread.daemon = True
         robot_thread.start()
 
     def _run_robot_test(self):
-        """Executes the robot command."""
         try:
             device_info = get_device_properties(self.udid)
             if not device_info:
-                self.output_queue.put(f"ERROR: Could not get device info for {self.udid}\n")
+                self.robot_output_queue.put(f"ERROR: Could not get device info for {self.udid}\n")
                 return
 
             file_path = Path(self.run_path)
@@ -703,131 +615,108 @@ class TestRunnerWindow(tk.Toplevel):
             
             base_command = (
                 f'robot --split-log --logtitle "{device_info["release"]} - {device_info["model"]}" '
-                f'-v udid:"{self.udid}" '
-                f'-v deviceName:"{device_info["model"]}" '
-                f'-v versao_OS:"{device_info["release"]}" '
-                f'-d "{cur_log_dir}" '
-                f'--name "{suite_name}" '
+                f'-v udid:"{self.udid}" -v deviceName:"{device_info["model"]}" -v versao_OS:"{device_info["release"]}" '
+                f'-d "{cur_log_dir}" --name "{suite_name}" '
             )
-
             if self.run_mode == "Suite":
                 command = f'{base_command} --argumentfile ".\\{file_path}"'
             else:
                 command = f'{base_command} ".\\{file_path}"'
 
-            self.output_queue.put(f"Executing command:\n{command}\n\n")
+            self.robot_output_queue.put(f"Executing command:\n{command}\n\n")
 
             creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
-            
             self.robot_process = subprocess.Popen(
-                command,
-                shell=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                encoding='utf-8',
-                errors='replace',
-                creationflags=creationflags
+                command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, encoding='utf-8', errors='replace', creationflags=creationflags
             )
-            
             for line in iter(self.robot_process.stdout.readline, ''):
-                self.output_queue.put(line)
+                self.robot_output_queue.put(line)
             self.robot_process.stdout.close()
-            
             return_code = self.robot_process.wait()
-            self.output_queue.put(f"\n--- Test execution finished with return code: {return_code} ---\n")
+            self.robot_output_queue.put(f"\n--- Test execution finished with return code: {return_code} ---\n")
             
-            self.output_queue.put("--- Generating report with rebot... ---\n")
+            self.robot_output_queue.put("--- Generating report with rebot... ---\n")
             output_xml_path = cur_log_dir / 'output.xml'
             if output_xml_path.exists():
                 rebot_command = f'rebot -d "{cur_log_dir}/" "{output_xml_path}"'
-                self.output_queue.put(f"Executing command:\n{rebot_command}\n\n")
                 rebot_process = subprocess.Popen(
-                    rebot_command,
-                    shell=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    encoding='utf-8',
-                    errors='replace',
-                    creationflags=creationflags
+                    rebot_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                    text=True, encoding='utf-8', errors='replace', creationflags=creationflags
                 )
-                for line in iter(rebot_process.stdout.readline, ''):
-                    self.output_queue.put(line)
+                for line in iter(rebot_process.stdout.readline, ''): self.robot_output_queue.put(line)
                 rebot_process.stdout.close()
-                rebot_return_code = rebot_process.wait()
-                self.output_queue.put(f"\n--- Rebot finished with return code: {rebot_return_code} ---\n")
+                self.robot_output_queue.put(f"\n--- Rebot finished with return code: {rebot_process.wait()} ---\n")
             else:
-                self.output_queue.put("ERROR: output.xml not found. Cannot generate rebot report.\n")
-                
+                self.robot_output_queue.put("ERROR: output.xml not found. Cannot generate rebot report.\n")
         except Exception as e:
-            self.output_queue.put(f"FATAL ERROR: Failed to run robot test.\n{e}\n")
+            self.robot_output_queue.put(f"FATAL ERROR: Failed to run robot test.\n{e}\n")
         finally:
-            self.after(0, lambda: self.stop_button.config(text="Close", command=self._on_close))
+            self.after(0, lambda: self.stop_test_button.config(text="Close", command=self._on_close))
             self.after(0, self.parent_app._load_and_display_logs, True)
 
-    def _check_output_queue(self):
-        """Checks the output queue and updates the text widget."""
-        while not self.output_queue.empty():
+    def _check_robot_output_queue(self):
+        if self.mode != 'test': return
+        while not self.robot_output_queue.empty():
             try:
-                line = self.output_queue.get_nowait()
-                self.output_text.text.config(state=NORMAL)
-                
+                line = self.robot_output_queue.get_nowait()
+                self.robot_output_text.text.config(state=NORMAL)
                 tag = None
-                if "| PASS |" in line:
-                    tag = "PASS"
-                elif "| FAIL |" in line:
-                    tag = "FAIL"
-                elif line.startswith(("Output:", "Log:", "Report:")):
-                    tag = "INFO"
-                
-                self.output_text.insert(END, line, tag)
-                self.output_text.see(END)
-                self.output_text.text.config(state=DISABLED)
+                if "| PASS |" in line: tag = "PASS"
+                elif "| FAIL |" in line: tag = "FAIL"
+                elif line.startswith(("Output:", "Log:", "Report:")): tag = "INFO"
+                self.robot_output_text.insert(END, line, tag)
+                self.robot_output_text.see(END)
+                self.robot_output_text.text.config(state=DISABLED)
             except Empty:
                 pass
-        self.after(100, self._check_output_queue)
+        self.after(100, self._check_robot_output_queue)
 
     def _stop_test(self):
-        """Stops the running robot test."""
-        self.stop_button.config(state=DISABLED)
-        self.output_queue.put("\n--- STOP button clicked. Terminating test... ---\n")
+        self.stop_test_button.config(state=DISABLED)
+        self.robot_output_queue.put("\n--- STOP button clicked. Terminating test... ---\n")
         if self.robot_process and self.robot_process.poll() is None:
-            thread = threading.Thread(target=self._terminate_process_tree, args=(self.robot_process.pid, "robot"))
-            thread.daemon = True
-            thread.start()
+            self._terminate_process_tree(self.robot_process.pid, "robot")
         else:
-            self.output_queue.put("INFO: Robot process was already finished.\n")
+            self.robot_output_queue.put("INFO: Robot process was already finished.\n")
 
+    # --- Window Management -------------------------------------------------------
     def _terminate_process_tree(self, pid: int, name: str):
         """Forcefully terminates a process and its entire tree."""
         try:
             if sys.platform == "win32":
                 subprocess.run(
-                    f"taskkill /PID {pid} /T /F",
-                    check=True,
-                    capture_output=True,
+                    f"taskkill /PID {pid} /T /F", check=True, capture_output=True,
                     creationflags=subprocess.CREATE_NO_WINDOW
                 )
             else:
                 os.killpg(os.getpgid(pid), signal.SIGTERM)
-            self.output_queue.put(f"INFO: {name.capitalize()} process tree (PID: {pid}) terminated.\n")
+            output_q = self.robot_output_queue if name == "robot" else self.scrcpy_output_queue
+            output_q.put(f"INFO: {name.capitalize()} process tree (PID: {pid}) terminated.\n")
         except (subprocess.CalledProcessError, ProcessLookupError, FileNotFoundError) as e:
-            self.output_queue.put(f"WARNING: Could not terminate {name} process tree (PID: {pid}). It might have already finished. Error: {e}\n")
+            print(f"WARNING: Could not terminate {name} process tree (PID: {pid}). Error: {e}")
 
     def _on_close(self):
-        """Handles window closing event."""
-        if self._is_closing:
-            return
+        if self._is_closing: return
         self._is_closing = True
-        
-        self._stop_test()
-        
-        if self.scrcpy_frame_widget:
-            self.scrcpy_frame_widget.close()
 
-        if self in self.parent_app.active_test_windows:
-            self.parent_app.active_test_windows.remove(self)
+        # Stop all background activities
+        if self.mode == 'test' and self.robot_process: self._stop_test()
+        if self.is_monitoring: self._stop_performance_monitor()
+        if self.is_recording:
+            self.scrcpy_output_queue.put("INFO: Stopping active recording before closing...\n")
+            threading.Thread(target=self._stop_recording_thread, daemon=True).start()
+
+        if self.is_mirroring: self._stop_scrcpy()
+
+        # Remove window from parent's active list
+        key_to_remove = None
+        for key, win in self.parent_app.active_command_windows.items():
+            if win is self:
+                key_to_remove = key
+                break
+        if key_to_remove:
+            del self.parent_app.active_command_windows[key_to_remove]
 
         self.destroy()
 
@@ -841,8 +730,7 @@ class RobotRunnerApp:
 
         self.devices: List[Dict[str, str]] = []
         self.appium_process: Optional[subprocess.Popen] = None
-        self.active_test_windows: List[TestRunnerWindow] = []
-        self.active_scrcpy_windows: Dict[str, ScrcpyEmbedWindow] = {}
+        self.active_command_windows: Dict[str, tk.Toplevel] = {}
         self.parsed_logs_data: Optional[List[Dict]] = None
         self.logs_tab_initialized = False
         self._is_closing = False
@@ -959,10 +847,6 @@ class RobotRunnerApp:
         self.refresh_button = ttk.Button(device_frame, text="Refresh", command=self._refresh_devices, bootstyle="secondary")
         self.refresh_button.pack(side=LEFT, padx=5)
         ToolTip(self.refresh_button, "Refreshes the list of connected devices.")
-        
-        self.mirror_button = ttk.Button(device_frame, text="Mirror Screen", command=self._mirror_device, bootstyle="info")
-        self.mirror_button.pack(side=LEFT, padx=5)
-        ToolTip(self.mirror_button, "Opens a separate, resizable screen mirror for the selected device(s).")
 
         test_frame = ttk.LabelFrame(self.run_tab, text="Test Selection", padding=10)
         test_frame.pack(fill=BOTH, expand=YES, pady=5)
@@ -990,17 +874,13 @@ class RobotRunnerApp:
         run_frame = ttk.LabelFrame(self.run_tab, text="Run Controls", padding=10)
         run_frame.pack(fill=X, pady=5)
         run_frame.columnconfigure(0, weight=1)
-
-        self.use_scrcpy_var = tk.BooleanVar(value=(sys.platform == "win32"))
-        scrcpy_check = ttk.Checkbutton(run_frame, text="Use Scrcpy during test", variable=self.use_scrcpy_var)
-        scrcpy_check.grid(row=0, column=0, sticky="e", padx=(0,5), pady=5)
         
-        if sys.platform != "win32":
-            scrcpy_check.config(state=DISABLED)
-            ToolTip(scrcpy_check, "Scrcpy embedding is only supported on Windows.")
+        self.device_options_button = ttk.Button(run_frame, text="Device Options", command=self._mirror_device, bootstyle="info")
+        self.device_options_button.grid(row=0, column=1, sticky="e", padx=(0, 5), pady=5)
+        ToolTip(self.device_options_button, "Opens a window with mirroring and other controls for the selected device(s).")
 
         self.run_button = ttk.Button(run_frame, text="Run Test", command=self._run_test, bootstyle="success")
-        self.run_button.grid(row=0, column=1, sticky="e", padx=5, pady=5)
+        self.run_button.grid(row=0, column=2, sticky="e", padx=5, pady=5)
         ToolTip(self.run_button, "Runs the selected test suite or test on the selected device.")
 
     def _on_run_mode_change(self):
@@ -1342,11 +1222,7 @@ class RobotRunnerApp:
                 self.root.update_idletasks()
                 self._terminate_process_tree(self.appium_process.pid, "Appium")
             
-            for window in list(self.active_test_windows):
-                if window.winfo_exists():
-                    window._on_close()
-
-            for window in list(self.active_scrcpy_windows.values()):
+            for window in list(self.active_command_windows.values()):
                 if window.winfo_exists():
                     window._on_close()
 
@@ -1413,11 +1289,10 @@ class RobotRunnerApp:
                 messagebox.showerror("Error", f"File not found:\n{path_to_run}")
                 return
 
-            use_scrcpy = self.use_scrcpy_var.get()
             for device_str in selected_devices:
                 udid = device_str.split(" | ")[-1]
-                test_win = TestRunnerWindow(self, udid, str(path_to_run), use_scrcpy, run_mode)
-                self.active_test_windows.append(test_win)
+                win = RunCommandWindow(self, udid, mode='test', run_path=str(path_to_run), run_mode=run_mode)
+                self.active_command_windows[f"{udid}_test"] = win
 
         except Exception as e:
             messagebox.showerror("Execution Error", f"An error occurred: {e}")
@@ -1491,13 +1366,13 @@ class RobotRunnerApp:
                 udid = selected_device_str.split(" | ")[-1]
                 model = selected_device_str.split(" | ")[0]
 
-                if udid in self.active_scrcpy_windows and self.active_scrcpy_windows[udid].winfo_exists():
-                    self.active_scrcpy_windows[udid].lift()
+                win_key = f"{udid}_mirror"
+                if win_key in self.active_command_windows and self.active_command_windows[win_key].winfo_exists():
+                    self.active_command_windows[win_key].lift()
                     continue
 
-                command_template = self.scrcpy_path_var.get() + " -s {udid}"
-                scrcpy_win = ScrcpyEmbedWindow(self, command_template, udid, f"Mirror - {model}")
-                self.active_scrcpy_windows[udid] = scrcpy_win
+                scrcpy_win = RunCommandWindow(self, udid, mode='mirror', title=f"Mirror - {model}")
+                self.active_command_windows[win_key] = scrcpy_win
 
         except Exception as e:
             messagebox.showerror("Mirror Error", f"Could not start screen mirror: {e}")
