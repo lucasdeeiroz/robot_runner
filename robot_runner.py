@@ -943,10 +943,18 @@ class RobotRunnerApp:
         device_frame = ttk.LabelFrame(self.run_tab, text="Device Selection", padding=10)
         device_frame.pack(fill=X, pady=5)
         
-        ttk.Label(device_frame, text="Select Device:").pack(side=LEFT, padx=5)
-        self.device_combobox = ttk.Combobox(device_frame, state="readonly", width=50)
-        self.device_combobox.pack(side=LEFT, padx=5, fill=X, expand=YES)
-        ToolTip(self.device_combobox, "Selects the device to run tests on.")
+        ttk.Label(device_frame, text="Select Device(s):").pack(side=LEFT, padx=5)
+        
+        listbox_frame = ttk.Frame(device_frame)
+        listbox_frame.pack(side=LEFT, padx=5, fill=X, expand=YES)
+        
+        scrollbar = ttk.Scrollbar(listbox_frame, orient=VERTICAL)
+        self.device_listbox = tk.Listbox(listbox_frame, selectmode=EXTENDED, exportselection=False, height=4, yscrollcommand=scrollbar.set)
+        scrollbar.config(command=self.device_listbox.yview)
+        
+        scrollbar.pack(side=RIGHT, fill=Y)
+        self.device_listbox.pack(side=LEFT, fill=BOTH, expand=YES)
+        ToolTip(self.device_listbox, "Selects device(s) to run tests on. Use Ctrl+Click or Shift+Click for multiple selections.")
         
         self.refresh_button = ttk.Button(device_frame, text="Refresh", command=self._refresh_devices, bootstyle="secondary")
         self.refresh_button.pack(side=LEFT, padx=5)
@@ -954,7 +962,7 @@ class RobotRunnerApp:
         
         self.mirror_button = ttk.Button(device_frame, text="Mirror Screen", command=self._mirror_device, bootstyle="info")
         self.mirror_button.pack(side=LEFT, padx=5)
-        ToolTip(self.mirror_button, "Opens a separate, resizable screen mirror for the selected device.")
+        ToolTip(self.mirror_button, "Opens a separate, resizable screen mirror for the selected device(s).")
 
         test_frame = ttk.LabelFrame(self.run_tab, text="Test Selection", padding=10)
         test_frame.pack(fill=BOTH, expand=YES, pady=5)
@@ -1374,13 +1382,17 @@ class RobotRunnerApp:
             w.selection_clear(0, END)
             
     def _run_test(self):
-        """Runs the selected test or suite on the selected device."""
+        """Runs the selected test or suite on the selected device(s)."""
         try:
-            selected_device_str = self.device_combobox.get()
-            if not selected_device_str or "No devices" in selected_device_str:
+            selected_device_indices = self.device_listbox.curselection()
+            if not selected_device_indices:
                 messagebox.showerror("Error", "No device selected.")
                 return
-            udid = selected_device_str.split(" | ")[-1]
+
+            selected_devices = [self.device_listbox.get(i) for i in selected_device_indices]
+            if any("No devices" in s for s in selected_devices):
+                messagebox.showerror("Error", "No device selected.")
+                return
 
             selected_indices = self.selection_listbox.curselection()
             if not selected_indices:
@@ -1402,8 +1414,10 @@ class RobotRunnerApp:
                 return
 
             use_scrcpy = self.use_scrcpy_var.get()
-            test_win = TestRunnerWindow(self, udid, str(path_to_run), use_scrcpy, run_mode)
-            self.active_test_windows.append(test_win)
+            for device_str in selected_devices:
+                udid = device_str.split(" | ")[-1]
+                test_win = TestRunnerWindow(self, udid, str(path_to_run), use_scrcpy, run_mode)
+                self.active_test_windows.append(test_win)
 
         except Exception as e:
             messagebox.showerror("Execution Error", f"An error occurred: {e}")
@@ -1461,23 +1475,29 @@ class RobotRunnerApp:
         thread.start()
 
     def _mirror_device(self):
-        """Opens a separate scrcpy window for the selected device."""
+        """Opens a separate scrcpy window for each selected device."""
         try:
-            selected_device_str = self.device_combobox.get()
-            if not selected_device_str or "No devices" in selected_device_str:
+            selected_device_indices = self.device_listbox.curselection()
+            if not selected_device_indices:
                 messagebox.showerror("Error", "No device selected.")
                 return
             
-            udid = selected_device_str.split(" | ")[-1]
-            model = selected_device_str.split(" | ")[0]
-
-            if udid in self.active_scrcpy_windows and self.active_scrcpy_windows[udid].winfo_exists():
-                self.active_scrcpy_windows[udid].lift()
+            selected_devices = [self.device_listbox.get(i) for i in selected_device_indices]
+            if any("No devices" in s for s in selected_devices):
+                messagebox.showerror("Error", "No device selected.")
                 return
 
-            command_template = self.scrcpy_path_var.get() + " -s {udid}"
-            scrcpy_win = ScrcpyEmbedWindow(self, command_template, udid, f"Mirror - {model}")
-            self.active_scrcpy_windows[udid] = scrcpy_win
+            for selected_device_str in selected_devices:
+                udid = selected_device_str.split(" | ")[-1]
+                model = selected_device_str.split(" | ")[0]
+
+                if udid in self.active_scrcpy_windows and self.active_scrcpy_windows[udid].winfo_exists():
+                    self.active_scrcpy_windows[udid].lift()
+                    continue
+
+                command_template = self.scrcpy_path_var.get() + " -s {udid}"
+                scrcpy_win = ScrcpyEmbedWindow(self, command_template, udid, f"Mirror - {model}")
+                self.active_scrcpy_windows[udid] = scrcpy_win
 
         except Exception as e:
             messagebox.showerror("Mirror Error", f"Could not start screen mirror: {e}")
@@ -1496,16 +1516,20 @@ class RobotRunnerApp:
         self.root.after(0, self._update_device_list)
 
     def _update_device_list(self):
-        """Updates the device combobox with the found devices."""
+        """Updates the device listbox with the found devices."""
+        self.device_listbox.delete(0, END)
         if self.devices:
+            self.device_listbox.config(state=NORMAL)
             device_strings = [
                 f"{d['model']} | Android {d['release']} | {d['udid']}"
                 for d in self.devices
             ]
-            self.device_combobox['values'] = device_strings
-            self.device_combobox.set(device_strings[0])
+            for device_string in device_strings:
+                self.device_listbox.insert(END, device_string)
+            self.device_listbox.selection_set(0)
         else:
-            self.device_combobox.set("No devices found")
+            self.device_listbox.insert(END, "No devices found")
+            self.device_listbox.config(state=DISABLED)
         self.refresh_button.config(state=NORMAL)
         self.status_var.set("Ready")
         
