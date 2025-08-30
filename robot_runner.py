@@ -653,7 +653,7 @@ class RunCommandWindow(tk.Toplevel):
             self.robot_output_queue.put(f"FATAL ERROR: Failed to run robot test.\n{e}\n")
         finally:
             self.after(0, lambda: self.stop_test_button.config(text="Close", command=self._on_close))
-            self.after(0, self.parent_app._load_and_display_logs, True)
+            self.after(0, self.parent_app._on_period_change) # Refresh logs view for current period
 
     def _check_robot_output_queue(self):
         if self.mode != 'test': return
@@ -759,6 +759,7 @@ class RobotRunnerApp:
         self.recordings_dir_var = tk.StringVar()
         self.theme_var = tk.StringVar()
         self.group_by_var = tk.StringVar(value="Device")
+        self.log_period_var = tk.StringVar(value="Last 7 Days")
         # --- Performance Monitor ---
         self.app_packages_var = tk.StringVar()
 
@@ -769,7 +770,6 @@ class RobotRunnerApp:
         self.logs_dir = Path(self.logs_dir_var.get())
         self.screenshots_dir = Path(self.screenshots_dir_var.get())
         self.recordings_dir = Path(self.recordings_dir_var.get())
-        self.logs_cache_file = self.logs_dir / "parsed_logs_cache.json"
 
     def _setup_style(self):
         """Configures the application's theme."""
@@ -810,10 +810,7 @@ class RobotRunnerApp:
         if selected_tab == "Tests Logs" and not self.logs_tab_initialized:
             self._setup_logs_tab()
             self.logs_tab_initialized = True
-            self.status_var.set("Parsing logs...")
-            self.root.update_idletasks()
-            self._load_and_display_logs(reparse=True)
-            self.status_var.set("Ready")
+            self._on_period_change()
 
 
     def _initialize_dirs_and_files(self):
@@ -822,9 +819,6 @@ class RobotRunnerApp:
         self.suites_dir.mkdir(exist_ok=True)
         self.tests_dir.mkdir(exist_ok=True)
         self.logs_dir.mkdir(exist_ok=True)
-        if not self.logs_cache_file.exists():
-            with open(self.logs_cache_file, 'w') as f:
-                json.dump([], f)
 
     def _setup_run_tab(self):
         """Configures the 'Run Tests' tab."""
@@ -996,21 +990,39 @@ class RobotRunnerApp:
         logs_controls_frame = ttk.Frame(self.logs_tab)
         logs_controls_frame.pack(fill=X, pady=5)
 
-        ttk.Label(logs_controls_frame, text="Group by:").pack(side=LEFT, padx=5)
-        self.group_by_combobox = ttk.Combobox(logs_controls_frame, textvariable=self.group_by_var,
-                                              values=["Device", "Suite", "Status"], state="readonly")
-        self.group_by_combobox.pack(side=LEFT, padx=5)
+        # --- Left-aligned controls ---
+        left_controls_frame = ttk.Frame(logs_controls_frame)
+        left_controls_frame.pack(side=LEFT, fill=X, expand=True)
+
+        ttk.Label(left_controls_frame, text="Group by:").pack(side=LEFT, padx=(0,5))
+        self.group_by_combobox = ttk.Combobox(left_controls_frame, textvariable=self.group_by_var,
+                                              values=["Device", "Suite", "Status"], state="readonly", width=10)
+        self.group_by_combobox.pack(side=LEFT, padx=(0, 15))
         self.group_by_combobox.bind("<<ComboboxSelected>>", self._on_group_by_selected)
         ToolTip(self.group_by_combobox, "Select how to group the displayed logs.")
 
-        self.reparse_button = ttk.Button(logs_controls_frame, text="Reparse Logs",
-                                    command=lambda: self._load_and_display_logs(reparse=True),
+        ttk.Label(left_controls_frame, text="Period:").pack(side=LEFT, padx=(0,5))
+        self.period_combobox = ttk.Combobox(left_controls_frame, textvariable=self.log_period_var,
+                                        values=["Today", "Last 7 Days", "Last 30 Days", "Last 6 Months", "All Time"], state="readonly")
+        self.period_combobox.pack(side=LEFT, padx=(0, 5))
+        self.period_combobox.bind("<<ComboboxSelected>>", self._on_period_change)
+        ToolTip(self.period_combobox, "Select the time period for the logs to display.")
+
+        # --- Right-aligned controls ---
+        right_controls_frame = ttk.Frame(logs_controls_frame)
+        right_controls_frame.pack(side=RIGHT)
+
+        self.log_cache_info_label = ttk.Label(right_controls_frame, text="No data loaded.")
+        self.log_cache_info_label.pack(side=LEFT, padx=(0, 10))
+
+        self.reparse_button = ttk.Button(right_controls_frame, text="Reparse",
+                                    command=self._start_log_reparse,
                                     bootstyle="secondary")
-        self.reparse_button.pack(side=LEFT, padx=5)
-        ToolTip(self.reparse_button, "Force a full re-parse of all logs in the 'logs' directory.")
+        self.reparse_button.pack(side=LEFT)
+        ToolTip(self.reparse_button, "Force a re-parse of all logs for the selected period.")
 
         self.progress_frame = ttk.Frame(self.logs_tab)
-        self.progress_frame.pack(fill=X, pady=5)
+        # self.progress_frame is packed later when needed
         self.progress_label = ttk.Label(self.progress_frame, text="Parsing...")
         self.progress_bar = ttk.Progressbar(self.progress_frame, mode='determinate')
         ToolTip(self.progress_bar, "Parsing logs... This may take a while depending on the number of logs.")
@@ -1031,6 +1043,7 @@ class RobotRunnerApp:
         self.logs_tree.pack(side=LEFT, fill=BOTH, expand=YES)
         
         self.logs_tree.bind("<Double-1>", self._on_log_double_click)
+        self.logs_tree.tag_configure("no_logs", foreground="gray")
         
     def _setup_settings_tab(self):
         """Configures the 'Settings' tab."""
@@ -1549,28 +1562,92 @@ class RobotRunnerApp:
         thread.daemon = True
         thread.start()
 
-    def _load_and_display_logs(self, reparse: bool = False):
-        """Loads logs from cache or reparses, then displays them."""
+    def _get_cache_path_for_period(self, period: str) -> Path:
+        """Returns the specific cache file path for a given period."""
+        period_map = {
+            "Today": "today",
+            "Last 7 Days": "7d",
+            "Last 30 Days": "30d",
+            "Last 6 Months": "6m",
+            "All Time": "all"
+        }
+        suffix = period_map.get(period, "all")
+        return self.logs_dir / f"parsed_logs_cache_{suffix}.json"
+
+    def _start_log_reparse(self):
+        """Starts the log parsing process based on the selected period."""
         if not self.logs_tab_initialized:
             self._setup_logs_tab()
             self.logs_tab_initialized = True
 
-        if reparse or not self.parsed_logs_data:
-            self.group_by_combobox.config(state=DISABLED)
-            self.reparse_button.config(state=DISABLED)
-            self.progress_frame.pack(fill=X, pady=5)
-            self.progress_label.pack(side=LEFT, padx=(0, 5))
-            self.progress_bar.pack(side=LEFT, fill=X, expand=YES)
-            
-            thread = threading.Thread(target=self._parse_logs_thread)
-            thread.daemon = True
-            thread.start()
-        else:
-            self._display_logs(self.parsed_logs_data)
+        self.group_by_combobox.config(state=DISABLED)
+        self.period_combobox.config(state=DISABLED)
+        self.reparse_button.config(state=DISABLED)
+        self.progress_frame.pack(fill=X, pady=5)
+        self.progress_label.pack(side=LEFT, padx=(0, 5))
+        self.progress_bar.pack(side=LEFT, fill=X, expand=YES)
 
-    def _parse_logs_thread(self):
-        """Parses logs in a background thread to avoid freezing the GUI."""
-        xml_files = list(self.logs_dir.glob("**/output.xml"))
+        selected_period = self.log_period_var.get()
+        thread = threading.Thread(target=self._parse_logs_thread, args=(selected_period,))
+        thread.daemon = True
+        thread.start()
+
+    def _on_period_change(self, event=None):
+        """Handles period selection change by attempting to load a cache file."""
+        if not self.logs_tab_initialized: return
+
+        period = self.log_period_var.get()
+        cache_file = self._get_cache_path_for_period(period)
+
+        for item in self.logs_tree.get_children():
+            self.logs_tree.delete(item)
+        self.parsed_logs_data = []
+
+        if cache_file.exists():
+            try:
+                with open(cache_file, 'r', encoding='utf-8') as f:
+                    self.parsed_logs_data = json.load(f)
+                
+                mtime = os.path.getmtime(cache_file)
+                mtime_str = datetime.datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
+                self.log_cache_info_label.config(text=f"Displaying cache from: {mtime_str}")
+                
+                self._display_logs(self.parsed_logs_data)
+            except (json.JSONDecodeError, IOError) as e:
+                self.log_cache_info_label.config(text=f"Error loading cache: {e}")
+                self.parsed_logs_data = []
+        else:
+            self.log_cache_info_label.config(text="No cache for this period. Click 'Reparse'.")
+            self._display_logs([])
+
+    def _parse_logs_thread(self, period: str):
+        """Parses logs in a background thread based on the selected period."""
+        now = datetime.datetime.now()
+        time_delta = None
+        if period == "Today":
+            start_date = now.date()
+        elif period == "Last 7 Days":
+            time_delta = datetime.timedelta(days=7)
+        elif period == "Last 30 Days":
+            time_delta = datetime.timedelta(days=30)
+        elif period == "Last 6 Months":
+            time_delta = datetime.timedelta(days=180)
+
+        all_xml_files = list(self.logs_dir.glob("**/output.xml"))
+        xml_files = []
+
+        if time_delta:
+            cutoff_time = now - time_delta
+            for f in all_xml_files:
+                if datetime.datetime.fromtimestamp(f.stat().st_mtime) >= cutoff_time:
+                    xml_files.append(f)
+        elif period == "Today":
+            for f in all_xml_files:
+                if datetime.date.fromtimestamp(f.stat().st_mtime) == start_date:
+                    xml_files.append(f)
+        else: # All Time
+            xml_files = all_xml_files
+
         total_files = len(xml_files)
         all_results = []
 
@@ -1597,7 +1674,7 @@ class RobotRunnerApp:
                         
                         try:
                             elapsed_seconds = float(elapsed_element)
-                            elapsed_formatted = str(datetime.timedelta(seconds=elapsed_seconds))
+                            elapsed_formatted = str(datetime.timedelta(seconds=round(elapsed_seconds)))
                         except (ValueError, TypeError):
                             elapsed_formatted = "N/A"
 
@@ -1616,8 +1693,9 @@ class RobotRunnerApp:
             
             self.root.after(0, self._update_parse_progress, i + 1, total_files)
 
+        cache_file_to_save = self._get_cache_path_for_period(period)
         try:
-            with open(self.logs_cache_file, 'w') as f:
+            with open(cache_file_to_save, 'w', encoding='utf-8') as f:
                 json.dump(all_results, f, indent=4)
         except Exception as e:
             print(f"Error writing to log cache file: {e}")
@@ -1632,14 +1710,21 @@ class RobotRunnerApp:
             self.progress_label.config(text=f"Parsing file {current} of {total}...")
         else:
             self.progress_label.config(text="No log files found.")
+            self.progress_bar['value'] = 100
 
     def _finalize_parsing(self, results):
         """Called on the main thread after parsing is complete."""
         self.parsed_logs_data = results
         self.progress_label.pack_forget()
         self.progress_bar.pack_forget()
+        self.progress_frame.pack_forget()
         self.group_by_combobox.config(state="readonly")
+        self.period_combobox.config(state="readonly")
         self.reparse_button.config(state=NORMAL)
+        
+        now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        self.log_cache_info_label.config(text=f"Cache updated: {now_str}")
+        
         self._display_logs(results)
 
     def _display_logs(self, log_data: List[Dict]):
@@ -1648,6 +1733,7 @@ class RobotRunnerApp:
             self.logs_tree.delete(item)
 
         if not log_data:
+            self.logs_tree.insert("", END, values=("No logs found for the selected period.", "", ""), tags=("no_logs",))
             return
 
         group_by = self.group_by_var.get()
@@ -1666,7 +1752,7 @@ class RobotRunnerApp:
                 grouped_data[key] = []
             grouped_data[key].append(result)
 
-        for group, results in grouped_data.items():
+        for group, results in sorted(grouped_data.items()):
             parent_id = self.logs_tree.insert("", END, text=group, values=(group, "", ""), open=True)
 
             if group_by == "Device":
@@ -1678,7 +1764,7 @@ class RobotRunnerApp:
                     suites_in_group[suite_key].append(res)
                 
                 self.logs_tree.heading("suite", text="Suite / Test")
-                for suite_name, tests in suites_in_group.items():
+                for suite_name, tests in sorted(suites_in_group.items()):
                     indented_suite_name = f"    {suite_name}"
                     suite_id = self.logs_tree.insert(parent_id, END, text=suite_name, values=(indented_suite_name, "", ""), open=True)
                     for test in tests:
@@ -1706,16 +1792,15 @@ class RobotRunnerApp:
 
     def _on_group_by_selected(self, event=None):
         """Handles changing the grouping of logs."""
-        if self.parsed_logs_data:
+        if self.parsed_logs_data is not None:
             self._display_logs(self.parsed_logs_data)
-        else:
-            self._load_and_display_logs(reparse=True)
 
     def _on_log_double_click(self, event):
         """Opens the log.html file in the default web browser."""
         try:
             item_id = self.logs_tree.selection()[0]
             item_tags = self.logs_tree.item(item_id, "tags")
+            if "no_logs" in item_tags: return # Do nothing for the placeholder message
             if len(item_tags) > 1:
                 log_path = item_tags[1]
                 if Path(log_path).exists():
