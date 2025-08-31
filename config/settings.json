@@ -6,6 +6,6 @@
     "logs_dir": "logs",
     "screenshots_dir": "screenshots",
     "recordings_dir": "recordings",
-    "theme": "darkly",
+    "theme": "dark",
     "app_packages": "com.android.chrome, com.chrome.beta"
 }
