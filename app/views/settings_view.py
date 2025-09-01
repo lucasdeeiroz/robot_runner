@@ -22,6 +22,7 @@ class SettingsView(ft.Column):
         )
         self.appium_command_field = ft.TextField(label="Appium Command", value=app_state.settings.appium_command)
         self.scrcpy_path_field = ft.TextField(label="Scrcpy Path", value=str(app_state.settings.scrcpy_path))
+        self.scrcpy_args_field = ft.TextField(label="Scrcpy Arguments", value=app_state.settings.scrcpy_args)
         self.suites_dir_field = ft.TextField(label="Suites Directory", value=str(app_state.settings.suites_dir))
         self.tests_dir_field = ft.TextField(label="Tests Directory", value=str(app_state.settings.tests_dir))
         self.logs_dir_field = ft.TextField(label="Logs Directory", value=str(app_state.settings.logs_dir))
@@ -35,6 +36,7 @@ class SettingsView(ft.Column):
             ft.Text("Paths & Commands", size=18),
             self.appium_command_field,
             self.scrcpy_path_field,
+            self.scrcpy_args_field,
             self.suites_dir_field,
             self.tests_dir_field,
             self.logs_dir_field,
@@ -59,6 +61,7 @@ class SettingsView(ft.Column):
             app_state.settings.theme = self.theme_dropdown.value
             app_state.settings.appium_command = self.appium_command_field.value
             app_state.settings.scrcpy_path = self.scrcpy_path_field.value
+            app_state.settings.scrcpy_args = self.scrcpy_args_field.value
             
             # CORRECTED: Convert string paths back to Path objects before assigning
             app_state.settings.suites_dir = Path(self.suites_dir_field.value)

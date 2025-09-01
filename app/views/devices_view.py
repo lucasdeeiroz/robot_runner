@@ -57,4 +57,4 @@ class DevicesView(ft.Column):
 
     def start_mirroring(self, e):
         udid = e.control.data
-        app_state.scrcpy_manager.start_mirroring(udid)
+        app_state.scrcpy_manager.start_mirroring(udid, app_state.settings.scrcpy_args)

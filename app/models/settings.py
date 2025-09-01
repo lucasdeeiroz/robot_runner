@@ -12,6 +12,7 @@ class AppSettings(BaseModel):
     """Defines the application's configuration structure using Pydantic."""
     appium_command: str = "appium --base-path=/wd/hub --relaxed-security"
     scrcpy_path: str = "scrcpy"
+    scrcpy_args: str = "-m 1024 -b 2M --max-fps=30 --no-audio"
     suites_dir: Path = Field(default_factory=lambda: BASE_DIR / "suites")
     tests_dir: Path = Field(default_factory=lambda: BASE_DIR / "tests")
     logs_dir: Path = Field(default_factory=lambda: BASE_DIR / "logs")

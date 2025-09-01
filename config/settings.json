@@ -1,6 +1,7 @@
 {
     "appium_command": "appium --base-path=/wd/hub --relaxed-security",
     "scrcpy_path": "scrcpy",
+    "scrcpy_args": "-m 1024 -b 2M --max-fps=30 --no-audio",
     "suites_dir": "suites",
     "tests_dir": "tests",
     "logs_dir": "logs",

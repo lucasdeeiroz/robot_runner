@@ -1,6 +1,4 @@
 import flet as ft
-import pygetwindow as gw
-import time
 import sys
 from pathlib import Path
 
@@ -20,30 +18,25 @@ def main(page: ft.Page):
     page.window_height = 800
     page.theme_mode = ft.ThemeMode.DARK if app_state.settings.theme == "dark" else ft.ThemeMode.LIGHT
     
+    def on_window_destroy(e):
+        """Cleanup when the app is closed."""
+        app_state.scrcpy_manager.stop_all_mirroring()
+
+    page.on_window_destroy = on_window_destroy
+
     # --- ROUTING LOGIC ---
     def route_change(route):
         page.views.clear()
         
-        # Main View Route
         if page.route == "/":
             page.views.append(
                 ft.View(
                     route="/",
                     controls=[MainView(page)],
                     padding=0,
-                    # CORRECTED HERE: Use the theme color string name
                     appbar=ft.AppBar(title=ft.Text("Robot Runner NG"), bgcolor="surfacevariant")
                 )
             )
-        # Execution View Route
-        elif page.route.startswith("/execute"):
-            udid = page.route.split("/")[-1] 
-            run_mode = page.route.split("/")[-2]
-            run_path = page.client_storage.get("run_path") 
-            if udid and run_path:
-                page.views.append(
-                    ExecutionView(page=page, udid=udid, run_path=run_path, run_mode=run_mode)
-                )
 
         page.update()
 
@@ -55,23 +48,7 @@ def main(page: ft.Page):
     page.on_route_change = route_change
     page.on_view_pop = view_pop
     
-    def on_window_event(e: ft.WindowEvent):
-        """Handles window events to keep scrcpy positioned."""
-        if e.data in ("move", "resize"):
-            try:
-                time.sleep(0.1)
-                main_window = gw.getWindowsWithTitle(page.title)[0]
-                app_state.scrcpy_manager.position_and_resize_window(main_window)
-            except IndexError:
-                pass
-            except Exception as ex:
-                print(f"Error during window event handler: {ex}")
-
-    page.on_window_event = on_window_event
-    
     page.go(page.route or "/")
 
-    page.update()
-
 if __name__ == "__main__":
-    ft.app(target=main)
+    ft.app(target=main, name="Robot Runner NG")

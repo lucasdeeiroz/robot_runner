@@ -2,18 +2,17 @@ import flet as ft
 from pathlib import Path
 from app.state import app_state
 from app.core import adb_manager
+import sys
+import subprocess
 
 class RunView(ft.Column):
-    # ... (__init__ method is the same) ...
     def __init__(self):
         super().__init__(spacing=20, expand=True, scroll=ft.ScrollMode.ADAPTIVE)
         
-        # --- State ---
-        # Ensure current_path is initialized as a Path object
         self.current_path = Path(app_state.settings.suites_dir)
         self.run_mode = "Suite"
-        # ... (rest of __init__)
-        self.device_list = ft.ListView(expand=True, spacing=5, height=150)
+        
+        self.device_list = ft.ListView(expand=True, spacing=5)
         self.run_mode_radio = ft.RadioGroup(
             content=ft.Row([
                 ft.Radio(value="Suite", label="Run by Suite"),
@@ -23,7 +22,7 @@ class RunView(ft.Column):
             on_change=self.on_run_mode_change
         )
         self.current_path_label = ft.Text(f"Path: {self.current_path}", weight=ft.FontWeight.BOLD)
-        self.file_list = ft.ListView(expand=True, spacing=5, height=300)
+        self.file_list = ft.ListView(expand=True, spacing=5)
         self.output_log = ft.ListView(expand=True, spacing=5, auto_scroll=True)
 
         self.controls = [
@@ -32,7 +31,8 @@ class RunView(ft.Column):
                 content=self.device_list, 
                 border=ft.border.all(1, "outlinevariant"), 
                 border_radius=ft.border_radius.all(5),
-                padding=10
+                padding=10,
+                expand=True
             ),
             ft.IconButton(icon="refresh", on_click=self.refresh_devices, tooltip="Refresh Devices"),
             
@@ -43,7 +43,8 @@ class RunView(ft.Column):
                 content=self.file_list, 
                 border=ft.border.all(1, "outlinevariant"), 
                 border_radius=ft.border_radius.all(5),
-                padding=10
+                padding=10,
+                expand=True
             ),
             
             ft.ElevatedButton(
@@ -72,14 +73,11 @@ class RunView(ft.Column):
         """Handles switching between Suite and Test mode."""
         self.run_mode = e.control.value
         if self.run_mode == "Suite":
-            # IMPROVEMENT: Ensure it's a Path object
             self.current_path = Path(app_state.settings.suites_dir)
         else:
-            # IMPROVEMENT: Ensure it's a Path object
             self.current_path = Path(app_state.settings.tests_dir)
         self.populate_file_list()
 
-    # ... (rest of the class methods) ...
     def refresh_devices(self, e):
         """Loads connected devices into the device list."""
         self.device_list.controls.clear()
@@ -132,19 +130,15 @@ class RunView(ft.Column):
         self.populate_file_list()
 
     def run_test(self, e):
-        """Navigates to the ExecutionView to run the test."""
+        """Launches the execution in a new window for each selected device."""
         selected_devices = [cb.data for cb in self.device_list.controls if isinstance(cb, ft.Checkbox) and cb.value]
         
-        # This view doesn't handle multiple device runs simultaneously yet.
-        # We will run on the first selected device.
         if not selected_devices:
             self.page.snack_bar = ft.SnackBar(content=ft.Text("Please select at least one device."), bgcolor="orange")
             self.page.snack_bar.open = True
             self.page.update()
             return
             
-        # A more robust selection method for files is needed. This is a placeholder.
-        # We'll assume the first .robot or .txt file is the target.
         selected_file = None
         for item in self.file_list.controls:
             if isinstance(item, ft.ListTile):
@@ -159,8 +153,12 @@ class RunView(ft.Column):
             self.page.update()
             return
         
-        udid = selected_devices[0]
-        
-        # Store the path to pass to the next view and navigate
-        self.page.client_storage.set("run_path", str(selected_file))
-        self.page.go(f"/execute/{self.run_mode}/{udid}")
+        for udid in selected_devices:
+            command = [
+                sys.executable,
+                "execution_app.py",
+                udid,
+                self.run_mode,
+                str(selected_file)
+            ]
+            subprocess.Popen(command)
