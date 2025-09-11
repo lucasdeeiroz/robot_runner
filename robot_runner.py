@@ -203,6 +203,10 @@ class RunCommandWindow(tk.Toplevel):
         if self.mode == 'test':
             separator = ttk.Separator(self.center_pane_container, orient=HORIZONTAL)
             separator.pack(fill=X, pady=10, padx=5)
+
+            self.repeat_test_button = ttk.Button(self.center_pane_container, text="Repeat Test", command=self._repeat_test)
+            self.close_button = ttk.Button(self.center_pane_container, text="Close", command=self._on_close)
+
             self.stop_test_button = ttk.Button(self.center_pane_container, text="Stop Test", bootstyle="danger", command=self._stop_test)
             self.stop_test_button.pack(fill=X, pady=5, padx=5)
 
@@ -596,7 +600,30 @@ class RunCommandWindow(tk.Toplevel):
         self.after(100, self._check_performance_output_queue)
 
     # --- Robot Test Methods ------------------------------------------------------
+    def _on_test_finished(self):
+        """Configures UI when test is finished."""
+        self.stop_test_button.pack_forget()
+        self.repeat_test_button.pack(fill=X, pady=5, padx=5)
+        self.close_button.pack(fill=X, pady=5, padx=5)
+
+    def _repeat_test(self):
+        """Repeats the test."""
+        self._start_test()
+
+    def _reset_ui_for_test_run(self):
+        """Resets the UI to the initial state for a test run."""
+        self.robot_output_text.text.config(state=NORMAL)
+        self.robot_output_text.delete("1.0", END)
+        self.robot_output_text.text.config(state=DISABLED)
+
+        self.repeat_test_button.pack_forget()
+        self.close_button.pack_forget()
+
+        self.stop_test_button.config(state=NORMAL)
+        self.stop_test_button.pack(fill=X, pady=5, padx=5)
+
     def _start_test(self):
+        self._reset_ui_for_test_run()
         robot_thread = threading.Thread(target=self._run_robot_test)
         robot_thread.daemon = True
         robot_thread.start()
@@ -652,7 +679,7 @@ class RunCommandWindow(tk.Toplevel):
         except Exception as e:
             self.robot_output_queue.put(f"FATAL ERROR: Failed to run robot test.\n{e}\n")
         finally:
-            self.after(0, lambda: self.stop_test_button.config(text="Close", command=self._on_close))
+            self.after(0, self._on_test_finished)
             self.after(0, self.parent_app._on_period_change) # Refresh logs view for current period
 
     def _check_robot_output_queue(self):
