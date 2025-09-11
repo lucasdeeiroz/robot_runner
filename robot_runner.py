@@ -143,6 +143,7 @@ class RunCommandWindow(tk.Toplevel):
             self.robot_output_text.text.tag_config("PASS", foreground="green")
             self.robot_output_text.text.tag_config("FAIL", foreground="red")
             self.robot_output_text.text.tag_config("INFO", foreground="yellow")
+            self.robot_output_text.text.tag_config("LINK", foreground="cyan", underline=True)
             self.output_paned_window.add(self.robot_output_frame, weight=1)
 
         # Scrcpy Output
@@ -688,16 +689,45 @@ class RunCommandWindow(tk.Toplevel):
             try:
                 line = self.robot_output_queue.get_nowait()
                 self.robot_output_text.text.config(state=NORMAL)
-                tag = None
-                if "| PASS |" in line: tag = "PASS"
-                elif "| FAIL |" in line: tag = "FAIL"
-                elif line.startswith(("Output:", "Log:", "Report:")): tag = "INFO"
-                self.robot_output_text.insert(END, line, tag)
+
+                if line.strip().startswith(("Output:", "Log:", "Report:")):
+                    parts = line.split(":", 1)
+                    prefix = parts[0].strip() + ":"
+                    path = parts[1].strip()
+
+                    self.robot_output_text.insert(END, f"{prefix: <8}")
+
+                    link_tag = f"LINK_{time.time()}"
+                    self.robot_output_text.insert(END, path, ("LINK", link_tag))
+                    self.robot_output_text.tag_bind(link_tag, "<Button-1>", lambda e, p=path: self._open_file_path(p))
+                    self.robot_output_text.tag_bind(link_tag, "<Enter>", lambda e: self.robot_output_text.config(cursor="hand2"))
+                    self.robot_output_text.tag_bind(link_tag, "<Leave>", lambda e: self.robot_output_text.config(cursor=""))
+                    self.robot_output_text.insert(END, "\n")
+
+                else:
+                    tag = None
+                    if "| PASS |" in line: tag = "PASS"
+                    elif "| FAIL |" in line: tag = "FAIL"
+                    elif line.startswith("---") or line.startswith("==="): tag = "INFO"
+                    self.robot_output_text.insert(END, line, tag)
+
                 self.robot_output_text.see(END)
                 self.robot_output_text.text.config(state=DISABLED)
             except Empty:
                 pass
         self.after(100, self._check_robot_output_queue)
+
+    def _open_file_path(self, path: str):
+        """Callback to open a file path from a link in the text widget."""
+        try:
+            # Sanitize path, sometimes it might have extra characters
+            clean_path = Path(path.strip())
+            if clean_path.exists():
+                os.startfile(clean_path)
+            else:
+                messagebox.showwarning("File Not Found", f"Could not find file:\n{clean_path}", parent=self)
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not open file: {e}", parent=self)
 
     def _stop_test(self):
         self.stop_test_button.config(state=DISABLED)
