@@ -83,6 +83,7 @@ class RunCommandWindow(tk.Toplevel):
         self.robot_process = None
         self.robot_output_queue = Queue()
         self.robot_output_is_visible = (self.mode == 'test')
+        self.cur_log_dir = None
 
         # --- Scrcpy Attributes ---
         self.command_template = self.parent_app.scrcpy_path_var.get() + " -s {udid}"
@@ -638,13 +639,13 @@ class RunCommandWindow(tk.Toplevel):
 
             file_path = Path(self.run_path)
             suite_name = file_path.stem
-            cur_log_dir = self.parent_app.logs_dir / f"A{device_info['release']}_{device_info['model']}_{self.udid}" / suite_name
-            cur_log_dir.mkdir(parents=True, exist_ok=True)
+            self.cur_log_dir = self.parent_app.logs_dir / f"A{device_info['release']}_{device_info['model']}_{self.udid}" / suite_name
+            self.cur_log_dir.mkdir(parents=True, exist_ok=True)
             
             base_command = (
                 f'robot --split-log --logtitle "{device_info["release"]} - {device_info["model"]}" '
                 f'-v udid:"{self.udid}" -v deviceName:"{device_info["model"]}" -v versao_OS:"{device_info["release"]}" '
-                f'-d "{cur_log_dir}" --name "{suite_name}" '
+                f'-d "{self.cur_log_dir}" --name "{suite_name}" '
             )
             if self.run_mode == "Suite":
                 command = f'{base_command} --argumentfile ".\\{file_path}"'
@@ -664,19 +665,6 @@ class RunCommandWindow(tk.Toplevel):
             return_code = self.robot_process.wait()
             self.robot_output_queue.put(f"\n--- Test execution finished with return code: {return_code} ---\n")
             
-            self.robot_output_queue.put("--- Generating report with rebot... ---\n")
-            output_xml_path = cur_log_dir / 'output.xml'
-            if output_xml_path.exists():
-                rebot_command = f'rebot -d "{cur_log_dir}/" "{output_xml_path}"'
-                rebot_process = subprocess.Popen(
-                    rebot_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                    text=True, encoding='utf-8', errors='replace', creationflags=creationflags
-                )
-                for line in iter(rebot_process.stdout.readline, ''): self.robot_output_queue.put(line)
-                rebot_process.stdout.close()
-                self.robot_output_queue.put(f"\n--- Rebot finished with return code: {rebot_process.wait()} ---\n")
-            else:
-                self.robot_output_queue.put("ERROR: output.xml not found. Cannot generate rebot report.\n")
         except Exception as e:
             self.robot_output_queue.put(f"FATAL ERROR: Failed to run robot test.\n{e}\n")
         finally:
@@ -708,7 +696,7 @@ class RunCommandWindow(tk.Toplevel):
                     tag = None
                     if "| PASS |" in line: tag = "PASS"
                     elif "| FAIL |" in line: tag = "FAIL"
-                    elif line.startswith("---") or line.startswith("==="): tag = "INFO"
+                    elif line.startswith("---"): tag = "INFO"
                     self.robot_output_text.insert(END, line, tag)
 
                 self.robot_output_text.see(END)
