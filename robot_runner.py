@@ -1465,8 +1465,10 @@ class RobotRunnerApp:
                 return
 
             for selected_device_str in selected_devices:
-                udid = selected_device_str.split(" | ")[-1]
-                model = selected_device_str.split(" | ")[0]
+                parts = selected_device_str.split(" | ")
+                model = parts[1].strip()
+                udid_with_status = parts[-1]
+                udid = udid_with_status.split(" ")[0]
 
                 win_key = f"{udid}_mirror"
                 if win_key in self.active_command_windows and self.active_command_windows[win_key].winfo_exists():
@@ -1489,7 +1491,8 @@ class RobotRunnerApp:
 
     def _get_devices_thread(self):
         """Gets device list in a background thread to avoid freezing the GUI."""
-        self.devices = get_connected_devices(self.appium_version)
+        appium_command = self.appium_command_var.get()
+        self.devices = get_connected_devices(appium_command)
         self.root.after(0, self._update_device_list)
 
     def _update_device_list(self):
@@ -1588,6 +1591,7 @@ class RobotRunnerApp:
 
     def _toggle_appium_server(self):
         """Starts or stops the Appium server via the Settings tab button."""
+        # If we have a process handle, we can stop it.
         if self.appium_process and self.appium_process.poll() is None:
             self.status_var.set("Stopping Appium server...")
             self.toggle_appium_button.config(state=DISABLED)
@@ -1596,6 +1600,10 @@ class RobotRunnerApp:
             thread = threading.Thread(target=self._terminate_process_tree, args=(self.appium_process.pid, "Appium"))
             thread.daemon = True
             thread.start()
+        # If there's no process handle, check if a server is running externally before starting.
+        elif self._is_appium_running():
+             messagebox.showwarning("Appium Running", "An Appium server is already running on the configured address. "
+                                                    "Please stop it manually or from the other process if you want to start a new one here.")
         else:
             self._start_appium_server(silent=False)
 
@@ -1705,35 +1713,23 @@ class RobotRunnerApp:
     def _is_appium_running(self) -> bool:
         """Checks if the Appium server is running and accessible by checking its status endpoint."""
         command = self.appium_command_var.get()
-        base_url = "http://127.0.0.1:4723"
+        host, port, base_path = _parse_appium_command(command)
+
+        # Appium 1.x used /wd/hub/status, Appium 2+ uses /status
+        # We'll try the configured path first, then the fallback.
+        primary_path = f"{base_path}/status".replace('//', '/')
+        primary_url = f"http://{host}:{port}{primary_path}"
         
-        path = "/status"  # Default for Appium 2.x
-
-        # Check for --base-path argument, supporting both space and equals separators
-        match = re.search(r'--base-path[ =]([/\w.-]+)', command)
-        if not match:
-            # Also support --base-path=/my/path without a space
-            match = re.search(r'--base-path=([/\w.-]+)', command)
-
-        if match:
-            base_path = match.group(1)
-            # Correctly join base_path and status endpoint to avoid double slashes
-            if base_path.endswith('/'):
-                path = f"{base_path}status"
-            else:
-                path = f"{base_path}/status"
-        
-        status_url = f"{base_url}{path}"
-
         try:
-            with urllib.request.urlopen(status_url, timeout=1) as response:
+            with urllib.request.urlopen(primary_url, timeout=2) as response:
                 return response.status == 200
         except Exception:
-            # Fallback for default Appium 1.x path if the constructed path fails
-            # and no explicit base path was found in the command.
-            if not match:
+            # If the primary URL fails and no base path was explicitly set,
+            # try the legacy /wd/hub/status endpoint.
+            if not re.search(r'--base-path', command):
+                legacy_url = f"http://{host}:{port}/wd/hub/status"
                 try:
-                    with urllib.request.urlopen(f"{base_url}/wd/hub/status", timeout=1) as response:
+                    with urllib.request.urlopen(legacy_url, timeout=2) as response:
                         return response.status == 200
                 except Exception:
                     return False
@@ -2041,15 +2037,15 @@ def execute_command(command: str) -> Tuple[bool, str]:
     except Exception as e:
         return False, f"An unexpected error occurred: {e}"
 
-def get_connected_devices(appium_version: Optional[str] = None) -> List[Dict[str, str]]:
+def get_connected_devices(appium_command: Optional[str] = None) -> List[Dict[str, str]]:
     """Returns a list of dictionaries, each representing a connected device."""
-    busy_udids = _get_busy_udids(appium_version)
+    busy_udids = _get_busy_udids(appium_command)
     success, output = execute_command("adb devices -l")
     if not success:
         return []
     
     devices = []
-    lines = output.strip().split('\n')[1:]
+    lines = output.strip().splitlines()[1:]
     for line in lines:
         if "device" in line and "unauthorized" not in line:
             parts = line.split()
@@ -2187,27 +2183,68 @@ def find_scrcpy() -> Optional[Path]:
     except (subprocess.CalledProcessError, FileNotFoundError):
         return None
 
-def _get_busy_udids(appium_version: Optional[str]) -> set:
+def _parse_appium_command(appium_command: Optional[str]) -> Tuple[str, int, str]:
+    """Parses the Appium command string to extract host, port, and base path."""
+    host = "127.0.0.1"
+    port = 4723
+    base_path = "" # Represents '/'
+
+    if appium_command:
+        parts = appium_command.split()
+        try:
+            if "--address" in parts:
+                host = parts[parts.index("--address") + 1]
+        except IndexError:
+            pass
+        try:
+            if "--port" in parts:
+                port = int(parts[parts.index("--port") + 1])
+        except (IndexError, ValueError):
+            pass
+        try:
+            if "--base-path" in parts:
+                base_path = parts[parts.index("--base-path") + 1]
+        except IndexError:
+            pass
+        
+        # Also handle --arg=value
+        for part in parts:
+            if part.startswith("--address="):
+                host = part.split("=")[1]
+            if part.startswith("--port="):
+                try:
+                    port = int(part.split("=")[1])
+                except (IndexError, ValueError):
+                    pass
+            if part.startswith("--base-path="):
+                base_path = part.split("=")[1]
+
+        # Ensure base_path starts with a slash if it exists
+        if base_path and not base_path.startswith('/'):
+            base_path = '/' + base_path
+            
+    return host, port, base_path
+
+def _get_busy_udids(appium_command: Optional[str]) -> set:
     """
     Checks Appium server for active sessions and returns a set of UDIDs for devices in use.
     """
-    host = "127.0.0.1"
-    port = 4723
+    host, port, base_path = _parse_appium_command(appium_command)
+
+    # We need to determine the correct sessions endpoint.
+    # We can try the configured path first, then a legacy fallback.
+    primary_sessions_path = f"{base_path}/sessions".replace('//', '/')
+    primary_sessions_url = f"http://{host}:{port}{primary_sessions_path}"
     
-    try:
-        with urllib.request.urlopen(f"http://{host}:{port}/status", timeout=1) as response:
-            if response.status != 200:
-                return set()
-    except Exception:
-        return set()
+    urls_to_try = [primary_sessions_url]
+    
+    # If no base path was specified, also try the legacy endpoint.
+    if not re.search(r'--base-path', appium_command or ""):
+        legacy_sessions_url = f"http://{host}:{port}/wd/hub/sessions"
+        if legacy_sessions_url != primary_sessions_url:
+             urls_to_try.append(legacy_sessions_url)
 
-    # Appium v2 uses /sessions, v3 uses /appium/sessions. We try the most likely one first.
-    session_endpoints = []
-    if appium_version and appium_version.startswith('3.'):
-        session_endpoints.append(f"http://{host}:{port}/appium/sessions")
-    session_endpoints.append(f"http://{host}:{port}/sessions")
-
-    for endpoint in session_endpoints:
+    for endpoint in urls_to_try:
         try:
             with urllib.request.urlopen(endpoint, timeout=2) as response:
                 if response.status == 200:
@@ -2224,6 +2261,7 @@ def _get_busy_udids(appium_version: Optional[str]) -> set:
             continue # Try the next endpoint if one fails
             
     return set()
+
 
 
 def load_theme_setting():
