@@ -696,7 +696,7 @@ class RunCommandWindow(tk.Toplevel):
                     tag = None
                     if "| PASS |" in line: tag = "PASS"
                     elif "| FAIL |" in line: tag = "FAIL"
-                    elif line.startswith("---"): tag = "INFO"
+                    # elif line.startswith("---"): tag = "INFO"
                     self.robot_output_text.insert(END, line, tag)
 
                 self.robot_output_text.see(END)
@@ -779,6 +779,7 @@ class RobotRunnerApp:
         self.parsed_logs_data: Optional[List[Dict]] = None
         self.logs_tab_initialized = False
         self._is_closing = False
+        self.appium_version: Optional[str] = None
 
         self._setup_string_vars()
         self._load_settings()
@@ -791,6 +792,7 @@ class RobotRunnerApp:
         
         self.root.after(100, self._refresh_devices)
         self.root.after(200, self._check_scrcpy_version)
+        self.root.after(300, self._check_appium_version)
 
     def _setup_string_vars(self):
         """Initializes all Tkinter StringVars."""
@@ -1316,44 +1318,86 @@ class RobotRunnerApp:
             w.selection_clear(0, END)
             
     def _run_test(self):
-        """Runs the selected test or suite on the selected device(s)."""
+        """
+        Validates selections and starts the test execution process in a background thread
+        to keep the UI responsive.
+        """
         try:
             selected_device_indices = self.device_listbox.curselection()
             if not selected_device_indices:
-                messagebox.showerror("Error", "No device selected.")
+                messagebox.showerror("Error", "No device selected.", parent=self.root)
                 return
 
             selected_devices = [self.device_listbox.get(i) for i in selected_device_indices]
             if any("No devices" in s for s in selected_devices):
-                messagebox.showerror("Error", "No device selected.")
+                messagebox.showerror("Error", "No device selected.", parent=self.root)
                 return
+
+            # Check for busy devices
+            busy_devices_selected = [s for s in selected_devices if "Busy" in s]
+            if busy_devices_selected:
+                if not messagebox.askyesno("Busy Device Warning",
+                                           f"The following device(s) are marked as busy:\n"
+                                           f"{ ''.join(busy_devices_selected)}\n\n"
+                                           f"Running a test might fail or disrupt an ongoing session. "
+                                           f"Do you want to continue anyway?", parent=self.root):
+                    return
 
             selected_indices = self.selection_listbox.curselection()
             if not selected_indices:
-                messagebox.showerror("Error", "No test or suite file selected.")
+                messagebox.showerror("Error", "No test or suite file selected.", parent=self.root)
                 return
-            
+
             selected_filename = self.selection_listbox.get(selected_indices[0])
-            
-            if selected_filename.startswith("["): # It's a folder or back button
-                messagebox.showwarning("Invalid Selection", "Please select a valid test or suite file to run.")
+            if selected_filename.startswith("["):  # It's a folder or back button
+                messagebox.showwarning("Invalid Selection", "Please select a valid test or suite file to run.", parent=self.root)
                 return
 
             run_mode = self.run_mode_var.get()
-            
             path_to_run = self.current_path / selected_filename
 
             if not path_to_run.exists():
-                messagebox.showerror("Error", f"File not found:\n{path_to_run}")
+                messagebox.showerror("Error", f"File not found:\n{path_to_run}", parent=self.root)
                 return
 
-            for device_str in selected_devices:
-                udid = device_str.split(" | ")[-1]
-                win = RunCommandWindow(self, udid, mode='test', run_path=str(path_to_run), run_mode=run_mode)
-                self.active_command_windows[f"{udid}_test"] = win
+            # All checks passed, start the background thread
+            thread = threading.Thread(target=self._run_test_thread, args=(selected_devices, str(path_to_run), run_mode))
+            thread.daemon = True
+            thread.start()
 
         except Exception as e:
-            messagebox.showerror("Execution Error", f"An error occurred: {e}")
+            messagebox.showerror("Execution Error", f"An unexpected error occurred: {e}", parent=self.root)
+
+    def _run_test_thread(self, selected_devices: List[str], path_to_run: str, run_mode: str):
+        """
+        This method runs in a background thread to prevent UI freezing.
+        It ensures Appium is running, then schedules the creation of test windows on the main thread.
+        """
+        try:
+            self.root.after(0, self.run_button.config, {'state': DISABLED, 'text': "Checking Appium..."})
+            # 1. Check for Appium and start it if necessary (this part can block)
+            if not self._is_appium_running():
+                self.root.after(0, self.status_var.set, "Appium server not found. Starting it automatically...")
+                self.root.after(0, self.run_button.config, {'text': "Starting Appium..."})
+                self._start_appium_server(silent=True)
+                if not self._wait_for_appium_startup(timeout=20):
+                    self.root.after(0, messagebox.showerror, "Appium Error", "Failed to start the Appium server. Check the logs in the Settings tab.")
+                    self.root.after(0, self.status_var.set, "Ready")
+                    return
+                self.root.after(0, self.status_var.set, "Appium server started. Running tests...")
+
+            # 2. Schedule the creation of a RunCommandWindow for each device on the main thread
+            for device_str in selected_devices:
+                udid_with_status = device_str.split(" | ")[-1]
+                udid = udid_with_status.split(" ")[0]
+                self.root.after(0, self._create_run_command_window, udid, path_to_run, run_mode)
+        finally:
+            self.root.after(0, self.run_button.config, {'state': NORMAL, 'text': "Run Test"})
+
+    def _create_run_command_window(self, udid: str, path_to_run: str, run_mode: str):
+        """Helper to safely create the RunCommandWindow from the main GUI thread."""
+        win = RunCommandWindow(self, udid, mode='test', run_path=path_to_run, run_mode=run_mode)
+        self.active_command_windows[f"{udid}_test"] = win
 
     def _pair_wireless_device(self):
         """Pairs with a device wirelessly using a pairing code."""
@@ -1438,33 +1482,44 @@ class RobotRunnerApp:
     def _refresh_devices(self):
         """Refreshes the list of connected ADB devices."""
         self.status_var.set("Refreshing devices...")
-        self.refresh_button.config(state=DISABLED)
+        self.refresh_button.config(state=DISABLED, text="Refreshing...")
         thread = threading.Thread(target=self._get_devices_thread)
         thread.daemon = True
         thread.start()
 
     def _get_devices_thread(self):
         """Gets device list in a background thread to avoid freezing the GUI."""
-        self.devices = get_connected_devices()
+        self.devices = get_connected_devices(self.appium_version)
         self.root.after(0, self._update_device_list)
 
     def _update_device_list(self):
         """Updates the device listbox with the found devices."""
+        selected_indices = self.device_listbox.curselection()
         self.device_listbox.delete(0, END)
         if self.devices:
             self.device_listbox.config(state=NORMAL)
-            device_strings = [
-                f"{d['model']} | Android {d['release']} | {d['udid']}"
-                for d in self.devices
-            ]
-            for device_string in device_strings:
+            for i, d in enumerate(self.devices):
+                status = d.get('status', 'Available')
+                device_string = f"Android {d['release']} | {d['model']} | {d['udid']} ({status})"
                 self.device_listbox.insert(END, device_string)
-            self.device_listbox.selection_set(0)
+                
+                color = "red" if status == "Busy" else "#43b581" # Use a less jarring green
+                self.device_listbox.itemconfig(i, foreground=color)
+
+            # Restore selection
+            for index in selected_indices:
+                if index < self.device_listbox.size():
+                    self.device_listbox.selection_set(index)
+            if not self.device_listbox.curselection() and self.device_listbox.size() > 0:
+                 self.device_listbox.selection_set(0)
         else:
             self.device_listbox.insert(END, "No devices found")
             self.device_listbox.config(state=DISABLED)
-        self.refresh_button.config(state=NORMAL)
-        self.status_var.set("Ready")
+        
+        self.refresh_button.config(state=NORMAL, text="Refresh")
+        # Only set status to ready if it was refreshing, to not overwrite other statuses
+        if "Refreshing" in self.status_var.get():
+            self.status_var.set("Ready")
         
     def _check_scrcpy_version(self):
         """Checks for scrcpy and offers to download if not found."""
@@ -1532,43 +1587,56 @@ class RobotRunnerApp:
             self.root.after(0, self.status_var.set, "Ready")
 
     def _toggle_appium_server(self):
-        """Starts or stops the Appium server."""
+        """Starts or stops the Appium server via the Settings tab button."""
         if self.appium_process and self.appium_process.poll() is None:
             self.status_var.set("Stopping Appium server...")
             self.toggle_appium_button.config(state=DISABLED)
             
+            # Use a thread to avoid blocking while terminating
             thread = threading.Thread(target=self._terminate_process_tree, args=(self.appium_process.pid, "Appium"))
             thread.daemon = True
             thread.start()
         else:
+            self._start_appium_server(silent=False)
+
+    def _start_appium_server(self, silent: bool = False):
+        """
+        Starts the Appium server in a background thread.
+        If silent, UI button states are not changed directly.
+        """
+        if not silent:
             self.status_var.set("Starting Appium server...")
             self.toggle_appium_button.config(state=DISABLED)
-            thread = threading.Thread(target=self._start_appium_thread)
-            thread.daemon = True
-            thread.start()
+        
+        thread = threading.Thread(target=self._appium_server_handler, args=(silent,))
+        thread.daemon = True
+        thread.start()
 
-    def _start_appium_thread(self):
-        """Runs the appium server in a background thread."""
+    def _appium_server_handler(self, silent: bool):
+        """
+        The core handler for running the Appium server process and piping its output.
+        This method runs in a separate thread.
+        """
         try:
             command = self.appium_command_var.get()
-            self.root.after(0, self._update_output_text, self.appium_output_text, f"> {command}\n", True)
+            # Clear and show command in output only when user starts it manually
+            clear_output = not silent
+            self.root.after(0, self._update_output_text, self.appium_output_text, f"> {command}\n", clear_output)
             
             creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
             self.appium_process = subprocess.Popen(
-                command,
-                shell=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                encoding='utf-8',
-                errors='replace',
-                creationflags=creationflags
+                command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, encoding='utf-8', errors='replace', creationflags=creationflags,
+                preexec_fn=os.setsid if sys.platform != "win32" else None
             )
 
+            # Update UI state
             self.root.after(0, lambda: self.appium_status_label.configure(text="Status: Running", bootstyle="success"))
-            self.root.after(0, lambda: self.toggle_appium_button.configure(text="Stop Appium", bootstyle="danger", state=NORMAL))
-            self.root.after(0, self.status_var.set, "Appium server running.")
+            if not silent:
+                self.root.after(0, lambda: self.toggle_appium_button.configure(text="Stop Appium", bootstyle="danger", state=NORMAL))
+                self.root.after(0, self.status_var.set, "Appium server running.")
 
+            # Pipe output to the GUI
             for line in iter(self.appium_process.stdout.readline, ''):
                 if self._is_closing or self.appium_process.poll() is not None:
                     break
@@ -1581,17 +1649,17 @@ class RobotRunnerApp:
         except FileNotFoundError:
             self.root.after(0, messagebox.showerror, "Error", "Appium command not found. Make sure it is installed and in your system's PATH.")
             self.root.after(0, lambda: self.appium_status_label.configure(text="Status: Error", bootstyle="danger"))
-            self.root.after(0, lambda: self.toggle_appium_button.config(state=NORMAL))
         except Exception as e:
             self.root.after(0, messagebox.showerror, "Error", f"Failed to start Appium server: {e}")
             self.root.after(0, lambda: self.appium_status_label.configure(text="Status: Error", bootstyle="danger"))
-            self.root.after(0, lambda: self.toggle_appium_button.config(state=NORMAL))
         finally:
             self.appium_process = None
             if not self._is_closing:
+                # Always reset the UI to a consistent 'stopped' state
                 self.root.after(0, lambda: self.appium_status_label.configure(text="Status: Stopped", bootstyle="danger"))
                 self.root.after(0, lambda: self.toggle_appium_button.configure(text="Start Appium", bootstyle="primary", state=NORMAL))
-                self.root.after(0, self.status_var.set, "Appium server stopped.")
+                if not silent:
+                    self.root.after(0, self.status_var.set, "Appium server stopped.")
 
     def _run_manual_adb_command(self):
         """Runs a manual ADB command entered by the user."""
@@ -1606,6 +1674,79 @@ class RobotRunnerApp:
         thread = threading.Thread(target=self._run_command_and_update_gui, args=(full_command, self.adb_tools_output_text, self.run_adb_button))
         thread.daemon = True
         thread.start()
+
+    def _check_appium_version(self):
+        """Checks the installed Appium version in a background thread."""
+        def check_thread():
+            try:
+                command = "appium --version"
+                success, output = execute_command(command)
+                if success and output:
+                    version_match = re.search(r'(\d+\.\d+\.\d+)', output)
+                    if version_match:
+                        self.appium_version = version_match.group(1)
+                        self.root.after(0, lambda: self.status_var.set(f"Ready | Appium v{self.appium_version} detected."))
+                    else:
+                        self.appium_version = "Unknown"
+                        self.root.after(0, lambda: self.status_var.set("Ready | Appium version format not recognized."))
+                else:
+                    self.appium_version = None
+                    self.root.after(0, lambda: messagebox.showwarning(
+                        "Appium Not Found",
+                        "Appium command not found. Please ensure Appium is installed (e.g., 'npm install -g appium') and accessible in your system's PATH."
+                    ))
+                    self.root.after(0, lambda: self.status_var.set("Ready | Appium not found."))
+            except Exception as e:
+                self.appium_version = None
+                self.root.after(0, lambda: self.status_var.set(f"Error checking Appium version: {e}"))
+
+        threading.Thread(target=check_thread, daemon=True).start()
+
+    def _is_appium_running(self) -> bool:
+        """Checks if the Appium server is running and accessible by checking its status endpoint."""
+        command = self.appium_command_var.get()
+        base_url = "http://127.0.0.1:4723"
+        
+        path = "/status"  # Default for Appium 2.x
+
+        # Check for --base-path argument, supporting both space and equals separators
+        match = re.search(r'--base-path[ =]([/\w.-]+)', command)
+        if not match:
+            # Also support --base-path=/my/path without a space
+            match = re.search(r'--base-path=([/\w.-]+)', command)
+
+        if match:
+            base_path = match.group(1)
+            # Correctly join base_path and status endpoint to avoid double slashes
+            if base_path.endswith('/'):
+                path = f"{base_path}status"
+            else:
+                path = f"{base_path}/status"
+        
+        status_url = f"{base_url}{path}"
+
+        try:
+            with urllib.request.urlopen(status_url, timeout=1) as response:
+                return response.status == 200
+        except Exception:
+            # Fallback for default Appium 1.x path if the constructed path fails
+            # and no explicit base path was found in the command.
+            if not match:
+                try:
+                    with urllib.request.urlopen(f"{base_url}/wd/hub/status", timeout=1) as response:
+                        return response.status == 200
+                except Exception:
+                    return False
+            return False
+
+    def _wait_for_appium_startup(self, timeout: int = 20) -> bool:
+        """Waits for the Appium server to become available after starting."""
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            if self._is_appium_running():
+                return True
+            time.sleep(0.5)
+        return False
 
     def _get_cache_path_for_period(self, period: str) -> Path:
         """Returns the specific cache file path for a given period."""
@@ -1900,8 +2041,9 @@ def execute_command(command: str) -> Tuple[bool, str]:
     except Exception as e:
         return False, f"An unexpected error occurred: {e}"
 
-def get_connected_devices() -> List[Dict[str, str]]:
+def get_connected_devices(appium_version: Optional[str] = None) -> List[Dict[str, str]]:
     """Returns a list of dictionaries, each representing a connected device."""
+    busy_udids = _get_busy_udids(appium_version)
     success, output = execute_command("adb devices -l")
     if not success:
         return []
@@ -1914,6 +2056,7 @@ def get_connected_devices() -> List[Dict[str, str]]:
             udid = parts[0]
             properties = get_device_properties(udid)
             if properties:
+                properties['status'] = "Busy" if udid in busy_udids else "Available"
                 devices.append(properties)
     return devices
 
@@ -2043,6 +2186,45 @@ def find_scrcpy() -> Optional[Path]:
         return Path("scrcpy")
     except (subprocess.CalledProcessError, FileNotFoundError):
         return None
+
+def _get_busy_udids(appium_version: Optional[str]) -> set:
+    """
+    Checks Appium server for active sessions and returns a set of UDIDs for devices in use.
+    """
+    host = "127.0.0.1"
+    port = 4723
+    
+    try:
+        with urllib.request.urlopen(f"http://{host}:{port}/status", timeout=1) as response:
+            if response.status != 200:
+                return set()
+    except Exception:
+        return set()
+
+    # Appium v2 uses /sessions, v3 uses /appium/sessions. We try the most likely one first.
+    session_endpoints = []
+    if appium_version and appium_version.startswith('3.'):
+        session_endpoints.append(f"http://{host}:{port}/appium/sessions")
+    session_endpoints.append(f"http://{host}:{port}/sessions")
+
+    for endpoint in session_endpoints:
+        try:
+            with urllib.request.urlopen(endpoint, timeout=2) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode())
+                    busy_udids = set()
+                    sessions = data.get('value', [])
+                    for session in sessions:
+                        caps = session.get('capabilities', {})
+                        udid = caps.get('udid') or caps.get('appium:udid')
+                        if udid:
+                            busy_udids.add(udid)
+                    return busy_udids
+        except Exception:
+            continue # Try the next endpoint if one fails
+            
+    return set()
+
 
 def load_theme_setting():
     """Loads the theme from settings.json before the main window is created."""
