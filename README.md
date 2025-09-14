@@ -6,10 +6,7 @@ A comprehensive desktop application, built with Python and Tkinter, for managing
 ![License](https://img.shields.io/github/license/lucasdeeiroz/robot_runner)
 ![GitHub repo size](https://img.shields.io/github/repo-size/lucasdeeiroz/robot_runner)
 
-<!-- Add a GIF demonstrating the application here -->
-<!-- <p align="center">
-  <img src="path/to/your/demo.gif" alt="Robot Runner Demo" width="800"/>
-</p> -->
+![Gravando 2025-09-14 185334](https://github.com/user-attachments/assets/b12aec31-bc41-49ba-9309-a31ac1ece96c)
 
 ## Key Features
 
@@ -30,10 +27,14 @@ A comprehensive desktop application, built with Python and Tkinter, for managing
     *   Search for elements in the current UI using XPath queries.
     *   Optional automatic refresh when the device's UI changes, keeping the inspector always in sync.
 
+<img width="1368" height="979" alt="image" src="https://github.com/user-attachments/assets/41febdd5-eaf2-42a2-ab4a-f0900d941698" />
+
 *   **Screen Mirroring & Control (Windows):**
     *   Low-latency Scrcpy screen mirroring embedded directly into the application window.
     *   Automatic download of the latest Scrcpy version if not found on the system.
     *   Integrated controls to take screenshots and record the device screen.
+
+<img width="1365" height="989" alt="image" src="https://github.com/user-attachments/assets/a99e024a-5112-431f-a4fb-e4f08e93b79b" />
 
 *   **Robot Framework Test Execution:**
     *   Integrated file browser to select argumentfile test suites (`.txt`) or individual test files (`.robot`).
@@ -41,10 +42,14 @@ A comprehensive desktop application, built with Python and Tkinter, for managing
     *   View live test output with syntax highlighting for status (PASS/FAIL).
     *   Button to forcefully stop a running test.
 
+<img width="1380" height="952" alt="image" src="https://github.com/user-attachments/assets/1199f456-047a-4f4a-88cb-5a96690cdc11" />
+
 *   **Performance Monitor:**
     *   Monitor real-time usage of **CPU**, **RAM**, **GPU** memory, and **FPS** for a specific application.
     *   View "Janky frames" and "Missed Vsyncs" data to identify rendering issues.
     *   Save performance logs to a text file for later analysis.
+
+<img width="1096" height="849" alt="image" src="https://github.com/user-attachments/assets/af21f7b9-f6c5-4347-b179-d4f7dfa30eaa" />
 
 *   **Test Logs Dashboard:**
     *   View a summary of all historical test runs.
@@ -53,10 +58,14 @@ A comprehensive desktop application, built with Python and Tkinter, for managing
     *   Open the full Robot Framework HTML report with a double-click.
     *   Uses a caching system for fast data loading.
 
+<img width="1015" height="749" alt="image" src="https://github.com/user-attachments/assets/8759cbe0-bf9d-4079-86ce-09d122584732" />
+
 *   **Settings & Tools:**
     *   Start and stop the Appium server directly from the GUI.
     *   Configure paths for Scrcpy, project directories (suites, tests, logs), etc.
     *   Customize the appearance with themes (light/dark) and change the application language.
+
+<img width="1309" height="931" alt="image" src="https://github.com/user-attachments/assets/23b77d27-8447-4032-8dd1-2b3827750d73" />
 
 ## Prerequisites
 
