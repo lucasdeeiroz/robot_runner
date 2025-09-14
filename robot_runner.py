@@ -1,25 +1,25 @@
-import tkinter as tk
-from tkinter import messagebox, simpledialog
-import ttkbootstrap as ttk
-from ttkbootstrap.scrolled import ScrolledText
-from ttkbootstrap.constants import *
-from ttkbootstrap.tooltip import ToolTip
-import subprocess
-import sys
-import json
-import urllib.request
-import zipfile
-import threading
-from typing import List, Tuple, Dict, Optional
-from pathlib import Path
-import time
-import datetime
-from queue import Queue, Empty
-import ctypes
 import os
+import sys
+import subprocess
 import signal
 import re
-import xml.etree.ElementTree as ET
+import json
+import zipfile
+import threading
+import urllib.request
+import time
+import datetime
+import ctypes
+from typing import List, Tuple, Dict, Optional
+from pathlib import Path
+from queue import Queue, Empty
+from lxml import etree as ET
+import tkinter as tk
+from tkinter import messagebox
+import ttkbootstrap as ttk
+from ttkbootstrap.scrolled import ScrolledText
+from ttkbootstrap.tooltip import ToolTip
+from ttkbootstrap.constants import *
 from PIL import Image, ImageTk
 
 # --- Internationalization Setup ---
@@ -117,6 +117,13 @@ class RunCommandWindow(tk.Toplevel):
         self.inspector_is_visible = False
         self.elements_data_map = {} # To store full data of UI elements
         self.current_selected_element_data = None # To store data of currently selected element for XPath generation
+        self.auto_refresh_thread = None
+        self.inspector_auto_refresh_var = tk.BooleanVar(value=True)
+        self.stop_auto_refresh_event = threading.Event()
+        self.last_ui_dump_hash = None
+        self.all_elements_list: List[Dict] = []
+        self.current_dump_path: Optional[Path] = None
+        self.xpath_search_var = tk.StringVar()
         
         # --- Window Setup ---
         window_title = title if title else _("running_title", title=Path(run_path).name)
@@ -189,10 +196,37 @@ class RunCommandWindow(tk.Toplevel):
             # Create a container for all inspector-related widgets in the left pane
             self.inspector_controls_frame = ttk.Frame(self.output_paned_window)
 
-            # Move Refresh button to the top, above "Visible Elements"
-            self.refresh_inspector_button = ttk.Button(self.inspector_controls_frame, text=_("refresh"), command=self._start_inspection, state=DISABLED)
-            self.refresh_inspector_button.pack(side=TOP, fill=X, pady=(0, 5), padx=0)
+            # Create a sub-frame for the top controls (refresh button and auto-refresh toggle)
+            inspector_top_controls_frame = ttk.Frame(self.inspector_controls_frame)
+            inspector_top_controls_frame.pack(side=TOP, fill=X, pady=(0, 5), padx=0)
+            inspector_top_controls_frame.columnconfigure(0, weight=1) # Make button expand
+
+            self.refresh_inspector_button = ttk.Button(inspector_top_controls_frame, text=_("refresh"), command=self._start_inspection, state=DISABLED)
+            self.refresh_inspector_button.grid(row=0, column=0, sticky="ew", padx=(0, 5))
             ToolTip(self.refresh_inspector_button, _("refresh_tooltip"))
+
+            self.auto_refresh_check = ttk.Checkbutton(inspector_top_controls_frame, text=_("inspector_auto_refresh"), variable=self.inspector_auto_refresh_var, bootstyle="round-toggle")
+            self.auto_refresh_check.grid(row=0, column=1, sticky="e")
+            ToolTip(self.auto_refresh_check, _("inspector_auto_refresh_tooltip"))
+
+            # --- Search Frame ---
+            search_frame = ttk.LabelFrame(self.inspector_controls_frame, text=_("inspector_search_xpath"), padding=5)
+            search_frame.pack(side=TOP, fill=X, pady=(5, 5))
+            search_frame.columnconfigure(0, weight=1)
+
+            self.xpath_search_entry = ttk.Entry(search_frame, textvariable=self.xpath_search_var)
+            self.xpath_search_entry.grid(row=0, column=0, sticky="ew", padx=(0, 5))
+            ToolTip(self.xpath_search_entry, _("search_tooltip"))
+
+            search_button_frame = ttk.Frame(search_frame)
+            search_button_frame.grid(row=0, column=1, sticky="e")
+
+            self.search_button = ttk.Button(search_button_frame, text=_("search_button"), command=self._perform_xpath_search, bootstyle="primary")
+            self.search_button.pack(side=LEFT)
+            
+            self.clear_search_button = ttk.Button(search_button_frame, text=_("clear_button"), command=self._clear_xpath_search, bootstyle="secondary")
+            self.clear_search_button.pack(side=LEFT, padx=(5, 0))
+            ToolTip(self.clear_search_button, _("clear_tooltip"))
 
             self.elements_list_frame = ttk.LabelFrame(self.inspector_controls_frame, text=_("visible_elements"), padding=5)
             self.elements_list_frame.pack(side=TOP, fill=BOTH, expand=YES)
@@ -202,12 +236,7 @@ class RunCommandWindow(tk.Toplevel):
             self.elements_tree.column("title", width=300, anchor=W)
             self.elements_tree.pack(fill=BOTH, expand=YES)
             self.elements_tree.bind("<<TreeviewSelect>>", self._on_element_select)
-
-            # XPath Buttons Frame
-            self.xpath_buttons_container = ttk.LabelFrame(self.inspector_controls_frame, text=_("copy_xpath_by_attribute"), padding=5)
-            self.xpath_buttons_container.pack(side=TOP, fill=X, pady=(5,0))
-            self.xpath_buttons = {} # Dictionary to hold the dynamically created buttons
-
+            self.elements_tree.bind("<Button-1>", self._on_treeview_click)
         # --- 2. Center Pane (Controls) ---
         self.center_pane_container = ttk.LabelFrame(self.main_paned_window, text=_("controls"), padding=10)
         
@@ -255,6 +284,19 @@ class RunCommandWindow(tk.Toplevel):
             self.inspect_button.pack(fill=X, pady=5, padx=5)
             ToolTip(self.inspect_button, _("inspector_tooltip"))
 
+            # --- Element Details Frame (moved to center pane) ---
+            self.element_details_frame = ttk.LabelFrame(self.center_pane_container, text=_("element_details"), padding=5)
+            # self.element_details_frame will be packed/unpacked dynamically
+            self.element_details_text = ScrolledText(self.element_details_frame, wrap=WORD, state=DISABLED, autohide=True)
+            self.element_details_text.pack(fill=BOTH, expand=YES)
+            self.element_details_text.text.tag_configure("bold", font="-weight bold")
+
+            # XPath Buttons Frame (moved to center pane)
+            self.xpath_buttons_container = ttk.LabelFrame(self.center_pane_container, text=_("copy_xpath_by_attribute"), padding=5)
+            # self.xpath_buttons_container will be packed/unpacked dynamically
+            self.xpath_buttons = {} # Dictionary to hold the dynamically created buttons
+
+
         # --- 3. Right Pane (Screen Mirror / Inspector) ---
         self.right_pane_container = ttk.LabelFrame(self.main_paned_window, text=_("screen_mirror"), padding=5)
         self.embed_frame = self.right_pane_container # for compatibility with old code
@@ -267,6 +309,7 @@ class RunCommandWindow(tk.Toplevel):
             self.screenshot_canvas = tk.Canvas(self.screenshot_canvas_frame, bg="black")
             self.screenshot_canvas.pack(fill=BOTH, expand=YES)
             self.screenshot_image_tk = None # To hold the PhotoImage object
+            self.screenshot_canvas.bind("<Button-1>", self._on_canvas_click)
             self.screenshot_canvas.bind("<Configure>", self._on_inspector_canvas_resize) # New line
 
         # --- Add panes and set initial state ---
@@ -467,12 +510,30 @@ class RunCommandWindow(tk.Toplevel):
             pass # Already added
         self._update_left_pane_visibility()
 
+        # Start auto-refresh thread
+        self.stop_auto_refresh_event.clear()
+        self.auto_refresh_thread = threading.Thread(target=self._auto_refresh_inspector_thread, daemon=True)
+        self.auto_refresh_thread.start()
+
+        # Pack the moved widgets into the center pane
+        # Pack XPath buttons at the bottom first, so the details frame can expand above it.
+        self.xpath_buttons_container.pack(side=BOTTOM, fill=X, pady=5, padx=5)
+        self.element_details_frame.pack(fill=BOTH, expand=YES, pady=5, padx=5)
+
     def _stop_inspector(self):
         if not self.is_inspecting: return
         self.is_inspecting = False
 
         # Hide inspector panes
         self.main_paned_window.forget(self.right_pane_container)
+
+        # Hide the moved widgets from the center pane
+        self.element_details_frame.pack_forget()
+        self.xpath_buttons_container.pack_forget()
+
+        # Stop auto-refresh thread
+        self.stop_auto_refresh_event.set()
+        self.last_ui_dump_hash = None
         self.output_paned_window.forget(self.inspector_controls_frame)
         self.inspector_paned_window.pack_forget()
         self.after(10, self._update_left_pane_visibility)
@@ -491,10 +552,72 @@ class RunCommandWindow(tk.Toplevel):
         self.refresh_inspector_button.config(state=DISABLED)
         self.right_pane_container.config(text=_("screen_mirror"))
 
+    def _auto_refresh_inspector_thread(self):
+        """Checks for UI changes in the background and triggers a refresh if detected."""
+        while not self.stop_auto_refresh_event.wait(5.0): # Wait for 5s, or until stop event is set
+            if not self.is_inspecting: # Extra safety check
+                break
+
+            # Check if auto-refresh is enabled by the user
+            if not self.inspector_auto_refresh_var.get():
+                continue
+
+            try:
+                # Do not check if a refresh is already in progress.
+                # The refresh button is disabled during refresh.
+                if self.refresh_inspector_button['state'] == DISABLED:
+                    continue
+
+                # Using a different filename to avoid race conditions with manual refresh
+                device_dump_path = "/sdcard/window_dump_autorefresh.xml"
+                local_dump_path = self.parent_app.logs_dir / f"window_dump_autorefresh_{self.udid.replace(':', '-')}.xml"
+
+                dump_cmd = f"adb -s {self.udid} shell uiautomator dump {device_dump_path}"
+                success_dump, _output = execute_command(dump_cmd)
+                if not success_dump:
+                    continue # Silently fail
+
+                pull_cmd = f"adb -s {self.udid} pull {device_dump_path} \"{local_dump_path}\""
+                success_pull, _output = execute_command(pull_cmd)
+                
+                execute_command(f"adb -s {self.udid} shell rm {device_dump_path}")
+
+                if not success_pull:
+                    continue # Silently fail
+
+                with open(local_dump_path, 'r', encoding='utf-8') as f:
+                    current_dump_content = f.read()
+                local_dump_path.unlink(missing_ok=True)
+
+                current_hash = hash(current_dump_content)
+
+                if self.last_ui_dump_hash is not None and current_hash != self.last_ui_dump_hash:
+                    # UI has changed, trigger a refresh on the main thread
+                    self.scrcpy_output_queue.put(_("ui_change_detected_refreshing") + "\n")
+                    self.after(0, self._start_inspection)
+            except tk.TclError:
+                # This can happen if the window is closed and widgets are destroyed
+                # while the thread is running. Exit gracefully.
+                break
+            except Exception as e:
+                print(f"Error in inspector auto-refresh thread: {e}")
+
     def _start_inspection(self):
         self.refresh_inspector_button.config(state=DISABLED, text=_("refreshing"))
         self.inspect_button.config(state=DISABLED, text=_("refreshing"))
         self.screenshot_canvas.delete("all")
+        self.xpath_search_var.set("") # Clear search on refresh
+
+        # Display updating message on canvas
+        self.screenshot_canvas.update_idletasks()
+        canvas_width = self.screenshot_canvas.winfo_width()
+        canvas_height = self.screenshot_canvas.winfo_height()
+        self.screenshot_canvas.create_text(
+            canvas_width / 2, canvas_height / 2,
+            text=_("inspector_updating_screen"),
+            font=("Helvetica", 16), fill=self.parent_app.style.colors.fg, tags="loading_text"
+        )
+
         for item in self.elements_tree.get_children():
             self.elements_tree.delete(item)
         self.elements_data_map = {} # Clear previous data
@@ -553,6 +676,15 @@ class RunCommandWindow(tk.Toplevel):
                 return
             execute_command(f"adb -s {self.udid} shell rm {device_dump_path}")
             self.scrcpy_output_queue.put(_("ui_dump_saved_success", path=local_dump_filepath) + "\n")
+
+            # Read dump content and store its hash for auto-refresh comparison
+            try:
+                with open(local_dump_filepath, 'r', encoding='utf-8') as f:
+                    dump_content = f.read()
+                self.last_ui_dump_hash = hash(dump_content)
+            except Exception as e:
+                self.scrcpy_output_queue.put(f"Warning: Could not read dump file for hashing: {e}\n")
+                self.last_ui_dump_hash = None
 
             # 3. Process and display
             self.after(0, self._display_inspection_results, local_screenshot_filepath, local_dump_filepath)
@@ -640,69 +772,79 @@ class RunCommandWindow(tk.Toplevel):
             self.scrcpy_output_queue.put(_("display_screenshot_error", error=e) + "\n")
             return
 
-        # Parse XML and populate treeview
+        # Parse XML
         try:
-            tree = ET.parse(dump_path)
+            # Use a recovering parser for potentially malformed UI dumps
+            parser = ET.XMLParser(recover=True)
+            tree = ET.parse(dump_path, parser)
             root = tree.getroot()
             
-            # Clear previous data and treeview
-            self.elements_data_map = {} 
-            for item in self.elements_tree.get_children():
-                self.elements_tree.delete(item)
+            self.current_dump_path = dump_path
+            self.all_elements_list = []
 
             for node in root.iter():
                 # Extract all relevant attributes
-                node_id = node.get("id")
-                resource_id = node.get("resource-id")
-                accessibility_id = node.get("content-desc") # Often used as accessibility_id
-                content_desc = node.get("content-desc")
-                text = node.get("text")
-                node_class = node.get("class")
-                node_package = node.get("package")
-                bounds_str = node.get("bounds")
+                self._parse_and_store_node(node)
 
-                # Prioritize display title based on the order: id, resource_id, accessibility_id, content_desc, text, class
-                display_title = ""
-                if node_id:
-                    display_title = f"id={node_id}"
-                elif resource_id:
-                    display_title = f"resource_id={resource_id.split('/')[-1]}" # Show only last part
-                elif accessibility_id:
-                    display_title = f"accessibility_id={accessibility_id}"
-                elif content_desc:
-                    display_title = f"content_desc={content_desc}"
-                elif text:
-                    display_title = f"text={text}"
-                elif node_class:
-                    display_title = f"class={node_class.split('.')[-1]}" # Show only last part
-                    if display_title != "class=ScrollView": # If it's not a ScrollView, ignore it
-                        continue
-
-                # Include the element if it has a display title or if it's a ScrollView (even if no other title)
-                if display_title or (node_class and "ScrollView" in node_class):
-                    if not display_title and node_class and "ScrollView" in node_class:
-                        display_title = f"Class: {node_class.split('.')[-1]}" # Ensure ScrollView is displayed by class if no other title
-
-                    # Store all data for tooltip and XPath generation
-                    element_full_data = {
-                        "id": node_id,
-                        "resource_id": resource_id,
-                        "accessibility_id": accessibility_id,
-                        "content_desc": content_desc,
-                        "text": text,
-                        "class": node_class,
-                        "package": node_package,
-                        "bounds_str": bounds_str,
-                        "bounds_coords": self._parse_bounds(bounds_str)
-                        # Add other attributes if needed for XPath or detailed display
-                    }
-                    
-                    # Insert into Treeview
-                    item_id = self.elements_tree.insert("", END, values=(display_title,), tags=("element", element_full_data["bounds_coords"]))
-                    self.elements_data_map[item_id] = element_full_data
+            self._populate_elements_tree(self.all_elements_list)
 
         except Exception as e:
             self.scrcpy_output_queue.put(_("parse_ui_dump_error", error=e) + "\n")
+
+    def _parse_and_store_node(self, node: ET.Element):
+        """Parses a single XML node and adds it to the all_elements_list if valid."""
+        # Start with a copy of all attributes from the XML node. This is the key change.
+        element_full_data = dict(node.attrib)
+
+        # Standardize some key names for internal use if they exist
+        resource_id = element_full_data.get("resource-id")
+        content_desc = element_full_data.get("content-desc")
+        text = element_full_data.get("text")
+        node_class = element_full_data.get("class")
+        bounds_str = element_full_data.get("bounds")
+
+        # Create a display title for the treeview, prioritizing more unique identifiers
+        display_title = ""
+        if resource_id:
+            display_title = f"resource_id={resource_id.split('/')[-1]}"
+        elif content_desc:
+            display_title = f"content_desc={content_desc}"
+        elif text:
+            display_title = f"text={text}"
+        elif node_class:
+            display_title = f"class={node_class.split('.')[-1]}"
+            # Filter out uninteresting elements unless they are ScrollViews
+            if "ScrollView" not in display_title:
+                return
+
+        # Ensure we have a title to display, or it's a ScrollView
+        if display_title or (node_class and "ScrollView" in node_class):
+            if not display_title and node_class and "ScrollView" in node_class:
+                display_title = f"Class: {node_class.split('.')[-1]}"
+
+            # Add our internal helper data to the dictionary
+            element_full_data["display_title"] = display_title
+            element_full_data["bounds_coords"] = self._parse_bounds(bounds_str)
+            # Create the accessibility_id alias for convenience in other parts of the code
+            element_full_data["accessibility_id"] = content_desc
+
+            self.all_elements_list.append(element_full_data)
+
+    def _populate_elements_tree(self, elements_to_display: List[Dict]):
+        """Clears and populates the elements treeview with the given list of elements."""
+        for item in self.elements_tree.get_children():
+            self.elements_tree.delete(item)
+        self.elements_data_map.clear()
+
+        if not elements_to_display:
+            self.elements_tree.insert("", END, values=(_("no_elements_found"),), tags=("no_elements",))
+            return
+
+        for element_data in elements_to_display:
+            display_title = element_data.get("display_title", "Unknown")
+            bounds_coords = element_data.get("bounds_coords")
+            item_id = self.elements_tree.insert("", END, values=(display_title,), tags=("element", bounds_coords))
+            self.elements_data_map[item_id] = element_data
 
     def _parse_bounds(self, bounds_str: str) -> Tuple[int, int, int, int]:
         # Example: [0,100][100,200]
@@ -720,6 +862,7 @@ class RunCommandWindow(tk.Toplevel):
         selected_items = self.elements_tree.selection()
         if not selected_items: 
             self._update_xpath_buttons_state(None) # Disable buttons if nothing selected
+            self._populate_element_details(None) # Clear details
             return
 
         item_id = selected_items[0]
@@ -756,8 +899,17 @@ class RunCommandWindow(tk.Toplevel):
                 )
             
             self._update_xpath_buttons_state(selected_element_data) # Enable/update buttons
+            self._populate_element_details(selected_element_data)
         else:
             self._update_xpath_buttons_state(None) # Disable buttons if no data found
+            self._populate_element_details(None)
+
+    def _on_treeview_click(self, event):
+        """Deselects the item if the user clicks on an empty area of the treeview."""
+        # identify_row returns the item ID at the given y-coordinate, or an empty string
+        item = self.elements_tree.identify_row(event.y)
+        if not item:
+            self.elements_tree.selection_set("")
 
     def _on_inspector_canvas_resize(self, event=None):
         """Redraws the selected element's highlight when the inspector canvas is resized."""
@@ -824,6 +976,25 @@ class RunCommandWindow(tk.Toplevel):
 
         return xpath
 
+    def _populate_element_details(self, element_data: Optional[Dict]):
+        """Populates the element details text view with all attributes."""
+        self.element_details_text.text.config(state=NORMAL)
+        self.element_details_text.text.delete("1.0", END)
+
+        if element_data:
+            # We don't want to show some internal data that is already represented elsewhere
+            attributes_to_show = {
+                k: v for k, v in element_data.items() 
+                if k not in ["bounds_coords", "display_title"] and v is not None and v != ''
+            }
+            
+            for key, value in sorted(attributes_to_show.items()):
+                # Make the key bold
+                self.element_details_text.text.insert(END, f"{key.replace('_', ' ').title()}: ", "bold")
+                self.element_details_text.text.insert(END, f"{value}\n")
+        
+        self.element_details_text.text.config(state=DISABLED)
+
     def _copy_xpath(self, attribute_type: str):
         """Generates XPath and copies it to clipboard."""
         xpath = self._generate_xpath(attribute_type)
@@ -836,6 +1007,110 @@ class RunCommandWindow(tk.Toplevel):
                 messagebox.showerror(_("copy_error_title"), _("copy_error_message", error=e), parent=self)
         else:
             messagebox.showwarning(_("no_xpath_title"), _("no_xpath_message"), parent=self)
+
+    def _perform_xpath_search(self):
+        """Filters the element list based on an XPath query against the last UI dump."""
+        xpath_query = self.xpath_search_var.get()
+        if not xpath_query or not self.current_dump_path:
+            return
+
+        try:
+            # Use a recovering parser for potentially malformed UI dumps
+            parser = ET.XMLParser(recover=True)
+            tree = ET.parse(self.current_dump_path, parser)
+            root = tree.getroot()
+            # Use .xpath() for full XPath 1.0 support, which includes functions like starts-with()
+            found_xml_nodes = root.xpath(xpath_query)
+            found_bounds = {node.get("bounds") for node in found_xml_nodes}
+            
+            filtered_elements = [
+                element_data for element_data in self.all_elements_list
+                if element_data.get("bounds") in found_bounds
+            ]
+            self._populate_elements_tree(filtered_elements)
+        except ET.XMLSyntaxError as e:
+            messagebox.showerror(_("parse_ui_dump_error"), str(e), parent=self)
+        except ET.XPathSyntaxError as e:
+            messagebox.showerror(_("invalid_xpath_title"), _("invalid_xpath_message", error=e), parent=self)
+
+    def _clear_xpath_search(self):
+        """Clears the XPath search and restores the full list of elements."""
+        self.xpath_search_var.set("")
+        self._populate_elements_tree(self.all_elements_list)
+
+    def _on_canvas_click(self, event):
+        """Handles clicks on the inspector screenshot canvas."""
+        if not self.is_inspecting or not hasattr(self, 'screenshot_original_size') or not self.screenshot_original_size:
+            return
+
+        # 1. Translate canvas coordinates to original image coordinates
+        canvas_width = self.screenshot_canvas.winfo_width()
+        canvas_height = self.screenshot_canvas.winfo_height()
+        current_img_width, current_img_height = self.screenshot_current_size
+        original_img_width, original_img_height = self.screenshot_original_size
+
+        offset_x = (canvas_width - current_img_width) / 2
+        offset_y = (canvas_height - current_img_height) / 2
+
+        click_x_on_image = event.x - offset_x
+        click_y_on_image = event.y - offset_y
+
+        # 2. Check if the click is on the image and find the best matching element
+        is_click_on_image = (0 <= click_x_on_image < current_img_width and 0 <= click_y_on_image < current_img_height)
+        best_match = None
+        if is_click_on_image:
+            scale_x = original_img_width / current_img_width
+            scale_y = original_img_height / current_img_height
+
+            original_click_x = click_x_on_image * scale_x
+            original_click_y = click_y_on_image * scale_y
+
+            # Find the smallest element containing the click
+            smallest_area = float('inf')
+
+            for item_id, element_data in self.elements_data_map.items():
+                bounds_coords = element_data.get("bounds_coords")
+                if bounds_coords:
+                    x, y, width, height = bounds_coords
+                    if x <= original_click_x < x + width and y <= original_click_y < y + height:
+                        area = width * height
+                        if area < smallest_area:
+                            smallest_area = area
+                            best_match = {"item_id": item_id, "element_data": element_data}
+
+        # 3. Handle the found element or deselect if no element was found
+        if best_match:
+            found_item_id = best_match["item_id"]
+            found_element_data = best_match["element_data"]
+            
+            current_selection = self.elements_tree.selection()
+            is_already_selected = current_selection and current_selection[0] == found_item_id
+
+            if is_already_selected:
+                bounds_coords = found_element_data.get("bounds_coords")
+                if bounds_coords:
+                    x, y, width, height = bounds_coords
+                    center_x, center_y = x + width / 2, y + height / 2
+                    threading.Thread(target=self._send_tap_to_device_and_refresh, args=(center_x, center_y), daemon=True).start()
+            else:
+                self.elements_tree.selection_set(found_item_id)
+                self.elements_tree.see(found_item_id)
+        else:
+            # Click was on an empty area (or outside the image), deselect everything
+            self.elements_tree.selection_set("")
+            self.screenshot_canvas.delete("highlight")
+            self._update_xpath_buttons_state(None)
+
+    def _send_tap_to_device_and_refresh(self, x, y):
+        """Sends a tap command to the device and then triggers an inspector refresh."""
+        self.scrcpy_output_queue.put(_("tap_info", x=int(x), y=int(y)) + "\n")
+        command = f"adb -s {self.udid} shell input tap {int(x)} {int(y)}"
+        success, output = execute_command(command)
+        if not success:
+            self.scrcpy_output_queue.put(_("tap_error", output=output) + "\n")
+        else:
+            self.scrcpy_output_queue.put(_("tap_success_refreshing") + "\n")
+            self.after(500, self._start_inspection)
 
     # --- Scrcpy Feature Methods ---
 
@@ -877,8 +1152,8 @@ class RunCommandWindow(tk.Toplevel):
             try:
                 line = self.scrcpy_output_queue.get_nowait()
                 self.scrcpy_output_text.text.config(state=NORMAL)
-                self.scrcpy_output_text.insert(END, line)
-                self.scrcpy_output_text.see(END)
+                self.scrcpy_output_text.text.insert(END, line)
+                self.scrcpy_output_text.text.see(END)
                 self.scrcpy_output_text.text.config(state=DISABLED)
                 if "INFO: Texture:" in line and not self.aspect_ratio:
                     try:
@@ -1046,7 +1321,7 @@ class RunCommandWindow(tk.Toplevel):
         self.stop_monitor_button.config(state=NORMAL)
         self.app_package_combo.config(state=DISABLED)
         self.performance_output_text.text.config(state=NORMAL)
-        self.performance_output_text.delete("1.0", END)
+        self.performance_output_text.text.delete("1.0", END)
         self.performance_output_text.text.config(state=DISABLED)
         log_dir = self.parent_app.logs_dir
         log_dir.mkdir(exist_ok=True)
@@ -1073,8 +1348,8 @@ class RunCommandWindow(tk.Toplevel):
             try:
                 line = self.performance_output_queue.get_nowait()
                 self.performance_output_text.text.config(state=NORMAL)
-                self.performance_output_text.insert(END, line)
-                self.performance_output_text.see(END)
+                self.performance_output_text.text.insert(END, line)
+                self.performance_output_text.text.see(END)
                 self.performance_output_text.text.config(state=DISABLED)
                 if self.performance_log_file:
                     try:
@@ -1102,7 +1377,7 @@ class RunCommandWindow(tk.Toplevel):
     def _reset_ui_for_test_run(self):
         """Resets the UI to the initial state for a test run."""
         self.robot_output_text.text.config(state=NORMAL)
-        self.robot_output_text.delete("1.0", END)
+        self.robot_output_text.text.delete("1.0", END)
         self.robot_output_text.text.config(state=DISABLED)
 
         self.repeat_test_button.pack_forget()
@@ -1170,22 +1445,22 @@ class RunCommandWindow(tk.Toplevel):
                     prefix = parts[0].strip() + ":"
                     path = parts[1].strip()
 
-                    self.robot_output_text.insert(END, f"{prefix: <8}")
+                    self.robot_output_text.text.insert(END, f"{prefix: <8}")
 
                     link_tag = f"LINK_{time.time()}"
-                    self.robot_output_text.insert(END, path, ("LINK", link_tag))
-                    self.robot_output_text.tag_bind(link_tag, "<Button-1>", lambda e, p=path: self._open_file_path(p))
-                    self.robot_output_text.tag_bind(link_tag, "<Enter>", lambda e: self.robot_output_text.config(cursor="hand2"))
-                    self.robot_output_text.tag_bind(link_tag, "<Leave>", lambda e: self.robot_output_text.config(cursor=""))
-                    self.robot_output_text.insert(END, "\n")
+                    self.robot_output_text.text.insert(END, path, ("LINK", link_tag))
+                    self.robot_output_text.text.tag_bind(link_tag, "<Button-1>", lambda e, p=path: self._open_file_path(p))
+                    self.robot_output_text.text.tag_bind(link_tag, "<Enter>", lambda e: self.robot_output_text.config(cursor="hand2"))
+                    self.robot_output_text.text.tag_bind(link_tag, "<Leave>", lambda e: self.robot_output_text.config(cursor=""))
+                    self.robot_output_text.text.insert(END, "\n")
 
                 else:
                     tag = None
                     if "| PASS |" in line: tag = "PASS"
                     elif "| FAIL |" in line: tag = "FAIL"
-                    self.robot_output_text.insert(END, line, tag)
+                    self.robot_output_text.text.insert(END, line, tag)
 
-                self.robot_output_text.see(END)
+                self.robot_output_text.text.see(END)
                 self.robot_output_text.text.config(state=DISABLED)
             except Empty:
                 pass
@@ -1221,7 +1496,7 @@ class RunCommandWindow(tk.Toplevel):
                     creationflags=subprocess.CREATE_NO_WINDOW
                 )
             else:
-                os.killpg(os.getpgid(pid), signal.SIGTERM)
+                os.kill(os.getpid(pid), signal.SIGTERM)
             output_q = self.robot_output_queue if name == "robot" else self.scrcpy_output_queue
             output_q.put(_("process_terminated_info", name=name.capitalize(), pid=pid) + "\n")
         except (subprocess.CalledProcessError, ProcessLookupError, FileNotFoundError) as e:
@@ -1253,6 +1528,7 @@ class RunCommandWindow(tk.Toplevel):
 
 # --- Main Application Class ---
 class RobotRunnerApp:
+    ''' Main application window '''
     def __init__(self, root: ttk.Window):
         self.root = root
         self.root.title(_("app_title"))
@@ -1793,7 +2069,7 @@ class RobotRunnerApp:
                     creationflags=subprocess.CREATE_NO_WINDOW
                 )
             else:
-                os.killpg(os.getpgid(pid), signal.SIGTERM)
+                os.kill(os.getpid(pid), signal.SIGTERM)
             print(_("appium_terminate_info", pid=pid))
         except (subprocess.CalledProcessError, ProcessLookupError, FileNotFoundError) as e:
             print(_("appium_terminate_warning", pid=pid, e=e))
@@ -2720,21 +2996,40 @@ def _parse_appium_command(appium_command: Optional[str]) -> Tuple[str, int, str]
 def _get_busy_udids(appium_command: Optional[str]) -> set:
     """
     Checks Appium server for active sessions and returns a set of UDIDs for devices in use.
+    Handles different Appium versions (1.x, 2.x, 3.x) and custom base paths.
     """
     host, port, base_path = _parse_appium_command(appium_command)
 
-    # We need to determine the correct sessions endpoint.
-    # We can try the configured path first, then a legacy fallback.
-    primary_sessions_path = f"{base_path}/sessions".replace('//', '/')
-    primary_sessions_url = f"http://{host}:{port}{primary_sessions_path}"
+    # Build an ordered list of potential session endpoint paths to try.
+    potential_paths = []
     
-    urls_to_try = [primary_sessions_url]
+    # Priority 1: Appium 3.x style with base path (e.g., /wd/hub/appium/sessions)
+    potential_paths.append(f"{base_path}/appium/sessions")
     
-    # If no base path was specified, also try the legacy endpoint.
-    if not re.search(r'--base-path', appium_command or ""):
-        legacy_sessions_url = f"http://{host}:{port}/wd/hub/sessions"
-        if legacy_sessions_url != primary_sessions_url:
-             urls_to_try.append(legacy_sessions_url)
+    # Priority 2: Appium 2.x style with base path (e.g., /wd/hub/sessions)
+    potential_paths.append(f"{base_path}/sessions")
+
+    # Priority 3: Appium 3.x default (e.g., /appium/sessions)
+    potential_paths.append("/appium/sessions")
+    
+    # Priority 4: Appium 2.x default (e.g., /sessions)
+    potential_paths.append("/sessions")
+
+    # Priority 5: Legacy Appium 1.x (e.g., /wd/hub/sessions)
+    potential_paths.append("/wd/hub/sessions")
+
+    # Create unique, ordered list of full URLs
+    urls_to_try = []
+    seen_urls = set()
+    for path in potential_paths:
+        # Normalize path to prevent duplicates and fix slashes
+        url = f"http://{host}:{port}{path}".replace('//', '/')
+        if "http:/" in url and "http://" not in url:
+            url = url.replace("http:/", "http://")
+
+        if url not in seen_urls:
+            urls_to_try.append(url)
+            seen_urls.add(url)
 
     for endpoint in urls_to_try:
         try:
@@ -2742,7 +3037,11 @@ def _get_busy_udids(appium_command: Optional[str]) -> set:
                 if response.status == 200:
                     data = json.loads(response.read().decode())
                     busy_udids = set()
+                    # W3C (Appium 2+) returns {"value": [...]}, some older versions might differ.
                     sessions = data.get('value', [])
+                    if not isinstance(sessions, list):
+                        sessions = []
+
                     for session in sessions:
                         caps = session.get('capabilities', {})
                         udid = caps.get('udid') or caps.get('appium:udid')
