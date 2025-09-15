@@ -13,9 +13,9 @@ import ctypes
 from typing import List, Tuple, Dict, Optional
 from pathlib import Path
 from queue import Queue, Empty
-from lxml import etree as ET
 import tkinter as tk
 from tkinter import messagebox
+from lxml import etree as ET
 import ttkbootstrap as ttk
 from ttkbootstrap.scrolled import ScrolledText
 from ttkbootstrap.tooltip import ToolTip
@@ -97,7 +97,7 @@ class RunCommandWindow(tk.Toplevel):
         self.scrcpy_hwnd = None
         self.original_style = None
         self.original_parent = None
-        self.scrcpy_output_queue = Queue()
+        self.scrcpy_output_queue = Queue() 
         self.aspect_ratio = None
         self.resize_job = None
         self.is_recording = False
@@ -116,6 +116,7 @@ class RunCommandWindow(tk.Toplevel):
         # --- Inspector Attributes ---
         self.inspector_is_visible = False
         self.elements_data_map = {} # To store full data of UI elements
+        self.is_inspection_running = False # To prevent race conditions
         self.current_selected_element_data = None # To store data of currently selected element for XPath generation
         self.auto_refresh_thread = None
         self.inspector_auto_refresh_var = tk.BooleanVar(value=True)
@@ -124,9 +125,16 @@ class RunCommandWindow(tk.Toplevel):
         self.all_elements_list: List[Dict] = []
         self.current_dump_path: Optional[Path] = None
         self.xpath_search_var = tk.StringVar()
+        self.is_dragging_locked_sash = False
         
         # --- Window Setup ---
-        window_title = title if title else _("running_title", title=Path(run_path).name)
+        if title:
+            window_title = title
+        else:
+            # Find the device model from the parent app's device list to correctly format the title
+            device_model = next((d.get('model', 'Unknown') for d in self.parent_app.devices if d.get('udid') == self.udid), 'Unknown')
+            window_title = _("running_title", title=Path(run_path).name, model=device_model)
+
         self.title(window_title)
         self.geometry("1200x800")
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -137,12 +145,52 @@ class RunCommandWindow(tk.Toplevel):
         if self.mode == 'test':
             self._start_test()
 
+        # Pre-fetch aspect ratio in the background
+        threading.Thread(target=self._fetch_initial_aspect_ratio, daemon=True).start()
+
         self.after(100, self._check_robot_output_queue)
         self.after(100, self._check_scrcpy_output_queue)
         self.after(100, self._check_performance_output_queue)
 
-        self.bind("<Configure>", self._on_window_resize)
+        # Store initial size to prevent unnecessary refreshes from non-resize <Configure> events
+        self.update_idletasks()
+        self.last_width = self.winfo_width()
+        self.last_height = self.winfo_height()
 
+        self.bind("<Configure>", self._on_window_resize)
+        # Bindings for locking the sash
+        self.main_paned_window.bind("<ButtonPress-1>", self._on_sash_press)
+        self.main_paned_window.bind("<ButtonRelease-1>", self._on_sash_release)
+        self.main_paned_window.bind("<B1-Motion>", self._on_sash_drag)
+
+    def _fetch_initial_aspect_ratio(self):
+        """Fetches and stores the device's aspect ratio in the background on startup."""
+        ratio = get_device_aspect_ratio(self.udid)
+        if ratio:
+            self.aspect_ratio = ratio
+            self.scrcpy_output_queue.put(f"INFO: Pre-fetched device aspect ratio: {ratio:.4f}\n")
+        else:
+            self.scrcpy_output_queue.put("WARNING: Could not pre-fetch device aspect ratio.\n")
+
+    def _on_sash_press(self, event):
+        """Identifies if the user is pressing on the locked sash (index 1)."""
+        try:
+            element = self.main_paned_window.identify(event.x, event.y)
+            # The identify method returns a tuple like (index, 'sash') or is an empty string
+            if isinstance(element, tuple) and len(element) > 0 and element[0] == 1:
+                self.is_dragging_locked_sash = True
+        except tk.TclError:
+            self.is_dragging_locked_sash = False
+
+    def _on_sash_release(self, event):
+        """Resets the sash drag flag on button release."""
+        self.is_dragging_locked_sash = False
+
+    def _on_sash_drag(self, event):
+        """Prevents dragging of the locked sash by cancelling the event."""
+        if self.is_dragging_locked_sash:
+            return "break"
+            
     # --- UI Setup ------------------------------------------------------------------
     def _setup_widgets(self):
         """Sets up the 3-pane widget layout for the window."""
@@ -377,27 +425,40 @@ class RunCommandWindow(tk.Toplevel):
 
     def _on_window_resize(self, event=None):
         """Debounces resize events to adjust aspect ratio."""
+        # Check if the size actually changed to avoid refreshes on focus change etc.
+        current_width = self.winfo_width()
+        current_height = self.winfo_height()
+        if current_width == self.last_width and current_height == self.last_height:
+            return
+        self.last_width = current_width
+        self.last_height = current_height
+
+        if self.resize_job:
+            self.after_cancel(self.resize_job)
+
         if self.is_inspecting:
-            self._start_inspector() # Refresh inspector on resize
-        elif self.aspect_ratio:
-            if self.resize_job:
-                self.after_cancel(self.resize_job)
+            # When inspecting, resizing should trigger a full refresh to get a new screenshot
+            # that matches the new canvas size for better quality.
+            self.resize_job = self.after(300, self._start_inspection)
+        elif self.is_mirroring and self.aspect_ratio:
+            # When mirroring, just adjust the sash to maintain aspect ratio.
             self.resize_job = self.after(100, self._adjust_aspect_ratio)
 
     def _adjust_aspect_ratio(self):
         """Adjusts paned window sashes to match the device's aspect ratio."""
         self.resize_job = None
         current_aspect_ratio = None
-        if self.is_mirroring and self.aspect_ratio:
+        if (self.is_mirroring or self.is_inspecting) and self.aspect_ratio:
             current_aspect_ratio = self.aspect_ratio
-        elif self.is_inspecting and hasattr(self, 'screenshot_original_size') and self.screenshot_original_size:
-            current_aspect_ratio = self.screenshot_original_size[0] / self.screenshot_original_size[1]
 
         if not current_aspect_ratio: return
 
         self.update_idletasks()
         
-        pane_height = self.embed_frame.winfo_height()
+        # Use the height of the main paned window as a stable reference,
+        # as the height of the embed_frame itself can be in flux during a resize,
+        # leading to inconsistent calculations.
+        pane_height = self.main_paned_window.winfo_height()
         if pane_height <= 1:
             self.after(100, self._adjust_aspect_ratio)
             return
@@ -436,16 +497,22 @@ class RunCommandWindow(tk.Toplevel):
         if self.is_mirroring: return
         self.is_mirroring = True
         
+        # Fetch the latest aspect ratio when starting
+        self.aspect_ratio = get_device_aspect_ratio(self.udid)
+        if self.aspect_ratio:
+            self.scrcpy_output_queue.put(f"INFO: Set aspect ratio to {self.aspect_ratio:.4f} for mirroring.\n")
+        else:
+            self.scrcpy_output_queue.put("WARNING: Could not determine aspect ratio for mirroring.\n")
+        
         self.main_paned_window.add(self.right_pane_container, weight=5)
         self.update_idletasks()
         try:
-            # Set an initial position for the new sash to make the pane visible
-            total_width = self.main_paned_window.winfo_width()
-            self.main_paned_window.sashpos(1, int(total_width * 0.6))
+            self._adjust_aspect_ratio()
         except tk.TclError:
             pass # Window may not be fully realized yet. Aspect ratio will fix it later.
 
-        self.inspect_button.config(state=DISABLED)
+        if hasattr(self, 'inspect_button'):
+            self.inspect_button.config(state=DISABLED)
         self.mirror_button.config(text=_("stop_mirroring"), bootstyle="danger")
         
         thread = threading.Thread(target=self._run_and_embed_scrcpy)
@@ -458,7 +525,8 @@ class RunCommandWindow(tk.Toplevel):
         self.is_mirroring = False
 
         self.main_paned_window.forget(self.right_pane_container)
-        self.inspect_button.config(state=NORMAL)
+        if hasattr(self, 'inspect_button'):
+            self.inspect_button.config(state=NORMAL)
         self.mirror_button.config(text=_("start_mirroring"), bootstyle="info")
         
         if self.scrcpy_process and self.scrcpy_process.poll() is None:
@@ -481,6 +549,13 @@ class RunCommandWindow(tk.Toplevel):
         if self.is_inspecting: return
         self.is_inspecting = True
         
+        # Fetch the latest aspect ratio when starting the inspector
+        self.aspect_ratio = get_device_aspect_ratio(self.udid)
+        if self.aspect_ratio:
+            self.scrcpy_output_queue.put(f"INFO: Set aspect ratio to {self.aspect_ratio:.4f} for inspector.\n")
+        else:
+            self.scrcpy_output_queue.put("WARNING: Could not determine aspect ratio for inspector.\n")
+        
         # Update button states
         self.mirror_button.config(state=DISABLED)
         self.inspect_button.config(text=_("stop_inspector"), bootstyle="danger")
@@ -491,8 +566,8 @@ class RunCommandWindow(tk.Toplevel):
         self.main_paned_window.add(self.right_pane_container, weight=5)
         self.update_idletasks()
         try:
-            total_width = self.main_paned_window.winfo_width()
-            self.main_paned_window.sashpos(1, int(total_width * 0.5))
+            # Immediately try to adjust aspect ratio with the fetched value
+            self._adjust_aspect_ratio()
         except tk.TclError:
             pass 
 
@@ -603,6 +678,11 @@ class RunCommandWindow(tk.Toplevel):
                 print(f"Error in inspector auto-refresh thread: {e}")
 
     def _start_inspection(self):
+        # Prevent multiple inspection threads from running at the same time
+        if getattr(self, 'is_inspection_running', False):
+            return
+        self.is_inspection_running = True
+
         self.refresh_inspector_button.config(state=DISABLED, text=_("refreshing"))
         self.inspect_button.config(state=DISABLED, text=_("refreshing"))
         self.screenshot_canvas.delete("all")
@@ -648,27 +728,46 @@ class RunCommandWindow(tk.Toplevel):
             execute_command(f"adb -s {self.udid} shell rm {device_screenshot_path}")
             self.scrcpy_output_queue.put(_("screenshot_saved_success", path=local_screenshot_filepath) + "\n")
 
-            # Resize pane before embedding image
-            try:
-                with Image.open(local_screenshot_filepath) as img:
-                    width, height = img.size
-                    aspect_ratio = width / height
-                # Schedule the sash adjustment on the main thread
-                self.after(0, self._adjust_inspector_pane_aspect_ratio, aspect_ratio)
-            except Exception as e:
-                self.scrcpy_output_queue.put(_("screenshot_dimension_warning", error=e) + "\n")
-
-            # 2. Get UI dump
+            # 2. Get UI dump with retry logic for robustness
             device_dump_path = "/sdcard/window_dump.xml"
             local_dump_filepath = self.parent_app.logs_dir / f"window_dump_{self.udid.replace(':', '-')}.xml"
             self.parent_app.logs_dir.mkdir(exist_ok=True)
 
             self.scrcpy_output_queue.put(_("get_ui_dump_info") + "\n")
-            dump_cmd = f"adb -s {self.udid} shell uiautomator dump {device_dump_path}"
-            success_dump, out_dump = execute_command(dump_cmd)
-            if not success_dump:
-                self.scrcpy_output_queue.put(f"{_('get_ui_dump_error')}\n{out_dump}\n")
+
+            dump_successful = False
+            max_retries = 3
+            last_dump_output = ""
+
+            for i in range(max_retries):
+                # Always clean up previous attempt's file before trying
+                execute_command(f"adb -s {self.udid} shell rm {device_dump_path}")
+
+                dump_cmd = f"adb -s {self.udid} shell uiautomator dump {device_dump_path}"
+                success_dump, out_dump = execute_command(dump_cmd)
+                last_dump_output = out_dump # Save the last output for error reporting
+
+                # Check for explicit failure from the dump command itself
+                if not success_dump or "ERROR" in out_dump:
+                    self.scrcpy_output_queue.put(f"INFO: UI dump attempt {i+1}/{max_retries} failed explicitly. Retrying...\n")
+                    time.sleep(0.5)
+                    continue
+
+                # Verify that the file was actually created on the device
+                check_exists_cmd = f"adb -s {self.udid} shell ls {device_dump_path}"
+                success_check, _unused = execute_command(check_exists_cmd)
+                if success_check:
+                    dump_successful = True
+                    break  # Success! Exit the retry loop.
+                else:
+                    self.scrcpy_output_queue.put(f"INFO: UI dump file not found after attempt {i+1}/{max_retries}. Retrying...\n")
+                    time.sleep(0.5)
+
+            if not dump_successful:
+                self.scrcpy_output_queue.put(f"{_('get_ui_dump_error')}\n{last_dump_output}\n")
                 return
+
+            # If we reach here, the file exists. Proceed with pull.
             pull_dump_cmd = f"adb -s {self.udid} pull {device_dump_path} \"{local_dump_filepath}\""
             success_pull_dump, out_pull_dump = execute_command(pull_dump_cmd)
             if not success_pull_dump:
@@ -692,9 +791,20 @@ class RunCommandWindow(tk.Toplevel):
         except Exception as e:
             self.scrcpy_output_queue.put(_("fatal_inspection_error", error=e) + "\n")
         finally:
-            self.after(0, lambda: self.refresh_inspector_button.config(state=NORMAL, text=_("refresh")))
-            self.after(0, lambda: self.inspect_button.config(state=NORMAL, text=_("stop_inspector")))
+            # Always reset the state on the main thread when the thread finishes,
+            # regardless of success or failure.
+            self.after(0, self._on_inspection_finished)
 
+    def _on_inspection_finished(self):
+        """Resets the state after an inspection attempt is complete."""
+        self.is_inspection_running = False
+        # Only re-enable buttons if the inspector mode is still active.
+        # This prevents re-enabling them if the user clicked "Stop Inspector"
+        # while a refresh was in progress.
+        if self.is_inspecting:
+            self.refresh_inspector_button.config(state=NORMAL, text=_("refresh"))
+            self.inspect_button.config(state=NORMAL, text=_("stop_inspector"))
+            
     def _adjust_inspector_pane_aspect_ratio(self, aspect_ratio):
         """Adjusts the inspector pane width to match the screenshot's aspect ratio."""
         if not self.is_inspecting:
@@ -751,22 +861,24 @@ class RunCommandWindow(tk.Toplevel):
                 return
 
             img_width, img_height = img.size
-            aspect_ratio = img_width / img_height
+            
+            # Use the pre-fetched aspect ratio. If it's not available, calculate as a fallback.
+            current_aspect_ratio = self.aspect_ratio
+            if current_aspect_ratio is None:
+                current_aspect_ratio = img_width / img_height if img_height > 0 else 1
 
             if img_width > canvas_width or img_height > canvas_height:
-                if (canvas_width / aspect_ratio) <= canvas_height:
+                if (canvas_width / current_aspect_ratio) <= canvas_height:
                     new_width = canvas_width
-                    new_height = int(canvas_width / aspect_ratio)
+                    new_height = int(canvas_width / current_aspect_ratio)
                 else:
                     new_height = canvas_height
-                    new_width = int(canvas_height * aspect_ratio)
+                    new_width = int(canvas_height * current_aspect_ratio)
                 img = img.resize((new_width, new_height), Image.LANCZOS)
             
             self.screenshot_current_size = img.size
             self.screenshot_image_tk = ImageTk.PhotoImage(img)
             self.screenshot_canvas.create_image(canvas_width / 2, canvas_height / 2, image=self.screenshot_image_tk, anchor=CENTER)
-            self.screenshot_canvas.image = self.screenshot_image_tk # Keep a reference
-            self.after(100, self._adjust_aspect_ratio) # Trigger aspect ratio adjustment for inspector
 
         except Exception as e:
             self.scrcpy_output_queue.put(_("display_screenshot_error", error=e) + "\n")
@@ -2838,6 +2950,17 @@ def get_device_properties(udid: str) -> Optional[Dict[str, str]]:
         return None
     except Exception:
         return None
+
+def get_device_aspect_ratio(udid: str) -> Optional[float]:
+    """Gets the device's physical screen aspect ratio using 'wm size'."""
+    success, output = execute_command(f"adb -s {udid} shell wm size")
+    if success:
+        match = re.search(r'Physical size:\s*(\d+)x(\d+)', output)
+        if match:
+            width, height = int(match.group(1)), int(match.group(2))
+            if height > 0:
+                return width / height
+    return None
 
 # --- Performance Monitor Helper Functions (Integrated) ---
 
