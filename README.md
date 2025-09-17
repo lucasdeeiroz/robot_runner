@@ -15,6 +15,8 @@ A comprehensive desktop application, built with Python and Tkinter, for managing
     *   Displays device information (Model, Android Version, UDID).
     *   Tools to pair, connect, and disconnect devices over Wi-Fi.
     *   Execute manual ADB commands with output display.
+ 
+<img width="1042" height="772" alt="image" src="https://github.com/user-attachments/assets/82ece9da-f427-40e9-883b-72ab0b1680ec" />
 
 *   **Interactive UI Inspector:**
     *   Inspect the UI of any application in real-time to easily create selectors.
