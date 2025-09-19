@@ -23,7 +23,7 @@ from ttkbootstrap.constants import *
 from PIL import Image, ImageTk
 
 # --- Internationalization Setup ---
-from locales.i18n import _, load_language
+from locales.i18n import gettext as translate, load_language
 
 # --- Conditional import for pywin32 ---
 if sys.platform == "win32":
@@ -32,8 +32,8 @@ if sys.platform == "win32":
         import win32con
     except ImportError:
         messagebox.showerror(
-            _("dependency_missing"),
-            _("pywin32_required")
+            translate("dependency_missing"),
+            translate("pywin32_required")
         )
         sys.exit(1)
 
@@ -133,7 +133,7 @@ class RunCommandWindow(tk.Toplevel):
         else:
             # Find the device model from the parent app's device list to correctly format the title
             device_model = next((d.get('model', 'Unknown') for d in self.parent_app.devices if d.get('udid') == self.udid), 'Unknown')
-            window_title = _("running_title", title=Path(run_path).name, model=device_model)
+            window_title = translate("running_title", title=Path(run_path).name, model=device_model)
 
         self.title(window_title)
         self.geometry("1200x800")
@@ -204,7 +204,7 @@ class RunCommandWindow(tk.Toplevel):
 
         # Robot Output (only for test mode)
         if self.mode == 'test':
-            self.robot_output_frame = ttk.LabelFrame(self.output_paned_window, text=_("test_output"), padding=5)
+            self.robot_output_frame = ttk.LabelFrame(self.output_paned_window, text=translate("test_output"), padding=5)
             self.robot_output_text = ScrolledText(self.robot_output_frame, wrap=WORD, state=DISABLED, autohide=True)
             self.robot_output_text.pack(fill=BOTH, expand=YES)
             self.robot_output_text.text.tag_config("PASS", foreground="green")
@@ -214,12 +214,12 @@ class RunCommandWindow(tk.Toplevel):
             self.output_paned_window.add(self.robot_output_frame, weight=1)
 
         # Scrcpy Output
-        self.scrcpy_output_frame = ttk.LabelFrame(self.output_paned_window, text=_("scrcpy_output"), padding=5)
+        self.scrcpy_output_frame = ttk.LabelFrame(self.output_paned_window, text=translate("scrcpy_output"), padding=5)
         self.scrcpy_output_text = ScrolledText(self.scrcpy_output_frame, wrap=WORD, state=DISABLED, autohide=True)
         self.scrcpy_output_text.pack(fill=BOTH, expand=YES)
 
         # Performance Monitor Output & Controls
-        self.performance_output_frame = ttk.LabelFrame(self.output_paned_window, text=_("performance_monitor"), padding=5)
+        self.performance_output_frame = ttk.LabelFrame(self.output_paned_window, text=translate("performance_monitor"), padding=5)
 
         monitor_controls_frame = ttk.Frame(self.performance_output_frame)
         monitor_controls_frame.pack(side=TOP, fill=X, pady=(0, 5), padx=5)
@@ -229,14 +229,14 @@ class RunCommandWindow(tk.Toplevel):
         self.performance_output_text = ScrolledText(self.performance_output_frame, wrap=WORD, state=DISABLED, autohide=True)
         self.performance_output_text.pack(fill=BOTH, expand=YES, padx=5, pady=(0,5))
         
-        ttk.Label(monitor_controls_frame, text=_("app_package")).grid(row=0, column=0, columnspan=2, sticky=W, pady=(0,2))
+        ttk.Label(monitor_controls_frame, text=translate("app_package")).grid(row=0, column=0, columnspan=2, sticky=W, pady=(0,2))
         self.app_package_combo = ttk.Combobox(monitor_controls_frame, values=self.parent_app.app_packages_var.get().split(','))
         self.app_package_combo.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 5))
         if self.app_package_combo['values']:
             self.app_package_combo.set(self.app_package_combo['values'][0])
-        self.start_monitor_button = ttk.Button(monitor_controls_frame, text=_("start_monitoring"), command=self._start_performance_monitor, bootstyle="success")
+        self.start_monitor_button = ttk.Button(monitor_controls_frame, text=translate("start_monitoring"), command=self._start_performance_monitor, bootstyle="success")
         self.start_monitor_button.grid(row=2, column=0, sticky="ew", padx=(0, 2))
-        self.stop_monitor_button = ttk.Button(monitor_controls_frame, text=_("stop_monitoring"), command=self._stop_performance_monitor, bootstyle="danger", state=DISABLED)
+        self.stop_monitor_button = ttk.Button(monitor_controls_frame, text=translate("stop_monitoring"), command=self._stop_performance_monitor, bootstyle="danger", state=DISABLED)
         self.stop_monitor_button.grid(row=2, column=1, sticky="ew", padx=(2, 0))
         
         # Inspector Controls (only for non-test mode)
@@ -249,78 +249,78 @@ class RunCommandWindow(tk.Toplevel):
             inspector_top_controls_frame.pack(side=TOP, fill=X, pady=(0, 5), padx=0)
             inspector_top_controls_frame.columnconfigure(0, weight=1) # Make button expand
 
-            self.refresh_inspector_button = ttk.Button(inspector_top_controls_frame, text=_("refresh"), command=self._start_inspection, state=DISABLED)
+            self.refresh_inspector_button = ttk.Button(inspector_top_controls_frame, text=translate("refresh"), command=self._start_inspection, state=DISABLED)
             self.refresh_inspector_button.grid(row=0, column=0, sticky="ew", padx=(0, 5))
-            ToolTip(self.refresh_inspector_button, _("refresh_tooltip"))
+            ToolTip(self.refresh_inspector_button, translate("refresh_tooltip"))
 
-            self.auto_refresh_check = ttk.Checkbutton(inspector_top_controls_frame, text=_("inspector_auto_refresh"), variable=self.inspector_auto_refresh_var, bootstyle="round-toggle")
+            self.auto_refresh_check = ttk.Checkbutton(inspector_top_controls_frame, text=translate("inspector_auto_refresh"), variable=self.inspector_auto_refresh_var, bootstyle="round-toggle")
             self.auto_refresh_check.grid(row=0, column=1, sticky="e")
-            ToolTip(self.auto_refresh_check, _("inspector_auto_refresh_tooltip"))
+            ToolTip(self.auto_refresh_check, translate("inspector_auto_refresh_tooltip"))
 
             # --- Search Frame ---
-            search_frame = ttk.LabelFrame(self.inspector_controls_frame, text=_("inspector_search_xpath"), padding=5)
+            search_frame = ttk.LabelFrame(self.inspector_controls_frame, text=translate("inspector_search_xpath"), padding=5)
             search_frame.pack(side=TOP, fill=X, pady=(5, 5))
             search_frame.columnconfigure(0, weight=1)
 
             self.xpath_search_entry = ttk.Entry(search_frame, textvariable=self.xpath_search_var)
             self.xpath_search_entry.grid(row=0, column=0, sticky="ew", padx=(0, 5))
-            ToolTip(self.xpath_search_entry, _("search_tooltip"))
+            ToolTip(self.xpath_search_entry, translate("search_tooltip"))
 
             search_button_frame = ttk.Frame(search_frame)
             search_button_frame.grid(row=0, column=1, sticky="e")
 
-            self.search_button = ttk.Button(search_button_frame, text=_("search_button"), command=self._perform_xpath_search, bootstyle="primary")
+            self.search_button = ttk.Button(search_button_frame, text=translate("search_button"), command=self._perform_xpath_search, bootstyle="primary")
             self.search_button.pack(side=LEFT)
             
-            self.clear_search_button = ttk.Button(search_button_frame, text=_("clear_button"), command=self._clear_xpath_search, bootstyle="secondary")
+            self.clear_search_button = ttk.Button(search_button_frame, text=translate("clear_button"), command=self._clear_xpath_search, bootstyle="secondary")
             self.clear_search_button.pack(side=LEFT, padx=(5, 0))
-            ToolTip(self.clear_search_button, _("clear_tooltip"))
+            ToolTip(self.clear_search_button, translate("clear_tooltip"))
 
-            self.elements_list_frame = ttk.LabelFrame(self.inspector_controls_frame, text=_("visible_elements"), padding=5)
+            self.elements_list_frame = ttk.LabelFrame(self.inspector_controls_frame, text=translate("visible_elements"), padding=5)
             self.elements_list_frame.pack(side=TOP, fill=BOTH, expand=YES)
 
             self.elements_tree = ttk.Treeview(self.elements_list_frame, columns=("title",), show="headings")
-            self.elements_tree.heading("title", text=_("element"))
+            self.elements_tree.heading("title", text=translate("element"))
             self.elements_tree.column("title", width=300, anchor=W)
             self.elements_tree.pack(fill=BOTH, expand=YES)
             self.elements_tree.bind("<<TreeviewSelect>>", self._on_element_select)
             self.elements_tree.bind("<Button-1>", self._on_treeview_click)
         # --- 2. Center Pane (Controls) ---
-        self.center_pane_container = ttk.LabelFrame(self.main_paned_window, text=_("controls"), padding=10)
+        self.center_pane_container = ttk.LabelFrame(self.main_paned_window, text=translate("controls"), padding=10)
         
         # Mirroring controls
-        self.mirror_button = ttk.Button(self.center_pane_container, text=_("start_mirroring"), command=self._toggle_mirroring, bootstyle="info")
+        self.mirror_button = ttk.Button(self.center_pane_container, text=translate("start_mirroring"), command=self._toggle_mirroring, bootstyle="info")
         self.mirror_button.pack(fill=X, pady=5, padx=5)
-        ToolTip(self.mirror_button, _("mirroring_tooltip"))
+        ToolTip(self.mirror_button, translate("mirroring_tooltip"))
 
         # ADB-dependent controls
-        self.screenshot_button = ttk.Button(self.center_pane_container, text=_("take_screenshot"), command=self._take_screenshot)
+        self.screenshot_button = ttk.Button(self.center_pane_container, text=translate("take_screenshot"), command=self._take_screenshot)
         self.screenshot_button.pack(fill=X, pady=5, padx=5)
-        ToolTip(self.screenshot_button, _("screenshot_tooltip"))
+        ToolTip(self.screenshot_button, translate("screenshot_tooltip"))
         
-        self.record_button = ttk.Button(self.center_pane_container, text=_("start_recording"), command=self._toggle_recording, bootstyle="primary")
+        self.record_button = ttk.Button(self.center_pane_container, text=translate("start_recording"), command=self._toggle_recording, bootstyle="primary")
         self.record_button.pack(fill=X, pady=5, padx=5)
-        ToolTip(self.record_button, _("recording_tooltip"))
+        ToolTip(self.record_button, translate("recording_tooltip"))
         
         # Visibility toggles
-        self.toggle_scrcpy_out_button = ttk.Button(self.center_pane_container, text=_("show_scrcpy_output"), command=lambda: self._toggle_output_visibility('scrcpy'), bootstyle="secondary")
+        self.toggle_scrcpy_out_button = ttk.Button(self.center_pane_container, text=translate("show_scrcpy_output"), command=lambda: self._toggle_output_visibility('scrcpy'), bootstyle="secondary")
         self.toggle_scrcpy_out_button.pack(fill=X, pady=5, padx=5)
         
-        self.toggle_perf_button = ttk.Button(self.center_pane_container, text=_("show_performance"), command=lambda: self._toggle_output_visibility('performance'), bootstyle="secondary")
+        self.toggle_perf_button = ttk.Button(self.center_pane_container, text=translate("show_performance"), command=lambda: self._toggle_output_visibility('performance'), bootstyle="secondary")
         self.toggle_perf_button.pack(fill=X, pady=5, padx=5)
 
         # Test controls (only for test mode)
         if self.mode == 'test':
-            self.toggle_robot_button = ttk.Button(self.center_pane_container, text=_("hide_test_output"), command=lambda: self._toggle_output_visibility('robot'), bootstyle="secondary")
+            self.toggle_robot_button = ttk.Button(self.center_pane_container, text=translate("hide_test_output"), command=lambda: self._toggle_output_visibility('robot'), bootstyle="secondary")
             self.toggle_robot_button.pack(fill=X, pady=5, padx=5)
             
             separator = ttk.Separator(self.center_pane_container, orient=HORIZONTAL)
             separator.pack(fill=X, pady=10, padx=5)
 
-            self.repeat_test_button = ttk.Button(self.center_pane_container, text=_("repeat_test"), command=self._repeat_test)
-            self.close_button = ttk.Button(self.center_pane_container, text=_("close"), command=self._on_close)
+            self.repeat_test_button = ttk.Button(self.center_pane_container, text=translate("repeat_test"), command=self._repeat_test)
+            self.close_button = ttk.Button(self.center_pane_container, text=translate("close"), command=self._on_close)
 
-            self.stop_test_button = ttk.Button(self.center_pane_container, text=_("stop_test"), bootstyle="danger", command=self._stop_test)
+            self.stop_test_button = ttk.Button(self.center_pane_container, text=translate("stop_test"), bootstyle="danger", command=self._stop_test)
             self.stop_test_button.pack(fill=X, pady=5, padx=5)
         
         # Inspector controls (only for non-test mode)
@@ -328,25 +328,25 @@ class RunCommandWindow(tk.Toplevel):
             separator = ttk.Separator(self.center_pane_container, orient=HORIZONTAL)
             separator.pack(fill=X, pady=10, padx=5)
 
-            self.inspect_button = ttk.Button(self.center_pane_container, text=_("start_inspector"), command=self._toggle_inspector_mode, bootstyle="primary")
+            self.inspect_button = ttk.Button(self.center_pane_container, text=translate("start_inspector"), command=self._toggle_inspector_mode, bootstyle="primary")
             self.inspect_button.pack(fill=X, pady=5, padx=5)
-            ToolTip(self.inspect_button, _("inspector_tooltip"))
+            ToolTip(self.inspect_button, translate("inspector_tooltip"))
 
             # --- Element Details Frame (moved to center pane) ---
-            self.element_details_frame = ttk.LabelFrame(self.center_pane_container, text=_("element_details"), padding=5)
+            self.element_details_frame = ttk.LabelFrame(self.center_pane_container, text=translate("element_details"), padding=5)
             # self.element_details_frame will be packed/unpacked dynamically
             self.element_details_text = ScrolledText(self.element_details_frame, wrap=WORD, state=DISABLED, autohide=True)
             self.element_details_text.pack(fill=BOTH, expand=YES)
             self.element_details_text.text.tag_configure("bold", font="-weight bold")
 
             # XPath Buttons Frame (moved to center pane)
-            self.xpath_buttons_container = ttk.LabelFrame(self.center_pane_container, text=_("copy_xpath_by_attribute"), padding=5)
+            self.xpath_buttons_container = ttk.LabelFrame(self.center_pane_container, text=translate("copy_xpath_by_attribute"), padding=5)
             # self.xpath_buttons_container will be packed/unpacked dynamically
             self.xpath_buttons = {} # Dictionary to hold the dynamically created buttons
 
 
         # --- 3. Right Pane (Screen Mirror / Inspector) ---
-        self.right_pane_container = ttk.LabelFrame(self.main_paned_window, text=_("screen_mirror"), padding=5)
+        self.right_pane_container = ttk.LabelFrame(self.main_paned_window, text=translate("screen_mirror"), padding=5)
         self.embed_frame = self.right_pane_container # for compatibility with old code
 
         # Inspector UI elements (only for non-test mode)
@@ -411,10 +411,10 @@ class RunCommandWindow(tk.Toplevel):
 
         if is_visible:
             self.output_paned_window.forget(frame)
-            button.config(text=_(show_keys[output_type]))
+            button.config(text=translate(show_keys[output_type]))
         else:
             self.output_paned_window.add(frame, weight=1)
-            button.config(text=_(hide_keys[output_type]))
+            button.config(text=translate(hide_keys[output_type]))
 
         # Update state variable
         if output_type == 'robot': self.robot_output_is_visible = not is_visible
@@ -513,7 +513,7 @@ class RunCommandWindow(tk.Toplevel):
 
         if hasattr(self, 'inspect_button'):
             self.inspect_button.config(state=DISABLED)
-        self.mirror_button.config(text=_("stop_mirroring"), bootstyle="danger")
+        self.mirror_button.config(text=translate("stop_mirroring"), bootstyle="danger")
         
         thread = threading.Thread(target=self._run_and_embed_scrcpy)
         thread.daemon = True
@@ -527,12 +527,12 @@ class RunCommandWindow(tk.Toplevel):
         self.main_paned_window.forget(self.right_pane_container)
         if hasattr(self, 'inspect_button'):
             self.inspect_button.config(state=NORMAL)
-        self.mirror_button.config(text=_("start_mirroring"), bootstyle="info")
+        self.mirror_button.config(text=translate("start_mirroring"), bootstyle="info")
         
         if self.scrcpy_process and self.scrcpy_process.poll() is None:
             self._terminate_process_tree(self.scrcpy_process.pid, "scrcpy")
             self.scrcpy_process = None
-            self.scrcpy_output_queue.put(_("scrcpy_stopped_by_user") + "\n")
+            self.scrcpy_output_queue.put(translate("scrcpy_stopped_by_user") + "\n")
 
     def _toggle_inspector_mode(self):
         if self.is_inspecting:
@@ -558,11 +558,11 @@ class RunCommandWindow(tk.Toplevel):
         
         # Update button states
         self.mirror_button.config(state=DISABLED)
-        self.inspect_button.config(text=_("stop_inspector"), bootstyle="danger")
+        self.inspect_button.config(text=translate("stop_inspector"), bootstyle="danger")
         self.refresh_inspector_button.config(state=NORMAL)
 
         # Set a minimum width for the right pane and a starting size
-        self.right_pane_container.config(text=_("inspector"))
+        self.right_pane_container.config(text=translate("inspector"))
         self.main_paned_window.add(self.right_pane_container, weight=5)
         self.update_idletasks()
         try:
@@ -623,9 +623,9 @@ class RunCommandWindow(tk.Toplevel):
 
         # Restore button states
         self.mirror_button.config(state=NORMAL)
-        self.inspect_button.config(text=_("start_inspector"), bootstyle="primary")
+        self.inspect_button.config(text=translate("start_inspector"), bootstyle="primary")
         self.refresh_inspector_button.config(state=DISABLED)
-        self.right_pane_container.config(text=_("screen_mirror"))
+        self.right_pane_container.config(text=translate("screen_mirror"))
 
     def _auto_refresh_inspector_thread(self):
         """Checks for UI changes in the background and triggers a refresh if detected."""
@@ -668,7 +668,7 @@ class RunCommandWindow(tk.Toplevel):
 
                 if self.last_ui_dump_hash is not None and current_hash != self.last_ui_dump_hash:
                     # UI has changed, trigger a refresh on the main thread
-                    self.scrcpy_output_queue.put(_("ui_change_detected_refreshing") + "\n")
+                    self.scrcpy_output_queue.put(translate("ui_change_detected_refreshing") + "\n")
                     self.after(0, self._start_inspection)
             except tk.TclError:
                 # This can happen if the window is closed and widgets are destroyed
@@ -683,8 +683,8 @@ class RunCommandWindow(tk.Toplevel):
             return
         self.is_inspection_running = True
 
-        self.refresh_inspector_button.config(state=DISABLED, text=_("refreshing"))
-        self.inspect_button.config(state=DISABLED, text=_("refreshing"))
+        self.refresh_inspector_button.config(state=DISABLED, text=translate("refreshing"))
+        self.inspect_button.config(state=DISABLED, text=translate("refreshing"))
         self.screenshot_canvas.delete("all")
         self.xpath_search_var.set("") # Clear search on refresh
 
@@ -694,7 +694,7 @@ class RunCommandWindow(tk.Toplevel):
         canvas_height = self.screenshot_canvas.winfo_height()
         self.screenshot_canvas.create_text(
             canvas_width / 2, canvas_height / 2,
-            text=_("inspector_updating_screen"),
+            text=translate("inspector_updating_screen"),
             font=("Helvetica", 16), fill=self.parent_app.style.colors.fg, tags="loading_text"
         )
 
@@ -714,26 +714,26 @@ class RunCommandWindow(tk.Toplevel):
             local_screenshot_filename = f"inspector_screenshot_{self.udid.replace(':', '-')}_{timestamp}.png"
             local_screenshot_filepath = screenshots_dir / local_screenshot_filename
 
-            self.scrcpy_output_queue.put(_("inspector_screenshot_info") + "\n")
+            self.scrcpy_output_queue.put(translate("inspector_screenshot_info") + "\n")
             capture_cmd = f"adb -s {self.udid} shell screencap -p {device_screenshot_path}"
             success_cap, out_cap = execute_command(capture_cmd)
             if not success_cap:
-                self.scrcpy_output_queue.put(f"{_('capture_screenshot_error')}\n{out_cap}\n")
+                self.scrcpy_output_queue.put(f"{translate('capture_screenshot_error')}\n{out_cap}\n")
                 return
             pull_cmd = f"adb -s {self.udid} pull {device_screenshot_path} \"{local_screenshot_filepath}\""
             success_pull, out_pull = execute_command(pull_cmd)
             if not success_pull:
-                self.scrcpy_output_queue.put(f"{_('pull_screenshot_error')}\n{out_pull}\n")
+                self.scrcpy_output_queue.put(f"{translate('pull_screenshot_error')}\n{out_pull}\n")
                 return
             execute_command(f"adb -s {self.udid} shell rm {device_screenshot_path}")
-            self.scrcpy_output_queue.put(_("screenshot_saved_success", path=local_screenshot_filepath) + "\n")
+            self.scrcpy_output_queue.put(translate("screenshot_saved_success", path=local_screenshot_filepath) + "\n")
 
             # 2. Get UI dump with retry logic for robustness
             device_dump_path = "/sdcard/window_dump.xml"
             local_dump_filepath = self.parent_app.logs_dir / f"window_dump_{self.udid.replace(':', '-')}.xml"
             self.parent_app.logs_dir.mkdir(exist_ok=True)
 
-            self.scrcpy_output_queue.put(_("get_ui_dump_info") + "\n")
+            self.scrcpy_output_queue.put(translate("get_ui_dump_info") + "\n")
 
             dump_successful = False
             max_retries = 3
@@ -764,17 +764,17 @@ class RunCommandWindow(tk.Toplevel):
                     time.sleep(0.5)
 
             if not dump_successful:
-                self.scrcpy_output_queue.put(f"{_('get_ui_dump_error')}\n{last_dump_output}\n")
+                self.scrcpy_output_queue.put(f"{translate('get_ui_dump_error')}\n{last_dump_output}\n")
                 return
 
             # If we reach here, the file exists. Proceed with pull.
             pull_dump_cmd = f"adb -s {self.udid} pull {device_dump_path} \"{local_dump_filepath}\""
             success_pull_dump, out_pull_dump = execute_command(pull_dump_cmd)
             if not success_pull_dump:
-                self.scrcpy_output_queue.put(f"{_('pull_ui_dump_error')}\n{out_pull_dump}\n")
+                self.scrcpy_output_queue.put(f"{translate('pull_ui_dump_error')}\n{out_pull_dump}\n")
                 return
             execute_command(f"adb -s {self.udid} shell rm {device_dump_path}")
-            self.scrcpy_output_queue.put(_("ui_dump_saved_success", path=local_dump_filepath) + "\n")
+            self.scrcpy_output_queue.put(translate("ui_dump_saved_success", path=local_dump_filepath) + "\n")
 
             # Read dump content and store its hash for auto-refresh comparison
             try:
@@ -789,7 +789,7 @@ class RunCommandWindow(tk.Toplevel):
             self.after(0, self._display_inspection_results, local_screenshot_filepath, local_dump_filepath)
 
         except Exception as e:
-            self.scrcpy_output_queue.put(_("fatal_inspection_error", error=e) + "\n")
+            self.scrcpy_output_queue.put(translate("fatal_inspection_error", error=e) + "\n")
         finally:
             # Always reset the state on the main thread when the thread finishes,
             # regardless of success or failure.
@@ -802,8 +802,8 @@ class RunCommandWindow(tk.Toplevel):
         # This prevents re-enabling them if the user clicked "Stop Inspector"
         # while a refresh was in progress.
         if self.is_inspecting:
-            self.refresh_inspector_button.config(state=NORMAL, text=_("refresh"))
-            self.inspect_button.config(state=NORMAL, text=_("stop_inspector"))
+            self.refresh_inspector_button.config(state=NORMAL, text=translate("refresh"))
+            self.inspect_button.config(state=NORMAL, text=translate("stop_inspector"))
             
     def _adjust_inspector_pane_aspect_ratio(self, aspect_ratio):
         """Adjusts the inspector pane width to match the screenshot's aspect ratio."""
@@ -881,7 +881,7 @@ class RunCommandWindow(tk.Toplevel):
             self.screenshot_canvas.create_image(canvas_width / 2, canvas_height / 2, image=self.screenshot_image_tk, anchor=CENTER)
 
         except Exception as e:
-            self.scrcpy_output_queue.put(_("display_screenshot_error", error=e) + "\n")
+            self.scrcpy_output_queue.put(translate("display_screenshot_error", error=e) + "\n")
             return
 
         # Parse XML
@@ -901,7 +901,7 @@ class RunCommandWindow(tk.Toplevel):
             self._populate_elements_tree(self.all_elements_list)
 
         except Exception as e:
-            self.scrcpy_output_queue.put(_("parse_ui_dump_error", error=e) + "\n")
+            self.scrcpy_output_queue.put(translate("parse_ui_dump_error", error=e) + "\n")
 
     def _parse_and_store_node(self, node: ET.Element):
         """Parses a single XML node and adds it to the all_elements_list if valid."""
@@ -949,7 +949,7 @@ class RunCommandWindow(tk.Toplevel):
         self.elements_data_map.clear()
 
         if not elements_to_display:
-            self.elements_tree.insert("", END, values=(_("no_elements_found"),), tags=("no_elements",))
+            self.elements_tree.insert("", END, values=(translate("no_elements_found"),), tags=("no_elements",))
             return
 
         for element_data in elements_to_display:
@@ -1114,11 +1114,11 @@ class RunCommandWindow(tk.Toplevel):
             try:
                 self.clipboard_clear()
                 self.clipboard_append(xpath)
-                messagebox.showinfo(_("xpath_copied_title"), _("xpath_copied_message", xpath=xpath), parent=self)
+                messagebox.showinfo(translate("xpath_copied_title"), translate("xpath_copied_message", xpath=xpath), parent=self)
             except Exception as e:
-                messagebox.showerror(_("copy_error_title"), _("copy_error_message", error=e), parent=self)
+                messagebox.showerror(translate("copy_error_title"), translate("copy_error_message", error=e), parent=self)
         else:
-            messagebox.showwarning(_("no_xpath_title"), _("no_xpath_message"), parent=self)
+            messagebox.showwarning(translate("no_xpath_title"), translate("no_xpath_message"), parent=self)
 
     def _perform_xpath_search(self):
         """Filters the element list based on an XPath query against the last UI dump."""
@@ -1141,9 +1141,9 @@ class RunCommandWindow(tk.Toplevel):
             ]
             self._populate_elements_tree(filtered_elements)
         except ET.XMLSyntaxError as e:
-            messagebox.showerror(_("parse_ui_dump_error"), str(e), parent=self)
+            messagebox.showerror(translate("parse_ui_dump_error"), str(e), parent=self)
         except ET.XPathSyntaxError as e:
-            messagebox.showerror(_("invalid_xpath_title"), _("invalid_xpath_message", error=e), parent=self)
+            messagebox.showerror(translate("invalid_xpath_title"), translate("invalid_xpath_message", error=e), parent=self)
 
     def _clear_xpath_search(self):
         """Clears the XPath search and restores the full list of elements."""
@@ -1215,13 +1215,13 @@ class RunCommandWindow(tk.Toplevel):
 
     def _send_tap_to_device_and_refresh(self, x, y):
         """Sends a tap command to the device and then triggers an inspector refresh."""
-        self.scrcpy_output_queue.put(_("tap_info", x=int(x), y=int(y)) + "\n")
+        self.scrcpy_output_queue.put(translate("tap_info", x=int(x), y=int(y)) + "\n")
         command = f"adb -s {self.udid} shell input tap {int(x)} {int(y)}"
         success, output = execute_command(command)
         if not success:
-            self.scrcpy_output_queue.put(_("tap_error", output=output) + "\n")
+            self.scrcpy_output_queue.put(translate("tap_error", output=output) + "\n")
         else:
-            self.scrcpy_output_queue.put(_("tap_success_refreshing") + "\n")
+            self.scrcpy_output_queue.put(translate("tap_success_refreshing") + "\n")
             self.after(500, self._start_inspection)
 
     # --- Scrcpy Feature Methods ---
@@ -1243,7 +1243,7 @@ class RunCommandWindow(tk.Toplevel):
             output_thread.start()
             self._find_and_embed_window()
         except Exception as e:
-            self.scrcpy_output_queue.put(_("scrcpy_start_error", error=e) + "\n")
+            self.scrcpy_output_queue.put(translate("scrcpy_start_error", error=e) + "\n")
             self.after(0, self._stop_scrcpy)
 
     def _pipe_scrcpy_output_to_queue(self):
@@ -1279,7 +1279,7 @@ class RunCommandWindow(tk.Toplevel):
             except Empty:
                 pass
         if self.is_mirroring and self.scrcpy_process and self.scrcpy_process.poll() is not None:
-             self.scrcpy_output_queue.put(f"\n{_('scrcpy_terminated_unexpectedly')}\n")
+             self.scrcpy_output_queue.put(f"\n{translate('scrcpy_terminated_unexpectedly')}\n")
              self._stop_scrcpy()
         self.after(100, self._check_scrcpy_output_queue)
 
@@ -1293,13 +1293,13 @@ class RunCommandWindow(tk.Toplevel):
                 self.after(0, self._embed_window)
                 return
             time.sleep(0.2)
-        self.scrcpy_output_queue.put(_("scrcpy_find_window_error", title=self.unique_title) + "\n")
+        self.scrcpy_output_queue.put(translate("scrcpy_find_window_error", title=self.unique_title) + "\n")
 
     def _embed_window(self):
         if not self.scrcpy_hwnd or not self.is_mirroring: return
         try:
             if not win32gui.IsWindow(self.scrcpy_hwnd):
-                self.scrcpy_output_queue.put(_("scrcpy_embed_error_invalid_handle") + "\n")
+                self.scrcpy_output_queue.put(translate("scrcpy_embed_error_invalid_handle") + "\n")
                 return
             container_id = self.embed_frame.winfo_id()
             self.original_parent = win32gui.SetParent(self.scrcpy_hwnd, container_id)
@@ -1310,9 +1310,9 @@ class RunCommandWindow(tk.Toplevel):
             width, height = self.embed_frame.winfo_width(), self.embed_frame.winfo_height()
             win32gui.MoveWindow(self.scrcpy_hwnd, 0, 0, width, height, True)
             self.embed_frame.bind("<Configure>", self._resize_child)
-            self.scrcpy_output_queue.put(_("scrcpy_embedded_info", hwnd=self.scrcpy_hwnd) + "\n")
+            self.scrcpy_output_queue.put(translate("scrcpy_embedded_info", hwnd=self.scrcpy_hwnd) + "\n")
         except win32gui.error as e:
-            self.scrcpy_output_queue.put(_("scrcpy_embed_error_win32", error=e) + "\n")
+            self.scrcpy_output_queue.put(translate("scrcpy_embed_error_win32", error=e) + "\n")
 
     def _resize_child(self, event):
         if self.scrcpy_hwnd:
@@ -1327,11 +1327,11 @@ class RunCommandWindow(tk.Toplevel):
 
     # --- Scrcpy Feature Methods --------------------------------------------------
     def _take_screenshot(self):
-        self.screenshot_button.config(state=DISABLED, text=_("taking_screenshot"))
+        self.screenshot_button.config(state=DISABLED, text=translate("taking_screenshot"))
         threading.Thread(target=self._take_screenshot_thread, daemon=True).start()
 
     def _take_screenshot_thread(self):
-        self.scrcpy_output_queue.put(_("screenshot_info") + "\n")
+        self.scrcpy_output_queue.put(translate("screenshot_info") + "\n")
         screenshots_dir = self.parent_app.screenshots_dir
         screenshots_dir.mkdir(exist_ok=True)
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -1342,24 +1342,24 @@ class RunCommandWindow(tk.Toplevel):
             capture_cmd = f"adb -s {self.udid} shell screencap -p {device_filename}"
             success_cap, out_cap = execute_command(capture_cmd)
             if not success_cap:
-                self.scrcpy_output_queue.put(f"{_('capture_screenshot_error')}\n{out_cap}\n")
+                self.scrcpy_output_queue.put(f"{translate('capture_screenshot_error')}\n{out_cap}\n")
                 return
             pull_cmd = f"adb -s {self.udid} pull {device_filename} \"{local_filepath}\""
             success_pull, out_pull = execute_command(pull_cmd)
             if not success_pull:
-                self.scrcpy_output_queue.put(f"{_('pull_screenshot_error')}\n{out_pull}\n")
+                self.scrcpy_output_queue.put(f"{translate('pull_screenshot_error')}\n{out_pull}\n")
             else:
-                self.scrcpy_output_queue.put(_("screenshot_saved_success", path=local_filepath) + "\n")
+                self.scrcpy_output_queue.put(translate("screenshot_saved_success", path=local_filepath) + "\n")
             execute_command(f"adb -s {self.udid} shell rm {device_filename}")
         finally:
-            self.after(0, lambda: self.screenshot_button.config(state=NORMAL, text=_("take_screenshot")))
+            self.after(0, lambda: self.screenshot_button.config(state=NORMAL, text=translate("take_screenshot")))
 
     def _toggle_recording(self):
         if not self.is_recording: self._start_recording()
         else: self._stop_recording()
 
     def _start_recording(self):
-        self.record_button.config(state=DISABLED, text=_("starting_recording"))
+        self.record_button.config(state=DISABLED, text=translate("starting_recording"))
         threading.Thread(target=self._start_recording_thread, daemon=True).start()
 
     def _start_recording_thread(self):
@@ -1369,7 +1369,7 @@ class RunCommandWindow(tk.Toplevel):
         device_filename = f"recording_{timestamp}.mp4"
         self.recording_device_path = f"/sdcard/{device_filename}"
         command_list = ["adb", "-s", self.udid, "shell", "screenrecord", self.recording_device_path]
-        self.scrcpy_output_queue.put(_("recording_start_info", command=' '.join(command_list)) + "\n")
+        self.scrcpy_output_queue.put(translate("recording_start_info", command=' '.join(command_list)) + "\n")
         try:
             self.recording_process = subprocess.Popen(
                 command_list, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
@@ -1378,27 +1378,27 @@ class RunCommandWindow(tk.Toplevel):
             )
             self.after(0, self._update_recording_ui, True)
         except Exception as e:
-            self.scrcpy_output_queue.put(_("recording_start_error", error=e) + "\n")
-            self.after(0, lambda: self.record_button.config(state=NORMAL, text=_("start_recording")))
+            self.scrcpy_output_queue.put(translate("recording_start_error", error=e) + "\n")
+            self.after(0, lambda: self.record_button.config(state=NORMAL, text=translate("start_recording")))
 
     def _stop_recording(self):
-        self.record_button.config(state=DISABLED, text=_("stopping_recording"))
+        self.record_button.config(state=DISABLED, text=translate("stopping_recording"))
         threading.Thread(target=self._stop_recording_thread, daemon=True).start()
 
     def _stop_recording_thread(self):
-        self.scrcpy_output_queue.put(_("recording_stop_info") + "\n")
+        self.scrcpy_output_queue.put(translate("recording_stop_info") + "\n")
         if not self.recording_process or self.recording_process.poll() is not None:
-            self.scrcpy_output_queue.put(_("no_active_recording_error") + "\n")
+            self.scrcpy_output_queue.put(translate("no_active_recording_error") + "\n")
             self.after(0, self._update_recording_ui, False)
             return
         try:
             self.recording_process.kill()
-            self.scrcpy_output_queue.put(_("recording_stopped_saving_info") + "\n")
+            self.scrcpy_output_queue.put(translate("recording_stopped_saving_info") + "\n")
         except subprocess.TimeoutExpired:
-            self.scrcpy_output_queue.put(_("recording_unresponsive_warning") + "\n")
+            self.scrcpy_output_queue.put(translate("recording_unresponsive_warning") + "\n")
             self.recording_process.kill()
         except Exception as e:
-            self.scrcpy_output_queue.put(_("recording_stop_error", error=e) + "\n")
+            self.scrcpy_output_queue.put(translate("recording_stop_error", error=e) + "\n")
             self.recording_process.kill()
         time.sleep(2)
         recordings_dir = self.parent_app.recordings_dir
@@ -1407,25 +1407,25 @@ class RunCommandWindow(tk.Toplevel):
         pull_cmd = f"adb -s {self.udid} pull {self.recording_device_path} \"{local_filepath}\""
         success_pull, out_pull = execute_command(pull_cmd)
         if not success_pull:
-            self.scrcpy_output_queue.put(f"{_('pull_recording_error')}\n{out_pull}\n")
+            self.scrcpy_output_queue.put(f"{translate('pull_recording_error')}\n{out_pull}\n")
         else:
-            self.scrcpy_output_queue.put(_("recording_saved_success", path=local_filepath) + "\n")
+            self.scrcpy_output_queue.put(translate("recording_saved_success", path=local_filepath) + "\n")
         execute_command(f"adb -s {self.udid} shell rm {self.recording_device_path}")
         self.after(0, self._update_recording_ui, False)
 
     def _update_recording_ui(self, is_recording: bool):
         self.is_recording = is_recording
         if is_recording:
-            self.record_button.config(text=_("stop_recording"), bootstyle="danger")
+            self.record_button.config(text=translate("stop_recording"), bootstyle="danger")
         else:
-            self.record_button.config(text=_("start_recording"), bootstyle="primary")
+            self.record_button.config(text=translate("start_recording"), bootstyle="primary")
         self.record_button.config(state=NORMAL)
 
     # --- Performance Monitor Methods ---------------------------------------------
     def _start_performance_monitor(self):
         app_package = self.app_package_combo.get()
         if not app_package:
-            messagebox.showwarning(_("input_error"), _("select_app_package_warning"), parent=self)
+            messagebox.showwarning(translate("input_error"), translate("select_app_package_warning"), parent=self)
             return
         self.is_monitoring = True
         self.stop_monitoring_event.clear()
@@ -1453,7 +1453,7 @@ class RunCommandWindow(tk.Toplevel):
             self.start_monitor_button.config(state=NORMAL)
             self.stop_monitor_button.config(state=DISABLED)
             self.app_package_combo.config(state="readonly")
-            self.performance_output_queue.put(f"\n{_('monitoring_stopped_by_user')}\n")
+            self.performance_output_queue.put(f"\n{translate('monitoring_stopped_by_user')}\n")
 
     def _check_performance_output_queue(self):
         while not self.performance_output_queue.empty():
@@ -1468,7 +1468,7 @@ class RunCommandWindow(tk.Toplevel):
                         mode = 'w' if "Starting monitoring" in line else 'a'
                         with open(self.performance_log_file, mode, encoding=OUTPUT_ENCODING) as f: f.write(line)
                     except Exception as e:
-                        self.performance_output_queue.put(f"\n{_('log_write_error', error=e)}\n")
+                        self.performance_output_queue.put(f"\n{translate('log_write_error', error=e)}\n")
             except Empty:
                 pass
         if self.is_monitoring and (self.performance_thread is None or not self.performance_thread.is_alive()):
@@ -1508,7 +1508,7 @@ class RunCommandWindow(tk.Toplevel):
         try:
             device_info = get_device_properties(self.udid)
             if not device_info:
-                self.robot_output_queue.put(_("get_device_info_error", udid=self.udid) + "\n")
+                self.robot_output_queue.put(translate("get_device_info_error", udid=self.udid) + "\n")
                 return
 
             file_path = Path(self.run_path)
@@ -1526,7 +1526,7 @@ class RunCommandWindow(tk.Toplevel):
             else:
                 command = f'{base_command} ".\\{file_path}"'
 
-            self.robot_output_queue.put(_("executing_command", command=command))
+            self.robot_output_queue.put(translate("executing_command", command=command))
 
             creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
             self.robot_process = subprocess.Popen(
@@ -1537,10 +1537,10 @@ class RunCommandWindow(tk.Toplevel):
                 self.robot_output_queue.put(line)
             self.robot_process.stdout.close()
             return_code = self.robot_process.wait()
-            self.robot_output_queue.put(_("test_finished", code=return_code) + "\n")
+            self.robot_output_queue.put(translate("test_finished", code=return_code) + "\n")
             
         except Exception as e:
-            self.robot_output_queue.put(_("robot_run_fatal_error", error=e) + "\n")
+            self.robot_output_queue.put(translate("robot_run_fatal_error", error=e) + "\n")
         finally:
             self.after(0, self._on_test_finished)
             self.after(0, self.parent_app._on_period_change) # Refresh logs view for current period
@@ -1586,17 +1586,17 @@ class RunCommandWindow(tk.Toplevel):
             if clean_path.exists():
                 os.startfile(clean_path)
             else:
-                messagebox.showwarning(_("file_not_found_title"), _("file_not_found_message", path=clean_path), parent=self)
+                messagebox.showwarning(translate("file_not_found_title"), translate("file_not_found_message", path=clean_path), parent=self)
         except Exception as e:
-            messagebox.showerror(_("open_file_error_title"), _("open_file_error_message", error=e), parent=self)
+            messagebox.showerror(translate("open_file_error_title"), translate("open_file_error_message", error=e), parent=self)
 
     def _stop_test(self):
         self.stop_test_button.config(state=DISABLED)
-        self.robot_output_queue.put(f"\n{_('stop_button_clicked')}\n")
+        self.robot_output_queue.put(f"\n{translate('stop_button_clicked')}\n")
         if self.robot_process and self.robot_process.poll() is None:
             self._terminate_process_tree(self.robot_process.pid, "robot")
         else:
-            self.robot_output_queue.put(_("robot_process_already_finished") + "\n")
+            self.robot_output_queue.put(translate("robot_process_already_finished") + "\n")
 
     # --- Window Management -------------------------------------------------------
     def _terminate_process_tree(self, pid: int, name: str):
@@ -1610,9 +1610,9 @@ class RunCommandWindow(tk.Toplevel):
             else:
                 os.kill(os.getpid(pid), signal.SIGTERM)
             output_q = self.robot_output_queue if name == "robot" else self.scrcpy_output_queue
-            output_q.put(_("process_terminated_info", name=name.capitalize(), pid=pid) + "\n")
+            output_q.put(translate("process_terminated_info", name=name.capitalize(), pid=pid) + "\n")
         except (subprocess.CalledProcessError, ProcessLookupError, FileNotFoundError) as e:
-            print(_("terminate_process_warning", name=name, pid=pid, e=e))
+            print(translate("terminate_process_warning", name=name, pid=pid, e=e))
 
     def _on_close(self):
         if self._is_closing: return
@@ -1622,7 +1622,7 @@ class RunCommandWindow(tk.Toplevel):
         if self.mode == 'test' and self.robot_process: self._stop_test()
         if self.is_monitoring: self._stop_performance_monitor()
         if self.is_recording:
-            self.scrcpy_output_queue.put(_("stop_recording_on_close") + "\n")
+            self.scrcpy_output_queue.put(translate("stop_recording_on_close") + "\n")
             threading.Thread(target=self._stop_recording_thread, daemon=True).start()
 
         if self.is_mirroring: self._stop_scrcpy()
@@ -1638,12 +1638,373 @@ class RunCommandWindow(tk.Toplevel):
 
         self.destroy()
 
+
+# --- Page Object Classes for Tabs ---
+
+class RunTabPage(ttk.Frame):
+    """UI and logic for the 'Run Tests' tab."""
+    def __init__(self, parent, app: "RobotRunnerApp"):
+        super().__init__(parent, padding=10)
+        self.app = app
+
+        self._setup_widgets()
+        self.on_run_mode_change()
+
+    def _setup_widgets(self):
+        device_frame = ttk.LabelFrame(self, text=translate("device_selection"), padding=10)
+        device_frame.pack(fill=X, pady=5)
+        
+        ttk.Label(device_frame, text=translate("select_devices")).pack(side=LEFT, padx=5)
+        
+        listbox_frame = ttk.Frame(device_frame)
+        listbox_frame.pack(side=LEFT, padx=5, fill=X, expand=YES)
+        
+        scrollbar = ttk.Scrollbar(listbox_frame, orient=VERTICAL)
+        self.device_listbox = tk.Listbox(listbox_frame, selectmode=EXTENDED, exportselection=False, height=4, yscrollcommand=scrollbar.set)
+        scrollbar.config(command=self.device_listbox.yview)
+        
+        scrollbar.pack(side=RIGHT, fill=Y)
+        self.device_listbox.pack(side=LEFT, fill=BOTH, expand=YES)
+        ToolTip(self.device_listbox, translate("devices_tooltip"))
+        
+        self.refresh_button = ttk.Button(device_frame, text=translate("refresh"), command=self.app._refresh_devices, bootstyle="secondary")
+        self.refresh_button.pack(side=LEFT, padx=5)
+        ToolTip(self.refresh_button, translate("refresh_devices_tooltip"))
+
+        test_frame = ttk.LabelFrame(self, text=translate("test_selection"), padding=10)
+        test_frame.pack(fill=BOTH, expand=YES, pady=5)
+        test_frame.columnconfigure(0, weight=1)
+        test_frame.rowconfigure(1, weight=1)
+
+        top_controls_frame = ttk.Frame(test_frame)
+        top_controls_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=2)
+        top_controls_frame.columnconfigure(0, weight=1)
+
+        self.selection_label = ttk.Label(top_controls_frame, text=translate("test_suites_txt"))
+        self.selection_label.grid(row=0, column=0, sticky=W)
+        
+        mode_frame = ttk.Frame(top_controls_frame)
+        mode_frame.grid(row=0, column=1, sticky="e")
+        ttk.Radiobutton(mode_frame, text=translate("run_by_suite"), variable=self.app.run_mode_var, value="Suite", command=self.on_run_mode_change).pack(side=LEFT, padx=5)
+        ttk.Radiobutton(mode_frame, text=translate("run_by_test"), variable=self.app.run_mode_var, value="Test", command=self.on_run_mode_change).pack(side=LEFT, padx=5)
+
+        self.selection_listbox = tk.Listbox(test_frame, exportselection=False)
+        self.selection_listbox.grid(row=1, column=0, padx=5, pady=2, sticky="nsew")
+        self.selection_listbox.bind("<Double-1>", self.on_selection_listbox_double_click)
+
+        run_frame = ttk.LabelFrame(self, text=translate("run_controls"), padding=10)
+        run_frame.pack(fill=X, pady=5)
+        run_frame.columnconfigure(1, weight=1)
+        
+        self.device_options_button = ttk.Button(run_frame, text=translate("device_toolbox"), command=self.app._mirror_device, bootstyle="info")
+        self.device_options_button.grid(row=0, column=0, sticky="w", padx=5, pady=5)
+        ToolTip(self.device_options_button, translate("device_toolbox_tooltip"))
+
+        self.run_button = ttk.Button(run_frame, text=translate("run_test"), command=self.app._run_test, bootstyle="success")
+        self.run_button.grid(row=0, column=2, sticky="e", padx=5, pady=5)
+        ToolTip(self.run_button, translate("run_test_tooltip"))
+
+    def on_run_mode_change(self):
+        """Handles the change of run mode and populates the listbox."""
+        if self.app.run_mode_var.get() == "Suite":
+            self.app.current_path = self.app.suites_dir
+        else:
+            self.app.current_path = self.app.tests_dir
+        self.populate_selection_listbox()
+
+    def populate_selection_listbox(self):
+        """Populates the listbox based on the selected run mode and current path."""
+        self.selection_listbox.delete(0, END)
+        mode = self.app.run_mode_var.get()
+        
+        base_dir = self.app.suites_dir if mode == "Suite" else self.app.tests_dir
+        
+        if self.app.current_path != base_dir:
+            self.selection_listbox.insert(END, translate("back_button"))
+
+        items = sorted(list(self.app.current_path.iterdir()), key=lambda p: (not p.is_dir(), p.name.lower()))
+        for item in items:
+            if item.is_dir():
+                self.selection_listbox.insert(END, translate("folder_prefix", name=item.name))
+            elif mode == "Suite" and item.suffix == ".txt":
+                self.selection_listbox.insert(END, item.name)
+            elif mode == "Test" and item.suffix == ".robot":
+                self.selection_listbox.insert(END, item.name)
+        
+        self.selection_label.config(text=translate("current_path_label", path=self.app.current_path))
+
+    def on_selection_listbox_double_click(self, event):
+        """Handles navigation in the listbox."""
+        selected_indices = self.selection_listbox.curselection()
+        if not selected_indices:
+            return
+        
+        selected_item = self.selection_listbox.get(selected_indices[0])
+
+        if selected_item == translate("back_button"):
+            self.app.current_path = self.app.current_path.parent
+        elif selected_item.startswith(translate("folder_prefix", name="").strip()):
+            folder_name = selected_item.replace(translate("folder_prefix", name="").strip(), "").strip()
+            self.app.current_path = self.app.current_path / folder_name
+        
+        self.populate_selection_listbox()
+
+class AdbToolsTabPage(ttk.Frame):
+    """UI and logic for the 'ADB Tools' tab."""
+    def __init__(self, parent, app: "RobotRunnerApp"):
+        super().__init__(parent, padding=10)
+        self.app = app
+        self._setup_widgets()
+
+    def _setup_widgets(self):
+        adb_tools_frame = ttk.Frame(self)
+        adb_tools_frame.pack(fill=BOTH, expand=YES)
+        adb_tools_frame.rowconfigure(2, weight=1)
+        adb_tools_frame.columnconfigure(0, weight=1)
+
+        wireless_frame = ttk.LabelFrame(adb_tools_frame, text=translate("wireless_adb"), padding=10)
+        wireless_frame.grid(row=0, column=0, sticky="ew", pady=5)
+        wireless_frame.columnconfigure(0, weight=2)
+        wireless_frame.columnconfigure(1, weight=1)
+        wireless_frame.columnconfigure(2, weight=1)
+
+        ttk.Label(wireless_frame, text=translate("ip_address")).grid(row=0, column=0, sticky=W, padx=5)
+        ttk.Label(wireless_frame, text=translate("port")).grid(row=0, column=1, sticky=W, padx=5)
+        ttk.Label(wireless_frame, text=translate("pairing_code")).grid(row=0, column=2, sticky=W, padx=5)
+
+        self.ip_entry = ttk.Entry(wireless_frame)
+        self.ip_entry.grid(row=1, column=0, sticky="ew", padx=5, pady=(0, 5))
+        self.port_entry = ttk.Entry(wireless_frame, width=8)
+        self.port_entry.grid(row=1, column=1, sticky="ew", padx=5, pady=(0, 5))
+        self.code_entry = ttk.Entry(wireless_frame, width=8)
+        self.code_entry.grid(row=1, column=2, sticky="ew", padx=5, pady=(0, 5))
+        
+        button_frame = ttk.Frame(wireless_frame)
+        button_frame.grid(row=2, column=0, columnspan=3, sticky="ew", pady=5)
+        button_frame.columnconfigure(0, weight=1)
+        button_frame.columnconfigure(1, weight=1)
+        button_frame.columnconfigure(2, weight=1)
+        
+        self.disconnect_button = ttk.Button(button_frame, text=translate("disconnect"), command=self.app._disconnect_wireless_device, bootstyle="danger")
+        self.disconnect_button.grid(row=0, column=0, sticky="ew", padx=5)
+        ToolTip(self.disconnect_button, translate("disconnect_tooltip"))
+
+        self.pair_button = ttk.Button(button_frame, text=translate("pair"), command=self.app._pair_wireless_device, bootstyle="info")
+        self.pair_button.grid(row=0, column=1, sticky="ew", padx=5)
+        ToolTip(self.pair_button, translate("pair_tooltip"))
+
+        self.connect_button = ttk.Button(button_frame, text=translate("connect"), command=self.app._connect_wireless_device)
+        self.connect_button.grid(row=0, column=2, sticky="ew", padx=5)
+        ToolTip(self.connect_button, translate("connect_tooltip"))
+
+        manual_cmd_frame = ttk.LabelFrame(adb_tools_frame, text=translate("manual_adb_command"), padding=10)
+        manual_cmd_frame.grid(row=1, column=0, sticky="ew", pady=5)
+        manual_cmd_frame.columnconfigure(0, weight=1)
+
+        ttk.Label(manual_cmd_frame, text=translate("adb_command_label")).grid(row=0, column=0, sticky=W, padx=5)
+        self.adb_command_entry = ttk.Entry(manual_cmd_frame)
+        self.adb_command_entry.grid(row=1, column=0, sticky="ew", padx=5, pady=(0, 5))
+        ToolTip(self.adb_command_entry, translate("adb_command_tooltip"))
+
+        self.run_adb_button = ttk.Button(manual_cmd_frame, text=translate("run_command"), command=self.app._run_manual_adb_command)
+        self.run_adb_button.grid(row=2, column=0, sticky="ew", padx=5, pady=5)
+        ToolTip(self.run_adb_button, translate("run_command_tooltip"))
+
+        output_frame = ttk.LabelFrame(adb_tools_frame, text=translate("adb_output"), padding=5)
+        output_frame.grid(row=2, column=0, sticky="nsew", pady=5)
+        output_frame.rowconfigure(0, weight=1)
+        output_frame.columnconfigure(0, weight=1)
+
+        self.adb_tools_output_text = ScrolledText(output_frame, wrap=WORD, state=DISABLED, autohide=True)
+        self.adb_tools_output_text.grid(row=0, column=0, sticky="nsew")
+
+class LogsTabPage(ttk.Frame):
+    """UI and logic for the 'Test Logs' tab. Widgets are created lazily."""
+    def __init__(self, parent, app: "RobotRunnerApp"):
+        super().__init__(parent, padding=10)
+        self.app = app
+
+    def setup_widgets(self):
+        """Creates and places all the widgets in the tab."""
+        logs_controls_frame = ttk.Frame(self)
+        logs_controls_frame.pack(fill=X, pady=5)
+
+        left_controls_frame = ttk.Frame(logs_controls_frame)
+        left_controls_frame.pack(side=LEFT, fill=X, expand=True)
+
+        ttk.Label(left_controls_frame, text=translate("group_by")).pack(side=LEFT, padx=(0,5))
+        self.group_by_combobox = ttk.Combobox(left_controls_frame, textvariable=self.app.group_by_var,
+                                              values=[translate("group_by_device"), translate("group_by_suite"), translate("group_by_status")], state="readonly", width=12)
+        self.group_by_combobox.pack(side=LEFT, padx=(0, 15))
+        self.group_by_combobox.bind("<<ComboboxSelected>>", self.app._on_group_by_selected)
+        ToolTip(self.group_by_combobox, translate("group_by_tooltip"))
+
+        ttk.Label(left_controls_frame, text=translate("period")).pack(side=LEFT, padx=(0,5))
+        self.period_combobox = ttk.Combobox(left_controls_frame, textvariable=self.app.log_period_var,
+                                        values=[translate("today"), translate("period_last_7_days"), translate("last_30_days"), translate("last_6_months"), translate("all_time")], state="readonly")
+        self.period_combobox.pack(side=LEFT, padx=(0, 5))
+        self.period_combobox.bind("<<ComboboxSelected>>", self.app._on_period_change)
+        ToolTip(self.period_combobox, translate("period_tooltip"))
+
+        right_controls_frame = ttk.Frame(logs_controls_frame)
+        right_controls_frame.pack(side=RIGHT)
+
+        self.log_cache_info_label = ttk.Label(right_controls_frame, text=translate("no_data_loaded"))
+        self.log_cache_info_label.pack(side=LEFT, padx=(0, 10))
+
+        self.reparse_button = ttk.Button(right_controls_frame, text=translate("reparse"),
+                                    command=self.app._start_log_reparse,
+                                    bootstyle="secondary")
+        self.reparse_button.pack(side=LEFT)
+        ToolTip(self.reparse_button, translate("reparse_tooltip"))
+
+        self.progress_frame = ttk.Frame(self)
+        self.progress_label = ttk.Label(self.progress_frame, text=translate("parsing"))
+        self.progress_bar = ttk.Progressbar(self.progress_frame, mode='determinate')
+        ToolTip(self.progress_bar, translate("parsing_tooltip"))
+        
+        logs_tree_frame = ttk.Frame(self)
+        logs_tree_frame.pack(fill=BOTH, expand=YES, pady=5)
+
+        scrollbar = ttk.Scrollbar(logs_tree_frame, orient=VERTICAL)
+        
+        self.logs_tree = ttk.Treeview(logs_tree_frame, columns=("suite", "status", "time"), show="headings", yscrollcommand=scrollbar.set)
+        scrollbar.config(command=self.logs_tree.yview)
+        
+        self.logs_tree.heading("suite", text=translate("log_tree_suite"))
+        self.logs_tree.heading("status", text=translate("log_tree_status"))
+        self.logs_tree.heading("time", text=translate("log_tree_time"))
+        
+        scrollbar.pack(side=RIGHT, fill=Y)
+        self.logs_tree.pack(side=LEFT, fill=BOTH, expand=YES)
+        
+        self.logs_tree.bind("<Double-1>", self.app._on_log_double_click)
+        self.logs_tree.tag_configure("no_logs", foreground="gray")
+
+class SettingsTabPage(ttk.Frame):
+    """UI and logic for the 'Settings' tab."""
+    def __init__(self, parent, app: "RobotRunnerApp"):
+        super().__init__(parent, padding=10)
+        self.app = app
+        self._setup_widgets()
+
+    def _setup_widgets(self):
+        settings_frame = ttk.Frame(self)
+        settings_frame.pack(fill=BOTH, expand=YES)
+
+        app_settings_frame = ttk.LabelFrame(settings_frame, text=translate("app_tool_paths"), padding=10)
+        app_settings_frame.pack(fill=X, pady=5)
+        app_settings_frame.columnconfigure(1, weight=1)
+
+        ttk.Label(app_settings_frame, text=translate("appium_server")).grid(row=0, column=0, padx=5, pady=5, sticky=W)
+        self.appium_status_label = ttk.Label(app_settings_frame, text=translate("appium_status_stopped"), bootstyle="danger")
+        self.appium_status_label.grid(row=0, column=1, padx=5, pady=5, sticky=W)
+        self.toggle_appium_button = ttk.Button(app_settings_frame, text=translate("start_appium"), command=self.app._toggle_appium_server, bootstyle="primary")
+        self.toggle_appium_button.grid(row=0, column=2, padx=5, pady=5)
+        ToolTip(self.toggle_appium_button, translate("appium_toggle_tooltip"))
+
+        ttk.Label(app_settings_frame, text=translate("appium_command")).grid(row=1, column=0, padx=5, pady=5, sticky=W)
+        ttk.Entry(app_settings_frame, textvariable=self.app.appium_command_var).grid(row=1, column=1, columnspan=2, padx=5, pady=5, sticky=EW)
+        
+        dir_settings_frame = ttk.LabelFrame(settings_frame, text=translate("dir_path_settings"), padding=10)
+        dir_settings_frame.pack(fill=X, pady=5)
+        dir_settings_frame.columnconfigure(1, weight=1)
+
+        ttk.Label(dir_settings_frame, text=translate("suites_dir")).grid(row=0, column=0, padx=5, pady=2, sticky=W)
+        ttk.Entry(dir_settings_frame, textvariable=self.app.suites_dir_var).grid(row=0, column=1, padx=5, pady=2, sticky=EW)
+        ttk.Label(dir_settings_frame, text=translate("tests_dir")).grid(row=0, column=2, padx=5, pady=2, sticky=W)
+        ttk.Entry(dir_settings_frame, textvariable=self.app.tests_dir_var).grid(row=0, column=3, padx=5, pady=2, sticky=EW)
+
+        ttk.Label(dir_settings_frame, text=translate("screenshots_dir")).grid(row=1, column=0, padx=5, pady=2, sticky=W)
+        ttk.Entry(dir_settings_frame, textvariable=self.app.screenshots_dir_var).grid(row=1, column=1, padx=5, pady=2, sticky=EW)
+        ttk.Label(dir_settings_frame, text=translate("recordings_dir")).grid(row=2, column=1, padx=5, pady=2, sticky=W)
+        ttk.Entry(dir_settings_frame, textvariable=self.app.recordings_dir_var).grid(row=1, column=3, padx=5, pady=2, sticky=EW)
+        
+        ttk.Label(dir_settings_frame, text=translate("logs_dir")).grid(row=2, column=0, padx=5, pady=2, sticky=W)
+        ttk.Entry(dir_settings_frame, textvariable=self.app.logs_dir_var).grid(row=2, column=1, padx=5, pady=2, sticky=EW)
+        ttk.Label(dir_settings_frame, text=translate("scrcpy_path")).grid(row=2, column=2, padx=5, pady=5, sticky=W)
+        ttk.Entry(dir_settings_frame, textvariable=self.app.scrcpy_path_var).grid(row=2, column=3, padx=5, pady=5, sticky=EW)
+        
+        inspector_settings_frame = ttk.LabelFrame(settings_frame, text=translate("inspector_settings"), padding=10)
+        inspector_settings_frame.pack(fill=X, pady=5)
+        inspector_settings_frame.columnconfigure(1, weight=1)
+        ttk.Label(inspector_settings_frame, text=translate("app_packages_label")).grid(row=6, column=0, padx=5, pady=5, sticky=W)
+        app_packages_entry = ttk.Entry(inspector_settings_frame, textvariable=self.app.app_packages_var)
+        app_packages_entry.grid(row=6, column=1, padx=5, pady=5, sticky=EW)
+        ToolTip(app_packages_entry, translate("app_packages_tooltip"))
+
+        bottom_frame = ttk.Frame(settings_frame)
+        bottom_frame.pack(fill=X, pady=0, padx=0)
+        bottom_frame.columnconfigure(0, weight=1)
+
+        appearance_frame = ttk.LabelFrame(bottom_frame, text=translate("appearance"), padding=10)
+        appearance_frame.grid(row=0, column=0, sticky="ew", pady=5, padx=0)
+        appearance_frame.columnconfigure(1, weight=1)
+
+        ttk.Label(appearance_frame, text=translate("theme")).grid(row=0, column=0, padx=5, pady=2, sticky=W)
+        theme_combo = ttk.Combobox(appearance_frame, textvariable=self.app.theme_var, values=["darkly", "litera"], state="readonly")
+        theme_combo.grid(row=0, column=1, padx=5, pady=2, sticky=W)
+        ttk.Label(appearance_frame, text=translate("theme_restart_required")).grid(row=0, column=2, padx=5, pady=2, sticky=W)
+        ToolTip(theme_combo, translate("theme_tooltip"))
+        
+        ttk.Label(appearance_frame, text=translate("language_label")).grid(row=1, column=0, padx=5, pady=2, sticky=W)
+        self.language_combo = ttk.Combobox(appearance_frame, state="readonly", values=list(self.app.LANGUAGES.values()))
+        self.language_combo.grid(row=1, column=1, padx=5, pady=2, sticky=W)
+        self.language_combo.bind("<<ComboboxSelected>>", self.app._on_language_select)
+        ToolTip(self.language_combo, translate("language_tooltip"))
+
+        current_lang_code = self.app.language_var.get()
+        current_lang_name = self.app.LANGUAGES.get(current_lang_code, "English")
+        self.language_combo.set(current_lang_name)
+
+        save_button = ttk.Button(bottom_frame, text=translate("save_settings"), command=self.app._save_settings, bootstyle="success")
+        save_button.grid(row=0, column=1, sticky="e", padx=10)
+        ToolTip(save_button, translate("save_settings_tooltip"))
+
+        output_frame = ttk.LabelFrame(settings_frame, text=translate("appium_server_output"), padding=5)
+        output_frame.pack(fill=BOTH, expand=YES, pady=5)
+        self.appium_output_text = ScrolledText(output_frame, wrap=WORD, state=DISABLED, autohide=True)
+        self.appium_output_text.pack(fill=BOTH, expand=YES)
+
+class AboutTabPage(ttk.Frame):
+    """UI and logic for the 'About' tab."""
+    def __init__(self, parent, app: "RobotRunnerApp"):
+        super().__init__(parent, padding=10)
+        self.app = app
+        self._setup_widgets()
+
+    def _setup_widgets(self):
+        about_frame = ttk.Frame(self)
+        about_frame.pack(fill=BOTH, expand=YES, padx=10, pady=5)
+
+        title_label = ttk.Label(about_frame, text=translate("about_title"), font="-size 20 -weight bold")
+        title_label.pack(pady=(0, 10))
+        ToolTip(title_label, "Robot Runner - by Lucas de Eiroz Rodrigues")
+
+        desc_label = ttk.Label(about_frame, text=translate("about_subtitle"), wraplength=500)
+        desc_label.pack(pady=(0, 20))
+
+        tools_frame = ttk.LabelFrame(about_frame, text=translate("acknowledgements"), padding=10)
+        tools_frame.pack(fill=X, pady=5)
+
+        tools_text = translate("acknowledgements_text")
+        ttk.Label(tools_frame, text=tools_text, justify=LEFT).pack(anchor=W)
+
+        license_frame = ttk.LabelFrame(about_frame, text=translate("license"), padding=10)
+        license_frame.pack(fill=BOTH, expand=YES, pady=5)
+        
+        license_text = translate("mit_license_text")
+        license_st = ScrolledText(license_frame, wrap=WORD, autohide=True)
+        license_st.pack(fill=BOTH, expand=YES)
+        license_st.insert(END, license_text)
+        license_st.text.config(state=DISABLED)
+
 # --- Main Application Class ---
 class RobotRunnerApp:
     ''' Main application window '''
     def __init__(self, root: ttk.Window):
         self.root = root
-        self.root.title(_("app_title"))
+        self.root.title(translate("app_title"))
         self.root.geometry("1000x700")
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         
@@ -1679,15 +2040,15 @@ class RobotRunnerApp:
         """Initializes all Tkinter StringVars."""
         self.scrcpy_path_var = tk.StringVar()
         self.appium_command_var = tk.StringVar()
-        self.run_mode_var = tk.StringVar(value=_("run_mode_suite"))
+        self.run_mode_var = tk.StringVar(value=translate("run_mode_suite"))
         self.suites_dir_var = tk.StringVar()
         self.tests_dir_var = tk.StringVar()
         self.logs_dir_var = tk.StringVar()
         self.screenshots_dir_var = tk.StringVar()
         self.recordings_dir_var = tk.StringVar()
         self.theme_var = tk.StringVar()
-        self.group_by_var = tk.StringVar(value=_("group_by_device"))
-        self.log_period_var = tk.StringVar(value=_("period_last_7_days"))
+        self.group_by_var = tk.StringVar(value=translate("group_by_device"))
+        self.log_period_var = tk.StringVar(value=translate("period_last_7_days"))
         # --- Performance Monitor ---
         self.app_packages_var = tk.StringVar()
         # --- Internationalization ---
@@ -1710,38 +2071,32 @@ class RobotRunnerApp:
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(pady=10, padx=10, fill=BOTH, expand=YES)
 
-        self.run_tab = ttk.Frame(self.notebook, padding=10)
-        self.logs_tab = ttk.Frame(self.notebook, padding=10)
-        self.adb_tools_tab = ttk.Frame(self.notebook, padding=10)
-        self.settings_tab = ttk.Frame(self.notebook, padding=10)
-        self.about_tab = ttk.Frame(self.notebook, padding=10)
+        self.run_tab = RunTabPage(self.notebook, self)
+        self.logs_tab = LogsTabPage(self.notebook, self)
+        self.adb_tools_tab = AdbToolsTabPage(self.notebook, self)
+        self.settings_tab = SettingsTabPage(self.notebook, self)
+        self.about_tab = AboutTabPage(self.notebook, self)
 
-        self.notebook.add(self.run_tab, text=_("run_tests_tab"))
-        self.notebook.add(self.logs_tab, text=_("logs_tab"))
-        self.notebook.add(self.adb_tools_tab, text=_("adb_tools_tab"))
-        self.notebook.add(self.settings_tab, text=_("settings_tab"))
-        self.notebook.add(self.about_tab, text=_("about_tab"))
-
-        self._setup_run_tab()
-        self._setup_adb_tools_tab()
-        self._setup_settings_tab()
-        self._setup_about_tab()
+        self.notebook.add(self.run_tab, text=translate("run_tests_tab"))
+        self.notebook.add(self.logs_tab, text=translate("logs_tab"))
+        self.notebook.add(self.adb_tools_tab, text=translate("adb_tools_tab"))
+        self.notebook.add(self.settings_tab, text=translate("settings_tab"))
+        self.notebook.add(self.about_tab, text=translate("about_tab"))
         
         self.notebook.bind("<<NotebookTabChanged>>", self._on_tab_change)
 
         self.status_bar = ttk.Frame(self.root, padding=(5, 2), relief=SUNKEN)
         self.status_bar.pack(side=BOTTOM, fill=X)
-        self.status_var = tk.StringVar(value=_("initializing"))
+        self.status_var = tk.StringVar(value=translate("initializing"))
         ttk.Label(self.status_bar, textvariable=self.status_var).pack(side=LEFT)
 
     def _on_tab_change(self, event):
         """Callback for when a notebook tab is changed."""
         selected_tab_index = self.notebook.index(self.notebook.select())
         if selected_tab_index == 1 and not self.logs_tab_initialized: # Logs Tab is at index 1
-            self._setup_logs_tab()
+            self.logs_tab.setup_widgets()
             self.logs_tab_initialized = True
             self._on_period_change()
-
 
     def _initialize_dirs_and_files(self):
         """Creates necessary directories and files on startup."""
@@ -1750,350 +2105,13 @@ class RobotRunnerApp:
         self.tests_dir.mkdir(exist_ok=True)
         self.logs_dir.mkdir(exist_ok=True)
 
-    def _setup_run_tab(self):
-        """Configures the 'Run Tests' tab."""
-        device_frame = ttk.LabelFrame(self.run_tab, text=_("device_selection"), padding=10)
-        device_frame.pack(fill=X, pady=5)
-        
-        ttk.Label(device_frame, text=_("select_devices")).pack(side=LEFT, padx=5)
-        
-        listbox_frame = ttk.Frame(device_frame)
-        listbox_frame.pack(side=LEFT, padx=5, fill=X, expand=YES)
-        
-        scrollbar = ttk.Scrollbar(listbox_frame, orient=VERTICAL)
-        self.device_listbox = tk.Listbox(listbox_frame, selectmode=EXTENDED, exportselection=False, height=4, yscrollcommand=scrollbar.set)
-        scrollbar.config(command=self.device_listbox.yview)
-        
-        scrollbar.pack(side=RIGHT, fill=Y)
-        self.device_listbox.pack(side=LEFT, fill=BOTH, expand=YES)
-        ToolTip(self.device_listbox, _("devices_tooltip"))
-        
-        self.refresh_button = ttk.Button(device_frame, text=_("refresh"), command=self._refresh_devices, bootstyle="secondary")
-        self.refresh_button.pack(side=LEFT, padx=5)
-        ToolTip(self.refresh_button, _("refresh_devices_tooltip"))
-
-        test_frame = ttk.LabelFrame(self.run_tab, text=_("test_selection"), padding=10)
-        test_frame.pack(fill=BOTH, expand=YES, pady=5)
-        test_frame.columnconfigure(0, weight=1)
-        test_frame.rowconfigure(1, weight=1)
-
-        top_controls_frame = ttk.Frame(test_frame)
-        top_controls_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=2)
-        top_controls_frame.columnconfigure(0, weight=1)
-
-        self.selection_label = ttk.Label(top_controls_frame, text=_("test_suites_txt"))
-        self.selection_label.grid(row=0, column=0, sticky=W)
-        
-        mode_frame = ttk.Frame(top_controls_frame)
-        mode_frame.grid(row=0, column=1, sticky="e")
-        ttk.Radiobutton(mode_frame, text=_("run_by_suite"), variable=self.run_mode_var, value="Suite", command=self._on_run_mode_change).pack(side=LEFT, padx=5)
-        ttk.Radiobutton(mode_frame, text=_("run_by_test"), variable=self.run_mode_var, value="Test", command=self._on_run_mode_change).pack(side=LEFT, padx=5)
-
-        self.selection_listbox = tk.Listbox(test_frame, exportselection=False)
-        self.selection_listbox.grid(row=1, column=0, padx=5, pady=2, sticky="nsew")
-        self.selection_listbox.bind("<Double-1>", self._on_selection_listbox_double_click)
-
-        self._on_run_mode_change()
-
-        run_frame = ttk.LabelFrame(self.run_tab, text=_("run_controls"), padding=10)
-        run_frame.pack(fill=X, pady=5)
-        run_frame.columnconfigure(1, weight=1)
-        
-        self.device_options_button = ttk.Button(run_frame, text=_("device_toolbox"), command=self._mirror_device, bootstyle="info")
-        self.device_options_button.grid(row=0, column=0, sticky="w", padx=5, pady=5)
-        ToolTip(self.device_options_button, _("device_toolbox_tooltip"))
-
-        self.run_button = ttk.Button(run_frame, text=_("run_test"), command=self._run_test, bootstyle="success")
-        self.run_button.grid(row=0, column=2, sticky="e", padx=5, pady=5)
-        ToolTip(self.run_button, _("run_test_tooltip"))
-
-    def _on_run_mode_change(self):
-        """Handles the change of run mode and populates the listbox."""
-        if self.run_mode_var.get() == "Suite":
-            self.current_path = self.suites_dir
-        else:
-            self.current_path = self.tests_dir
-        self._populate_selection_listbox()
-
-    def _populate_selection_listbox(self):
-        """Populates the listbox based on the selected run mode and current path."""
-        self.selection_listbox.delete(0, END)
-        mode = self.run_mode_var.get()
-        
-        base_dir = self.suites_dir if mode == "Suite" else self.tests_dir
-        
-        if self.current_path != base_dir:
-            self.selection_listbox.insert(END, _("back_button"))
-
-        items = sorted(list(self.current_path.iterdir()), key=lambda p: (not p.is_dir(), p.name.lower()))
-        for item in items:
-            if item.is_dir():
-                self.selection_listbox.insert(END, _("folder_prefix", name=item.name))
-            elif mode == "Suite" and item.suffix == ".txt":
-                self.selection_listbox.insert(END, item.name)
-            elif mode == "Test" and item.suffix == ".robot":
-                self.selection_listbox.insert(END, item.name)
-        
-        self.selection_label.config(text=_("current_path_label", path=self.current_path))
-
-    def _on_selection_listbox_double_click(self, event):
-        """Handles navigation in the listbox."""
-        selected_indices = self.selection_listbox.curselection()
-        if not selected_indices:
-            return
-        
-        selected_item = self.selection_listbox.get(selected_indices[0])
-
-        if selected_item == _("back_button"):
-            self.current_path = self.current_path.parent
-        elif selected_item.startswith(_("folder_prefix", name="").strip()):
-            folder_name = selected_item.replace(_("folder_prefix", name="").strip(), "").strip()
-            self.current_path = self.current_path / folder_name
-        
-        self._populate_selection_listbox()
-
-    def _setup_adb_tools_tab(self):
-        """Configures the 'ADB Tools' tab."""
-        adb_tools_frame = ttk.Frame(self.adb_tools_tab)
-        adb_tools_frame.pack(fill=BOTH, expand=YES)
-        adb_tools_frame.rowconfigure(2, weight=1)
-        adb_tools_frame.columnconfigure(0, weight=1)
-
-        wireless_frame = ttk.LabelFrame(adb_tools_frame, text=_("wireless_adb"), padding=10)
-        wireless_frame.grid(row=0, column=0, sticky="ew", pady=5)
-        wireless_frame.columnconfigure(0, weight=2)
-        wireless_frame.columnconfigure(1, weight=1)
-        wireless_frame.columnconfigure(2, weight=1)
-
-        ttk.Label(wireless_frame, text=_("ip_address")).grid(row=0, column=0, sticky=W, padx=5)
-        ttk.Label(wireless_frame, text=_("port")).grid(row=0, column=1, sticky=W, padx=5)
-        ttk.Label(wireless_frame, text=_("pairing_code")).grid(row=0, column=2, sticky=W, padx=5)
-
-        self.ip_entry = ttk.Entry(wireless_frame)
-        self.ip_entry.grid(row=1, column=0, sticky="ew", padx=5, pady=(0, 5))
-        self.port_entry = ttk.Entry(wireless_frame, width=8)
-        self.port_entry.grid(row=1, column=1, sticky="ew", padx=5, pady=(0, 5))
-        self.code_entry = ttk.Entry(wireless_frame, width=8)
-        self.code_entry.grid(row=1, column=2, sticky="ew", padx=5, pady=(0, 5))
-        
-        button_frame = ttk.Frame(wireless_frame)
-        button_frame.grid(row=2, column=0, columnspan=3, sticky="ew", pady=5)
-        button_frame.columnconfigure(0, weight=1)
-        button_frame.columnconfigure(1, weight=1)
-        button_frame.columnconfigure(2, weight=1)
-        
-        self.disconnect_button = ttk.Button(button_frame, text=_("disconnect"), command=self._disconnect_wireless_device, bootstyle="danger")
-        self.disconnect_button.grid(row=0, column=0, sticky="ew", padx=5)
-        ToolTip(self.disconnect_button, _("disconnect_tooltip"))
-
-        self.pair_button = ttk.Button(button_frame, text=_("pair"), command=self._pair_wireless_device, bootstyle="info")
-        self.pair_button.grid(row=0, column=1, sticky="ew", padx=5)
-        ToolTip(self.pair_button, _("pair_tooltip"))
-
-        self.connect_button = ttk.Button(button_frame, text=_("connect"), command=self._connect_wireless_device)
-        self.connect_button.grid(row=0, column=2, sticky="ew", padx=5)
-        ToolTip(self.connect_button, _("connect_tooltip"))
-
-        manual_cmd_frame = ttk.LabelFrame(adb_tools_frame, text=_("manual_adb_command"), padding=10)
-        manual_cmd_frame.grid(row=1, column=0, sticky="ew", pady=5)
-        manual_cmd_frame.columnconfigure(0, weight=1)
-
-        ttk.Label(manual_cmd_frame, text=_("adb_command_label")).grid(row=0, column=0, sticky=W, padx=5)
-        self.adb_command_entry = ttk.Entry(manual_cmd_frame)
-        self.adb_command_entry.grid(row=1, column=0, sticky="ew", padx=5, pady=(0, 5))
-        ToolTip(self.adb_command_entry, _("adb_command_tooltip"))
-
-        self.run_adb_button = ttk.Button(manual_cmd_frame, text=_("run_command"), command=self._run_manual_adb_command)
-        self.run_adb_button.grid(row=2, column=0, sticky="ew", padx=5, pady=5)
-        ToolTip(self.run_adb_button, _("run_command_tooltip"))
-
-        output_frame = ttk.LabelFrame(adb_tools_frame, text=_("adb_output"), padding=5)
-        output_frame.grid(row=2, column=0, sticky="nsew", pady=5)
-        output_frame.rowconfigure(0, weight=1)
-        output_frame.columnconfigure(0, weight=1)
-
-        self.adb_tools_output_text = ScrolledText(output_frame, wrap=WORD, state=DISABLED, autohide=True)
-        self.adb_tools_output_text.grid(row=0, column=0, sticky="nsew")
-
-    def _setup_logs_tab(self):
-        """Configures the 'Tests Logs' tab."""
-        logs_controls_frame = ttk.Frame(self.logs_tab)
-        logs_controls_frame.pack(fill=X, pady=5)
-
-        # --- Left-aligned controls ---
-        left_controls_frame = ttk.Frame(logs_controls_frame)
-        left_controls_frame.pack(side=LEFT, fill=X, expand=True)
-
-        ttk.Label(left_controls_frame, text=_("group_by")).pack(side=LEFT, padx=(0,5))
-        self.group_by_combobox = ttk.Combobox(left_controls_frame, textvariable=self.group_by_var,
-                                              values=[_("group_by_device"), _("group_by_suite"), _("group_by_status")], state="readonly", width=12)
-        self.group_by_combobox.pack(side=LEFT, padx=(0, 15))
-        self.group_by_combobox.bind("<<ComboboxSelected>>", self._on_group_by_selected)
-        ToolTip(self.group_by_combobox, _("group_by_tooltip"))
-
-        ttk.Label(left_controls_frame, text=_("period")).pack(side=LEFT, padx=(0,5))
-        self.period_combobox = ttk.Combobox(left_controls_frame, textvariable=self.log_period_var,
-                                        values=[_("today"), _("period_last_7_days"), _("last_30_days"), _("last_6_months"), _("all_time")], state="readonly")
-        self.period_combobox.pack(side=LEFT, padx=(0, 5))
-        self.period_combobox.bind("<<ComboboxSelected>>", self._on_period_change)
-        ToolTip(self.period_combobox, _("period_tooltip"))
-
-        # --- Right-aligned controls ---
-        right_controls_frame = ttk.Frame(logs_controls_frame)
-        right_controls_frame.pack(side=RIGHT)
-
-        self.log_cache_info_label = ttk.Label(right_controls_frame, text=_("no_data_loaded"))
-        self.log_cache_info_label.pack(side=LEFT, padx=(0, 10))
-
-        self.reparse_button = ttk.Button(right_controls_frame, text=_("reparse"),
-                                    command=self._start_log_reparse,
-                                    bootstyle="secondary")
-        self.reparse_button.pack(side=LEFT)
-        ToolTip(self.reparse_button, _("reparse_tooltip"))
-
-        self.progress_frame = ttk.Frame(self.logs_tab)
-        # self.progress_frame is packed later when needed
-        self.progress_label = ttk.Label(self.progress_frame, text=_("parsing"))
-        self.progress_bar = ttk.Progressbar(self.progress_frame, mode='determinate')
-        ToolTip(self.progress_bar, _("parsing_tooltip"))
-        
-        logs_tree_frame = ttk.Frame(self.logs_tab)
-        logs_tree_frame.pack(fill=BOTH, expand=YES, pady=5)
-
-        scrollbar = ttk.Scrollbar(logs_tree_frame, orient=VERTICAL)
-        
-        self.logs_tree = ttk.Treeview(logs_tree_frame, columns=("suite", "status", "time"), show="headings", yscrollcommand=scrollbar.set)
-        scrollbar.config(command=self.logs_tree.yview)
-        
-        self.logs_tree.heading("suite", text=_("log_tree_suite"))
-        self.logs_tree.heading("status", text=_("log_tree_status"))
-        self.logs_tree.heading("time", text=_("log_tree_time"))
-        
-        scrollbar.pack(side=RIGHT, fill=Y)
-        self.logs_tree.pack(side=LEFT, fill=BOTH, expand=YES)
-        
-        self.logs_tree.bind("<Double-1>", self._on_log_double_click)
-        self.logs_tree.tag_configure("no_logs", foreground="gray")
-        
-    def _setup_settings_tab(self):
-        """Configures the 'Settings' tab."""
-        settings_frame = ttk.Frame(self.settings_tab)
-        settings_frame.pack(fill=BOTH, expand=YES)
-
-        # --- Appium Settings ---
-        app_settings_frame = ttk.LabelFrame(settings_frame, text=_("app_tool_paths"), padding=10)
-        app_settings_frame.pack(fill=X, pady=5)
-        app_settings_frame.columnconfigure(1, weight=1)
-
-        ttk.Label(app_settings_frame, text=_("appium_server")).grid(row=0, column=0, padx=5, pady=5, sticky=W)
-        self.appium_status_label = ttk.Label(app_settings_frame, text=_("appium_status_stopped"), bootstyle="danger")
-        self.appium_status_label.grid(row=0, column=1, padx=5, pady=5, sticky=W)
-        self.toggle_appium_button = ttk.Button(app_settings_frame, text=_("start_appium"), command=self._toggle_appium_server, bootstyle="primary")
-        self.toggle_appium_button.grid(row=0, column=2, padx=5, pady=5)
-        ToolTip(self.toggle_appium_button, _("appium_toggle_tooltip"))
-
-        ttk.Label(app_settings_frame, text=_("appium_command")).grid(row=1, column=0, padx=5, pady=5, sticky=W)
-        ttk.Entry(app_settings_frame, textvariable=self.appium_command_var).grid(row=1, column=1, columnspan=2, padx=5, pady=5, sticky=EW)
-        
-        # --- Directory Settings ---
-        dir_settings_frame = ttk.LabelFrame(settings_frame, text=_("dir_path_settings"), padding=10)
-        dir_settings_frame.pack(fill=X, pady=5)
-        dir_settings_frame.columnconfigure(1, weight=1)
-
-        ttk.Label(dir_settings_frame, text=_("suites_dir")).grid(row=0, column=0, padx=5, pady=2, sticky=W)
-        ttk.Entry(dir_settings_frame, textvariable=self.suites_dir_var).grid(row=0, column=1, padx=5, pady=2, sticky=EW)
-        ttk.Label(dir_settings_frame, text=_("tests_dir")).grid(row=0, column=2, padx=5, pady=2, sticky=W)
-        ttk.Entry(dir_settings_frame, textvariable=self.tests_dir_var).grid(row=0, column=3, padx=5, pady=2, sticky=EW)
-
-        ttk.Label(dir_settings_frame, text=_("screenshots_dir")).grid(row=1, column=0, padx=5, pady=2, sticky=W)
-        ttk.Entry(dir_settings_frame, textvariable=self.screenshots_dir_var).grid(row=1, column=1, padx=5, pady=2, sticky=EW)
-        ttk.Label(dir_settings_frame, text=_("recordings_dir")).grid(row=2, column=1, padx=5, pady=2, sticky=W)
-        ttk.Entry(dir_settings_frame, textvariable=self.recordings_dir_var).grid(row=1, column=3, padx=5, pady=2, sticky=EW)
-        
-        ttk.Label(dir_settings_frame, text=_("logs_dir")).grid(row=2, column=0, padx=5, pady=2, sticky=W)
-        ttk.Entry(dir_settings_frame, textvariable=self.logs_dir_var).grid(row=2, column=1, padx=5, pady=2, sticky=EW)
-        ttk.Label(dir_settings_frame, text=_("scrcpy_path")).grid(row=2, column=2, padx=5, pady=5, sticky=W)
-        ttk.Entry(dir_settings_frame, textvariable=self.scrcpy_path_var).grid(row=2, column=3, padx=5, pady=5, sticky=EW)
-        
-        # --- Performance Monitor Settings ---
-        inspector_settings_frame = ttk.LabelFrame(settings_frame, text=_("inspector_settings"), padding=10)
-        inspector_settings_frame.pack(fill=X, pady=5)
-        inspector_settings_frame.columnconfigure(1, weight=1)
-        ttk.Label(inspector_settings_frame, text=_("app_packages_label")).grid(row=6, column=0, padx=5, pady=5, sticky=W)
-        app_packages_entry = ttk.Entry(inspector_settings_frame, textvariable=self.app_packages_var)
-        app_packages_entry.grid(row=6, column=1, padx=5, pady=5, sticky=EW)
-        ToolTip(app_packages_entry, _("app_packages_tooltip"))
-
-
-        bottom_frame = ttk.Frame(settings_frame)
-        bottom_frame.pack(fill=X, pady=0, padx=0)
-        bottom_frame.columnconfigure(0, weight=1)
-
-        appearance_frame = ttk.LabelFrame(bottom_frame, text=_("appearance"), padding=10)
-        appearance_frame.grid(row=0, column=0, sticky="ew", pady=5, padx=0)
-        appearance_frame.columnconfigure(1, weight=1)
-
-        ttk.Label(appearance_frame, text=_("theme")).grid(row=0, column=0, padx=5, pady=2, sticky=W)
-        theme_combo = ttk.Combobox(appearance_frame, textvariable=self.theme_var, values=["darkly", "litera"], state="readonly")
-        theme_combo.grid(row=0, column=1, padx=5, pady=2, sticky=W)
-        ttk.Label(appearance_frame, text=_("theme_restart_required")).grid(row=0, column=2, padx=5, pady=2, sticky=W)
-        ToolTip(theme_combo, _("theme_tooltip"))
-        
-        # --- Language Selector ---
-        ttk.Label(appearance_frame, text=_("language_label")).grid(row=1, column=0, padx=5, pady=2, sticky=W)
-        self.language_combo = ttk.Combobox(appearance_frame, state="readonly", values=list(self.LANGUAGES.values()))
-        self.language_combo.grid(row=1, column=1, padx=5, pady=2, sticky=W)
-        self.language_combo.bind("<<ComboboxSelected>>", self._on_language_select)
-        ToolTip(self.language_combo, _("language_tooltip"))
-
-        # Set initial value for the language combobox
-        current_lang_code = self.language_var.get()
-        current_lang_name = self.LANGUAGES.get(current_lang_code, "English") # Fallback to English
-        self.language_combo.set(current_lang_name)
-
-        save_button = ttk.Button(bottom_frame, text=_("save_settings"), command=self._save_settings, bootstyle="success")
-        save_button.grid(row=0, column=1, sticky="e", padx=10)
-        ToolTip(save_button, _("save_settings_tooltip"))
-
-        output_frame = ttk.LabelFrame(settings_frame, text=_("appium_server_output"), padding=5)
-        output_frame.pack(fill=BOTH, expand=YES, pady=5)
-        self.appium_output_text = ScrolledText(output_frame, wrap=WORD, state=DISABLED, autohide=True)
-        self.appium_output_text.pack(fill=BOTH, expand=YES)
-        
     def _on_language_select(self, event=None):
         """Updates the language_var with the code corresponding to the selected language name."""
-        selected_name = self.language_combo.get()
+        selected_name = self.settings_tab.language_combo.get()
         for code, name in self.LANGUAGES.items():
             if name == selected_name:
                 self.language_var.set(code)
                 break
-
-    def _setup_about_tab(self):
-        """Configures the 'About' tab with project information."""
-        about_frame = ttk.Frame(self.about_tab)
-        about_frame.pack(fill=BOTH, expand=YES, padx=10, pady=5)
-
-        title_label = ttk.Label(about_frame, text=_("about_title"), font="-size 20 -weight bold")
-        title_label.pack(pady=(0, 10))
-        ToolTip(title_label, "Robot Runner - by Lucas de Eiroz Rodrigues")
-
-        desc_label = ttk.Label(about_frame, text=_("about_subtitle"), wraplength=500)
-        desc_label.pack(pady=(0, 20))
-
-        tools_frame = ttk.LabelFrame(about_frame, text=_("acknowledgements"), padding=10)
-        tools_frame.pack(fill=X, pady=5)
-
-        tools_text = _("acknowledgements_text")
-        ttk.Label(tools_frame, text=tools_text, justify=LEFT).pack(anchor=W)
-
-        license_frame = ttk.LabelFrame(about_frame, text=_("license"), padding=10)
-        license_frame.pack(fill=BOTH, expand=YES, pady=5)
-        
-        license_text = _("mit_license_text")
-        license_st = ScrolledText(license_frame, wrap=WORD, autohide=True)
-        license_st.pack(fill=BOTH, expand=YES)
-        license_st.insert(END, license_text)
-        license_st.text.config(state=DISABLED)
 
     def _load_settings(self):
         """Loads settings from the settings.json file."""
@@ -2104,7 +2122,7 @@ class RobotRunnerApp:
             else:
                 settings = {}
         except (json.JSONDecodeError, IOError) as e:
-            print(_("error_loading_settings", e=e))
+            print(translate("error_loading_settings", e=e))
             settings = {}
 
         self.appium_command_var.set(settings.get("appium_command", "appium --base-path=/wd/hub --relaxed-security"))
@@ -2145,22 +2163,22 @@ class RobotRunnerApp:
             self._update_paths_from_settings()
             
             if self.initial_theme != self.theme_var.get() or self.initial_language != self.language_var.get():
-                messagebox.showinfo(_("restart_required_title"), _("restart_required_message"), parent=self.root)
+                messagebox.showinfo(translate("restart_required_title"), translate("restart_required_message"), parent=self.root)
                 self.initial_theme = self.theme_var.get()
                 self.initial_language = self.language_var.get()
             else:
-                messagebox.showinfo(_("settings_saved_title"), _("settings_saved_message"), parent=self.root)
+                messagebox.showinfo(translate("settings_saved_title"), translate("settings_saved_message"), parent=self.root)
 
         except IOError as e:
-            messagebox.showerror(_("open_file_error_title"), _("save_settings_error", e=e), parent=self.root)
+            messagebox.showerror(translate("open_file_error_title"), translate("save_settings_error", e=e), parent=self.root)
         
     def _on_close(self):
         """Handles the main window closing event."""
-        if messagebox.askokcancel(_("quit_title"), _("quit_message")):
+        if messagebox.askokcancel(translate("quit_title"), translate("quit_message")):
             self._is_closing = True
             
             if self.appium_process:
-                self.status_var.set(_("stopping_appium_message"))
+                self.status_var.set(translate("stopping_appium_message"))
                 self.root.update_idletasks()
                 self._terminate_process_tree(self.appium_process.pid, "Appium")
             
@@ -2182,9 +2200,9 @@ class RobotRunnerApp:
                 )
             else:
                 os.kill(os.getpid(pid), signal.SIGTERM)
-            print(_("appium_terminate_info", pid=pid))
+            print(translate("appium_terminate_info", pid=pid))
         except (subprocess.CalledProcessError, ProcessLookupError, FileNotFoundError) as e:
-            print(_("appium_terminate_warning", pid=pid, e=e))
+            print(translate("appium_terminate_warning", pid=pid, e=e))
 
     def _on_test_suite_select(self, event):
         """Handles test selection, preventing selection of blank space."""
@@ -2205,39 +2223,39 @@ class RobotRunnerApp:
         to keep the UI responsive.
         """
         try:
-            selected_device_indices = self.device_listbox.curselection()
+            selected_device_indices = self.run_tab.device_listbox.curselection()
             if not selected_device_indices:
-                messagebox.showerror(_("open_file_error_title"), _("no_device_selected"), parent=self.root)
+                messagebox.showerror(translate("open_file_error_title"), translate("no_device_selected"), parent=self.root)
                 return
 
-            selected_devices = [self.device_listbox.get(i) for i in selected_device_indices]
-            if any(_("no_devices_found") in s for s in selected_devices):
-                messagebox.showerror(_("open_file_error_title"), _("no_device_selected"), parent=self.root)
+            selected_devices = [self.run_tab.device_listbox.get(i) for i in selected_device_indices]
+            if any(translate("no_devices_found") in s for s in selected_devices):
+                messagebox.showerror(translate("open_file_error_title"), translate("no_device_selected"), parent=self.root)
                 return
 
             # Check for busy devices
-            busy_devices_selected = [s for s in selected_devices if _("device_busy") in s]
+            busy_devices_selected = [s for s in selected_devices if translate("device_busy") in s]
             if busy_devices_selected:
-                if not messagebox.askyesno(_("busy_device_warning_title"),
-                                           _("busy_device_warning_message", devices=''.join(busy_devices_selected)),
+                if not messagebox.askyesno(translate("busy_device_warning_title"),
+                                           translate("busy_device_warning_message", devices=''.join(busy_devices_selected)),
                                            parent=self.root):
                     return
 
-            selected_indices = self.selection_listbox.curselection()
+            selected_indices = self.run_tab.selection_listbox.curselection()
             if not selected_indices:
-                messagebox.showerror(_("open_file_error_title"), _("no_test_file_selected"), parent=self.root)
+                messagebox.showerror(translate("open_file_error_title"), translate("no_test_file_selected"), parent=self.root)
                 return
 
-            selected_filename = self.selection_listbox.get(selected_indices[0])
+            selected_filename = self.run_tab.selection_listbox.get(selected_indices[0])
             if selected_filename.startswith("["):  # It's a folder or back button
-                messagebox.showwarning(_("invalid_selection_title"), _("invalid_selection_message"), parent=self.root)
+                messagebox.showwarning(translate("invalid_selection_title"), translate("invalid_selection_message"), parent=self.root)
                 return
 
             run_mode = self.run_mode_var.get()
             path_to_run = self.current_path / selected_filename
 
             if not path_to_run.exists():
-                messagebox.showerror(_("open_file_error_title"), _("file_not_found_error", path=path_to_run), parent=self.root)
+                messagebox.showerror(translate("open_file_error_title"), translate("file_not_found_error", path=path_to_run), parent=self.root)
                 return
 
             # All checks passed, start the background thread
@@ -2246,7 +2264,7 @@ class RobotRunnerApp:
             thread.start()
 
         except Exception as e:
-            messagebox.showerror(_("execution_error"), _("unexpected_error", error=e), parent=self.root)
+            messagebox.showerror(translate("execution_error"), translate("unexpected_error", error=e), parent=self.root)
 
     def _run_test_thread(self, selected_devices: List[str], path_to_run: str, run_mode: str):
         """
@@ -2254,17 +2272,17 @@ class RobotRunnerApp:
         It ensures Appium is running, then schedules the creation of test windows on the main thread.
         """
         try:
-            self.root.after(0, self.run_button.config, {'state': DISABLED, 'text': _("checking_appium")})
+            self.root.after(0, self.run_tab.run_button.config, {'state': DISABLED, 'text': translate("checking_appium")})
             # 1. Check for Appium and start it if necessary (this part can block)
             if not self._is_appium_running():
-                self.root.after(0, self.status_var.set, _("appium_not_found_starting"))
-                self.root.after(0, self.run_button.config, {'text': _("starting_appium")})
+                self.root.after(0, self.status_var.set, translate("appium_not_found_starting"))
+                self.root.after(0, self.run_tab.run_button.config, {'text': translate("starting_appium")})
                 self._start_appium_server(silent=True)
                 if not self._wait_for_appium_startup(timeout=20):
-                    self.root.after(0, messagebox.showerror, "Appium Error", _("appium_start_fail_error"))
-                    self.root.after(0, self.status_var.set, _("ready"))
+                    self.root.after(0, messagebox.showerror, "Appium Error", translate("appium_start_fail_error"))
+                    self.root.after(0, self.status_var.set, translate("ready"))
                     return
-                self.root.after(0, self.status_var.set, _("appium_started_running_tests"))
+                self.root.after(0, self.status_var.set, translate("appium_started_running_tests"))
 
             # 2. Schedule the creation of a RunCommandWindow for each device on the main thread
             for device_str in selected_devices:
@@ -2272,7 +2290,7 @@ class RobotRunnerApp:
                 udid = udid_with_status.split(" ")[0]
                 self.root.after(0, self._create_run_command_window, udid, path_to_run, run_mode)
         finally:
-            self.root.after(0, self.run_button.config, {'state': NORMAL, 'text': _("run_test")})
+            self.root.after(0, self.run_tab.run_button.config, {'state': NORMAL, 'text': translate("run_test")})
 
     def _create_run_command_window(self, udid: str, path_to_run: str, run_mode: str):
         """Helper to safely create the RunCommandWindow from the main GUI thread."""
@@ -2281,67 +2299,67 @@ class RobotRunnerApp:
 
     def _pair_wireless_device(self):
         """Pairs with a device wirelessly using a pairing code."""
-        ip = self.ip_entry.get()
-        port = self.port_entry.get()
-        code = self.code_entry.get()
+        ip = self.adb_tools_tab.ip_entry.get()
+        port = self.adb_tools_tab.port_entry.get()
+        code = self.adb_tools_tab.code_entry.get()
 
         if not all([ip, port, code]):
-            messagebox.showwarning(_("input_error"), _("input_error_pair"))
+            messagebox.showwarning(translate("input_error"), translate("input_error_pair"))
             return
 
         command = f"adb pair {ip}:{port} {code}"
-        self.pair_button.config(state=DISABLED)
-        self._update_output_text(self.adb_tools_output_text, f"> {command}\n", True)
+        self.adb_tools_tab.pair_button.config(state=DISABLED)
+        self._update_output_text(self.adb_tools_tab.adb_tools_output_text, f"> {command}\n", True)
         
-        thread = threading.Thread(target=self._run_command_and_update_gui, args=(command, self.adb_tools_output_text, self.pair_button, True))
+        thread = threading.Thread(target=self._run_command_and_update_gui, args=(command, self.adb_tools_tab.adb_tools_output_text, self.adb_tools_tab.pair_button, True))
         thread.daemon = True
         thread.start()
 
     def _connect_wireless_device(self):
         """Attempts to connect to a device wirelessly via ADB."""
-        ip = self.ip_entry.get()
-        port = self.port_entry.get()
+        ip = self.adb_tools_tab.ip_entry.get()
+        port = self.adb_tools_tab.port_entry.get()
         
         if not all([ip, port]):
-            messagebox.showwarning(_("input_error"), _("input_error_connect"))
+            messagebox.showwarning(translate("input_error"), translate("input_error_connect"))
             return
 
         command = f"adb connect {ip}:{port}"
-        self.connect_button.config(state=DISABLED)
-        self._update_output_text(self.adb_tools_output_text, f"> {command}\n", True)
+        self.adb_tools_tab.connect_button.config(state=DISABLED)
+        self._update_output_text(self.adb_tools_tab.adb_tools_output_text, f"> {command}\n", True)
         
-        thread = threading.Thread(target=self._run_command_and_update_gui, args=(command, self.adb_tools_output_text, self.connect_button, True))
+        thread = threading.Thread(target=self._run_command_and_update_gui, args=(command, self.adb_tools_tab.adb_tools_output_text, self.adb_tools_tab.connect_button, True))
         thread.daemon = True
         thread.start()
 
     def _disconnect_wireless_device(self):
         """Disconnects a specific wireless device or all of them."""
-        ip = self.ip_entry.get()
-        port = self.port_entry.get()
+        ip = self.adb_tools_tab.ip_entry.get()
+        port = self.adb_tools_tab.port_entry.get()
         
         if ip and port:
             command = f"adb disconnect {ip}:{port}"
         else:
             command = "adb disconnect"
 
-        self.disconnect_button.config(state=DISABLED)
-        self._update_output_text(self.adb_tools_output_text, f"> {command}\n", True)
+        self.adb_tools_tab.disconnect_button.config(state=DISABLED)
+        self._update_output_text(self.adb_tools_tab.adb_tools_output_text, f"> {command}\n", True)
         
-        thread = threading.Thread(target=self._run_command_and_update_gui, args=(command, self.adb_tools_output_text, self.disconnect_button, True))
+        thread = threading.Thread(target=self._run_command_and_update_gui, args=(command, self.adb_tools_tab.adb_tools_output_text, self.adb_tools_tab.disconnect_button, True))
         thread.daemon = True
         thread.start()
 
     def _mirror_device(self):
         """Opens a separate scrcpy window for each selected device."""
         try:
-            selected_device_indices = self.device_listbox.curselection()
+            selected_device_indices = self.run_tab.device_listbox.curselection()
             if not selected_device_indices:
-                messagebox.showerror(_("open_file_error_title"), _("no_device_selected"))
+                messagebox.showerror(translate("open_file_error_title"), translate("no_device_selected"))
                 return
             
-            selected_devices = [self.device_listbox.get(i) for i in selected_device_indices]
-            if any(_("no_devices_found") in s for s in selected_devices):
-                messagebox.showerror(_("open_file_error_title"), _("no_device_selected"))
+            selected_devices = [self.run_tab.device_listbox.get(i) for i in selected_device_indices]
+            if any(translate("no_devices_found") in s for s in selected_devices):
+                messagebox.showerror(translate("open_file_error_title"), translate("no_device_selected"))
                 return
 
             for selected_device_str in selected_devices:
@@ -2355,16 +2373,16 @@ class RobotRunnerApp:
                     self.active_command_windows[win_key].lift()
                     continue
 
-                scrcpy_win = RunCommandWindow(self, udid, mode='mirror', title=_("mirror_title", model=model))
+                scrcpy_win = RunCommandWindow(self, udid, mode='mirror', title=translate("mirror_title", model=model))
                 self.active_command_windows[win_key] = scrcpy_win
 
         except Exception as e:
-            messagebox.showerror(_("mirror_error_title"), _("mirror_error_message", error=e))
+            messagebox.showerror(translate("mirror_error_title"), translate("mirror_error_message", error=e))
 
     def _refresh_devices(self):
         """Refreshes the list of connected ADB devices."""
-        self.status_var.set(_("refreshing"))
-        self.refresh_button.config(state=DISABLED, text=_("refreshing"))
+        self.status_var.set(translate("refreshing"))
+        self.run_tab.refresh_button.config(state=DISABLED, text=translate("refreshing"))
         thread = threading.Thread(target=self._get_devices_thread)
         thread.daemon = True
         thread.start()
@@ -2377,32 +2395,32 @@ class RobotRunnerApp:
 
     def _update_device_list(self):
         """Updates the device listbox with the found devices."""
-        selected_indices = self.device_listbox.curselection()
-        self.device_listbox.delete(0, END)
+        selected_indices = self.run_tab.device_listbox.curselection()
+        self.run_tab.device_listbox.delete(0, END)
         if self.devices:
-            self.device_listbox.config(state=NORMAL)
+            self.run_tab.device_listbox.config(state=NORMAL)
             for i, d in enumerate(self.devices):
-                status_text = _("device_busy") if d.get('status') == "Busy" else ""
+                status_text = translate("device_busy") if d.get('status') == "Busy" else ""
                 device_string = f"Android {d['release']} | {d['model']} | {d['udid']} {status_text}"
-                self.device_listbox.insert(END, device_string)
+                self.run_tab.device_listbox.insert(END, device_string)
                 
                 color = "red" if d.get('status') == "Busy" else "#43b581" # Use a less jarring green
-                self.device_listbox.itemconfig(i, foreground=color)
+                self.run_tab.device_listbox.itemconfig(i, foreground=color)
 
             # Restore selection
             for index in selected_indices:
-                if index < self.device_listbox.size():
-                    self.device_listbox.selection_set(index)
-            if not self.device_listbox.curselection() and self.device_listbox.size() > 0:
-                 self.device_listbox.selection_set(0)
+                if index < self.run_tab.device_listbox.size():
+                    self.run_tab.device_listbox.selection_set(index)
+            if not self.run_tab.device_listbox.curselection() and self.run_tab.device_listbox.size() > 0:
+                 self.run_tab.device_listbox.selection_set(0)
         else:
-            self.device_listbox.insert(END, _("no_devices_found"))
-            self.device_listbox.config(state=DISABLED)
+            self.run_tab.device_listbox.insert(END, translate("no_devices_found"))
+            self.run_tab.device_listbox.config(state=DISABLED)
         
-        self.refresh_button.config(state=NORMAL, text=_("refresh"))
+        self.run_tab.refresh_button.config(state=NORMAL, text=translate("refresh"))
         # Only set status to ready if it was refreshing, to not overwrite other statuses
-        if _("refreshing") in self.status_var.get():
-            self.status_var.set(_("ready"))
+        if translate("refreshing") in self.status_var.get():
+            self.status_var.set(translate("ready"))
         
     def _check_scrcpy_version(self):
         """Checks for scrcpy and offers to download if not found."""
@@ -2419,8 +2437,8 @@ class RobotRunnerApp:
 
     def _prompt_download_scrcpy(self):
         """Asks the user if they want to download scrcpy."""
-        if messagebox.askyesno(_("scrcpy_not_found_title"), _("scrcpy_not_found_message")):
-            self.status_var.set(_("downloading_scrcpy"))
+        if messagebox.askyesno(translate("scrcpy_not_found_title"), translate("scrcpy_not_found_message")):
+            self.status_var.set(translate("downloading_scrcpy"))
             download_thread = threading.Thread(target=self._download_and_extract_scrcpy)
             download_thread.daemon = True
             download_thread.start()
@@ -2434,7 +2452,7 @@ class RobotRunnerApp:
             
             asset = next((a for a in release_data['assets'] if 'win64' in a['name'] and a['name'].endswith('.zip')), None)
             if not asset:
-                self.root.after(0, messagebox.showerror, _("download_error_title"), _("download_error_no_release"))
+                self.root.after(0, messagebox.showerror, translate("download_error_title"), translate("download_error_no_release"))
                 return
 
             download_url = asset['browser_download_url']
@@ -2460,19 +2478,19 @@ class RobotRunnerApp:
             
             new_scrcpy_path = scrcpy_dir / "scrcpy.exe"
             self.scrcpy_path_var.set(str(new_scrcpy_path))
-            self.root.after(0, messagebox.showinfo, _("success_title"), _("scrcpy_download_success", path=scrcpy_dir))
+            self.root.after(0, messagebox.showinfo, translate("success_title"), translate("scrcpy_download_success", path=scrcpy_dir))
 
         except Exception as e:
-            self.root.after(0, messagebox.showerror, _("download_failed_title"), _("scrcpy_download_error", error=e))
+            self.root.after(0, messagebox.showerror, translate("download_failed_title"), translate("scrcpy_download_error", error=e))
         finally:
-            self.root.after(0, self.status_var.set, _("ready"))
+            self.root.after(0, self.status_var.set, translate("ready"))
 
     def _toggle_appium_server(self):
         """Starts or stops the Appium server via the Settings tab button."""
         # If we have a process handle, we can stop it.
         if self.appium_process and self.appium_process.poll() is None:
-            self.status_var.set(_("stopping_appium_message"))
-            self.toggle_appium_button.config(state=DISABLED)
+            self.status_var.set(translate("stopping_appium_message"))
+            self.settings_tab.toggle_appium_button.config(state=DISABLED)
             
             # Use a thread to avoid blocking while terminating
             thread = threading.Thread(target=self._terminate_process_tree, args=(self.appium_process.pid, "Appium"))
@@ -2480,7 +2498,7 @@ class RobotRunnerApp:
             thread.start()
         # If there's no process handle, check if a server is running externally before starting.
         elif self._is_appium_running():
-             messagebox.showwarning(_("appium_running_title"), _("appium_running_message"))
+             messagebox.showwarning(translate("appium_running_title"), translate("appium_running_message"))
         else:
             self._start_appium_server(silent=False)
 
@@ -2490,8 +2508,8 @@ class RobotRunnerApp:
         If silent, UI button states are not changed directly.
         """
         if not silent:
-            self.status_var.set(_("appium_status_starting"))
-            self.toggle_appium_button.config(state=DISABLED)
+            self.status_var.set(translate("appium_status_starting"))
+            self.settings_tab.toggle_appium_button.config(state=DISABLED)
         
         thread = threading.Thread(target=self._appium_server_handler, args=(silent,))
         thread.daemon = True
@@ -2506,7 +2524,7 @@ class RobotRunnerApp:
             command = self.appium_command_var.get()
             # Clear and show command in output only when user starts it manually
             clear_output = not silent
-            self.root.after(0, self._update_output_text, self.appium_output_text, f"> {command}\n", clear_output)
+            self.root.after(0, self._update_output_text, self.settings_tab.appium_output_text, f"> {command}\n", clear_output)
             
             creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
             self.appium_process = subprocess.Popen(
@@ -2515,51 +2533,51 @@ class RobotRunnerApp:
                 preexec_fn=os.setsid if sys.platform != "win32" else None
             )
 
-            # Renomeamos as variáveis descartáveis para não conflitarem com a função de tradução `_`
+            # Renomeamos as variáveis descartáveis para não conflitarem com a função de tradução `translate`
             _host, port, _base_path = _parse_appium_command(command)
 
             # Update UI state
-            self.root.after(0, lambda: self.appium_status_label.configure(text=_("appium_status_running", port=port), bootstyle="success"))
+            self.root.after(0, lambda: self.settings_tab.appium_status_label.configure(text=translate("appium_status_running", port=port), bootstyle="success"))
             if not silent:
-                self.root.after(0, lambda: self.toggle_appium_button.configure(text=_("stop_appium"), bootstyle="danger", state=NORMAL))
-                self.root.after(0, self.status_var.set, _("appium_started_running_tests")) # Assuming a key for this status
+                self.root.after(0, lambda: self.settings_tab.toggle_appium_button.configure(text=translate("stop_appium"), bootstyle="danger", state=NORMAL))
+                self.root.after(0, self.status_var.set, translate("appium_started_running_tests")) # Assuming a key for this status
 
             # Pipe output to the GUI
             for line in iter(self.appium_process.stdout.readline, ''):
                 if self._is_closing or self.appium_process.poll() is not None:
                     break
-                self.root.after(0, self._update_output_text, self.appium_output_text, line, False)
+                self.root.after(0, self._update_output_text, self.settings_tab.appium_output_text, line, False)
             
             if self.appium_process:
                 self.appium_process.stdout.close()
                 self.appium_process.wait()
 
         except FileNotFoundError:
-            self.root.after(0, messagebox.showerror, _("open_file_error_title"), _("appium_command_not_found"))
-            self.root.after(0, lambda: self.appium_status_label.configure(text=_("appium_status_error"), bootstyle="danger"))
+            self.root.after(0, messagebox.showerror, translate("open_file_error_title"), translate("appium_command_not_found"))
+            self.root.after(0, lambda: self.settings_tab.appium_status_label.configure(text=translate("appium_status_error"), bootstyle="danger"))
         except Exception as e:
-            self.root.after(0, messagebox.showerror, _("open_file_error_title"), _("appium_start_generic_error", error=e))
-            self.root.after(0, lambda: self.appium_status_label.configure(text=_("appium_status_error"), bootstyle="danger"))
+            self.root.after(0, messagebox.showerror, translate("open_file_error_title"), translate("appium_start_generic_error", error=e))
+            self.root.after(0, lambda: self.settings_tab.appium_status_label.configure(text=translate("appium_status_error"), bootstyle="danger"))
         finally:
             self.appium_process = None
             if not self._is_closing:
                 # Always reset the UI to a consistent 'stopped' state
-                self.root.after(0, lambda: self.appium_status_label.configure(text=_("appium_status_stopped"), bootstyle="danger"))
-                self.root.after(0, lambda: self.toggle_appium_button.configure(text=_("start_appium"), bootstyle="primary", state=NORMAL))
+                self.root.after(0, lambda: self.settings_tab.appium_status_label.configure(text=translate("appium_status_stopped"), bootstyle="danger"))
+                self.root.after(0, lambda: self.settings_tab.toggle_appium_button.configure(text=translate("start_appium"), bootstyle="primary", state=NORMAL))
                 if not silent:
-                    self.root.after(0, self.status_var.set, _("ready")) # Assuming a key for this status
+                    self.root.after(0, self.status_var.set, translate("ready")) # Assuming a key for this status
 
     def _run_manual_adb_command(self):
         """Runs a manual ADB command entered by the user."""
-        command = self.adb_command_entry.get()
+        command = self.adb_tools_tab.adb_command_entry.get()
         if not command:
             return
         
         full_command = f"adb {command}"
-        self.run_adb_button.config(state=DISABLED)
-        self._update_output_text(self.adb_tools_output_text, f"> {full_command}\n", True)
+        self.adb_tools_tab.run_adb_button.config(state=DISABLED)
+        self._update_output_text(self.adb_tools_tab.adb_tools_output_text, f"> {full_command}\n", True)
         
-        thread = threading.Thread(target=self._run_command_and_update_gui, args=(full_command, self.adb_tools_output_text, self.run_adb_button))
+        thread = threading.Thread(target=self._run_command_and_update_gui, args=(full_command, self.adb_tools_tab.adb_tools_output_text, self.adb_tools_tab.run_adb_button))
         thread.daemon = True
         thread.start()
 
@@ -2573,20 +2591,20 @@ class RobotRunnerApp:
                     version_match = re.search(r'(\d+\.\d+\.\d+)', output)
                     if version_match:
                         self.appium_version = version_match.group(1)
-                        self.root.after(0, lambda: self.status_var.set(_("ready_with_appium_version", version=self.appium_version)))
+                        self.root.after(0, lambda: self.status_var.set(translate("ready_with_appium_version", version=self.appium_version)))
                     else:
                         self.appium_version = "Unknown"
-                        self.root.after(0, lambda: self.status_var.set(_("ready_appium_version_unknown")))
+                        self.root.after(0, lambda: self.status_var.set(translate("ready_appium_version_unknown")))
                 else:
                     self.appium_version = None
                     self.root.after(0, lambda: messagebox.showwarning(
-                        _("appium_not_found_title"),
-                        _("appium_not_found_message")
+                        translate("appium_not_found_title"),
+                        translate("appium_not_found_message")
                     ))
-                    self.root.after(0, lambda: self.status_var.set(_("ready_appium_not_found")))
+                    self.root.after(0, lambda: self.status_var.set(translate("ready_appium_not_found")))
             except Exception as e:
                 self.appium_version = None
-                self.root.after(0, lambda: self.status_var.set(_("error_checking_appium_version", error=e)))
+                self.root.after(0, lambda: self.status_var.set(translate("error_checking_appium_version", error=e)))
 
         threading.Thread(target=check_thread, daemon=True).start()
 
@@ -2627,11 +2645,11 @@ class RobotRunnerApp:
     def _get_cache_path_for_period(self, period: str) -> Path:
         """Returns the specific cache file path for a given period."""
         period_map = {
-            _("today"): "today",
-            _("period_last_7_days"): "7d",
-            _("last_30_days"): "30d",
-            _("last_6_months"): "6m",
-            _("all_time"): "all"
+            translate("today"): "today",
+            translate("period_last_7_days"): "7d",
+            translate("last_30_days"): "30d",
+            translate("last_6_months"): "6m",
+            translate("all_time"): "all"
         }
         suffix = period_map.get(period, "all")
         return self.logs_dir / f"parsed_logs_cache_{suffix}.json"
@@ -2639,15 +2657,15 @@ class RobotRunnerApp:
     def _start_log_reparse(self):
         """Starts the log parsing process based on the selected period."""
         if not self.logs_tab_initialized:
-            self._setup_logs_tab()
+            self.logs_tab.setup_widgets()
             self.logs_tab_initialized = True
 
-        self.group_by_combobox.config(state=DISABLED)
-        self.period_combobox.config(state=DISABLED)
-        self.reparse_button.config(state=DISABLED)
-        self.progress_frame.pack(fill=X, pady=5)
-        self.progress_label.pack(side=LEFT, padx=(0, 5))
-        self.progress_bar.pack(side=LEFT, fill=X, expand=YES)
+        self.logs_tab.group_by_combobox.config(state=DISABLED)
+        self.logs_tab.period_combobox.config(state=DISABLED)
+        self.logs_tab.reparse_button.config(state=DISABLED)
+        self.logs_tab.progress_frame.pack(fill=X, pady=5)
+        self.logs_tab.progress_label.pack(side=LEFT, padx=(0, 5))
+        self.logs_tab.progress_bar.pack(side=LEFT, fill=X, expand=YES)
 
         selected_period = self.log_period_var.get()
         thread = threading.Thread(target=self._parse_logs_thread, args=(selected_period,))
@@ -2661,8 +2679,8 @@ class RobotRunnerApp:
         period = self.log_period_var.get()
         cache_file = self._get_cache_path_for_period(period)
 
-        for item in self.logs_tree.get_children():
-            self.logs_tree.delete(item)
+        for item in self.logs_tab.logs_tree.get_children():
+            self.logs_tab.logs_tree.delete(item)
         self.parsed_logs_data = []
 
         if cache_file.exists():
@@ -2672,27 +2690,27 @@ class RobotRunnerApp:
                 
                 mtime = os.path.getmtime(cache_file)
                 mtime_str = datetime.datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
-                self.log_cache_info_label.config(text=_("cache_from_date", date=mtime_str))
+                self.logs_tab.log_cache_info_label.config(text=translate("cache_from_date", date=mtime_str))
                 
                 self._display_logs(self.parsed_logs_data)
             except (json.JSONDecodeError, IOError) as e:
-                self.log_cache_info_label.config(text=_("cache_load_error", error=e))
+                self.logs_tab.log_cache_info_label.config(text=translate("cache_load_error", error=e))
                 self.parsed_logs_data = []
         else:
-            self.log_cache_info_label.config(text=_("no_cache_for_period"))
+            self.logs_tab.log_cache_info_label.config(text=translate("no_cache_for_period"))
             self._display_logs([])
 
     def _parse_logs_thread(self, period: str):
         """Parses logs in a background thread based on the selected period."""
         now = datetime.datetime.now()
         time_delta = None
-        if period == _("today"):
+        if period == translate("today"):
             start_date = now.date()
-        elif period == _("period_last_7_days"):
+        elif period == translate("period_last_7_days"):
             time_delta = datetime.timedelta(days=7)
-        elif period == _("last_30_days"):
+        elif period == translate("last_30_days"):
             time_delta = datetime.timedelta(days=30)
-        elif period == _("last_6_months"):
+        elif period == translate("last_6_months"):
             time_delta = datetime.timedelta(days=180)
 
         all_xml_files = list(self.logs_dir.glob("**/output.xml"))
@@ -2703,7 +2721,7 @@ class RobotRunnerApp:
             for f in all_xml_files:
                 if datetime.datetime.fromtimestamp(f.stat().st_mtime) >= cutoff_time:
                     xml_files.append(f)
-        elif period == _("today"):
+        elif period == translate("today"):
             for f in all_xml_files:
                 if datetime.date.fromtimestamp(f.stat().st_mtime) == start_date:
                     xml_files.append(f)
@@ -2768,34 +2786,34 @@ class RobotRunnerApp:
         """Updates the progress bar and label from the main thread."""
         if total > 0:
             percentage = (current / total) * 100
-            self.progress_bar['value'] = percentage
-            self.progress_label.config(text=_("parsing_progress", current=current, total=total))
+            self.logs_tab.progress_bar['value'] = percentage
+            self.logs_tab.progress_label.config(text=translate("parsing_progress", current=current, total=total))
         else:
-            self.progress_label.config(text=_("no_log_files_found"))
-            self.progress_bar['value'] = 100
+            self.logs_tab.progress_label.config(text=translate("no_log_files_found"))
+            self.logs_tab.progress_bar['value'] = 100
 
     def _finalize_parsing(self, results):
         """Called on the main thread after parsing is complete."""
         self.parsed_logs_data = results
-        self.progress_label.pack_forget()
-        self.progress_bar.pack_forget()
-        self.progress_frame.pack_forget()
-        self.group_by_combobox.config(state="readonly")
-        self.period_combobox.config(state="readonly")
-        self.reparse_button.config(state=NORMAL)
+        self.logs_tab.progress_label.pack_forget()
+        self.logs_tab.progress_bar.pack_forget()
+        self.logs_tab.progress_frame.pack_forget()
+        self.logs_tab.group_by_combobox.config(state="readonly")
+        self.logs_tab.period_combobox.config(state="readonly")
+        self.logs_tab.reparse_button.config(state=NORMAL)
         
         now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        self.log_cache_info_label.config(text=_("cache_updated_at", date=now_str))
+        self.logs_tab.log_cache_info_label.config(text=translate("cache_updated_at", date=now_str))
         
         self._display_logs(results)
 
     def _display_logs(self, log_data: List[Dict]):
         """Displays the parsed log data in the Treeview."""
-        for item in self.logs_tree.get_children():
-            self.logs_tree.delete(item)
+        for item in self.logs_tab.logs_tree.get_children():
+            self.logs_tab.logs_tree.delete(item)
 
         if not log_data:
-            self.logs_tree.insert("", END, values=(_("no_logs_found"), "", ""), tags=("no_logs",))
+            self.logs_tab.logs_tree.insert("", END, values=(translate("no_logs_found"), "", ""), tags=("no_logs",))
             return
 
         group_by = self.group_by_var.get()
@@ -2803,11 +2821,11 @@ class RobotRunnerApp:
 
         for result in log_data:
             key = ""
-            if group_by == _("group_by_device"):
+            if group_by == translate("group_by_device"):
                 key = result.get("device", "Unknown Device")
-            elif group_by == _("group_by_suite"):
+            elif group_by == translate("group_by_suite"):
                 key = result.get("suite", "Unknown Suite")
-            elif group_by == _("group_by_status"):
+            elif group_by == translate("group_by_status"):
                 key = result.get("status", "UNKNOWN")
             
             if key not in grouped_data:
@@ -2815,9 +2833,9 @@ class RobotRunnerApp:
             grouped_data[key].append(result)
 
         for group, results in sorted(grouped_data.items()):
-            parent_id = self.logs_tree.insert("", END, text=group, values=(group, "", ""), open=True)
+            parent_id = self.logs_tab.logs_tree.insert("", END, text=group, values=(group, "", ""), open=True)
 
-            if group_by == _("group_by_device"):
+            if group_by == translate("group_by_device"):
                 suites_in_group = {}
                 for res in results:
                     suite_key = res.get("suite", "Unknown Suite")
@@ -2825,32 +2843,32 @@ class RobotRunnerApp:
                         suites_in_group[suite_key] = []
                     suites_in_group[suite_key].append(res)
                 
-                self.logs_tree.heading("suite", text=_("log_tree_suite_test"))
+                self.logs_tab.logs_tree.heading("suite", text=translate("log_tree_suite_test"))
                 for suite_name, tests in sorted(suites_in_group.items()):
                     indented_suite_name = f"    {suite_name}"
-                    suite_id = self.logs_tree.insert(parent_id, END, text=suite_name, values=(indented_suite_name, "", ""), open=True)
+                    suite_id = self.logs_tab.logs_tree.insert(parent_id, END, text=suite_name, values=(indented_suite_name, "", ""), open=True)
                     for test in tests:
                         test_display_name = f"        - {test['test']}"
-                        self.logs_tree.insert(suite_id, END, values=(test_display_name, test["status"], test["time"]),
+                        self.logs_tab.logs_tree.insert(suite_id, END, values=(test_display_name, test["status"], test["time"]),
                                               tags=(test["status"], test["log_path"]))
             else:
-                if group_by == _("group_by_suite"):
-                    self.logs_tree.heading("suite", text=_("log_tree_test"))
-                elif group_by == _("group_by_status"):
-                    self.logs_tree.heading("suite", text=_("log_tree_device_suite"))
+                if group_by == translate("group_by_suite"):
+                    self.logs_tab.logs_tree.heading("suite", text=translate("log_tree_test"))
+                elif group_by == translate("group_by_status"):
+                    self.logs_tab.logs_tree.heading("suite", text=translate("log_tree_device_suite"))
 
                 for result in results:
                     first_col_val = result["test"]
-                    if group_by == _("group_by_status"):
+                    if group_by == translate("group_by_status"):
                         first_col_val = f'{result["device"]} / {result["suite"]}'
                     
                     indented_val = f"    {first_col_val}"
-                    self.logs_tree.insert(parent_id, END, values=(indented_val, result["status"], result["time"]),
+                    self.logs_tab.logs_tree.insert(parent_id, END, values=(indented_val, result["status"], result["time"]),
                                           tags=(result["status"], result["log_path"]))
         
-        self.logs_tree.tag_configure("PASS", foreground="green")
-        self.logs_tree.tag_configure("FAIL", foreground="red")
-        self.logs_tree.tag_configure("SKIP", foreground="orange")
+        self.logs_tab.logs_tree.tag_configure("PASS", foreground="green")
+        self.logs_tab.logs_tree.tag_configure("FAIL", foreground="red")
+        self.logs_tab.logs_tree.tag_configure("SKIP", foreground="orange")
 
     def _on_group_by_selected(self, event=None):
         """Handles changing the grouping of logs."""
@@ -2860,19 +2878,19 @@ class RobotRunnerApp:
     def _on_log_double_click(self, event):
         """Opens the log.html file in the default web browser."""
         try:
-            item_id = self.logs_tree.selection()[0]
-            item_tags = self.logs_tree.item(item_id, "tags")
+            item_id = self.logs_tab.logs_tree.selection()[0]
+            item_tags = self.logs_tab.logs_tree.item(item_id, "tags")
             if "no_logs" in item_tags: return # Do nothing for the placeholder message
             if len(item_tags) > 1:
                 log_path = item_tags[1]
                 if Path(log_path).exists():
                     os.startfile(log_path)
                 else:
-                    messagebox.showwarning(_("file_not_found_title"), _("log_open_error", path=log_path))
+                    messagebox.showwarning(translate("file_not_found_title"), translate("log_open_error", path=log_path))
         except IndexError:
             pass
         except Exception as e:
-            messagebox.showerror(_("open_file_error_title"), _("log_open_error_generic", error=e))
+            messagebox.showerror(translate("open_file_error_title"), translate("log_open_error_generic", error=e))
             
     def _run_command_and_update_gui(self, command: str, output_widget: ScrolledText, button: ttk.Button, refresh_on_success: bool = False):
         success, output = execute_command(command)

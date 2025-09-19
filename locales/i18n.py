@@ -21,7 +21,7 @@ def load_language(language_code: str = "en_US"):
             # If en_US is also missing, translations will be empty.
             translations = {}
 
-def translate(key: str, **kwargs) -> str:
+def gettext(key: str, **kwargs) -> str:
     """
     Returns the translated string for the given key.
     If the key is not found, it returns the key itself.
@@ -35,6 +35,6 @@ def translate(key: str, **kwargs) -> str:
             # Return the raw string if formatting fails
             return text
     return text
-
-# Alias for the translate function, a common convention in i18n
-_ = translate
+ 
+# Alias for clarity, allowing `translate()` to be used in the code.
+translate = gettext
