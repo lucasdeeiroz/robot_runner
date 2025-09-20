@@ -2749,6 +2749,7 @@ class RobotRunnerApp:
 
     def _parse_logs_thread(self, period: str):
         """Parses logs in a background thread based on the selected period."""
+        # Recursively find all possible output.xml files, timestamped or not. This is the most robust way.
         all_xml_files = list(self.logs_dir.glob("**/output*.xml"))
         
         # --- Filter files based on the selected period using the reliable 'generated' timestamp ---
@@ -2777,10 +2778,7 @@ class RobotRunnerApp:
                        (cutoff_time and gen_time >= cutoff_time):
                         xml_files_to_parse.append(f)
 
-        total_found = len(all_xml_files)
-        total_to_parse = len(xml_files_to_parse)
-        self.root.after(0, self._update_log_parse_status, translate("parsing_summary", total_found=total_found, to_parse=total_to_parse))
-
+        total_files = len(xml_files_to_parse)
         all_results = []
 
         for i, xml_file in enumerate(xml_files_to_parse):
@@ -2832,11 +2830,11 @@ class RobotRunnerApp:
                         "log_path": str(xml_file.parent / "log.html")
                     })
             except ET.ParseError:
-                pass # Silently ignore files that cannot be parsed
-            except Exception:
-                pass # Silently ignore other processing errors for a given file
+                print(f"Warning: Could not parse {xml_file}")
+            except Exception as e:
+                print(f"Error processing log file {xml_file}: {e}")
             
-            self.root.after(0, self._update_parse_progress, i + 1, total_to_parse)
+            self.root.after(0, self._update_parse_progress, i + 1, total_files)
 
         cache_file_to_save = self._get_cache_path_for_period(period)
         try:
@@ -2847,11 +2845,6 @@ class RobotRunnerApp:
             
         self.root.after(0, self._finalize_parsing, all_results)
 
-    def _update_log_parse_status(self, text: str):
-        """Updates the log cache info label from any thread."""
-        if self.logs_tab_initialized:
-            self.logs_tab.log_cache_info_label.config(text=text)
-
     def _update_parse_progress(self, current, total):
         """Updates the progress bar and label from the main thread."""
         if total > 0:
@@ -2859,7 +2852,6 @@ class RobotRunnerApp:
             self.logs_tab.progress_bar['value'] = percentage
             self.logs_tab.progress_label.config(text=translate("parsing_progress", current=current, total=total))
         else:
-            # If there are no files to parse, we can consider it 100% done.
             self.logs_tab.progress_label.config(text=translate("no_log_files_found"))
             self.logs_tab.progress_bar['value'] = 100
 
@@ -3002,7 +2994,7 @@ def execute_command(command: str) -> Tuple[bool, str]:
     except subprocess.CalledProcessError as e:
         return False, e.stdout.strip() + "\n" + e.stderr.strip()
     except FileNotFoundError:
-        return False, f"Error: Command not found. Make sure that '{command.split()[0]}' is in your system's PATH."
+        return False, f"Error: Command not found. Make sure '{command.split()[0]}' is in your system's PATH."
     except Exception as e:
         return False, f"An unexpected error occurred: {e}"
 
@@ -3275,6 +3267,29 @@ def _get_busy_udids(appium_command: Optional[str]) -> set:
     return set()
 
 
+def get_generation_time(xml_file: Path) -> Optional[datetime.datetime]:
+    """
+    Quickly gets the 'generated' timestamp from an output.xml file using regex for performance.
+    Falls back to the file's modification time if regex fails.
+    """
+    try:
+        with open(xml_file, 'r', encoding='utf-8', errors='ignore') as f:
+            # Read only the first 512 bytes, as the 'generated' attribute is near the start.
+            chunk = f.read(512)
+            match = re.search(r'generated="(\d{8} \d{2}:\d{2}:\d{2}\.\d{3,})"', chunk)
+            if match:
+                generated_str = match.group(1)
+                # The string might have more than 6 digits for microseconds, but strptime %f handles it.
+                return datetime.datetime.strptime(generated_str, '%Y%m%d %H:%M:%S.%f')
+    except (IOError, ValueError):
+        pass  # Ignore errors and fall back to mtime.
+
+    # Fallback to the file's modification time if the fast method fails.
+    try:
+        return datetime.datetime.fromtimestamp(xml_file.stat().st_mtime)
+    except Exception:
+        return None
+
 
 def load_theme_setting():
     """Loads the theme from settings.json before the main window is created."""
@@ -3286,29 +3301,6 @@ def load_theme_setting():
         return "darkly"
     except Exception:
         return "darkly"
-
-def get_generation_time(xml_file: Path) -> Optional[datetime.datetime]:
-    """
-    Quickly parses the 'generated' attribute from a Robot Framework output.xml file.
-    Falls back to the file's modification time if parsing fails.
-    """
-    try:
-        # Use iterparse to read only up to the root element's start tag, which is very fast.
-        for event, element in ET.iterparse(str(xml_file), events=('start',)):
-            if element.tag == 'robot':
-                generated_str = element.get('generated')
-                if generated_str:
-                    # Robot format is 'YYYYMMDD HH:MM:SS.sss'
-                    return datetime.datetime.strptime(generated_str, '%Y%m%d %H:%M:%S.%f')
-            # We've processed the root tag, no need to parse the rest of the file.
-            break
-    except (ET.ParseError, ValueError, TypeError):
-        # This block catches issues with XML parsing or date string conversion.
-        pass
-    try: # Fallback to the file's modification time.
-        return datetime.datetime.fromtimestamp(xml_file.stat().st_mtime)
-    except Exception:
-        return None
 
 def load_language_setting():
     """Loads the language from settings.json before the main window is created."""
