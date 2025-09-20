@@ -127,6 +127,12 @@ class RunCommandWindow(tk.Toplevel):
         self.xpath_search_var = tk.StringVar()
         self.is_dragging_locked_sash = False
         
+        # --- Inspector Filter Attributes ---
+        self.filter_by_resource_id_var = tk.BooleanVar(value=True)
+        self.filter_by_text_var = tk.BooleanVar(value=True)
+        self.filter_by_content_desc_var = tk.BooleanVar(value=True)
+        self.filter_by_class_var = tk.BooleanVar(value=False)
+        
         # --- Window Setup ---
         if title:
             window_title = title
@@ -253,8 +259,19 @@ class RunCommandWindow(tk.Toplevel):
             self.refresh_inspector_button.grid(row=0, column=0, sticky="ew", padx=(0, 5))
             ToolTip(self.refresh_inspector_button, translate("refresh_tooltip"))
 
+            # --- Attribute Filter Menu ---
+            self.filter_menubutton = ttk.Menubutton(inspector_top_controls_frame, text=translate("inspector_filter_attributes"), bootstyle="outline-toolbutton")
+            self.filter_menubutton.grid(row=0, column=1, sticky="ew", padx=5)
+            filter_menu = tk.Menu(self.filter_menubutton, tearoff=False)
+            self.filter_menubutton["menu"] = filter_menu
+            
+            filter_menu.add_checkbutton(label=translate("filter_by_resource_id"), variable=self.filter_by_resource_id_var, command=self._update_element_tree_view)
+            filter_menu.add_checkbutton(label=translate("filter_by_text"), variable=self.filter_by_text_var, command=self._update_element_tree_view)
+            filter_menu.add_checkbutton(label=translate("filter_by_content_desc"), variable=self.filter_by_content_desc_var, command=self._update_element_tree_view)
+            filter_menu.add_checkbutton(label=translate("filter_by_class"), variable=self.filter_by_class_var, command=self._update_element_tree_view)
+
             self.auto_refresh_check = ttk.Checkbutton(inspector_top_controls_frame, text=translate("inspector_auto_refresh"), variable=self.inspector_auto_refresh_var, bootstyle="round-toggle")
-            self.auto_refresh_check.grid(row=0, column=1, sticky="e")
+            self.auto_refresh_check.grid(row=0, column=2, sticky="e")
             ToolTip(self.auto_refresh_check, translate("inspector_auto_refresh_tooltip"))
 
             # --- Search Frame ---
@@ -897,8 +914,8 @@ class RunCommandWindow(tk.Toplevel):
             for node in root.iter():
                 # Extract all relevant attributes
                 self._parse_and_store_node(node)
-
-            self._populate_elements_tree(self.all_elements_list)
+            
+            self._update_element_tree_view()
 
         except Exception as e:
             self.scrcpy_output_queue.put(translate("parse_ui_dump_error", error=e) + "\n")
@@ -1135,11 +1152,12 @@ class RunCommandWindow(tk.Toplevel):
             found_xml_nodes = root.xpath(xpath_query)
             found_bounds = {node.get("bounds") for node in found_xml_nodes}
             
-            filtered_elements = [
+            search_results = [
                 element_data for element_data in self.all_elements_list
                 if element_data.get("bounds") in found_bounds
             ]
-            self._populate_elements_tree(filtered_elements)
+            final_list = self._apply_inspector_filter(source_list=search_results)
+            self._populate_elements_tree(final_list)
         except ET.XMLSyntaxError as e:
             messagebox.showerror(translate("parse_ui_dump_error"), str(e), parent=self)
         except ET.XPathSyntaxError as e:
@@ -1148,7 +1166,7 @@ class RunCommandWindow(tk.Toplevel):
     def _clear_xpath_search(self):
         """Clears the XPath search and restores the full list of elements."""
         self.xpath_search_var.set("")
-        self._populate_elements_tree(self.all_elements_list)
+        self._update_element_tree_view()
 
     def _on_canvas_click(self, event):
         """Handles clicks on the inspector screenshot canvas."""
@@ -1223,6 +1241,45 @@ class RunCommandWindow(tk.Toplevel):
         else:
             self.scrcpy_output_queue.put(translate("tap_success_refreshing") + "\n")
             self.after(500, self._start_inspection)
+
+    def _apply_inspector_filter(self, source_list: Optional[List[Dict]] = None) -> List[Dict]:
+        """
+        Filters a list of UI elements based on the currently selected attribute filters.
+        Returns the filtered list.
+        """
+        use_list = source_list if source_list is not None else self.all_elements_list
+        if not use_list:
+            return []
+
+        # Check which filters are active
+        active_filters = {
+            "resource-id": self.filter_by_resource_id_var.get(),
+            "text": self.filter_by_text_var.get(),
+            "accessibility_id": self.filter_by_content_desc_var.get(),
+            "class": self.filter_by_class_var.get()
+        }
+
+        # If no filters are selected, show everything from the source list
+        if not any(active_filters.values()):
+            return use_list
+
+        filtered_elements = []
+        for element_data in use_list:
+            # Check if the element has any of the attributes that are being filtered for
+            if (active_filters["resource-id"] and element_data.get("resource-id")) or \
+               (active_filters["text"] and element_data.get("text")) or \
+               (active_filters["accessibility_id"] and element_data.get("accessibility_id")) or \
+               (active_filters["class"] and element_data.get("class")):
+                filtered_elements.append(element_data)
+        
+        return filtered_elements
+
+    def _update_element_tree_view(self):
+        """Applies the current filters to the master element list and updates the treeview."""
+        if not self.is_inspecting:
+            return
+        filtered_list = self._apply_inspector_filter()
+        self._populate_elements_tree(filtered_list)
 
     # --- Scrcpy Feature Methods ---
 
