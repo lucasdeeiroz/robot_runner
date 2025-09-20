@@ -1556,8 +1556,10 @@ class RunCommandWindow(tk.Toplevel):
             self.cur_log_dir = self.parent_app.logs_dir / f"A{device_info['release']}_{device_info['model']}_{self.udid}" / suite_name
             self.cur_log_dir.mkdir(parents=True, exist_ok=True)
             
+            timestamp_option = " --timestampoutputs" if self.parent_app.timestamp_logs_var.get() else ""
+            
             base_command = (
-                f'robot --split-log --logtitle "{device_info["release"]} - {device_info["model"]}" '
+                f'robot{timestamp_option} --split-log --logtitle "{device_info["release"]} - {device_info["model"]}" '
                 f'-v udid:"{self.udid}" -v deviceName:"{device_info["model"]}" -v versao_OS:"{device_info["release"]}" '
                 f'-d "{self.cur_log_dir}" --name "{suite_name}" '
             )
@@ -1740,8 +1742,11 @@ class RunTabPage(ttk.Frame):
         self.device_options_button.grid(row=0, column=0, sticky="w", padx=5, pady=5)
         ToolTip(self.device_options_button, translate("device_toolbox_tooltip"))
 
+        self.timestamp_check = ttk.Checkbutton(run_frame, text=translate("do_not_overwrite_logs"), variable=self.app.timestamp_logs_var)
+        self.timestamp_check.grid(row=0, column=2, sticky="e", padx=(0, 10))
+
         self.run_button = ttk.Button(run_frame, text=translate("run_test"), command=self.app._run_test, bootstyle="success")
-        self.run_button.grid(row=0, column=2, sticky="e", padx=5, pady=5)
+        self.run_button.grid(row=0, column=3, sticky="e", padx=5, pady=5)
         ToolTip(self.run_button, translate("run_test_tooltip"))
 
     def on_run_mode_change(self):
@@ -2092,6 +2097,7 @@ class RobotRunnerApp:
         self.log_period_var = tk.StringVar(value=translate("period_last_7_days"))
         # --- Performance Monitor ---
         self.app_packages_var = tk.StringVar()
+        self.timestamp_logs_var = tk.BooleanVar(value=False)
         # --- Internationalization ---
         self.language_var = tk.StringVar()
 
@@ -2743,76 +2749,94 @@ class RobotRunnerApp:
 
     def _parse_logs_thread(self, period: str):
         """Parses logs in a background thread based on the selected period."""
+        all_xml_files = list(self.logs_dir.glob("**/output*.xml"))
+        
+        # --- Filter files based on the selected period using the reliable 'generated' timestamp ---
         now = datetime.datetime.now()
-        time_delta = None
-        if period == translate("today"):
-            start_date = now.date()
-        elif period == translate("period_last_7_days"):
-            time_delta = datetime.timedelta(days=7)
-        elif period == translate("last_30_days"):
-            time_delta = datetime.timedelta(days=30)
-        elif period == translate("last_6_months"):
-            time_delta = datetime.timedelta(days=180)
+        xml_files_to_parse = []
 
-        all_xml_files = list(self.logs_dir.glob("**/output.xml"))
-        xml_files = []
+        if period == translate("all_time"):
+            xml_files_to_parse = all_xml_files
+        else:
+            today_date = now.date() if period == translate("today") else None
+            time_delta = None
+            
+            if period == translate("period_last_7_days"):
+                time_delta = datetime.timedelta(days=7)
+            elif period == translate("last_30_days"):
+                time_delta = datetime.timedelta(days=30)
+            elif period == translate("last_6_months"):
+                time_delta = datetime.timedelta(days=180)
 
-        if time_delta:
-            cutoff_time = now - time_delta
+            cutoff_time = now - time_delta if time_delta else None
+
             for f in all_xml_files:
-                if datetime.datetime.fromtimestamp(f.stat().st_mtime) >= cutoff_time:
-                    xml_files.append(f)
-        elif period == translate("today"):
-            for f in all_xml_files:
-                if datetime.date.fromtimestamp(f.stat().st_mtime) == start_date:
-                    xml_files.append(f)
-        else: # All Time
-            xml_files = all_xml_files
+                gen_time = get_generation_time(f)
+                if gen_time:
+                    if (today_date and gen_time.date() == today_date) or \
+                       (cutoff_time and gen_time >= cutoff_time):
+                        xml_files_to_parse.append(f)
 
-        total_files = len(xml_files)
+        total_found = len(all_xml_files)
+        total_to_parse = len(xml_files_to_parse)
+        self.root.after(0, self._update_log_parse_status, translate("parsing_summary", total_found=total_found, to_parse=total_to_parse))
+
         all_results = []
 
-        for i, xml_file in enumerate(xml_files):
+        for i, xml_file in enumerate(xml_files_to_parse):
             try:
                 tree = ET.parse(xml_file)
                 root = tree.getroot()
-                suite_element = root.find("suite")
-                if suite_element is not None:
+
+                # Robustly get the device directory name regardless of path depth.
+                relative_path = xml_file.relative_to(self.logs_dir)
+                if len(relative_path.parts) > 1:
+                    device_dir_name = relative_path.parts[0]
+                else:
+                    device_dir_name = "Unknown_Device"
+
+                device_parts = device_dir_name.split('_')
+                if len(device_parts) > 2:
+                    device = " ".join(device_parts[1:-1])
+                else:
+                    device = device_dir_name
+
+                # Iterate over ALL test elements in the document to handle nested suites.
+                for test_element in root.iter("test"):
+                    suite_element = test_element.getparent()
                     suite_name = suite_element.get("name", "Unknown_Suite")
                     
-                    device_dir_name = xml_file.parent.parent.name
-                    device_parts = device_dir_name.split('_')
-                    if len(device_parts) > 2:
-                        device = " ".join(device_parts[1:-1])
-                    else:
-                        device = device_dir_name
+                    test_name = test_element.get("name", "Unknown_Test")
+                    status_element = test_element.find("status")
 
-                    for test_element in suite_element.findall("test"):
-                        test_name = test_element.get("name", "Unknown_Test")
-                        status_element = test_element.find("status")
+                    # Robustness: Handle cases where a test might not have a status (e.g., crashed)
+                    if status_element is not None:
                         status = status_element.get("status", "UNKNOWN")
                         elapsed_element = status_element.get("elapsed", "0")
-                        
-                        try:
-                            elapsed_seconds = float(elapsed_element)
-                            elapsed_formatted = str(datetime.timedelta(seconds=round(elapsed_seconds)))
-                        except (ValueError, TypeError):
-                            elapsed_formatted = "N/A"
+                    else:
+                        status = "ERROR" # Assign a default error status for incomplete logs
+                        elapsed_element = "0"
+                    
+                    try:
+                        elapsed_seconds = float(elapsed_element)
+                        elapsed_formatted = str(datetime.timedelta(seconds=round(elapsed_seconds)))
+                    except (ValueError, TypeError):
+                        elapsed_formatted = "N/A"
 
-                        all_results.append({
-                            "device": device,
-                            "suite": suite_name,
-                            "test": test_name,
-                            "status": status,
-                            "time": elapsed_formatted,
-                            "log_path": str(xml_file.parent / "log.html")
-                        })
+                    all_results.append({
+                        "device": device,
+                        "suite": suite_name,
+                        "test": test_name,
+                        "status": status,
+                        "time": elapsed_formatted,
+                        "log_path": str(xml_file.parent / "log.html")
+                    })
             except ET.ParseError:
-                print(f"Warning: Could not parse {xml_file}")
-            except Exception as e:
-                print(f"Error processing log file {xml_file}: {e}")
+                pass # Silently ignore files that cannot be parsed
+            except Exception:
+                pass # Silently ignore other processing errors for a given file
             
-            self.root.after(0, self._update_parse_progress, i + 1, total_files)
+            self.root.after(0, self._update_parse_progress, i + 1, total_to_parse)
 
         cache_file_to_save = self._get_cache_path_for_period(period)
         try:
@@ -2823,6 +2847,11 @@ class RobotRunnerApp:
             
         self.root.after(0, self._finalize_parsing, all_results)
 
+    def _update_log_parse_status(self, text: str):
+        """Updates the log cache info label from any thread."""
+        if self.logs_tab_initialized:
+            self.logs_tab.log_cache_info_label.config(text=text)
+
     def _update_parse_progress(self, current, total):
         """Updates the progress bar and label from the main thread."""
         if total > 0:
@@ -2830,6 +2859,7 @@ class RobotRunnerApp:
             self.logs_tab.progress_bar['value'] = percentage
             self.logs_tab.progress_label.config(text=translate("parsing_progress", current=current, total=total))
         else:
+            # If there are no files to parse, we can consider it 100% done.
             self.logs_tab.progress_label.config(text=translate("no_log_files_found"))
             self.logs_tab.progress_bar['value'] = 100
 
@@ -2844,7 +2874,7 @@ class RobotRunnerApp:
         self.logs_tab.reparse_button.config(state=NORMAL)
         
         now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        self.logs_tab.log_cache_info_label.config(text=translate("cache_updated_at", date=now_str))
+        self.logs_tab.log_cache_info_label.config(text=translate("parsing_complete", count=len(results)))
         
         self._display_logs(results)
 
@@ -2972,7 +3002,7 @@ def execute_command(command: str) -> Tuple[bool, str]:
     except subprocess.CalledProcessError as e:
         return False, e.stdout.strip() + "\n" + e.stderr.strip()
     except FileNotFoundError:
-        return False, f"Error: Command not found. Make sure '{command.split()[0]}' is in your system's PATH."
+        return False, f"Error: Command not found. Make sure that '{command.split()[0]}' is in your system's PATH."
     except Exception as e:
         return False, f"An unexpected error occurred: {e}"
 
@@ -3256,6 +3286,29 @@ def load_theme_setting():
         return "darkly"
     except Exception:
         return "darkly"
+
+def get_generation_time(xml_file: Path) -> Optional[datetime.datetime]:
+    """
+    Quickly parses the 'generated' attribute from a Robot Framework output.xml file.
+    Falls back to the file's modification time if parsing fails.
+    """
+    try:
+        # Use iterparse to read only up to the root element's start tag, which is very fast.
+        for event, element in ET.iterparse(str(xml_file), events=('start',)):
+            if element.tag == 'robot':
+                generated_str = element.get('generated')
+                if generated_str:
+                    # Robot format is 'YYYYMMDD HH:MM:SS.sss'
+                    return datetime.datetime.strptime(generated_str, '%Y%m%d %H:%M:%S.%f')
+            # We've processed the root tag, no need to parse the rest of the file.
+            break
+    except (ET.ParseError, ValueError, TypeError):
+        # This block catches issues with XML parsing or date string conversion.
+        pass
+    try: # Fallback to the file's modification time.
+        return datetime.datetime.fromtimestamp(xml_file.stat().st_mtime)
+    except Exception:
+        return None
 
 def load_language_setting():
     """Loads the language from settings.json before the main window is created."""
