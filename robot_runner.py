@@ -112,6 +112,8 @@ class RunCommandWindow(tk.Toplevel):
         self.stop_monitoring_event = threading.Event()
         self.performance_output_queue = Queue()
         self.performance_log_file = None
+        self.performance_monitor_is_minimized = tk.BooleanVar(value=False)
+        self.last_performance_line_var = tk.StringVar()
         
         # --- Inspector Attributes ---
         self.inspector_is_visible = False
@@ -231,19 +233,28 @@ class RunCommandWindow(tk.Toplevel):
         monitor_controls_frame.pack(side=TOP, fill=X, pady=(0, 5), padx=5)
         monitor_controls_frame.columnconfigure(0, weight=1)
         monitor_controls_frame.columnconfigure(1, weight=1)
+        monitor_controls_frame.columnconfigure(2, weight=0)
 
         self.performance_output_text = ScrolledText(self.performance_output_frame, wrap=WORD, state=DISABLED, autohide=True)
         self.performance_output_text.pack(fill=BOTH, expand=YES, padx=5, pady=(0,5))
         
-        ttk.Label(monitor_controls_frame, text=translate("app_package")).grid(row=0, column=0, columnspan=2, sticky=W, pady=(0,2))
+        self.minimized_performance_label = ttk.Label(self.performance_output_frame, textvariable=self.last_performance_line_var, font=("Courier", 9))
+        
+        ttk.Label(monitor_controls_frame, text=translate("app_package")).grid(row=0, column=0, columnspan=3, sticky=W, pady=(0,2))
         self.app_package_combo = ttk.Combobox(monitor_controls_frame, values=self.parent_app.app_packages_var.get().split(','))
-        self.app_package_combo.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 5))
+        self.app_package_combo.grid(row=1, column=0, columnspan=3, sticky="ew", pady=(0, 5))
         if self.app_package_combo['values']:
             self.app_package_combo.set(self.app_package_combo['values'][0])
         self.start_monitor_button = ttk.Button(monitor_controls_frame, text=translate("start_monitoring"), command=self._start_performance_monitor, bootstyle="success")
         self.start_monitor_button.grid(row=2, column=0, sticky="ew", padx=(0, 2))
         self.stop_monitor_button = ttk.Button(monitor_controls_frame, text=translate("stop_monitoring"), command=self._stop_performance_monitor, bootstyle="danger", state=DISABLED)
         self.stop_monitor_button.grid(row=2, column=1, sticky="ew", padx=(2, 0))
+        
+        self.toggle_minimize_perf_button = ttk.Button(
+            monitor_controls_frame, text=translate("minimize_performance"), 
+            command=self._toggle_performance_minimize
+        )
+        self.toggle_minimize_perf_button.grid(row=2, column=2, sticky="ew", padx=(5,0))
         
         # Inspector Controls (only for non-test mode)
         if self.mode != 'test':
@@ -1491,6 +1502,7 @@ class RunCommandWindow(tk.Toplevel):
         self.app_package_combo.config(state=DISABLED)
         self.performance_output_text.text.config(state=NORMAL)
         self.performance_output_text.text.delete("1.0", END)
+        self.last_performance_line_var.set("")
         self.performance_output_text.text.config(state=DISABLED)
         log_dir = self.parent_app.logs_dir
         log_dir.mkdir(exist_ok=True)
@@ -1511,19 +1523,44 @@ class RunCommandWindow(tk.Toplevel):
             self.stop_monitor_button.config(state=DISABLED)
             self.app_package_combo.config(state="readonly")
             self.performance_output_queue.put(f"\n{translate('monitoring_stopped_by_user')}\n")
+            self.last_performance_line_var.set("")
 
     def _check_performance_output_queue(self):
         while not self.performance_output_queue.empty():
+            line_to_log = ""
             try:
-                line = self.performance_output_queue.get_nowait()
+                item = self.performance_output_queue.get_nowait()
+                
+                if isinstance(item, dict):
+                    # Recreate the full line for the log/main view
+                    line_to_log = (
+                        f"{item['ts']:<10} | {item['elapsed']:<10} | CPU: {item['cpu']:<5} | "
+                        f"RAM: {item['ram']:<7} | GPU: {item['gpu']:<10} | "
+                        f"Missed Vsync: {item['vsync']:<1} | Janky: {item['janky']:<15} | "
+                        f"FPS: {item['fps']:<4}\n"
+                    )
+                    
+                    # Create the compact line for the minimized view
+                    janky_percent = item['janky'].split(' ')[0]
+                    compact_line = (
+                        f"CPU:{item['cpu']}% RAM:{item['ram']}MB GPU:{item['gpu']}KB "
+                        f"Janky:{janky_percent} FPS:{item['fps']}"
+                    )
+                    self.last_performance_line_var.set(compact_line)
+                elif isinstance(item, str):
+                    line_to_log = item
+                    if translate('monitoring_stopped_by_user') in item:
+                        self.last_performance_line_var.set("")
+
+                # Write the full line to the text widget and log file
                 self.performance_output_text.text.config(state=NORMAL)
-                self.performance_output_text.text.insert(END, line)
+                self.performance_output_text.text.insert(END, line_to_log)
                 self.performance_output_text.text.see(END)
                 self.performance_output_text.text.config(state=DISABLED)
                 if self.performance_log_file:
                     try:
-                        mode = 'w' if "Starting monitoring" in line else 'a'
-                        with open(self.performance_log_file, mode, encoding=OUTPUT_ENCODING) as f: f.write(line)
+                        mode = 'w' if "Starting monitoring" in line_to_log else 'a'
+                        with open(self.performance_log_file, mode, encoding=OUTPUT_ENCODING) as f: f.write(line_to_log)
                     except Exception as e:
                         self.performance_output_queue.put(f"\n{translate('log_write_error', error=e)}\n")
             except Empty:
@@ -1531,6 +1568,23 @@ class RunCommandWindow(tk.Toplevel):
         if self.is_monitoring and (self.performance_thread is None or not self.performance_thread.is_alive()):
              self._stop_performance_monitor()
         self.after(100, self._check_performance_output_queue)
+
+    def _toggle_performance_minimize(self):
+        """Toggles the performance monitor view between full log and a single line summary."""
+        is_minimized = self.performance_monitor_is_minimized.get()
+        
+        if is_minimized:
+            # Maximize
+            self.minimized_performance_label.pack_forget()
+            self.performance_output_text.pack(fill=BOTH, expand=YES, padx=5, pady=(0,5))
+            self.toggle_minimize_perf_button.config(text=translate("minimize_performance"))
+            self.performance_monitor_is_minimized.set(False)
+        else:
+            # Minimize
+            self.performance_output_text.pack_forget()
+            self.minimized_performance_label.pack(fill=X, padx=5, pady=5)
+            self.toggle_minimize_perf_button.config(text=translate("maximize_performance"))
+            self.performance_monitor_is_minimized.set(True)
 
     # --- Robot Test Methods ------------------------------------------------------
     def _on_test_finished(self):
@@ -3127,8 +3181,17 @@ def run_performance_monitor(udid: str, app_package: str, output_queue: Queue, st
             surface_name = get_surface_view_name(udid, app_package)
             surface_fps, last_timestamps = get_surface_fps(udid, surface_name, last_timestamps)
 
-            output_line = f"{ts:<10} | {elapsed_time_str:<10} | CPU: {cpu_percent:<5} | RAM: {ram_mb:<7} | GPU: {gpu_mem_kb:<10} | Missed Vsync: {missed_vsync:<1} | Janky: {jank_info:<15} | FPS: {surface_fps:<4}\n"
-            output_queue.put(output_line)
+            perf_data = {
+                "ts": ts,
+                "elapsed": elapsed_time_str,
+                "cpu": cpu_percent,
+                "ram": ram_mb,
+                "gpu": gpu_mem_kb,
+                "vsync": missed_vsync,
+                "janky": jank_info,
+                "fps": surface_fps
+            }
+            output_queue.put(perf_data)
             
             # This loop runs roughly every second, driven by the ADB command delays
         
