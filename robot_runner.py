@@ -1949,6 +1949,7 @@ class SettingsTabPage(ttk.Frame):
         dir_settings_frame = ttk.LabelFrame(settings_frame, text=translate("dir_path_settings"), padding=10)
         dir_settings_frame.pack(fill=X, pady=5)
         dir_settings_frame.columnconfigure(1, weight=1)
+        dir_settings_frame.columnconfigure(3, weight=1)
 
         ttk.Label(dir_settings_frame, text=translate("suites_dir")).grid(row=0, column=0, padx=5, pady=2, sticky=W)
         ttk.Entry(dir_settings_frame, textvariable=self.app.suites_dir_var).grid(row=0, column=1, padx=5, pady=2, sticky=EW)
@@ -1957,7 +1958,7 @@ class SettingsTabPage(ttk.Frame):
 
         ttk.Label(dir_settings_frame, text=translate("screenshots_dir")).grid(row=1, column=0, padx=5, pady=2, sticky=W)
         ttk.Entry(dir_settings_frame, textvariable=self.app.screenshots_dir_var).grid(row=1, column=1, padx=5, pady=2, sticky=EW)
-        ttk.Label(dir_settings_frame, text=translate("recordings_dir")).grid(row=2, column=1, padx=5, pady=2, sticky=W)
+        ttk.Label(dir_settings_frame, text=translate("recordings_dir")).grid(row=1, column=2, padx=5, pady=2, sticky=W)
         ttk.Entry(dir_settings_frame, textvariable=self.app.recordings_dir_var).grid(row=1, column=3, padx=5, pady=2, sticky=EW)
         
         ttk.Label(dir_settings_frame, text=translate("logs_dir")).grid(row=2, column=0, padx=5, pady=2, sticky=W)
@@ -2578,8 +2579,8 @@ class RobotRunnerApp:
 
             # Update UI state
             self.root.after(0, lambda: self.settings_tab.appium_status_label.configure(text=translate("appium_status_running", port=port), bootstyle="success"))
+            self.root.after(0, lambda: self.settings_tab.toggle_appium_button.configure(text=translate("stop_appium"), bootstyle="danger", state=NORMAL))
             if not silent:
-                self.root.after(0, lambda: self.settings_tab.toggle_appium_button.configure(text=translate("stop_appium"), bootstyle="danger", state=NORMAL))
                 self.root.after(0, self.status_var.set, translate("appium_started_running_tests")) # Assuming a key for this status
 
             # Pipe output to the GUI
