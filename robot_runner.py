@@ -166,11 +166,7 @@ class RunCommandWindow(tk.Toplevel):
         self.last_height = self.winfo_height()
 
         self.bind("<Configure>", self._on_window_resize)
-        # Bindings for locking the sash
-        self.main_paned_window.bind("<ButtonPress-1>", self._on_sash_press)
-        self.main_paned_window.bind("<ButtonRelease-1>", self._on_sash_release)
-        self.main_paned_window.bind("<B1-Motion>", self._on_sash_drag)
-
+            
     def _fetch_initial_aspect_ratio(self):
         """Fetches and stores the device's aspect ratio in the background on startup."""
         ratio = get_device_aspect_ratio(self.udid)
@@ -179,25 +175,6 @@ class RunCommandWindow(tk.Toplevel):
             self.scrcpy_output_queue.put(f"INFO: Pre-fetched device aspect ratio: {ratio:.4f}\n")
         else:
             self.scrcpy_output_queue.put("WARNING: Could not pre-fetch device aspect ratio.\n")
-
-    def _on_sash_press(self, event):
-        """Identifies if the user is pressing on the locked sash (index 1)."""
-        try:
-            element = self.main_paned_window.identify(event.x, event.y)
-            # The identify method returns a tuple like (index, 'sash') or is an empty string
-            if isinstance(element, tuple) and len(element) > 0 and element[0] == 1:
-                self.is_dragging_locked_sash = True
-        except tk.TclError:
-            self.is_dragging_locked_sash = False
-
-    def _on_sash_release(self, event):
-        """Resets the sash drag flag on button release."""
-        self.is_dragging_locked_sash = False
-
-    def _on_sash_drag(self, event):
-        """Prevents dragging of the locked sash by cancelling the event."""
-        if self.is_dragging_locked_sash:
-            return "break"
             
     # --- UI Setup ------------------------------------------------------------------
     def _setup_widgets(self):
@@ -210,8 +187,28 @@ class RunCommandWindow(tk.Toplevel):
         self.output_paned_window = ttk.PanedWindow(self.left_pane_container, orient=VERTICAL)
         self.output_paned_window.pack(fill=BOTH, expand=YES)
 
+        # --- 2. Center Pane (Controls) ---
+        self.center_pane_container = ttk.LabelFrame(self.main_paned_window, text=translate("controls"), padding=10)
+
+        # Mirroring controls
+        self.mirror_button = ttk.Button(self.center_pane_container, text=translate("start_mirroring"), command=self._toggle_mirroring, bootstyle="info")
+        self.mirror_button.pack(fill=X, pady=5, padx=5)
+        ToolTip(self.mirror_button, translate("mirroring_tooltip"))
+
+        # ADB-dependent controls
+        self.screenshot_button = ttk.Button(self.center_pane_container, text=translate("take_screenshot"), command=self._take_screenshot)
+        self.screenshot_button.pack(fill=X, pady=5, padx=5)
+        ToolTip(self.screenshot_button, translate("screenshot_tooltip"))
+        
+        self.record_button = ttk.Button(self.center_pane_container, text=translate("start_recording"), command=self._toggle_recording, bootstyle="primary")
+        self.record_button.pack(fill=X, pady=5, padx=5)
+        ToolTip(self.record_button, translate("recording_tooltip"))
+
+        # --- Panes inside Left Pane ---
+
         # Robot Output (only for test mode)
         if self.mode == 'test':
+            # Test controls (only for test mode)
             self.robot_output_frame = ttk.LabelFrame(self.output_paned_window, text=translate("test_output"), padding=5)
             self.robot_output_text = ScrolledText(self.robot_output_frame, wrap=WORD, state=DISABLED, autohide=True)
             self.robot_output_text.pack(fill=BOTH, expand=YES)
@@ -255,9 +252,37 @@ class RunCommandWindow(tk.Toplevel):
             command=self._toggle_performance_minimize
         )
         self.toggle_minimize_perf_button.grid(row=2, column=2, sticky="ew", padx=(5,0))
+
+        # --- Controls in Center Pane ---
+
+        # Visibility toggles
+        self.toggle_scrcpy_out_button = ttk.Button(self.center_pane_container, text=translate("show_scrcpy_output"), command=lambda: self._toggle_output_visibility('scrcpy'), bootstyle="secondary")
+        self.toggle_scrcpy_out_button.pack(fill=X, pady=5, padx=5)
+        
+        self.toggle_perf_button = ttk.Button(self.center_pane_container, text=translate("show_performance"), command=lambda: self._toggle_output_visibility('performance'), bootstyle="secondary")
+        self.toggle_perf_button.pack(fill=X, pady=5, padx=5)
         
         # Inspector Controls (only for non-test mode)
         if self.mode != 'test':
+            # --- Element Details Frame (moved to center pane) ---
+            self.element_details_frame = ttk.LabelFrame(self.center_pane_container, text=translate("element_details"), padding=5)
+            # self.element_details_frame will be packed/unpacked dynamically
+            self.element_details_text = ScrolledText(self.element_details_frame, wrap=WORD, state=DISABLED, autohide=True)
+            self.element_details_text.pack(fill=BOTH, expand=YES)
+            self.element_details_text.text.tag_configure("bold", font="-weight bold")
+
+            # XPath Buttons Frame (moved to center pane)
+            self.xpath_buttons_container = ttk.LabelFrame(self.center_pane_container, text=translate("copy_xpath_by_attribute"), padding=5)
+            # self.xpath_buttons_container will be packed/unpacked dynamically
+            self.xpath_buttons = {} # Dictionary to hold the dynamically created buttons
+
+            separator = ttk.Separator(self.center_pane_container, orient=HORIZONTAL)
+            separator.pack(fill=X, pady=10, padx=5)
+
+            self.inspect_button = ttk.Button(self.center_pane_container, text=translate("start_inspector"), command=self._toggle_inspector_mode, bootstyle="primary")
+            self.inspect_button.pack(fill=X, pady=5, padx=5)
+            ToolTip(self.inspect_button, translate("inspector_tooltip"))
+
             # Create a container for all inspector-related widgets in the left pane
             self.inspector_controls_frame = ttk.Frame(self.output_paned_window)
 
@@ -313,29 +338,6 @@ class RunCommandWindow(tk.Toplevel):
             self.elements_tree.pack(fill=BOTH, expand=YES)
             self.elements_tree.bind("<<TreeviewSelect>>", self._on_element_select)
             self.elements_tree.bind("<Button-1>", self._on_treeview_click)
-        # --- 2. Center Pane (Controls) ---
-        self.center_pane_container = ttk.LabelFrame(self.main_paned_window, text=translate("controls"), padding=10)
-        
-        # Mirroring controls
-        self.mirror_button = ttk.Button(self.center_pane_container, text=translate("start_mirroring"), command=self._toggle_mirroring, bootstyle="info")
-        self.mirror_button.pack(fill=X, pady=5, padx=5)
-        ToolTip(self.mirror_button, translate("mirroring_tooltip"))
-
-        # ADB-dependent controls
-        self.screenshot_button = ttk.Button(self.center_pane_container, text=translate("take_screenshot"), command=self._take_screenshot)
-        self.screenshot_button.pack(fill=X, pady=5, padx=5)
-        ToolTip(self.screenshot_button, translate("screenshot_tooltip"))
-        
-        self.record_button = ttk.Button(self.center_pane_container, text=translate("start_recording"), command=self._toggle_recording, bootstyle="primary")
-        self.record_button.pack(fill=X, pady=5, padx=5)
-        ToolTip(self.record_button, translate("recording_tooltip"))
-        
-        # Visibility toggles
-        self.toggle_scrcpy_out_button = ttk.Button(self.center_pane_container, text=translate("show_scrcpy_output"), command=lambda: self._toggle_output_visibility('scrcpy'), bootstyle="secondary")
-        self.toggle_scrcpy_out_button.pack(fill=X, pady=5, padx=5)
-        
-        self.toggle_perf_button = ttk.Button(self.center_pane_container, text=translate("show_performance"), command=lambda: self._toggle_output_visibility('performance'), bootstyle="secondary")
-        self.toggle_perf_button.pack(fill=X, pady=5, padx=5)
 
         # Test controls (only for test mode)
         if self.mode == 'test':
@@ -350,28 +352,6 @@ class RunCommandWindow(tk.Toplevel):
 
             self.stop_test_button = ttk.Button(self.center_pane_container, text=translate("stop_test"), bootstyle="danger", command=self._stop_test)
             self.stop_test_button.pack(fill=X, pady=5, padx=5)
-        
-        # Inspector controls (only for non-test mode)
-        if self.mode != 'test':
-            separator = ttk.Separator(self.center_pane_container, orient=HORIZONTAL)
-            separator.pack(fill=X, pady=10, padx=5)
-
-            self.inspect_button = ttk.Button(self.center_pane_container, text=translate("start_inspector"), command=self._toggle_inspector_mode, bootstyle="primary")
-            self.inspect_button.pack(fill=X, pady=5, padx=5)
-            ToolTip(self.inspect_button, translate("inspector_tooltip"))
-
-            # --- Element Details Frame (moved to center pane) ---
-            self.element_details_frame = ttk.LabelFrame(self.center_pane_container, text=translate("element_details"), padding=5)
-            # self.element_details_frame will be packed/unpacked dynamically
-            self.element_details_text = ScrolledText(self.element_details_frame, wrap=WORD, state=DISABLED, autohide=True)
-            self.element_details_text.pack(fill=BOTH, expand=YES)
-            self.element_details_text.text.tag_configure("bold", font="-weight bold")
-
-            # XPath Buttons Frame (moved to center pane)
-            self.xpath_buttons_container = ttk.LabelFrame(self.center_pane_container, text=translate("copy_xpath_by_attribute"), padding=5)
-            # self.xpath_buttons_container will be packed/unpacked dynamically
-            self.xpath_buttons = {} # Dictionary to hold the dynamically created buttons
-
 
         # --- 3. Right Pane (Screen Mirror / Inspector) ---
         self.right_pane_container = ttk.LabelFrame(self.main_paned_window, text=translate("screen_mirror"), padding=5)
@@ -390,30 +370,18 @@ class RunCommandWindow(tk.Toplevel):
 
         # --- Add panes and set initial state ---
         self.main_paned_window.add(self.left_pane_container, weight=3)
-        self.main_paned_window.add(self.center_pane_container, weight=1)
+        self.main_paned_window.add(self.center_pane_container, weight=0) # Set weight to 0 to make it "fixed"
 
         if self.mode != 'test':
              self.after(100, lambda: self.main_paned_window.sashpos(0, 0)) # Hide left pane
+        
+        # --- Finalize Layout Rules ---
+        self.center_pane_container.update_idletasks()
+        self.center_pane_width = self.center_pane_container.winfo_width()
+        min_window_width = self.center_pane_width * 3
+        self.minsize(width=min_window_width, height=500)
 
     # --- Visibility & Layout Toggles ---------------------------------------------
-    def _update_left_pane_visibility(self):
-        """Automatically shows or hides the left output pane based on visible content."""
-        # Check if there are any visible panes in the output_paned_window
-        has_visible_panes = bool(self.output_paned_window.panes())
-
-        try:
-            sash_pos = self.main_paned_window.sashpos(0)
-            is_pane_visible = sash_pos > 10
-
-            if has_visible_panes and not is_pane_visible:
-                restore_width = getattr(self, '_left_pane_width', 300)
-                self.main_paned_window.sashpos(0, restore_width)
-            elif not has_visible_panes and is_pane_visible:
-                self._left_pane_width = sash_pos
-                self.main_paned_window.sashpos(0, 0)
-        except tk.TclError:
-            pass # Sash may not exist yet
-
     def _toggle_output_visibility(self, output_type: str):
         """Shows or hides a specific output frame in the left pane."""
         frame_map = {
@@ -449,7 +417,7 @@ class RunCommandWindow(tk.Toplevel):
         elif output_type == 'scrcpy': self.scrcpy_output_is_visible = not is_visible
         elif output_type == 'performance': self.performance_monitor_is_visible = not is_visible
 
-        self._update_left_pane_visibility()
+        self.after(10, self._apply_layout_rules)
 
     def _on_window_resize(self, event=None):
         """Debounces resize events to adjust aspect ratio."""
@@ -463,51 +431,60 @@ class RunCommandWindow(tk.Toplevel):
 
         if self.resize_job:
             self.after_cancel(self.resize_job)
+        self.resize_job = self.after(150, self._apply_layout_rules)
 
-        if self.is_inspecting:
-            # When inspecting, resizing should trigger a full refresh to get a new screenshot
-            # that matches the new canvas size for better quality.
-            self.resize_job = self.after(300, self._start_inspection)
-        elif self.is_mirroring and self.aspect_ratio:
-            # When mirroring, just adjust the sash to maintain aspect ratio.
-            self.resize_job = self.after(100, self._adjust_aspect_ratio)
-
-    def _adjust_aspect_ratio(self):
-        """Adjusts paned window sashes to match the device's aspect ratio."""
+    def _apply_layout_rules(self, event=None):
+        """Applies layout rules to set sash positions based on visible panes and window size."""
         self.resize_job = None
-        current_aspect_ratio = None
-        if (self.is_mirroring or self.is_inspecting) and self.aspect_ratio:
-            current_aspect_ratio = self.aspect_ratio
-
-        if not current_aspect_ratio: return
+        if not self.winfo_exists(): return
 
         self.update_idletasks()
-        
-        # Use the height of the main paned window as a stable reference,
-        # as the height of the embed_frame itself can be in flux during a resize,
-        # leading to inconsistent calculations.
-        pane_height = self.main_paned_window.winfo_height()
-        if pane_height <= 1:
-            self.after(100, self._adjust_aspect_ratio)
+        total_width = self.main_paned_window.winfo_width()
+        total_height = self.main_paned_window.winfo_height()
+        if total_height <= 1 or total_width <= 1:
             return
+
+        is_right_visible = len(self.main_paned_window.panes()) == 3
+        is_left_visible = bool(self.output_paned_window.panes())
         
-        ideal_mirror_width = int(pane_height * current_aspect_ratio)
+        min_pane_width = 150 # A reasonable minimum
+
         try:
-            total_width = self.main_paned_window.winfo_width()
+            # Case 1: All three panes are visible
+            if is_left_visible and is_right_visible:
+                ideal_right_width = int(total_height * self.aspect_ratio) if self.aspect_ratio else min_pane_width
+                if ideal_right_width < min_pane_width: ideal_right_width = min_pane_width
 
-            # Position of sash between center and right panes
-            sash1_pos = total_width - ideal_mirror_width
-            
-            # Enforce minimum width for other panes.
-            min_other_panes_width = 300
-            if sash1_pos < min_other_panes_width:
-                sash1_pos = min_other_panes_width
-            
-            if sash1_pos >= total_width: # prevent error
-                sash1_pos = total_width - 50 # keep mirror visible a bit
+                remaining_width = total_width - ideal_right_width
+                if remaining_width < (min_pane_width * 2):
+                    remaining_width = min_pane_width * 2
 
-            self.main_paned_window.sashpos(1, sash1_pos)
-        except (tk.TclError, AttributeError):
+                left_width = int(remaining_width * (2/3))
+                center_width = remaining_width - left_width
+                
+                self.main_paned_window.sashpos(0, left_width)
+                self.main_paned_window.sashpos(1, left_width + center_width)
+
+            # Case 2: Only right and center are visible
+            elif not is_left_visible and is_right_visible:
+                self.main_paned_window.sashpos(0, 0)
+                ideal_right_width = int(total_height * self.aspect_ratio) if self.aspect_ratio else min_pane_width
+                if ideal_right_width < min_pane_width: ideal_right_width = min_pane_width
+
+                center_width = total_width - ideal_right_width
+                if center_width < min_pane_width: center_width = min_pane_width
+                self.main_paned_window.sashpos(1, center_width)
+
+            # Case 3: Only left and center are visible
+            elif is_left_visible and not is_right_visible:
+                left_width = int(total_width * (2/3))
+                self.main_paned_window.sashpos(0, left_width)
+
+            # Case 4: Only center pane is visible
+            elif not is_left_visible and not is_right_visible:
+                # Collapse the left pane, making the center pane take up all the space
+                self.main_paned_window.sashpos(0, 0)
+        except tk.TclError:
             pass
 
     # --- Scrcpy Core Methods -----------------------------------------------------
@@ -534,10 +511,9 @@ class RunCommandWindow(tk.Toplevel):
         
         self.main_paned_window.add(self.right_pane_container, weight=5)
         self.update_idletasks()
-        try:
-            self._adjust_aspect_ratio()
-        except tk.TclError:
-            pass # Window may not be fully realized yet. Aspect ratio will fix it later.
+        
+        # Apply layout rules to set initial sash positions correctly
+        self.after(10, self._apply_layout_rules)
 
         if hasattr(self, 'inspect_button'):
             self.inspect_button.config(state=DISABLED)
@@ -553,6 +529,9 @@ class RunCommandWindow(tk.Toplevel):
         self.is_mirroring = False
 
         self.main_paned_window.forget(self.right_pane_container)
+        # Re-apply layout for the remaining panes
+        self.after(10, self._apply_layout_rules)
+
         if hasattr(self, 'inspect_button'):
             self.inspect_button.config(state=NORMAL)
         self.mirror_button.config(text=translate("start_mirroring"), bootstyle="info")
@@ -593,25 +572,13 @@ class RunCommandWindow(tk.Toplevel):
         self.right_pane_container.config(text=translate("inspector"))
         self.main_paned_window.add(self.right_pane_container, weight=5)
         self.update_idletasks()
-        try:
-            # Immediately try to adjust aspect ratio with the fetched value
-            self._adjust_aspect_ratio()
-        except tk.TclError:
-            pass 
-
+        
         # Show inspector panes
         self.inspector_paned_window.pack(fill=BOTH, expand=YES)
         try:
             self.inspector_paned_window.add(self.screenshot_canvas_frame, weight=3)
         except tk.TclError:
             pass # Already added
-        
-        # E01: Use the new container frame
-        try:
-            self.output_paned_window.add(self.inspector_controls_frame, weight=1)
-        except tk.TclError:
-            pass # Already added
-        self._update_left_pane_visibility()
 
         # Start auto-refresh thread
         self.stop_auto_refresh_event.clear()
@@ -622,6 +589,14 @@ class RunCommandWindow(tk.Toplevel):
         # Pack XPath buttons at the bottom first, so the details frame can expand above it.
         self.xpath_buttons_container.pack(side=BOTTOM, fill=X, pady=5, padx=5)
         self.element_details_frame.pack(fill=BOTH, expand=YES, pady=5, padx=5)
+        
+        # Add inspector controls to the left pane and apply layout
+        try:
+            self.output_paned_window.add(self.inspector_controls_frame, weight=1)
+        except tk.TclError:
+            pass # Already added
+        
+        self.after(10, self._apply_layout_rules)
 
     def _stop_inspector(self):
         if not self.is_inspecting: return
@@ -629,6 +604,7 @@ class RunCommandWindow(tk.Toplevel):
 
         # Hide inspector panes
         self.main_paned_window.forget(self.right_pane_container)
+        self.after(10, self._apply_layout_rules)
 
         # Hide the moved widgets from the center pane
         self.element_details_frame.pack_forget()
@@ -638,8 +614,6 @@ class RunCommandWindow(tk.Toplevel):
         self.stop_auto_refresh_event.set()
         self.last_ui_dump_hash = None
         self.output_paned_window.forget(self.inspector_controls_frame)
-        self.inspector_paned_window.pack_forget()
-        self.after(10, self._update_left_pane_visibility)
 
         # Clear canvas and treeview
         self.screenshot_canvas.delete("all")
@@ -833,46 +807,6 @@ class RunCommandWindow(tk.Toplevel):
             self.refresh_inspector_button.config(state=NORMAL, text=translate("refresh"))
             self.inspect_button.config(state=NORMAL, text=translate("stop_inspector"))
             
-    def _adjust_inspector_pane_aspect_ratio(self, aspect_ratio):
-        """Adjusts the inspector pane width to match the screenshot's aspect ratio."""
-        if not self.is_inspecting:
-            return
-            
-        self.update_idletasks( )
-        
-        pane_height = self.right_pane_container.winfo_height()
-        if pane_height <= 1: # Not rendered yet
-            self.after(100, self._adjust_inspector_pane_aspect_ratio, aspect_ratio)
-            return
-            
-        # Calculate ideal width based on height and aspect ratio
-        ideal_width = int(pane_height * aspect_ratio)
-        
-        try:
-            total_width = self.main_paned_window.winfo_width()
-            
-            # Get current position of the first sash (left/center)
-            sash0_pos = self.main_paned_window.sashpos(0)
-
-            # The new width for the right pane should not make the window excessively large
-            # Let's cap the ideal_width to a reasonable portion of the total window
-            if ideal_width > total_width * 0.8:
-                ideal_width = int(total_width * 0.8)
-
-            # The position of the second sash is the start of the right pane
-            sash1_pos = total_width - ideal_width
-            
-            # Ensure center pane doesn't get crushed
-            min_center_width = 150
-            if sash1_pos < sash0_pos + min_center_width:
-                sash1_pos = sash0_pos + min_center_width
-
-            if sash1_pos < total_width: # Basic sanity check
-                self.main_paned_window.sashpos(1, sash1_pos)
-
-        except (tk.TclError, AttributeError):
-            pass # Sash may not exist or other issues
-
     def _display_inspection_results(self, screenshot_path: Path, dump_path: Path):
         # Display screenshot
         try:
@@ -889,20 +823,15 @@ class RunCommandWindow(tk.Toplevel):
                 return
 
             img_width, img_height = img.size
-            
-            # Use the pre-fetched aspect ratio. If it's not available, calculate as a fallback.
-            current_aspect_ratio = self.aspect_ratio
-            if current_aspect_ratio is None:
-                current_aspect_ratio = img_width / img_height if img_height > 0 else 1
+            aspect_ratio = img_width / img_height if img_height > 0 else 1
 
-            if img_width > canvas_width or img_height > canvas_height:
-                if (canvas_width / current_aspect_ratio) <= canvas_height:
-                    new_width = canvas_width
-                    new_height = int(canvas_width / current_aspect_ratio)
-                else:
-                    new_height = canvas_height
-                    new_width = int(canvas_height * current_aspect_ratio)
-                img = img.resize((new_width, new_height), Image.LANCZOS)
+            if (canvas_width / aspect_ratio) <= canvas_height:
+                new_width = canvas_width
+                new_height = int(canvas_width / aspect_ratio)
+            else:
+                new_height = canvas_height
+                new_width = int(canvas_height * aspect_ratio)
+            img = img.resize((new_width, new_height), Image.LANCZOS)
             
             self.screenshot_current_size = img.size
             self.screenshot_image_tk = ImageTk.PhotoImage(img)
