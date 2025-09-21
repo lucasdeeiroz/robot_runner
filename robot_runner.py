@@ -5,6 +5,7 @@ import signal
 import re
 import json
 import zipfile
+import shutil
 import threading
 import urllib.request
 import time
@@ -2517,9 +2518,7 @@ class RobotRunnerApp:
                 extracted_folder = next(temp_extract_dir.iterdir())
                 for item in extracted_folder.iterdir():
                     item.rename(scrcpy_dir / item.name)
-                
-                temp_extract_dir.rmdir()
-                extracted_folder.rmdir()
+                shutil.rmtree(temp_extract_dir)
 
             zip_path.unlink()
             
