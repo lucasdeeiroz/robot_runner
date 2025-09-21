@@ -1,6 +1,6 @@
 {
     "appium_command": "appium --base-path=/wd/hub --relaxed-security",
-    "scrcpy_path": "C:\\Users\\lucas\\Projetos_Programacao\\robot_runner\\scrcpy\\scrcpy.exe",
+    "scrcpy_path": "scrcpy",
     "suites_dir": "suites",
     "tests_dir": "tests",
     "logs_dir": "logs",
