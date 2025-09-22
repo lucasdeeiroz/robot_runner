@@ -66,7 +66,6 @@ class ConsoleRedirector:
         """Flush method is required for stream-like objects."""
         pass
 
-
 # --- Run Command Window Class (Unified) ---
 class RunCommandWindow(tk.Toplevel):
     """
@@ -189,12 +188,12 @@ class RunCommandWindow(tk.Toplevel):
         self.output_paned_window.pack(fill=BOTH, expand=YES)
 
         # --- 2. Center Pane (Controls) ---
-        self.center_pane_container = ttk.LabelFrame(self.main_paned_window, text=translate("controls"), padding=10)
+        self.center_pane_container = ttk.Frame(self.main_paned_window, padding=10)
 
         # Mirroring controls
         self.mirror_button = ttk.Button(self.center_pane_container, text=translate("start_mirroring"), command=self._toggle_mirroring, bootstyle="info")
         self.mirror_button.pack(fill=X, pady=5, padx=5)
-        ToolTip(self.mirror_button, translate("mirroring_tooltip"))
+        ToolTip(self.mirror_button, translate("start_mirroring_tooltip"))
 
         # ADB-dependent controls
         self.screenshot_button = ttk.Button(self.center_pane_container, text=translate("take_screenshot"), command=self._take_screenshot)
@@ -203,14 +202,14 @@ class RunCommandWindow(tk.Toplevel):
         
         self.record_button = ttk.Button(self.center_pane_container, text=translate("start_recording"), command=self._toggle_recording, bootstyle="primary")
         self.record_button.pack(fill=X, pady=5, padx=5)
-        ToolTip(self.record_button, translate("recording_tooltip"))
+        ToolTip(self.record_button, translate("start_recording_tooltip"))
 
         # --- Panes inside Left Pane ---
 
         # Robot Output (only for test mode)
         if self.mode == 'test':
             # Test controls (only for test mode)
-            self.robot_output_frame = ttk.LabelFrame(self.output_paned_window, text=translate("test_output"), padding=5)
+            self.robot_output_frame = ttk.Frame(self.output_paned_window, padding=5)
             self.robot_output_text = ScrolledText(self.robot_output_frame, wrap=WORD, state=DISABLED, autohide=True)
             self.robot_output_text.pack(fill=BOTH, expand=YES)
             self.robot_output_text.text.tag_config("PASS", foreground="green")
@@ -220,12 +219,12 @@ class RunCommandWindow(tk.Toplevel):
             self.output_paned_window.add(self.robot_output_frame, weight=1)
 
         # Scrcpy Output
-        self.scrcpy_output_frame = ttk.LabelFrame(self.output_paned_window, text=translate("scrcpy_output"), padding=5)
+        self.scrcpy_output_frame = ttk.Frame(self.output_paned_window, padding=5)
         self.scrcpy_output_text = ScrolledText(self.scrcpy_output_frame, wrap=WORD, state=DISABLED, autohide=True)
         self.scrcpy_output_text.pack(fill=BOTH, expand=YES)
 
         # Performance Monitor Output & Controls
-        self.performance_output_frame = ttk.LabelFrame(self.output_paned_window, text=translate("performance_monitor"), padding=5)
+        self.performance_output_frame = ttk.Frame(self.output_paned_window, padding=5)
 
         monitor_controls_frame = ttk.Frame(self.performance_output_frame)
         monitor_controls_frame.pack(side=TOP, fill=X, pady=(0, 5), padx=5)
@@ -243,37 +242,37 @@ class RunCommandWindow(tk.Toplevel):
         self.app_package_combo.grid(row=1, column=0, columnspan=3, sticky="ew", pady=(0, 5))
         if self.app_package_combo['values']:
             self.app_package_combo.set(self.app_package_combo['values'][0])
-        self.start_monitor_button = ttk.Button(monitor_controls_frame, text=translate("start_monitoring"), command=self._start_performance_monitor, bootstyle="success")
-        self.start_monitor_button.grid(row=2, column=0, sticky="ew", padx=(0, 2))
-        self.stop_monitor_button = ttk.Button(monitor_controls_frame, text=translate("stop_monitoring"), command=self._stop_performance_monitor, bootstyle="danger", state=DISABLED)
-        self.stop_monitor_button.grid(row=2, column=1, sticky="ew", padx=(2, 0))
+        ToolTip(self.app_package_combo, text=translate("select_app_to_monitor_tooltip"))
+        self.monitor_button = ttk.Button(monitor_controls_frame, text=translate("start_monitoring"), command=self._toggle_performance_monitor, bootstyle="success")
+        self.monitor_button.grid(row=2, column=0, columnspan=2, sticky="ew", padx=(0, 2))
+        ToolTip(self.monitor_button, text=translate("start_monitoring_tooltip"))
         
-        self.toggle_minimize_perf_button = ttk.Button(
-            monitor_controls_frame, text=translate("minimize_performance"), 
-            command=self._toggle_performance_minimize
-        )
+        self.toggle_minimize_perf_button = ttk.Button(monitor_controls_frame, text=translate("minimize_performance"), command=self._toggle_performance_minimize, state=DISABLED, bootstyle="secondary")
         self.toggle_minimize_perf_button.grid(row=2, column=2, sticky="ew", padx=(5,0))
+        ToolTip(self.toggle_minimize_perf_button, text=translate("minimize_performance_tooltip"))
 
         # --- Controls in Center Pane ---
 
         # Visibility toggles
         self.toggle_scrcpy_out_button = ttk.Button(self.center_pane_container, text=translate("show_scrcpy_output"), command=lambda: self._toggle_output_visibility('scrcpy'), bootstyle="secondary")
         self.toggle_scrcpy_out_button.pack(fill=X, pady=5, padx=5)
+        ToolTip(self.toggle_scrcpy_out_button, text=translate("show_scrcpy_output_tooltip"))
         
         self.toggle_perf_button = ttk.Button(self.center_pane_container, text=translate("show_performance"), command=lambda: self._toggle_output_visibility('performance'), bootstyle="secondary")
         self.toggle_perf_button.pack(fill=X, pady=5, padx=5)
+        ToolTip(self.toggle_perf_button, text=translate("show_performance_tooltip"))
         
         # Inspector Controls (only for non-test mode)
         if self.mode != 'test':
             # --- Element Details Frame (moved to center pane) ---
-            self.element_details_frame = ttk.LabelFrame(self.center_pane_container, text=translate("element_details"), padding=5)
+            self.element_details_frame = ttk.Frame(self.center_pane_container, padding=5)
             # self.element_details_frame will be packed/unpacked dynamically
             self.element_details_text = ScrolledText(self.element_details_frame, wrap=WORD, state=DISABLED, autohide=True)
             self.element_details_text.pack(fill=BOTH, expand=YES)
             self.element_details_text.text.tag_configure("bold", font="-weight bold")
 
             # XPath Buttons Frame (moved to center pane)
-            self.xpath_buttons_container = ttk.LabelFrame(self.center_pane_container, text=translate("copy_xpath_by_attribute"), padding=5)
+            self.xpath_buttons_container = ttk.Frame(self.center_pane_container, padding=5)
             # self.xpath_buttons_container will be packed/unpacked dynamically
             self.xpath_buttons = {} # Dictionary to hold the dynamically created buttons
 
@@ -301,6 +300,7 @@ class RunCommandWindow(tk.Toplevel):
             self.filter_menubutton.grid(row=0, column=1, sticky="ew", padx=5)
             filter_menu = tk.Menu(self.filter_menubutton, tearoff=False)
             self.filter_menubutton["menu"] = filter_menu
+            ToolTip(self.filter_menubutton, text=translate("filter_elements_by_attributes_tooltip"))
             
             filter_menu.add_checkbutton(label=translate("filter_by_resource_id"), variable=self.filter_by_resource_id_var, command=self._update_element_tree_view)
             filter_menu.add_checkbutton(label=translate("filter_by_text"), variable=self.filter_by_text_var, command=self._update_element_tree_view)
@@ -312,7 +312,7 @@ class RunCommandWindow(tk.Toplevel):
             ToolTip(self.auto_refresh_check, translate("inspector_auto_refresh_tooltip"))
 
             # --- Search Frame ---
-            search_frame = ttk.LabelFrame(self.inspector_controls_frame, text=translate("inspector_search_xpath"), padding=5)
+            search_frame = ttk.Frame(self.inspector_controls_frame, padding=5)
             search_frame.pack(side=TOP, fill=X, pady=(5, 5))
             search_frame.columnconfigure(0, weight=1)
 
@@ -325,12 +325,13 @@ class RunCommandWindow(tk.Toplevel):
 
             self.search_button = ttk.Button(search_button_frame, text=translate("search_button"), command=self._perform_xpath_search, bootstyle="primary")
             self.search_button.pack(side=LEFT)
+            ToolTip(self.search_button, text=translate("search_inspector_element_tooltip"))
             
             self.clear_search_button = ttk.Button(search_button_frame, text=translate("clear_button"), command=self._clear_xpath_search, bootstyle="secondary")
             self.clear_search_button.pack(side=LEFT, padx=(5, 0))
             ToolTip(self.clear_search_button, translate("clear_tooltip"))
 
-            self.elements_list_frame = ttk.LabelFrame(self.inspector_controls_frame, text=translate("visible_elements"), padding=5)
+            self.elements_list_frame = ttk.Frame(self.inspector_controls_frame, padding=5)
             self.elements_list_frame.pack(side=TOP, fill=BOTH, expand=YES)
 
             self.elements_tree = ttk.Treeview(self.elements_list_frame, columns=("title",), show="headings")
@@ -344,18 +345,23 @@ class RunCommandWindow(tk.Toplevel):
         if self.mode == 'test':
             self.toggle_robot_button = ttk.Button(self.center_pane_container, text=translate("hide_test_output"), command=lambda: self._toggle_output_visibility('robot'), bootstyle="secondary")
             self.toggle_robot_button.pack(fill=X, pady=5, padx=5)
+            ToolTip(self.toggle_robot_button, text=translate("hide_robot_output_tooltip"))
             
             separator = ttk.Separator(self.center_pane_container, orient=HORIZONTAL)
             separator.pack(fill=X, pady=10, padx=5)
 
             self.repeat_test_button = ttk.Button(self.center_pane_container, text=translate("repeat_test"), command=self._repeat_test)
+            ToolTip(self.repeat_test_button, text=translate("repeat_test_tooltip"))
             self.close_button = ttk.Button(self.center_pane_container, text=translate("close"), command=self._on_close)
+            ToolTip(self.close_button, text=translate("close_window_tooltip"))
+
 
             self.stop_test_button = ttk.Button(self.center_pane_container, text=translate("stop_test"), bootstyle="danger", command=self._stop_test)
             self.stop_test_button.pack(fill=X, pady=5, padx=5)
+            ToolTip(self.stop_test_button, text=translate("stop_test_tooltip"))
 
         # --- 3. Right Pane (Screen Mirror / Inspector) ---
-        self.right_pane_container = ttk.LabelFrame(self.main_paned_window, text=translate("screen_mirror"), padding=5)
+        self.right_pane_container = ttk.Frame(self.main_paned_window, padding=5)
         self.embed_frame = self.right_pane_container # for compatibility with old code
 
         # Inspector UI elements (only for non-test mode)
@@ -409,9 +415,11 @@ class RunCommandWindow(tk.Toplevel):
         if is_visible:
             self.output_paned_window.forget(frame)
             button.config(text=translate(show_keys[output_type]))
+            ToolTip(button, translate(show_keys[output_type]))
         else:
             self.output_paned_window.add(frame, weight=1)
             button.config(text=translate(hide_keys[output_type]))
+            ToolTip(button, translate(hide_keys[output_type]))
 
         # Update state variable
         if output_type == 'robot': self.robot_output_is_visible = not is_visible
@@ -519,6 +527,7 @@ class RunCommandWindow(tk.Toplevel):
         if hasattr(self, 'inspect_button'):
             self.inspect_button.config(state=DISABLED)
         self.mirror_button.config(text=translate("stop_mirroring"), bootstyle="danger")
+        ToolTip(self.mirror_button, text=translate("stop_mirroring_tooltip"))
         
         thread = threading.Thread(target=self._run_and_embed_scrcpy)
         thread.daemon = True
@@ -536,6 +545,7 @@ class RunCommandWindow(tk.Toplevel):
         if hasattr(self, 'inspect_button'):
             self.inspect_button.config(state=NORMAL)
         self.mirror_button.config(text=translate("start_mirroring"), bootstyle="info")
+        ToolTip(self.mirror_button, text=translate("start_mirroring_tooltip"))
         
         if self.scrcpy_process and self.scrcpy_process.poll() is None:
             self._terminate_process_tree(self.scrcpy_process.pid, "scrcpy")
@@ -567,10 +577,10 @@ class RunCommandWindow(tk.Toplevel):
         # Update button states
         self.mirror_button.config(state=DISABLED)
         self.inspect_button.config(text=translate("stop_inspector"), bootstyle="danger")
+        ToolTip(self.inspect_button, text=translate("stop_inspector_tooltip"))
         self.refresh_inspector_button.config(state=NORMAL)
 
         # Set a minimum width for the right pane and a starting size
-        self.right_pane_container.config(text=translate("inspector"))
         self.main_paned_window.add(self.right_pane_container, weight=5)
         self.update_idletasks()
         
@@ -627,8 +637,8 @@ class RunCommandWindow(tk.Toplevel):
         # Restore button states
         self.mirror_button.config(state=NORMAL)
         self.inspect_button.config(text=translate("start_inspector"), bootstyle="primary")
+        ToolTip(self.inspect_button, text=translate("start_inspector_tooltip"))
         self.refresh_inspector_button.config(state=DISABLED)
-        self.right_pane_container.config(text=translate("screen_mirror"))
 
     def _auto_refresh_inspector_thread(self):
         """Checks for UI changes in the background and triggers a refresh if detected."""
@@ -687,7 +697,9 @@ class RunCommandWindow(tk.Toplevel):
         self.is_inspection_running = True
 
         self.refresh_inspector_button.config(state=DISABLED, text=translate("refreshing"))
+        ToolTip(self.refresh_inspector_button, text=translate("refreshing_tooltip"))
         self.inspect_button.config(state=DISABLED, text=translate("refreshing"))
+        ToolTip(self.inspect_button, text=translate("refreshing_tooltip"))
         self.screenshot_canvas.delete("all")
         self.xpath_search_var.set("") # Clear search on refresh
 
@@ -806,7 +818,9 @@ class RunCommandWindow(tk.Toplevel):
         # while a refresh was in progress.
         if self.is_inspecting:
             self.refresh_inspector_button.config(state=NORMAL, text=translate("refresh"))
+            ToolTip(self.refresh_inspector_button, text=translate("refresh"))
             self.inspect_button.config(state=NORMAL, text=translate("stop_inspector"))
+            ToolTip(self.inspect_button, text=translate("stop_inspector_tooltip"))
             
     def _display_inspection_results(self, screenshot_path: Path, dump_path: Path):
         # Display screenshot
@@ -878,7 +892,7 @@ class RunCommandWindow(tk.Toplevel):
         if resource_id:
             display_title = f"resource_id={resource_id.split('/')[-1]}"
         elif content_desc:
-            display_title = f"content_desc={content_desc}"
+            display_title = f"accessibility_id={content_desc}"
         elif text:
             display_title = f"text={text}"
         elif node_class:
@@ -1016,7 +1030,7 @@ class RunCommandWindow(tk.Toplevel):
                     text=button_text,
                     command=lambda a=attr: self._copy_xpath(a)
                 )
-                ToolTip(button, f"Copy XPath: //*[@{attr}='{attr_value}']")
+                ToolTip(button, translate("copy_xpath_tooltip", attr=attr, value=attr_value))
                 # Align buttons vertically
                 button.pack(side=TOP, fill=X, padx=2, pady=1)
                 self.xpath_buttons[attr] = button
@@ -1195,8 +1209,8 @@ class RunCommandWindow(tk.Toplevel):
         # Check which filters are active
         active_filters = {
             "resource-id": self.filter_by_resource_id_var.get(),
-            "text": self.filter_by_text_var.get(),
             "accessibility_id": self.filter_by_content_desc_var.get(),
+            "text": self.filter_by_text_var.get(),
             "class": self.filter_by_class_var.get()
         }
 
@@ -1208,8 +1222,8 @@ class RunCommandWindow(tk.Toplevel):
         for element_data in use_list:
             # Check if the element has any of the attributes that are being filtered for
             if (active_filters["resource-id"] and element_data.get("resource-id")) or \
-               (active_filters["text"] and element_data.get("text")) or \
                (active_filters["accessibility_id"] and element_data.get("accessibility_id")) or \
+               (active_filters["text"] and element_data.get("text")) or \
                (active_filters["class"] and element_data.get("class")):
                 filtered_elements.append(element_data)
         
@@ -1271,7 +1285,7 @@ class RunCommandWindow(tk.Toplevel):
                         width, height = map(int, resolution.split('x'))
                         if height > 0:
                             self.aspect_ratio = width / height
-                            self.after(100, self._adjust_aspect_ratio)
+                            self.after(100, self._fetch_initial_aspect_ratio)
                     except (ValueError, IndexError):
                         pass
             except Empty:
@@ -1351,6 +1365,7 @@ class RunCommandWindow(tk.Toplevel):
             execute_command(f"adb -s {self.udid} shell rm {device_filename}")
         finally:
             self.after(0, lambda: self.screenshot_button.config(state=NORMAL, text=translate("take_screenshot")))
+            ToolTip(self.screenshot_button, text=translate("take_screenshot_tooltip"))
 
     def _toggle_recording(self):
         if not self.is_recording: self._start_recording()
@@ -1358,6 +1373,7 @@ class RunCommandWindow(tk.Toplevel):
 
     def _start_recording(self):
         self.record_button.config(state=DISABLED, text=translate("starting_recording"))
+        ToolTip(self.record_button, text=translate("starting_recording_tooltip"))
         threading.Thread(target=self._start_recording_thread, daemon=True).start()
 
     def _start_recording_thread(self):
@@ -1378,9 +1394,11 @@ class RunCommandWindow(tk.Toplevel):
         except Exception as e:
             self.scrcpy_output_queue.put(translate("recording_start_error", error=e) + "\n")
             self.after(0, lambda: self.record_button.config(state=NORMAL, text=translate("start_recording")))
+            ToolTip(self.record_button, text=translate("start_recording_tooltip"))
 
     def _stop_recording(self):
         self.record_button.config(state=DISABLED, text=translate("stopping_recording"))
+        ToolTip(self.record_button, text=translate("stopping_recording_tooltip"))
         threading.Thread(target=self._stop_recording_thread, daemon=True).start()
 
     def _stop_recording_thread(self):
@@ -1415,11 +1433,19 @@ class RunCommandWindow(tk.Toplevel):
         self.is_recording = is_recording
         if is_recording:
             self.record_button.config(text=translate("stop_recording"), bootstyle="danger")
+            ToolTip(self.record_button, text=translate("stop_recording_tooltip"))
         else:
             self.record_button.config(text=translate("start_recording"), bootstyle="primary")
+            ToolTip(self.record_button, text=translate("start_recording_tooltip"))
         self.record_button.config(state=NORMAL)
 
     # --- Performance Monitor Methods ---------------------------------------------
+    def _toggle_performance_monitor(self):
+        if self.is_monitoring:
+            self._stop_performance_monitor()
+        else:
+            self._start_performance_monitor()
+
     def _start_performance_monitor(self):
         app_package = self.app_package_combo.get()
         if not app_package:
@@ -1427,8 +1453,9 @@ class RunCommandWindow(tk.Toplevel):
             return
         self.is_monitoring = True
         self.stop_monitoring_event.clear()
-        self.start_monitor_button.config(state=DISABLED)
-        self.stop_monitor_button.config(state=NORMAL)
+        self.monitor_button.config(text=translate("stop_monitoring"), bootstyle="danger")
+        ToolTip(self.monitor_button, text=translate("stop_monitoring_tooltip"))
+        self.toggle_minimize_perf_button.config(state=NORMAL)
         self.app_package_combo.config(state=DISABLED)
         self.performance_output_text.text.config(state=NORMAL)
         self.performance_output_text.text.delete("1.0", END)
@@ -1449,8 +1476,9 @@ class RunCommandWindow(tk.Toplevel):
         if self.is_monitoring:
             self.stop_monitoring_event.set()
             self.is_monitoring = False
-            self.start_monitor_button.config(state=NORMAL)
-            self.stop_monitor_button.config(state=DISABLED)
+            self.monitor_button.config(text=translate("start_monitoring"), bootstyle="success")
+            ToolTip(self.monitor_button, text=translate("start_monitoring_tooltip"))
+            self.toggle_minimize_perf_button.config(state=DISABLED)
             self.app_package_combo.config(state="readonly")
             self.performance_output_queue.put(f"\n{translate('monitoring_stopped_by_user')}\n")
             self.last_performance_line_var.set("")
@@ -1508,12 +1536,14 @@ class RunCommandWindow(tk.Toplevel):
             self.minimized_performance_label.pack_forget()
             self.performance_output_text.pack(fill=BOTH, expand=YES, padx=5, pady=(0,5))
             self.toggle_minimize_perf_button.config(text=translate("minimize_performance"))
+            ToolTip(self.toggle_minimize_perf_button, text=translate("minimize_performance_tooltip"))
             self.performance_monitor_is_minimized.set(False)
         else:
             # Minimize
             self.performance_output_text.pack_forget()
             self.minimized_performance_label.pack(fill=X, padx=5, pady=5)
             self.toggle_minimize_perf_button.config(text=translate("maximize_performance"))
+            ToolTip(self.toggle_minimize_perf_button, text=translate("maximize_performance_tooltip"))
             self.performance_monitor_is_minimized.set(True)
 
     # --- Robot Test Methods ------------------------------------------------------
@@ -1538,6 +1568,7 @@ class RunCommandWindow(tk.Toplevel):
 
         self.stop_test_button.config(state=NORMAL)
         self.stop_test_button.pack(fill=X, pady=5, padx=5)
+        ToolTip(self.stop_test_button, text=translate("stop_test_tooltip"))
 
     def _start_test(self):
         self._reset_ui_for_test_run()
@@ -1681,7 +1712,6 @@ class RunCommandWindow(tk.Toplevel):
 
         self.destroy()
 
-
 # --- Page Object Classes for Tabs ---
 
 class RunTabPage(ttk.Frame):
@@ -1694,27 +1724,32 @@ class RunTabPage(ttk.Frame):
         self.on_run_mode_change()
 
     def _setup_widgets(self):
-        device_frame = ttk.LabelFrame(self, text=translate("device_selection"), padding=10)
+        device_frame = ttk.Frame(self, padding=10)
         device_frame.pack(fill=X, pady=5)
+        device_frame.columnconfigure(0, weight=1)
+        device_frame.columnconfigure(1, weight=0)
         
-        ttk.Label(device_frame, text=translate("select_devices")).pack(side=LEFT, padx=5)
-        
+        # ttk.Label(device_frame, text=translate("select_devices")).pack(side=LEFT, padx=5)
+        listbox_label = ttk.Label(device_frame, text=translate("select_devices"))
+        listbox_label.grid(row=0, column=0, sticky=W)
         listbox_frame = ttk.Frame(device_frame)
-        listbox_frame.pack(side=LEFT, padx=5, fill=X, expand=YES)
+        listbox_frame.grid(row=1, column=0, sticky="nsew")
+        listbox_frame.columnconfigure(0, weight=1)
         
-        scrollbar = ttk.Scrollbar(listbox_frame, orient=VERTICAL)
-        self.device_listbox = tk.Listbox(listbox_frame, selectmode=EXTENDED, exportselection=False, height=4, yscrollcommand=scrollbar.set)
-        scrollbar.config(command=self.device_listbox.yview)
+        # scrollbar = ttk.Scrollbar(listbox_frame, orient=VERTICAL)
+        self.device_listbox = tk.Listbox(listbox_frame, selectmode=EXTENDED, exportselection=False, height=4)
+        # scrollbar.config(command=self.device_listbox.yview)
         
-        scrollbar.pack(side=RIGHT, fill=Y)
+        # scrollbar.pack(side=RIGHT, fill=Y)
         self.device_listbox.pack(side=LEFT, fill=BOTH, expand=YES)
         ToolTip(self.device_listbox, translate("devices_tooltip"))
         
         self.refresh_button = ttk.Button(device_frame, text=translate("refresh"), command=self.app._refresh_devices, bootstyle="secondary")
-        self.refresh_button.pack(side=LEFT, padx=5)
+        self.refresh_button.grid(row=1, column=1, sticky="e", padx=5)
+        self.refresh_button.columnconfigure(0, weight=0)
         ToolTip(self.refresh_button, translate("refresh_devices_tooltip"))
 
-        test_frame = ttk.LabelFrame(self, text=translate("test_selection"), padding=10)
+        test_frame = ttk.Frame(self, padding=10)
         test_frame.pack(fill=BOTH, expand=YES, pady=5)
         test_frame.columnconfigure(0, weight=1)
         test_frame.rowconfigure(1, weight=1)
@@ -1730,12 +1765,13 @@ class RunTabPage(ttk.Frame):
         mode_frame.grid(row=0, column=1, sticky="e")
         ttk.Radiobutton(mode_frame, text=translate("run_by_suite"), variable=self.app.run_mode_var, value="Suite", command=self.on_run_mode_change).pack(side=LEFT, padx=5)
         ttk.Radiobutton(mode_frame, text=translate("run_by_test"), variable=self.app.run_mode_var, value="Test", command=self.on_run_mode_change).pack(side=LEFT, padx=5)
+        ToolTip(mode_frame, text=translate("select_run_mode_tooltip"))
 
         self.selection_listbox = tk.Listbox(test_frame, exportselection=False)
         self.selection_listbox.grid(row=1, column=0, padx=5, pady=2, sticky="nsew")
         self.selection_listbox.bind("<Double-1>", self.on_selection_listbox_double_click)
 
-        run_frame = ttk.LabelFrame(self, text=translate("run_controls"), padding=10)
+        run_frame = ttk.Frame(self, padding=10)
         run_frame.pack(fill=X, pady=5)
         run_frame.columnconfigure(1, weight=1)
         
@@ -1745,6 +1781,7 @@ class RunTabPage(ttk.Frame):
 
         self.timestamp_check = ttk.Checkbutton(run_frame, text=translate("do_not_overwrite_logs"), variable=self.app.timestamp_logs_var)
         self.timestamp_check.grid(row=0, column=2, sticky="e", padx=(0, 10))
+        ToolTip(self.timestamp_check, text=translate("timestamp_logs_tooltip"))
 
         self.run_button = ttk.Button(run_frame, text=translate("run_test"), command=self.app._run_test, bootstyle="success")
         self.run_button.grid(row=0, column=3, sticky="e", padx=5, pady=5)
@@ -1808,7 +1845,7 @@ class AdbToolsTabPage(ttk.Frame):
         adb_tools_frame.rowconfigure(2, weight=1)
         adb_tools_frame.columnconfigure(0, weight=1)
 
-        wireless_frame = ttk.LabelFrame(adb_tools_frame, text=translate("wireless_adb"), padding=10)
+        wireless_frame = ttk.Frame(adb_tools_frame, padding=10)
         wireless_frame.grid(row=0, column=0, sticky="ew", pady=5)
         wireless_frame.columnconfigure(0, weight=2)
         wireless_frame.columnconfigure(1, weight=1)
@@ -1820,10 +1857,15 @@ class AdbToolsTabPage(ttk.Frame):
 
         self.ip_entry = ttk.Entry(wireless_frame)
         self.ip_entry.grid(row=1, column=0, sticky="ew", padx=5, pady=(0, 5))
+        ToolTip(self.ip_entry, text=translate("wireless_ip_tooltip"))
+
         self.port_entry = ttk.Entry(wireless_frame, width=8)
         self.port_entry.grid(row=1, column=1, sticky="ew", padx=5, pady=(0, 5))
+        ToolTip(self.port_entry, text=translate("wireless_port_tooltip"))
+
         self.code_entry = ttk.Entry(wireless_frame, width=8)
         self.code_entry.grid(row=1, column=2, sticky="ew", padx=5, pady=(0, 5))
+        ToolTip(self.code_entry, text=translate("wireless_code_tooltip"))
         
         button_frame = ttk.Frame(wireless_frame)
         button_frame.grid(row=2, column=0, columnspan=3, sticky="ew", pady=5)
@@ -1843,7 +1885,7 @@ class AdbToolsTabPage(ttk.Frame):
         self.connect_button.grid(row=0, column=2, sticky="ew", padx=5)
         ToolTip(self.connect_button, translate("connect_tooltip"))
 
-        manual_cmd_frame = ttk.LabelFrame(adb_tools_frame, text=translate("manual_adb_command"), padding=10)
+        manual_cmd_frame = ttk.Frame(adb_tools_frame, padding=10)
         manual_cmd_frame.grid(row=1, column=0, sticky="ew", pady=5)
         manual_cmd_frame.columnconfigure(0, weight=1)
 
@@ -1945,6 +1987,8 @@ class SettingsTabPage(ttk.Frame):
         ttk.Label(app_settings_frame, text=translate("appium_server")).grid(row=0, column=0, padx=5, pady=5, sticky=W)
         self.appium_status_label = ttk.Label(app_settings_frame, text=translate("appium_status_stopped"), bootstyle="danger")
         self.appium_status_label.grid(row=0, column=1, padx=5, pady=5, sticky=W)
+        ToolTip(self.appium_status_label, text=translate("appium_status_tooltip"))
+
         self.toggle_appium_button = ttk.Button(app_settings_frame, text=translate("start_appium"), command=self.app._toggle_appium_server, bootstyle="primary")
         self.toggle_appium_button.grid(row=0, column=2, padx=5, pady=5)
         ToolTip(self.toggle_appium_button, translate("appium_toggle_tooltip"))
@@ -1984,22 +2028,21 @@ class SettingsTabPage(ttk.Frame):
         bottom_frame.pack(fill=X, pady=0, padx=0)
         bottom_frame.columnconfigure(0, weight=1)
 
-        appearance_frame = ttk.LabelFrame(bottom_frame, text=translate("appearance"), padding=10)
+        appearance_frame = ttk.LabelFrame(bottom_frame, text=translate("appearance") + " " + translate("theme_restart_required"), padding=10)
         appearance_frame.grid(row=0, column=0, sticky="ew", pady=5, padx=0)
         appearance_frame.columnconfigure(1, weight=1)
 
         ttk.Label(appearance_frame, text=translate("theme")).grid(row=0, column=0, padx=5, pady=2, sticky=W)
         theme_combo = ttk.Combobox(appearance_frame, textvariable=self.app.theme_var, values=["darkly", "litera"], state="readonly")
         theme_combo.grid(row=0, column=1, padx=5, pady=2, sticky=W)
-        ttk.Label(appearance_frame, text=translate("theme_restart_required")).grid(row=0, column=2, padx=5, pady=2, sticky=W)
         ToolTip(theme_combo, translate("theme_tooltip"))
         
-        ttk.Label(appearance_frame, text=translate("language_label")).grid(row=1, column=0, padx=5, pady=2, sticky=W)
+        ttk.Label(appearance_frame, text=translate("language_label")).grid(row=0, column=2, padx=5, pady=2, sticky=W)
         self.language_combo = ttk.Combobox(appearance_frame, state="readonly", values=list(self.app.LANGUAGES.values()))
-        self.language_combo.grid(row=1, column=1, padx=5, pady=2, sticky=W)
+        self.language_combo.grid(row=0, column=3, padx=5, pady=2, sticky=W)
         self.language_combo.bind("<<ComboboxSelected>>", self.app._on_language_select)
         ToolTip(self.language_combo, translate("language_tooltip"))
-
+        
         current_lang_code = self.app.language_var.get()
         current_lang_name = self.app.LANGUAGES.get(current_lang_code, "English")
         self.language_combo.set(current_lang_name)
@@ -2026,7 +2069,7 @@ class AboutTabPage(ttk.Frame):
 
         title_label = ttk.Label(about_frame, text=translate("about_title"), font="-size 20 -weight bold")
         title_label.pack(pady=(0, 10))
-        ToolTip(title_label, "Robot Runner - by Lucas de Eiroz Rodrigues")
+        ToolTip(title_label, translate("app_author_tooltip"))
 
         desc_label = ttk.Label(about_frame, text=translate("about_subtitle"), wraplength=500)
         desc_label.pack(pady=(0, 20))
@@ -2327,7 +2370,7 @@ class RobotRunnerApp:
                 self.root.after(0, self.run_tab.run_button.config, {'text': translate("starting_appium")})
                 self._start_appium_server(silent=True)
                 if not self._wait_for_appium_startup(timeout=20):
-                    self.root.after(0, messagebox.showerror, "Appium Error", translate("appium_start_fail_error"))
+                    self.root.after(0, messagebox.showerror, translate("appium_error_title"), translate("appium_start_fail_error"))
                     self.root.after(0, self.status_var.set, translate("ready"))
                     return
                 self.root.after(0, self.status_var.set, translate("appium_started_running_tests"))
@@ -2966,7 +3009,6 @@ class RobotRunnerApp:
             
         self.root.after(0, lambda: button.config(state=NORMAL))
 
-
     def _update_output_text(self, widget: ScrolledText, result: str, clear: bool):
         widget.text.config(state=NORMAL)
         if clear:
@@ -3150,7 +3192,6 @@ def run_performance_monitor(udid: str, app_package: str, output_queue: Queue, st
             output_queue.put(f"ERROR in monitoring loop: {e}. Retrying...\n")
             time.sleep(2)
 
-
 def find_scrcpy() -> Optional[Path]:
     """Tries to find scrcpy.exe in common locations or PATH."""
     local_scrcpy = BASE_DIR / "scrcpy" / "scrcpy.exe"
@@ -3265,7 +3306,6 @@ def _get_busy_udids(appium_command: Optional[str]) -> set:
             
     return set()
 
-
 def get_generation_time(xml_file: Path) -> Optional[datetime.datetime]:
     """
     Quickly gets the 'generated' timestamp from an output.xml file using regex for performance.
@@ -3288,7 +3328,6 @@ def get_generation_time(xml_file: Path) -> Optional[datetime.datetime]:
         return datetime.datetime.fromtimestamp(xml_file.stat().st_mtime)
     except Exception:
         return None
-
 
 def load_theme_setting():
     """Loads the theme from settings.json before the main window is created."""
