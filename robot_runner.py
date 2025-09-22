@@ -2845,7 +2845,11 @@ class RobotRunnerApp:
                 for test_element in root.iter("test"):
                     suite_element = test_element.getparent()
                     suite_name = suite_element.get("name", "Unknown_Suite")
-                    
+
+                    # Determine the correct log file name (handles timestamped logs)
+                    log_filename = xml_file.name.replace("output", "log").replace(".xml", ".html")
+                    log_path = xml_file.parent / log_filename
+
                     test_name = test_element.get("name", "Unknown_Test")
                     status_element = test_element.find("status")
 
@@ -2869,7 +2873,7 @@ class RobotRunnerApp:
                         "test": test_name,
                         "status": status,
                         "time": elapsed_formatted,
-                        "log_path": str(xml_file.parent / "log.html")
+                        "log_path": str(log_path)
                     })
             except ET.ParseError:
                 print(f"Warning: Could not parse {xml_file}")
