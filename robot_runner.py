@@ -149,7 +149,6 @@ class RunCommandWindow(tk.Toplevel):
 
         self._setup_widgets()
 
-        # --- Start Processes ---
         if self.mode == 'test':
             self._start_test()
 
@@ -511,12 +510,13 @@ class RunCommandWindow(tk.Toplevel):
         if self.is_mirroring: return
         self.is_mirroring = True
         
-        # Fetch the latest aspect ratio when starting
-        self.aspect_ratio = get_device_aspect_ratio(self.udid)
-        if self.aspect_ratio:
-            self.scrcpy_output_queue.put(f"INFO: Set aspect ratio to {self.aspect_ratio:.4f} for mirroring.\n")
-        else:
-            self.scrcpy_output_queue.put("WARNING: Could not determine aspect ratio for mirroring.\n")
+        # If aspect ratio wasn't pre-fetched yet, get it now.
+        if self.aspect_ratio is None:
+            self.aspect_ratio = get_device_aspect_ratio(self.udid)
+            if self.aspect_ratio:
+                self.scrcpy_output_queue.put(f"INFO: Fetched aspect ratio on demand: {self.aspect_ratio:.4f} for mirroring.\n")
+            else:
+                self.scrcpy_output_queue.put("WARNING: Could not determine aspect ratio for mirroring.\n")
         
         self.main_paned_window.add(self.right_pane_container, weight=5)
         self.update_idletasks()
@@ -538,12 +538,15 @@ class RunCommandWindow(tk.Toplevel):
         if not self.is_mirroring: return
         self.is_mirroring = False
 
+        # Reset scrcpy window handles and unbind events
+        if self.scrcpy_hwnd:
+            self.embed_frame.unbind("<Configure>")
+            self.scrcpy_hwnd = None
+
         self.main_paned_window.forget(self.right_pane_container)
         # Re-apply layout for the remaining panes
         self.after(10, self._apply_layout_rules)
 
-        if hasattr(self, 'inspect_button'):
-            self.inspect_button.config(state=NORMAL)
         self.mirror_button.config(text=translate("start_mirroring"), bootstyle="info")
         ToolTip(self.mirror_button, text=translate("start_mirroring_tooltip"))
         
@@ -551,6 +554,11 @@ class RunCommandWindow(tk.Toplevel):
             self._terminate_process_tree(self.scrcpy_process.pid, "scrcpy")
             self.scrcpy_process = None
             self.scrcpy_output_queue.put(translate("scrcpy_stopped_by_user") + "\n")
+
+        # Always reset the process handle
+        self.scrcpy_process = None
+        if hasattr(self, 'inspect_button'):
+            self.inspect_button.config(state=NORMAL)
 
     def _toggle_inspector_mode(self):
         if self.is_inspecting:
@@ -567,12 +575,13 @@ class RunCommandWindow(tk.Toplevel):
         if self.is_inspecting: return
         self.is_inspecting = True
         
-        # Fetch the latest aspect ratio when starting the inspector
-        self.aspect_ratio = get_device_aspect_ratio(self.udid)
-        if self.aspect_ratio:
-            self.scrcpy_output_queue.put(f"INFO: Set aspect ratio to {self.aspect_ratio:.4f} for inspector.\n")
-        else:
-            self.scrcpy_output_queue.put("WARNING: Could not determine aspect ratio for inspector.\n")
+        # If aspect ratio wasn't pre-fetched yet, get it now.
+        if self.aspect_ratio is None:
+            self.aspect_ratio = get_device_aspect_ratio(self.udid)
+            if self.aspect_ratio:
+                self.scrcpy_output_queue.put(f"INFO: Fetched aspect ratio on demand: {self.aspect_ratio:.4f} for inspector.\n")
+            else:
+                self.scrcpy_output_queue.put("WARNING: Could not determine aspect ratio for inspector.\n")
         
         # Update button states
         self.mirror_button.config(state=DISABLED)
@@ -1279,15 +1288,6 @@ class RunCommandWindow(tk.Toplevel):
                 self.scrcpy_output_text.text.insert(END, line)
                 self.scrcpy_output_text.text.see(END)
                 self.scrcpy_output_text.text.config(state=DISABLED)
-                if "INFO: Texture:" in line and not self.aspect_ratio:
-                    try:
-                        resolution = line.split(":")[-1].strip()
-                        width, height = map(int, resolution.split('x'))
-                        if height > 0:
-                            self.aspect_ratio = width / height
-                            self.after(100, self._fetch_initial_aspect_ratio)
-                    except (ValueError, IndexError):
-                        pass
             except Empty:
                 pass
         if self.is_mirroring and self.scrcpy_process and self.scrcpy_process.poll() is not None:
@@ -1306,6 +1306,7 @@ class RunCommandWindow(tk.Toplevel):
                 return
             time.sleep(0.2)
         self.scrcpy_output_queue.put(translate("scrcpy_find_window_error", title=self.unique_title) + "\n")
+        self.after(0, self._stop_scrcpy)
 
     def _embed_window(self):
         if not self.scrcpy_hwnd or not self.is_mirroring: return
@@ -2481,7 +2482,17 @@ class RobotRunnerApp:
     def _get_devices_thread(self):
         """Gets device list in a background thread to avoid freezing the GUI."""
         appium_command = self.appium_command_var.get()
-        self.devices = get_connected_devices(appium_command)
+
+        # Determine if we should even attempt to check Appium.
+        # We attempt a check if the app started it, or if it was detected at launch.
+        appium_might_be_running = (self.appium_process and self.appium_process.poll() is None) or (self.appium_version is not None)
+
+        # Now, if we think it might be running, we do the actual network check to confirm.
+        should_check_busy_devices = False
+        if appium_might_be_running:
+            should_check_busy_devices = self._is_appium_running()
+
+        self.devices = get_connected_devices(appium_command, check_busy_devices=should_check_busy_devices)
         self.root.after(0, self._update_device_list)
 
     def _update_device_list(self):
@@ -3043,9 +3054,12 @@ def execute_command(command: str) -> Tuple[bool, str]:
     except Exception as e:
         return False, f"An unexpected error occurred: {e}"
 
-def get_connected_devices(appium_command: Optional[str] = None) -> List[Dict[str, str]]:
+def get_connected_devices(appium_command: Optional[str] = None, check_busy_devices: bool = False) -> List[Dict[str, str]]:
     """Returns a list of dictionaries, each representing a connected device."""
-    busy_udids = _get_busy_udids(appium_command)
+    busy_udids = set()
+    if check_busy_devices:
+        busy_udids = _get_busy_udids(appium_command)
+
     success, output = execute_command("adb devices -l")
     if not success:
         return []
