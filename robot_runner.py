@@ -2482,7 +2482,17 @@ class RobotRunnerApp:
     def _get_devices_thread(self):
         """Gets device list in a background thread to avoid freezing the GUI."""
         appium_command = self.appium_command_var.get()
-        self.devices = get_connected_devices(appium_command)
+
+        # Determine if we should even attempt to check Appium.
+        # We attempt a check if the app started it, or if it was detected at launch.
+        appium_might_be_running = (self.appium_process and self.appium_process.poll() is None) or (self.appium_version is not None)
+
+        # Now, if we think it might be running, we do the actual network check to confirm.
+        should_check_busy_devices = False
+        if appium_might_be_running:
+            should_check_busy_devices = self._is_appium_running()
+
+        self.devices = get_connected_devices(appium_command, check_busy_devices=should_check_busy_devices)
         self.root.after(0, self._update_device_list)
 
     def _update_device_list(self):
@@ -3044,9 +3054,12 @@ def execute_command(command: str) -> Tuple[bool, str]:
     except Exception as e:
         return False, f"An unexpected error occurred: {e}"
 
-def get_connected_devices(appium_command: Optional[str] = None) -> List[Dict[str, str]]:
+def get_connected_devices(appium_command: Optional[str] = None, check_busy_devices: bool = False) -> List[Dict[str, str]]:
     """Returns a list of dictionaries, each representing a connected device."""
-    busy_udids = _get_busy_udids(appium_command)
+    busy_udids = set()
+    if check_busy_devices:
+        busy_udids = _get_busy_udids(appium_command)
+
     success, output = execute_command("adb devices -l")
     if not success:
         return []
