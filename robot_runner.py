@@ -3102,6 +3102,38 @@ def get_device_aspect_ratio(udid: str) -> Optional[float]:
                 return width / height
     return None
 
+# --- Performance Monitor Helper Functions (Optimized for Persistent Shell) ---
+
+def execute_on_persistent_shell(process: subprocess.Popen, command: str) -> str:
+    """
+    Executes a command on a persistent adb shell process and reads the output.
+    """
+    if process.poll() is not None:
+        return "Error: Shell process is not running."
+
+    # A unique marker to signal the end of a command's output
+    end_marker = "ROBOT_RUNNER_CMD_DONE"
+    
+    # Write the command, followed by the end marker, to the shell's stdin
+    process.stdin.write(f"{command}\n")
+    process.stdin.write(f"echo {end_marker}\n")
+    process.stdin.flush()
+
+    output_lines = []
+    while True:
+        try:
+            # Use a timeout to prevent blocking indefinitely if the shell hangs
+            line = process.stdout.readline()
+            if not line: # Shell closed
+                break
+            if end_marker in line:
+                break
+            output_lines.append(line)
+        except (IOError, ValueError): # Catches errors if the pipe is closed
+            break
+            
+    return "".join(output_lines).strip()
+
 # --- Performance Monitor Helper Functions (Integrated) ---
 
 def execute_monitor_command(command: str) -> str:
@@ -3121,20 +3153,20 @@ def execute_monitor_command(command: str) -> str:
     except Exception as e:
         return f"Unexpected Error: {e}"
 
-def get_surface_view_name(udid: str, app_package: str) -> str:
-    """Finds the full name of the SurfaceView layer for the app package."""
-    output = execute_monitor_command(f"adb -s {udid} shell dumpsys SurfaceFlinger --list")
+def get_surface_view_name(shell_process: subprocess.Popen, app_package: str) -> str:
+    """Finds the full name of the SurfaceView layer for the app package using a persistent shell."""
+    output = execute_on_persistent_shell(shell_process, "dumpsys SurfaceFlinger --list")
     blast_match = re.search(r'(SurfaceView\[.*?{}\S*?\(BLAST\)#\d+)'.format(re.escape(app_package)), output)
     if blast_match:
         return blast_match.group(1)
     match = re.search(r'(SurfaceView\[.*?{}.*?#\d+)'.format(re.escape(app_package)), output)
     return match.group(1) if match else ""
 
-def get_surface_fps(udid: str, surface_name: str, last_timestamps: set) -> tuple[str, set]:
-    """Calculates FPS by comparing frame timestamps."""
+def get_surface_fps(shell_process: subprocess.Popen, surface_name: str, last_timestamps: set) -> tuple[str, set]:
+    """Calculates FPS by comparing frame timestamps using a persistent shell."""
     if not surface_name:
         return "N/A", last_timestamps
-    output = execute_monitor_command(f"adb -s {udid} shell dumpsys SurfaceFlinger --latency '{surface_name}'")
+    output = execute_on_persistent_shell(shell_process, f"dumpsys SurfaceFlinger --latency '{surface_name}'")
     lines = output.splitlines()
     current_timestamps = {int(parts[2]) for line in lines[1:] if len(parts := line.split()) == 3 and parts[0] != '0'}
     if not last_timestamps:
@@ -3144,31 +3176,50 @@ def get_surface_fps(udid: str, surface_name: str, last_timestamps: set) -> tuple
 
 def run_performance_monitor(udid: str, app_package: str, output_queue: Queue, stop_event: threading.Event):
     """Continuously monitors app performance and puts the output in a queue."""
-    output_queue.put(f"Starting monitoring for app '{app_package}' on device '{udid}'...\n")
-    header = f"{'Timestamp':<10} | {'Elapsed':<10} | {'CPU':<5} | {'RAM':<7} | {'GPU':<10} | {'Missed Vsync':<1} | {'Janky':<15} | {'FPS':<4}\n"
-    output_queue.put(header)
-    output_queue.put("-" * len(header) + "\n")
+    shell_process = None
+    try:
+        # --- Start the persistent shell ---
+        creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+        shell_process = subprocess.Popen(
+            f"adb -s {udid} shell",
+            shell=True,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding=OUTPUT_ENCODING,
+            errors='replace',
+            creationflags=creationflags
+        )
 
-    execute_monitor_command(f"adb -s {udid} shell dumpsys gfxinfo {app_package} reset")
-    time.sleep(0.2)
+        output_queue.put(f"Starting monitoring for app '{app_package}' on device '{udid}'...\n")
+        header = f"{'Timestamp':<10} | {'Elapsed':<10} | {'CPU':<5} | {'RAM':<7} | {'GPU':<10} | {'Missed Vsync':<1} | {'Janky':<15} | {'FPS':<4}\n"
+        output_queue.put(header)
+        output_queue.put("-" * len(header) + "\n")
 
-    last_timestamps = set()
-    start_time = time.time()
+        # Reset gfxinfo once at the beginning
+        execute_on_persistent_shell(shell_process, f"dumpsys gfxinfo {app_package} reset")
+        time.sleep(0.2)
 
-    while not stop_event.is_set():
-        try:
+        last_timestamps = set()
+        start_time = time.time()
+
+        while not stop_event.is_set():
             elapsed_seconds = time.time() - start_time
             elapsed_time_str = time.strftime("%M:%S", time.gmtime(elapsed_seconds))
             ts = time.strftime("%H:%M:%S")
 
-            ram_output = execute_monitor_command(f"adb -s {udid} shell dumpsys meminfo {app_package}")
+            # --- Execute commands on the persistent shell ---
+            ram_output = execute_on_persistent_shell(shell_process, f"dumpsys meminfo {app_package}")
             ram_mb = "N/A"
             if "TOTAL" in ram_output and (match := re.search(r"TOTAL\s+(\d+)", ram_output)):
                 ram_mb = f"{int(match.group(1)) / 1024:.2f}"
 
-            cpu_output = execute_monitor_command(f"adb -s {udid} shell dumpsys cpuinfo")
+            # Using 'top' is more efficient for CPU than 'dumpsys cpuinfo' in a loop
+            cpu_output = execute_on_persistent_shell(shell_process, f"top -n 1 -b")
             cpu_percent = "N/A"
-            if "Error" not in cpu_output:
+            # Check for shell errors before parsing
+            if "Error" not in cpu_output and "not found" not in cpu_output:
                 for line in cpu_output.splitlines():
                     if app_package in line:
                         parts = line.strip().split()
@@ -3176,7 +3227,7 @@ def run_performance_monitor(udid: str, app_package: str, output_queue: Queue, st
                             cpu_percent = parts[0].replace('%', '')
                             break
             
-            gfx_output = execute_monitor_command(f"adb -s {udid} shell dumpsys gfxinfo {app_package}")
+            gfx_output = execute_on_persistent_shell(shell_process, f"dumpsys gfxinfo {app_package}")
             jank_info = "0.00% (0/0)"
             if jank_match := re.search(r"Janky frames: (\d+) \(([\d.]+)%\)", gfx_output):
                 total_frames = (re.search(r"Total frames rendered: (\d+)", gfx_output) or '?').group(1)
@@ -3189,8 +3240,8 @@ def run_performance_monitor(udid: str, app_package: str, output_queue: Queue, st
 
             missed_vsync = (re.search(r"Number Missed Vsync: (\d+)", gfx_output) or "N/A").group(1)
 
-            surface_name = get_surface_view_name(udid, app_package)
-            surface_fps, last_timestamps = get_surface_fps(udid, surface_name, last_timestamps)
+            surface_name = get_surface_view_name(shell_process, app_package)
+            surface_fps, last_timestamps = get_surface_fps(shell_process, surface_name, last_timestamps)
 
             perf_data = {
                 "ts": ts,
@@ -3204,11 +3255,15 @@ def run_performance_monitor(udid: str, app_package: str, output_queue: Queue, st
             }
             output_queue.put(perf_data)
             
-            # This loop runs roughly every second, driven by the ADB command delays
-        
-        except Exception as e:
-            output_queue.put(f"ERROR in monitoring loop: {e}. Retrying...\n")
-            time.sleep(2)
+            # The loop is now much faster, so we need to add a sleep to control the update frequency
+            time.sleep(1)
+
+    except Exception as e:
+        output_queue.put(f"ERROR in monitoring loop: {e}. Retrying...\n")
+        time.sleep(2)
+    finally:
+        if shell_process:
+            shell_process.terminate()
 
 def find_scrcpy() -> Optional[Path]:
     """Tries to find scrcpy.exe in common locations or PATH."""
