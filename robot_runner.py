@@ -121,7 +121,7 @@ class RunCommandWindow(tk.Toplevel):
         self.is_inspection_running = False # To prevent race conditions
         self.current_selected_element_data = None # To store data of currently selected element for XPath generation
         self.auto_refresh_thread = None
-        self.inspector_auto_refresh_var = tk.BooleanVar(value=True)
+        self.inspector_auto_refresh_var = tk.BooleanVar(value=False)
         self.stop_auto_refresh_event = threading.Event()
         self.last_ui_dump_hash = None
         self.all_elements_list: List[Dict] = []
@@ -133,7 +133,8 @@ class RunCommandWindow(tk.Toplevel):
         self.filter_by_resource_id_var = tk.BooleanVar(value=True)
         self.filter_by_text_var = tk.BooleanVar(value=True)
         self.filter_by_content_desc_var = tk.BooleanVar(value=True)
-        self.filter_by_class_var = tk.BooleanVar(value=False)
+        self.filter_by_scrollview_var = tk.BooleanVar(value=True)
+        self.filter_by_other_class_var = tk.BooleanVar(value=False)
         
         # --- Window Setup ---
         if title:
@@ -304,7 +305,8 @@ class RunCommandWindow(tk.Toplevel):
             filter_menu.add_checkbutton(label=translate("filter_by_resource_id"), variable=self.filter_by_resource_id_var, command=self._update_element_tree_view)
             filter_menu.add_checkbutton(label=translate("filter_by_text"), variable=self.filter_by_text_var, command=self._update_element_tree_view)
             filter_menu.add_checkbutton(label=translate("filter_by_content_desc"), variable=self.filter_by_content_desc_var, command=self._update_element_tree_view)
-            filter_menu.add_checkbutton(label=translate("filter_by_class"), variable=self.filter_by_class_var, command=self._update_element_tree_view)
+            filter_menu.add_checkbutton(label=translate("filter_by_scrollview"), variable=self.filter_by_scrollview_var, command=self._update_element_tree_view)
+            filter_menu.add_checkbutton(label=translate("filter_by_other_class"), variable=self.filter_by_other_class_var, command=self._update_element_tree_view)
 
             self.auto_refresh_check = ttk.Checkbutton(inspector_top_controls_frame, text=translate("inspector_auto_refresh"), variable=self.inspector_auto_refresh_var, bootstyle="round-toggle")
             self.auto_refresh_check.grid(row=0, column=2, sticky="e")
@@ -567,8 +569,9 @@ class RunCommandWindow(tk.Toplevel):
             # If mirroring is active, stop it first
             if self.is_mirroring:
                 self._stop_scrcpy()
-            self._start_inspector()
-            self._start_inspection() # Perform the first inspection
+            self._start_inspector() # This sets up the UI
+            # Schedule the first inspection to run after the UI has had a moment to draw itself
+            self.after(100, self._start_inspection)
 
     def _start_inspector(self):
         """Configures the UI for inspector mode, but does not run the inspection itself."""
@@ -706,15 +709,21 @@ class RunCommandWindow(tk.Toplevel):
         self.is_inspection_running = True
 
         self.refresh_inspector_button.config(state=DISABLED, text=translate("refreshing"))
-        ToolTip(self.refresh_inspector_button, text=translate("refreshing_tooltip"))
+        ToolTip(self.refresh_inspector_button, text=translate("refreshing"))
         self.inspect_button.config(state=DISABLED, text=translate("refreshing"))
-        ToolTip(self.inspect_button, text=translate("refreshing_tooltip"))
+        ToolTip(self.inspect_button, text=translate("refreshing"))
         self.screenshot_canvas.delete("all")
         self.xpath_search_var.set("") # Clear search on refresh
 
         # Display updating message on canvas
         self.screenshot_canvas.update_idletasks()
         canvas_width = self.screenshot_canvas.winfo_width()
+
+        # If the canvas hasn't been drawn yet, its size will be 1.
+        # In that case, schedule this part of the function to run again shortly.
+        if canvas_width <= 1:
+            self.after(50, self._start_inspection)
+            return
         canvas_height = self.screenshot_canvas.winfo_height()
         self.screenshot_canvas.create_text(
             canvas_width / 2, canvas_height / 2,
@@ -905,20 +914,13 @@ class RunCommandWindow(tk.Toplevel):
         elif text:
             display_title = f"text={text}"
         elif node_class:
-            display_title = f"class={node_class.split('.')[-1]}"
-            # Filter out uninteresting elements unless they are ScrollViews
-            if "ScrollView" not in display_title:
-                return
+            display_title = f"class={node_class.split('.')[-1]}" # Keep this for display
 
-        # Ensure we have a title to display, or it's a ScrollView
-        if display_title or (node_class and "ScrollView" in node_class):
-            if not display_title and node_class and "ScrollView" in node_class:
-                display_title = f"Class: {node_class.split('.')[-1]}"
-
+        # Ensure we have a title to display
+        if display_title:
             # Add our internal helper data to the dictionary
             element_full_data["display_title"] = display_title
             element_full_data["bounds_coords"] = self._parse_bounds(bounds_str)
-            # Create the accessibility_id alias for convenience in other parts of the code
             element_full_data["accessibility_id"] = content_desc
 
             self.all_elements_list.append(element_full_data)
@@ -1220,7 +1222,8 @@ class RunCommandWindow(tk.Toplevel):
             "resource-id": self.filter_by_resource_id_var.get(),
             "accessibility_id": self.filter_by_content_desc_var.get(),
             "text": self.filter_by_text_var.get(),
-            "class": self.filter_by_class_var.get()
+            "scrollview": self.filter_by_scrollview_var.get(),
+            "other_class": self.filter_by_other_class_var.get()
         }
 
         # If no filters are selected, show everything from the source list
@@ -1230,11 +1233,20 @@ class RunCommandWindow(tk.Toplevel):
         filtered_elements = []
         for element_data in use_list:
             # Check if the element has any of the attributes that are being filtered for
-            if (active_filters["resource-id"] and element_data.get("resource-id")) or \
-               (active_filters["accessibility_id"] and element_data.get("accessibility_id")) or \
-               (active_filters["text"] and element_data.get("text")) or \
-               (active_filters["class"] and element_data.get("class")):
+            if (active_filters["resource-id"] and element_data.get("resource-id")):
                 filtered_elements.append(element_data)
+            elif (active_filters["accessibility_id"] and element_data.get("accessibility_id")):
+                filtered_elements.append(element_data)
+            elif (active_filters["text"] and element_data.get("text")):
+                filtered_elements.append(element_data)
+            elif (active_filters["scrollview"] and "ScrollView" in element_data.get("class", "")):
+                 filtered_elements.append(element_data)
+            elif (active_filters["other_class"] and element_data.get("class") and "ScrollView" not in element_data.get("class", "")):
+                # This logic ensures we only add it if it's a class-based element that isn't a ScrollView
+                # and doesn't have the other, more specific, identifiers.
+                if not (element_data.get("resource-id") or element_data.get("accessibility_id") or element_data.get("text")):
+                    filtered_elements.append(element_data)
+
         
         return filtered_elements
 
