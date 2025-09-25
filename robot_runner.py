@@ -155,9 +155,9 @@ class RunCommandWindow(tk.Toplevel):
         # Pre-fetch aspect ratio in the background
         threading.Thread(target=self._fetch_initial_aspect_ratio, daemon=True).start()
 
-        self.after(100, self._check_robot_output_queue)
-        self.after(100, self._check_scrcpy_output_queue)
-        self.after(100, self._check_performance_output_queue)
+        self.after(500, self._check_robot_output_queue) # Intervalo alterado para 500ms
+        self.after(500, self._check_scrcpy_output_queue) # Intervalo alterado para 500ms
+        self.after(500, self._check_performance_output_queue) # Intervalo alterado para 500ms
 
         # Store initial size to prevent unnecessary refreshes from non-resize <Configure> events
         self.update_idletasks()
@@ -1281,19 +1281,24 @@ class RunCommandWindow(tk.Toplevel):
             pass # Pipe may already be closed or process object gone
 
     def _check_scrcpy_output_queue(self):
+        lines_to_add = []
         while not self.scrcpy_output_queue.empty():
             try:
                 line = self.scrcpy_output_queue.get_nowait()
-                self.scrcpy_output_text.text.config(state=NORMAL)
-                self.scrcpy_output_text.text.insert(END, line)
-                self.scrcpy_output_text.text.see(END)
-                self.scrcpy_output_text.text.config(state=DISABLED)
+                lines_to_add.append(line)
             except Empty:
                 pass
+        
+        if lines_to_add:
+            self.scrcpy_output_text.text.config(state=NORMAL)
+            self.scrcpy_output_text.text.insert(END, "".join(lines_to_add))
+            self.scrcpy_output_text.text.see(END)
+            self.scrcpy_output_text.text.config(state=DISABLED)
+
         if self.is_mirroring and self.scrcpy_process and self.scrcpy_process.poll() is not None:
              self.scrcpy_output_queue.put(f"\n{translate('scrcpy_terminated_unexpectedly')}\n")
              self._stop_scrcpy()
-        self.after(100, self._check_scrcpy_output_queue)
+        self.after(500, self._check_scrcpy_output_queue)
 
     def _find_and_embed_window(self):
         start_time = time.time()
@@ -1485,21 +1490,27 @@ class RunCommandWindow(tk.Toplevel):
             self.last_performance_line_var.set("")
 
     def _check_performance_output_queue(self):
+        items_to_process = []
         while not self.performance_output_queue.empty():
-            line_to_log = ""
             try:
                 item = self.performance_output_queue.get_nowait()
-                
+                items_to_process.append(item)
+            except Empty:
+                pass
+
+        if items_to_process:
+            log_content_batch = []
+            self.performance_output_text.text.config(state=NORMAL)
+
+            for item in items_to_process:
+                line_to_log = ""
                 if isinstance(item, dict):
-                    # Recreate the full line for the log/main view
                     line_to_log = (
                         f"{item['ts']:<10} | {item['elapsed']:<10} | CPU: {item['cpu']:<5} | "
                         f"RAM: {item['ram']:<7} | GPU: {item['gpu']:<10} | "
                         f"Missed Vsync: {item['vsync']:<1} | Janky: {item['janky']:<15} | "
                         f"FPS: {item['fps']:<4}\n"
                     )
-                    
-                    # Create the compact line for the minimized view
                     janky_percent = item['janky'].split(' ')[0]
                     compact_line = (
                         f"CPU:{item['cpu']}% RAM:{item['ram']}MB GPU:{item['gpu']}KB "
@@ -1511,22 +1522,23 @@ class RunCommandWindow(tk.Toplevel):
                     if translate('monitoring_stopped_by_user') in item:
                         self.last_performance_line_var.set("")
 
-                # Write the full line to the text widget and log file
-                self.performance_output_text.text.config(state=NORMAL)
-                self.performance_output_text.text.insert(END, line_to_log)
-                self.performance_output_text.text.see(END)
-                self.performance_output_text.text.config(state=DISABLED)
-                if self.performance_log_file:
-                    try:
-                        mode = 'w' if "Starting monitoring" in line_to_log else 'a'
-                        with open(self.performance_log_file, mode, encoding=OUTPUT_ENCODING) as f: f.write(line_to_log)
-                    except Exception as e:
-                        self.performance_output_queue.put(f"\n{translate('log_write_error', error=e)}\n")
-            except Empty:
-                pass
+                log_content_batch.append(line_to_log)
+
+            # Batch update the GUI and log file
+            self.performance_output_text.text.insert(END, "".join(log_content_batch))
+            self.performance_output_text.text.see(END)
+            self.performance_output_text.text.config(state=DISABLED)
+
+            if self.performance_log_file:
+                try:
+                    with open(self.performance_log_file, 'a', encoding=OUTPUT_ENCODING) as f:
+                        f.write("".join(log_content_batch))
+                except Exception as e:
+                    self.performance_output_queue.put(f"\n{translate('log_write_error', error=e)}\n")
+
         if self.is_monitoring and (self.performance_thread is None or not self.performance_thread.is_alive()):
              self._stop_performance_monitor()
-        self.after(100, self._check_performance_output_queue)
+        self.after(500, self._check_performance_output_queue)
 
     def _toggle_performance_minimize(self):
         """Toggles the performance monitor view between full log and a single line summary."""
@@ -1622,12 +1634,19 @@ class RunCommandWindow(tk.Toplevel):
 
     def _check_robot_output_queue(self):
         if self.mode != 'test': return
+        
+        lines_to_process = []
         while not self.robot_output_queue.empty():
             try:
                 line = self.robot_output_queue.get_nowait()
-                self.robot_output_text.text.config(state=NORMAL)
+                lines_to_process.append(line)
+            except Empty:
+                pass
 
-                if line.strip().startswith(("Output:", "Log:", "Report:")):
+        if lines_to_process:
+            self.robot_output_text.text.config(state=NORMAL)
+            for line in lines_to_process:
+                 if line.strip().startswith(("Output:", "Log:", "Report:")):
                     parts = line.split(":", 1)
                     prefix = parts[0].strip() + ":"
                     path = parts[1].strip()
@@ -1641,17 +1660,16 @@ class RunCommandWindow(tk.Toplevel):
                     self.robot_output_text.text.tag_bind(link_tag, "<Leave>", lambda e: self.robot_output_text.config(cursor=""))
                     self.robot_output_text.text.insert(END, "\n")
 
-                else:
+                 else:
                     tag = None
                     if "| PASS |" in line: tag = "PASS"
                     elif "| FAIL |" in line: tag = "FAIL"
                     self.robot_output_text.text.insert(END, line, tag)
 
-                self.robot_output_text.text.see(END)
-                self.robot_output_text.text.config(state=DISABLED)
-            except Empty:
-                pass
-        self.after(100, self._check_robot_output_queue)
+            self.robot_output_text.text.see(END)
+            self.robot_output_text.text.config(state=DISABLED)
+
+        self.after(500, self._check_robot_output_queue)
 
     def _open_file_path(self, path: str):
         """Callback to open a file path from a link in the text widget."""
