@@ -1687,6 +1687,17 @@ class RunCommandWindow(tk.Toplevel):
         self.stop_test_button.config(state=DISABLED)
         self.robot_output_queue.put(f"\n{translate('stop_button_clicked')}\n")
         if self.robot_process and self.robot_process.poll() is None:
+            # Use a thread to avoid blocking the UI while terminating
+            thread = threading.Thread(target=self._terminate_process_tree, args=(self.robot_process.pid, "robot"))
+            thread.daemon = True
+            thread.start()
+        else:
+            self.robot_output_queue.put(translate("robot_process_already_finished") + "\n")
+
+    def _stop_test_sync(self):
+        """Synchronous version of stop_test for internal state changes."""
+        self.robot_output_queue.put(f"\n{translate('stop_button_clicked')}\n")
+        if self.robot_process and self.robot_process.poll() is None:
             self._terminate_process_tree(self.robot_process.pid, "robot")
         else:
             self.robot_output_queue.put(translate("robot_process_already_finished") + "\n")
@@ -1711,14 +1722,8 @@ class RunCommandWindow(tk.Toplevel):
         if self._is_closing: return
         self._is_closing = True
 
-        # Stop all background activities
-        if self.mode == 'test' and self.robot_process: self._stop_test()
-        if self.is_monitoring: self._stop_performance_monitor()
-        if self.is_recording:
-            self.scrcpy_output_queue.put(translate("stop_recording_on_close") + "\n")
-            threading.Thread(target=self._stop_recording_thread, daemon=True).start()
-
-        if self.is_mirroring: self._stop_scrcpy()
+        # Stop all background activities gracefully
+        self._stop_all_activities()
 
         # Remove window from parent's active list
         key_to_remove = None
@@ -1727,9 +1732,34 @@ class RunCommandWindow(tk.Toplevel):
                 key_to_remove = key
                 break
         if key_to_remove:
+            # Ensure the key exists before deleting
+            if key_to_remove in self.parent_app.active_command_windows:
+                del self.parent_app.active_command_windows[key_to_remove]
+
+        self.destroy()
+
+    def _on_close_reused(self):
+        """Handles closing logic when the window is being reused for another task."""
+        if self._is_closing: return
+        self._is_closing = True
+        self._stop_all_activities()
+        key_to_remove = self.udid
+        if key_to_remove in self.parent_app.active_command_windows:
             del self.parent_app.active_command_windows[key_to_remove]
 
         self.destroy()
+
+    def _stop_all_activities(self):
+        """Stops all running processes and threads associated with this window."""
+        if self.mode == 'test' and self.robot_process and self.robot_process.poll() is None:
+            self._stop_test_sync() # Use synchronous version to ensure it's stopped before next action
+        if self.is_monitoring:
+            self._stop_performance_monitor()
+        if self.is_recording:
+            self.scrcpy_output_queue.put(translate("stop_recording_on_close") + "\n")
+            self._stop_recording() # This now handles threading internally
+        if self.is_mirroring:
+            self._stop_scrcpy()
 
 # --- Page Object Classes for Tabs ---
 
@@ -2404,8 +2434,14 @@ class RobotRunnerApp:
 
     def _create_run_command_window(self, udid: str, path_to_run: str, run_mode: str):
         """Helper to safely create the RunCommandWindow from the main GUI thread."""
+        # Centralized Resource Management: If a window for this UDID already exists, close it before creating a new one.
+        if udid in self.active_command_windows and self.active_command_windows[udid].winfo_exists():
+            win = self.active_command_windows[udid]
+            win._on_close() # This will stop activities and remove the window from the dict.
+
+        # If no window exists, create a new one.
         win = RunCommandWindow(self, udid, mode='test', run_path=path_to_run, run_mode=run_mode)
-        self.active_command_windows[f"{udid}_test"] = win
+        self.active_command_windows[udid] = win
 
     def _pair_wireless_device(self):
         """Pairs with a device wirelessly using a pairing code."""
@@ -2478,13 +2514,13 @@ class RobotRunnerApp:
                 udid_with_status = parts[-1]
                 udid = udid_with_status.split(" ")[0]
 
-                win_key = f"{udid}_mirror"
-                if win_key in self.active_command_windows and self.active_command_windows[win_key].winfo_exists():
-                    self.active_command_windows[win_key].lift()
-                    continue
+                # Centralized Resource Management: If a window for this UDID already exists, close it before creating a new one.
+                if udid in self.active_command_windows and self.active_command_windows[udid].winfo_exists():
+                    win = self.active_command_windows[udid]
+                    win._on_close() # This will stop activities and remove the window from the dict.
 
                 scrcpy_win = RunCommandWindow(self, udid, mode='mirror', title=translate("mirror_title", model=model))
-                self.active_command_windows[win_key] = scrcpy_win
+                self.active_command_windows[udid] = scrcpy_win
 
         except Exception as e:
             messagebox.showerror(translate("mirror_error_title"), translate("mirror_error_message", error=e))
