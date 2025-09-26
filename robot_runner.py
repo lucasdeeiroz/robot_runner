@@ -1699,7 +1699,8 @@ class RunCommandWindow(tk.Toplevel):
 
             file_path = Path(self.run_path)
             suite_name = file_path.stem
-            self.cur_log_dir = self.parent_app.logs_dir / f"A{device_info['release']}_{device_info['model']}_{self.udid}" / suite_name
+            sanitized_udid = self.udid.split(':')[0]
+            self.cur_log_dir = self.parent_app.logs_dir / f"A{device_info['release']}_{device_info['model']}_{sanitized_udid}" / suite_name
             self.cur_log_dir.mkdir(parents=True, exist_ok=True)
             
             timestamp_option = " --timestampoutputs" if self.parent_app.timestamp_logs_var.get() else ""
@@ -1871,10 +1872,10 @@ class RunTabPage(ttk.Frame):
         self.app = app
 
         self._setup_widgets()
-        self.on_run_mode_change()
+        self.on_run_mode_change() # Initial population
 
     def _setup_widgets(self):
-        device_frame = ttk.Frame(self, padding=10)
+        device_frame = ttk.LabelFrame(self, text=translate("device_selection"), padding=10)
         device_frame.pack(fill=X, pady=5)
         device_frame.columnconfigure(0, weight=1)
         device_frame.columnconfigure(1, weight=0)
@@ -1893,13 +1894,93 @@ class RunTabPage(ttk.Frame):
         # scrollbar.pack(side=RIGHT, fill=Y)
         self.device_listbox.pack(side=LEFT, fill=BOTH, expand=YES)
         ToolTip(self.device_listbox, translate("devices_tooltip"))
+        self.device_listbox.bind("<<ListboxSelect>>", self.app._on_device_select)
         
         self.refresh_button = ttk.Button(device_frame, text=translate("refresh"), command=self.app._refresh_devices, bootstyle="secondary")
         self.refresh_button.grid(row=1, column=1, sticky="e", padx=5)
         self.refresh_button.columnconfigure(0, weight=0)
         ToolTip(self.refresh_button, translate("refresh_devices_tooltip"))
 
-        test_frame = ttk.Frame(self, padding=10)
+        # --- Sub-notebook for Tests and ADB ---
+        sub_notebook = ttk.Notebook(self)
+        sub_notebook.pack(fill=BOTH, expand=YES, pady=5)
+
+        tests_tab = ttk.Frame(sub_notebook, padding=10)
+        adb_tab = ttk.Frame(sub_notebook, padding=10)
+
+        sub_notebook.add(tests_tab, text=translate("tests_sub_tab"))
+        sub_notebook.add(adb_tab, text=translate("adb_sub_tab"))
+
+        self._setup_tests_tab(tests_tab)
+        self._setup_adb_tab(adb_tab)
+
+    def _setup_adb_tab(self, parent_frame: ttk.Frame):
+        """Sets up the widgets for the new ADB sub-tab."""
+        parent_frame.rowconfigure(2, weight=1)
+        parent_frame.columnconfigure(0, weight=1)
+
+        wireless_frame = ttk.LabelFrame(parent_frame, text=translate("wireless_adb"), padding=10)
+        wireless_frame.grid(row=0, column=0, sticky="ew", pady=5)
+        wireless_frame.columnconfigure(0, weight=2)
+        wireless_frame.columnconfigure(1, weight=1)
+        wireless_frame.columnconfigure(2, weight=1)
+
+        ttk.Label(wireless_frame, text=translate("ip_address")).grid(row=0, column=0, sticky=W, padx=5)
+        ttk.Label(wireless_frame, text=translate("port")).grid(row=0, column=1, sticky=W, padx=5)
+        ttk.Label(wireless_frame, text=translate("pairing_code")).grid(row=0, column=2, sticky=W, padx=5)
+
+        self.ip_entry = ttk.Entry(wireless_frame, textvariable=self.app.adb_ip_var)
+        self.ip_entry.grid(row=1, column=0, sticky="ew", padx=5, pady=(0, 5))
+        ToolTip(self.ip_entry, text=translate("wireless_ip_tooltip"))
+
+        self.port_entry = ttk.Entry(wireless_frame, textvariable=self.app.adb_port_var, width=8)
+        self.port_entry.grid(row=1, column=1, sticky="ew", padx=5, pady=(0, 5))
+        ToolTip(self.port_entry, text=translate("wireless_port_tooltip"))
+
+        self.code_entry = ttk.Entry(wireless_frame, width=8)
+        self.code_entry.grid(row=1, column=2, sticky="ew", padx=5, pady=(0, 5))
+        ToolTip(self.code_entry, text=translate("wireless_code_tooltip"))
+        
+        button_frame = ttk.Frame(wireless_frame)
+        button_frame.grid(row=2, column=0, columnspan=3, sticky="ew", pady=5)
+        button_frame.columnconfigure((0, 1, 2), weight=1)
+        
+        self.disconnect_button = ttk.Button(button_frame, text=translate("disconnect"), command=self.app._disconnect_wireless_device, bootstyle="danger")
+        self.disconnect_button.grid(row=0, column=0, sticky="ew", padx=5)
+        ToolTip(self.disconnect_button, translate("disconnect_tooltip"))
+
+        self.pair_button = ttk.Button(button_frame, text=translate("pair"), command=self.app._pair_wireless_device, bootstyle="info")
+        self.pair_button.grid(row=0, column=1, sticky="ew", padx=5)
+        ToolTip(self.pair_button, translate("pair_tooltip"))
+
+        self.connect_button = ttk.Button(button_frame, text=translate("connect"), command=self.app._connect_wireless_device)
+        self.connect_button.grid(row=0, column=2, sticky="ew", padx=5)
+        ToolTip(self.connect_button, translate("connect_tooltip"))
+
+        manual_cmd_frame = ttk.LabelFrame(parent_frame, text=translate("manual_adb_command"), padding=10)
+        manual_cmd_frame.grid(row=1, column=0, sticky="ew", pady=5)
+        manual_cmd_frame.columnconfigure(0, weight=1)
+
+        ttk.Label(manual_cmd_frame, text=translate("adb_command_label")).grid(row=0, column=0, sticky=W, padx=5)
+        self.adb_command_entry = ttk.Entry(manual_cmd_frame)
+        self.adb_command_entry.grid(row=1, column=0, sticky="ew", padx=5, pady=(0, 5))
+        ToolTip(self.adb_command_entry, translate("adb_command_tooltip"))
+
+        self.run_adb_button = ttk.Button(manual_cmd_frame, text=translate("run_command"), command=self.app._run_manual_adb_command)
+        self.run_adb_button.grid(row=2, column=0, sticky="ew", padx=5, pady=5)
+        ToolTip(self.run_adb_button, translate("run_command_tooltip"))
+
+        output_frame = ttk.LabelFrame(parent_frame, text=translate("adb_output"), padding=5)
+        output_frame.grid(row=2, column=0, sticky="nsew", pady=5)
+        output_frame.rowconfigure(0, weight=1)
+        output_frame.columnconfigure(0, weight=1)
+
+        self.adb_output_text = ScrolledText(output_frame, wrap=WORD, state=DISABLED, autohide=True)
+        self.adb_output_text.grid(row=0, column=0, sticky="nsew")
+
+    def _setup_tests_tab(self, parent_frame: ttk.Frame):
+        """Sets up the widgets for the Tests sub-tab."""
+        test_frame = ttk.Frame(parent_frame)
         test_frame.pack(fill=BOTH, expand=YES, pady=5)
         test_frame.columnconfigure(0, weight=1)
         test_frame.rowconfigure(1, weight=1)
@@ -1921,7 +2002,7 @@ class RunTabPage(ttk.Frame):
         self.selection_listbox.grid(row=1, column=0, padx=5, pady=2, sticky="nsew")
         self.selection_listbox.bind("<Double-1>", self.on_selection_listbox_double_click)
 
-        run_frame = ttk.Frame(self, padding=10)
+        run_frame = ttk.Frame(parent_frame, padding=(0, 10, 0, 0))
         run_frame.pack(fill=X, pady=5)
         run_frame.columnconfigure(1, weight=1)
         
@@ -1981,80 +2062,6 @@ class RunTabPage(ttk.Frame):
             self.app.current_path = self.app.current_path / folder_name
         
         self.populate_selection_listbox()
-
-class AdbToolsTabPage(ttk.Frame):
-    """UI and logic for the 'ADB Tools' tab."""
-    def __init__(self, parent, app: "RobotRunnerApp"):
-        super().__init__(parent, padding=10)
-        self.app = app
-        self._setup_widgets()
-
-    def _setup_widgets(self):
-        adb_tools_frame = ttk.Frame(self)
-        adb_tools_frame.pack(fill=BOTH, expand=YES)
-        adb_tools_frame.rowconfigure(2, weight=1)
-        adb_tools_frame.columnconfigure(0, weight=1)
-
-        wireless_frame = ttk.Frame(adb_tools_frame, padding=10)
-        wireless_frame.grid(row=0, column=0, sticky="ew", pady=5)
-        wireless_frame.columnconfigure(0, weight=2)
-        wireless_frame.columnconfigure(1, weight=1)
-        wireless_frame.columnconfigure(2, weight=1)
-
-        ttk.Label(wireless_frame, text=translate("ip_address")).grid(row=0, column=0, sticky=W, padx=5)
-        ttk.Label(wireless_frame, text=translate("port")).grid(row=0, column=1, sticky=W, padx=5)
-        ttk.Label(wireless_frame, text=translate("pairing_code")).grid(row=0, column=2, sticky=W, padx=5)
-
-        self.ip_entry = ttk.Entry(wireless_frame)
-        self.ip_entry.grid(row=1, column=0, sticky="ew", padx=5, pady=(0, 5))
-        ToolTip(self.ip_entry, text=translate("wireless_ip_tooltip"))
-
-        self.port_entry = ttk.Entry(wireless_frame, width=8)
-        self.port_entry.grid(row=1, column=1, sticky="ew", padx=5, pady=(0, 5))
-        ToolTip(self.port_entry, text=translate("wireless_port_tooltip"))
-
-        self.code_entry = ttk.Entry(wireless_frame, width=8)
-        self.code_entry.grid(row=1, column=2, sticky="ew", padx=5, pady=(0, 5))
-        ToolTip(self.code_entry, text=translate("wireless_code_tooltip"))
-        
-        button_frame = ttk.Frame(wireless_frame)
-        button_frame.grid(row=2, column=0, columnspan=3, sticky="ew", pady=5)
-        button_frame.columnconfigure(0, weight=1)
-        button_frame.columnconfigure(1, weight=1)
-        button_frame.columnconfigure(2, weight=1)
-        
-        self.disconnect_button = ttk.Button(button_frame, text=translate("disconnect"), command=self.app._disconnect_wireless_device, bootstyle="danger")
-        self.disconnect_button.grid(row=0, column=0, sticky="ew", padx=5)
-        ToolTip(self.disconnect_button, translate("disconnect_tooltip"))
-
-        self.pair_button = ttk.Button(button_frame, text=translate("pair"), command=self.app._pair_wireless_device, bootstyle="info")
-        self.pair_button.grid(row=0, column=1, sticky="ew", padx=5)
-        ToolTip(self.pair_button, translate("pair_tooltip"))
-
-        self.connect_button = ttk.Button(button_frame, text=translate("connect"), command=self.app._connect_wireless_device)
-        self.connect_button.grid(row=0, column=2, sticky="ew", padx=5)
-        ToolTip(self.connect_button, translate("connect_tooltip"))
-
-        manual_cmd_frame = ttk.Frame(adb_tools_frame, padding=10)
-        manual_cmd_frame.grid(row=1, column=0, sticky="ew", pady=5)
-        manual_cmd_frame.columnconfigure(0, weight=1)
-
-        ttk.Label(manual_cmd_frame, text=translate("adb_command_label")).grid(row=0, column=0, sticky=W, padx=5)
-        self.adb_command_entry = ttk.Entry(manual_cmd_frame)
-        self.adb_command_entry.grid(row=1, column=0, sticky="ew", padx=5, pady=(0, 5))
-        ToolTip(self.adb_command_entry, translate("adb_command_tooltip"))
-
-        self.run_adb_button = ttk.Button(manual_cmd_frame, text=translate("run_command"), command=self.app._run_manual_adb_command)
-        self.run_adb_button.grid(row=2, column=0, sticky="ew", padx=5, pady=5)
-        ToolTip(self.run_adb_button, translate("run_command_tooltip"))
-
-        output_frame = ttk.LabelFrame(adb_tools_frame, text=translate("adb_output"), padding=5)
-        output_frame.grid(row=2, column=0, sticky="nsew", pady=5)
-        output_frame.rowconfigure(0, weight=1)
-        output_frame.columnconfigure(0, weight=1)
-
-        self.adb_tools_output_text = ScrolledText(output_frame, wrap=WORD, state=DISABLED, autohide=True)
-        self.adb_tools_output_text.grid(row=0, column=0, sticky="nsew")
 
 class LogsTabPage(ttk.Frame):
     """UI and logic for the 'Test Logs' tab. Widgets are created lazily."""
@@ -2293,6 +2300,8 @@ class RobotRunnerApp:
         self.app_packages_var = tk.StringVar()
         self.timestamp_logs_var = tk.BooleanVar(value=False)
         # --- Internationalization ---
+        self.adb_ip_var = tk.StringVar()
+        self.adb_port_var = tk.StringVar()
         self.language_var = tk.StringVar()
 
     def _update_paths_from_settings(self):
@@ -2314,13 +2323,11 @@ class RobotRunnerApp:
 
         self.run_tab = RunTabPage(self.notebook, self)
         self.logs_tab = LogsTabPage(self.notebook, self)
-        self.adb_tools_tab = AdbToolsTabPage(self.notebook, self)
         self.settings_tab = SettingsTabPage(self.notebook, self)
         self.about_tab = AboutTabPage(self.notebook, self)
 
-        self.notebook.add(self.run_tab, text=translate("run_tests_tab"))
+        self.notebook.add(self.run_tab, text=translate("execute_tab"))
         self.notebook.add(self.logs_tab, text=translate("logs_tab"))
-        self.notebook.add(self.adb_tools_tab, text=translate("adb_tools_tab"))
         self.notebook.add(self.settings_tab, text=translate("settings_tab"))
         self.notebook.add(self.about_tab, text=translate("about_tab"))
         
@@ -2549,57 +2556,103 @@ class RobotRunnerApp:
         win = RunCommandWindow(self, udid, mode='test', run_path=path_to_run, run_mode=run_mode)
         self.active_command_windows[udid] = win
 
+    def _on_device_select(self, event=None):
+        """Callback when a device is selected in the listbox."""
+        selected_indices = self.run_tab.device_listbox.curselection()
+        if not selected_indices:
+            return
+
+        # Use the first selected device for IP lookup
+        selected_device_str = self.run_tab.device_listbox.get(selected_indices[0])
+        udid = selected_device_str.split(" | ")[-1].split(" ")[0]
+        
+        # Check if the device is already connected via Wi-Fi (udid will be an IP:Port)
+        if ":" in udid:
+            ip, port = udid.split(":")
+            self.adb_ip_var.set(ip)
+            self.adb_port_var.set(port)
+        else:
+            # For USB devices, fetch the IP but leave the port blank for the user to fill.
+            threading.Thread(target=self._fetch_and_set_device_ip, args=(udid,), daemon=True).start()
+
+    def _fetch_and_set_device_ip(self, udid: str):
+        """Fetches the wlan0 IP address of a USB device and updates the GUI."""
+        ip_address = get_device_ip(udid)
+        if ip_address:
+            self.root.after(0, self.adb_ip_var.set, ip_address)
+            # Clear the port field, as it's dynamic and should be entered by the user.
+            self.root.after(0, self.adb_port_var.set, "") # Clear previous port
+            # Automatically try to find the port for this IP
+            threading.Thread(target=self._find_and_set_mdns_port, args=(ip_address,), daemon=True).start()
+
+    def _find_and_set_mdns_port(self, ip_address: str):
+        """
+        Runs 'adb mdns services' in the background to find the port for a given IP.
+        Updates the port entry if a match is found.
+        """
+        command = "adb mdns services"
+        success, output = execute_command(command)
+
+        if success:
+            for line in output.splitlines():
+                # Check if the line contains the IP and the adb service identifier
+                if ip_address in line and "_adb-tls-connect._tcp" in line:
+                    # Extract the port from the ip:port part
+                    match = re.search(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d+)", line)
+                    if match:
+                        found_ip = match.group(1)
+                        found_port = match.group(2)
+                        if found_ip == ip_address:
+                            self.root.after(0, self.adb_port_var.set, found_port)
+                            break # Found it, no need to continue
+
     def _pair_wireless_device(self):
         """Pairs with a device wirelessly using a pairing code."""
-        ip = self.adb_tools_tab.ip_entry.get()
-        port = self.adb_tools_tab.port_entry.get()
-        code = self.adb_tools_tab.code_entry.get()
+        ip = self.run_tab.ip_entry.get()
+        port = self.run_tab.port_entry.get()
+        code = self.run_tab.code_entry.get()
 
         if not all([ip, port, code]):
             messagebox.showwarning(translate("input_error"), translate("input_error_pair"))
             return
 
         command = f"adb pair {ip}:{port} {code}"
-        self.adb_tools_tab.pair_button.config(state=DISABLED)
-        self._update_output_text(self.adb_tools_tab.adb_tools_output_text, f"> {command}\n", True)
-        
-        thread = threading.Thread(target=self._run_command_and_update_gui, args=(command, self.adb_tools_tab.adb_tools_output_text, self.adb_tools_tab.pair_button, True))
-        thread.daemon = True
-        thread.start()
+        self.run_tab.pair_button.config(state=DISABLED)
+        # For now, we don't have a dedicated output on this tab, so we just run it.
+        self._update_output_text(self.run_tab.adb_output_text, f"> {command}\n", True)
+        threading.Thread(target=self._run_command_and_update_gui, args=(command, self.run_tab.adb_output_text, self.run_tab.pair_button, True), daemon=True).start()
 
     def _connect_wireless_device(self):
         """Attempts to connect to a device wirelessly via ADB."""
-        ip = self.adb_tools_tab.ip_entry.get()
-        port = self.adb_tools_tab.port_entry.get()
+        ip = self.adb_ip_var.get()
+        port = self.adb_port_var.get()
+        ip = self.run_tab.ip_entry.get()
+        port = self.run_tab.port_entry.get()
         
         if not all([ip, port]):
             messagebox.showwarning(translate("input_error"), translate("input_error_connect"))
             return
 
         command = f"adb connect {ip}:{port}"
-        self.adb_tools_tab.connect_button.config(state=DISABLED)
-        self._update_output_text(self.adb_tools_tab.adb_tools_output_text, f"> {command}\n", True)
-        
-        thread = threading.Thread(target=self._run_command_and_update_gui, args=(command, self.adb_tools_tab.adb_tools_output_text, self.adb_tools_tab.connect_button, True))
-        thread.daemon = True
-        thread.start()
+        self.run_tab.connect_button.config(state=DISABLED)
+        self._update_output_text(self.run_tab.adb_output_text, f"> {command}\n", True)
+        threading.Thread(target=self._run_command_and_update_gui, args=(command, self.run_tab.adb_output_text, self.run_tab.connect_button, True), daemon=True).start()
 
     def _disconnect_wireless_device(self):
         """Disconnects a specific wireless device or all of them."""
-        ip = self.adb_tools_tab.ip_entry.get()
-        port = self.adb_tools_tab.port_entry.get()
+        ip = self.adb_ip_var.get()
+        port = self.adb_port_var.get()
+        ip = self.run_tab.ip_entry.get()
+        port = self.run_tab.port_entry.get()
         
         if ip and port:
             command = f"adb disconnect {ip}:{port}"
         else:
             command = "adb disconnect"
 
-        self.adb_tools_tab.disconnect_button.config(state=DISABLED)
-        self._update_output_text(self.adb_tools_tab.adb_tools_output_text, f"> {command}\n", True)
-        
-        thread = threading.Thread(target=self._run_command_and_update_gui, args=(command, self.adb_tools_tab.adb_tools_output_text, self.adb_tools_tab.disconnect_button, True))
-        thread.daemon = True
-        thread.start()
+        self.run_tab.disconnect_button.config(state=DISABLED)
+        self._update_output_text(self.run_tab.adb_output_text, f"> {command}\n", True)
+        threading.Thread(target=self._run_command_and_update_gui, args=(command, self.run_tab.adb_output_text, self.run_tab.disconnect_button, True), daemon=True).start()
 
     def _mirror_device(self):    
         selected_device_indices = self.run_tab.device_listbox.curselection()
@@ -2795,7 +2848,6 @@ class RobotRunnerApp:
         thread = threading.Thread(target=self._appium_server_handler, args=(silent,))
         thread.daemon = True
         thread.start()
-
     def _appium_server_handler(self, silent: bool):
         """
         The core handler for running the Appium server process and piping its output.
@@ -2850,15 +2902,29 @@ class RobotRunnerApp:
 
     def _run_manual_adb_command(self):
         """Runs a manual ADB command entered by the user."""
-        command = self.adb_tools_tab.adb_command_entry.get()
+        selected_device_indices = self.run_tab.device_listbox.curselection()
+        if not selected_device_indices:
+            messagebox.showerror(translate("open_file_error_title"), translate("no_device_selected"), parent=self.root)
+            return
+
+        # Use the first selected device for the manual command
+        selected_device_str = self.run_tab.device_listbox.get(selected_device_indices[0])
+        udid = selected_device_str.split(" | ")[-1].split(" ")[0]
+
+        command = self.run_tab.adb_command_entry.get()
         if not command:
             return
         
-        full_command = f"adb {command}"
-        self.adb_tools_tab.run_adb_button.config(state=DISABLED)
-        self._update_output_text(self.adb_tools_tab.adb_tools_output_text, f"> {full_command}\n", True)
+        # Check if the user is trying to target a specific device, which we will override.
+        if "-s" in command.split():
+            messagebox.showwarning(translate("input_error"), "The -s <udid> flag is added automatically based on your selection. Please remove it from the command.", parent=self.root)
+            return
         
-        thread = threading.Thread(target=self._run_command_and_update_gui, args=(full_command, self.adb_tools_tab.adb_tools_output_text, self.adb_tools_tab.run_adb_button))
+        full_command = f"adb -s {udid} {command}"
+        self.run_tab.run_adb_button.config(state=DISABLED)
+        self._update_output_text(self.run_tab.adb_output_text, f"> {full_command}\n", True)
+        
+        thread = threading.Thread(target=self._run_command_and_update_gui, args=(full_command, self.run_tab.adb_output_text, self.run_tab.run_adb_button))
         thread.daemon = True
         thread.start()
 
@@ -3193,19 +3259,21 @@ class RobotRunnerApp:
         except Exception as e:
             messagebox.showerror(translate("open_file_error_title"), translate("log_open_error_generic", error=e))
             
-    def _run_command_and_update_gui(self, command: str, output_widget: ScrolledText, button: ttk.Button, refresh_on_success: bool = False):
+    def _run_command_and_update_gui(self, command: str, output_widget: Optional[ScrolledText], button: ttk.Button, refresh_on_success: bool = False):
         success, output = execute_command(command)
-        if not output:
-            self.root.after(0, self._update_output_text, output_widget, f"\nResult: {success}\n", False)
-        else:
-            self.root.after(0, self._update_output_text, output_widget, f"\nResult:\n{output}\n", False)
+        if output_widget:
+            if not output:
+                self.root.after(0, self._update_output_text, output_widget, f"\nResult: {success}\n", False)
+            else:
+                self.root.after(0, self._update_output_text, output_widget, f"\nResult:\n{output}\n", False)
         
         if success and refresh_on_success:
             self.root.after(100, self._refresh_devices)
             
         self.root.after(0, lambda: button.config(state=NORMAL))
 
-    def _update_output_text(self, widget: ScrolledText, result: str, clear: bool):
+    def _update_output_text(self, widget: Optional[ScrolledText], result: str, clear: bool):
+        if not widget: return
         widget.text.config(state=NORMAL)
         if clear:
             widget.delete("1.0", END)
@@ -3271,6 +3339,16 @@ def get_device_properties(udid: str) -> Optional[Dict[str, str]]:
         return None
     except Exception:
         return None
+
+def get_device_ip(udid: str) -> Optional[str]:
+    """Gets the wlan0 IP address for a given device UDID."""
+    command = f"adb -s {udid} shell ip -f inet addr show wlan0"
+    success, output = execute_command(command)
+    if success:
+        match = re.search(r'inet (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/', output)
+        if match:
+            return match.group(1)
+    return None
 
 def get_device_aspect_ratio(udid: str) -> Optional[float]:
     """Gets the device's physical screen aspect ratio using 'wm size'."""
