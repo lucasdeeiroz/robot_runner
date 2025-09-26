@@ -773,10 +773,10 @@ class RunCommandWindow(tk.Toplevel):
             local_screenshot_filename = f"inspector_screenshot_{self.udid.replace(':', '-')}_{timestamp}.png"
             local_screenshot_filepath = screenshots_dir / local_screenshot_filename
 
+            shell_manager = self.parent_app.shell_manager
             self.scrcpy_output_queue.put(translate("inspector_screenshot_info") + "\n")
-            capture_cmd = f"adb -s {self.udid} shell screencap -p {device_screenshot_path}"
-            success_cap, out_cap = execute_command(capture_cmd)
-            if not success_cap:
+            out_cap = shell_manager.execute(self.udid, f"screencap -p {device_screenshot_path}")
+            if "Error:" in out_cap:
                 self.scrcpy_output_queue.put(f"{translate('capture_screenshot_error')}\n{out_cap}\n")
                 return
             pull_cmd = f"adb -s {self.udid} pull {device_screenshot_path} \"{local_screenshot_filepath}\""
@@ -784,7 +784,7 @@ class RunCommandWindow(tk.Toplevel):
             if not success_pull:
                 self.scrcpy_output_queue.put(f"{translate('pull_screenshot_error')}\n{out_pull}\n")
                 return
-            execute_command(f"adb -s {self.udid} shell rm {device_screenshot_path}")
+            shell_manager.execute(self.udid, f"rm {device_screenshot_path}")
             self.scrcpy_output_queue.put(translate("screenshot_saved_success", path=local_screenshot_filepath) + "\n")
 
             # 2. Get UI dump with retry logic for robustness
@@ -800,22 +800,20 @@ class RunCommandWindow(tk.Toplevel):
 
             for i in range(max_retries):
                 # Always clean up previous attempt's file before trying
-                execute_command(f"adb -s {self.udid} shell rm {device_dump_path}")
+                shell_manager.execute(self.udid, f"rm {device_dump_path}")
 
-                dump_cmd = f"adb -s {self.udid} shell uiautomator dump {device_dump_path}"
-                success_dump, out_dump = execute_command(dump_cmd)
+                out_dump = shell_manager.execute(self.udid, f"uiautomator dump {device_dump_path}")
                 last_dump_output = out_dump # Save the last output for error reporting
 
                 # Check for explicit failure from the dump command itself
-                if not success_dump or "ERROR" in out_dump:
+                if "ERROR" in out_dump:
                     self.scrcpy_output_queue.put(f"INFO: UI dump attempt {i+1}/{max_retries} failed explicitly. Retrying...\n")
                     time.sleep(0.5)
                     continue
 
                 # Verify that the file was actually created on the device
-                check_exists_cmd = f"adb -s {self.udid} shell ls {device_dump_path}"
-                success_check, _unused = execute_command(check_exists_cmd)
-                if success_check:
+                check_output = shell_manager.execute(self.udid, f"ls {device_dump_path}")
+                if device_dump_path in check_output:
                     dump_successful = True
                     break  # Success! Exit the retry loop.
                 else:
@@ -832,7 +830,7 @@ class RunCommandWindow(tk.Toplevel):
             if not success_pull_dump:
                 self.scrcpy_output_queue.put(f"{translate('pull_ui_dump_error')}\n{out_pull_dump}\n")
                 return
-            execute_command(f"adb -s {self.udid} shell rm {device_dump_path}")
+            shell_manager.execute(self.udid, f"rm {device_dump_path}")
             self.scrcpy_output_queue.put(translate("ui_dump_saved_success", path=local_dump_filepath) + "\n")
 
             # Read dump content and store its hash for auto-refresh comparison
@@ -1574,13 +1572,14 @@ class RunCommandWindow(tk.Toplevel):
         self.performance_log_file = log_dir / f"performance_log_{app_name}_{self.udid.replace(':', '-')}.txt"
         self.performance_thread = threading.Thread(
             target=run_performance_monitor, 
-            args=(self.udid, app_package, self.performance_output_queue, self.stop_monitoring_event)
+            args=(self.parent_app.shell_manager, self.udid, app_package, self.performance_output_queue, self.stop_monitoring_event)
         )
         self.performance_thread.daemon = True
         self.performance_thread.start()
         
     def _stop_performance_monitor(self):
         if self.is_monitoring:
+            self.parent_app.shell_manager.close(self.udid)
             self.stop_monitoring_event.set()
             self.is_monitoring = False
             self.monitor_button.config(text=translate("start_monitoring"), bootstyle="success")
@@ -1827,6 +1826,7 @@ class RunCommandWindow(tk.Toplevel):
         # Stop all background activities gracefully
         self._stop_all_activities()
 
+        self.parent_app.shell_manager.close(self.udid)
         # Remove window from parent's active list
         key_to_remove = None
         for key, win in self.parent_app.active_command_windows.items():
@@ -1862,6 +1862,7 @@ class RunCommandWindow(tk.Toplevel):
             self._stop_recording() # This now handles threading internally
         if self.is_mirroring:
             self._stop_scrcpy()
+        self.parent_app.shell_manager.close(self.udid)
 
 # --- Page Object Classes for Tabs ---
 
@@ -2246,6 +2247,57 @@ class AboutTabPage(ttk.Frame):
         license_st.insert(END, license_text)
         license_st.text.config(state=DISABLED)
 
+# --- ADB Shell Manager Class ---
+class AdbShellManager:
+    """Manages persistent adb shell processes for multiple devices."""
+    def __init__(self):
+        self.shells: Dict[str, subprocess.Popen] = {}
+        self.lock = threading.Lock()
+
+    def get_shell(self, udid: str) -> Optional[subprocess.Popen]:
+        """Gets an existing shell process or creates a new one for the given UDID."""
+        with self.lock:
+            if udid in self.shells and self.shells[udid].poll() is None:
+                return self.shells[udid]
+
+            try:
+                creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+                process = subprocess.Popen(
+                    f"adb -s {udid} shell",
+                    shell=True,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    encoding=OUTPUT_ENCODING,
+                    errors='replace',
+                    creationflags=creationflags
+                )
+                self.shells[udid] = process
+                return process
+            except Exception:
+                return None
+
+    def execute(self, udid: str, command: str) -> str:
+        """Executes a command on the persistent shell for the given UDID."""
+        process = self.get_shell(udid)
+        if not process or process.poll() is not None:
+            return f"Error: Shell for {udid} is not running."
+
+        return execute_on_persistent_shell(process, command)
+
+    def close(self, udid: str):
+        """Closes the persistent shell for a specific UDID."""
+        with self.lock:
+            if udid in self.shells and self.shells[udid].poll() is None:
+                self.shells[udid].terminate()
+                del self.shells[udid]
+
+    def close_all(self):
+        """Closes all active persistent shells."""
+        for udid in list(self.shells.keys()):
+            self.close(udid)
+
 # --- Main Application Class ---
 class RobotRunnerApp:
     ''' Main application window '''
@@ -2268,6 +2320,7 @@ class RobotRunnerApp:
         self.parsed_logs_data: Optional[List[Dict]] = None
         self.logs_tab_initialized = False
         self._is_closing = False
+        self.shell_manager = AdbShellManager()
         self.appium_version: Optional[str] = None
 
         self._setup_string_vars()
@@ -2433,6 +2486,8 @@ class RobotRunnerApp:
             for window in list(self.active_command_windows.values()):
                 if window.winfo_exists():
                     window._on_close()
+            
+            self.shell_manager.close_all()
 
             self.root.destroy()
             
@@ -3433,60 +3488,37 @@ def get_surface_fps(shell_process: subprocess.Popen, surface_name: str, last_tim
     new_frames_count = len(current_timestamps - last_timestamps)
     return f"{float(new_frames_count):.2f}", current_timestamps
 
-def run_performance_monitor(udid: str, app_package: str, output_queue: Queue, stop_event: threading.Event):
+def run_performance_monitor(shell_manager: AdbShellManager, udid: str, app_package: str, output_queue: Queue, stop_event: threading.Event):
     """Continuously monitors app performance and puts the output in a queue."""
-    shell_process = None
     try:
-        # --- Start the persistent shell ---
-        creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
-        shell_process = subprocess.Popen(
-            f"adb -s {udid} shell",
-            shell=True,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            encoding=OUTPUT_ENCODING,
-            errors='replace',
-            creationflags=creationflags
-        )
-
         output_queue.put(f"Starting monitoring for app '{app_package}' on device '{udid}'...\n")
         header = f"{'Timestamp':<10} | {'Elapsed':<10} | {'CPU':<5} | {'RAM':<7} | {'GPU':<10} | {'Missed Vsync':<1} | {'Janky':<15} | {'FPS':<4}\n"
         output_queue.put(header)
         output_queue.put("-" * len(header) + "\n")
 
         # Reset gfxinfo once at the beginning
-        execute_on_persistent_shell(shell_process, f"dumpsys gfxinfo {app_package} reset")
+        shell_manager.execute(udid, f"dumpsys gfxinfo {app_package} reset")
         time.sleep(0.2)
 
         last_timestamps = set()
         start_time = time.time()
 
         while not stop_event.is_set():
-            elapsed_seconds = time.time() - start_time
-            elapsed_time_str = time.strftime("%M:%S", time.gmtime(elapsed_seconds))
-            ts = time.strftime("%H:%M:%S")
-
-            # --- Execute commands on the persistent shell ---
-            ram_output = execute_on_persistent_shell(shell_process, f"dumpsys meminfo {app_package}")
+            ram_output = shell_manager.execute(udid, f"dumpsys meminfo {app_package}")
             ram_mb = "N/A"
             if "TOTAL" in ram_output and (match := re.search(r"TOTAL\s+(\d+)", ram_output)):
                 ram_mb = f"{int(match.group(1)) / 1024:.2f}"
 
-            # Using 'top' is more efficient for CPU than 'dumpsys cpuinfo' in a loop
-            cpu_output = execute_on_persistent_shell(shell_process, f"top -n 1 -b")
+            cpu_output = shell_manager.execute(udid, "top -n 1 -b")
             cpu_percent = "N/A"
-            # Check for shell errors before parsing
             if "Error" not in cpu_output and "not found" not in cpu_output:
                 for line in cpu_output.splitlines():
                     if app_package in line:
                         parts = line.strip().split()
-                        if parts and '%' in parts[0]:
-                            cpu_percent = parts[0].replace('%', '')
-                            break
+                        cpu_percent = parts[8] if len(parts) > 8 else "N/A"
+                        break
             
-            gfx_output = execute_on_persistent_shell(shell_process, f"dumpsys gfxinfo {app_package}")
+            gfx_output = shell_manager.execute(udid, f"dumpsys gfxinfo {app_package}")
             jank_info = "0.00% (0/0)"
             if jank_match := re.search(r"Janky frames: (\d+) \(([\d.]+)%\)", gfx_output):
                 total_frames = (re.search(r"Total frames rendered: (\d+)", gfx_output) or '?').group(1)
@@ -3499,12 +3531,16 @@ def run_performance_monitor(udid: str, app_package: str, output_queue: Queue, st
 
             missed_vsync = (re.search(r"Number Missed Vsync: (\d+)", gfx_output) or "N/A").group(1)
 
-            surface_name = get_surface_view_name(shell_process, app_package)
-            surface_fps, last_timestamps = get_surface_fps(shell_process, surface_name, last_timestamps)
+            surface_name_output = shell_manager.execute(udid, "dumpsys SurfaceFlinger --list")
+            surface_name = get_surface_view_name(surface_name_output, app_package)
+            latency_output = shell_manager.execute(udid, f"dumpsys SurfaceFlinger --latency '{surface_name}'")
+            surface_fps, last_timestamps = get_surface_fps(latency_output, last_timestamps)
 
             perf_data = {
-                "ts": ts,
-                "elapsed": elapsed_time_str,
+                "ts": time.strftime("%H:%M:%S"),
+                "elapsed": time.strftime(
+                    "%M:%S", time.gmtime(time.time() - start_time)
+                ),
                 "cpu": cpu_percent,
                 "ram": ram_mb,
                 "gpu": gpu_mem_kb,
@@ -3514,15 +3550,10 @@ def run_performance_monitor(udid: str, app_package: str, output_queue: Queue, st
             }
             output_queue.put(perf_data)
             
-            # The loop is now much faster, so we need to add a sleep to control the update frequency
             time.sleep(1)
 
     except Exception as e:
         output_queue.put(f"ERROR in monitoring loop: {e}. Retrying...\n")
-        time.sleep(2)
-    finally:
-        if shell_process:
-            shell_process.terminate()
 
 def find_scrcpy() -> Optional[Path]:
     """Tries to find scrcpy.exe in common locations or PATH."""
