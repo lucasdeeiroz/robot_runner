@@ -2514,12 +2514,12 @@ class RobotRunnerApp:
         """
         try:
             self.root.after(0, self.run_tab.run_button.config, {'state': DISABLED, 'text': translate("checking_appium")})
-            # 1. Check for Appium and start it if necessary (this part can block)
+            
             if not self._is_appium_running():
                 self.root.after(0, self.status_var.set, translate("appium_not_found_starting"))
                 self.root.after(0, self.run_tab.run_button.config, {'text': translate("starting_appium")})
                 self._start_appium_server(silent=True)
-                if not self._wait_for_appium_startup(timeout=20):
+                if not self._wait_for_appium_startup(timeout=30):
                     self.root.after(0, messagebox.showerror, translate("appium_error_title"), translate("appium_start_fail_error"))
                     self.root.after(0, self.status_var.set, translate("ready"))
                     return
@@ -2529,8 +2529,13 @@ class RobotRunnerApp:
             for device_str in selected_devices:
                 udid_with_status = device_str.split(" | ")[-1]
                 udid = udid_with_status.split(" ")[0]
+                
+                self.root.after(0, self.run_tab.run_button.config, {'text': translate("opening_udid", udid=udid)})
                 self.root.after(0, self._create_run_command_window, udid, path_to_run, run_mode)
+                
+                time.sleep(2)
         finally:
+            # Restore the button to its original state after the loop
             self.root.after(0, self.run_tab.run_button.config, {'state': NORMAL, 'text': translate("run_test")})
 
     def _create_run_command_window(self, udid: str, path_to_run: str, run_mode: str):
@@ -2596,20 +2601,29 @@ class RobotRunnerApp:
         thread.daemon = True
         thread.start()
 
-    def _mirror_device(self):
-        """Opens a separate scrcpy window for each selected device."""
-        try:
-            selected_device_indices = self.run_tab.device_listbox.curselection()
-            if not selected_device_indices:
-                messagebox.showerror(translate("open_file_error_title"), translate("no_device_selected"))
-                return
-            
-            selected_devices = [self.run_tab.device_listbox.get(i) for i in selected_device_indices]
-            if any(translate("no_devices_found") in s for s in selected_devices):
-                messagebox.showerror(translate("open_file_error_title"), translate("no_device_selected"))
-                return
+    def _mirror_device(self):    
+        selected_device_indices = self.run_tab.device_listbox.curselection()
+        if not selected_device_indices:
+            messagebox.showerror(translate("open_file_error_title"), translate("no_device_selected"))
+            return
+        
+        selected_devices = [self.run_tab.device_listbox.get(i) for i in selected_device_indices]
+        if any(translate("no_devices_found") in s for s in selected_devices):
+            messagebox.showerror(translate("open_file_error_title"), translate("no_device_selected"))
+            return
 
-            for selected_device_str in selected_devices:
+        # Disable the button immediately
+        self.run_tab.device_options_button.config(state=DISABLED)
+
+        # Start a thread to handle the sequential opening
+        thread = threading.Thread(target=self._mirror_device_thread, args=(selected_devices,))
+        thread.daemon = True
+        thread.start()
+
+    def _mirror_device_thread(self, selected_devices: List[str]):
+        """Opens a separate toolbox window for each selected device with a delay."""
+        try:
+            for i, selected_device_str in enumerate(selected_devices):
                 parts = selected_device_str.split(" | ")
                 model = parts[1].strip()
                 udid_with_status = parts[-1]
@@ -2617,14 +2631,26 @@ class RobotRunnerApp:
 
                 # Centralized Resource Management: If a window for this UDID already exists, close it before creating a new one.
                 if udid in self.active_command_windows and self.active_command_windows[udid].winfo_exists():
-                    win = self.active_command_windows[udid]
-                    win._on_close() # This will stop activities and remove the window from the dict.
+                    self.root.after(0, self.active_command_windows[udid]._on_close)
+                    time.sleep(0.5) # Give it a moment to close
 
-                scrcpy_win = RunCommandWindow(self, udid, mode='mirror', title=translate("mirror_title", model=model))
-                self.active_command_windows[udid] = scrcpy_win
+                # Update button text on the main thread
+                self.root.after(0, self.run_tab.device_options_button.config, {'text': translate("opening_udid", udid=udid)})
 
-        except Exception as e:
-            messagebox.showerror(translate("mirror_error_title"), translate("mirror_error_message", error=e))
+                # Create the new window on the main thread
+                self.root.after(0, self._create_mirror_window, udid, model)
+
+                # Wait before opening the next one, but not after the last one
+                if i < len(selected_devices) - 1:
+                    time.sleep(2)
+        finally:
+            # Restore the button to its original state after the loop
+            self.root.after(0, self.run_tab.device_options_button.config, {'state': NORMAL, 'text': translate("device_toolbox")})
+
+    def _create_mirror_window(self, udid: str, model: str):
+        """Helper to create the mirror window on the main thread."""
+        win = RunCommandWindow(self, udid, mode='mirror', title=translate("mirror_title", model=model))
+        self.active_command_windows[udid] = win
 
     def _refresh_devices(self):
         """Refreshes the list of connected ADB devices."""

@@ -183,6 +183,7 @@
     "no_test_file_selected": "No test or suite file selected.",
     "no_xpath_message": "Could not generate XPath for the selected element with the chosen attribute.",
     "no_xpath_title": "No XPath",
+    "opening_udid": "Opening {udid}...",
     "open_file_error_message": "Could not open file: {error}",
     "open_file_error_title": "Error",
     "pair": "Pair",
