@@ -342,6 +342,32 @@ class RunCommandWindow(tk.Toplevel):
             self.elements_tree.bind("<<TreeviewSelect>>", self._on_element_select)
             self.elements_tree.bind("<Button-1>", self._on_treeview_click)
 
+            # --- Element Actions Frame ---
+            self.element_actions_frame = ttk.LabelFrame(self.inspector_controls_frame, text=translate("inspector_element_actions"), padding=5)
+            self.element_actions_frame.pack(side=TOP, fill=X, pady=(5, 0))
+            self.element_actions_frame.columnconfigure((0, 1, 2, 3), weight=1)
+
+            self.action_click_button = ttk.Button(self.element_actions_frame, text=translate("action_click"), command=lambda: self._perform_element_action("click"), state=DISABLED)
+            self.action_click_button.grid(row=0, column=0, columnspan=2, sticky="ew", padx=2, pady=2)
+            ToolTip(self.action_click_button, translate("action_click_tooltip"))
+
+            self.action_long_click_button = ttk.Button(self.element_actions_frame, text=translate("action_long_click"), command=lambda: self._perform_element_action("long_click"), state=DISABLED)
+            self.action_long_click_button.grid(row=0, column=2, columnspan=2, sticky="ew", padx=2, pady=2)
+            ToolTip(self.action_long_click_button, translate("action_long_click_tooltip"))
+
+            self.action_swipe_up_button = ttk.Button(self.element_actions_frame, text=translate("action_swipe_up"), command=lambda: self._perform_element_action("swipe_up"), state=DISABLED)
+            self.action_swipe_up_button.grid(row=1, column=0, sticky="ew", padx=2, pady=2)
+            ToolTip(self.action_swipe_up_button, translate("action_swipe_up_tooltip"))
+            self.action_swipe_down_button = ttk.Button(self.element_actions_frame, text=translate("action_swipe_down"), command=lambda: self._perform_element_action("swipe_down"), state=DISABLED)
+            self.action_swipe_down_button.grid(row=1, column=1, sticky="ew", padx=2, pady=2)
+            ToolTip(self.action_swipe_down_button, translate("action_swipe_down_tooltip"))
+            self.action_swipe_left_button = ttk.Button(self.element_actions_frame, text=translate("action_swipe_left"), command=lambda: self._perform_element_action("swipe_left"), state=DISABLED)
+            self.action_swipe_left_button.grid(row=1, column=2, sticky="ew", padx=2, pady=2)
+            ToolTip(self.action_swipe_left_button, translate("action_swipe_left_tooltip"))
+            self.action_swipe_right_button = ttk.Button(self.element_actions_frame, text=translate("action_swipe_right"), command=lambda: self._perform_element_action("swipe_right"), state=DISABLED)
+            self.action_swipe_right_button.grid(row=1, column=3, sticky="ew", padx=2, pady=2)
+            ToolTip(self.action_swipe_right_button, translate("action_swipe_right_tooltip"))
+
         # Test controls (only for test mode)
         if self.mode == 'test':
             self.toggle_robot_button = ttk.Button(self.center_pane_container, text=translate("hide_test_output"), command=lambda: self._toggle_output_visibility('robot'), bootstyle="secondary")
@@ -994,11 +1020,20 @@ class RunCommandWindow(tk.Toplevel):
                 )
             
             self._update_xpath_buttons_state(selected_element_data) # Enable/update buttons
+            self._update_element_actions_state(True) # Enable action buttons
             self._populate_element_details(selected_element_data)
         else:
             self._update_xpath_buttons_state(None) # Disable buttons if no data found
+            self._update_element_actions_state(False) # Disable action buttons
             self._populate_element_details(None)
 
+    def _update_element_actions_state(self, enabled: bool):
+        """Enables or disables all element action buttons."""
+        state = NORMAL if enabled else DISABLED
+        for button in [self.action_click_button, self.action_long_click_button,
+                       self.action_swipe_up_button, self.action_swipe_down_button,
+                       self.action_swipe_left_button, self.action_swipe_right_button]:
+            button.config(state=state)
     def _on_treeview_click(self, event):
         """Deselects the item if the user clicks on an empty area of the treeview."""
         # identify_row returns the item ID at the given y-coordinate, or an empty string
@@ -1207,6 +1242,60 @@ class RunCommandWindow(tk.Toplevel):
         else:
             self.scrcpy_output_queue.put(translate("tap_success_refreshing") + "\n")
             self.after(500, self._start_inspection)
+
+    def _perform_element_action(self, action_type: str):
+        """
+        Performs a specified action (click, long_click, swipe) on the selected element
+        and triggers a refresh.
+        """
+        if not self.current_selected_element_data:
+            return
+
+        bounds_coords = self.current_selected_element_data.get("bounds_coords")
+        if not bounds_coords:
+            return
+
+        x, y, width, height = bounds_coords
+        center_x = x + width / 2
+        center_y = y + height / 2
+
+        # Disable buttons during action
+        self._update_element_actions_state(False)
+        self.scrcpy_output_queue.put(translate("performing_action", action=action_type) + "\n")
+
+        # Run action in a thread to not block UI
+        threading.Thread(target=self._execute_action_and_refresh, args=(action_type, x, y, width, height, center_x, center_y), daemon=True).start()
+
+    def _execute_action_and_refresh(self, action_type: str, x, y, width, height, center_x, center_y):
+        """Helper method that runs in a thread to execute an ADB command."""
+        command = ""
+        if action_type == "click":
+            command = f"adb -s {self.udid} shell input tap {int(center_x)} {int(center_y)}"
+        elif action_type == "long_click":
+            command = f"adb -s {self.udid} shell input swipe {int(center_x)} {int(center_y)} {int(center_x)} {int(center_y)} 500" # 500ms duration
+        elif action_type == "swipe_up":
+            y_start, y_end = y + height * 0.8, y + height * 0.2
+            command = f"adb -s {self.udid} shell input swipe {int(center_x)} {int(y_start)} {int(center_x)} {int(y_end)} 400"
+        elif action_type == "swipe_down":
+            y_start, y_end = y + height * 0.2, y + height * 0.8
+            command = f"adb -s {self.udid} shell input swipe {int(center_x)} {int(y_start)} {int(center_x)} {int(y_end)} 400"
+        elif action_type == "swipe_left":
+            x_start, x_end = x + width * 0.8, x + width * 0.2
+            command = f"adb -s {self.udid} shell input swipe {int(x_start)} {int(center_y)} {int(x_end)} {int(center_y)} 400"
+        elif action_type == "swipe_right":
+            x_start, x_end = x + width * 0.2, x + width * 0.8
+            command = f"adb -s {self.udid} shell input swipe {int(x_start)} {int(center_y)} {int(x_end)} {int(center_y)} 400"
+
+        if command:
+            success, output = execute_command(command)
+            if not success:
+                self.scrcpy_output_queue.put(translate("action_error", action=action_type, output=output) + "\n")
+            else:
+                self.scrcpy_output_queue.put(translate("action_success_refreshing", action=action_type) + "\n")
+                self.after(500, self._start_inspection)
+        
+        # Re-enable buttons on the main thread, regardless of outcome
+        self.after(0, self._update_element_actions_state, True)
 
     def _apply_inspector_filter(self, source_list: Optional[List[Dict]] = None) -> List[Dict]:
         """
