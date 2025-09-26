@@ -121,7 +121,7 @@ class RunCommandWindow(tk.Toplevel):
         self.is_inspection_running = False # To prevent race conditions
         self.current_selected_element_data = None # To store data of currently selected element for XPath generation
         self.auto_refresh_thread = None
-        self.inspector_auto_refresh_var = tk.BooleanVar(value=True)
+        self.inspector_auto_refresh_var = tk.BooleanVar(value=False)
         self.stop_auto_refresh_event = threading.Event()
         self.last_ui_dump_hash = None
         self.all_elements_list: List[Dict] = []
@@ -133,7 +133,8 @@ class RunCommandWindow(tk.Toplevel):
         self.filter_by_resource_id_var = tk.BooleanVar(value=True)
         self.filter_by_text_var = tk.BooleanVar(value=True)
         self.filter_by_content_desc_var = tk.BooleanVar(value=True)
-        self.filter_by_class_var = tk.BooleanVar(value=False)
+        self.filter_by_scrollview_var = tk.BooleanVar(value=True)
+        self.filter_by_other_class_var = tk.BooleanVar(value=False)
         
         # --- Window Setup ---
         if title:
@@ -155,9 +156,9 @@ class RunCommandWindow(tk.Toplevel):
         # Pre-fetch aspect ratio in the background
         threading.Thread(target=self._fetch_initial_aspect_ratio, daemon=True).start()
 
-        self.after(100, self._check_robot_output_queue)
-        self.after(100, self._check_scrcpy_output_queue)
-        self.after(100, self._check_performance_output_queue)
+        self.after(500, self._check_robot_output_queue) # Intervalo alterado para 500ms
+        self.after(500, self._check_scrcpy_output_queue) # Intervalo alterado para 500ms
+        self.after(500, self._check_performance_output_queue) # Intervalo alterado para 500ms
 
         # Store initial size to prevent unnecessary refreshes from non-resize <Configure> events
         self.update_idletasks()
@@ -304,7 +305,8 @@ class RunCommandWindow(tk.Toplevel):
             filter_menu.add_checkbutton(label=translate("filter_by_resource_id"), variable=self.filter_by_resource_id_var, command=self._update_element_tree_view)
             filter_menu.add_checkbutton(label=translate("filter_by_text"), variable=self.filter_by_text_var, command=self._update_element_tree_view)
             filter_menu.add_checkbutton(label=translate("filter_by_content_desc"), variable=self.filter_by_content_desc_var, command=self._update_element_tree_view)
-            filter_menu.add_checkbutton(label=translate("filter_by_class"), variable=self.filter_by_class_var, command=self._update_element_tree_view)
+            filter_menu.add_checkbutton(label=translate("filter_by_scrollview"), variable=self.filter_by_scrollview_var, command=self._update_element_tree_view)
+            filter_menu.add_checkbutton(label=translate("filter_by_other_class"), variable=self.filter_by_other_class_var, command=self._update_element_tree_view)
 
             self.auto_refresh_check = ttk.Checkbutton(inspector_top_controls_frame, text=translate("inspector_auto_refresh"), variable=self.inspector_auto_refresh_var, bootstyle="round-toggle")
             self.auto_refresh_check.grid(row=0, column=2, sticky="e")
@@ -339,6 +341,32 @@ class RunCommandWindow(tk.Toplevel):
             self.elements_tree.pack(fill=BOTH, expand=YES)
             self.elements_tree.bind("<<TreeviewSelect>>", self._on_element_select)
             self.elements_tree.bind("<Button-1>", self._on_treeview_click)
+
+            # --- Element Actions Frame ---
+            self.element_actions_frame = ttk.LabelFrame(self.inspector_controls_frame, text=translate("inspector_element_actions"), padding=5)
+            self.element_actions_frame.pack(side=TOP, fill=X, pady=(5, 0))
+            self.element_actions_frame.columnconfigure((0, 1, 2, 3), weight=1)
+
+            self.action_click_button = ttk.Button(self.element_actions_frame, text=translate("action_click"), command=lambda: self._perform_element_action("click"), state=DISABLED)
+            self.action_click_button.grid(row=0, column=0, columnspan=2, sticky="ew", padx=2, pady=2)
+            ToolTip(self.action_click_button, translate("action_click_tooltip"))
+
+            self.action_long_click_button = ttk.Button(self.element_actions_frame, text=translate("action_long_click"), command=lambda: self._perform_element_action("long_click"), state=DISABLED)
+            self.action_long_click_button.grid(row=0, column=2, columnspan=2, sticky="ew", padx=2, pady=2)
+            ToolTip(self.action_long_click_button, translate("action_long_click_tooltip"))
+
+            self.action_swipe_up_button = ttk.Button(self.element_actions_frame, text=translate("action_swipe_up"), command=lambda: self._perform_element_action("swipe_up"), state=DISABLED)
+            self.action_swipe_up_button.grid(row=1, column=0, sticky="ew", padx=2, pady=2)
+            ToolTip(self.action_swipe_up_button, translate("action_swipe_up_tooltip"))
+            self.action_swipe_down_button = ttk.Button(self.element_actions_frame, text=translate("action_swipe_down"), command=lambda: self._perform_element_action("swipe_down"), state=DISABLED)
+            self.action_swipe_down_button.grid(row=1, column=1, sticky="ew", padx=2, pady=2)
+            ToolTip(self.action_swipe_down_button, translate("action_swipe_down_tooltip"))
+            self.action_swipe_left_button = ttk.Button(self.element_actions_frame, text=translate("action_swipe_left"), command=lambda: self._perform_element_action("swipe_left"), state=DISABLED)
+            self.action_swipe_left_button.grid(row=1, column=2, sticky="ew", padx=2, pady=2)
+            ToolTip(self.action_swipe_left_button, translate("action_swipe_left_tooltip"))
+            self.action_swipe_right_button = ttk.Button(self.element_actions_frame, text=translate("action_swipe_right"), command=lambda: self._perform_element_action("swipe_right"), state=DISABLED)
+            self.action_swipe_right_button.grid(row=1, column=3, sticky="ew", padx=2, pady=2)
+            ToolTip(self.action_swipe_right_button, translate("action_swipe_right_tooltip"))
 
         # Test controls (only for test mode)
         if self.mode == 'test':
@@ -567,8 +595,9 @@ class RunCommandWindow(tk.Toplevel):
             # If mirroring is active, stop it first
             if self.is_mirroring:
                 self._stop_scrcpy()
-            self._start_inspector()
-            self._start_inspection() # Perform the first inspection
+            self._start_inspector() # This sets up the UI
+            # Schedule the first inspection to run after the UI has had a moment to draw itself
+            self.after(100, self._start_inspection)
 
     def _start_inspector(self):
         """Configures the UI for inspector mode, but does not run the inspection itself."""
@@ -706,15 +735,21 @@ class RunCommandWindow(tk.Toplevel):
         self.is_inspection_running = True
 
         self.refresh_inspector_button.config(state=DISABLED, text=translate("refreshing"))
-        ToolTip(self.refresh_inspector_button, text=translate("refreshing_tooltip"))
+        ToolTip(self.refresh_inspector_button, text=translate("refreshing"))
         self.inspect_button.config(state=DISABLED, text=translate("refreshing"))
-        ToolTip(self.inspect_button, text=translate("refreshing_tooltip"))
+        ToolTip(self.inspect_button, text=translate("refreshing"))
         self.screenshot_canvas.delete("all")
         self.xpath_search_var.set("") # Clear search on refresh
 
         # Display updating message on canvas
         self.screenshot_canvas.update_idletasks()
         canvas_width = self.screenshot_canvas.winfo_width()
+
+        # If the canvas hasn't been drawn yet, its size will be 1.
+        # In that case, schedule this part of the function to run again shortly.
+        if canvas_width <= 1:
+            self.after(50, self._start_inspection)
+            return
         canvas_height = self.screenshot_canvas.winfo_height()
         self.screenshot_canvas.create_text(
             canvas_width / 2, canvas_height / 2,
@@ -738,10 +773,10 @@ class RunCommandWindow(tk.Toplevel):
             local_screenshot_filename = f"inspector_screenshot_{self.udid.replace(':', '-')}_{timestamp}.png"
             local_screenshot_filepath = screenshots_dir / local_screenshot_filename
 
+            shell_manager = self.parent_app.shell_manager
             self.scrcpy_output_queue.put(translate("inspector_screenshot_info") + "\n")
-            capture_cmd = f"adb -s {self.udid} shell screencap -p {device_screenshot_path}"
-            success_cap, out_cap = execute_command(capture_cmd)
-            if not success_cap:
+            out_cap = shell_manager.execute(self.udid, f"screencap -p {device_screenshot_path}")
+            if "Error:" in out_cap:
                 self.scrcpy_output_queue.put(f"{translate('capture_screenshot_error')}\n{out_cap}\n")
                 return
             pull_cmd = f"adb -s {self.udid} pull {device_screenshot_path} \"{local_screenshot_filepath}\""
@@ -749,7 +784,7 @@ class RunCommandWindow(tk.Toplevel):
             if not success_pull:
                 self.scrcpy_output_queue.put(f"{translate('pull_screenshot_error')}\n{out_pull}\n")
                 return
-            execute_command(f"adb -s {self.udid} shell rm {device_screenshot_path}")
+            shell_manager.execute(self.udid, f"rm {device_screenshot_path}")
             self.scrcpy_output_queue.put(translate("screenshot_saved_success", path=local_screenshot_filepath) + "\n")
 
             # 2. Get UI dump with retry logic for robustness
@@ -765,22 +800,20 @@ class RunCommandWindow(tk.Toplevel):
 
             for i in range(max_retries):
                 # Always clean up previous attempt's file before trying
-                execute_command(f"adb -s {self.udid} shell rm {device_dump_path}")
+                shell_manager.execute(self.udid, f"rm {device_dump_path}")
 
-                dump_cmd = f"adb -s {self.udid} shell uiautomator dump {device_dump_path}"
-                success_dump, out_dump = execute_command(dump_cmd)
+                out_dump = shell_manager.execute(self.udid, f"uiautomator dump {device_dump_path}")
                 last_dump_output = out_dump # Save the last output for error reporting
 
                 # Check for explicit failure from the dump command itself
-                if not success_dump or "ERROR" in out_dump:
+                if "ERROR" in out_dump:
                     self.scrcpy_output_queue.put(f"INFO: UI dump attempt {i+1}/{max_retries} failed explicitly. Retrying...\n")
                     time.sleep(0.5)
                     continue
 
                 # Verify that the file was actually created on the device
-                check_exists_cmd = f"adb -s {self.udid} shell ls {device_dump_path}"
-                success_check, _unused = execute_command(check_exists_cmd)
-                if success_check:
+                check_output = shell_manager.execute(self.udid, f"ls {device_dump_path}")
+                if device_dump_path in check_output:
                     dump_successful = True
                     break  # Success! Exit the retry loop.
                 else:
@@ -797,7 +830,7 @@ class RunCommandWindow(tk.Toplevel):
             if not success_pull_dump:
                 self.scrcpy_output_queue.put(f"{translate('pull_ui_dump_error')}\n{out_pull_dump}\n")
                 return
-            execute_command(f"adb -s {self.udid} shell rm {device_dump_path}")
+            shell_manager.execute(self.udid, f"rm {device_dump_path}")
             self.scrcpy_output_queue.put(translate("ui_dump_saved_success", path=local_dump_filepath) + "\n")
 
             # Read dump content and store its hash for auto-refresh comparison
@@ -905,20 +938,13 @@ class RunCommandWindow(tk.Toplevel):
         elif text:
             display_title = f"text={text}"
         elif node_class:
-            display_title = f"class={node_class.split('.')[-1]}"
-            # Filter out uninteresting elements unless they are ScrollViews
-            if "ScrollView" not in display_title:
-                return
+            display_title = f"class={node_class.split('.')[-1]}" # Keep this for display
 
-        # Ensure we have a title to display, or it's a ScrollView
-        if display_title or (node_class and "ScrollView" in node_class):
-            if not display_title and node_class and "ScrollView" in node_class:
-                display_title = f"Class: {node_class.split('.')[-1]}"
-
+        # Ensure we have a title to display
+        if display_title:
             # Add our internal helper data to the dictionary
             element_full_data["display_title"] = display_title
             element_full_data["bounds_coords"] = self._parse_bounds(bounds_str)
-            # Create the accessibility_id alias for convenience in other parts of the code
             element_full_data["accessibility_id"] = content_desc
 
             self.all_elements_list.append(element_full_data)
@@ -992,11 +1018,20 @@ class RunCommandWindow(tk.Toplevel):
                 )
             
             self._update_xpath_buttons_state(selected_element_data) # Enable/update buttons
+            self._update_element_actions_state(True) # Enable action buttons
             self._populate_element_details(selected_element_data)
         else:
             self._update_xpath_buttons_state(None) # Disable buttons if no data found
+            self._update_element_actions_state(False) # Disable action buttons
             self._populate_element_details(None)
 
+    def _update_element_actions_state(self, enabled: bool):
+        """Enables or disables all element action buttons."""
+        state = NORMAL if enabled else DISABLED
+        for button in [self.action_click_button, self.action_long_click_button,
+                       self.action_swipe_up_button, self.action_swipe_down_button,
+                       self.action_swipe_left_button, self.action_swipe_right_button]:
+            button.config(state=state)
     def _on_treeview_click(self, event):
         """Deselects the item if the user clicks on an empty area of the treeview."""
         # identify_row returns the item ID at the given y-coordinate, or an empty string
@@ -1206,6 +1241,60 @@ class RunCommandWindow(tk.Toplevel):
             self.scrcpy_output_queue.put(translate("tap_success_refreshing") + "\n")
             self.after(500, self._start_inspection)
 
+    def _perform_element_action(self, action_type: str):
+        """
+        Performs a specified action (click, long_click, swipe) on the selected element
+        and triggers a refresh.
+        """
+        if not self.current_selected_element_data:
+            return
+
+        bounds_coords = self.current_selected_element_data.get("bounds_coords")
+        if not bounds_coords:
+            return
+
+        x, y, width, height = bounds_coords
+        center_x = x + width / 2
+        center_y = y + height / 2
+
+        # Disable buttons during action
+        self._update_element_actions_state(False)
+        self.scrcpy_output_queue.put(translate("performing_action", action=action_type) + "\n")
+
+        # Run action in a thread to not block UI
+        threading.Thread(target=self._execute_action_and_refresh, args=(action_type, x, y, width, height, center_x, center_y), daemon=True).start()
+
+    def _execute_action_and_refresh(self, action_type: str, x, y, width, height, center_x, center_y):
+        """Helper method that runs in a thread to execute an ADB command."""
+        command = ""
+        if action_type == "click":
+            command = f"adb -s {self.udid} shell input tap {int(center_x)} {int(center_y)}"
+        elif action_type == "long_click":
+            command = f"adb -s {self.udid} shell input swipe {int(center_x)} {int(center_y)} {int(center_x)} {int(center_y)} 500" # 500ms duration
+        elif action_type == "swipe_up":
+            y_start, y_end = y + height * 0.8, y + height * 0.2
+            command = f"adb -s {self.udid} shell input swipe {int(center_x)} {int(y_start)} {int(center_x)} {int(y_end)} 400"
+        elif action_type == "swipe_down":
+            y_start, y_end = y + height * 0.2, y + height * 0.8
+            command = f"adb -s {self.udid} shell input swipe {int(center_x)} {int(y_start)} {int(center_x)} {int(y_end)} 400"
+        elif action_type == "swipe_left":
+            x_start, x_end = x + width * 0.8, x + width * 0.2
+            command = f"adb -s {self.udid} shell input swipe {int(x_start)} {int(center_y)} {int(x_end)} {int(center_y)} 400"
+        elif action_type == "swipe_right":
+            x_start, x_end = x + width * 0.2, x + width * 0.8
+            command = f"adb -s {self.udid} shell input swipe {int(x_start)} {int(center_y)} {int(x_end)} {int(center_y)} 400"
+
+        if command:
+            success, output = execute_command(command)
+            if not success:
+                self.scrcpy_output_queue.put(translate("action_error", action=action_type, output=output) + "\n")
+            else:
+                self.scrcpy_output_queue.put(translate("action_success_refreshing", action=action_type) + "\n")
+                self.after(500, self._start_inspection)
+        
+        # Re-enable buttons on the main thread, regardless of outcome
+        self.after(0, self._update_element_actions_state, True)
+
     def _apply_inspector_filter(self, source_list: Optional[List[Dict]] = None) -> List[Dict]:
         """
         Filters a list of UI elements based on the currently selected attribute filters.
@@ -1220,7 +1309,8 @@ class RunCommandWindow(tk.Toplevel):
             "resource-id": self.filter_by_resource_id_var.get(),
             "accessibility_id": self.filter_by_content_desc_var.get(),
             "text": self.filter_by_text_var.get(),
-            "class": self.filter_by_class_var.get()
+            "scrollview": self.filter_by_scrollview_var.get(),
+            "other_class": self.filter_by_other_class_var.get()
         }
 
         # If no filters are selected, show everything from the source list
@@ -1230,11 +1320,20 @@ class RunCommandWindow(tk.Toplevel):
         filtered_elements = []
         for element_data in use_list:
             # Check if the element has any of the attributes that are being filtered for
-            if (active_filters["resource-id"] and element_data.get("resource-id")) or \
-               (active_filters["accessibility_id"] and element_data.get("accessibility_id")) or \
-               (active_filters["text"] and element_data.get("text")) or \
-               (active_filters["class"] and element_data.get("class")):
+            if (active_filters["resource-id"] and element_data.get("resource-id")):
                 filtered_elements.append(element_data)
+            elif (active_filters["accessibility_id"] and element_data.get("accessibility_id")):
+                filtered_elements.append(element_data)
+            elif (active_filters["text"] and element_data.get("text")):
+                filtered_elements.append(element_data)
+            elif (active_filters["scrollview"] and "ScrollView" in element_data.get("class", "")):
+                 filtered_elements.append(element_data)
+            elif (active_filters["other_class"] and element_data.get("class") and "ScrollView" not in element_data.get("class", "")):
+                # This logic ensures we only add it if it's a class-based element that isn't a ScrollView
+                # and doesn't have the other, more specific, identifiers.
+                if not (element_data.get("resource-id") or element_data.get("accessibility_id") or element_data.get("text")):
+                    filtered_elements.append(element_data)
+
         
         return filtered_elements
 
@@ -1281,19 +1380,24 @@ class RunCommandWindow(tk.Toplevel):
             pass # Pipe may already be closed or process object gone
 
     def _check_scrcpy_output_queue(self):
+        lines_to_add = []
         while not self.scrcpy_output_queue.empty():
             try:
                 line = self.scrcpy_output_queue.get_nowait()
-                self.scrcpy_output_text.text.config(state=NORMAL)
-                self.scrcpy_output_text.text.insert(END, line)
-                self.scrcpy_output_text.text.see(END)
-                self.scrcpy_output_text.text.config(state=DISABLED)
+                lines_to_add.append(line)
             except Empty:
                 pass
+        
+        if lines_to_add:
+            self.scrcpy_output_text.text.config(state=NORMAL)
+            self.scrcpy_output_text.text.insert(END, "".join(lines_to_add))
+            self.scrcpy_output_text.text.see(END)
+            self.scrcpy_output_text.text.config(state=DISABLED)
+
         if self.is_mirroring and self.scrcpy_process and self.scrcpy_process.poll() is not None:
              self.scrcpy_output_queue.put(f"\n{translate('scrcpy_terminated_unexpectedly')}\n")
              self._stop_scrcpy()
-        self.after(100, self._check_scrcpy_output_queue)
+        self.after(500, self._check_scrcpy_output_queue)
 
     def _find_and_embed_window(self):
         start_time = time.time()
@@ -1468,13 +1572,14 @@ class RunCommandWindow(tk.Toplevel):
         self.performance_log_file = log_dir / f"performance_log_{app_name}_{self.udid.replace(':', '-')}.txt"
         self.performance_thread = threading.Thread(
             target=run_performance_monitor, 
-            args=(self.udid, app_package, self.performance_output_queue, self.stop_monitoring_event)
+            args=(self.parent_app.shell_manager, self.udid, app_package, self.performance_output_queue, self.stop_monitoring_event)
         )
         self.performance_thread.daemon = True
         self.performance_thread.start()
         
     def _stop_performance_monitor(self):
         if self.is_monitoring:
+            self.parent_app.shell_manager.close(self.udid)
             self.stop_monitoring_event.set()
             self.is_monitoring = False
             self.monitor_button.config(text=translate("start_monitoring"), bootstyle="success")
@@ -1485,21 +1590,27 @@ class RunCommandWindow(tk.Toplevel):
             self.last_performance_line_var.set("")
 
     def _check_performance_output_queue(self):
+        items_to_process = []
         while not self.performance_output_queue.empty():
-            line_to_log = ""
             try:
                 item = self.performance_output_queue.get_nowait()
-                
+                items_to_process.append(item)
+            except Empty:
+                pass
+
+        if items_to_process:
+            log_content_batch = []
+            self.performance_output_text.text.config(state=NORMAL)
+
+            for item in items_to_process:
+                line_to_log = ""
                 if isinstance(item, dict):
-                    # Recreate the full line for the log/main view
                     line_to_log = (
                         f"{item['ts']:<10} | {item['elapsed']:<10} | CPU: {item['cpu']:<5} | "
                         f"RAM: {item['ram']:<7} | GPU: {item['gpu']:<10} | "
                         f"Missed Vsync: {item['vsync']:<1} | Janky: {item['janky']:<15} | "
                         f"FPS: {item['fps']:<4}\n"
                     )
-                    
-                    # Create the compact line for the minimized view
                     janky_percent = item['janky'].split(' ')[0]
                     compact_line = (
                         f"CPU:{item['cpu']}% RAM:{item['ram']}MB GPU:{item['gpu']}KB "
@@ -1511,22 +1622,23 @@ class RunCommandWindow(tk.Toplevel):
                     if translate('monitoring_stopped_by_user') in item:
                         self.last_performance_line_var.set("")
 
-                # Write the full line to the text widget and log file
-                self.performance_output_text.text.config(state=NORMAL)
-                self.performance_output_text.text.insert(END, line_to_log)
-                self.performance_output_text.text.see(END)
-                self.performance_output_text.text.config(state=DISABLED)
-                if self.performance_log_file:
-                    try:
-                        mode = 'w' if "Starting monitoring" in line_to_log else 'a'
-                        with open(self.performance_log_file, mode, encoding=OUTPUT_ENCODING) as f: f.write(line_to_log)
-                    except Exception as e:
-                        self.performance_output_queue.put(f"\n{translate('log_write_error', error=e)}\n")
-            except Empty:
-                pass
+                log_content_batch.append(line_to_log)
+
+            # Batch update the GUI and log file
+            self.performance_output_text.text.insert(END, "".join(log_content_batch))
+            self.performance_output_text.text.see(END)
+            self.performance_output_text.text.config(state=DISABLED)
+
+            if self.performance_log_file:
+                try:
+                    with open(self.performance_log_file, 'a', encoding=OUTPUT_ENCODING) as f:
+                        f.write("".join(log_content_batch))
+                except Exception as e:
+                    self.performance_output_queue.put(f"\n{translate('log_write_error', error=e)}\n")
+
         if self.is_monitoring and (self.performance_thread is None or not self.performance_thread.is_alive()):
              self._stop_performance_monitor()
-        self.after(100, self._check_performance_output_queue)
+        self.after(500, self._check_performance_output_queue)
 
     def _toggle_performance_minimize(self):
         """Toggles the performance monitor view between full log and a single line summary."""
@@ -1586,7 +1698,8 @@ class RunCommandWindow(tk.Toplevel):
 
             file_path = Path(self.run_path)
             suite_name = file_path.stem
-            self.cur_log_dir = self.parent_app.logs_dir / f"A{device_info['release']}_{device_info['model']}_{self.udid}" / suite_name
+            sanitized_udid = self.udid.split(':')[0]
+            self.cur_log_dir = self.parent_app.logs_dir / f"A{device_info['release']}_{device_info['model']}_{sanitized_udid}" / suite_name
             self.cur_log_dir.mkdir(parents=True, exist_ok=True)
             
             timestamp_option = " --timestampoutputs" if self.parent_app.timestamp_logs_var.get() else ""
@@ -1622,12 +1735,19 @@ class RunCommandWindow(tk.Toplevel):
 
     def _check_robot_output_queue(self):
         if self.mode != 'test': return
+        
+        lines_to_process = []
         while not self.robot_output_queue.empty():
             try:
                 line = self.robot_output_queue.get_nowait()
-                self.robot_output_text.text.config(state=NORMAL)
+                lines_to_process.append(line)
+            except Empty:
+                pass
 
-                if line.strip().startswith(("Output:", "Log:", "Report:")):
+        if lines_to_process:
+            self.robot_output_text.text.config(state=NORMAL)
+            for line in lines_to_process:
+                 if line.strip().startswith(("Output:", "Log:", "Report:")):
                     parts = line.split(":", 1)
                     prefix = parts[0].strip() + ":"
                     path = parts[1].strip()
@@ -1641,17 +1761,16 @@ class RunCommandWindow(tk.Toplevel):
                     self.robot_output_text.text.tag_bind(link_tag, "<Leave>", lambda e: self.robot_output_text.config(cursor=""))
                     self.robot_output_text.text.insert(END, "\n")
 
-                else:
+                 else:
                     tag = None
                     if "| PASS |" in line: tag = "PASS"
                     elif "| FAIL |" in line: tag = "FAIL"
                     self.robot_output_text.text.insert(END, line, tag)
 
-                self.robot_output_text.text.see(END)
-                self.robot_output_text.text.config(state=DISABLED)
-            except Empty:
-                pass
-        self.after(100, self._check_robot_output_queue)
+            self.robot_output_text.text.see(END)
+            self.robot_output_text.text.config(state=DISABLED)
+
+        self.after(500, self._check_robot_output_queue)
 
     def _open_file_path(self, path: str):
         """Callback to open a file path from a link in the text widget."""
@@ -1667,6 +1786,17 @@ class RunCommandWindow(tk.Toplevel):
 
     def _stop_test(self):
         self.stop_test_button.config(state=DISABLED)
+        self.robot_output_queue.put(f"\n{translate('stop_button_clicked')}\n")
+        if self.robot_process and self.robot_process.poll() is None:
+            # Use a thread to avoid blocking the UI while terminating
+            thread = threading.Thread(target=self._terminate_process_tree, args=(self.robot_process.pid, "robot"))
+            thread.daemon = True
+            thread.start()
+        else:
+            self.robot_output_queue.put(translate("robot_process_already_finished") + "\n")
+
+    def _stop_test_sync(self):
+        """Synchronous version of stop_test for internal state changes."""
         self.robot_output_queue.put(f"\n{translate('stop_button_clicked')}\n")
         if self.robot_process and self.robot_process.poll() is None:
             self._terminate_process_tree(self.robot_process.pid, "robot")
@@ -1693,15 +1823,10 @@ class RunCommandWindow(tk.Toplevel):
         if self._is_closing: return
         self._is_closing = True
 
-        # Stop all background activities
-        if self.mode == 'test' and self.robot_process: self._stop_test()
-        if self.is_monitoring: self._stop_performance_monitor()
-        if self.is_recording:
-            self.scrcpy_output_queue.put(translate("stop_recording_on_close") + "\n")
-            threading.Thread(target=self._stop_recording_thread, daemon=True).start()
+        # Stop all background activities gracefully
+        self._stop_all_activities()
 
-        if self.is_mirroring: self._stop_scrcpy()
-
+        self.parent_app.shell_manager.close(self.udid)
         # Remove window from parent's active list
         key_to_remove = None
         for key, win in self.parent_app.active_command_windows.items():
@@ -1709,9 +1834,35 @@ class RunCommandWindow(tk.Toplevel):
                 key_to_remove = key
                 break
         if key_to_remove:
+            # Ensure the key exists before deleting
+            if key_to_remove in self.parent_app.active_command_windows:
+                del self.parent_app.active_command_windows[key_to_remove]
+
+        self.destroy()
+
+    def _on_close_reused(self):
+        """Handles closing logic when the window is being reused for another task."""
+        if self._is_closing: return
+        self._is_closing = True
+        self._stop_all_activities()
+        key_to_remove = self.udid
+        if key_to_remove in self.parent_app.active_command_windows:
             del self.parent_app.active_command_windows[key_to_remove]
 
         self.destroy()
+
+    def _stop_all_activities(self):
+        """Stops all running processes and threads associated with this window."""
+        if self.mode == 'test' and self.robot_process and self.robot_process.poll() is None:
+            self._stop_test_sync() # Use synchronous version to ensure it's stopped before next action
+        if self.is_monitoring:
+            self._stop_performance_monitor()
+        if self.is_recording:
+            self.scrcpy_output_queue.put(translate("stop_recording_on_close") + "\n")
+            self._stop_recording() # This now handles threading internally
+        if self.is_mirroring:
+            self._stop_scrcpy()
+        self.parent_app.shell_manager.close(self.udid)
 
 # --- Page Object Classes for Tabs ---
 
@@ -1722,10 +1873,10 @@ class RunTabPage(ttk.Frame):
         self.app = app
 
         self._setup_widgets()
-        self.on_run_mode_change()
+        self.on_run_mode_change() # Initial population
 
     def _setup_widgets(self):
-        device_frame = ttk.Frame(self, padding=10)
+        device_frame = ttk.LabelFrame(self, text=translate("device_selection"), padding=10)
         device_frame.pack(fill=X, pady=5)
         device_frame.columnconfigure(0, weight=1)
         device_frame.columnconfigure(1, weight=0)
@@ -1744,13 +1895,93 @@ class RunTabPage(ttk.Frame):
         # scrollbar.pack(side=RIGHT, fill=Y)
         self.device_listbox.pack(side=LEFT, fill=BOTH, expand=YES)
         ToolTip(self.device_listbox, translate("devices_tooltip"))
+        self.device_listbox.bind("<<ListboxSelect>>", self.app._on_device_select)
         
         self.refresh_button = ttk.Button(device_frame, text=translate("refresh"), command=self.app._refresh_devices, bootstyle="secondary")
         self.refresh_button.grid(row=1, column=1, sticky="e", padx=5)
         self.refresh_button.columnconfigure(0, weight=0)
         ToolTip(self.refresh_button, translate("refresh_devices_tooltip"))
 
-        test_frame = ttk.Frame(self, padding=10)
+        # --- Sub-notebook for Tests and ADB ---
+        sub_notebook = ttk.Notebook(self)
+        sub_notebook.pack(fill=BOTH, expand=YES, pady=5)
+
+        tests_tab = ttk.Frame(sub_notebook, padding=10)
+        adb_tab = ttk.Frame(sub_notebook, padding=10)
+
+        sub_notebook.add(tests_tab, text=translate("tests_sub_tab"))
+        sub_notebook.add(adb_tab, text=translate("adb_sub_tab"))
+
+        self._setup_tests_tab(tests_tab)
+        self._setup_adb_tab(adb_tab)
+
+    def _setup_adb_tab(self, parent_frame: ttk.Frame):
+        """Sets up the widgets for the new ADB sub-tab."""
+        parent_frame.rowconfigure(2, weight=1)
+        parent_frame.columnconfigure(0, weight=1)
+
+        wireless_frame = ttk.LabelFrame(parent_frame, text=translate("wireless_adb"), padding=10)
+        wireless_frame.grid(row=0, column=0, sticky="ew", pady=5)
+        wireless_frame.columnconfigure(0, weight=2)
+        wireless_frame.columnconfigure(1, weight=1)
+        wireless_frame.columnconfigure(2, weight=1)
+
+        ttk.Label(wireless_frame, text=translate("ip_address")).grid(row=0, column=0, sticky=W, padx=5)
+        ttk.Label(wireless_frame, text=translate("port")).grid(row=0, column=1, sticky=W, padx=5)
+        ttk.Label(wireless_frame, text=translate("pairing_code")).grid(row=0, column=2, sticky=W, padx=5)
+
+        self.ip_entry = ttk.Entry(wireless_frame, textvariable=self.app.adb_ip_var)
+        self.ip_entry.grid(row=1, column=0, sticky="ew", padx=5, pady=(0, 5))
+        ToolTip(self.ip_entry, text=translate("wireless_ip_tooltip"))
+
+        self.port_entry = ttk.Entry(wireless_frame, textvariable=self.app.adb_port_var, width=8)
+        self.port_entry.grid(row=1, column=1, sticky="ew", padx=5, pady=(0, 5))
+        ToolTip(self.port_entry, text=translate("wireless_port_tooltip"))
+
+        self.code_entry = ttk.Entry(wireless_frame, width=8)
+        self.code_entry.grid(row=1, column=2, sticky="ew", padx=5, pady=(0, 5))
+        ToolTip(self.code_entry, text=translate("wireless_code_tooltip"))
+        
+        button_frame = ttk.Frame(wireless_frame)
+        button_frame.grid(row=2, column=0, columnspan=3, sticky="ew", pady=5)
+        button_frame.columnconfigure((0, 1, 2), weight=1)
+        
+        self.disconnect_button = ttk.Button(button_frame, text=translate("disconnect"), command=self.app._disconnect_wireless_device, bootstyle="danger")
+        self.disconnect_button.grid(row=0, column=0, sticky="ew", padx=5)
+        ToolTip(self.disconnect_button, translate("disconnect_tooltip"))
+
+        self.pair_button = ttk.Button(button_frame, text=translate("pair"), command=self.app._pair_wireless_device, bootstyle="info")
+        self.pair_button.grid(row=0, column=1, sticky="ew", padx=5)
+        ToolTip(self.pair_button, translate("pair_tooltip"))
+
+        self.connect_button = ttk.Button(button_frame, text=translate("connect"), command=self.app._connect_wireless_device)
+        self.connect_button.grid(row=0, column=2, sticky="ew", padx=5)
+        ToolTip(self.connect_button, translate("connect_tooltip"))
+
+        manual_cmd_frame = ttk.LabelFrame(parent_frame, text=translate("manual_adb_command"), padding=10)
+        manual_cmd_frame.grid(row=1, column=0, sticky="ew", pady=5)
+        manual_cmd_frame.columnconfigure(0, weight=1)
+
+        ttk.Label(manual_cmd_frame, text=translate("adb_command_label")).grid(row=0, column=0, sticky=W, padx=5)
+        self.adb_command_entry = ttk.Entry(manual_cmd_frame)
+        self.adb_command_entry.grid(row=1, column=0, sticky="ew", padx=5, pady=(0, 5))
+        ToolTip(self.adb_command_entry, translate("adb_command_tooltip"))
+
+        self.run_adb_button = ttk.Button(manual_cmd_frame, text=translate("run_command"), command=self.app._run_manual_adb_command)
+        self.run_adb_button.grid(row=2, column=0, sticky="ew", padx=5, pady=5)
+        ToolTip(self.run_adb_button, translate("run_command_tooltip"))
+
+        output_frame = ttk.LabelFrame(parent_frame, text=translate("adb_output"), padding=5)
+        output_frame.grid(row=2, column=0, sticky="nsew", pady=5)
+        output_frame.rowconfigure(0, weight=1)
+        output_frame.columnconfigure(0, weight=1)
+
+        self.adb_output_text = ScrolledText(output_frame, wrap=WORD, state=DISABLED, autohide=True)
+        self.adb_output_text.grid(row=0, column=0, sticky="nsew")
+
+    def _setup_tests_tab(self, parent_frame: ttk.Frame):
+        """Sets up the widgets for the Tests sub-tab."""
+        test_frame = ttk.Frame(parent_frame)
         test_frame.pack(fill=BOTH, expand=YES, pady=5)
         test_frame.columnconfigure(0, weight=1)
         test_frame.rowconfigure(1, weight=1)
@@ -1772,7 +2003,7 @@ class RunTabPage(ttk.Frame):
         self.selection_listbox.grid(row=1, column=0, padx=5, pady=2, sticky="nsew")
         self.selection_listbox.bind("<Double-1>", self.on_selection_listbox_double_click)
 
-        run_frame = ttk.Frame(self, padding=10)
+        run_frame = ttk.Frame(parent_frame, padding=(0, 10, 0, 0))
         run_frame.pack(fill=X, pady=5)
         run_frame.columnconfigure(1, weight=1)
         
@@ -1832,80 +2063,6 @@ class RunTabPage(ttk.Frame):
             self.app.current_path = self.app.current_path / folder_name
         
         self.populate_selection_listbox()
-
-class AdbToolsTabPage(ttk.Frame):
-    """UI and logic for the 'ADB Tools' tab."""
-    def __init__(self, parent, app: "RobotRunnerApp"):
-        super().__init__(parent, padding=10)
-        self.app = app
-        self._setup_widgets()
-
-    def _setup_widgets(self):
-        adb_tools_frame = ttk.Frame(self)
-        adb_tools_frame.pack(fill=BOTH, expand=YES)
-        adb_tools_frame.rowconfigure(2, weight=1)
-        adb_tools_frame.columnconfigure(0, weight=1)
-
-        wireless_frame = ttk.Frame(adb_tools_frame, padding=10)
-        wireless_frame.grid(row=0, column=0, sticky="ew", pady=5)
-        wireless_frame.columnconfigure(0, weight=2)
-        wireless_frame.columnconfigure(1, weight=1)
-        wireless_frame.columnconfigure(2, weight=1)
-
-        ttk.Label(wireless_frame, text=translate("ip_address")).grid(row=0, column=0, sticky=W, padx=5)
-        ttk.Label(wireless_frame, text=translate("port")).grid(row=0, column=1, sticky=W, padx=5)
-        ttk.Label(wireless_frame, text=translate("pairing_code")).grid(row=0, column=2, sticky=W, padx=5)
-
-        self.ip_entry = ttk.Entry(wireless_frame)
-        self.ip_entry.grid(row=1, column=0, sticky="ew", padx=5, pady=(0, 5))
-        ToolTip(self.ip_entry, text=translate("wireless_ip_tooltip"))
-
-        self.port_entry = ttk.Entry(wireless_frame, width=8)
-        self.port_entry.grid(row=1, column=1, sticky="ew", padx=5, pady=(0, 5))
-        ToolTip(self.port_entry, text=translate("wireless_port_tooltip"))
-
-        self.code_entry = ttk.Entry(wireless_frame, width=8)
-        self.code_entry.grid(row=1, column=2, sticky="ew", padx=5, pady=(0, 5))
-        ToolTip(self.code_entry, text=translate("wireless_code_tooltip"))
-        
-        button_frame = ttk.Frame(wireless_frame)
-        button_frame.grid(row=2, column=0, columnspan=3, sticky="ew", pady=5)
-        button_frame.columnconfigure(0, weight=1)
-        button_frame.columnconfigure(1, weight=1)
-        button_frame.columnconfigure(2, weight=1)
-        
-        self.disconnect_button = ttk.Button(button_frame, text=translate("disconnect"), command=self.app._disconnect_wireless_device, bootstyle="danger")
-        self.disconnect_button.grid(row=0, column=0, sticky="ew", padx=5)
-        ToolTip(self.disconnect_button, translate("disconnect_tooltip"))
-
-        self.pair_button = ttk.Button(button_frame, text=translate("pair"), command=self.app._pair_wireless_device, bootstyle="info")
-        self.pair_button.grid(row=0, column=1, sticky="ew", padx=5)
-        ToolTip(self.pair_button, translate("pair_tooltip"))
-
-        self.connect_button = ttk.Button(button_frame, text=translate("connect"), command=self.app._connect_wireless_device)
-        self.connect_button.grid(row=0, column=2, sticky="ew", padx=5)
-        ToolTip(self.connect_button, translate("connect_tooltip"))
-
-        manual_cmd_frame = ttk.Frame(adb_tools_frame, padding=10)
-        manual_cmd_frame.grid(row=1, column=0, sticky="ew", pady=5)
-        manual_cmd_frame.columnconfigure(0, weight=1)
-
-        ttk.Label(manual_cmd_frame, text=translate("adb_command_label")).grid(row=0, column=0, sticky=W, padx=5)
-        self.adb_command_entry = ttk.Entry(manual_cmd_frame)
-        self.adb_command_entry.grid(row=1, column=0, sticky="ew", padx=5, pady=(0, 5))
-        ToolTip(self.adb_command_entry, translate("adb_command_tooltip"))
-
-        self.run_adb_button = ttk.Button(manual_cmd_frame, text=translate("run_command"), command=self.app._run_manual_adb_command)
-        self.run_adb_button.grid(row=2, column=0, sticky="ew", padx=5, pady=5)
-        ToolTip(self.run_adb_button, translate("run_command_tooltip"))
-
-        output_frame = ttk.LabelFrame(adb_tools_frame, text=translate("adb_output"), padding=5)
-        output_frame.grid(row=2, column=0, sticky="nsew", pady=5)
-        output_frame.rowconfigure(0, weight=1)
-        output_frame.columnconfigure(0, weight=1)
-
-        self.adb_tools_output_text = ScrolledText(output_frame, wrap=WORD, state=DISABLED, autohide=True)
-        self.adb_tools_output_text.grid(row=0, column=0, sticky="nsew")
 
 class LogsTabPage(ttk.Frame):
     """UI and logic for the 'Test Logs' tab. Widgets are created lazily."""
@@ -2090,6 +2247,57 @@ class AboutTabPage(ttk.Frame):
         license_st.insert(END, license_text)
         license_st.text.config(state=DISABLED)
 
+# --- ADB Shell Manager Class ---
+class AdbShellManager:
+    """Manages persistent adb shell processes for multiple devices."""
+    def __init__(self):
+        self.shells: Dict[str, subprocess.Popen] = {}
+        self.lock = threading.Lock()
+
+    def get_shell(self, udid: str) -> Optional[subprocess.Popen]:
+        """Gets an existing shell process or creates a new one for the given UDID."""
+        with self.lock:
+            if udid in self.shells and self.shells[udid].poll() is None:
+                return self.shells[udid]
+
+            try:
+                creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+                process = subprocess.Popen(
+                    f"adb -s {udid} shell",
+                    shell=True,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    encoding=OUTPUT_ENCODING,
+                    errors='replace',
+                    creationflags=creationflags
+                )
+                self.shells[udid] = process
+                return process
+            except Exception:
+                return None
+
+    def execute(self, udid: str, command: str) -> str:
+        """Executes a command on the persistent shell for the given UDID."""
+        process = self.get_shell(udid)
+        if not process or process.poll() is not None:
+            return f"Error: Shell for {udid} is not running."
+
+        return execute_on_persistent_shell(process, command)
+
+    def close(self, udid: str):
+        """Closes the persistent shell for a specific UDID."""
+        with self.lock:
+            if udid in self.shells and self.shells[udid].poll() is None:
+                self.shells[udid].terminate()
+                del self.shells[udid]
+
+    def close_all(self):
+        """Closes all active persistent shells."""
+        for udid in list(self.shells.keys()):
+            self.close(udid)
+
 # --- Main Application Class ---
 class RobotRunnerApp:
     ''' Main application window '''
@@ -2112,6 +2320,7 @@ class RobotRunnerApp:
         self.parsed_logs_data: Optional[List[Dict]] = None
         self.logs_tab_initialized = False
         self._is_closing = False
+        self.shell_manager = AdbShellManager()
         self.appium_version: Optional[str] = None
 
         self._setup_string_vars()
@@ -2144,6 +2353,8 @@ class RobotRunnerApp:
         self.app_packages_var = tk.StringVar()
         self.timestamp_logs_var = tk.BooleanVar(value=False)
         # --- Internationalization ---
+        self.adb_ip_var = tk.StringVar()
+        self.adb_port_var = tk.StringVar()
         self.language_var = tk.StringVar()
 
     def _update_paths_from_settings(self):
@@ -2165,13 +2376,11 @@ class RobotRunnerApp:
 
         self.run_tab = RunTabPage(self.notebook, self)
         self.logs_tab = LogsTabPage(self.notebook, self)
-        self.adb_tools_tab = AdbToolsTabPage(self.notebook, self)
         self.settings_tab = SettingsTabPage(self.notebook, self)
         self.about_tab = AboutTabPage(self.notebook, self)
 
-        self.notebook.add(self.run_tab, text=translate("run_tests_tab"))
+        self.notebook.add(self.run_tab, text=translate("execute_tab"))
         self.notebook.add(self.logs_tab, text=translate("logs_tab"))
-        self.notebook.add(self.adb_tools_tab, text=translate("adb_tools_tab"))
         self.notebook.add(self.settings_tab, text=translate("settings_tab"))
         self.notebook.add(self.about_tab, text=translate("about_tab"))
         
@@ -2277,6 +2486,8 @@ class RobotRunnerApp:
             for window in list(self.active_command_windows.values()):
                 if window.winfo_exists():
                     window._on_close()
+            
+            self.shell_manager.close_all()
 
             self.root.destroy()
             
@@ -2365,12 +2576,12 @@ class RobotRunnerApp:
         """
         try:
             self.root.after(0, self.run_tab.run_button.config, {'state': DISABLED, 'text': translate("checking_appium")})
-            # 1. Check for Appium and start it if necessary (this part can block)
+            
             if not self._is_appium_running():
                 self.root.after(0, self.status_var.set, translate("appium_not_found_starting"))
                 self.root.after(0, self.run_tab.run_button.config, {'text': translate("starting_appium")})
                 self._start_appium_server(silent=True)
-                if not self._wait_for_appium_startup(timeout=20):
+                if not self._wait_for_appium_startup(timeout=30):
                     self.root.after(0, messagebox.showerror, translate("appium_error_title"), translate("appium_start_fail_error"))
                     self.root.after(0, self.status_var.set, translate("ready"))
                     return
@@ -2380,96 +2591,174 @@ class RobotRunnerApp:
             for device_str in selected_devices:
                 udid_with_status = device_str.split(" | ")[-1]
                 udid = udid_with_status.split(" ")[0]
+                
+                self.root.after(0, self.run_tab.run_button.config, {'text': translate("opening_udid", udid=udid)})
                 self.root.after(0, self._create_run_command_window, udid, path_to_run, run_mode)
+                
+                time.sleep(2)
         finally:
+            # Restore the button to its original state after the loop
             self.root.after(0, self.run_tab.run_button.config, {'state': NORMAL, 'text': translate("run_test")})
 
     def _create_run_command_window(self, udid: str, path_to_run: str, run_mode: str):
         """Helper to safely create the RunCommandWindow from the main GUI thread."""
+        # Centralized Resource Management: If a window for this UDID already exists, close it before creating a new one.
+        if udid in self.active_command_windows and self.active_command_windows[udid].winfo_exists():
+            win = self.active_command_windows[udid]
+            win._on_close() # This will stop activities and remove the window from the dict.
+
+        # If no window exists, create a new one.
         win = RunCommandWindow(self, udid, mode='test', run_path=path_to_run, run_mode=run_mode)
-        self.active_command_windows[f"{udid}_test"] = win
+        self.active_command_windows[udid] = win
+
+    def _on_device_select(self, event=None):
+        """Callback when a device is selected in the listbox."""
+        selected_indices = self.run_tab.device_listbox.curselection()
+        if not selected_indices:
+            return
+
+        # Use the first selected device for IP lookup
+        selected_device_str = self.run_tab.device_listbox.get(selected_indices[0])
+        udid = selected_device_str.split(" | ")[-1].split(" ")[0]
+        
+        # Check if the device is already connected via Wi-Fi (udid will be an IP:Port)
+        if ":" in udid:
+            ip, port = udid.split(":")
+            self.adb_ip_var.set(ip)
+            self.adb_port_var.set(port)
+        else:
+            # For USB devices, fetch the IP but leave the port blank for the user to fill.
+            threading.Thread(target=self._fetch_and_set_device_ip, args=(udid,), daemon=True).start()
+
+    def _fetch_and_set_device_ip(self, udid: str):
+        """Fetches the wlan0 IP address of a USB device and updates the GUI."""
+        ip_address = get_device_ip(udid)
+        if ip_address:
+            self.root.after(0, self.adb_ip_var.set, ip_address)
+            # Clear the port field, as it's dynamic and should be entered by the user.
+            self.root.after(0, self.adb_port_var.set, "") # Clear previous port
+            # Automatically try to find the port for this IP
+            threading.Thread(target=self._find_and_set_mdns_port, args=(ip_address,), daemon=True).start()
+
+    def _find_and_set_mdns_port(self, ip_address: str):
+        """
+        Runs 'adb mdns services' in the background to find the port for a given IP.
+        Updates the port entry if a match is found.
+        """
+        command = "adb mdns services"
+        success, output = execute_command(command)
+
+        if success:
+            for line in output.splitlines():
+                # Check if the line contains the IP and the adb service identifier
+                if ip_address in line and "_adb-tls-connect._tcp" in line:
+                    # Extract the port from the ip:port part
+                    match = re.search(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d+)", line)
+                    if match:
+                        found_ip = match.group(1)
+                        found_port = match.group(2)
+                        if found_ip == ip_address:
+                            self.root.after(0, self.adb_port_var.set, found_port)
+                            break # Found it, no need to continue
 
     def _pair_wireless_device(self):
         """Pairs with a device wirelessly using a pairing code."""
-        ip = self.adb_tools_tab.ip_entry.get()
-        port = self.adb_tools_tab.port_entry.get()
-        code = self.adb_tools_tab.code_entry.get()
+        ip = self.run_tab.ip_entry.get()
+        port = self.run_tab.port_entry.get()
+        code = self.run_tab.code_entry.get()
 
         if not all([ip, port, code]):
             messagebox.showwarning(translate("input_error"), translate("input_error_pair"))
             return
 
         command = f"adb pair {ip}:{port} {code}"
-        self.adb_tools_tab.pair_button.config(state=DISABLED)
-        self._update_output_text(self.adb_tools_tab.adb_tools_output_text, f"> {command}\n", True)
-        
-        thread = threading.Thread(target=self._run_command_and_update_gui, args=(command, self.adb_tools_tab.adb_tools_output_text, self.adb_tools_tab.pair_button, True))
-        thread.daemon = True
-        thread.start()
+        self.run_tab.pair_button.config(state=DISABLED)
+        # For now, we don't have a dedicated output on this tab, so we just run it.
+        self._update_output_text(self.run_tab.adb_output_text, f"> {command}\n", True)
+        threading.Thread(target=self._run_command_and_update_gui, args=(command, self.run_tab.adb_output_text, self.run_tab.pair_button, True), daemon=True).start()
 
     def _connect_wireless_device(self):
         """Attempts to connect to a device wirelessly via ADB."""
-        ip = self.adb_tools_tab.ip_entry.get()
-        port = self.adb_tools_tab.port_entry.get()
+        ip = self.adb_ip_var.get()
+        port = self.adb_port_var.get()
+        ip = self.run_tab.ip_entry.get()
+        port = self.run_tab.port_entry.get()
         
         if not all([ip, port]):
             messagebox.showwarning(translate("input_error"), translate("input_error_connect"))
             return
 
         command = f"adb connect {ip}:{port}"
-        self.adb_tools_tab.connect_button.config(state=DISABLED)
-        self._update_output_text(self.adb_tools_tab.adb_tools_output_text, f"> {command}\n", True)
-        
-        thread = threading.Thread(target=self._run_command_and_update_gui, args=(command, self.adb_tools_tab.adb_tools_output_text, self.adb_tools_tab.connect_button, True))
-        thread.daemon = True
-        thread.start()
+        self.run_tab.connect_button.config(state=DISABLED)
+        self._update_output_text(self.run_tab.adb_output_text, f"> {command}\n", True)
+        threading.Thread(target=self._run_command_and_update_gui, args=(command, self.run_tab.adb_output_text, self.run_tab.connect_button, True), daemon=True).start()
 
     def _disconnect_wireless_device(self):
         """Disconnects a specific wireless device or all of them."""
-        ip = self.adb_tools_tab.ip_entry.get()
-        port = self.adb_tools_tab.port_entry.get()
+        ip = self.adb_ip_var.get()
+        port = self.adb_port_var.get()
+        ip = self.run_tab.ip_entry.get()
+        port = self.run_tab.port_entry.get()
         
         if ip and port:
             command = f"adb disconnect {ip}:{port}"
         else:
             command = "adb disconnect"
 
-        self.adb_tools_tab.disconnect_button.config(state=DISABLED)
-        self._update_output_text(self.adb_tools_tab.adb_tools_output_text, f"> {command}\n", True)
+        self.run_tab.disconnect_button.config(state=DISABLED)
+        self._update_output_text(self.run_tab.adb_output_text, f"> {command}\n", True)
+        threading.Thread(target=self._run_command_and_update_gui, args=(command, self.run_tab.adb_output_text, self.run_tab.disconnect_button, True), daemon=True).start()
+
+    def _mirror_device(self):    
+        selected_device_indices = self.run_tab.device_listbox.curselection()
+        if not selected_device_indices:
+            messagebox.showerror(translate("open_file_error_title"), translate("no_device_selected"))
+            return
         
-        thread = threading.Thread(target=self._run_command_and_update_gui, args=(command, self.adb_tools_tab.adb_tools_output_text, self.adb_tools_tab.disconnect_button, True))
+        selected_devices = [self.run_tab.device_listbox.get(i) for i in selected_device_indices]
+        if any(translate("no_devices_found") in s for s in selected_devices):
+            messagebox.showerror(translate("open_file_error_title"), translate("no_device_selected"))
+            return
+
+        # Disable the button immediately
+        self.run_tab.device_options_button.config(state=DISABLED)
+
+        # Start a thread to handle the sequential opening
+        thread = threading.Thread(target=self._mirror_device_thread, args=(selected_devices,))
         thread.daemon = True
         thread.start()
 
-    def _mirror_device(self):
-        """Opens a separate scrcpy window for each selected device."""
+    def _mirror_device_thread(self, selected_devices: List[str]):
+        """Opens a separate toolbox window for each selected device with a delay."""
         try:
-            selected_device_indices = self.run_tab.device_listbox.curselection()
-            if not selected_device_indices:
-                messagebox.showerror(translate("open_file_error_title"), translate("no_device_selected"))
-                return
-            
-            selected_devices = [self.run_tab.device_listbox.get(i) for i in selected_device_indices]
-            if any(translate("no_devices_found") in s for s in selected_devices):
-                messagebox.showerror(translate("open_file_error_title"), translate("no_device_selected"))
-                return
-
-            for selected_device_str in selected_devices:
+            for i, selected_device_str in enumerate(selected_devices):
                 parts = selected_device_str.split(" | ")
                 model = parts[1].strip()
                 udid_with_status = parts[-1]
                 udid = udid_with_status.split(" ")[0]
 
-                win_key = f"{udid}_mirror"
-                if win_key in self.active_command_windows and self.active_command_windows[win_key].winfo_exists():
-                    self.active_command_windows[win_key].lift()
-                    continue
+                # Centralized Resource Management: If a window for this UDID already exists, close it before creating a new one.
+                if udid in self.active_command_windows and self.active_command_windows[udid].winfo_exists():
+                    self.root.after(0, self.active_command_windows[udid]._on_close)
+                    time.sleep(0.5) # Give it a moment to close
 
-                scrcpy_win = RunCommandWindow(self, udid, mode='mirror', title=translate("mirror_title", model=model))
-                self.active_command_windows[win_key] = scrcpy_win
+                # Update button text on the main thread
+                self.root.after(0, self.run_tab.device_options_button.config, {'text': translate("opening_udid", udid=udid)})
 
-        except Exception as e:
-            messagebox.showerror(translate("mirror_error_title"), translate("mirror_error_message", error=e))
+                # Create the new window on the main thread
+                self.root.after(0, self._create_mirror_window, udid, model)
+
+                # Wait before opening the next one, but not after the last one
+                if i < len(selected_devices) - 1:
+                    time.sleep(2)
+        finally:
+            # Restore the button to its original state after the loop
+            self.root.after(0, self.run_tab.device_options_button.config, {'state': NORMAL, 'text': translate("device_toolbox")})
+
+    def _create_mirror_window(self, udid: str, model: str):
+        """Helper to create the mirror window on the main thread."""
+        win = RunCommandWindow(self, udid, mode='mirror', title=translate("mirror_title", model=model))
+        self.active_command_windows[udid] = win
 
     def _refresh_devices(self):
         """Refreshes the list of connected ADB devices."""
@@ -2614,7 +2903,6 @@ class RobotRunnerApp:
         thread = threading.Thread(target=self._appium_server_handler, args=(silent,))
         thread.daemon = True
         thread.start()
-
     def _appium_server_handler(self, silent: bool):
         """
         The core handler for running the Appium server process and piping its output.
@@ -2669,15 +2957,29 @@ class RobotRunnerApp:
 
     def _run_manual_adb_command(self):
         """Runs a manual ADB command entered by the user."""
-        command = self.adb_tools_tab.adb_command_entry.get()
+        selected_device_indices = self.run_tab.device_listbox.curselection()
+        if not selected_device_indices:
+            messagebox.showerror(translate("open_file_error_title"), translate("no_device_selected"), parent=self.root)
+            return
+
+        # Use the first selected device for the manual command
+        selected_device_str = self.run_tab.device_listbox.get(selected_device_indices[0])
+        udid = selected_device_str.split(" | ")[-1].split(" ")[0]
+
+        command = self.run_tab.adb_command_entry.get()
         if not command:
             return
         
-        full_command = f"adb {command}"
-        self.adb_tools_tab.run_adb_button.config(state=DISABLED)
-        self._update_output_text(self.adb_tools_tab.adb_tools_output_text, f"> {full_command}\n", True)
+        # Check if the user is trying to target a specific device, which we will override.
+        if "-s" in command.split():
+            messagebox.showwarning(translate("input_error"), "The -s <udid> flag is added automatically based on your selection. Please remove it from the command.", parent=self.root)
+            return
         
-        thread = threading.Thread(target=self._run_command_and_update_gui, args=(full_command, self.adb_tools_tab.adb_tools_output_text, self.adb_tools_tab.run_adb_button))
+        full_command = f"adb -s {udid} {command}"
+        self.run_tab.run_adb_button.config(state=DISABLED)
+        self._update_output_text(self.run_tab.adb_output_text, f"> {full_command}\n", True)
+        
+        thread = threading.Thread(target=self._run_command_and_update_gui, args=(full_command, self.run_tab.adb_output_text, self.run_tab.run_adb_button))
         thread.daemon = True
         thread.start()
 
@@ -3012,19 +3314,21 @@ class RobotRunnerApp:
         except Exception as e:
             messagebox.showerror(translate("open_file_error_title"), translate("log_open_error_generic", error=e))
             
-    def _run_command_and_update_gui(self, command: str, output_widget: ScrolledText, button: ttk.Button, refresh_on_success: bool = False):
+    def _run_command_and_update_gui(self, command: str, output_widget: Optional[ScrolledText], button: ttk.Button, refresh_on_success: bool = False):
         success, output = execute_command(command)
-        if not output:
-            self.root.after(0, self._update_output_text, output_widget, f"\nResult: {success}\n", False)
-        else:
-            self.root.after(0, self._update_output_text, output_widget, f"\nResult:\n{output}\n", False)
+        if output_widget:
+            if not output:
+                self.root.after(0, self._update_output_text, output_widget, f"\nResult: {success}\n", False)
+            else:
+                self.root.after(0, self._update_output_text, output_widget, f"\nResult:\n{output}\n", False)
         
         if success and refresh_on_success:
             self.root.after(100, self._refresh_devices)
             
         self.root.after(0, lambda: button.config(state=NORMAL))
 
-    def _update_output_text(self, widget: ScrolledText, result: str, clear: bool):
+    def _update_output_text(self, widget: Optional[ScrolledText], result: str, clear: bool):
+        if not widget: return
         widget.text.config(state=NORMAL)
         if clear:
             widget.delete("1.0", END)
@@ -3091,6 +3395,16 @@ def get_device_properties(udid: str) -> Optional[Dict[str, str]]:
     except Exception:
         return None
 
+def get_device_ip(udid: str) -> Optional[str]:
+    """Gets the wlan0 IP address for a given device UDID."""
+    command = f"adb -s {udid} shell ip -f inet addr show wlan0"
+    success, output = execute_command(command)
+    if success:
+        match = re.search(r'inet (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/', output)
+        if match:
+            return match.group(1)
+    return None
+
 def get_device_aspect_ratio(udid: str) -> Optional[float]:
     """Gets the device's physical screen aspect ratio using 'wm size'."""
     success, output = execute_command(f"adb -s {udid} shell wm size")
@@ -3101,6 +3415,38 @@ def get_device_aspect_ratio(udid: str) -> Optional[float]:
             if height > 0:
                 return width / height
     return None
+
+# --- Performance Monitor Helper Functions (Optimized for Persistent Shell) ---
+
+def execute_on_persistent_shell(process: subprocess.Popen, command: str) -> str:
+    """
+    Executes a command on a persistent adb shell process and reads the output.
+    """
+    if process.poll() is not None:
+        return "Error: Shell process is not running."
+
+    # A unique marker to signal the end of a command's output
+    end_marker = "ROBOT_RUNNER_CMD_DONE"
+    
+    # Write the command, followed by the end marker, to the shell's stdin
+    process.stdin.write(f"{command}\n")
+    process.stdin.write(f"echo {end_marker}\n")
+    process.stdin.flush()
+
+    output_lines = []
+    while True:
+        try:
+            # Use a timeout to prevent blocking indefinitely if the shell hangs
+            line = process.stdout.readline()
+            if not line: # Shell closed
+                break
+            if end_marker in line:
+                break
+            output_lines.append(line)
+        except (IOError, ValueError): # Catches errors if the pipe is closed
+            break
+            
+    return "".join(output_lines).strip()
 
 # --- Performance Monitor Helper Functions (Integrated) ---
 
@@ -3121,20 +3467,20 @@ def execute_monitor_command(command: str) -> str:
     except Exception as e:
         return f"Unexpected Error: {e}"
 
-def get_surface_view_name(udid: str, app_package: str) -> str:
-    """Finds the full name of the SurfaceView layer for the app package."""
-    output = execute_monitor_command(f"adb -s {udid} shell dumpsys SurfaceFlinger --list")
+def get_surface_view_name(shell_process: subprocess.Popen, app_package: str) -> str:
+    """Finds the full name of the SurfaceView layer for the app package using a persistent shell."""
+    output = execute_on_persistent_shell(shell_process, "dumpsys SurfaceFlinger --list")
     blast_match = re.search(r'(SurfaceView\[.*?{}\S*?\(BLAST\)#\d+)'.format(re.escape(app_package)), output)
     if blast_match:
         return blast_match.group(1)
     match = re.search(r'(SurfaceView\[.*?{}.*?#\d+)'.format(re.escape(app_package)), output)
     return match.group(1) if match else ""
 
-def get_surface_fps(udid: str, surface_name: str, last_timestamps: set) -> tuple[str, set]:
-    """Calculates FPS by comparing frame timestamps."""
+def get_surface_fps(shell_process: subprocess.Popen, surface_name: str, last_timestamps: set) -> tuple[str, set]:
+    """Calculates FPS by comparing frame timestamps using a persistent shell."""
     if not surface_name:
         return "N/A", last_timestamps
-    output = execute_monitor_command(f"adb -s {udid} shell dumpsys SurfaceFlinger --latency '{surface_name}'")
+    output = execute_on_persistent_shell(shell_process, f"dumpsys SurfaceFlinger --latency '{surface_name}'")
     lines = output.splitlines()
     current_timestamps = {int(parts[2]) for line in lines[1:] if len(parts := line.split()) == 3 and parts[0] != '0'}
     if not last_timestamps:
@@ -3142,41 +3488,37 @@ def get_surface_fps(udid: str, surface_name: str, last_timestamps: set) -> tuple
     new_frames_count = len(current_timestamps - last_timestamps)
     return f"{float(new_frames_count):.2f}", current_timestamps
 
-def run_performance_monitor(udid: str, app_package: str, output_queue: Queue, stop_event: threading.Event):
+def run_performance_monitor(shell_manager: AdbShellManager, udid: str, app_package: str, output_queue: Queue, stop_event: threading.Event):
     """Continuously monitors app performance and puts the output in a queue."""
-    output_queue.put(f"Starting monitoring for app '{app_package}' on device '{udid}'...\n")
-    header = f"{'Timestamp':<10} | {'Elapsed':<10} | {'CPU':<5} | {'RAM':<7} | {'GPU':<10} | {'Missed Vsync':<1} | {'Janky':<15} | {'FPS':<4}\n"
-    output_queue.put(header)
-    output_queue.put("-" * len(header) + "\n")
+    try:
+        output_queue.put(f"Starting monitoring for app '{app_package}' on device '{udid}'...\n")
+        header = f"{'Timestamp':<10} | {'Elapsed':<10} | {'CPU':<5} | {'RAM':<7} | {'GPU':<10} | {'Missed Vsync':<1} | {'Janky':<15} | {'FPS':<4}\n"
+        output_queue.put(header)
+        output_queue.put("-" * len(header) + "\n")
 
-    execute_monitor_command(f"adb -s {udid} shell dumpsys gfxinfo {app_package} reset")
-    time.sleep(0.2)
+        # Reset gfxinfo once at the beginning
+        shell_manager.execute(udid, f"dumpsys gfxinfo {app_package} reset")
+        time.sleep(0.2)
 
-    last_timestamps = set()
-    start_time = time.time()
+        last_timestamps = set()
+        start_time = time.time()
 
-    while not stop_event.is_set():
-        try:
-            elapsed_seconds = time.time() - start_time
-            elapsed_time_str = time.strftime("%M:%S", time.gmtime(elapsed_seconds))
-            ts = time.strftime("%H:%M:%S")
-
-            ram_output = execute_monitor_command(f"adb -s {udid} shell dumpsys meminfo {app_package}")
+        while not stop_event.is_set():
+            ram_output = shell_manager.execute(udid, f"dumpsys meminfo {app_package}")
             ram_mb = "N/A"
             if "TOTAL" in ram_output and (match := re.search(r"TOTAL\s+(\d+)", ram_output)):
                 ram_mb = f"{int(match.group(1)) / 1024:.2f}"
 
-            cpu_output = execute_monitor_command(f"adb -s {udid} shell dumpsys cpuinfo")
+            cpu_output = shell_manager.execute(udid, "top -n 1 -b")
             cpu_percent = "N/A"
-            if "Error" not in cpu_output:
+            if "Error" not in cpu_output and "not found" not in cpu_output:
                 for line in cpu_output.splitlines():
                     if app_package in line:
                         parts = line.strip().split()
-                        if parts and '%' in parts[0]:
-                            cpu_percent = parts[0].replace('%', '')
-                            break
+                        cpu_percent = parts[8] if len(parts) > 8 else "N/A"
+                        break
             
-            gfx_output = execute_monitor_command(f"adb -s {udid} shell dumpsys gfxinfo {app_package}")
+            gfx_output = shell_manager.execute(udid, f"dumpsys gfxinfo {app_package}")
             jank_info = "0.00% (0/0)"
             if jank_match := re.search(r"Janky frames: (\d+) \(([\d.]+)%\)", gfx_output):
                 total_frames = (re.search(r"Total frames rendered: (\d+)", gfx_output) or '?').group(1)
@@ -3189,12 +3531,16 @@ def run_performance_monitor(udid: str, app_package: str, output_queue: Queue, st
 
             missed_vsync = (re.search(r"Number Missed Vsync: (\d+)", gfx_output) or "N/A").group(1)
 
-            surface_name = get_surface_view_name(udid, app_package)
-            surface_fps, last_timestamps = get_surface_fps(udid, surface_name, last_timestamps)
+            surface_name_output = shell_manager.execute(udid, "dumpsys SurfaceFlinger --list")
+            surface_name = get_surface_view_name(surface_name_output, app_package)
+            latency_output = shell_manager.execute(udid, f"dumpsys SurfaceFlinger --latency '{surface_name}'")
+            surface_fps, last_timestamps = get_surface_fps(latency_output, last_timestamps)
 
             perf_data = {
-                "ts": ts,
-                "elapsed": elapsed_time_str,
+                "ts": time.strftime("%H:%M:%S"),
+                "elapsed": time.strftime(
+                    "%M:%S", time.gmtime(time.time() - start_time)
+                ),
                 "cpu": cpu_percent,
                 "ram": ram_mb,
                 "gpu": gpu_mem_kb,
@@ -3204,11 +3550,10 @@ def run_performance_monitor(udid: str, app_package: str, output_queue: Queue, st
             }
             output_queue.put(perf_data)
             
-            # This loop runs roughly every second, driven by the ADB command delays
-        
-        except Exception as e:
-            output_queue.put(f"ERROR in monitoring loop: {e}. Retrying...\n")
-            time.sleep(2)
+            time.sleep(1)
+
+    except Exception as e:
+        output_queue.put(f"ERROR in monitoring loop: {e}. Retrying...\n")
 
 def find_scrcpy() -> Optional[Path]:
     """Tries to find scrcpy.exe in common locations or PATH."""
