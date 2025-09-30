@@ -1400,46 +1400,17 @@ class RunCommandWindow(tk.Toplevel):
         self.after(500, self._check_scrcpy_output_queue)
 
     def _find_and_embed_window(self):
-        """
-        Finds the scrcpy window and embeds it into the mirror_frame.
-        Includes a retry mechanism to handle race conditions on startup.
-        """
-        max_retries = 10
-        retry_delay = 0.5  # 500ms
-        for attempt in range(max_retries):
-            try:
-                if sys.platform == "win32":
-                    self.scrcpy_hwnd = win32gui.FindWindow(None, self.scrcpy_window_title)
-                    if self.scrcpy_hwnd:
-                        self.root.after(100, self._embed_window)
-                        return
-                else: # Linux/macOS
-                    # On Linux, we might need to wait a bit for the window to appear
-                    time.sleep(0.5) # Initial wait
-                    # This command is a bit of a hack. It might need adjustment.
-                    # It tries to find the window ID by title.
-                    cmd = f'xdotool search --name "^{re.escape(self.scrcpy_window_title)}$"'
-                    success, output = execute_command(cmd)
-                    if success and output.strip():
-                        self.scrcpy_hwnd = int(output.strip().splitlines()[0])
-                        self.root.after(100, self._embed_window)
-                        return
-
-            except Exception as e:
-                self.scrcpy_output_queue.put(f"Embed Error: {e}\n")
-
-            if self.stop_event.is_set():
-                return # Stop trying if the whole operation was cancelled
-
-            time.sleep(retry_delay)
-
-        # If the loop finishes without finding the window
-        if not self.stop_event.is_set():
-            self.scrcpy_output_queue.put(
-                "ERROR: Failed to find scrcpy window after multiple retries. "
-                "Try starting mirroring again.\n"
-            )
-            self._stop_scrcpy() # Clean up the failed attempt
+        start_time = time.time()
+        while time.time() - start_time < 15:
+            if not self.is_mirroring: return # Stop if user cancelled
+            hwnd = win32gui.FindWindow(None, self.unique_title)
+            if hwnd:
+                self.scrcpy_hwnd = hwnd
+                self.after(0, self._embed_window)
+                return
+            time.sleep(0.2)
+        self.scrcpy_output_queue.put(translate("scrcpy_find_window_error", title=self.unique_title) + "\n")
+        self.after(0, self._stop_scrcpy)
 
     def _embed_window(self):
         if not self.scrcpy_hwnd or not self.is_mirroring: return
@@ -1838,76 +1809,60 @@ class RunCommandWindow(tk.Toplevel):
         try:
             if sys.platform == "win32":
                 subprocess.run(
-                    f"taskkill /PID {pid} /T /F",
-                    check=True,
-                    capture_output=True,
+                    f"taskkill /PID {pid} /T /F", check=True, capture_output=True,
                     creationflags=subprocess.CREATE_NO_WINDOW
                 )
             else:
                 os.kill(os.getpid(pid), signal.SIGTERM)
-            print(translate("appium_terminate_info", pid=pid))
+            output_q = self.robot_output_queue if name == "robot" else self.scrcpy_output_queue
+            output_q.put(translate("process_terminated_info", name=name.capitalize(), pid=pid) + "\n")
         except (subprocess.CalledProcessError, ProcessLookupError, FileNotFoundError) as e:
-            print(translate("appium_terminate_warning", pid=pid, e=e))
+            print(translate("terminate_process_warning", name=name, pid=pid, e=e))
 
     def _on_close(self):
-        """Handles the main window closing event."""
-        if messagebox.askokcancel(translate("quit_title"), translate("quit_message")):
-            self._is_closing = True
-            
-            if self.appium_process:
-                self.status_var.set(translate("stopping_appium_message"))
-                self.root.update_idletasks()
-                self._terminate_process_tree(self.appium_process.pid, "Appium")
-            
-            for window in list(self.active_command_windows.values()):
-                if window.winfo_exists():
-                    window._on_close()
-            
-            self.shell_manager.close_all()
+        if self._is_closing: return
+        self._is_closing = True
 
-            self.root.destroy()
-            
-    def _find_and_embed_window(self):
-        """
-        Finds the scrcpy window and embeds it into the mirror_frame.
-        Includes a retry mechanism to handle race conditions on startup.
-        """
-        max_retries = 10
-        retry_delay = 0.5  # 500ms
-        for attempt in range(max_retries):
-            try:
-                if sys.platform == "win32":
-                    self.scrcpy_hwnd = win32gui.FindWindow(None, self.scrcpy_window_title)
-                    if self.scrcpy_hwnd:
-                        self.root.after(100, self._embed_window)
-                        return
-                else: # Linux/macOS
-                    # On Linux, we might need to wait a bit for the window to appear
-                    time.sleep(0.5) # Initial wait
-                    # This command is a bit of a hack. It might need adjustment.
-                    # It tries to find the window ID by title.
-                    cmd = f'xdotool search --name "^{re.escape(self.scrcpy_window_title)}$"'
-                    success, output = execute_command(cmd)
-                    if success and output.strip():
-                        self.scrcpy_hwnd = int(output.strip().splitlines()[0])
-                        self.root.after(100, self._embed_window)
-                        return
+        # Stop all background activities gracefully
+        self._stop_all_activities()
 
-            except Exception as e:
-                self.scrcpy_output_queue.put(f"Embed Error: {e}\n")
+        self.parent_app.shell_manager.close(self.udid)
+        # Remove window from parent's active list
+        key_to_remove = None
+        for key, win in self.parent_app.active_command_windows.items():
+            if win is self:
+                key_to_remove = key
+                break
+        if key_to_remove:
+            # Ensure the key exists before deleting
+            if key_to_remove in self.parent_app.active_command_windows:
+                del self.parent_app.active_command_windows[key_to_remove]
 
-            if self.stop_event.is_set():
-                return # Stop trying if the whole operation was cancelled
+        self.destroy()
 
-            time.sleep(retry_delay)
+    def _on_close_reused(self):
+        """Handles closing logic when the window is being reused for another task."""
+        if self._is_closing: return
+        self._is_closing = True
+        self._stop_all_activities()
+        key_to_remove = self.udid
+        if key_to_remove in self.parent_app.active_command_windows:
+            del self.parent_app.active_command_windows[key_to_remove]
 
-        # If the loop finishes without finding the window
-        if not self.stop_event.is_set():
-            self.scrcpy_output_queue.put(
-                "ERROR: Failed to find scrcpy window after multiple retries. "
-                "Try starting mirroring again.\n"
-            )
-            self._stop_scrcpy() # Clean up the failed attempt
+        self.destroy()
+
+    def _stop_all_activities(self):
+        """Stops all running processes and threads associated with this window."""
+        if self.mode == 'test' and self.robot_process and self.robot_process.poll() is None:
+            self._stop_test_sync() # Use synchronous version to ensure it's stopped before next action
+        if self.is_monitoring:
+            self._stop_performance_monitor()
+        if self.is_recording:
+            self.scrcpy_output_queue.put(translate("stop_recording_on_close") + "\n")
+            self._stop_recording() # This now handles threading internally
+        if self.is_mirroring:
+            self._stop_scrcpy()
+        self.parent_app.shell_manager.close(self.udid)
 
 # --- Page Object Classes for Tabs ---
 
