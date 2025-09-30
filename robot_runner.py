@@ -1400,17 +1400,46 @@ class RunCommandWindow(tk.Toplevel):
         self.after(500, self._check_scrcpy_output_queue)
 
     def _find_and_embed_window(self):
-        start_time = time.time()
-        while time.time() - start_time < 15:
-            if not self.is_mirroring: return # Stop if user cancelled
-            hwnd = win32gui.FindWindow(None, self.unique_title)
-            if hwnd:
-                self.scrcpy_hwnd = hwnd
-                self.after(0, self._embed_window)
-                return
-            time.sleep(0.2)
-        self.scrcpy_output_queue.put(translate("scrcpy_find_window_error", title=self.unique_title) + "\n")
-        self.after(0, self._stop_scrcpy)
+        """
+        Finds the scrcpy window and embeds it into the mirror_frame.
+        Includes a retry mechanism to handle race conditions on startup.
+        """
+        max_retries = 10
+        retry_delay = 0.5  # 500ms
+        for attempt in range(max_retries):
+            try:
+                if sys.platform == "win32":
+                    self.scrcpy_hwnd = win32gui.FindWindow(None, self.scrcpy_window_title)
+                    if self.scrcpy_hwnd:
+                        self.root.after(100, self._embed_window)
+                        return
+                else: # Linux/macOS
+                    # On Linux, we might need to wait a bit for the window to appear
+                    time.sleep(0.5) # Initial wait
+                    # This command is a bit of a hack. It might need adjustment.
+                    # It tries to find the window ID by title.
+                    cmd = f'xdotool search --name "^{re.escape(self.scrcpy_window_title)}$"'
+                    success, output = execute_command(cmd)
+                    if success and output.strip():
+                        self.scrcpy_hwnd = int(output.strip().splitlines()[0])
+                        self.root.after(100, self._embed_window)
+                        return
+
+            except Exception as e:
+                self.scrcpy_output_queue.put(f"Embed Error: {e}\n")
+
+            if self.stop_event.is_set():
+                return # Stop trying if the whole operation was cancelled
+
+            time.sleep(retry_delay)
+
+        # If the loop finishes without finding the window
+        if not self.stop_event.is_set():
+            self.scrcpy_output_queue.put(
+                "ERROR: Failed to find scrcpy window after multiple retries. "
+                "Try starting mirroring again.\n"
+            )
+            self._stop_scrcpy() # Clean up the failed attempt
 
     def _embed_window(self):
         if not self.scrcpy_hwnd or not self.is_mirroring: return
@@ -1809,60 +1838,76 @@ class RunCommandWindow(tk.Toplevel):
         try:
             if sys.platform == "win32":
                 subprocess.run(
-                    f"taskkill /PID {pid} /T /F", check=True, capture_output=True,
+                    f"taskkill /PID {pid} /T /F",
+                    check=True,
+                    capture_output=True,
                     creationflags=subprocess.CREATE_NO_WINDOW
                 )
             else:
                 os.kill(os.getpid(pid), signal.SIGTERM)
-            output_q = self.robot_output_queue if name == "robot" else self.scrcpy_output_queue
-            output_q.put(translate("process_terminated_info", name=name.capitalize(), pid=pid) + "\n")
+            print(translate("appium_terminate_info", pid=pid))
         except (subprocess.CalledProcessError, ProcessLookupError, FileNotFoundError) as e:
-            print(translate("terminate_process_warning", name=name, pid=pid, e=e))
+            print(translate("appium_terminate_warning", pid=pid, e=e))
 
     def _on_close(self):
-        if self._is_closing: return
-        self._is_closing = True
+        """Handles the main window closing event."""
+        if messagebox.askokcancel(translate("quit_title"), translate("quit_message")):
+            self._is_closing = True
+            
+            if self.appium_process:
+                self.status_var.set(translate("stopping_appium_message"))
+                self.root.update_idletasks()
+                self._terminate_process_tree(self.appium_process.pid, "Appium")
+            
+            for window in list(self.active_command_windows.values()):
+                if window.winfo_exists():
+                    window._on_close()
+            
+            self.shell_manager.close_all()
 
-        # Stop all background activities gracefully
-        self._stop_all_activities()
+            self.root.destroy()
+            
+    def _find_and_embed_window(self):
+        """
+        Finds the scrcpy window and embeds it into the mirror_frame.
+        Includes a retry mechanism to handle race conditions on startup.
+        """
+        max_retries = 10
+        retry_delay = 0.5  # 500ms
+        for attempt in range(max_retries):
+            try:
+                if sys.platform == "win32":
+                    self.scrcpy_hwnd = win32gui.FindWindow(None, self.scrcpy_window_title)
+                    if self.scrcpy_hwnd:
+                        self.root.after(100, self._embed_window)
+                        return
+                else: # Linux/macOS
+                    # On Linux, we might need to wait a bit for the window to appear
+                    time.sleep(0.5) # Initial wait
+                    # This command is a bit of a hack. It might need adjustment.
+                    # It tries to find the window ID by title.
+                    cmd = f'xdotool search --name "^{re.escape(self.scrcpy_window_title)}$"'
+                    success, output = execute_command(cmd)
+                    if success and output.strip():
+                        self.scrcpy_hwnd = int(output.strip().splitlines()[0])
+                        self.root.after(100, self._embed_window)
+                        return
 
-        self.parent_app.shell_manager.close(self.udid)
-        # Remove window from parent's active list
-        key_to_remove = None
-        for key, win in self.parent_app.active_command_windows.items():
-            if win is self:
-                key_to_remove = key
-                break
-        if key_to_remove:
-            # Ensure the key exists before deleting
-            if key_to_remove in self.parent_app.active_command_windows:
-                del self.parent_app.active_command_windows[key_to_remove]
+            except Exception as e:
+                self.scrcpy_output_queue.put(f"Embed Error: {e}\n")
 
-        self.destroy()
+            if self.stop_event.is_set():
+                return # Stop trying if the whole operation was cancelled
 
-    def _on_close_reused(self):
-        """Handles closing logic when the window is being reused for another task."""
-        if self._is_closing: return
-        self._is_closing = True
-        self._stop_all_activities()
-        key_to_remove = self.udid
-        if key_to_remove in self.parent_app.active_command_windows:
-            del self.parent_app.active_command_windows[key_to_remove]
+            time.sleep(retry_delay)
 
-        self.destroy()
-
-    def _stop_all_activities(self):
-        """Stops all running processes and threads associated with this window."""
-        if self.mode == 'test' and self.robot_process and self.robot_process.poll() is None:
-            self._stop_test_sync() # Use synchronous version to ensure it's stopped before next action
-        if self.is_monitoring:
-            self._stop_performance_monitor()
-        if self.is_recording:
-            self.scrcpy_output_queue.put(translate("stop_recording_on_close") + "\n")
-            self._stop_recording() # This now handles threading internally
-        if self.is_mirroring:
-            self._stop_scrcpy()
-        self.parent_app.shell_manager.close(self.udid)
+        # If the loop finishes without finding the window
+        if not self.stop_event.is_set():
+            self.scrcpy_output_queue.put(
+                "ERROR: Failed to find scrcpy window after multiple retries. "
+                "Try starting mirroring again.\n"
+            )
+            self._stop_scrcpy() # Clean up the failed attempt
 
 # --- Page Object Classes for Tabs ---
 
@@ -1944,7 +1989,7 @@ class RunTabPage(ttk.Frame):
         
         button_frame = ttk.Frame(wireless_frame)
         button_frame.grid(row=2, column=0, columnspan=3, sticky="ew", pady=5)
-        button_frame.columnconfigure((0, 1, 2), weight=1)
+        button_frame.columnconfigure(0, weight=1)
         
         self.disconnect_button = ttk.Button(button_frame, text=translate("disconnect"), command=self.app._disconnect_wireless_device, bootstyle="danger")
         self.disconnect_button.grid(row=0, column=0, sticky="ew", padx=5)
@@ -3504,12 +3549,21 @@ def run_performance_monitor(shell_manager: AdbShellManager, udid: str, app_packa
         start_time = time.time()
 
         while not stop_event.is_set():
-            ram_output = shell_manager.execute(udid, f"dumpsys meminfo {app_package}")
+            # Get a persistent shell for this iteration
+            shell_process = shell_manager.get_shell(udid)
+            if not shell_process:
+                output_queue.put(f"ERROR: Could not get a persistent shell for {udid}. Retrying...\n")
+                time.sleep(2)
+                continue
+
+            # --- RAM Usage ---
+            ram_output = execute_on_persistent_shell(shell_process, f"dumpsys meminfo {app_package}")
             ram_mb = "N/A"
             if "TOTAL" in ram_output and (match := re.search(r"TOTAL\s+(\d+)", ram_output)):
                 ram_mb = f"{int(match.group(1)) / 1024:.2f}"
 
-            cpu_output = shell_manager.execute(udid, "top -n 1 -b")
+            # --- CPU Usage ---
+            cpu_output = execute_on_persistent_shell(shell_process, "top -n 1 -b")
             cpu_percent = "N/A"
             if "Error" not in cpu_output and "not found" not in cpu_output:
                 for line in cpu_output.splitlines():
@@ -3518,10 +3572,12 @@ def run_performance_monitor(shell_manager: AdbShellManager, udid: str, app_packa
                         cpu_percent = parts[8] if len(parts) > 8 else "N/A"
                         break
             
-            gfx_output = shell_manager.execute(udid, f"dumpsys gfxinfo {app_package}")
+            # --- Graphics Info (Jank, GPU, Vsync) ---
+            gfx_output = execute_on_persistent_shell(shell_process, f"dumpsys gfxinfo {app_package}")
             jank_info = "0.00% (0/0)"
             if jank_match := re.search(r"Janky frames: (\d+) \(([\d.]+)%\)", gfx_output):
-                total_frames = (re.search(r"Total frames rendered: (\d+)", gfx_output) or '?').group(1)
+                total_frames_match = re.search(r"Total frames rendered: (\d+)", gfx_output)
+                total_frames = total_frames_match.group(1) if total_frames_match else '?'
                 jank_info = f"{jank_match.group(2)}% ({jank_match.group(1)}/{total_frames})"
 
             gpu_mem_kb = "N/A"
@@ -3529,12 +3585,12 @@ def run_performance_monitor(shell_manager: AdbShellManager, udid: str, app_packa
                 value, unit = float(gpu_mem_match.group(1)), gpu_mem_match.group(2)
                 gpu_mem_kb = f"{value * 1024:.2f}" if unit == "MB" else f"{value:.2f}"
 
-            missed_vsync = (re.search(r"Number Missed Vsync: (\d+)", gfx_output) or "N/A").group(1)
+            missed_vsync_match = re.search(r"Number Missed Vsync: (\d+)", gfx_output)
+            missed_vsync = missed_vsync_match.group(1) if missed_vsync_match else "N/A"
 
-            surface_name_output = shell_manager.execute(udid, "dumpsys SurfaceFlinger --list")
-            surface_name = get_surface_view_name(surface_name_output, app_package)
-            latency_output = shell_manager.execute(udid, f"dumpsys SurfaceFlinger --latency '{surface_name}'")
-            surface_fps, last_timestamps = get_surface_fps(latency_output, last_timestamps)
+            # --- FPS Calculation ---
+            surface_name = get_surface_view_name(shell_process, app_package)
+            surface_fps, last_timestamps = get_surface_fps(shell_process, surface_name, last_timestamps)
 
             perf_data = {
                 "ts": time.strftime("%H:%M:%S"),
