@@ -92,7 +92,7 @@ class RunCommandWindow(tk.Toplevel):
         self.cur_log_dir = None
 
         # --- Scrcpy Attributes ---
-        self.command_template = self.parent_app.scrcpy_path_var.get() + " -s {udid}"
+        self.command_template = self.parent_app.scrcpy_path_var.get() + " -s {udid} --window-title=\"{title}\""
         self.scrcpy_process = None
         self.scrcpy_hwnd = None
         self.original_style = None
@@ -148,34 +148,23 @@ class RunCommandWindow(tk.Toplevel):
         self.geometry("1200x800")
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
+        # --- UI Initialization ---
+        self._initialize_ui()
+
+    def _initialize_ui(self):
+        """Initializes the UI components."""
         self._setup_widgets()
 
         if self.mode == 'test':
             self._start_test()
+        
+        # Don't start mirroring automatically. Wait for the button click.
+        # self.after(100, self.set_aspect_ratio)
 
-        # Pre-fetch aspect ratio in the background
-        threading.Thread(target=self._fetch_initial_aspect_ratio, daemon=True).start()
+        self.after(100, self._check_robot_output_queue)
+        self.after(100, self._check_scrcpy_output_queue)
+        self.after(100, self._check_performance_output_queue)
 
-        self.after(500, self._check_robot_output_queue) # Intervalo alterado para 500ms
-        self.after(500, self._check_scrcpy_output_queue) # Intervalo alterado para 500ms
-        self.after(500, self._check_performance_output_queue) # Intervalo alterado para 500ms
-
-        # Store initial size to prevent unnecessary refreshes from non-resize <Configure> events
-        self.update_idletasks()
-        self.last_width = self.winfo_width()
-        self.last_height = self.winfo_height()
-
-        self.bind("<Configure>", self._on_window_resize)
-            
-    def _fetch_initial_aspect_ratio(self):
-        """Fetches and stores the device's aspect ratio in the background on startup."""
-        ratio = get_device_aspect_ratio(self.udid)
-        if ratio:
-            self.aspect_ratio = ratio
-            self.scrcpy_output_queue.put(f"INFO: Pre-fetched device aspect ratio: {ratio:.4f}\n")
-        else:
-            self.scrcpy_output_queue.put("WARNING: Could not pre-fetch device aspect ratio.\n")
-            
     # --- UI Setup ------------------------------------------------------------------
     def _setup_widgets(self):
         """Sets up the 3-pane widget layout for the window."""
@@ -531,35 +520,81 @@ class RunCommandWindow(tk.Toplevel):
             # If inspector is active, stop it first
             if self.is_inspecting:
                 self._stop_inspector()
-            self._start_scrcpy()
+            # Start the process by setting the aspect ratio first.
+            # The actual scrcpy start will be chained after it completes.
+            self.set_aspect_ratio()
 
-    def _start_scrcpy(self):
-        """Starts the scrcpy process and adds the mirror pane."""
-        if self.is_mirroring: return
+    def set_aspect_ratio(self):
+        """
+        Calculates and sets the device's aspect ratio, then starts mirroring.
+        This acts as the entry point for starting the mirror.
+        """
+        if self.is_mirroring:
+            return
+
+        self.scrcpy_output_queue.put(translate("calculating_aspect_ratio") + "\n")
+        
+        # Disable button to prevent multiple clicks
+        self.mirror_button.config(state=DISABLED)
+
+        # Run aspect ratio calculation in a separate thread to avoid freezing the UI
+        threading.Thread(target=self._calculate_and_start_mirroring, daemon=True).start()
+
+    def _calculate_and_start_mirroring(self):
+        """
+        Worker thread function to get aspect ratio and then trigger mirroring
+        on the main UI thread.
+        """
+        ratio = get_device_aspect_ratio(self.udid)
+        if ratio:
+            self.aspect_ratio = ratio
+            self.scrcpy_output_queue.put(f"INFO: {translate('aspect_ratio_calculated')}: {ratio:.4f}\n")
+            # Once we have the ratio, schedule the mirroring to start on the main thread
+            self.after(0, self._start_mirroring_after_aspect_ratio)
+        else:
+            self.scrcpy_output_queue.put(f"WARNING: {translate('aspect_ratio_error')}\n")
+            # Re-enable the button on the main thread if it fails
+            self.after(0, lambda: self.mirror_button.config(state=NORMAL))
+
+    def _start_mirroring_after_aspect_ratio(self):
+        """
+        Starts the scrcpy process now that the aspect ratio is known and the UI
+        is ready. This method is always called on the main UI thread.
+        """
+        if self.is_mirroring:
+            return
         self.is_mirroring = True
-        
-        # If aspect ratio wasn't pre-fetched yet, get it now.
-        if self.aspect_ratio is None:
-            self.aspect_ratio = get_device_aspect_ratio(self.udid)
-            if self.aspect_ratio:
-                self.scrcpy_output_queue.put(f"INFO: Fetched aspect ratio on demand: {self.aspect_ratio:.4f} for mirroring.\n")
-            else:
-                self.scrcpy_output_queue.put("WARNING: Could not determine aspect ratio for mirroring.\n")
-        
+
         self.main_paned_window.add(self.right_pane_container, weight=5)
         self.update_idletasks()
-        
-        # Apply layout rules to set initial sash positions correctly
         self.after(10, self._apply_layout_rules)
 
         if hasattr(self, 'inspect_button'):
             self.inspect_button.config(state=DISABLED)
-        self.mirror_button.config(text=translate("stop_mirroring"), bootstyle="danger")
-        ToolTip(self.mirror_button, text=translate("stop_mirroring_tooltip"))
         
+        # Re-enable the button, but now as a "Stop" button
+        self.mirror_button.config(
+            state=NORMAL,
+            text=translate("stop_mirroring"),
+            bootstyle="danger"
+        )
+        ToolTip(self.mirror_button, text=translate("stop_mirroring_tooltip"))
+
         thread = threading.Thread(target=self._run_and_embed_scrcpy)
         thread.daemon = True
         thread.start()
+
+    def _start_scrcpy(self):
+        """
+        Starts the scrcpy process and adds the mirror pane.
+        This method is now a legacy entry point and should not be used directly.
+        It's kept for compatibility in case other parts of the code call it.
+        The correct entry point is now `set_aspect_ratio`.
+        """
+        if self.is_mirroring: return
+
+        # If called directly, fall back to the new standard flow.
+        self.set_aspect_ratio()
 
     def _stop_scrcpy(self):
         """Stops the scrcpy process and removes the mirror pane."""
@@ -825,7 +860,7 @@ class RunCommandWindow(tk.Toplevel):
                 return
 
             # If we reach here, the file exists. Proceed with pull.
-            pull_dump_cmd = f"adb -s {self.udid} pull {device_dump_path} \"{local_dump_filepath}\""
+            pull_dump_cmd = f"adb -s {udid} pull {device_dump_path} \"{local_dump_filepath}\""
             success_pull_dump, out_pull_dump = execute_command(pull_dump_cmd)
             if not success_pull_dump:
                 self.scrcpy_output_queue.put(f"{translate('pull_ui_dump_error')}\n{out_pull_dump}\n")
@@ -1134,7 +1169,7 @@ class RunCommandWindow(tk.Toplevel):
             except Exception as e:
                 messagebox.showerror(translate("copy_error_title"), translate("copy_error_message", error=e), parent=self)
         else:
-            messagebox.showwarning(translate("no_xpath_title"), translate("no_xpath_message"), parent=self)
+            messagebox.showwarning(translate("no_xpath_title"), translate("no_xpath_message", parent=self))
 
     def _perform_xpath_search(self):
         """Filters the element list based on an XPath query against the last UI dump."""
@@ -1344,14 +1379,15 @@ class RunCommandWindow(tk.Toplevel):
         filtered_list = self._apply_inspector_filter()
         self._populate_elements_tree(filtered_list)
 
-    # --- Scrcpy Feature Methods ---
-
+    # --- Scrcpy Feature Methods --------------------------------------------------
     def _run_and_embed_scrcpy(self):
         """Runs scrcpy, captures its output, and embeds its window."""
         try:
+            # Ensure the command template uses the latest scrcpy path
+            self.command_template = self.parent_app.scrcpy_path_var.get() + " -s {udid} --window-title=\"{title}\""
             self.unique_title = f"scrcpy_{int(time.time() * 1000)}"
-            command_with_udid = self.command_template.format(udid=self.udid)
-            command_to_run = f'{command_with_udid} -m 1024 -b 2M --max-fps=30 --no-audio --window-title="{self.unique_title}"'
+            command_with_udid = self.command_template.format(udid=self.udid, title=self.unique_title)
+            command_to_run = f'{command_with_udid} -m 1024 -b 2M --max-fps=30 --no-audio'
             creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
             
             self.scrcpy_process = subprocess.Popen(
@@ -1490,6 +1526,7 @@ class RunCommandWindow(tk.Toplevel):
         command_list = ["adb", "-s", self.udid, "shell", "screenrecord", self.recording_device_path]
         self.scrcpy_output_queue.put(translate("recording_start_info", command=' '.join(command_list)) + "\n")
         try:
+           
             self.recording_process = subprocess.Popen(
                 command_list, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                 encoding=OUTPUT_ENCODING, errors='replace',
