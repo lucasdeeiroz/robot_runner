@@ -2372,6 +2372,7 @@ class RobotRunnerApp:
         self.root.after(100, self._refresh_devices)
         self.root.after(200, self._check_scrcpy_version)
         self.root.after(300, self._check_appium_version)
+        self.root.after(500, self._start_initial_log_parse)
 
     def _setup_string_vars(self):
         """Initializes all Tkinter StringVars."""
@@ -2385,7 +2386,7 @@ class RobotRunnerApp:
         self.recordings_dir_var = tk.StringVar()
         self.theme_var = tk.StringVar()
         self.group_by_var = tk.StringVar(value=translate("group_by_device"))
-        self.log_period_var = tk.StringVar(value=translate("period_last_7_days"))
+        self.log_period_var = tk.StringVar(value=translate("today"))
         # --- Performance Monitor ---
         self.app_packages_var = tk.StringVar()
         self.timestamp_logs_var = tk.BooleanVar(value=False)
@@ -3111,6 +3112,14 @@ class RobotRunnerApp:
         thread.daemon = True
         thread.start()
 
+    def _start_initial_log_parse(self):
+        """Starts an initial, silent log parse in the background for the default period."""
+        # This method is designed to run silently on startup to pre-cache logs.
+        # It does not provide any UI feedback (progress bar, etc.).
+        period = self.log_period_var.get() # Default is "Last 7 Days"
+        thread = threading.Thread(target=self._parse_logs_thread, args=(period, True), daemon=True)
+        thread.start()
+
     def _on_period_change(self, event=None):
         """Handles period selection change by attempting to load a cache file."""
         if not self.logs_tab_initialized: return
@@ -3139,7 +3148,7 @@ class RobotRunnerApp:
             self.logs_tab.log_cache_info_label.config(text=translate("no_cache_for_period"))
             self._display_logs([])
 
-    def _parse_logs_thread(self, period: str):
+    def _parse_logs_thread(self, period: str, silent: bool = False):
         """Parses logs in a background thread based on the selected period."""
         # Recursively find all possible output.xml files, timestamped or not. This is the most robust way.
         all_xml_files = list(self.logs_dir.glob("**/output*.xml"))
@@ -3230,7 +3239,8 @@ class RobotRunnerApp:
             except Exception as e:
                 print(f"Error processing log file {xml_file}: {e}")
             
-            self.root.after(0, self._update_parse_progress, i + 1, total_files)
+            if not silent:
+                self.root.after(0, self._update_parse_progress, i + 1, total_files)
 
         cache_file_to_save = self._get_cache_path_for_period(period)
         try:
@@ -3239,7 +3249,8 @@ class RobotRunnerApp:
         except Exception as e:
             print(f"Error writing to log cache file: {e}")
             
-        self.root.after(0, self._finalize_parsing, all_results)
+        if not silent:
+            self.root.after(0, self._finalize_parsing, all_results)
 
     def _update_parse_progress(self, current, total):
         """Updates the progress bar and label from the main thread."""
