@@ -177,7 +177,12 @@ class RunCommandWindow(tk.Toplevel):
         # --- 1. Left Pane (Outputs) ---
         self.left_pane_container = ttk.Frame(self.main_paned_window, padding=5)
         self.output_paned_window = ttk.PanedWindow(self.left_pane_container, orient=VERTICAL)
-        self.output_paned_window.pack(fill=BOTH, expand=YES)
+        # The output_paned_window is packed by _update_left_pane_visibility
+
+        # --- Placeholder for empty left pane ---
+        self.placeholder_frame = ttk.Frame(self.left_pane_container)
+        placeholder_label = ttk.Label(self.placeholder_frame, text=translate("select_output_placeholder"), justify=CENTER, anchor=CENTER, wraplength=300)
+        placeholder_label.pack(fill=BOTH, expand=YES, padx=20, pady=20)
 
         # --- 2. Center Pane (Controls) ---
         self.center_pane_container = ttk.Frame(self.main_paned_window, padding=10)
@@ -398,6 +403,8 @@ class RunCommandWindow(tk.Toplevel):
         self.main_paned_window.add(self.left_pane_container, weight=3)
         self.main_paned_window.add(self.center_pane_container, weight=0) # Set weight to 0 to make it "fixed"
 
+        self._update_left_pane_visibility() # Set initial state
+
         if self.mode != 'test':
              self.after(100, lambda: self.main_paned_window.sashpos(0, 0)) # Hide left pane
         
@@ -408,6 +415,22 @@ class RunCommandWindow(tk.Toplevel):
         self.minsize(width=min_window_width, height=500)
 
     # --- Visibility & Layout Toggles ---------------------------------------------
+    def _update_left_pane_visibility(self):
+        """
+        Checks if any output panes are visible in the output_paned_window.
+        If not, it hides the output_paned_window and shows a placeholder frame.
+        Otherwise, it ensures the output_paned_window is visible.
+        This is a fallback for when the sash is not completely hidden.
+        """
+        panes = self.output_paned_window.panes()
+        if not panes:
+            # No panes are visible, show placeholder
+            self.output_paned_window.pack_forget()
+            self.placeholder_frame.pack(in_=self.left_pane_container, fill=BOTH, expand=YES)
+        else:
+            # At least one pane is visible, show the paned window
+            self.placeholder_frame.pack_forget()
+            self.output_paned_window.pack(in_=self.left_pane_container, fill=BOTH, expand=YES)
     def _toggle_output_visibility(self, output_type: str):
         """Shows or hides a specific output frame in the left pane."""
         frame_map = {
@@ -416,6 +439,8 @@ class RunCommandWindow(tk.Toplevel):
         }
         if self.mode == 'test':
             frame_map['robot'] = (self.robot_output_frame, self.toggle_robot_button, self.robot_output_is_visible)
+        else:
+            frame_map['inspector'] = (self.inspector_controls_frame, self.inspect_button, self.inspector_is_visible)
         if output_type not in frame_map: return
         
         frame, button, is_visible = frame_map[output_type]
@@ -423,12 +448,14 @@ class RunCommandWindow(tk.Toplevel):
         show_keys = {
             'robot': 'show_test_output',
             'scrcpy': 'show_scrcpy_output',
-            'performance': 'show_performance'
+            'performance': 'show_performance',
+            'inspector': 'show_inspector'
         }
         hide_keys = {
             'robot': 'hide_test_output',
             'scrcpy': 'hide_scrcpy_output',
-            'performance': 'hide_performance'
+            'performance': 'hide_performance',
+            'inspector': 'stop_inspector'
         }
 
         if is_visible:
@@ -444,6 +471,10 @@ class RunCommandWindow(tk.Toplevel):
         if output_type == 'robot': self.robot_output_is_visible = not is_visible
         elif output_type == 'scrcpy': self.scrcpy_output_is_visible = not is_visible
         elif output_type == 'performance': self.performance_monitor_is_visible = not is_visible
+        elif output_type == 'inspector': self.inspector_is_visible = not is_visible
+
+
+        self._update_left_pane_visibility()
 
         self.after(10, self._apply_layout_rules)
 
@@ -683,12 +714,7 @@ class RunCommandWindow(tk.Toplevel):
         self.xpath_buttons_container.pack(side=BOTTOM, fill=X, pady=5, padx=5)
         self.element_details_frame.pack(fill=BOTH, expand=YES, pady=5, padx=5)
         
-        # Add inspector controls to the left pane and apply layout
-        try:
-            self.output_paned_window.add(self.inspector_controls_frame, weight=1)
-        except tk.TclError:
-            pass # Already added
-        
+        self._toggle_output_visibility('inspector')
         self.after(10, self._apply_layout_rules)
         # Wait for the canvas to be drawn before starting the first inspection
         self.after(50, self._wait_for_canvas_and_inspect)
@@ -719,7 +745,7 @@ class RunCommandWindow(tk.Toplevel):
         # Stop auto-refresh thread and forget the inspector controls from the left pane
         self.stop_auto_refresh_event.set()
         self.last_ui_dump_hash = None
-        self.output_paned_window.forget(self.inspector_controls_frame)
+        self._toggle_output_visibility('inspector')
 
         # Clear canvas, treeview, and details
         self.screenshot_canvas.delete("all")

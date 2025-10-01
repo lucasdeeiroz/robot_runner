@@ -276,6 +276,7 @@
     "select_app_package_warning": "Please select an app package to monitor.",
     "select_app_to_monitor_tooltip": "Select the app to be monitored",
     "select_devices": "Select Device(s):",
+    "select_output_placeholder": "No output selected.\n\nPlease select an option from the control panel to view its output here.",
     "select_run_mode_tooltip": "Select the test execution mode",
     "settings_saved_message": "Your settings have been saved successfully.",
     "settings_saved_title": "Settings Saved",

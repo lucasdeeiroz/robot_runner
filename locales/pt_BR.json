@@ -276,6 +276,7 @@
     "select_app_package_warning": "Por favor, selecione um pacote de aplicativo para monitorar.",
     "select_app_to_monitor_tooltip": "Selecione o app a ser monitorado",
     "select_devices": "Selecione o(s) Dispositivo(s):",
+    "select_output_placeholder": "Nenhuma saída selecionada.\n\nPor favor, selecione uma opção no painel de controle para visualizar sua saída aqui.",
     "select_run_mode_tooltip": "Selecione o modo de execução do teste",
     "settings_saved_message": "Suas configurações foram salvas com sucesso.",
     "settings_saved_title": "Configurações Salvas",
