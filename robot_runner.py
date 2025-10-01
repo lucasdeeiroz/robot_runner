@@ -1981,18 +1981,20 @@ class RunTabPage(ttk.Frame):
         
         button_frame = ttk.Frame(wireless_frame)
         button_frame.grid(row=2, column=0, columnspan=3, sticky="ew", pady=5)
-        button_frame.columnconfigure(0, weight=1)
+        button_frame.columnconfigure(0, weight=1) # Disconnect
+        button_frame.columnconfigure(1, weight=1) # Pair
+        button_frame.columnconfigure(2, weight=1) # Connect
         
         self.disconnect_button = ttk.Button(button_frame, text=translate("disconnect"), command=self.app._disconnect_wireless_device, bootstyle="danger")
-        self.disconnect_button.grid(row=0, column=0, sticky="ew", padx=5)
+        self.disconnect_button.grid(row=0, column=0, sticky="ew", padx=(0, 5))
         ToolTip(self.disconnect_button, translate("disconnect_tooltip"))
 
         self.pair_button = ttk.Button(button_frame, text=translate("pair"), command=self.app._pair_wireless_device, bootstyle="info")
         self.pair_button.grid(row=0, column=1, sticky="ew", padx=5)
         ToolTip(self.pair_button, translate("pair_tooltip"))
 
-        self.connect_button = ttk.Button(button_frame, text=translate("connect"), command=self.app._connect_wireless_device)
-        self.connect_button.grid(row=0, column=2, sticky="ew", padx=5)
+        self.connect_button = ttk.Button(button_frame, text=translate("connect"), command=self.app._connect_wireless_device, bootstyle="primary")
+        self.connect_button.grid(row=0, column=2, sticky="ew", padx=(5, 0))
         ToolTip(self.connect_button, translate("connect_tooltip"))
 
         manual_cmd_frame = ttk.LabelFrame(parent_frame, text=translate("manual_adb_command"), padding=10)
