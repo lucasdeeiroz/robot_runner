@@ -630,22 +630,18 @@ class RunCommandWindow(tk.Toplevel):
             # If mirroring is active, stop it first
             if self.is_mirroring:
                 self._stop_scrcpy()
-            self._start_inspector() # This sets up the UI
-            # Schedule the first inspection to run after the UI has had a moment to draw itself
-            self.after(100, self._start_inspection)
+            self._start_inspector()
 
     def _start_inspector(self):
-        """Configures the UI for inspector mode, but does not run the inspection itself."""
+        """Configures the UI for inspector mode and ensures aspect ratio is set."""
         if self.is_inspecting: return
         self.is_inspecting = True
-        
-        # If aspect ratio wasn't pre-fetched yet, get it now.
         if self.aspect_ratio is None:
             self.aspect_ratio = get_device_aspect_ratio(self.udid)
             if self.aspect_ratio:
-                self.scrcpy_output_queue.put(f"INFO: Fetched aspect ratio on demand: {self.aspect_ratio:.4f} for inspector.\n")
+                self.scrcpy_output_queue.put(f"INFO: {translate('aspect_ratio_calculated')}: {self.aspect_ratio:.4f} for inspector.\n")
             else:
-                self.scrcpy_output_queue.put("WARNING: Could not determine aspect ratio for inspector.\n")
+                self.scrcpy_output_queue.put(f"WARNING: {translate('aspect_ratio_error')}\n")
         
         # Update button states
         self.mirror_button.config(state=DISABLED)
@@ -681,6 +677,20 @@ class RunCommandWindow(tk.Toplevel):
             pass # Already added
         
         self.after(10, self._apply_layout_rules)
+        # Wait for the canvas to be drawn before starting the first inspection
+        self.after(50, self._wait_for_canvas_and_inspect)
+
+    def _wait_for_canvas_and_inspect(self):
+        """
+        Waits until the inspector canvas has a valid size, then starts the inspection.
+        This prevents race conditions where inspection starts before the UI is rendered.
+        """
+        if not self.is_inspecting: return # Stop if the user cancelled
+        
+        if self.screenshot_canvas.winfo_width() > 1 and self.screenshot_canvas.winfo_height() > 1:
+            self._start_inspection()
+        else:
+            self.after(50, self._wait_for_canvas_and_inspect) # Check again shortly
 
     def _stop_inspector(self):
         if not self.is_inspecting: return
@@ -796,16 +806,16 @@ class RunCommandWindow(tk.Toplevel):
             self.elements_tree.delete(item)
         self.elements_data_map = {} # Clear previous data
         
-        threading.Thread(target=self._perform_inspection_thread, daemon=True).start()
+        threading.Thread(target=self._perform_inspection_thread, args=(self.udid,), daemon=True).start()
 
-    def _perform_inspection_thread(self):
+    def _perform_inspection_thread(self, udid: str):
         try:
             # 1. Take screenshot
             screenshots_dir = self.parent_app.screenshots_dir
             screenshots_dir.mkdir(exist_ok=True)
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             device_screenshot_path = "/sdcard/inspector_screenshot.png"
-            local_screenshot_filename = f"inspector_screenshot_{self.udid.replace(':', '-')}_{timestamp}.png"
+            local_screenshot_filename = f"inspector_screenshot_{udid.replace(':', '-')}_{timestamp}.png"
             local_screenshot_filepath = screenshots_dir / local_screenshot_filename
 
             shell_manager = self.parent_app.shell_manager
@@ -814,7 +824,7 @@ class RunCommandWindow(tk.Toplevel):
             if "Error:" in out_cap:
                 self.scrcpy_output_queue.put(f"{translate('capture_screenshot_error')}\n{out_cap}\n")
                 return
-            pull_cmd = f"adb -s {self.udid} pull {device_screenshot_path} \"{local_screenshot_filepath}\""
+            pull_cmd = f"adb -s {udid} pull {device_screenshot_path} \"{local_screenshot_filepath}\""
             success_pull, out_pull = execute_command(pull_cmd)
             if not success_pull:
                 self.scrcpy_output_queue.put(f"{translate('pull_screenshot_error')}\n{out_pull}\n")
@@ -824,7 +834,7 @@ class RunCommandWindow(tk.Toplevel):
 
             # 2. Get UI dump with retry logic for robustness
             device_dump_path = "/sdcard/window_dump.xml"
-            local_dump_filepath = self.parent_app.logs_dir / f"window_dump_{self.udid.replace(':', '-')}.xml"
+            local_dump_filepath = self.parent_app.logs_dir / f"window_dump_{udid.replace(':', '-')}.xml"
             self.parent_app.logs_dir.mkdir(exist_ok=True)
 
             self.scrcpy_output_queue.put(translate("get_ui_dump_info") + "\n")
@@ -882,10 +892,6 @@ class RunCommandWindow(tk.Toplevel):
 
         except Exception as e:
             self.scrcpy_output_queue.put(translate("fatal_inspection_error", error=e) + "\n")
-        finally:
-            # Always reset the state on the main thread when the thread finishes,
-            # regardless of success or failure.
-            self.after(0, self._on_inspection_finished)
 
     def _on_inspection_finished(self):
         """Resets the state after an inspection attempt is complete."""
@@ -900,57 +906,61 @@ class RunCommandWindow(tk.Toplevel):
             ToolTip(self.inspect_button, text=translate("stop_inspector_tooltip"))
             
     def _display_inspection_results(self, screenshot_path: Path, dump_path: Path):
-        # Display screenshot
         try:
-            img = Image.open(screenshot_path)
-            self.screenshot_original_size = img.size
-            
-            # Resize image to fit canvas while maintaining aspect ratio
-            self.screenshot_canvas.update_idletasks() # Ensure canvas dimensions are up-to-date
-            canvas_width = self.screenshot_canvas.winfo_width()
-            canvas_height = self.screenshot_canvas.winfo_height()
+            # Display screenshot
+            try:
+                img = Image.open(screenshot_path)
+                self.screenshot_original_size = img.size
+                
+                # Resize image to fit canvas while maintaining aspect ratio
+                self.screenshot_canvas.update_idletasks() # Ensure canvas dimensions are up-to-date
+                canvas_width = self.screenshot_canvas.winfo_width()
+                canvas_height = self.screenshot_canvas.winfo_height()
 
-            if canvas_width == 1 or canvas_height == 1: # Canvas still not rendered correctly, try again
-                self.after(100, lambda: self._display_inspection_results(screenshot_path, dump_path))
-                return
+                if canvas_width == 1 or canvas_height == 1: # Canvas still not rendered correctly, try again
+                    self.after(100, lambda: self._display_inspection_results(screenshot_path, dump_path))
+                    # DO NOT call _on_inspection_finished here, let the rescheduled call handle it.
+                    return
 
-            img_width, img_height = img.size
-            aspect_ratio = img_width / img_height if img_height > 0 else 1
+                img_width, img_height = img.size
+                aspect_ratio = img_width / img_height if img_height > 0 else 1
 
-            if (canvas_width / aspect_ratio) <= canvas_height:
-                new_width = canvas_width
-                new_height = int(canvas_width / aspect_ratio)
-            else:
-                new_height = canvas_height
-                new_width = int(canvas_height * aspect_ratio)
-            img = img.resize((new_width, new_height), Image.LANCZOS)
-            
-            self.screenshot_current_size = img.size
-            self.screenshot_image_tk = ImageTk.PhotoImage(img)
-            self.screenshot_canvas.create_image(canvas_width / 2, canvas_height / 2, image=self.screenshot_image_tk, anchor=CENTER)
+                if (canvas_width / aspect_ratio) <= canvas_height:
+                    new_width = canvas_width
+                    new_height = int(canvas_width / aspect_ratio)
+                else:
+                    new_height = canvas_height
+                    new_width = int(canvas_height * aspect_ratio)
+                img = img.resize((new_width, new_height), Image.LANCZOS)
+                
+                self.screenshot_current_size = img.size
+                self.screenshot_image_tk = ImageTk.PhotoImage(img)
+                self.screenshot_canvas.create_image(canvas_width / 2, canvas_height / 2, image=self.screenshot_image_tk, anchor=CENTER)
 
-        except Exception as e:
-            self.scrcpy_output_queue.put(translate("display_screenshot_error", error=e) + "\n")
-            return
+            except Exception as e:
+                self.scrcpy_output_queue.put(translate("display_screenshot_error", error=e) + "\n")
 
-        # Parse XML
-        try:
-            # Use a recovering parser for potentially malformed UI dumps
-            parser = ET.XMLParser(recover=True)
-            tree = ET.parse(dump_path, parser)
-            root = tree.getroot()
-            
-            self.current_dump_path = dump_path
-            self.all_elements_list = []
+            # Parse XML
+            try:
+                # Use a recovering parser for potentially malformed UI dumps
+                parser = ET.XMLParser(recover=True)
+                tree = ET.parse(dump_path, parser)
+                root = tree.getroot()
+                
+                self.current_dump_path = dump_path
+                self.all_elements_list = []
 
-            for node in root.iter():
-                # Extract all relevant attributes
-                self._parse_and_store_node(node)
-            
-            self._update_element_tree_view()
+                for node in root.iter():
+                    # Extract all relevant attributes
+                    self._parse_and_store_node(node)
+                
+                self._update_element_tree_view()
 
-        except Exception as e:
-            self.scrcpy_output_queue.put(translate("parse_ui_dump_error", error=e) + "\n")
+            except Exception as e:
+                self.scrcpy_output_queue.put(translate("parse_ui_dump_error", error=e) + "\n")
+        finally:
+            # This block ensures that the UI state is reset AFTER attempting to display results.
+            self._on_inspection_finished()
 
     def _parse_and_store_node(self, node: ET.Element):
         """Parses a single XML node and adds it to the all_elements_list if valid."""
@@ -1993,7 +2003,7 @@ class RunTabPage(ttk.Frame):
         self.pair_button.grid(row=0, column=1, sticky="ew", padx=5)
         ToolTip(self.pair_button, translate("pair_tooltip"))
 
-        self.connect_button = ttk.Button(button_frame, text=translate("connect"), command=self.app._connect_wireless_device, bootstyle="primary")
+        self.connect_button = ttk.Button(button_frame, text=translate("connect"), command=self.app._connect_wireless_device)
         self.connect_button.grid(row=0, column=2, sticky="ew", padx=(5, 0))
         ToolTip(self.connect_button, translate("connect_tooltip"))
 
@@ -2006,7 +2016,7 @@ class RunTabPage(ttk.Frame):
         self.adb_command_entry.grid(row=1, column=0, sticky="ew", padx=5, pady=(0, 5))
         ToolTip(self.adb_command_entry, translate("adb_command_tooltip"))
 
-        self.run_adb_button = ttk.Button(manual_cmd_frame, text=translate("run_command"), command=self.app._run_manual_adb_command)
+        self.run_adb_button = ttk.Button(manual_cmd_frame, text=translate("run_command"), command=self.app._run_manual_adb_command, bootstyle="primary")
         self.run_adb_button.grid(row=2, column=0, sticky="ew", padx=5, pady=5)
         ToolTip(self.run_adb_button, translate("run_command_tooltip"))
 
