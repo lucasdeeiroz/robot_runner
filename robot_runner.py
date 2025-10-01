@@ -102,6 +102,8 @@ class RunCommandWindow(tk.Toplevel):
         self.resize_job = None
         self.is_recording = False
         self.recording_process = None
+        self.last_width = 0
+        self.last_height = 0
         self.recording_device_path = ""
         self.scrcpy_output_is_visible = False
 
@@ -146,6 +148,7 @@ class RunCommandWindow(tk.Toplevel):
 
         self.title(window_title)
         self.geometry("1200x800")
+        self.bind("<Configure>", self._on_window_resize)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         # --- UI Initialization ---
@@ -444,16 +447,6 @@ class RunCommandWindow(tk.Toplevel):
 
         self.after(10, self._apply_layout_rules)
 
-    def _on_window_resize(self, event=None):
-        """Debounces resize events to adjust aspect ratio."""
-        # Check if the size actually changed to avoid refreshes on focus change etc.
-        current_width = self.winfo_width()
-        current_height = self.winfo_height()
-        if current_width == self.last_width and current_height == self.last_height:
-            return
-        self.last_width = current_width
-        self.last_height = current_height
-
         if self.resize_job:
             self.after_cancel(self.resize_job)
         self.resize_job = self.after(150, self._apply_layout_rules)
@@ -472,45 +465,65 @@ class RunCommandWindow(tk.Toplevel):
         is_right_visible = len(self.main_paned_window.panes()) == 3
         is_left_visible = bool(self.output_paned_window.panes())
         
-        min_pane_width = 150 # A reasonable minimum
+        min_pane_width = 150 # A reasonable minimum width for any pane
 
         try:
+            # Calculate the ideal width for the right pane to maintain aspect ratio
+            ideal_right_width = 0
+            if is_right_visible and self.aspect_ratio:
+                # The height of the right pane is effectively the height of the main paned window
+                ideal_right_width = int(self.main_paned_window.winfo_height() * self.aspect_ratio)
+                if ideal_right_width < min_pane_width:
+                    ideal_right_width = min_pane_width
+
+            # Calculate the width available for the left and center panes
+            available_for_left_center = total_width - ideal_right_width
+
+            left_width = 0
+            center_width = 0
+
+            if is_left_visible:
+                # Distribute available space: 2/3 for left, 1/3 for center
+                left_width = int(available_for_left_center * (2/3))
+                center_width = available_for_left_center - left_width
+            else:
+                # If left is not visible, center takes all available space
+                center_width = available_for_left_center
+
+            # Ensure panes don't become too small
+            if is_left_visible and left_width < min_pane_width:
+                left_width = min_pane_width
+                center_width = available_for_left_center - left_width
+            
+            if center_width < min_pane_width:
+                center_width = min_pane_width
+                if is_left_visible:
+                    left_width = available_for_left_center - center_width
+                    if left_width < 0: left_width = 0
+
             # Case 1: All three panes are visible
-            if is_left_visible and is_right_visible:
-                ideal_right_width = int(total_height * self.aspect_ratio) if self.aspect_ratio else min_pane_width
-                if ideal_right_width < min_pane_width: ideal_right_width = min_pane_width
-
-                remaining_width = total_width - ideal_right_width
-                if remaining_width < (min_pane_width * 2):
-                    remaining_width = min_pane_width * 2
-
-                left_width = int(remaining_width * (2/3))
-                center_width = remaining_width - left_width
-                
+            if is_right_visible:
                 self.main_paned_window.sashpos(0, left_width)
-                self.main_paned_window.sashpos(1, left_width + center_width)
-
-            # Case 2: Only right and center are visible
-            elif not is_left_visible and is_right_visible:
-                self.main_paned_window.sashpos(0, 0)
-                ideal_right_width = int(total_height * self.aspect_ratio) if self.aspect_ratio else min_pane_width
-                if ideal_right_width < min_pane_width: ideal_right_width = min_pane_width
-
-                center_width = total_width - ideal_right_width
-                if center_width < min_pane_width: center_width = min_pane_width
-                self.main_paned_window.sashpos(1, center_width)
-
-            # Case 3: Only left and center are visible
-            elif is_left_visible and not is_right_visible:
-                left_width = int(total_width * (2/3))
+                self.main_paned_window.sashpos(1, left_width + center_width) # Sash is relative to the start
+            elif is_left_visible: # Only left and center are visible
+                left_width = int(total_width * (2/3)) # No right pane, so split the total width
                 self.main_paned_window.sashpos(0, left_width)
-
-            # Case 4: Only center pane is visible
-            elif not is_left_visible and not is_right_visible:
-                # Collapse the left pane, making the center pane take up all the space
-                self.main_paned_window.sashpos(0, 0)
         except tk.TclError:
             pass
+
+    def _on_window_resize(self, event=None):
+        """Debounces resize events to adjust aspect ratio."""
+        # Check if the size actually changed to avoid refreshes on focus change etc.
+        current_width = self.winfo_width()
+        current_height = self.winfo_height()
+        if current_width == self.last_width and current_height == self.last_height:
+            return
+        self.last_width = current_width
+        self.last_height = current_height
+
+        if self.resize_job:
+            self.after_cancel(self.resize_job)
+        self.resize_job = self.after(150, self._apply_layout_rules)
 
     # --- Scrcpy Core Methods -----------------------------------------------------
     def _toggle_mirroring(self):
@@ -697,31 +710,34 @@ class RunCommandWindow(tk.Toplevel):
         self.is_inspecting = False
 
         # Hide inspector panes
-        self.main_paned_window.forget(self.right_pane_container)
-        self.after(10, self._apply_layout_rules)
+        self.main_paned_window.forget(self.right_pane_container) # Forget the right pane (screenshot)
 
         # Hide the moved widgets from the center pane
         self.element_details_frame.pack_forget()
         self.xpath_buttons_container.pack_forget()
 
-        # Stop auto-refresh thread
+        # Stop auto-refresh thread and forget the inspector controls from the left pane
         self.stop_auto_refresh_event.set()
         self.last_ui_dump_hash = None
         self.output_paned_window.forget(self.inspector_controls_frame)
 
-        # Clear canvas and treeview
+        # Clear canvas, treeview, and details
         self.screenshot_canvas.delete("all")
         for item in self.elements_tree.get_children():
             self.elements_tree.delete(item)
         
         # Clear XPath buttons
         self._update_xpath_buttons_state(None)
+        self._populate_element_details(None)
 
         # Restore button states
         self.mirror_button.config(state=NORMAL)
         self.inspect_button.config(text=translate("start_inspector"), bootstyle="primary")
         ToolTip(self.inspect_button, text=translate("start_inspector_tooltip"))
         self.refresh_inspector_button.config(state=DISABLED)
+
+        # Hide the left pane if it's now empty
+        self.after(10, self._apply_layout_rules)
 
     def _auto_refresh_inspector_thread(self):
         """Checks for UI changes in the background and triggers a refresh if detected."""
@@ -908,6 +924,9 @@ class RunCommandWindow(tk.Toplevel):
     def _display_inspection_results(self, screenshot_path: Path, dump_path: Path):
         try:
             # Display screenshot
+            self.current_screenshot_path = screenshot_path
+            self.current_dump_path = dump_path
+
             try:
                 img = Image.open(screenshot_path)
                 self.screenshot_original_size = img.size
@@ -935,7 +954,7 @@ class RunCommandWindow(tk.Toplevel):
                 
                 self.screenshot_current_size = img.size
                 self.screenshot_image_tk = ImageTk.PhotoImage(img)
-                self.screenshot_canvas.create_image(canvas_width / 2, canvas_height / 2, image=self.screenshot_image_tk, anchor=CENTER)
+                self.screenshot_canvas.create_image(canvas_width / 2, canvas_height / 2, image=self.screenshot_image_tk, anchor=CENTER, tags="screenshot")
 
             except Exception as e:
                 self.scrcpy_output_queue.put(translate("display_screenshot_error", error=e) + "\n")
@@ -947,7 +966,6 @@ class RunCommandWindow(tk.Toplevel):
                 tree = ET.parse(dump_path, parser)
                 root = tree.getroot()
                 
-                self.current_dump_path = dump_path
                 self.all_elements_list = []
 
                 for node in root.iter():
@@ -964,7 +982,7 @@ class RunCommandWindow(tk.Toplevel):
 
     def _parse_and_store_node(self, node: ET.Element):
         """Parses a single XML node and adds it to the all_elements_list if valid."""
-        # Start with a copy of all attributes from the XML node. This is the key change.
+        # Start with a copy of all attributes from the XML node.
         element_full_data = dict(node.attrib)
 
         # Standardize some key names for internal use if they exist
@@ -981,9 +999,11 @@ class RunCommandWindow(tk.Toplevel):
         elif content_desc:
             display_title = f"accessibility_id={content_desc}"
         elif text:
-            display_title = f"text={text}"
+            # Truncate long text for display
+            display_text = (text[:40] + '...') if len(text) > 43 else text
+            display_title = f"text={display_text}"
         elif node_class:
-            display_title = f"class={node_class.split('.')[-1]}" # Keep this for display
+            display_title = f"class={node_class.split('.')[-1]}"
 
         # Ensure we have a title to display
         if display_title:
@@ -1085,11 +1105,18 @@ class RunCommandWindow(tk.Toplevel):
             self.elements_tree.selection_set("")
 
     def _on_inspector_canvas_resize(self, event=None):
-        """Redraws the selected element's highlight when the inspector canvas is resized."""
-        if self.is_inspecting and self.elements_tree.selection():
-            # Re-select the currently selected item to trigger redraw
-            # Pass None as event, as it's not a direct selection event
-            self._on_element_select(None)
+        """
+        Redraws the screenshot and highlight when the inspector canvas is resized.
+        This is a more robust way to handle window resizing.
+        """
+        self.screenshot_canvas.delete("highlight")
+        if self.is_inspecting and hasattr(self, 'current_screenshot_path') and self.current_screenshot_path:
+            # Redraw the entire screenshot to fit the new canvas size
+            self._display_inspection_results(self.current_screenshot_path, self.current_dump_path)
+            
+            # After redrawing, re-apply the highlight for the selected element
+            if self.elements_tree.selection():
+                self._on_element_select(None)
 
     def _update_xpath_buttons_state(self, element_data: Optional[Dict]):
         """Creates/updates XPath copy buttons based on available element data."""
@@ -1104,7 +1131,7 @@ class RunCommandWindow(tk.Toplevel):
             return
 
         # Define which attributes to create buttons for
-        attributes_to_check = ["resource_id", "text", "accessibility_id", "class"]
+        attributes_to_check = ["resource-id", "text", "content-desc", "class"]
         
         for attr in attributes_to_check:
             attr_value = element_data.get(attr)
@@ -1117,7 +1144,7 @@ class RunCommandWindow(tk.Toplevel):
                 button = ttk.Button(
                     self.xpath_buttons_container,
                     text=button_text,
-                    command=lambda a=attr: self._copy_xpath(a)
+                    command=lambda a=attr: self._copy_xpath(a) # Use the original attribute name
                 )
                 ToolTip(button, translate("copy_xpath_tooltip", attr=attr, value=attr_value))
                 # Align buttons vertically
@@ -1132,20 +1159,16 @@ class RunCommandWindow(tk.Toplevel):
         element = self.current_selected_element_data
         xpath = ""
 
-        if attribute_type == "id" and element.get("id"):
-            xpath = f"//*[@id='{element["id"]}']"
-        elif attribute_type == "resource_id" and element.get("resource_id"):
-            xpath = f"//*[@resource-id='{element["resource_id"]}']"
-        elif attribute_type == "accessibility_id" and element.get("accessibility_id"):
-            xpath = f"//*[@content-desc='{element["accessibility_id"]}']"
-        elif attribute_type == "text" and element.get("text"):
-            xpath = f"//*[@text='{element["text"]}']"
-        elif attribute_type == "class" and element.get("class"):
-            xpath = f"//android.widget.{element["class"].split('.')[-1]}" # Simplified for common Android classes
-        
-        # Add a more generic fallback if specific attribute is not found but class is
-        if not xpath and element.get("class"):
-             xpath = f"//android.widget.{element["class"].split('.')[-1]}"
+        attr_value = element.get(attribute_type)
+        if not attr_value:
+            return ""
+
+        if attribute_type == "class":
+            # For 'class', the XPath is different
+            xpath = f"//{attr_value}"
+        else:
+            # For other attributes like resource-id, text, content-desc
+            xpath = f"//*[@{attribute_type}='{attr_value}']"
 
         return xpath
 
