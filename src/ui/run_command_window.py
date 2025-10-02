@@ -282,6 +282,7 @@ class RunCommandWindow(ttk.Toplevel):
         self.filter_menubutton = ttk.Menubutton(top_controls, text=translate("inspector_filter_attributes"), bootstyle="outline-toolbutton")
         self.filter_menubutton.grid(row=0, column=1, sticky="ew", padx=5)
         filter_menu = ttk.Menu(self.filter_menubutton, tearoff=False)
+        ToolTip(self.filter_menubutton, text=translate("filter_elements_by_attributes_tooltip"))
         self.filter_menubutton["menu"] = filter_menu
         filter_menu.add_checkbutton(label=translate("filter_by_resource_id"), variable=self.filter_by_resource_id_var, command=self._update_element_tree_view)
         filter_menu.add_checkbutton(label=translate("filter_by_text"), variable=self.filter_by_text_var, command=self._update_element_tree_view)
@@ -303,8 +304,10 @@ class RunCommandWindow(ttk.Toplevel):
         search_button_frame.grid(row=0, column=1, sticky="e")
         self.search_button = ttk.Button(search_button_frame, text=translate("search_button"), command=self._perform_xpath_search, bootstyle="primary")
         self.search_button.pack(side=LEFT)
+        ToolTip(self.search_button, text=translate("search_inspector_element_tooltip"))
         self.clear_search_button = ttk.Button(search_button_frame, text=translate("clear_button"), command=self._clear_xpath_search, bootstyle="secondary")
         self.clear_search_button.pack(side=LEFT, padx=(5, 0))
+        ToolTip(self.clear_search_button, text=translate("clear_tooltip"))
 
         elements_list_frame = ttk.Frame(self.inspector_controls_frame, padding=5)
         elements_list_frame.pack(side=TOP, fill=BOTH, expand=YES)
@@ -320,16 +323,22 @@ class RunCommandWindow(ttk.Toplevel):
         actions_frame.columnconfigure((0, 1, 2, 3), weight=1)
         self.action_click_button = ttk.Button(actions_frame, text=translate("action_click"), command=lambda: self._perform_element_action("click"), state=DISABLED)
         self.action_click_button.grid(row=0, column=0, columnspan=2, sticky="ew", padx=2, pady=2)
+        ToolTip(self.action_click_button, text=translate("action_click_tooltip"))
         self.action_long_click_button = ttk.Button(actions_frame, text=translate("action_long_click"), command=lambda: self._perform_element_action("long_click"), state=DISABLED)
         self.action_long_click_button.grid(row=0, column=2, columnspan=2, sticky="ew", padx=2, pady=2)
+        ToolTip(self.action_long_click_button, text=translate("action_long_click_tooltip"))
         self.action_swipe_up_button = ttk.Button(actions_frame, text=translate("action_swipe_up"), command=lambda: self._perform_element_action("swipe_up"), state=DISABLED)
         self.action_swipe_up_button.grid(row=1, column=0, sticky="ew", padx=2, pady=2)
+        ToolTip(self.action_swipe_up_button, text=translate("action_swipe_up_tooltip"))
         self.action_swipe_down_button = ttk.Button(actions_frame, text=translate("action_swipe_down"), command=lambda: self._perform_element_action("swipe_down"), state=DISABLED)
         self.action_swipe_down_button.grid(row=1, column=1, sticky="ew", padx=2, pady=2)
+        ToolTip(self.action_swipe_down_button, text=translate("action_swipe_down_tooltip"))
         self.action_swipe_left_button = ttk.Button(actions_frame, text=translate("action_swipe_left"), command=lambda: self._perform_element_action("swipe_left"), state=DISABLED)
         self.action_swipe_left_button.grid(row=1, column=2, sticky="ew", padx=2, pady=2)
+        ToolTip(self.action_swipe_left_button, text=translate("action_swipe_left_tooltip"))
         self.action_swipe_right_button = ttk.Button(actions_frame, text=translate("action_swipe_right"), command=lambda: self._perform_element_action("swipe_right"), state=DISABLED)
         self.action_swipe_right_button.grid(row=1, column=3, sticky="ew", padx=2, pady=2)
+        ToolTip(self.action_swipe_right_button, text=translate("action_swipe_right_tooltip"))
 
     def _setup_inspector_right_pane(self):
         """Sets up the inspector's screenshot canvas in the right pane."""

@@ -2,9 +2,9 @@ import sys
 import ctypes
 import ttkbootstrap as ttk
 
-# Adiciona o diretório do projeto ao sys.path para permitir importações relativas
+# Adds the project directory to sys.path to allow relative imports
 if __name__ == '__main__':
-    # Garante que o diretório 'src' seja encontrado, não importa como o script é executado
+    # Ensures that the 'src' directory is found, no matter how the script is executed
     from pathlib import Path
     project_dir = Path(__file__).resolve().parent
     sys.path.insert(0, str(project_dir))

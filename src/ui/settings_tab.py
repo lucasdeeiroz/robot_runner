@@ -31,26 +31,41 @@ class SettingsTabPage(ttk.Frame):
         ToolTip(self.toggle_appium_button, translate("appium_toggle_tooltip"))
 
         ttk.Label(app_settings_frame, text=translate("appium_command")).grid(row=1, column=0, padx=5, pady=5, sticky=W)
-        ttk.Entry(app_settings_frame, textvariable=self.app.appium_command_var).grid(row=1, column=1, columnspan=2, padx=5, pady=5, sticky=EW)
+        appium_command_entry = ttk.Entry(app_settings_frame, textvariable=self.app.appium_command_var)
+        appium_command_entry.grid(row=1, column=1, columnspan=2, padx=5, pady=5, sticky=EW)
+        ToolTip(appium_command_entry, text=translate("appium_command_tooltip"))
         
         dir_settings_frame = ttk.LabelFrame(settings_frame, text=translate("dir_path_settings"), padding=10)
         dir_settings_frame.pack(fill=X, pady=5)
         dir_settings_frame.columnconfigure(1, weight=1); dir_settings_frame.columnconfigure(3, weight=1)
 
         ttk.Label(dir_settings_frame, text=translate("suites_dir")).grid(row=0, column=0, padx=5, pady=2, sticky=W)
-        ttk.Entry(dir_settings_frame, textvariable=self.app.suites_dir_var).grid(row=0, column=1, padx=5, pady=2, sticky=EW)
+        suites_dir_entry = ttk.Entry(dir_settings_frame, textvariable=self.app.suites_dir_var)
+        suites_dir_entry.grid(row=0, column=1, padx=5, pady=2, sticky=EW)
+        ToolTip(suites_dir_entry, text=translate("suites_dir_tooltip"))
+        
         ttk.Label(dir_settings_frame, text=translate("tests_dir")).grid(row=0, column=2, padx=5, pady=2, sticky=W)
-        ttk.Entry(dir_settings_frame, textvariable=self.app.tests_dir_var).grid(row=0, column=3, padx=5, pady=2, sticky=EW)
+        tests_dir_entry = ttk.Entry(dir_settings_frame, textvariable=self.app.tests_dir_var)
+        tests_dir_entry.grid(row=0, column=3, padx=5, pady=2, sticky=EW)
+        ToolTip(tests_dir_entry, text=translate("tests_dir_tooltip"))
+        
         ttk.Label(dir_settings_frame, text=translate("logs_dir")).grid(row=2, column=0, padx=5, pady=2, sticky=W)
-        ttk.Entry(dir_settings_frame, textvariable=self.app.logs_dir_var).grid(row=2, column=1, padx=5, pady=2, sticky=EW)
+        logs_dir_entry = ttk.Entry(dir_settings_frame, textvariable=self.app.logs_dir_var)
+        logs_dir_entry.grid(row=2, column=1, padx=5, pady=2, sticky=EW)
+        ToolTip(logs_dir_entry, text=translate("logs_dir_tooltip"))
+        
         ttk.Label(dir_settings_frame, text=translate("scrcpy_path")).grid(row=2, column=2, padx=5, pady=5, sticky=W)
-        ttk.Entry(dir_settings_frame, textvariable=self.app.scrcpy_path_var).grid(row=2, column=3, padx=5, pady=5, sticky=EW)
+        scrcpy_path_entry = ttk.Entry(dir_settings_frame, textvariable=self.app.scrcpy_path_var)
+        scrcpy_path_entry.grid(row=2, column=3, padx=5, pady=5, sticky=EW)
+        ToolTip(scrcpy_path_entry, text=translate("scrcpy_path_tooltip"))
         
         inspector_settings_frame = ttk.LabelFrame(settings_frame, text=translate("inspector_settings"), padding=10)
         inspector_settings_frame.pack(fill=X, pady=5)
         inspector_settings_frame.columnconfigure(1, weight=1)
         ttk.Label(inspector_settings_frame, text=translate("app_packages_label")).grid(row=0, column=0, padx=5, pady=5, sticky=W)
-        ttk.Entry(inspector_settings_frame, textvariable=self.app.app_packages_var).grid(row=0, column=1, padx=5, pady=5, sticky=EW)
+        app_packages_entry = ttk.Entry(inspector_settings_frame, textvariable=self.app.app_packages_var)
+        app_packages_entry.grid(row=0, column=1, padx=5, pady=5, sticky=EW)
+        ToolTip(app_packages_entry, text=translate("app_packages_tooltip"))
 
         bottom_frame = ttk.Frame(settings_frame); bottom_frame.pack(fill=X, pady=0, padx=0); bottom_frame.columnconfigure(0, weight=1)
         appearance_frame = ttk.LabelFrame(bottom_frame, text=translate("appearance") + " " + translate("theme_restart_required"), padding=10)
@@ -62,7 +77,9 @@ class SettingsTabPage(ttk.Frame):
         self.language_combo.bind("<<ComboboxSelected>>", self.app._on_language_select)
         self.language_combo.set(self.app.LANGUAGES.get(self.app.language_var.get(), "English"))
 
-        ttk.Button(bottom_frame, text=translate("save_settings"), command=self.app._save_settings, bootstyle="success").grid(row=0, column=1, sticky="e", padx=10)
+        save_button = ttk.Button(bottom_frame, text=translate("save_settings"), command=self.app._save_settings, bootstyle="success")
+        save_button.grid(row=0, column=1, sticky="e", padx=10)
+        ToolTip(save_button, text=translate("save_settings_tooltip"))
 
         output_frame = ttk.LabelFrame(settings_frame, text=translate("appium_server_output"), padding=5)
         output_frame.pack(fill=BOTH, expand=YES, pady=5)

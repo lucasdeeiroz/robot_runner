@@ -60,10 +60,13 @@ class RunTabPage(ttk.Frame):
 
         self.ip_entry = ttk.Entry(wireless_frame, textvariable=self.app.adb_ip_var)
         self.ip_entry.grid(row=1, column=0, sticky="ew", padx=5, pady=(0, 5))
+        ToolTip(self.ip_entry, text=translate("wireless_ip_tooltip"))
         self.port_entry = ttk.Entry(wireless_frame, textvariable=self.app.adb_port_var, width=8)
         self.port_entry.grid(row=1, column=1, sticky="ew", padx=5, pady=(0, 5))
+        ToolTip(self.port_entry, text=translate("wireless_port_tooltip"))
         self.code_entry = ttk.Entry(wireless_frame, width=8)
         self.code_entry.grid(row=1, column=2, sticky="ew", padx=5, pady=(0, 5))
+        ToolTip(self.code_entry, text=translate("wireless_code_tooltip"))
         
         button_frame = ttk.Frame(wireless_frame)
         button_frame.grid(row=2, column=0, columnspan=3, sticky="ew", pady=5)
@@ -71,18 +74,23 @@ class RunTabPage(ttk.Frame):
         
         self.disconnect_button = ttk.Button(button_frame, text=translate("disconnect"), command=self.app._disconnect_wireless_device, bootstyle="danger")
         self.disconnect_button.grid(row=0, column=0, sticky="ew", padx=(0, 5))
+        ToolTip(self.disconnect_button, text=translate("disconnect_tooltip"))
         self.pair_button = ttk.Button(button_frame, text=translate("pair"), command=self.app._pair_wireless_device, bootstyle="info")
         self.pair_button.grid(row=0, column=1, sticky="ew", padx=5)
+        ToolTip(self.pair_button, text=translate("pair_tooltip"))
         self.connect_button = ttk.Button(button_frame, text=translate("connect"), command=self.app._connect_wireless_device)
         self.connect_button.grid(row=0, column=2, sticky="ew", padx=(5, 0))
+        ToolTip(self.connect_button, text=translate("connect_tooltip"))
 
         manual_cmd_frame = ttk.LabelFrame(parent_frame, text=translate("manual_adb_command"), padding=10)
         manual_cmd_frame.grid(row=1, column=0, sticky="ew", pady=5)
         manual_cmd_frame.columnconfigure(0, weight=1)
         self.adb_command_entry = ttk.Entry(manual_cmd_frame)
         self.adb_command_entry.grid(row=0, column=0, sticky="ew", padx=5, pady=(0, 5))
+        ToolTip(self.adb_command_entry, text=translate("adb_command_tooltip"))
         self.run_adb_button = ttk.Button(manual_cmd_frame, text=translate("run_command"), command=self.app._run_manual_adb_command, bootstyle="primary")
         self.run_adb_button.grid(row=1, column=0, sticky="ew", padx=5, pady=5)
+        ToolTip(self.run_adb_button, text=translate("run_command_tooltip"))
 
         output_frame = ttk.LabelFrame(parent_frame, text=translate("adb_output"), padding=5)
         output_frame.grid(row=2, column=0, sticky="nsew", pady=5)
@@ -101,15 +109,19 @@ class RunTabPage(ttk.Frame):
         mode_frame = ttk.Frame(top_controls); mode_frame.grid(row=0, column=1, sticky="e")
         ttk.Radiobutton(mode_frame, text=translate("run_by_suite"), variable=self.app.run_mode_var, value="Suite", command=self.on_run_mode_change).pack(side=LEFT, padx=5)
         ttk.Radiobutton(mode_frame, text=translate("run_by_test"), variable=self.app.run_mode_var, value="Test", command=self.on_run_mode_change).pack(side=LEFT, padx=5)
+        ToolTip(mode_frame, text=translate("select_run_mode_tooltip"))
 
         self.selection_listbox = tk.Listbox(test_frame, exportselection=False); self.selection_listbox.grid(row=1, column=0, padx=5, pady=2, sticky="nsew")
         self.selection_listbox.bind("<Double-1>", self.on_selection_listbox_double_click)
 
         run_frame = ttk.Frame(parent_frame, padding=(0, 10, 0, 0)); run_frame.pack(fill=X, pady=5)
         run_frame.columnconfigure(1, weight=1)
-        self.device_options_button = ttk.Button(run_frame, text=translate("device_toolbox"), command=self.app._mirror_device, bootstyle="info"); self.device_options_button.grid(row=0, column=0, sticky="w", padx=5, pady=5)
+        self.device_options_button = ttk.Button(run_frame, text=translate("device_toolbox"), command=self.app._mirror_device, bootstyle="info"); self.device_options_button.grid(row=0, column=0, sticky="w", padx=5, pady=5);
+        ToolTip(self.device_options_button, text=translate("device_toolbox_tooltip"))
         self.timestamp_check = ttk.Checkbutton(run_frame, text=translate("do_not_overwrite_logs"), variable=self.app.timestamp_logs_var); self.timestamp_check.grid(row=0, column=2, sticky="e", padx=(0, 10))
+        ToolTip(self.timestamp_check, text=translate("timestamp_logs_tooltip"))
         self.run_button = ttk.Button(run_frame, text=translate("run_test"), command=self.app._run_test, bootstyle="success"); self.run_button.grid(row=0, column=3, sticky="e", padx=5, pady=5)
+        ToolTip(self.run_button, text=translate("run_test_tooltip"))
 
     def on_run_mode_change(self):
         """Handles the change of run mode."""
