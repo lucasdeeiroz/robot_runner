@@ -81,7 +81,7 @@ class RobotRunnerApp:
         """Initializes all Tkinter StringVars."""
         self.scrcpy_path_var = tk.StringVar()
         self.appium_command_var = tk.StringVar()
-        self.run_mode_var = tk.StringVar(value="Suite")
+        self.run_mode_var = tk.StringVar(value=translate("run_mode_suite"))
         self.suites_dir_var = tk.StringVar()
         self.tests_dir_var = tk.StringVar()
         self.logs_dir_var = tk.StringVar()
