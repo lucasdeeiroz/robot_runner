@@ -307,9 +307,18 @@ class RobotRunnerApp:
                 return
 
             run_mode = self.run_mode_var.get()
-            path_to_run = self.current_path / selected_filename
+            
+            # Create a Path object for the selection.
+            selected_path = Path(selected_filename)
 
-            if not path_to_run.exists():
+            # If the selection is already an absolute path (e.g., "C:\..."), use it directly.
+            # Otherwise, join it with the current directory. This robustly prevents ".\C:\" errors.
+            if selected_path.is_absolute():
+                path_to_run = selected_path.resolve()
+            else:
+                path_to_run = (self.current_path / selected_path).resolve()
+
+            if not path_to_run.exists(): # Now path_to_run is a Path object, so .exists() works.
                 messagebox.showerror(translate("open_file_error_title"), translate("file_not_found_error", path=path_to_run), parent=self.root)
                 return
 

@@ -1142,7 +1142,14 @@ class RunCommandWindow(ttk.Toplevel):
             
             ts_opt = " --timestampoutputs" if self.parent_app.timestamp_logs_var.get() else ""
             base_cmd = f'robot{ts_opt} --split-log --logtitle "{device_info["release"]} - {device_info["model"]}" -v udid:"{self.udid}" -v deviceName:"{device_info["model"]}" -v versao_OS:"{device_info["release"]}" -d "{self.cur_log_dir}" --name "{suite_name}"'
-            command = f'{base_cmd} --argumentfile ".\\{self.run_path}"' if self.run_mode == "Suite" else f'{base_cmd} ".\\{self.run_path}"'
+            
+            # The self.run_path is already an absolute path, so it should be used directly.
+            # Enclosing it in quotes handles paths with spaces.
+            if self.run_mode == "Suite":
+                command = f'{base_cmd} --argumentfile "{self.run_path}"'
+            else:
+                command = f'{base_cmd} "{self.run_path}"'
+
             self.robot_output_queue.put(translate("executing_command", command=command))
 
             creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
