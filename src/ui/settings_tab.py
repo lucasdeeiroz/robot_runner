@@ -49,9 +49,19 @@ class SettingsTabPage(ttk.Frame):
         tests_dir_entry.grid(row=0, column=3, padx=5, pady=2, sticky=EW)
         ToolTip(tests_dir_entry, text=translate("tests_dir_tooltip"))
         
-        ttk.Label(dir_settings_frame, text=translate("logs_dir")).grid(row=2, column=0, padx=5, pady=2, sticky=W)
+        ttk.Label(dir_settings_frame, text=translate("screenshots_dir")).grid(row=1, column=0, padx=5, pady=2, sticky=W)
+        screenshots_dir_entry = ttk.Entry(dir_settings_frame, textvariable=self.app.screenshots_dir_var)
+        screenshots_dir_entry.grid(row=1, column=1, padx=5, pady=2, sticky=EW)
+        ToolTip(screenshots_dir_entry, text=translate("screenshots_dir_tooltip"))
+
+        ttk.Label(dir_settings_frame, text=translate("recordings_dir")).grid(row=1, column=2, padx=5, pady=2, sticky=W)
+        recordings_dir_entry = ttk.Entry(dir_settings_frame, textvariable=self.app.recordings_dir_var)
+        recordings_dir_entry.grid(row=1, column=3, padx=5, pady=2, sticky=EW)
+        ToolTip(recordings_dir_entry, text=translate("recordings_dir_tooltip"))
+        
+        ttk.Label(dir_settings_frame, text=translate("logs_dir")).grid(row=2, column=0, padx=5, pady=5, sticky=W)
         logs_dir_entry = ttk.Entry(dir_settings_frame, textvariable=self.app.logs_dir_var)
-        logs_dir_entry.grid(row=2, column=1, padx=5, pady=2, sticky=EW)
+        logs_dir_entry.grid(row=2, column=1, padx=5, pady=5, sticky=EW)
         ToolTip(logs_dir_entry, text=translate("logs_dir_tooltip"))
         
         ttk.Label(dir_settings_frame, text=translate("scrcpy_path")).grid(row=2, column=2, padx=5, pady=5, sticky=W)

@@ -1,11 +1,11 @@
 {
     "appium_command": "appium --base-path=/wd/hub --relaxed-security",
-    "scrcpy_path": "C:\\Users\\lucas\\Projetos_Programacao\\robot_runner\\scrcpy\\scrcpy.exe",
-    "suites_dir": "suites",
-    "tests_dir": "tests",
-    "logs_dir": "logs",
-    "screenshots_dir": "screenshots",
-    "recordings_dir": "recordings",
+    "scrcpy_path": "%CUR_DIR%\\scrcpy\\scrcpy.exe",
+    "suites_dir": "%CUR_DIR%\\suites",
+    "tests_dir": "%CUR_DIR%\\tests",
+    "logs_dir": "%CUR_DIR%\\logs",
+    "screenshots_dir": "%USERPROFILE%\\Pictures\\RobotRunner",
+    "recordings_dir": "%USERPROFILE%\\Videos\\RobotRunner",
     "theme": "darkly",
     "language": "en_US",
     "app_packages": "com.android.chrome, com.chrome.beta"

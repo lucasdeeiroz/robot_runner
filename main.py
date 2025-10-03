@@ -157,6 +157,15 @@ class RobotRunnerApp:
                 self.language_var.set(code)
                 break
 
+    def _get_expanded_path_setting(self, settings: Dict, key: str, default: str) -> str:
+        """Gets a path from settings, expands custom and environment variables, and returns it."""
+        path_value = settings.get(key, default)
+        # First, replace the custom %CUR_DIR% placeholder (case-insensitive)
+        # The lambda function prevents re.sub from misinterpreting backslashes in the path as escape sequences (e.g., \U in C:\Users).
+        path_value = re.sub(r'%CUR_DIR%', lambda m: str(BASE_DIR), path_value, flags=re.IGNORECASE)
+        # Then, expand standard environment variables like %USERPROFILE% or $HOME
+        return os.path.expandvars(path_value)
+
     def _load_settings(self): # This method is now in SettingsTabPage
         """Loads settings from the settings.json file."""
         try:
@@ -169,13 +178,13 @@ class RobotRunnerApp:
             print(translate("error_loading_settings", e=e))
             settings = {}
 
-        self.appium_command_var.set(settings.get("appium_command", "appium --base-path=/wd/hub --relaxed-security"))
-        self.scrcpy_path_var.set(settings.get("scrcpy_path", ""))
-        self.suites_dir_var.set(settings.get("suites_dir", "suites"))
-        self.tests_dir_var.set(settings.get("tests_dir", "tests"))
-        self.logs_dir_var.set(settings.get("logs_dir", "logs"))
-        self.screenshots_dir_var.set(settings.get("screenshots_dir", str(BASE_DIR / "screenshots")))
-        self.recordings_dir_var.set(settings.get("recordings_dir", str(BASE_DIR / "recordings")))
+        self.appium_command_var.set(self._get_expanded_path_setting(settings, "appium_command", "appium --base-path=/wd/hub --relaxed-security"))
+        self.scrcpy_path_var.set(self._get_expanded_path_setting(settings, "scrcpy_path", ""))
+        self.suites_dir_var.set(self._get_expanded_path_setting(settings, "suites_dir", "suites"))
+        self.tests_dir_var.set(self._get_expanded_path_setting(settings, "tests_dir", "tests"))
+        self.logs_dir_var.set(self._get_expanded_path_setting(settings, "logs_dir", "logs"))
+        self.screenshots_dir_var.set(self._get_expanded_path_setting(settings, "screenshots_dir", str(BASE_DIR / "screenshots")))
+        self.recordings_dir_var.set(self._get_expanded_path_setting(settings, "recordings_dir", str(BASE_DIR / "recordings")))
         self.theme_var.set(settings.get("theme", "darkly"))
         self.language_var.set(settings.get("language", "en_US"))
         # --- Performance Monitor ---
