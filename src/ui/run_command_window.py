@@ -495,7 +495,7 @@ class RunCommandWindow(ttk.Toplevel):
         self.mirror_button.config(state=NORMAL, text=translate("stop_mirroring"), bootstyle="danger")
         ToolTip(self.mirror_button, text=translate("stop_mirroring_tooltip"))
 
-        threading.Thread(target=self._run_and_embed_scrcpy, daemon=True).start()
+        threading.Thread(target=self._run_and_embed_scrcpy, args=(self.embed_frame.winfo_id(),), daemon=True).start()
 
     def _stop_scrcpy(self):
         """Stops the scrcpy process."""
@@ -903,7 +903,7 @@ class RunCommandWindow(ttk.Toplevel):
         if self.is_inspecting: self._populate_elements_tree(self._apply_inspector_filter())
 
     # --- Scrcpy Feature Methods ---
-    def _run_and_embed_scrcpy(self):
+    def _run_and_embed_scrcpy(self, container_id: int):
         """Runs scrcpy, captures output, and embeds its window."""
         try:
             cmd_template = self.parent_app.scrcpy_path_var.get() + " -s {udid} --window-title=\"{title}\""
@@ -913,7 +913,10 @@ class RunCommandWindow(ttk.Toplevel):
             
             self.scrcpy_process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding=OUTPUT_ENCODING, errors='replace', creationflags=creationflags)
             threading.Thread(target=self._pipe_scrcpy_output_to_queue, daemon=True).start()
-            if sys.platform == "win32": self._find_and_embed_window()
+            
+            # Give scrcpy a moment to initialize, especially on the first run. This helps prevent race conditions.
+            time.sleep(1)
+            if sys.platform == "win32": self._find_and_embed_window(container_id)
         except Exception as e:
             self.scrcpy_output_queue.put(translate("scrcpy_start_error", error=e) + "\n")
             self.after(0, self._stop_scrcpy)
@@ -939,21 +942,26 @@ class RunCommandWindow(ttk.Toplevel):
              self._stop_scrcpy()
         self.after(500, self._check_scrcpy_output_queue)
 
-    def _find_and_embed_window(self):
+    def _find_and_embed_window(self, container_id: int):
         start_time = time.time()
-        while time.time() - start_time < 15:
+        while time.time() - start_time < 30: # Increased timeout for slower connections
             if not self.is_mirroring: return
             hwnd = win32gui.FindWindow(None, self.unique_title)
-            if hwnd: self.scrcpy_hwnd = hwnd; self.after(0, self._embed_window); return
+            if hwnd: self.scrcpy_hwnd = hwnd; self.after(0, self._embed_window, container_id); return
             time.sleep(0.2)
         self.scrcpy_output_queue.put(translate("scrcpy_find_window_error", title=self.unique_title) + "\n")
         self.after(0, self._stop_scrcpy)
 
-    def _embed_window(self):
+    def _embed_window(self, container_id: int):
         if not self.scrcpy_hwnd or not self.is_mirroring or not win32gui: return
+        
+        # Wait for the container to be fully realized by the window manager
+        if not container_id or container_id == 0:
+            self.after(50, self._embed_window, self.embed_frame.winfo_id())
+            return
+
         try:
             if not win32gui.IsWindow(self.scrcpy_hwnd): self.scrcpy_output_queue.put(translate("scrcpy_embed_error_invalid_handle") + "\n"); return
-            container_id = self.embed_frame.winfo_id() # type: ignore
             win32gui.SetParent(self.scrcpy_hwnd, container_id)
             style = win32gui.GetWindowLong(self.scrcpy_hwnd, win32con.GWL_STYLE)
             new_style = style & ~win32con.WS_CAPTION & ~win32con.WS_THICKFRAME
