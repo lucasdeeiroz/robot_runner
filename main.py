@@ -494,16 +494,20 @@ class RobotRunnerApp:
                 udid_with_status = parts[-1]
                 udid = udid_with_status.split(" ")[0]
 
+                # Find the full device info to get the Android version
+                device_info = next((d for d in self.devices if d.get('udid') == udid), None)
+                version = device_info.get('release', '') if device_info else ''
+
                 # Centralized Resource Management: If a window for this UDID already exists, close it before creating a new one.
                 if udid in self.active_command_windows and self.active_command_windows[udid].winfo_exists():
                     self.root.after(0, self.active_command_windows[udid]._on_close)
                     time.sleep(0.5) # Give it a moment to close
 
                 # Update button text on the main thread
-                self.root.after(0, self.run_tab.device_options_button.config, {'text': translate("opening_udid", udid=udid)})
+                self.root.after(0, lambda: self.run_tab.device_options_button.config(text=translate("opening_udid", udid=udid)))
 
                 # Create the new window on the main thread
-                self.root.after(0, self._create_mirror_window, udid, model)
+                self.root.after(0, self._create_mirror_window, udid, model, version)
 
                 # Wait before opening the next one, but not after the last one
                 if i < len(selected_devices) - 1:
@@ -512,9 +516,9 @@ class RobotRunnerApp:
             # Restore the button to its original state after the loop
             self.root.after(0, self.run_tab.device_options_button.config, {'state': NORMAL, 'text': translate("device_toolbox")})
 
-    def _create_mirror_window(self, udid: str, model: str): # This method is now in RunTabPage
+    def _create_mirror_window(self, udid: str, model: str, version: str): # This method is now in RunTabPage
         """Helper to create the mirror window on the main thread."""
-        win = RunCommandWindow(self, udid, mode='mirror', title=translate("mirror_title", model=model))
+        win = RunCommandWindow(self, udid, mode='mirror', title=translate("mirror_title", version=version, model=model))
         self.active_command_windows[udid] = win
 
     def _refresh_devices(self): # This method is now in RunTabPage

@@ -100,8 +100,12 @@ class RunCommandWindow(ttk.Toplevel):
         self.filter_by_other_class_var = ttk.BooleanVar(value=False)
         
         # --- Window Setup ---
-        device_model = next((d.get('model', 'Unknown') for d in self.parent_app.devices if d.get('udid') == self.udid), 'Unknown')
-        window_title = title or translate("running_title", title=Path(run_path).name, model=device_model)
+        device_info = get_device_properties(self.udid) or {}
+        device_model = device_info.get('model', 'Unknown')
+        device_version = device_info.get('release', '')
+
+        # Use the provided title, or generate one based on the mode.
+        window_title = title or translate("running_title", suite=Path(run_path).name, version=device_version, model=device_model)
         self.title(window_title)
         self.geometry("1200x800")
         self.bind("<Configure>", self._on_window_resize)
