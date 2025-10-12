@@ -1,11 +1,16 @@
 import tkinter as tk
+import threading
+from tkinter import messagebox
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 from ttkbootstrap.scrolled import ScrolledText
 from ttkbootstrap.tooltip import ToolTip
 
 from src.locales.i18n import gettext as translate
-
+from src.app_utils import (
+    execute_command
+)
+from src.device_utils import get_device_ip
 
 class RunTabPage(ttk.Frame):
     """UI and logic for the 'Run Tests' tab."""
@@ -17,7 +22,7 @@ class RunTabPage(ttk.Frame):
         self.on_run_mode_change()
 
     def _setup_widgets(self):
-        device_frame = ttk.LabelFrame(self, text=translate("device_selection"), padding=10)
+        device_frame = ttk.Frame(self, padding=10)
         device_frame.pack(fill=X, pady=5)
         device_frame.columnconfigure(0, weight=1)
         
@@ -29,7 +34,7 @@ class RunTabPage(ttk.Frame):
         self.device_listbox = tk.Listbox(listbox_frame, selectmode=EXTENDED, exportselection=False, height=4)
         self.device_listbox.pack(side=LEFT, fill=BOTH, expand=YES)
         ToolTip(self.device_listbox, translate("devices_tooltip"))
-        self.device_listbox.bind("<<ListboxSelect>>", self.app._on_device_select)
+        self.device_listbox.bind("<<ListboxSelect>>", self._on_device_select)
         
         self.refresh_button = ttk.Button(device_frame, text=translate("refresh"), command=self.app._refresh_devices, bootstyle="secondary")
         self.refresh_button.grid(row=1, column=1, sticky="e", padx=5)
@@ -38,16 +43,19 @@ class RunTabPage(ttk.Frame):
         sub_notebook = ttk.Notebook(self)
         sub_notebook.pack(fill=BOTH, expand=YES, pady=5)
         tests_tab = ttk.Frame(sub_notebook, padding=10)
-        adb_tab = ttk.Frame(sub_notebook, padding=10)
+        connect_tab = ttk.Frame(sub_notebook, padding=10)
+        commands_tab = ttk.Frame(sub_notebook, padding=10)
         sub_notebook.add(tests_tab, text=translate("tests_sub_tab"))
-        sub_notebook.add(adb_tab, text=translate("adb_sub_tab"))
+        sub_notebook.add(connect_tab, text=translate("connect_sub_tab"))
+        sub_notebook.add(commands_tab, text=translate("commands_sub_tab"))
 
         self._setup_tests_tab(tests_tab)
-        self._setup_adb_tab(adb_tab)
+        self._setup_adb_tab(connect_tab)
+        self._setup_commands_tab(commands_tab)
 
     def _setup_adb_tab(self, parent_frame: ttk.Frame):
         """Sets up the widgets for the ADB sub-tab."""
-        parent_frame.rowconfigure(2, weight=1)
+        parent_frame.rowconfigure(3, weight=1)
         parent_frame.columnconfigure(0, weight=1)
 
         wireless_frame = ttk.LabelFrame(parent_frame, text=translate("wireless_adb"), padding=10)
@@ -82,21 +90,68 @@ class RunTabPage(ttk.Frame):
         self.connect_button.grid(row=0, column=2, sticky="ew", padx=(5, 0))
         ToolTip(self.connect_button, text=translate("connect_tooltip"))
 
-        manual_cmd_frame = ttk.LabelFrame(parent_frame, text=translate("manual_adb_command"), padding=10)
-        manual_cmd_frame.grid(row=1, column=0, sticky="ew", pady=5)
-        manual_cmd_frame.columnconfigure(0, weight=1)
-        self.adb_command_entry = ttk.Entry(manual_cmd_frame)
-        self.adb_command_entry.grid(row=0, column=0, sticky="ew", padx=5, pady=(0, 5))
-        ToolTip(self.adb_command_entry, text=translate("adb_command_tooltip"))
-        self.run_adb_button = ttk.Button(manual_cmd_frame, text=translate("run_command"), command=self.app._run_manual_adb_command, bootstyle="primary")
-        self.run_adb_button.grid(row=1, column=0, sticky="ew", padx=5, pady=5)
-        ToolTip(self.run_adb_button, text=translate("run_command_tooltip"))
+        self.mdns_info_label = ttk.Label(wireless_frame, text="", bootstyle="warning", wraplength=400)
+        self.mdns_info_label.grid(row=3, column=0, columnspan=3, sticky="ew", padx=5, pady=(5, 0))
+        self.mdns_info_label.grid_remove() # Hide it by default
 
+    def _setup_commands_tab(self, parent_frame: ttk.Frame):
+        """Sets up the widgets for the Commands sub-tab."""
+        parent_frame.rowconfigure(2, weight=1)
+        parent_frame.columnconfigure(0, weight=1)
+        
+        common_cmd_frame = ttk.LabelFrame(parent_frame, text=translate("common_adb_commands_label"), padding=10)
+        common_cmd_frame.grid(row=0, column=0, sticky="ew", pady=(0, 5))
+        common_cmd_frame.columnconfigure(0, weight=1)
+        self.common_adb_commands_combo = ttk.Combobox(common_cmd_frame, values=self.app.common_adb_commands, state="readonly")
+        self.common_adb_commands_combo.pack(fill=X, expand=YES, padx=5, pady=5)
+        self.common_adb_commands_combo.bind("<<ComboboxSelected>>", self._on_common_command_select)
+
+        manual_cmd_frame = ttk.LabelFrame(parent_frame, text=translate("manual_adb_command"), padding=10)
+        manual_cmd_frame.grid(row=1, column=0, sticky="ew", pady=(0,5))
+        manual_cmd_frame.columnconfigure(0, weight=1)
+        
+        entry_button_frame = ttk.Frame(manual_cmd_frame)
+        entry_button_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=(0, 5))
+        entry_button_frame.columnconfigure(0, weight=1)
+
+        self.adb_command_entry = ttk.Entry(manual_cmd_frame)
+        self.adb_command_entry.grid(row=0, column=0, sticky="ew", padx=5, pady=(0,5))
+        ToolTip(self.adb_command_entry, text=translate("adb_command_tooltip"))
+
+        self.add_common_cmd_button = ttk.Button(manual_cmd_frame, text=translate("add_to_common_commands_button"), command=self._add_to_common_commands, bootstyle="info-outline")
+        self.add_common_cmd_button.grid(row=1, column=0, sticky="ew", padx=5, pady=5)
+        ToolTip(self.add_common_cmd_button, text=translate("add_to_common_commands_tooltip"))
+
+        self.run_adb_button = ttk.Button(manual_cmd_frame, text=translate("run_command"), command=self.app._run_manual_adb_command, bootstyle="primary")
+        self.run_adb_button.grid(row=2, column=0, sticky="ew", padx=5, pady=5)
+        ToolTip(self.run_adb_button, text=translate("run_command_tooltip"))
+        
         output_frame = ttk.LabelFrame(parent_frame, text=translate("adb_output"), padding=5)
         output_frame.grid(row=2, column=0, sticky="nsew", pady=5)
         output_frame.rowconfigure(0, weight=1); output_frame.columnconfigure(0, weight=1)
         self.adb_output_text = ScrolledText(output_frame, wrap=WORD, state=DISABLED, autohide=True)
         self.adb_output_text.grid(row=0, column=0, sticky="nsew")
+
+    def _on_common_command_select(self, event=None):
+        """Fills the manual command entry with the selected common command."""
+        selected_command = self.common_adb_commands_combo.get()
+        self.adb_command_entry.delete(0, END)
+        self.adb_command_entry.insert(0, selected_command)
+
+    def _add_to_common_commands(self):
+        """Adds the command from the entry to the common commands list and saves it."""
+        command_to_add = self.adb_command_entry.get().strip()
+        if not command_to_add:
+            messagebox.showwarning(translate("no_command_to_add_title"), translate("no_command_to_add_message"), parent=self.app.root)
+            return
+        if command_to_add in self.app.common_adb_commands:
+            messagebox.showinfo(translate("command_already_exists_title"), translate("command_already_exists_message", command=command_to_add), parent=self.app.root)
+            return
+        
+        self.app.common_adb_commands.append(command_to_add)
+        self.common_adb_commands_combo['values'] = self.app.common_adb_commands
+        self.app.settings_tab._save_settings() # Trigger save
+        messagebox.showinfo(translate("command_added_to_list_title"), translate("command_added_to_list_message", command=command_to_add), parent=self.app.root)
 
     def _setup_tests_tab(self, parent_frame: ttk.Frame):
         """Sets up the widgets for the Tests sub-tab."""
@@ -149,3 +204,33 @@ class RunTabPage(ttk.Frame):
             folder_name = selected_item.replace(translate("folder_prefix", name="").strip(), "").strip()
             self.app.current_path = self.app.current_path / folder_name
         self.populate_selection_listbox()
+
+    def _on_device_select(self, event=None):
+        """Callback when a device is selected in the listbox."""
+        selected_indices = self.device_listbox.curselection()
+        if not selected_indices:
+            return
+
+        self.mdns_info_label.grid_remove() # Hide info label on new selection
+        # Use the first selected device for IP lookup
+        selected_device_str = self.device_listbox.get(selected_indices[0])
+        udid = selected_device_str.split(" | ")[-1].split(" ")[0]
+        
+        # Check if the device is already connected via Wi-Fi (udid will be an IP:Port)
+        if ":" in udid:
+            ip, port = udid.split(":")
+            self.app.adb_ip_var.set(ip)
+            self.app.adb_port_var.set(port)
+        else:
+            # For USB devices, fetch the IP and then try to find the wireless debugging port via mDNS.
+            threading.Thread(target=self._fetch_ip_and_find_port, args=(udid,), daemon=True).start()
+
+    def _fetch_ip_and_find_port(self, udid: str):
+        """Fetches the IP of a USB device and then searches for its mDNS wireless port."""
+        ip_address = get_device_ip(udid)
+        if ip_address:
+            self.app.root.after(0, self.app.adb_ip_var.set, ip_address)
+            # Clear the port field and show a "searching" message while we look for it.
+            self.app.root.after(0, self.app.adb_port_var.set, translate("finding_wireless_port"))
+            # Start a new thread to find the port via mDNS without blocking.
+            threading.Thread(target=self.app._find_and_set_mdns_port, args=(udid, ip_address), daemon=True).start()

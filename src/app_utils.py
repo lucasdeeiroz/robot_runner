@@ -10,6 +10,7 @@ if getattr(sys, 'frozen', False):
 else:
     BASE_DIR = Path(__file__).resolve().parent.parent
 
+CONFIG_DIR = BASE_DIR / "config"
 SETTINGS_FILE = BASE_DIR / "config" / "settings.json"
 
 # --- Encoding for subprocess output ---

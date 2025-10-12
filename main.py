@@ -22,21 +22,18 @@ from src.locales.i18n import gettext as translate
 
 from src.shell_manager import AdbShellManager
 from src.app_utils import (
-    execute_command, SETTINGS_FILE, BASE_DIR, OUTPUT_ENCODING
+    execute_command, SETTINGS_FILE, BASE_DIR, CONFIG_DIR, OUTPUT_ENCODING
 )
 from src.device_utils import (
     get_connected_devices, find_scrcpy, _prompt_download_scrcpy,
     _parse_appium_command, get_device_ip
 )
-from src.log_parser import get_generation_time
+from src.log_parser import get_generation_time # This import is used in _parse_logs_thread
 from src.ui.run_command_window import RunCommandWindow
-from src.ui.run_tab import RunTabPage
+from src.ui.run_tab import RunTabPage # Removed unused imports connect_sub_tab and commands_sub_tab
 from src.ui.logs_tab import LogsTabPage
 from src.ui.settings_tab import SettingsTabPage
 from src.ui.about_tab import AboutTabPage
-
-# --- Constants ---
-CONFIG_DIR = BASE_DIR / "config"
 
 # --- Main Application Class ---
 class RobotRunnerApp:
@@ -80,9 +77,11 @@ class RobotRunnerApp:
     def _setup_string_vars(self):
         """Initializes all Tkinter StringVars."""
         self.scrcpy_path_var = tk.StringVar()
-        self.appium_command_var = tk.StringVar()
+        self.appium_options_var = tk.StringVar()
         self.run_mode_var = tk.StringVar(value=translate("run_mode_suite"))
         self.suites_dir_var = tk.StringVar()
+        self.scrcpy_options_var = tk.StringVar()
+        self.robot_options_var = tk.StringVar()
         self.tests_dir_var = tk.StringVar()
         self.logs_dir_var = tk.StringVar()
         self.screenshots_dir_var = tk.StringVar()
@@ -98,6 +97,7 @@ class RobotRunnerApp:
         self.adb_port_var = tk.StringVar()
         self.language_var = tk.StringVar()
         self.current_path = Path() # Initialize current_path
+        self.common_adb_commands = []
     
     def _update_paths_from_settings(self):
         """Updates Path objects from the StringVars."""
@@ -149,13 +149,6 @@ class RobotRunnerApp:
         self.tests_dir.mkdir(exist_ok=True)
         self.logs_dir.mkdir(exist_ok=True)
 
-    def _on_language_select(self, event=None): # This method is now in SettingsTabPage
-        """Updates the language_var with the code corresponding to the selected language name."""
-        selected_name = self.settings_tab.language_combo.get()
-        for code, name in self.LANGUAGES.items():
-            if name == selected_name:
-                self.language_var.set(code)
-                break
 
     def _get_expanded_path_setting(self, settings: Dict, key: str, default: str) -> str:
         """Gets a path from settings, expands custom and environment variables, and returns it."""
@@ -166,7 +159,7 @@ class RobotRunnerApp:
         # Then, expand standard environment variables like %USERPROFILE% or $HOME
         return os.path.expandvars(path_value)
 
-    def _load_settings(self): # This method is now in SettingsTabPage
+    def _load_settings(self):
         """Loads settings from the settings.json file."""
         try:
             if SETTINGS_FILE.exists():
@@ -178,10 +171,12 @@ class RobotRunnerApp:
             print(translate("error_loading_settings", e=e))
             settings = {}
 
-        self.appium_command_var.set(self._get_expanded_path_setting(settings, "appium_command", "appium --base-path=/wd/hub --relaxed-security"))
+        self.appium_options_var.set(self._get_expanded_path_setting(settings, "appium_command", "--base-path=/wd/hub --relaxed-security"))
         self.scrcpy_path_var.set(self._get_expanded_path_setting(settings, "scrcpy_path", ""))
         self.suites_dir_var.set(self._get_expanded_path_setting(settings, "suites_dir", "suites"))
         self.tests_dir_var.set(self._get_expanded_path_setting(settings, "tests_dir", "tests"))
+        self.scrcpy_options_var.set(settings.get("scrcpy_options", "-m 1024 -b 2M --max-fps=30 --no-audio --stay-awake"))
+        self.robot_options_var.set(settings.get("robot_options", "--split-log"))
         self.logs_dir_var.set(self._get_expanded_path_setting(settings, "logs_dir", "logs"))
         self.screenshots_dir_var.set(self._get_expanded_path_setting(settings, "screenshots_dir", str(BASE_DIR / "screenshots")))
         self.recordings_dir_var.set(self._get_expanded_path_setting(settings, "recordings_dir", str(BASE_DIR / "recordings")))
@@ -189,43 +184,17 @@ class RobotRunnerApp:
         self.language_var.set(settings.get("language", "en_US"))
         # --- Performance Monitor ---
         self.app_packages_var.set(settings.get("app_packages", "com.android.chrome"))
+        self.common_adb_commands = settings.get("common_adb_commands", [
+            "shell getprop ro.product.model",
+            "shell wm size",
+            "shell pm list packages -3",
+            "logcat -d"
+        ])
         
         self.initial_theme = self.theme_var.get()
         self.initial_language = self.language_var.get()
 
-    def _save_settings(self): # This method is now in SettingsTabPage
-        """Saves current settings to the settings.json file."""
-        CONFIG_DIR.mkdir(exist_ok=True)
-        settings = {
-            "appium_command": self.appium_command_var.get(),
-            "scrcpy_path": self.scrcpy_path_var.get(),
-            "suites_dir": self.suites_dir_var.get(),
-            "tests_dir": self.tests_dir_var.get(),
-            "logs_dir": self.logs_dir_var.get(),
-            "screenshots_dir": self.screenshots_dir_var.get(),
-            "recordings_dir": self.recordings_dir_var.get(),
-            "theme": self.theme_var.get(),
-            "language": self.language_var.get(),
-            # --- Performance Monitor ---
-            "app_packages": self.app_packages_var.get()
-        }
-        try:
-            with open(SETTINGS_FILE, 'w') as f:
-                json.dump(settings, f, indent=4)
-            
-            self._update_paths_from_settings()
-            
-            if self.initial_theme != self.theme_var.get() or self.initial_language != self.language_var.get():
-                messagebox.showinfo(translate("restart_required_title"), translate("restart_required_message"), parent=self.root)
-                self.initial_theme = self.theme_var.get()
-                self.initial_language = self.language_var.get()
-            else:
-                messagebox.showinfo(translate("settings_saved_title"), translate("settings_saved_message"), parent=self.root)
-
-        except IOError as e:
-            messagebox.showerror(translate("open_file_error_title"), translate("save_settings_error", e=e), parent=self.root)
-        
-    def _on_close(self): # This method is now in SettingsTabPage
+    def _on_close(self):
         """Handles the main window closing event."""
         if messagebox.askokcancel(translate("quit_title"), translate("quit_message")):
             self._is_closing = True
@@ -243,7 +212,7 @@ class RobotRunnerApp:
 
             self.root.destroy()
             
-    def _terminate_process_tree(self, pid: int, name: str): # This method is now in SettingsTabPage
+    def _terminate_process_tree(self, pid: int, name: str):
         """Forcefully terminates a process and its entire tree."""
         try:
             if sys.platform == "win32":
@@ -372,55 +341,42 @@ class RobotRunnerApp:
         win = RunCommandWindow(self, udid, mode='test', run_path=path_to_run, run_mode=run_mode)
         self.active_command_windows[udid] = win
 
-    def _on_device_select(self, event=None): # This method is now in RunTabPage
-        """Callback when a device is selected in the listbox."""
-        selected_indices = self.run_tab.device_listbox.curselection()
-        if not selected_indices:
-            return
-
-        # Use the first selected device for IP lookup
-        selected_device_str = self.run_tab.device_listbox.get(selected_indices[0])
-        udid = selected_device_str.split(" | ")[-1].split(" ")[0]
-        
-        # Check if the device is already connected via Wi-Fi (udid will be an IP:Port)
-        if ":" in udid:
-            ip, port = udid.split(":")
-            self.adb_ip_var.set(ip)
-            self.adb_port_var.set(port)
-        else:
-            # For USB devices, fetch the IP but leave the port blank for the user to fill.
-            threading.Thread(target=self._fetch_and_set_device_ip, args=(udid,), daemon=True).start()
-
-    def _fetch_and_set_device_ip(self, udid: str): # This method is now in RunTabPage
-        """Fetches the wlan0 IP address of a USB device and updates the GUI."""
-        ip_address = get_device_ip(udid)
-        if ip_address:
-            self.root.after(0, self.adb_ip_var.set, ip_address)
-            # Clear the port field, as it's dynamic and should be entered by the user.
-            self.root.after(0, self.adb_port_var.set, "") # Clear previous port
-            # Automatically try to find the port for this IP
-            threading.Thread(target=self._find_and_set_mdns_port, args=(ip_address,), daemon=True).start()
-    
-    def _find_and_set_mdns_port(self, ip_address: str):
+    def _find_and_set_mdns_port(self, udid: str, ip_address: str):
         """
         Runs 'adb mdns services' in the background to find the port for a given IP.
         Updates the port entry if a match is found.
+        Includes a timeout to prevent getting stuck.
         """
+        start_time = time.time()
+        timeout = 5  # 5 seconds
         command = "adb mdns services"
-        success, output = execute_command(command)
-
-        if success:
-            for line in output.splitlines():
-                # Check if the line contains the IP and the adb service identifier
-                if ip_address in line and "_adb-tls-connect._tcp" in line:
-                    # Extract the port from the ip:port part
-                    match = re.search(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d+)", line)
-                    if match:
-                        found_ip = match.group(1)
-                        found_port = match.group(2)
-                        if found_ip == ip_address:
+        
+        while time.time() - start_time < timeout:
+            success, output = execute_command(command)
+            if success:
+                for line in output.splitlines():
+                    if ip_address in line and "_adb-tls-connect._tcp" in line:
+                        match = re.search(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d+)", line)
+                        if match and match.group(1) == ip_address:
+                            found_port = match.group(2)
                             self.root.after(0, self.adb_port_var.set, found_port)
-                            break # Found it, no need to continue
+                            return # Success, exit the function
+            time.sleep(0.5) # Wait a bit before retrying
+            
+        # If the loop finishes without finding the port (timeout)
+        current_text = self.adb_port_var.get()
+        if translate("finding_wireless_port") in current_text:
+            # Attempt to open the wireless debugging screen on the device
+            dev_settings_command = f"adb -s {udid} shell am start -a android.settings.DEVELOPMENT_SETTINGS"
+            success, output = execute_command(dev_settings_command)
+            # If opening Developer Options fails, fall back to opening the main Settings screen.
+            if not success or "unable to resolve" in output.lower() or "activity not found" in output.lower():
+                main_settings_command = f"adb -s {udid} shell am start -a android.settings.SETTINGS"
+                execute_command(main_settings_command)
+            self.root.after(0, self.adb_port_var.set, "") # Clear the "Searching..." message
+            self.root.after(0, self.run_tab.mdns_info_label.config, {"text": translate("mdns_failure_tooltip")})
+            self.root.after(0, self.run_tab.mdns_info_label.grid) # Show the info label
+            self.root.after(100, self.run_tab.port_entry.focus_set) # Focus the port entry for manual input
 
     def _pair_wireless_device(self): # This method is now in RunTabPage
         """Pairs with a device wirelessly using a pairing code."""
@@ -466,8 +422,24 @@ class RobotRunnerApp:
         self._update_output_text(self.run_tab.adb_output_text, f"> {command}\n", True)
         threading.Thread(target=self._run_command_and_update_gui, args=(command, self.run_tab.adb_output_text, self.run_tab.disconnect_button, True), daemon=True).start()
 
+    def _restart_adb_server(self):
+        """Kills and restarts the ADB server."""
+        self.settings_tab.restart_adb_button.config(state=DISABLED)
+        self._update_output_text(self.run_tab.adb_output_text, f"> {translate('restart_adb_server')}...\n", True)
+        
+        def restart_thread(): # This function is correctly defined and used.
+            kill_cmd = "adb kill-server"
+            self.root.after(0, self._update_output_text, self.run_tab.adb_output_text, f"> {kill_cmd}\n", False)
+            _, kill_output = execute_command(kill_cmd)
+            self.root.after(0, self._update_output_text, self.run_tab.adb_output_text, f"{kill_output}\n", False)
+            
+            self.root.after(100, self._refresh_devices) # Refresh devices after restarting (Run tab)
+            self.root.after(0, lambda: self.settings_tab.restart_adb_button.config(state=NORMAL)) # Settings tab
+
+        threading.Thread(target=restart_thread, daemon=True).start()
+
     def _mirror_device(self): # This method is now in RunTabPage
-        selected_device_indices = self.run_tab.device_listbox.curselection()
+        selected_device_indices = self.run_tab.device_listbox.curselection() # type: ignore
         if not selected_device_indices:
             messagebox.showerror(translate("open_file_error_title"), translate("no_device_selected"))
             return
@@ -531,7 +503,8 @@ class RobotRunnerApp:
 
     def _get_devices_thread(self): # This method is now in RunTabPage
         """Gets device list in a background thread to avoid freezing the GUI."""
-        appium_command = self.appium_command_var.get()
+        appium_opt = self.appium_options_var.get()
+        appium_command = f"appium {appium_opt}"
 
         # Determine if we should even attempt to check Appium.
         # We attempt a check if the app started it, or if it was detected at launch.
@@ -548,10 +521,16 @@ class RobotRunnerApp:
     def _update_device_list(self): # This method is now in RunTabPage
         """Updates the device listbox with the found devices."""
         selected_indices = self.run_tab.device_listbox.curselection()
+        self.run_tab.device_listbox.config(state=NORMAL) # Ensure the listbox is enabled before clearing
         self.run_tab.device_listbox.delete(0, END)
+
         if self.devices:
             self.run_tab.device_listbox.config(state=NORMAL)
             for i, d in enumerate(self.devices):
+                # Adjust listbox height dynamically, with a max of 10
+                num_devices = len(self.devices)
+                self.run_tab.device_listbox.config(height=min(num_devices, 10))
+
                 status_text = translate("device_busy") if d.get('status') == "Busy" else ""
                 device_string = f"Android {d['release']} | {d['model']} | {d['udid']} {status_text}"
                 self.run_tab.device_listbox.insert(END, device_string)
@@ -568,6 +547,7 @@ class RobotRunnerApp:
         else:
             self.run_tab.device_listbox.insert(END, translate("no_devices_found"))
             self.run_tab.device_listbox.config(state=DISABLED)
+            self.run_tab.device_listbox.config(height=1) # Set height to 1 when no devices
         
         self.run_tab.refresh_button.config(state=NORMAL, text=translate("refresh"))
         # Only set status to ready if it was refreshing, to not overwrite other statuses
@@ -590,7 +570,7 @@ class RobotRunnerApp:
     def _prompt_download_scrcpy(self): # This method is now in RunTabPage
         _prompt_download_scrcpy(self)
 
-    def _toggle_appium_server(self): # This method is now in SettingsTabPage
+    def _toggle_appium_server(self):
         """Starts or stops the Appium server via the Settings tab button."""
         # If we have a process handle, we can stop it.
         if self.appium_process and self.appium_process.poll() is None:
@@ -607,7 +587,7 @@ class RobotRunnerApp:
         else:
             self._start_appium_server(silent=False)
 
-    def _start_appium_server(self, silent: bool = False): # This method is now in SettingsTabPage
+    def _start_appium_server(self, silent: bool = False):
         """
         Starts the Appium server in a background thread.
         If silent, UI button states are not changed directly.
@@ -619,13 +599,14 @@ class RobotRunnerApp:
         thread = threading.Thread(target=self._appium_server_handler, args=(silent,))
         thread.daemon = True
         thread.start()
-    def _appium_server_handler(self, silent: bool): # This method is now in SettingsTabPage
+    def _appium_server_handler(self, silent: bool):
         """
         The core handler for running the Appium server process and piping its output.
         This method runs in a separate thread.
         """
         try:
-            command = self.appium_command_var.get()
+            appium_opt = self.appium_options_var.get()
+            command = f"appium {appium_opt}"
             # Clear and show command in output only when user starts it manually
             clear_output = not silent
             self.root.after(0, self._update_output_text, self.settings_tab.appium_output_text, f"> {command}\n", clear_output)
@@ -726,9 +707,10 @@ class RobotRunnerApp:
 
         threading.Thread(target=check_thread, daemon=True).start()
 
-    def _is_appium_running(self) -> bool: # This method is now in SettingsTabPage
+    def _is_appium_running(self) -> bool:
         """Checks if the Appium server is running and accessible by checking its status endpoint."""
-        command = self.appium_command_var.get()
+        appium_opt = self.appium_options_var.get()
+        command = f"appium {appium_opt}"
         host, port, base_path = _parse_appium_command(command)
 
         # Appium 1.x used /wd/hub/status, Appium 2+ uses /status
@@ -751,7 +733,7 @@ class RobotRunnerApp:
                     return False
             return False
 
-    def _wait_for_appium_startup(self, timeout: int = 20) -> bool: # This method is now in SettingsTabPage
+    def _wait_for_appium_startup(self, timeout: int = 20) -> bool:
         """Waits for the Appium server to become available after starting."""
         start_time = time.time()
         while time.time() - start_time < timeout:
@@ -1018,7 +1000,7 @@ class RobotRunnerApp:
         self.logs_tab.logs_tree.tag_configure("FAIL", foreground="red")
         self.logs_tab.logs_tree.tag_configure("SKIP", foreground="orange")
     
-    def _on_group_by_selected(self, event=None): # This method is now in LogsTabPage
+    def _on_group_by_selected(self, event=None):
         """Handles changing the grouping of logs."""
         if self.parsed_logs_data is not None:
             self._display_logs(self.parsed_logs_data)
@@ -1053,7 +1035,7 @@ class RobotRunnerApp:
             
         self.root.after(0, lambda: button.config(state=NORMAL))
 
-    def _update_output_text(self, widget: Optional[ScrolledText], result: str, clear: bool): # This method is now in SettingsTabPage
+    def _update_output_text(self, widget: Optional[ScrolledText], result: str, clear: bool):
         if not widget: return
         widget.text.config(state=NORMAL)
         if clear:

@@ -448,7 +448,7 @@ class RunCommandWindow(ttk.Toplevel):
             if is_right_visible:
                 self.main_paned_window.sashpos(1, left_width + center_width)
 
-        except (ttk.TclError, ValueError):
+        except (tk.TclError, ValueError):
             pass
 
     def _on_window_resize(self, event=None):
@@ -912,7 +912,8 @@ class RunCommandWindow(ttk.Toplevel):
         try:
             cmd_template = self.parent_app.scrcpy_path_var.get() + " -s {udid} --window-title=\"{title}\""
             self.unique_title = f"scrcpy_{int(time.time() * 1000)}"
-            command = f'{cmd_template.format(udid=self.udid, title=self.unique_title)} -m 1024 -b 2M --max-fps=30 --no-audio'
+            scrcpy_opt = self.parent_app.scrcpy_options_var.get()
+            command = f'{cmd_template.format(udid=self.udid, title=self.unique_title)} {scrcpy_opt}'
             creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
             
             self.scrcpy_process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding=OUTPUT_ENCODING, errors='replace', creationflags=creationflags)
@@ -965,6 +966,7 @@ class RunCommandWindow(ttk.Toplevel):
             return
 
         try:
+            # win32con is imported at the top of the file if win32gui is available
             if not win32gui.IsWindow(self.scrcpy_hwnd): self.scrcpy_output_queue.put(translate("scrcpy_embed_error_invalid_handle") + "\n"); return
             win32gui.SetParent(self.scrcpy_hwnd, container_id)
             style = win32gui.GetWindowLong(self.scrcpy_hwnd, win32con.GWL_STYLE)
@@ -1145,7 +1147,8 @@ class RunCommandWindow(ttk.Toplevel):
             self.cur_log_dir.mkdir(parents=True, exist_ok=True)
             
             ts_opt = " --timestampoutputs" if self.parent_app.timestamp_logs_var.get() else ""
-            base_cmd = f'robot{ts_opt} --split-log --logtitle "{device_info["release"]} - {device_info["model"]}" -v udid:"{self.udid}" -v deviceName:"{device_info["model"]}" -v versao_OS:"{device_info["release"]}" -d "{self.cur_log_dir}" --name "{suite_name}"'
+            robot_opt = self.parent_app.robot_options_var.get()
+            base_cmd = f'robot{ts_opt} {robot_opt} --logtitle "{device_info["release"]} - {device_info["model"]}" -v udid:"{self.udid}" -v deviceName:"{device_info["model"]}" -v versao_OS:"{device_info["release"]}" -d "{self.cur_log_dir}" --name "{suite_name}"'
             
             # The self.run_path is already an absolute path, so it should be used directly.
             # Enclosing it in quotes handles paths with spaces.

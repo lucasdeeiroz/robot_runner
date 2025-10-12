@@ -28,4 +28,5 @@ if __name__ == "__main__":
 
     app = ttk.Window(themename=theme)
     gui = RobotRunnerApp(app)
+    app.minsize(800, 600)  # Set the minimum size of the window
     app.mainloop()
