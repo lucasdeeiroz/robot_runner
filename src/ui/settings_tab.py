@@ -1,4 +1,5 @@
 import json
+import tkinter as tk
 from tkinter import messagebox
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
@@ -13,9 +14,10 @@ from src.ui.path_selector import PathSelector
 
 class SettingsTabPage(ttk.Frame):
     """UI and logic for the 'Settings' tab."""
-    def __init__(self, parent, app):
+    def __init__(self, parent, data_model, callbacks: dict = None):
         super().__init__(parent, padding=10)
-        self.app = app
+        self.model = data_model
+        self.callbacks = callbacks if callbacks is not None else {}
 
         self._setup_widgets()
 
@@ -58,35 +60,35 @@ class SettingsTabPage(ttk.Frame):
         """Saves current settings to the settings.json file."""
         CONFIG_DIR.mkdir(exist_ok=True)
         settings = {
-            "appium_command": self.app.appium_options_var.get(),
-            "scrcpy_path": self.app.scrcpy_path_var.get(),
-            "suites_dir": self.app.suites_dir_var.get(),
-            "tests_dir": self.app.tests_dir_var.get(),
-            "scrcpy_options": self.app.scrcpy_options_var.get(),
-            "robot_options": self.app.robot_options_var.get(),
-            "logs_dir": self.app.logs_dir_var.get(),
-            "screenshots_dir": self.app.screenshots_dir_var.get(),
-            "recordings_dir": self.app.recordings_dir_var.get(),
-            "theme": self.app.theme_var.get(),
-            "language": self.app.language_var.get(),
-            "app_packages": self.app.app_packages_var.get(),
-            "common_adb_commands": self.app.common_adb_commands
+            "appium_command": self.model.appium_options_var.get(),
+            "scrcpy_path": self.model.scrcpy_path_var.get(),
+            "suites_dir": self.model.suites_dir_var.get(),
+            "tests_dir": self.model.tests_dir_var.get(),
+            "scrcpy_options": self.model.scrcpy_options_var.get(),
+            "robot_options": self.model.robot_options_var.get(),
+            "logs_dir": self.model.logs_dir_var.get(),
+            "screenshots_dir": self.model.screenshots_dir_var.get(),
+            "recordings_dir": self.model.recordings_dir_var.get(),
+            "theme": self.model.theme_var.get(),
+            "language": self.model.language_var.get(),
+            "app_packages": self.model.app_packages_var.get(),
+            "common_adb_commands": self.model.common_adb_commands
         }
         try:
             with open(SETTINGS_FILE, 'w') as f:
                 json.dump(settings, f, indent=4)
             
-            self.app._update_paths_from_settings()
+            self.callbacks.get('update_paths_from_settings', lambda: None)()
             
-            if self.app.initial_theme != self.app.theme_var.get() or self.app.initial_language != self.app.language_var.get():
-                messagebox.showinfo(translate("restart_required_title"), translate("restart_required_message"), parent=self.app.root)
-                self.app.initial_theme = self.app.theme_var.get()
-                self.app.initial_language = self.app.language_var.get()
+            if self.model.initial_theme != self.model.theme_var.get() or self.model.initial_language != self.model.language_var.get():
+                messagebox.showinfo(translate("restart_required_title"), translate("restart_required_message"))
+                self.model.initial_theme = self.model.theme_var.get()
+                self.model.initial_language = self.model.language_var.get()
             
-            self.app.show_toast(translate("settings_saved_title"), translate("settings_saved_message"), "success")
+            self.callbacks.get('show_toast', lambda *args, **kwargs: None)(translate("settings_saved_title"), translate("settings_saved_message"), "success")
 
         except IOError as e:
-            self.app.show_toast(translate("open_file_error_title"), translate("save_settings_error", e=e), "danger")
+            self.callbacks.get('show_toast', lambda *args, **kwargs: None)(translate("open_file_error_title"), translate("save_settings_error", e=e), "danger")
 
     def _setup_app_tab(self, parent_frame):
         """Populates the 'App' settings tab."""
@@ -98,13 +100,13 @@ class SettingsTabPage(ttk.Frame):
         adb_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=10)
         adb_frame.columnconfigure(1, weight=1)
 
-        screenshots_selector = PathSelector(adb_frame, translate("screenshots_dir"), self.app.screenshots_dir_var, translate("screenshots_dir_tooltip"))
+        screenshots_selector = PathSelector(adb_frame, translate("screenshots_dir"), self.model.screenshots_dir_var, translate("screenshots_dir_tooltip"))
         screenshots_selector.grid(row=0, column=0, columnspan=2, sticky="ew")
 
-        recordings_selector = PathSelector(adb_frame, translate("recordings_dir"), self.app.recordings_dir_var, translate("recordings_dir_tooltip"))
+        recordings_selector = PathSelector(adb_frame, translate("recordings_dir"), self.model.recordings_dir_var, translate("recordings_dir_tooltip"))
         recordings_selector.grid(row=1, column=0, columnspan=2, sticky="ew")
 
-        self.restart_adb_button = ttk.Button(adb_frame, text=translate("restart_adb_server"), command=self.app._restart_adb_server, bootstyle="warning")
+        self.restart_adb_button = ttk.Button(adb_frame, text=translate("restart_adb_server"), command=self.callbacks.get('restart_adb_server'), bootstyle="warning")
         self.restart_adb_button.grid(row=2, column=0, sticky="w", padx=5, pady=5)
         ToolTip(self.restart_adb_button, translate("restart_adb_server_tooltip"))
     
@@ -115,13 +117,13 @@ class SettingsTabPage(ttk.Frame):
         appearance_frame.columnconfigure(1, weight=1)
 
         ttk.Label(appearance_frame, text=translate("theme")).grid(row=0, column=0, padx=5, pady=5, sticky=W)
-        theme_combo = ttk.Combobox(appearance_frame, textvariable=self.app.theme_var, values=self.app.style.theme_names())
+        theme_combo = ttk.Combobox(appearance_frame, textvariable=self.model.theme_var, values=self.model.style.theme_names())
         theme_combo.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
         ToolTip(theme_combo, translate("theme_tooltip"))
 
         ttk.Label(appearance_frame, text=translate("language_label")).grid(row=1, column=0, padx=5, pady=5, sticky=W)
-        self.language_combo = ttk.Combobox(appearance_frame, values=list(self.app.LANGUAGES.values()))
-        self.language_combo.set(self.app.LANGUAGES.get(self.app.language_var.get(), "English"))
+        self.language_combo = ttk.Combobox(appearance_frame, values=list(self.model.LANGUAGES.values()))
+        self.language_combo.set(self.model.LANGUAGES.get(self.model.language_var.get(), "English"))
         self.language_combo.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
         self.language_combo.bind("<<ComboboxSelected>>", self._on_language_select)
         ToolTip(self.language_combo, translate("language_tooltip"))
@@ -129,9 +131,9 @@ class SettingsTabPage(ttk.Frame):
     def _on_language_select(self, event=None):
         """Updates the language_var with the code corresponding to the selected language name."""
         selected_name = self.language_combo.get()
-        for code, name in self.app.LANGUAGES.items():
+        for code, name in self.model.LANGUAGES.items():
             if name == selected_name:
-                self.app.language_var.set(code)
+                self.model.language_var.set(code)
                 break
 
     def _setup_appium_tab(self, parent_frame):
@@ -145,7 +147,7 @@ class SettingsTabPage(ttk.Frame):
         appium_cmd_frame.columnconfigure(1, weight=1)
 
         ttk.Label(appium_cmd_frame, text=translate("appium_command")).grid(row=0, column=0, padx=5, pady=5, sticky=W)
-        appium_cmd_entry = ttk.Entry(appium_cmd_frame, textvariable=self.app.appium_options_var)
+        appium_cmd_entry = ttk.Entry(appium_cmd_frame, textvariable=self.model.appium_options_var)
         appium_cmd_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
         ToolTip(appium_cmd_entry, translate("appium_command_tooltip"))
 
@@ -154,7 +156,7 @@ class SettingsTabPage(ttk.Frame):
         self.appium_status_label.grid(row=0, column=1, padx=(0, 10), pady=5, sticky="e")
         ToolTip(self.appium_status_label, translate("appium_status_tooltip"))
 
-        self.toggle_appium_button = ttk.Button(appium_cmd_frame, text=translate("start_appium"), command=self.app._toggle_appium_server, bootstyle="primary")
+        self.toggle_appium_button = ttk.Button(appium_cmd_frame, text=translate("start_appium"), command=self.callbacks.get('toggle_appium_server'), bootstyle="primary")
         self.toggle_appium_button.grid(row=1, column=1, padx=5, pady=5, sticky="e")
         ToolTip(self.toggle_appium_button, translate("appium_toggle_tooltip"))
 
@@ -179,7 +181,7 @@ class SettingsTabPage(ttk.Frame):
         mirror_paths_frame.columnconfigure(1, weight=1)
 
         # Using PathSelector for scrcpy path
-        scrcpy_selector = PathSelector(mirror_paths_frame, translate("scrcpy_path"), self.app.scrcpy_path_var, translate("scrcpy_path_tooltip"))
+        scrcpy_selector = PathSelector(mirror_paths_frame, translate("scrcpy_path"), self.model.scrcpy_path_var, translate("scrcpy_path_tooltip"))
         scrcpy_selector.grid(row=0, column=0, columnspan=2, sticky="ew")
 
         # --- Scrcpy Options ---
@@ -188,7 +190,7 @@ class SettingsTabPage(ttk.Frame):
         scrcpy_options_frame.columnconfigure(1, weight=1)
 
         ttk.Label(scrcpy_options_frame, text=translate("scrcpy_command_options")).grid(row=0, column=0, padx=5, pady=5, sticky=W)
-        scrcpy_options_entry = ttk.Entry(scrcpy_options_frame, textvariable=self.app.scrcpy_options_var)
+        scrcpy_options_entry = ttk.Entry(scrcpy_options_frame, textvariable=self.model.scrcpy_options_var)
         scrcpy_options_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
         ToolTip(scrcpy_options_entry, translate("scrcpy_options_tooltip"))
 
@@ -202,7 +204,7 @@ class SettingsTabPage(ttk.Frame):
         perf_monitor_frame.columnconfigure(1, weight=1)
 
         ttk.Label(perf_monitor_frame, text=translate("app_packages_label")).grid(row=0, column=0, padx=5, pady=5, sticky=W)
-        app_packages_entry = ttk.Entry(perf_monitor_frame, textvariable=self.app.app_packages_var)
+        app_packages_entry = ttk.Entry(perf_monitor_frame, textvariable=self.model.app_packages_var)
         app_packages_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
         ToolTip(app_packages_entry, translate("app_packages_tooltip"))
 
@@ -215,13 +217,13 @@ class SettingsTabPage(ttk.Frame):
         test_dirs_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 10))
         test_dirs_frame.columnconfigure(1, weight=1)
 
-        suites_selector = PathSelector(test_dirs_frame, translate("suites_dir"), self.app.suites_dir_var, translate("suites_dir_tooltip"))
+        suites_selector = PathSelector(test_dirs_frame, translate("suites_dir"), self.model.suites_dir_var, translate("suites_dir_tooltip"))
         suites_selector.grid(row=0, column=0, columnspan=2, sticky="ew")
 
-        tests_selector = PathSelector(test_dirs_frame, translate("tests_dir"), self.app.tests_dir_var, translate("tests_dir_tooltip"))
+        tests_selector = PathSelector(test_dirs_frame, translate("tests_dir"), self.model.tests_dir_var, translate("tests_dir_tooltip"))
         tests_selector.grid(row=1, column=0, columnspan=2, sticky="ew")
 
-        logs_selector = PathSelector(test_dirs_frame, translate("logs_dir"), self.app.logs_dir_var, translate("logs_dir_tooltip"))
+        logs_selector = PathSelector(test_dirs_frame, translate("logs_dir"), self.model.logs_dir_var, translate("logs_dir_tooltip"))
         logs_selector.grid(row=2, column=0, columnspan=2, sticky="ew")
 
         # --- Robot Options ---
@@ -230,6 +232,6 @@ class SettingsTabPage(ttk.Frame):
         robot_options_frame.grid(row=3, column=0, columnspan=2, sticky="ew", pady=10)
         robot_options_frame.columnconfigure(0, weight=1)
 
-        robot_options_entry = ttk.Entry(robot_options_frame, textvariable=self.app.robot_options_var)
+        robot_options_entry = ttk.Entry(robot_options_frame, textvariable=self.model.robot_options_var)
         robot_options_entry.pack(fill=X, expand=YES, padx=5, pady=5)
         ToolTip(robot_options_entry, translate("robot_options_tooltip"))

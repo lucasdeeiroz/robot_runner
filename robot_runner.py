@@ -1,15 +1,20 @@
 import sys
 import ctypes
 import ttkbootstrap as ttk
+from pathlib import Path
 
 # Adds the project directory to sys.path to allow relative imports
 if __name__ == '__main__':
-    # Ensures that the 'src' directory is found, no matter how the script is executed
-    from pathlib import Path
-    project_dir = Path(__file__).resolve().parent
-    sys.path.insert(0, str(project_dir))
-
+    # Determine the base path for resources, works for dev and for PyInstaller
+    if getattr(sys, 'frozen', False):
+        # Running in a bundle
+        BASE_DIR = Path(sys._MEIPASS)
+    else:
+        # Running in a normal Python environment
+        BASE_DIR = Path(__file__).resolve().parent
+    sys.path.insert(0, str(BASE_DIR.parent))
 from src.locales.i18n import load_language
+from src.locales.i18n import set_language_base_path
 from src.app_utils import load_language_setting, load_theme_setting
 from main import RobotRunnerApp
 
@@ -22,6 +27,7 @@ if __name__ == "__main__":
         except Exception:
             pass
 
+    set_language_base_path(BASE_DIR)
     language = load_language_setting()
     load_language(language)
     theme = load_theme_setting()

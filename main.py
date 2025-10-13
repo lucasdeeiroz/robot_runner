@@ -137,11 +137,29 @@ class RobotRunnerApp:
         self.pages = {}
         self.nav_buttons = {}
         
+        # Define callbacks to pass to UI tabs, breaking circular dependencies.
+        settings_callbacks = {
+            'restart_adb_server': self._restart_adb_server,
+            'toggle_appium_server': self._toggle_appium_server,
+            'show_toast': self.show_toast,
+            'update_paths_from_settings': self._update_paths_from_settings
+        }
+
+        run_callbacks = {
+            # This callback will be set after settings_tab is initialized
+            'save_settings': lambda: None 
+        }
+
         # Create pages
-        self.run_tab = RunTabPage(self.content_frame, self)
+        self.run_tab = RunTabPage(self.content_frame, self, callbacks=run_callbacks)
         self.logs_tab = LogsTabPage(self.content_frame, self)
-        self.settings_tab = SettingsTabPage(self.content_frame, self)
+        # Pass 'self' as the data_model and the callbacks dictionary.
+        # This aligns with the refactored SettingsTabPage.__init__
+        self.settings_tab = SettingsTabPage(self.content_frame, self, callbacks=settings_callbacks)
         self.about_tab = AboutTabPage(self.content_frame, self)
+
+        # Now that settings_tab exists, we can assign its save method to the run_tab's callback.
+        self.run_tab.callbacks['save_settings'] = self.settings_tab._save_settings
 
         # Page and button configuration
         page_configs = [

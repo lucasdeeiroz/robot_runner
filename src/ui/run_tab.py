@@ -31,9 +31,14 @@ except (ImportError, ModuleNotFoundError) as e:
 
 class RunTabPage(ttk.Frame):
     """UI and logic for the 'Run Tests' tab."""
-    def __init__(self, parent, app):
+    def __init__(self, parent, app, callbacks: dict = None):
         super().__init__(parent, padding=10)
         self.app = app
+        self.callbacks = callbacks if callbacks is not None else {}
+
+        # Ensure the common_adb_commands attribute exists on the app object to prevent AttributeError
+        if not hasattr(self.app, 'common_adb_commands'):
+            self.app.common_adb_commands = []
 
         self.remote_conn_mode_var = tk.StringVar(value="host")
         self._setup_widgets()
@@ -192,7 +197,8 @@ class RunTabPage(ttk.Frame):
         
         self.app.common_adb_commands.append(command_to_add)
         self.common_adb_commands_combo['values'] = self.app.common_adb_commands
-        self.app.settings_tab._save_settings() # Trigger save
+        # Use a callback to break the circular dependency with settings_tab.
+        self.callbacks.get('save_settings', lambda: self.app.show_toast("Error", "Save callback not configured.", "danger"))()
 
     def _setup_remote_conn_tab(self, parent_frame: ttk.Frame):
         """Sets up the widgets for the Remote Connection (ngrok) sub-tab."""
@@ -359,8 +365,8 @@ class RunTabPage(ttk.Frame):
         test_frame = ttk.Frame(parent_frame) # This frame will contain the listbox and its controls
         test_frame.grid(row=1, column=0, sticky="nsew", pady=5)
         test_frame.columnconfigure(0, weight=1) 
-        # Make the row with the listbox expand, not the controls row.
-        test_frame.rowconfigure(2, weight=1)
+        # Make the row with the listbox (row 1) expand, not the controls row (row 0).
+        test_frame.rowconfigure(1, weight=1)
 
         top_controls = ttk.Frame(test_frame)
         top_controls.grid(row=0, column=0, sticky="ew", padx=5, pady=2)
