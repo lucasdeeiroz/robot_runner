@@ -34,6 +34,7 @@ from src.ui.run_tab import RunTabPage # Removed unused imports connect_sub_tab a
 from src.ui.logs_tab import LogsTabPage
 from src.ui.settings_tab import SettingsTabPage
 from src.ui.about_tab import AboutTabPage
+from src.ui.toast import Toast
 
 # --- Main Application Class ---
 class RobotRunnerApp:
@@ -113,31 +114,82 @@ class RobotRunnerApp:
     
     def _create_widgets(self):
         """Creates and places all the widgets in the main window."""
-        self.notebook = ttk.Notebook(self.root)
-        self.notebook.pack(pady=10, padx=10, fill=BOTH, expand=YES)
+        # Main container using grid layout for vertical navigation on the left
+        self.root.columnconfigure(0, weight=1) # Navigation area gets 1/4 of the space
+        self.root.columnconfigure(1, weight=3) # Content area gets 3/4 of the space
+        self.root.rowconfigure(0, weight=1)    # Main content row should expand
+        self.root.rowconfigure(1, weight=0)    # Status bar row should not expand
 
-        self.run_tab = RunTabPage(self.notebook, self)
-        self.logs_tab = LogsTabPage(self.notebook, self)
-        self.settings_tab = SettingsTabPage(self.notebook, self)
-        self.about_tab = AboutTabPage(self.notebook, self)
-
-        self.notebook.add(self.run_tab, text=translate("execute_tab"))
-        self.notebook.add(self.logs_tab, text=translate("logs_tab"))
-        self.notebook.add(self.settings_tab, text=translate("settings_tab"))
-        self.notebook.add(self.about_tab, text=translate("about_tab"))
+        # Left frame for navigation buttons
+        nav_frame = ttk.Frame(self.root)
+        nav_frame.grid(row=0, column=0, sticky="nsew", padx=(10, 5), pady=10)
         
-        self.notebook.bind("<<NotebookTabChanged>>", self._on_tab_change)
+        # A new frame inside nav_frame to hold the buttons and allow centering
+        button_holder_frame = ttk.Frame(nav_frame)
+        button_holder_frame.pack(side=TOP, fill='x', pady=(20, 0)) # Anchor to top with padding
 
+        # Right frame for content pages
+        self.content_frame = ttk.Frame(self.root)
+        self.content_frame.grid(row=0, column=1, sticky="nsew", padx=(5, 10), pady=10)
+        self.content_frame.columnconfigure(0, weight=1)
+        self.content_frame.rowconfigure(0, weight=1)
+
+        self.pages = {}
+        self.nav_buttons = {}
+        
+        # Create pages
+        self.run_tab = RunTabPage(self.content_frame, self)
+        self.logs_tab = LogsTabPage(self.content_frame, self)
+        self.settings_tab = SettingsTabPage(self.content_frame, self)
+        self.about_tab = AboutTabPage(self.content_frame, self)
+
+        # Page and button configuration
+        page_configs = [
+            ("run", self.run_tab, translate("execute_tab")),
+            ("logs", self.logs_tab, translate("logs_tab")),
+            ("settings", self.settings_tab, translate("settings_tab")),
+            ("about", self.about_tab, translate("about_tab"))
+        ]
+
+        # Iterate to create buttons and pack them inside the holder frame
+        for name, page, text in page_configs:
+            self.pages[name] = page
+            page.grid(row=0, column=0, sticky="nsew")
+            button = ttk.Button(
+                button_holder_frame, # Parent is the new holder frame
+                text=text, 
+                command=lambda n=name: self._show_page(n),
+                bootstyle="outline" # Default style for non-selected tabs
+            )
+            button.pack(fill=X, padx=5, pady=5)
+            self.nav_buttons[name] = button
+
+        self._show_page("run") # Show the first page initially
+
+        # Use grid for the status bar as well, placing it in the second row
         self.status_bar = ttk.Frame(self.root, padding=(5, 2), relief=SUNKEN)
-        self.status_bar.pack(side=BOTTOM, fill=X)
+        self.status_bar.grid(row=1, column=0, columnspan=2, sticky="ew", padx=10, pady=(0, 10))
         self.status_var = tk.StringVar(value=translate("initializing"))
         self.status_label = ttk.Label(self.status_bar, textvariable=self.status_var)
-        self.status_label.pack(side=LEFT)
+        self.status_label.pack(side=LEFT) # pack is fine here, as its parent is status_bar, not root
+
+    def show_toast(self, title: str, message: str, bootstyle: str = "default", duration: int = 3000):
+        """Creates and shows a toast notification."""
+        Toast(self.root, title, message, bootstyle, duration)
+
+    def _show_page(self, name: str):
+        """Shows the selected page and updates button styles."""
+        for page_name, page in self.pages.items():
+            page.grid_remove()
+            self.nav_buttons[page_name].config(bootstyle="outline")
+        
+        self.pages[name].grid()
+        self.nav_buttons[name].config(bootstyle="primary") # Highlight selected tab
+        self._on_tab_change(name)
     
-    def _on_tab_change(self, event):
+    def _on_tab_change(self, page_name: str):
         """Callback for when a notebook tab is changed."""
-        selected_tab_index = self.notebook.index(self.notebook.select())
-        if selected_tab_index == 1 and not self.logs_tab_initialized: # Logs Tab is at index 1
+        if page_name == "logs" and not self.logs_tab_initialized:
             self.logs_tab.setup_widgets()
             self.logs_tab_initialized = True
             self._on_period_change()
@@ -349,34 +401,38 @@ class RobotRunnerApp:
         """
         start_time = time.time()
         timeout = 5  # 5 seconds
-        command = "adb mdns services"
+        command = "adb mdns services" # type: ignore
         
         while time.time() - start_time < timeout:
-            success, output = execute_command(command)
+            success, output = execute_command(command) # type: ignore
             if success:
                 for line in output.splitlines():
                     if ip_address in line and "_adb-tls-connect._tcp" in line:
                         match = re.search(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d+)", line)
                         if match and match.group(1) == ip_address:
                             found_port = match.group(2)
-                            self.root.after(0, self.adb_port_var.set, found_port)
+                            self.root.after(0, self.adb_port_var.set, found_port) # type: ignore
                             return # Success, exit the function
             time.sleep(0.5) # Wait a bit before retrying
             
         # If the loop finishes without finding the port (timeout)
-        current_text = self.adb_port_var.get()
+        current_text = self.adb_port_var.get() # type: ignore
         if translate("finding_wireless_port") in current_text:
-            # Attempt to open the wireless debugging screen on the device
-            dev_settings_command = f"adb -s {udid} shell am start -a android.settings.DEVELOPMENT_SETTINGS"
-            success, output = execute_command(dev_settings_command)
-            # If opening Developer Options fails, fall back to opening the main Settings screen.
-            if not success or "unable to resolve" in output.lower() or "activity not found" in output.lower():
-                main_settings_command = f"adb -s {udid} shell am start -a android.settings.SETTINGS"
-                execute_command(main_settings_command)
-            self.root.after(0, self.adb_port_var.set, "") # Clear the "Searching..." message
-            self.root.after(0, self.run_tab.mdns_info_label.config, {"text": translate("mdns_failure_tooltip")})
-            self.root.after(0, self.run_tab.mdns_info_label.grid) # Show the info label
-            self.root.after(100, self.run_tab.port_entry.focus_set) # Focus the port entry for manual input
+            # Only attempt to open settings if the user is on the 'Connect' tab.
+            selected_tab_text = self.run_tab.sub_notebook.tab(self.run_tab.sub_notebook.select(), "text")
+            if selected_tab_text == translate("connect_sub_tab"):
+                # Attempt to open the wireless debugging screen on the device
+                dev_settings_command = f"adb -s {udid} shell am start -a android.settings.DEVELOPMENT_SETTINGS"
+                success, output = execute_command(dev_settings_command) # type: ignore
+                # If opening Developer Options fails, fall back to opening the main Settings screen.
+                if not success or "unable to resolve" in output.lower() or "activity not found" in output.lower():
+                    main_settings_command = f"adb -s {udid} shell am start -a android.settings.SETTINGS"
+                    execute_command(main_settings_command) # type: ignore
+                self.root.after(0, self.run_tab.mdns_info_label.config, {"text": translate("mdns_failure_tooltip")}) # type: ignore
+                self.root.after(0, self.run_tab.mdns_info_label.grid) # Show the info label # type: ignore
+                self.root.after(100, self.run_tab.port_entry.focus_set) # Focus the port entry for manual input # type: ignore
+            
+            self.root.after(0, self.adb_port_var.set, "") # Clear the "Searching..." message in all cases
 
     def _pair_wireless_device(self): # This method is now in RunTabPage
         """Pairs with a device wirelessly using a pairing code."""

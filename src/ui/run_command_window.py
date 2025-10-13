@@ -621,7 +621,9 @@ class RunCommandWindow(ttk.Toplevel):
 
         self.screenshot_canvas.update_idletasks()
         w, h = self.screenshot_canvas.winfo_width(), self.screenshot_canvas.winfo_height()
-        if w <= 1: self.after(50, self._start_inspection); return
+        if w <= 1:
+            self.after(50, self._start_inspection)
+            return
         self.screenshot_canvas.create_text(w / 2, h / 2, text=translate("inspector_updating_screen"), font=("Helvetica", 16), fill=self.parent_app.style.colors.fg, tags="loading_text")
 
         for item in self.elements_tree.get_children(): self.elements_tree.delete(item)
@@ -640,7 +642,8 @@ class RunCommandWindow(ttk.Toplevel):
             self.scrcpy_output_queue.put(translate("inspector_screenshot_info") + "\n")
             shell_manager.execute(self.udid, f"screencap -p {dev_sc_path}")
             if not execute_command(f"adb -s {self.udid} pull {dev_sc_path} \"{local_sc_path}\"")[0]:
-                self.scrcpy_output_queue.put(f"{translate('pull_screenshot_error')}\n"); return
+                self.scrcpy_output_queue.put(f"{translate('pull_screenshot_error')}\n")
+                return
             shell_manager.execute(self.udid, f"rm {dev_sc_path}")
 
             # 2. UI Dump
@@ -648,9 +651,11 @@ class RunCommandWindow(ttk.Toplevel):
             local_dump_path = self.parent_app.logs_dir / f"window_dump_{self.udid.replace(':', '-')}.xml"
             self.scrcpy_output_queue.put(translate("get_ui_dump_info") + "\n")
             if not shell_manager.execute(self.udid, f"uiautomator dump {dev_dump_path}"):
-                self.scrcpy_output_queue.put(f"{translate('get_ui_dump_error')}\n"); return
+                self.scrcpy_output_queue.put(f"{translate('get_ui_dump_error')}\n")
+                return
             if not execute_command(f"adb -s {self.udid} pull {dev_dump_path} \"{local_dump_path}\"")[0]:
-                self.scrcpy_output_queue.put(f"{translate('pull_ui_dump_error')}\n"); return
+                self.scrcpy_output_queue.put(f"{translate('pull_ui_dump_error')}\n")
+                return
             shell_manager.execute(self.udid, f"rm {dev_dump_path}")
 
             with open(local_dump_path, 'r', encoding='utf-8') as f: self.last_ui_dump_hash = hash(f.read())
@@ -677,7 +682,9 @@ class RunCommandWindow(ttk.Toplevel):
             self.screenshot_original_size = img.size
             self.screenshot_canvas.update_idletasks()
             canvas_w, canvas_h = self.screenshot_canvas.winfo_width(), self.screenshot_canvas.winfo_height()
-            if canvas_w <= 1: self.after(100, self._display_inspection_results, screenshot_path, dump_path); return
+            if canvas_w <= 1: 
+                self.after(100, self._display_inspection_results, screenshot_path, dump_path)
+                return
 
             img_w, img_h = img.size
             aspect = img_w / img_h if img_h > 0 else 1
@@ -740,7 +747,9 @@ class RunCommandWindow(ttk.Toplevel):
         self.screenshot_canvas.delete("highlight")
         selected = self.elements_tree.selection()
         if not selected:
-            self._update_xpath_buttons_state(None); self._populate_element_details(None); return
+            self._update_xpath_buttons_state(None)
+            self._populate_element_details(None)
+            return
 
         el_data = self.elements_data_map.get(selected[0])
         if el_data and (bounds := el_data.get("bounds_coords")):
@@ -809,7 +818,9 @@ class RunCommandWindow(ttk.Toplevel):
     def _copy_xpath(self, attribute_type: str):
         """Generates XPath and copies it to clipboard."""
         if xpath := self._generate_xpath(attribute_type):
-            self.clipboard_clear(); self.clipboard_append(xpath); tk.messagebox.showinfo(translate("xpath_copied_title"), translate("xpath_copied_message", xpath=xpath), parent=self)
+            self.clipboard_clear()
+            self.clipboard_append(xpath)
+            tk.messagebox.showinfo(translate("xpath_copied_title"), translate("xpath_copied_message", xpath=xpath), parent=self)
 
     def _perform_xpath_search(self):
         """Filters the element list based on an XPath query."""
@@ -824,7 +835,8 @@ class RunCommandWindow(ttk.Toplevel):
 
     def _clear_xpath_search(self):
         """Clears the XPath search."""
-        self.xpath_search_var.set(""); self._update_element_tree_view()
+        self.xpath_search_var.set("")
+        self._update_element_tree_view()
 
     def _on_canvas_click(self, event):
         """Handles clicks on the inspector screenshot canvas."""
@@ -851,9 +863,12 @@ class RunCommandWindow(ttk.Toplevel):
                 x, y, w, h = best_match["element_data"]["bounds_coords"]
                 threading.Thread(target=self._send_tap_to_device_and_refresh, args=(x + w / 2, y + h / 2), daemon=True).start()
             else:
-                self.elements_tree.selection_set(best_match["item_id"]); self.elements_tree.see(best_match["item_id"])
+                self.elements_tree.selection_set(best_match["item_id"])
+                self.elements_tree.see(best_match["item_id"])
         else:
-            self.elements_tree.selection_set(""); self.screenshot_canvas.delete("highlight"); self._update_xpath_buttons_state(None)
+            self.elements_tree.selection_set("")
+            self.screenshot_canvas.delete("highlight")
+            self._update_xpath_buttons_state(None)
 
     def _send_tap_to_device_and_refresh(self, x, y):
         """Sends a tap command and triggers an inspector refresh."""
@@ -952,7 +967,10 @@ class RunCommandWindow(ttk.Toplevel):
         while time.time() - start_time < 30: # Increased timeout for slower connections
             if not self.is_mirroring: return
             hwnd = win32gui.FindWindow(None, self.unique_title)
-            if hwnd: self.scrcpy_hwnd = hwnd; self.after(0, self._embed_window, container_id); return
+            if hwnd:
+                self.scrcpy_hwnd = hwnd
+                self.after(0, self._embed_window, container_id)
+                return
             time.sleep(0.2)
         self.scrcpy_output_queue.put(translate("scrcpy_find_window_error", title=self.unique_title) + "\n")
         self.after(0, self._stop_scrcpy)
@@ -967,7 +985,9 @@ class RunCommandWindow(ttk.Toplevel):
 
         try:
             # win32con is imported at the top of the file if win32gui is available
-            if not win32gui.IsWindow(self.scrcpy_hwnd): self.scrcpy_output_queue.put(translate("scrcpy_embed_error_invalid_handle") + "\n"); return
+            if not win32gui.IsWindow(self.scrcpy_hwnd):
+                self.scrcpy_output_queue.put(translate("scrcpy_embed_error_invalid_handle") + "\n")
+                return
             win32gui.SetParent(self.scrcpy_hwnd, container_id)
             style = win32gui.GetWindowLong(self.scrcpy_hwnd, win32con.GWL_STYLE)
             new_style = style & ~win32con.WS_CAPTION & ~win32con.WS_THICKFRAME
@@ -982,7 +1002,9 @@ class RunCommandWindow(ttk.Toplevel):
         if self.scrcpy_hwnd and win32gui:
             try: win32gui.MoveWindow(self.scrcpy_hwnd, 0, 0, event.width, event.height, True)
             except win32gui.error as e:
-                if e.winerror == 1400: self.scrcpy_hwnd = None; self.embed_frame.unbind("<Configure>")
+                if e.winerror == 1400:
+                    self.scrcpy_hwnd = None
+                    self.embed_frame.unbind("<Configure>")
                 else: raise
 
     def _take_screenshot(self):
@@ -1013,7 +1035,8 @@ class RunCommandWindow(ttk.Toplevel):
         threading.Thread(target=self._start_recording_thread, daemon=True).start()
 
     def _start_recording_thread(self):
-        recordings_dir = self.parent_app.recordings_dir; recordings_dir.mkdir(exist_ok=True)
+        recordings_dir = self.parent_app.recordings_dir
+        recordings_dir.mkdir(exist_ok=True)
         self.recording_device_path = f"/sdcard/recording_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4"
         command = ["adb", "-s", self.udid, "shell", "screenrecord", self.recording_device_path]
         self.scrcpy_output_queue.put(translate("recording_start_info", command=' '.join(command)) + "\n")
@@ -1032,7 +1055,8 @@ class RunCommandWindow(ttk.Toplevel):
         self.scrcpy_output_queue.put(translate("recording_stop_info") + "\n")
         if not self.recording_process or self.recording_process.poll() is not None:
             self.scrcpy_output_queue.put(translate("no_active_recording_error") + "\n")
-            self.after(0, self._update_recording_ui, False); return
+            self.after(0, self._update_recording_ui, False)
+            return
         try:
             self.recording_process.kill()
             self.scrcpy_output_queue.put(translate("recording_stopped_saving_info") + "\n")
@@ -1058,15 +1082,19 @@ class RunCommandWindow(ttk.Toplevel):
 
     def _start_performance_monitor(self):
         if not (app_package := self.app_package_combo.get()):
-            Messagebox.show_warning(translate("input_error"), translate("select_app_package_warning"), parent=self); return
+            Messagebox.show_warning(translate("input_error"), translate("select_app_package_warning"), parent=self)
+            return
         self.is_monitoring = True
         self.stop_monitoring_event.clear()
         self.monitor_button.config(text=translate("stop_monitoring"), bootstyle="danger")
         self.toggle_minimize_perf_button.config(state=NORMAL)
         self.app_package_combo.config(state=DISABLED)
-        self.performance_output_text.text.config(state=NORMAL); self.performance_output_text.text.delete("1.0", END); self.performance_output_text.text.config(state=DISABLED)
+        self.performance_output_text.text.config(state=NORMAL)
+        self.performance_output_text.text.delete("1.0", END)
+        self.performance_output_text.text.config(state=DISABLED)
         self.last_performance_line_var.set("")
-        log_dir = self.parent_app.logs_dir; log_dir.mkdir(exist_ok=True)
+        log_dir = self.parent_app.logs_dir
+        log_dir.mkdir(exist_ok=True)
         self.performance_log_file = log_dir / f"performance_log_{app_package.split('.')[-1]}_{self.udid.replace(':', '-')}.txt"
         self.performance_thread = threading.Thread(target=run_performance_monitor, args=(self.parent_app.shell_manager, self.udid, app_package, self.performance_output_queue, self.stop_monitoring_event), daemon=True)
         self.performance_thread.start()
@@ -1099,7 +1127,9 @@ class RunCommandWindow(ttk.Toplevel):
                     line = item
                     if translate('monitoring_stopped_by_user') in item: self.last_performance_line_var.set("")
                 log_batch.append(line)
-            self.performance_output_text.text.insert(END, "".join(log_batch)); self.performance_output_text.text.see(END); self.performance_output_text.text.config(state=DISABLED)
+            self.performance_output_text.text.insert(END, "".join(log_batch))
+            self.performance_output_text.text.see(END)
+            self.performance_output_text.text.config(state=DISABLED)
             if self.performance_log_file:
                 with open(self.performance_log_file, 'a', encoding=OUTPUT_ENCODING) as f: f.write("".join(log_batch))
         if self.is_monitoring and (not self.performance_thread or not self.performance_thread.is_alive()): self._stop_performance_monitor()
@@ -1129,9 +1159,13 @@ class RunCommandWindow(ttk.Toplevel):
 
     def _reset_ui_for_test_run(self):
         """Resets the UI for a test run."""
-        self.robot_output_text.text.config(state=NORMAL); self.robot_output_text.text.delete("1.0", END); self.robot_output_text.text.config(state=DISABLED)
-        self.repeat_test_button.pack_forget(); self.close_button.pack_forget()
-        self.stop_test_button.config(state=NORMAL); self.stop_test_button.pack(fill=X, pady=5, padx=5)
+        self.robot_output_text.text.config(state=NORMAL)
+        self.robot_output_text.text.delete("1.0", END)
+        self.robot_output_text.text.config(state=DISABLED)
+        self.repeat_test_button.pack_forget()
+        self.close_button.pack_forget()
+        self.stop_test_button.config(state=NORMAL)
+        self.stop_test_button.pack(fill=X, pady=5, padx=5)
 
     def _start_test(self):
         self._reset_ui_for_test_run()
@@ -1140,7 +1174,9 @@ class RunCommandWindow(ttk.Toplevel):
     def _run_robot_test(self):
         try:
             device_info = get_device_properties(self.udid)
-            if not device_info: self.robot_output_queue.put(translate("get_device_info_error", udid=self.udid) + "\n"); return
+            if not device_info:
+                self.robot_output_queue.put(translate("get_device_info_error", udid=self.udid) + "\n")
+                return
 
             suite_name = Path(self.run_path).stem
             self.cur_log_dir = self.parent_app.logs_dir / f"A{device_info['release']}_{device_info['model']}_{self.udid.split(':')[0]}" / suite_name
@@ -1161,10 +1197,12 @@ class RunCommandWindow(ttk.Toplevel):
 
             creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
             self.robot_process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding=OUTPUT_ENCODING, errors='replace', creationflags=creationflags)
-            for line in iter(self.robot_process.stdout.readline, ''): self.robot_output_queue.put(line)
+            for line in iter(self.robot_process.stdout.readline, ''):
+                self.robot_output_queue.put(line)
             self.robot_process.stdout.close()
             self.robot_output_queue.put(translate("test_finished", code=self.robot_process.wait()) + "\n")
-        except Exception as e: self.robot_output_queue.put(translate("robot_run_fatal_error", error=e) + "\n")
+        except Exception as e:
+            self.robot_output_queue.put(translate("robot_run_fatal_error", error=e) + "\n")
         finally:
             self.after(0, self._on_test_finished)
             self.after(0, self.parent_app._on_period_change)
@@ -1190,7 +1228,8 @@ class RunCommandWindow(ttk.Toplevel):
                  else:
                     tag = "PASS" if "| PASS |" in line else "FAIL" if "| FAIL |" in line else None
                     self.robot_output_text.text.insert(END, line, tag)
-            self.robot_output_text.text.see(END); self.robot_output_text.text.config(state=DISABLED)
+            self.robot_output_text.text.see(END)
+            self.robot_output_text.text.config(state=DISABLED)
         self.after(500, self._check_robot_output_queue)
 
     def _open_file_path(self, path: str):

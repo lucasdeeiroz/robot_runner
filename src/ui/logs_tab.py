@@ -16,9 +16,14 @@ class LogsTabPage(ttk.Frame):
         """Creates and places all the widgets in the tab."""
         logs_controls_frame = ttk.Frame(self)
         logs_controls_frame.pack(fill=X, pady=5)
+        # Configure grid columns for the controls frame
+        logs_controls_frame.columnconfigure(0, weight=1) # Left controls should expand
+        logs_controls_frame.columnconfigure(1, weight=0) # Right controls should not expand
+
+        ttk.Label(logs_controls_frame, text="Logs", font="-weight bold").grid(row=0, column=0, sticky="w", pady=(0, 5))
 
         left_controls_frame = ttk.Frame(logs_controls_frame)
-        left_controls_frame.pack(side=LEFT, fill=X, expand=True)
+        left_controls_frame.grid(row=1, column=0, sticky="ew")
 
         ttk.Label(left_controls_frame, text=translate("group_by")).pack(side=LEFT, padx=(0,5))
         self.group_by_combobox = ttk.Combobox(left_controls_frame, textvariable=self.app.group_by_var,
@@ -35,7 +40,7 @@ class LogsTabPage(ttk.Frame):
         ToolTip(self.period_combobox, translate("period_tooltip"))
 
         right_controls_frame = ttk.Frame(logs_controls_frame)
-        right_controls_frame.pack(side=RIGHT)
+        right_controls_frame.grid(row=1, column=1, sticky="e")
 
         self.log_cache_info_label = ttk.Label(right_controls_frame, text=translate("no_data_loaded"))
         self.log_cache_info_label.pack(side=LEFT, padx=(0, 10))
