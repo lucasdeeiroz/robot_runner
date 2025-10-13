@@ -16,21 +16,19 @@ class AboutTabPage(ttk.Frame):
         about_frame = ttk.Frame(self)
         about_frame.pack(fill=ttk.BOTH, expand=ttk.YES, padx=10, pady=5)
 
-        title_label = ttk.Label(about_frame, text=translate("about_title"), font="-size 20 -weight bold")
+        title_label = ttk.Label(about_frame, text=translate("about_title"), font="-size 24 -weight bold")
         title_label.pack(pady=(0, 10))
         ToolTip(title_label, translate("app_author_tooltip"))
 
         desc_label = ttk.Label(about_frame, text=translate("about_subtitle"), wraplength=500)
         desc_label.pack(pady=(0, 20))
 
-        tools_frame = ttk.LabelFrame(about_frame, text=translate("acknowledgements"), padding=10)
-        tools_frame.pack(fill=ttk.X, pady=5)
+        ttk.Label(about_frame, text=translate("acknowledgements"), font="-weight bold").pack(anchor=ttk.W, pady=(10, 5))
+        ttk.Label(about_frame, text=translate("acknowledgements_text"), justify=ttk.LEFT).pack(anchor=ttk.W, fill=ttk.X)
 
-        tools_text = translate("acknowledgements_text")
-        ttk.Label(tools_frame, text=tools_text, justify=ttk.LEFT).pack(anchor=ttk.W)
-
-        license_frame = ttk.LabelFrame(about_frame, text=translate("license"), padding=10)
-        license_frame.pack(fill=ttk.BOTH, expand=ttk.YES, pady=5)
+        ttk.Label(about_frame, text=translate("license"), font="-weight bold").pack(anchor=ttk.W, pady=(20, 5))
+        license_frame = ttk.Frame(about_frame, padding=0, borderwidth=0)
+        license_frame.pack(fill=ttk.BOTH, expand=ttk.YES)
         
         license_text_widget = ScrolledText(license_frame, wrap=ttk.WORD, autohide=True)
         license_text_widget.pack(fill=ttk.BOTH, expand=ttk.YES)

@@ -29,8 +29,7 @@ from src.device_utils import (
     _parse_appium_command, get_device_ip
 )
 from src.log_parser import get_generation_time # This import is used in _parse_logs_thread
-from src.ui.run_command_window import RunCommandWindow
-from src.ui.run_tab import RunTabPage # Removed unused imports connect_sub_tab and commands_sub_tab
+from src.ui.run_tab import RunTabPage
 from src.ui.logs_tab import LogsTabPage
 from src.ui.settings_tab import SettingsTabPage
 from src.ui.about_tab import AboutTabPage
@@ -305,12 +304,12 @@ class RobotRunnerApp:
         try:
             selected_device_indices = self.run_tab.device_listbox.curselection()
             if not selected_device_indices:
-                messagebox.showerror(translate("open_file_error_title"), translate("no_device_selected"), parent=self.root)
+                self.show_toast(translate("open_file_error_title"), translate("no_device_selected"), "warning")
                 return
 
             selected_devices = [self.run_tab.device_listbox.get(i) for i in selected_device_indices]
             if any(translate("no_devices_found") in s for s in selected_devices):
-                messagebox.showerror(translate("open_file_error_title"), translate("no_device_selected"), parent=self.root)
+                self.show_toast(translate("open_file_error_title"), translate("no_device_selected"), "warning")
                 return
 
             # Check for busy devices
@@ -323,12 +322,12 @@ class RobotRunnerApp:
 
             selected_indices = self.run_tab.selection_listbox.curselection()
             if not selected_indices:
-                messagebox.showerror(translate("open_file_error_title"), translate("no_test_file_selected"), parent=self.root)
+                self.show_toast(translate("open_file_error_title"), translate("no_test_file_selected"), "warning")
                 return
 
             selected_filename = self.run_tab.selection_listbox.get(selected_indices[0])
             if selected_filename.startswith("["):  # It's a folder or back button
-                messagebox.showwarning(translate("invalid_selection_title"), translate("invalid_selection_message"), parent=self.root)
+                self.show_toast(translate("invalid_selection_title"), translate("invalid_selection_message"), "warning")
                 return
 
             run_mode = self.run_mode_var.get()
@@ -344,7 +343,7 @@ class RobotRunnerApp:
                 path_to_run = (self.current_path / selected_path).resolve()
 
             if not path_to_run.exists(): # Now path_to_run is a Path object, so .exists() works.
-                messagebox.showerror(translate("open_file_error_title"), translate("file_not_found_error", path=path_to_run), parent=self.root)
+                self.show_toast(translate("open_file_error_title"), translate("file_not_found_error", path=path_to_run), "danger")
                 return
 
             # All checks passed, start the background thread
@@ -388,6 +387,7 @@ class RobotRunnerApp:
 
     def _create_run_command_window(self, udid: str, path_to_run: str, run_mode: str): # This method is now in RunTabPage
         """Helper to safely create the RunCommandWindow from the main GUI thread."""
+        from src.ui.run_command_window import RunCommandWindow
         # Centralized Resource Management: If a window for this UDID already exists, close it before creating a new one.
         if udid in self.active_command_windows and self.active_command_windows[udid].winfo_exists():
             win = self.active_command_windows[udid]
@@ -501,12 +501,12 @@ class RobotRunnerApp:
     def _mirror_device(self): # This method is now in RunTabPage
         selected_device_indices = self.run_tab.device_listbox.curselection() # type: ignore
         if not selected_device_indices:
-            messagebox.showerror(translate("open_file_error_title"), translate("no_device_selected"))
+            self.show_toast(translate("open_file_error_title"), translate("no_device_selected"), "warning")
             return
         
         selected_devices = [self.run_tab.device_listbox.get(i) for i in selected_device_indices]
         if any(translate("no_devices_found") in s for s in selected_devices):
-            messagebox.showerror(translate("open_file_error_title"), translate("no_device_selected"))
+            self.show_toast(translate("open_file_error_title"), translate("no_device_selected"), "warning")
             return
 
         # Disable the button immediately
@@ -550,6 +550,7 @@ class RobotRunnerApp:
 
     def _create_mirror_window(self, udid: str, model: str, version: str): # This method is now in RunTabPage
         """Helper to create the mirror window on the main thread."""
+        from src.ui.run_command_window import RunCommandWindow
         win = RunCommandWindow(self, udid, mode='mirror', title=translate("mirror_title", version=version, model=model))
         self.active_command_windows[udid] = win
 

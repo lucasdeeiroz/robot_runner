@@ -1,12 +1,14 @@
 import tkinter as tk
 import threading
 import sys
+from pathlib import Path
 import time
 from tkinter import messagebox
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 from ttkbootstrap.scrolled import ScrolledText
 from ttkbootstrap.tooltip import ToolTip
+from typing import List
 
 from src.app_utils import execute_command
 from src.locales.i18n import gettext as translate
@@ -164,6 +166,13 @@ class RunTabPage(ttk.Frame):
         output_frame.columnconfigure(0, weight=1)
         self.adb_output_text = ScrolledText(output_frame, wrap=WORD, state=DISABLED, autohide=True)
         self.adb_output_text.grid(row=0, column=0, sticky="nsew")
+        
+        # Add a placeholder text
+        self.adb_output_text.text.config(state=NORMAL)
+        self.adb_output_text.text.insert("1.0", translate("select_output_placeholder"))
+        self.adb_output_text.text.config(state=DISABLED)
+        self.adb_output_text.text.tag_configure("placeholder", foreground="gray")
+        self.adb_output_text.text.tag_add("placeholder", "1.0", "end")
 
     def _on_common_command_select(self, event=None):
         """Fills the manual command entry with the selected common command."""
