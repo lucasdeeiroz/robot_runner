@@ -174,8 +174,20 @@ class RobotRunnerApp:
         self.status_label.pack(side=LEFT) # pack is fine here, as its parent is status_bar, not root
 
     def show_toast(self, title: str, message: str, bootstyle: str = "default", duration: int = 3000):
-        """Creates and shows a toast notification."""
-        Toast(self.root, title, message, bootstyle, duration)
+        """Creates and shows a toast notification at the bottom-center of the main window."""
+        toast = Toast(self.root, title, message, bootstyle, duration)
+        
+        # Calculate position to anchor the toast to the bottom-center of the main window
+        self.root.update_idletasks()
+        toast.update_idletasks()
+        
+        root_x, root_y = self.root.winfo_x(), self.root.winfo_y()
+        root_width, root_height = self.root.winfo_width(), self.root.winfo_height()
+        toast_width, toast_height = toast.winfo_width(), toast.winfo_height()
+        
+        x = root_x + (root_width // 2) - (toast_width // 2)
+        y = root_y + root_height - toast_height - 50 # 50px padding from the bottom
+        toast.geometry(f"+{x}+{y}")
 
     def _show_page(self, name: str):
         """Shows the selected page and updates button styles."""

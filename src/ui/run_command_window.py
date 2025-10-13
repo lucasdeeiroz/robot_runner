@@ -17,7 +17,6 @@ from PIL import Image, ImageTk
 from ttkbootstrap.constants import *
 from ttkbootstrap.scrolled import ScrolledText
 from ttkbootstrap.tooltip import ToolTip
-from ttkbootstrap.dialogs import Messagebox
 
 from src.app_utils import OUTPUT_ENCODING, execute_command
 from src.device_utils import get_device_aspect_ratio, get_device_properties
@@ -70,6 +69,7 @@ class RunCommandWindow(ttk.Toplevel):
         self.scrcpy_output_is_visible = False
         self.scrcpy_output_queue = Queue()
 
+        self.center_pane_width = 150 # Default width
         # --- Performance Monitor Attributes ---
         self.performance_monitor_is_visible = False
         self.is_monitoring = False
@@ -129,6 +129,12 @@ class RunCommandWindow(ttk.Toplevel):
         self.main_paned_window = ttk.PanedWindow(self, orient=HORIZONTAL)
         self.main_paned_window.pack(fill=BOTH, expand=YES)
 
+        # --- Status Bar ---
+        self.status_bar = ttk.Frame(self, padding=(5, 2), relief=SUNKEN)
+        self.status_bar.pack(side=BOTTOM, fill=X, padx=5, pady=(0, 5))
+        self.status_var = tk.StringVar()
+        self.status_label = ttk.Label(self.status_bar, textvariable=self.status_var, anchor=W)
+        self.status_label.pack(side=LEFT, fill=X, expand=YES)
         # --- 1. Left Pane (Outputs) ---
         self.left_pane_container = ttk.Frame(self.main_paned_window, padding=5)
         self.output_paned_window = ttk.PanedWindow(self.left_pane_container, orient=VERTICAL)
@@ -164,8 +170,9 @@ class RunCommandWindow(ttk.Toplevel):
         """Sets the center pane width after the window is fully drawn."""
         if not self.winfo_exists(): return
         self.center_pane_container.update_idletasks() # Ensure widgets are drawn
-        self.center_pane_width = self.center_pane_container.winfo_width()
-        self.minsize(width=self.center_pane_width * 3, height=500)
+        width = self.center_pane_container.winfo_width()
+        if width > 1: self.center_pane_width = width
+
     def _setup_center_pane_controls(self):
         """Sets up the control buttons in the center pane."""
         self.mirror_button = ttk.Button(self.center_pane_container, text=translate("start_mirroring"), command=self._toggle_mirroring, bootstyle="info")
@@ -188,10 +195,13 @@ class RunCommandWindow(ttk.Toplevel):
         self.toggle_perf_button.pack(fill=X, pady=5, padx=5)
         ToolTip(self.toggle_perf_button, text=translate("show_performance_tooltip"))
         
-        if self.mode != 'test':
-            self._setup_inspector_center_pane()
-        else:
+        if self.mode == 'test':
             self._setup_test_mode_center_pane()
+        else:
+            self.inspect_button = ttk.Button(self.center_pane_container, text=translate("start_inspector"), command=self._toggle_inspector_mode, bootstyle="primary")
+            self.inspect_button.pack(fill=X, pady=5, padx=5)
+            ToolTip(self.inspect_button, translate("inspector_tooltip"))
+            self._setup_inspector_center_pane()
 
     def _setup_inspector_center_pane(self):
         """Sets up inspector-specific controls in the center pane."""
@@ -199,23 +209,16 @@ class RunCommandWindow(ttk.Toplevel):
         self.element_details_text = ScrolledText(self.element_details_frame, wrap=WORD, state=DISABLED, autohide=True)
         self.element_details_text.pack(fill=BOTH, expand=YES)
         self.element_details_text.text.tag_configure("bold", font="-weight bold")
-
-        self.xpath_buttons_container = ttk.Frame(self.center_pane_container, padding=5)
+        
+        self.xpath_buttons_container = ttk.Frame(self.center_pane_container)
         self.xpath_buttons = {}
-
-        ttk.Separator(self.center_pane_container, orient=HORIZONTAL).pack(fill=X, pady=10, padx=5)
-
-        self.inspect_button = ttk.Button(self.center_pane_container, text=translate("start_inspector"), command=self._toggle_inspector_mode, bootstyle="primary")
-        self.inspect_button.pack(fill=X, pady=5, padx=5)
-        ToolTip(self.inspect_button, translate("inspector_tooltip"))
+        self.xpath_buttons_container.pack(side=BOTTOM, fill=X, pady=5, padx=5)
 
     def _setup_test_mode_center_pane(self):
         """Sets up test-mode-specific controls in the center pane."""
         self.toggle_robot_button = ttk.Button(self.center_pane_container, text=translate("hide_test_output"), command=lambda: self._toggle_output_visibility('robot'), bootstyle="secondary")
         self.toggle_robot_button.pack(fill=X, pady=5, padx=5)
         ToolTip(self.toggle_robot_button, text=translate("hide_robot_output_tooltip"))
-        
-        ttk.Separator(self.center_pane_container, orient=HORIZONTAL).pack(fill=X, pady=10, padx=5)
 
         self.repeat_test_button = ttk.Button(self.center_pane_container, text=translate("repeat_test"), command=self._repeat_test)
         ToolTip(self.repeat_test_button, text=translate("repeat_test_tooltip"))
@@ -322,9 +325,10 @@ class RunCommandWindow(ttk.Toplevel):
         self.elements_tree.bind("<<TreeviewSelect>>", self._on_element_select)
         self.elements_tree.bind("<Button-1>", self._on_treeview_click)
 
-        actions_frame = ttk.LabelFrame(self.inspector_controls_frame, text=translate("inspector_element_actions"), padding=5)
-        actions_frame.pack(side=TOP, fill=X, pady=(5, 0))
-        actions_frame.columnconfigure((0, 1, 2, 3), weight=1)
+        ttk.Label(self.inspector_controls_frame, text=translate("inspector_element_actions"), font="-weight bold").pack(side=TOP, fill=X, pady=(10, 2), padx=5)
+        actions_frame = ttk.Frame(self.inspector_controls_frame, padding=(5,0,5,5))
+        actions_frame.pack(side=TOP, fill=X)
+        actions_frame.columnconfigure((0, 1, 2, 3), weight=1) # type: ignore
         self.action_click_button = ttk.Button(actions_frame, text=translate("action_click"), command=lambda: self._perform_element_action("click"), state=DISABLED)
         self.action_click_button.grid(row=0, column=0, columnspan=2, sticky="ew", padx=2, pady=2)
         ToolTip(self.action_click_button, text=translate("action_click_tooltip"))
@@ -535,6 +539,7 @@ class RunCommandWindow(ttk.Toplevel):
         self.is_inspecting = True
         if self.aspect_ratio is None:
             self.aspect_ratio = get_device_aspect_ratio(self.udid)
+        self.element_details_frame.pack(fill=BOTH, expand=YES, pady=5, padx=5)
         
         self.mirror_button.config(state=DISABLED)
         self.inspect_button.config(text=translate("stop_inspector"), bootstyle="danger")
@@ -551,9 +556,6 @@ class RunCommandWindow(ttk.Toplevel):
         self.auto_refresh_thread = threading.Thread(target=self._auto_refresh_inspector_thread, daemon=True)
         self.auto_refresh_thread.start()
 
-        self.xpath_buttons_container.pack(side=BOTTOM, fill=X, pady=5, padx=5)
-        self.element_details_frame.pack(fill=BOTH, expand=YES, pady=5, padx=5)
-        
         self._toggle_output_visibility('inspector')
         self.after(50, self._wait_for_canvas_and_inspect)
 
@@ -566,10 +568,9 @@ class RunCommandWindow(ttk.Toplevel):
     def _stop_inspector(self):
         if not self.is_inspecting: return
         self.is_inspecting = False
+        self.element_details_frame.pack_forget()
 
         self.main_paned_window.forget(self.right_pane_container)
-        self.element_details_frame.pack_forget()
-        self.xpath_buttons_container.pack_forget()
         
         # Properly remove the pane to prevent "already added" error on restart.
         # ttkbootstrap.PanedWindow does not have a 'forget' method, but 'remove' is used for panes.
@@ -606,7 +607,7 @@ class RunCommandWindow(ttk.Toplevel):
                     with open(local_dump_path, 'r', encoding='utf-8') as f: current_hash = hash(f.read())
                     local_dump_path.unlink(missing_ok=True)
                     if self.last_ui_dump_hash is not None and current_hash != self.last_ui_dump_hash:
-                        self.scrcpy_output_queue.put(translate("ui_change_detected_refreshing") + "\n")
+                        self.scrcpy_output_queue.put(f"{translate('ui_change_detected_refreshing')}\n")
                         self.after(0, self._start_inspection)
             except Exception as e: print(f"Error in inspector auto-refresh thread: {e}")
 
@@ -639,7 +640,7 @@ class RunCommandWindow(ttk.Toplevel):
             # 1. Screenshot
             dev_sc_path = "/sdcard/inspector_screenshot.png"
             local_sc_path = self.parent_app.screenshots_dir / f"inspector_screenshot_{self.udid.replace(':', '-')}_{timestamp}.png"
-            self.scrcpy_output_queue.put(translate("inspector_screenshot_info") + "\n")
+            self.scrcpy_output_queue.put(f"{translate('inspector_screenshot_info')}\n")
             shell_manager.execute(self.udid, f"screencap -p {dev_sc_path}")
             if not execute_command(f"adb -s {self.udid} pull {dev_sc_path} \"{local_sc_path}\"")[0]:
                 self.scrcpy_output_queue.put(f"{translate('pull_screenshot_error')}\n")
@@ -649,11 +650,13 @@ class RunCommandWindow(ttk.Toplevel):
             # 2. UI Dump
             dev_dump_path = "/sdcard/window_dump.xml"
             local_dump_path = self.parent_app.logs_dir / f"window_dump_{self.udid.replace(':', '-')}.xml"
-            self.scrcpy_output_queue.put(translate("get_ui_dump_info") + "\n")
+            self.scrcpy_output_queue.put(f"{translate('get_ui_dump_info')}\n")
             if not shell_manager.execute(self.udid, f"uiautomator dump {dev_dump_path}"):
                 self.scrcpy_output_queue.put(f"{translate('get_ui_dump_error')}\n")
                 return
-            if not execute_command(f"adb -s {self.udid} pull {dev_dump_path} \"{local_dump_path}\"")[0]:
+            if execute_command(f"adb -s {self.udid} pull {dev_dump_path} \"{local_dump_path}\"")[0]:
+                self.scrcpy_output_queue.put(f"{translate('ui_dump_saved_success', path=local_dump_path)}\n")
+            else:
                 self.scrcpy_output_queue.put(f"{translate('pull_ui_dump_error')}\n")
                 return
             shell_manager.execute(self.udid, f"rm {dev_dump_path}")
@@ -820,7 +823,7 @@ class RunCommandWindow(ttk.Toplevel):
         if xpath := self._generate_xpath(attribute_type):
             self.clipboard_clear()
             self.clipboard_append(xpath)
-            tk.messagebox.showinfo(translate("xpath_copied_title"), translate("xpath_copied_message", xpath=xpath), parent=self)
+            self.parent_app.show_toast(translate("xpath_copied_title"), translate("xpath_copied_message", xpath=xpath), bootstyle="success")
 
     def _perform_xpath_search(self):
         """Filters the element list based on an XPath query."""
@@ -831,7 +834,7 @@ class RunCommandWindow(ttk.Toplevel):
             search_results = [el for el in self.all_elements_list if el.get("bounds") in found_bounds]
             self._populate_elements_tree(self._apply_inspector_filter(source_list=search_results))
         except ET.XPathSyntaxError as e:
-            tk.messagebox.showerror(translate("invalid_xpath_title"), translate("invalid_xpath_message", error=e), parent=self)
+            self.parent_app.show_toast(translate("invalid_xpath_title"), translate("invalid_xpath_message", error=e), bootstyle="danger")
 
     def _clear_xpath_search(self):
         """Clears the XPath search."""
@@ -872,9 +875,10 @@ class RunCommandWindow(ttk.Toplevel):
 
     def _send_tap_to_device_and_refresh(self, x, y):
         """Sends a tap command and triggers an inspector refresh."""
-        self.scrcpy_output_queue.put(translate("tap_info", x=int(x), y=int(y)) + "\n")
+        self.scrcpy_output_queue.put(f"{translate('tap_info', x=int(x), y=int(y))}\n")
         if execute_command(f"adb -s {self.udid} shell input tap {int(x)} {int(y)}")[0]:
-            self.scrcpy_output_queue.put(translate("tap_success_refreshing") + "\n")
+            self.parent_app.show_toast(translate("inspector"), translate("tap_success_refreshing"), bootstyle="info")
+            self.scrcpy_output_queue.put(f"{translate('tap_success_refreshing')}\n")
             self.after(500, self._start_inspection)
 
     def _perform_element_action(self, action_type: str):
@@ -896,7 +900,8 @@ class RunCommandWindow(ttk.Toplevel):
         elif action_type == "swipe_right": cmd = f"adb -s {self.udid} shell input swipe {int(x + width * 0.2)} {int(cy)} {int(x + width * 0.8)} {int(cy)} 400"
 
         if cmd and execute_command(cmd)[0]:
-            self.scrcpy_output_queue.put(translate("action_success_refreshing", action=action_type) + "\n")
+            self.parent_app.show_toast(translate("inspector"), translate("action_success_refreshing", action=action_type), bootstyle="info")
+            self.scrcpy_output_queue.put(f"{translate('action_success_refreshing', action=action_type)}\n")
             self.after(500, self._start_inspection)
         self.after(0, self._update_element_actions_state, True)
 
@@ -957,6 +962,9 @@ class RunCommandWindow(ttk.Toplevel):
             self.scrcpy_output_text.text.insert(END, "".join(lines))
             self.scrcpy_output_text.text.see(END)
             self.scrcpy_output_text.text.config(state=DISABLED)
+            # Update status bar with the last non-empty line
+            last_line = next((line.strip() for line in reversed(lines) if line.strip()), None)
+            if last_line: self.status_var.set(last_line)
         if self.is_mirroring and self.scrcpy_process and self.scrcpy_process.poll() is not None:
              self.scrcpy_output_queue.put(f"\n{translate('scrcpy_terminated_unexpectedly')}\n")
              self._stop_scrcpy()
@@ -993,7 +1001,7 @@ class RunCommandWindow(ttk.Toplevel):
             new_style = style & ~win32con.WS_CAPTION & ~win32con.WS_THICKFRAME
             win32gui.SetWindowLong(self.scrcpy_hwnd, win32con.GWL_STYLE, new_style)
             self.embed_frame.update_idletasks()
-            win32gui.MoveWindow(self.scrcpy_hwnd, 0, 0, self.embed_frame.winfo_width(), self.embed_frame.winfo_height(), True)
+            win32gui.MoveWindow(self.scrcpy_hwnd, 0, 0, self.embed_frame.winfo_width(), self.embed_frame.winfo_height(), True) # type: ignore
             self.embed_frame.bind("<Configure>", self._resize_child)
             self.scrcpy_output_queue.put(translate("scrcpy_embedded_info", hwnd=self.scrcpy_hwnd) + "\n")
         except win32gui.error as e: self.scrcpy_output_queue.put(translate("scrcpy_embed_error_win32", error=e) + "\n")
@@ -1012,7 +1020,6 @@ class RunCommandWindow(ttk.Toplevel):
         threading.Thread(target=self._take_screenshot_thread, daemon=True).start()
 
     def _take_screenshot_thread(self):
-        self.scrcpy_output_queue.put(translate("screenshot_info") + "\n")
         screenshots_dir = self.parent_app.screenshots_dir
         screenshots_dir.mkdir(exist_ok=True)
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -1020,8 +1027,11 @@ class RunCommandWindow(ttk.Toplevel):
         try:
             if execute_command(f"adb -s {self.udid} shell screencap -p {dev_path}")[0] and \
                execute_command(f"adb -s {self.udid} pull {dev_path} \"{local_path}\"")[0]:
-                self.scrcpy_output_queue.put(translate("screenshot_saved_success", path=local_path) + "\n")
-            else: self.scrcpy_output_queue.put(f"{translate('capture_screenshot_error')}\n")
+                self.parent_app.show_toast(translate("success_title"), translate("screenshot_saved_success", path=local_path), bootstyle="success")
+                self.scrcpy_output_queue.put(f"{translate('screenshot_saved_success', path=local_path)}\n")
+            else: 
+                self.parent_app.show_toast(translate("error_title"), translate("capture_screenshot_error"), bootstyle="danger")
+                self.scrcpy_output_queue.put(f"{translate('capture_screenshot_error')}\n")
             execute_command(f"adb -s {self.udid} shell rm {dev_path}")
         finally:
             self.after(0, lambda: self.screenshot_button.config(state=NORMAL, text=translate("take_screenshot")))
@@ -1038,7 +1048,7 @@ class RunCommandWindow(ttk.Toplevel):
         recordings_dir = self.parent_app.recordings_dir
         recordings_dir.mkdir(exist_ok=True)
         self.recording_device_path = f"/sdcard/recording_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4"
-        command = ["adb", "-s", self.udid, "shell", "screenrecord", self.recording_device_path]
+        command = ["adb", "-s", self.udid, "shell", "screenrecord", self.recording_device_path] # type: ignore
         self.scrcpy_output_queue.put(translate("recording_start_info", command=' '.join(command)) + "\n")
         try:
             self.recording_process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding=OUTPUT_ENCODING, errors='replace', creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
@@ -1052,7 +1062,6 @@ class RunCommandWindow(ttk.Toplevel):
         threading.Thread(target=self._stop_recording_thread, daemon=True).start()
 
     def _stop_recording_thread(self):
-        self.scrcpy_output_queue.put(translate("recording_stop_info") + "\n")
         if not self.recording_process or self.recording_process.poll() is not None:
             self.scrcpy_output_queue.put(translate("no_active_recording_error") + "\n")
             self.after(0, self._update_recording_ui, False)
@@ -1064,8 +1073,11 @@ class RunCommandWindow(ttk.Toplevel):
         time.sleep(2)
         local_path = self.parent_app.recordings_dir / f"{self.udid.replace(':', '-')}_{Path(self.recording_device_path).name}"
         if execute_command(f"adb -s {self.udid} pull {self.recording_device_path} \"{local_path}\"")[0]:
-            self.scrcpy_output_queue.put(translate("recording_saved_success", path=local_path) + "\n")
-        else: self.scrcpy_output_queue.put(f"{translate('pull_recording_error')}\n")
+            self.parent_app.show_toast(translate("success_title"), translate("recording_saved_success", path=local_path), bootstyle="success")
+            self.scrcpy_output_queue.put(f"{translate('recording_saved_success', path=local_path)}\n")
+        else: 
+            self.parent_app.show_toast(translate("error_title"), translate("pull_recording_error"), bootstyle="danger")
+            self.scrcpy_output_queue.put(f"{translate('pull_recording_error')}\n")
         execute_command(f"adb -s {self.udid} shell rm {self.recording_device_path}")
         self.after(0, self._update_recording_ui, False)
 
@@ -1082,7 +1094,7 @@ class RunCommandWindow(ttk.Toplevel):
 
     def _start_performance_monitor(self):
         if not (app_package := self.app_package_combo.get()):
-            Messagebox.show_warning(translate("input_error"), translate("select_app_package_warning"), parent=self)
+            self.parent_app.show_toast(translate("input_error"), translate("select_app_package_warning"), bootstyle="warning")
             return
         self.is_monitoring = True
         self.stop_monitoring_event.clear()
@@ -1237,8 +1249,8 @@ class RunCommandWindow(ttk.Toplevel):
         try:
             clean_path = Path(path)
             if clean_path.exists(): os.startfile(clean_path)
-            else: tk.messagebox.showwarning(title=translate("file_not_found_title"), message=translate("file_not_found_message", path=clean_path), parent=self)
-        except Exception as e: tk.messagebox.showerror(title=translate("open_file_error_title"), message=translate("open_file_error_message", error=e), parent=self)
+            else: self.parent_app.show_toast(translate("file_not_found_title"), translate("file_not_found_message", path=clean_path), bootstyle="warning")
+        except Exception as e: self.parent_app.show_toast(translate("open_file_error_title"), translate("open_file_error_message", error=e), bootstyle="danger")
 
     def _stop_test(self):
         self.stop_test_button.config(state=DISABLED)
