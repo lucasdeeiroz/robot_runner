@@ -1,5 +1,7 @@
 import tkinter as tk
 import threading
+import sys
+import time
 from tkinter import messagebox
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
@@ -11,12 +13,27 @@ from src.locales.i18n import gettext as translate
 from src.ui.toast import Toast
 from src.device_utils import get_device_ip
 
+try:
+    from pyngrok import ngrok
+    from pyngrok.exception import PyngrokError
+    PYNGROK_INSTALLED = True
+    PYNGROK_ERROR_MESSAGE = ""
+except (ImportError, ModuleNotFoundError) as e:
+    PYNGROK_INSTALLED = False
+    PYNGROK_ERROR_MESSAGE = (
+        f"{translate('pyngrok_import_error_message')}\n\n"
+        f"Error: {e}\n"
+        f"Python: {sys.executable}"
+    )
+
+
 class RunTabPage(ttk.Frame):
     """UI and logic for the 'Run Tests' tab."""
     def __init__(self, parent, app):
         super().__init__(parent, padding=10)
         self.app = app
 
+        self.remote_conn_mode_var = tk.StringVar(value="host")
         self._setup_widgets()
         self.on_run_mode_change()
 
@@ -54,7 +71,10 @@ class RunTabPage(ttk.Frame):
 
     def _setup_adb_tab(self, parent_frame: ttk.Frame):
         """Sets up the widgets for the ADB sub-tab."""
-        parent_frame.rowconfigure(3, weight=1)
+        # Add a spacer frame that will expand, keeping all other widgets packed at the top.
+        spacer = ttk.Frame(parent_frame)
+        spacer.grid(row=10, column=0, sticky="nsew") # Place it at a high row index
+        parent_frame.rowconfigure(10, weight=1)
         parent_frame.columnconfigure(0, weight=1)
 
         ttk.Label(parent_frame, text=translate("wireless_adb"), font="-weight bold").grid(row=0, column=0, sticky="w", pady=(0, 5))
@@ -96,6 +116,8 @@ class RunTabPage(ttk.Frame):
         self.mdns_info_label = ttk.Label(wireless_frame, text="", bootstyle="warning", wraplength=400)
         self.mdns_info_label.grid(row=4, column=0, columnspan=3, sticky="ew", padx=5, pady=(5, 0))
         self.mdns_info_label.grid_remove() # Hide it by default
+
+        self._setup_remote_conn_tab(parent_frame)
 
     def _setup_commands_tab(self, parent_frame: ttk.Frame):
         """Sets up the widgets for the Commands sub-tab."""
@@ -162,6 +184,160 @@ class RunTabPage(ttk.Frame):
         self.app.common_adb_commands.append(command_to_add)
         self.common_adb_commands_combo['values'] = self.app.common_adb_commands
         self.app.settings_tab._save_settings() # Trigger save
+
+    def _setup_remote_conn_tab(self, parent_frame: ttk.Frame):
+        """Sets up the widgets for the Remote Connection (ngrok) sub-tab."""
+        ttk.Label(parent_frame, text=translate("remote_connection_ngrok"), font="-weight bold").grid(row=5, column=0, sticky="w", pady=(20, 5))
+        remote_frame = ttk.Frame(parent_frame, padding=10, borderwidth=0, relief="solid")
+        remote_frame.grid(row=6, column=0, sticky="ew", pady=5)
+        remote_frame.columnconfigure(1, weight=1)
+
+        # Mode Selection
+        mode_frame = ttk.Frame(remote_frame)
+        mode_frame.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 10))
+        ttk.Radiobutton(mode_frame, text=translate("remote_mode_host"), variable=self.remote_conn_mode_var, value="host", command=self._on_remote_mode_change).pack(side=LEFT, padx=(0, 10))
+        ttk.Radiobutton(mode_frame, text=translate("remote_mode_client"), variable=self.remote_conn_mode_var, value="client", command=self._on_remote_mode_change).pack(side=LEFT)
+
+        # Host Controls
+        self.host_frame = ttk.Frame(remote_frame)
+        self.host_frame.grid(row=1, column=0, columnspan=2, sticky="ew")
+        self.host_frame.columnconfigure(1, weight=1)
+        ttk.Label(self.host_frame, text=translate("remote_host_url_label")).grid(row=0, column=0, sticky="w", padx=(0, 5))
+        self.ngrok_url_entry = ttk.Entry(self.host_frame, state="readonly")
+        self.ngrok_url_entry.grid(row=0, column=1, sticky="ew")
+        self.ngrok_url_entry.bind("<Button-1>", self._copy_ngrok_url)
+        self.start_host_button = ttk.Button(self.host_frame, text=translate("remote_start_host_button"), command=self._start_ngrok_host_session, bootstyle="primary")
+        self.start_host_button.grid(row=1, column=1, sticky="e", pady=(5,0))
+
+        # Client Controls
+        self.client_frame = ttk.Frame(remote_frame)
+        self.client_frame.grid(row=1, column=0, columnspan=2, sticky="ew")
+        self.client_frame.columnconfigure(1, weight=1)
+        ttk.Label(self.client_frame, text=translate("remote_client_url_label")).grid(row=0, column=0, sticky="w", padx=(0, 5))
+        self.remote_url_entry = ttk.Entry(self.client_frame)
+        self.remote_url_entry.grid(row=0, column=1, sticky="ew")
+        self.connect_client_button = ttk.Button(self.client_frame, text=translate("remote_connect_client_button"), command=self._connect_to_remote_host, bootstyle="primary")
+        self.connect_client_button.grid(row=1, column=1, sticky="e", pady=(5,0))
+
+        self._on_remote_mode_change() # Set initial visibility
+
+    def _copy_ngrok_url(self, event=None):
+        """Copies the ngrok public URL to the clipboard when the entry is clicked."""
+        url = self.ngrok_url_entry.get()
+        # Check if it's a valid ngrok URL and not a status message
+        if "ngrok.io" in url:
+            self.app.root.clipboard_clear()
+            self.app.root.clipboard_append(url)
+            self.app.show_toast(
+                title=translate("url_copied_title"),
+                message=translate("url_copied_message", url=url),
+                bootstyle="info"
+            )
+
+    def _on_remote_mode_change(self):
+        """Shows/hides Host/Client controls based on selection."""
+        if self.remote_conn_mode_var.get() == "host":
+            self.host_frame.grid()
+            self.client_frame.grid_remove()
+        else:
+            self.host_frame.grid_remove()
+            self.client_frame.grid()
+
+    def _start_ngrok_host_session(self):
+        """Starts the ngrok host session in a background thread."""
+        if not PYNGROK_INSTALLED:
+            messagebox.showerror(translate("dependency_missing"), PYNGROK_ERROR_MESSAGE)
+            return
+
+        if self.app.ngrok_tunnel:
+            self._stop_ngrok_host_session()
+            return
+
+        selected_indices = self.device_listbox.curselection()
+        if not selected_indices:
+            self.app.show_toast(translate("open_file_error_title"), translate("no_device_selected"), "warning")
+            return
+
+        self.start_host_button.config(state=DISABLED)
+        threading.Thread(target=self._ngrok_host_thread, args=(selected_indices[0],), daemon=True).start()
+
+    def _ngrok_host_thread(self, device_index: int):
+        """The logic for setting up the ngrok host tunnel."""
+        try:
+            device_str = self.device_listbox.get(device_index)
+            udid = device_str.split(" | ")[-1].split(" ")[0]
+            device_port = 5555 + device_index
+
+            self.app.root.after(0, lambda: self.ngrok_url_entry.config(state=NORMAL))
+            self.app.root.after(0, self.ngrok_url_entry.delete, 0, END)
+            self.app.root.after(0, self.ngrok_url_entry.insert, 0, translate("remote_status_starting_tcpip"))
+            self.app.root.after(0, lambda: self.ngrok_url_entry.config(state="readonly"))
+
+            # 1. Set device to TCP/IP mode
+            execute_command(f"adb -s {udid} tcpip {device_port}")
+            time.sleep(1) # Give ADB a moment
+
+            # 2. Start ngrok tunnel
+            self.app.root.after(0, lambda: self.ngrok_url_entry.config(state=NORMAL))
+            self.app.root.after(0, self.ngrok_url_entry.delete, 0, END)
+            self.app.root.after(0, self.ngrok_url_entry.insert, 0, translate("remote_status_starting_tunnel"))
+            self.app.root.after(0, lambda: self.ngrok_url_entry.config(state="readonly"))
+
+            self.app.ngrok_tunnel = ngrok.connect(5037, "tcp")
+            public_url = self.app.ngrok_tunnel.public_url.replace("tcp://", "")
+
+            # 3. Update UI with URL and button state
+            self.app.root.after(0, lambda: self.ngrok_url_entry.config(state=NORMAL))
+            self.app.root.after(0, self.ngrok_url_entry.delete, 0, END)
+            self.app.root.after(0, self.ngrok_url_entry.insert, 0, public_url)
+            self.app.root.after(0, lambda: self.ngrok_url_entry.config(state="readonly"))
+            self.app.root.after(0, lambda: self.start_host_button.configure(
+                text=translate("remote_stop_host_button"),
+                bootstyle="danger",
+                state=NORMAL
+            ))
+
+        except PyngrokError as e:
+            self.app.root.after(0, messagebox.showerror, translate("remote_error_title"), translate("remote_error_ngrok", error=e))
+            self._reset_host_ui()
+        except Exception as e:
+            self.app.root.after(0, messagebox.showerror, translate("remote_error_title"), translate("remote_error_generic", error=e))
+            self._reset_host_ui()
+
+    def _stop_ngrok_host_session(self):
+        """Stops the ngrok tunnel and resets the device."""
+        if self.app.ngrok_tunnel:
+            ngrok.disconnect(self.app.ngrok_tunnel.public_url)
+            ngrok.kill()
+            self.app.ngrok_tunnel = None
+
+        # Revert all devices to USB mode as we don't track which one was used
+        execute_command("adb devices -l | awk 'NR>1 {print $1}' | xargs -I {} adb -s {} usb")
+        self._reset_host_ui()
+        self.app.show_toast(translate("remote_session_stopped_title"), translate("remote_session_stopped_message"), "info")
+
+    def _reset_host_ui(self):
+        """Resets the host UI elements to their initial state."""
+        self.app.root.after(0, lambda: self.start_host_button.configure(
+            text=translate("remote_start_host_button"),
+            bootstyle="primary",
+            state=NORMAL
+        ))
+        self.app.root.after(0, lambda: self.ngrok_url_entry.config(state=NORMAL))
+        self.app.root.after(0, self.ngrok_url_entry.delete, 0, END)
+        self.app.root.after(0, lambda: self.ngrok_url_entry.config(state="readonly"))
+
+    def _connect_to_remote_host(self):
+        """Connects to a remote ngrok host address."""
+        remote_url = self.remote_url_entry.get().strip()
+        if not remote_url:
+            self.app.show_toast(translate("input_error"), translate("remote_error_no_url"), "warning")
+            return
+
+        command = f"adb connect {remote_url}"
+        self.connect_client_button.config(state=DISABLED)
+        self.app._update_output_text(self.adb_output_text, f"> {command}\n", True)
+        threading.Thread(target=self.app._run_command_and_update_gui, args=(command, self.adb_output_text, self.connect_client_button, True), daemon=True).start()
 
     def _setup_tests_tab(self, parent_frame: ttk.Frame):
         """Sets up the widgets for the Tests sub-tab."""

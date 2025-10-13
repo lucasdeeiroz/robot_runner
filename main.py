@@ -56,6 +56,7 @@ class RobotRunnerApp:
         self.appium_process: Optional[subprocess.Popen] = None
         self.active_command_windows: Dict[str, tk.Toplevel] = {}
         self.parsed_logs_data: Optional[List[Dict]] = None
+        self.ngrok_tunnel = None
         self.logs_tab_initialized = False
         self._is_closing = False
         self.shell_manager = AdbShellManager()
@@ -255,6 +256,9 @@ class RobotRunnerApp:
                 self.status_var.set(translate("stopping_appium_message"))
                 self.root.update_idletasks()
                 self._terminate_process_tree(self.appium_process.pid, "Appium")
+
+            if hasattr(self, 'ngrok_tunnel') and self.ngrok_tunnel:
+                self.run_tab._stop_ngrok_host_session()
             
             for window in list(self.active_command_windows.values()):
                 if window.winfo_exists():
@@ -581,12 +585,10 @@ class RobotRunnerApp:
         self.run_tab.device_listbox.delete(0, END)
 
         if self.devices:
-            self.run_tab.device_listbox.config(state=NORMAL)
             for i, d in enumerate(self.devices):
                 # Adjust listbox height dynamically, with a max of 10
                 num_devices = len(self.devices)
                 self.run_tab.device_listbox.config(height=min(num_devices, 10))
-
                 status_text = translate("device_busy") if d.get('status') == "Busy" else ""
                 device_string = f"Android {d['release']} | {d['model']} | {d['udid']} {status_text}"
                 self.run_tab.device_listbox.insert(END, device_string)
@@ -1079,17 +1081,26 @@ class RobotRunnerApp:
             messagebox.showerror(translate("open_file_error_title"), translate("log_open_error_generic", error=e))
             
     def _run_command_and_update_gui(self, command: str, output_widget: Optional[ScrolledText], button: ttk.Button, refresh_on_success: bool = False): # This method is now in RunTabPage
-        success, output = execute_command(command)
-        if output_widget:
-            if not output:
-                self.root.after(0, self._update_output_text, output_widget, f"\nResult: {success}\n", False)
-            else:
-                self.root.after(0, self._update_output_text, output_widget, f"\nResult:\n{output}\n", False)
-        
-        if success and refresh_on_success:
-            self.root.after(100, self._refresh_devices)
+        try:
+            success, output = execute_command(command)
+            if output_widget:
+                if not output:
+                    self.root.after(0, self._update_output_text, output_widget, f"\nResult: {success}\n", False)
+                else:
+                    self.root.after(0, self._update_output_text, output_widget, f"\nResult:\n{output}\n", False)
             
-        self.root.after(0, lambda: button.config(state=NORMAL))
+            # --- Enhanced Feedback for Connection Commands ---
+            if "connect" in command and "adb" in command:
+                if success and "connected to" in output:
+                    self.root.after(0, self.show_toast, translate("remote_connect_success_title"), translate("remote_connect_success_message", url=command.split()[-1]), "success")
+                else:
+                    error_reason = output.split(':')[-1].strip() if output else "Unknown error"
+                    self.root.after(0, self.show_toast, translate("remote_connect_fail_title"), translate("remote_connect_fail_message", output=error_reason), "danger")
+            
+            if success and refresh_on_success:
+                self.root.after(100, self._refresh_devices)
+        finally:
+            self.root.after(0, lambda: button.config(state=NORMAL))
 
     def _update_output_text(self, widget: Optional[ScrolledText], result: str, clear: bool):
         if not widget: return
