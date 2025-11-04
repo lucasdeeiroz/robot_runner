@@ -166,7 +166,4 @@ cython_debug/
 scrcpy*/
 recordings/
 screenshots/
-tests/
-suites/
-resources/
 logs/

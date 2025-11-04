@@ -1,0 +1,10 @@
+--doc Executa os testes de abertura do Google Chrome
+
+# É possível adicionar tags (--include [tag] e --exclude [tag])
+--Include chrome
+
+# É possível adicionar variáveis globais na execução (--variable [VAR]:[valor])
+
+
+# É possível adicionar diversos arquivos de teste ([./caminho/ate/teste.robot])
+./tests/
