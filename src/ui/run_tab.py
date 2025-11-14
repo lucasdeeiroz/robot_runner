@@ -1,18 +1,18 @@
 import tkinter as tk
 import threading
 import sys
-from pathlib import Path
+# from pathlib import Path
 import time
 from tkinter import messagebox
+# from typing import List
 import ttkbootstrap as ttk
-from ttkbootstrap.constants import *
+from ttkbootstrap.constants import BOTH, END, YES, WORD, NORMAL, DISABLED, LEFT, EXTENDED, X, W
 from ttkbootstrap.scrolled import ScrolledText
 from ttkbootstrap.tooltip import ToolTip
-from typing import List
 
 from src.app_utils import execute_command
 from src.locales.i18n import gettext as translate
-from src.ui.toast import Toast
+# from src.ui.toast import Toast
 from src.device_utils import get_device_ip
 
 try:

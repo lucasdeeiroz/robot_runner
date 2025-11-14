@@ -10,11 +10,11 @@ from pathlib import Path
 from queue import Empty, Queue
 from typing import Dict, List, Optional, Tuple
 
-import ttkbootstrap as ttk
 import tkinter as tk
+import ttkbootstrap as ttk
 from lxml import etree as ET
 from PIL import Image, ImageTk
-from ttkbootstrap.constants import *
+from ttkbootstrap.constants import BOTH, END, YES, WORD, NORMAL, DISABLED, LEFT, HORIZONTAL, VERTICAL, BOTTOM, TOP, SUNKEN, CENTER, X, W
 from ttkbootstrap.scrolled import ScrolledText
 from ttkbootstrap.tooltip import ToolTip
 
@@ -126,7 +126,7 @@ class RunCommandWindow(ttk.Toplevel):
 
     def _setup_widgets(self):
         """Sets up the 3-pane widget layout for the window."""
-        self.main_paned_window = ttk.PanedWindow(self, orient=HORIZONTAL)
+        self.main_paned_window = ttk.Panedwindow(self, orient=HORIZONTAL)
         self.main_paned_window.pack(fill=BOTH, expand=YES)
 
         # --- Status Bar ---
@@ -137,7 +137,7 @@ class RunCommandWindow(ttk.Toplevel):
         self.status_label.pack(side=LEFT, fill=X, expand=YES)
         # --- 1. Left Pane (Outputs) ---
         self.left_pane_container = ttk.Frame(self.main_paned_window, padding=5)
-        self.output_paned_window = ttk.PanedWindow(self.left_pane_container, orient=VERTICAL)
+        self.output_paned_window = ttk.Panedwindow(self.left_pane_container, orient=VERTICAL)
         self.placeholder_frame = ttk.Frame(self.left_pane_container)
         placeholder_label = ttk.Label(self.placeholder_frame, text=translate("select_output_placeholder"), justify=CENTER, anchor=CENTER, wraplength=300)
         placeholder_label.pack(fill=BOTH, expand=YES, padx=20, pady=20)
@@ -350,7 +350,7 @@ class RunCommandWindow(ttk.Toplevel):
 
     def _setup_inspector_right_pane(self):
         """Sets up the inspector's screenshot canvas in the right pane."""
-        self.inspector_paned_window = ttk.PanedWindow(self.right_pane_container, orient=VERTICAL)
+        self.inspector_paned_window = ttk.Panedwindow(self.right_pane_container, orient=VERTICAL)
         self.screenshot_canvas_frame = ttk.Frame(self.inspector_paned_window)
         self.screenshot_canvas = ttk.Canvas(self.screenshot_canvas_frame, bg="black")
         self.screenshot_canvas.pack(fill=BOTH, expand=YES)

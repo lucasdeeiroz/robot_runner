@@ -1,5 +1,6 @@
 import ttkbootstrap as ttk
 from ttkbootstrap.scrolled import ScrolledText
+from ttkbootstrap.constants import BOTH, END, YES, WORD, DISABLED, LEFT, X, W
 from ttkbootstrap.tooltip import ToolTip
 
 from src.locales.i18n import gettext as translate
@@ -14,7 +15,7 @@ class AboutTabPage(ttk.Frame):
 
     def _setup_widgets(self):
         about_frame = ttk.Frame(self)
-        about_frame.pack(fill=ttk.BOTH, expand=ttk.YES, padx=10, pady=5)
+        about_frame.pack(fill=BOTH, expand=YES, padx=10, pady=5)
 
         title_label = ttk.Label(about_frame, text=translate("about_title"), font="-size 24 -weight bold")
         title_label.pack(pady=(0, 10))
@@ -23,14 +24,14 @@ class AboutTabPage(ttk.Frame):
         desc_label = ttk.Label(about_frame, text=translate("about_subtitle"), wraplength=500)
         desc_label.pack(pady=(0, 20))
 
-        ttk.Label(about_frame, text=translate("acknowledgements"), font="-weight bold").pack(anchor=ttk.W, pady=(10, 5))
-        ttk.Label(about_frame, text=translate("acknowledgements_text"), justify=ttk.LEFT).pack(anchor=ttk.W, fill=ttk.X)
+        ttk.Label(about_frame, text=translate("acknowledgements"), font="-weight bold").pack(anchor=W, pady=(10, 5))
+        ttk.Label(about_frame, text=translate("acknowledgements_text"), justify=LEFT).pack(anchor=W, fill=X)
 
-        ttk.Label(about_frame, text=translate("license"), font="-weight bold").pack(anchor=ttk.W, pady=(20, 5))
+        ttk.Label(about_frame, text=translate("license"), font="-weight bold").pack(anchor=W, pady=(20, 5))
         license_frame = ttk.Frame(about_frame, padding=0, borderwidth=0)
-        license_frame.pack(fill=ttk.BOTH, expand=ttk.YES)
+        license_frame.pack(fill=BOTH, expand=YES)
         
-        license_text_widget = ScrolledText(license_frame, wrap=ttk.WORD, autohide=True)
-        license_text_widget.pack(fill=ttk.BOTH, expand=ttk.YES)
-        license_text_widget.text.insert(ttk.END, translate("mit_license_text"))
-        license_text_widget.text.config(state=ttk.DISABLED)
+        license_text_widget = ScrolledText(license_frame, wrap=WORD, autohide=True)
+        license_text_widget.pack(fill=BOTH, expand=YES)
+        license_text_widget.text.insert(END, translate("mit_license_text"))
+        license_text_widget.text.config(state=DISABLED)

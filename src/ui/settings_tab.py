@@ -1,8 +1,8 @@
 import json
-import tkinter as tk
+# import tkinter as tk
 from tkinter import messagebox
 import ttkbootstrap as ttk
-from ttkbootstrap.constants import *
+from ttkbootstrap.constants import BOTH, YES, WORD, DISABLED, RIGHT, BOTTOM, X, W
 from ttkbootstrap.scrolled import ScrolledText
 from ttkbootstrap.tooltip import ToolTip
 

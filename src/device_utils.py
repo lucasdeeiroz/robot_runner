@@ -9,8 +9,8 @@ from pathlib import Path
 from tkinter import messagebox
 from typing import Dict, List, Optional, Set, Tuple
 
-from .app_utils import BASE_DIR, execute_command
 from src.locales.i18n import gettext as translate
+from .app_utils import BASE_DIR, execute_command
 
 
 def get_connected_devices(appium_command: Optional[str] = None, check_busy_devices: bool = False) -> List[Dict[str, str]]:

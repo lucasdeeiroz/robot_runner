@@ -1,7 +1,7 @@
-pillow
-pyinstaller
-pyngrok
-pywin32; sys_platform == 'win32'
-robotframework
-ttkbootstrap
-lxml
+pillow>=11.3.0
+pyinstaller>=6.16.0
+pyngrok>=7.4.1
+pywin32>=311; sys_platform == 'win32'
+robotframework>=7.3.2
+ttkbootstrap>=1.18.2
+lxml>=6.0.2
