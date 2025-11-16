@@ -126,6 +126,46 @@ class RunCommandWindow(ttk.Toplevel):
 
         self._initialize_ui()
 
+    def _setup_ui_for_mode(self):
+        """Dynamically sets up or re-configures the UI based on the current mode."""
+        # Clear existing panes and center controls to rebuild them for the new mode
+        for pane in self.output_paned_window.panes():
+            self.output_paned_window.forget(pane)
+        
+        # --- Full Reset of Panes ---
+        # Forget all panes from the main window to ensure a clean state.
+        for pane in self.main_paned_window.panes():
+            self.main_paned_window.forget(pane)
+        
+        # Clear controls from the center pane.
+        for widget in self.center_pane_container.winfo_children():
+            widget.pack_forget()
+
+        # Reset visibility states to ensure a clean setup for the new mode
+        # --- Reset State Variables ---
+        self.robot_output_is_visible = (self.mode == 'test')
+        self.scrcpy_output_is_visible = False
+        self.performance_monitor_is_visible = False
+        self.inspector_is_visible = False
+        self.package_log_is_visible = False
+        self.robot_output_queue = Queue() # Re-initialize the queue for the new test run
+        # Re-setup all widgets, which will now respect the current `self.mode`
+
+        # --- Rebuild UI Components ---
+        self._setup_center_pane_controls()
+        self._setup_left_pane_outputs()
+        
+        # Add panes back in the correct order.
+        self.main_paned_window.add(self.left_pane_container, weight=3)
+        self.main_paned_window.add(self.center_pane_container, weight=0)
+
+        self._update_left_pane_visibility()
+
+        # Ensure the left pane is part of the main paned window
+        if self.left_pane_container not in self.main_paned_window.panes():
+            self.main_paned_window.insert(0, self.left_pane_container)
+        self.after(50, self._set_center_pane_width)
+
     def _initialize_ui(self):
         """Initializes the UI components."""
         self._setup_widgets()
@@ -308,9 +348,11 @@ class RunCommandWindow(ttk.Toplevel):
         ttk.Label(controls_frame, text=translate("log_level")).grid(row=0, column=2, sticky="w", padx=5)
 
         # Row 1: Comboboxes and Button
-        self.package_log_combo = ttk.Combobox(controls_frame, values=self.parent_app.app_packages_var.get().split(','), state="readonly", width=20)
+        packages = self.parent_app.app_packages_var.get().split(',')
+        all_option = translate('all_packages_option')
+        self.package_log_combo = ttk.Combobox(controls_frame, values=[all_option] + packages, state="readonly", width=20)
         self.package_log_combo.grid(row=1, column=0, columnspan=2, sticky="ew", padx=5)
-        if self.package_log_combo['values']: self.package_log_combo.set(self.package_log_combo['values'][0])
+        self.package_log_combo.set(self.package_log_combo['values'][0])
         self.package_log_level_combo = ttk.Combobox(controls_frame, textvariable=self.package_log_level_var, values=list(self.LOG_LEVELS.keys()), state="readonly", width=10)
         self.package_log_level_combo.grid(row=1, column=2, sticky="ew", padx=5)
         self.log_package_button = ttk.Button(controls_frame, text=translate("start_logging"), command=self._toggle_package_logging, bootstyle="success")
@@ -436,9 +478,10 @@ class RunCommandWindow(ttk.Toplevel):
 
         if is_visible:
             self.output_paned_window.forget(frame)
+            if frame in self.output_paned_window.panes(): self.output_paned_window.forget(frame)
             button.config(text=translate(show_keys[output_type]))
         else:
-            self.output_paned_window.add(frame, weight=1)
+            if frame not in self.output_paned_window.panes(): self.output_paned_window.add(frame, weight=1)
             button.config(text=translate(hide_keys[output_type]))
 
         # Update state variable
@@ -1245,11 +1288,14 @@ class RunCommandWindow(ttk.Toplevel):
         device_log_dir = self.parent_app.logs_dir / f"A{device_info['release']}_{device_info['model']}_{self.udid.split(':')[0]}" / logcat_sub_dir
         device_log_dir.mkdir(parents=True, exist_ok=True)
 
+        is_all_packages = app_package == translate('all_packages_option')
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"logcat_{app_package.replace('.', '_')}_{self.udid.replace(':', '-')}_{timestamp}.txt"
+        filename_part = "all_packages" if is_all_packages else app_package.replace('.', '_')
+        filename = f"logcat_{filename_part}_{self.udid.replace(':', '-')}_{timestamp}.txt"
         self.package_log_file = device_log_dir / filename
 
-        header = f"--- Logcat for {app_package} (Level: {log_level_name}) on {self.udid} started at {timestamp} ---\n"
+        header_package_name = translate('all_packages_header') if is_all_packages else app_package
+        header = f"--- Logcat for {header_package_name} (Level: {log_level_name}) on {self.udid} started at {timestamp} ---\n"
         self.package_log_output_queue.put(header)
         self.package_log_output_queue.put(f"--- {translate('log_file_saving_to', path=self.package_log_file)} ---\n\n")
 
@@ -1281,33 +1327,42 @@ class RunCommandWindow(ttk.Toplevel):
     def _run_logcat_for_package(self, package_name: str, log_level: str):
         """Executes 'adb logcat' for a specific package and pipes output to a queue."""
         try:
-            # --- Adaptive Logcat Strategy ---
-            # 1. Try the modern '--app' method first. It's more robust if supported.
-            logcat_command = f"adb -s {self.udid} logcat --app={package_name} *:{log_level}"
-            process = subprocess.Popen(logcat_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding=OUTPUT_ENCODING, errors='replace', creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
-
-            # Check for immediate failure, which indicates an unsupported command on older Android.
-            time.sleep(0.5) # Give the process a moment to fail
-            if process.poll() is not None:
-                output = process.stdout.read() if process.stdout else ""
-                if "Unknown option" in output:
-                    self.package_log_output_queue.put(f"--- {translate('logcat_fallback_info')} ---\n")
-                    
-                    # 2. Fallback to the classic PID-based method for older devices.
-                    pid_command = f"adb -s {self.udid} shell pidof -s {package_name}"
-                    pid_process = subprocess.run(pid_command, shell=True, capture_output=True, text=True, encoding=OUTPUT_ENCODING, errors='replace')
-                    pid = pid_process.stdout.strip()
-
-                    if not pid or not pid.isdigit():
-                        self.package_log_output_queue.put(f"{translate('logcat_pid_error', package_name=package_name)}\n")
+            # Handle the "All" packages case
+            if package_name == translate('all_packages_option'):
+                logcat_command = f"adb -s {self.udid} logcat *:{log_level}"
+                process = subprocess.Popen(logcat_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding=OUTPUT_ENCODING, errors='replace', creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
+            else:
+                # --- Adaptive Logcat Strategy ---
+                # 1. Try the modern '--app' method first. It's more robust if supported.
+                logcat_command = f"adb -s {self.udid} logcat --app={package_name} *:{log_level}"
+                process = subprocess.Popen(logcat_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding=OUTPUT_ENCODING, errors='replace', creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
+    
+                # Check for immediate failure, which indicates an unsupported command on older Android.
+                time.sleep(0.5) # Give the process a moment to fail
+                if process.poll() is not None:
+                    output = process.stdout.read() if process.stdout else ""
+                    if "Unknown option" in output:
+                        self.package_log_output_queue.put(f"--- {translate('logcat_fallback_info', method='--app')} ---\n")
+                        
+                        # 2. Fallback to the classic PID-based method.
+                        pid_command = f"adb -s {self.udid} shell pidof -s {package_name}"
+                        pid_process = subprocess.run(pid_command, shell=True, capture_output=True, text=True, encoding=OUTPUT_ENCODING, errors='replace')
+                        pid = pid_process.stdout.strip()
+    
+                        if pid and pid.isdigit():
+                            logcat_command = f"adb -s {self.udid} logcat --pid={pid} *:{log_level}"
+                            process = subprocess.Popen(logcat_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding=OUTPUT_ENCODING, errors='replace', creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
+                        else:
+                            # 3. If PID also fails, stop the operation.
+                            self.package_log_output_queue.put(f"--- {translate('logcat_pid_error', package_name=package_name)} ---\n")
+                            self.after(0, self._stop_package_logging)
+                            return
+                    else:
+                        # The process failed for another reason
+                        self.package_log_output_queue.put(output)
+                        self.after(0, self._stop_package_logging)
                         return
-
-                    logcat_command = f"adb -s {self.udid} logcat --pid={pid} *:{log_level}"
-                    process = subprocess.Popen(logcat_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding=OUTPUT_ENCODING, errors='replace', creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
-                else:
-                    # The process failed for another reason
-                    self.package_log_output_queue.put(output)
-                    return
+            
 
             while not self.stop_package_log_event.is_set() and process.poll() is None:
                 line = process.stdout.readline() # type: ignore
@@ -1324,6 +1379,9 @@ class RunCommandWindow(ttk.Toplevel):
     # --- Robot Test Methods ---
     def _on_test_finished(self):
         """Configures UI when test is finished."""
+        # Add a safety check to ensure the window and widgets still exist.
+        if not self.winfo_exists():
+            return
         self.stop_test_button.pack_forget()
         self.repeat_test_button.pack(fill=X, pady=5, padx=5)
         self.close_button.pack(fill=X, pady=5, padx=5)
@@ -1332,6 +1390,12 @@ class RunCommandWindow(ttk.Toplevel):
 
     def _reset_ui_for_test_run(self):
         """Resets the UI for a test run."""
+        # Ensure test-specific widgets exist before trying to configure them.
+        if not hasattr(self, 'robot_output_text'):
+            self._setup_left_pane_outputs()
+        if not hasattr(self, 'stop_test_button'):
+            self._setup_test_mode_center_pane()
+
         self.robot_output_text.text.config(state=NORMAL)
         self.robot_output_text.text.delete("1.0", END)
         self.robot_output_text.text.config(state=DISABLED)
@@ -1341,7 +1405,13 @@ class RunCommandWindow(ttk.Toplevel):
         self.stop_test_button.pack(fill=X, pady=5, padx=5)
 
     def _start_test(self):
+        # Update mode and title for reused windows
+        self.mode = 'test'
+        self.title(translate("running_title", suite=Path(self.run_path).name, version=get_device_properties(self.udid).get('release', ''), model=get_device_properties(self.udid).get('model', '')))
+        self._setup_ui_for_mode()
+        
         self._reset_ui_for_test_run()
+
         threading.Thread(target=self._run_robot_test, daemon=True).start()
 
     def _run_robot_test(self):
@@ -1381,7 +1451,11 @@ class RunCommandWindow(ttk.Toplevel):
             self.after(0, self.parent_app._on_period_change)
 
     def _check_robot_output_queue(self):
-        if self.mode != 'test': return
+        # This check now runs continuously, but only processes the queue if in 'test' mode.
+        # This makes it resilient to mode changes.
+        if self.mode != 'test':
+            self.after(500, self._check_robot_output_queue) # Re-schedule itself
+            return
         lines = []
         while not self.robot_output_queue.empty():
             try: lines.append(self.robot_output_queue.get_nowait())
@@ -1466,8 +1540,18 @@ class RunCommandWindow(ttk.Toplevel):
         self.parent_app.shell_manager.close(self.udid)
         if self.udid in self.parent_app.active_command_windows:
             del self.parent_app.active_command_windows[self.udid]
-        # Refresh the main device list to remove the "Busy" status
-        self.parent_app.root.after(100, self.parent_app._refresh_devices)
+
+        # --- Direct UI Update on Close ---
+        # Instead of a full refresh, directly find and update the device status in the main listbox.
+        # This provides immediate feedback to the user.
+        for i in range(self.parent_app.run_tab.device_listbox.size()):
+            device_str = self.parent_app.run_tab.device_listbox.get(i)
+            if self.udid in device_str:
+                new_device_str = device_str.replace(f" {translate('device_busy')}", "")
+                self.parent_app.run_tab.device_listbox.delete(i)
+                self.parent_app.run_tab.device_listbox.insert(i, new_device_str)
+                self.parent_app.run_tab.device_listbox.itemconfig(i, foreground="#43b581") # Reset color
+                break
         self.destroy()
 
     def _stop_all_activities(self):

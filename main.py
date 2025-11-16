@@ -344,39 +344,52 @@ class RobotRunnerApp:
         except tk.TclError:
             w.selection_clear(0, END)
             
-    def _run_test(self): # This method is now in RunTabPage
+    def _run_test(self) -> bool:
         """
         Validates selections and starts the test execution process in a background thread
-        to keep the UI responsive.
+        to keep the UI responsive. Returns True if tests are started, False otherwise.
         """
         try:
             selected_device_indices = self.run_tab.device_listbox.curselection()
             if not selected_device_indices:
                 self.show_toast(translate("open_file_error_title"), translate("no_device_selected"), "warning")
-                return
+                return False
 
             selected_devices = [self.run_tab.device_listbox.get(i) for i in selected_device_indices]
             if any(translate("no_devices_found") in s for s in selected_devices):
                 self.show_toast(translate("open_file_error_title"), translate("no_device_selected"), "warning")
-                return
-
-            # Check for busy devices
-            busy_devices_selected = [s for s in selected_devices if translate("device_busy") in s]
-            if busy_devices_selected:
-                if not messagebox.askyesno(translate("busy_device_warning_title"),
-                                           translate("busy_device_warning_message", devices=''.join(busy_devices_selected)),
-                                           parent=self.root):
-                    return
+                return False
+            
+            # --- Robust Busy Device Check ---
+            # Check both the UI state ("(Busy)") and if a command window already exists for the UDID.
+            # This prevents race conditions where the UI might be stale.
+            # This check is now more flexible: if a window exists but isn't running a test,
+            # it will be reused instead of blocking the user.
+            for device_str in selected_devices:
+                udid = device_str.split(" | ")[-1].split(" ")[0]
+                # A device is truly busy only if its window exists AND a robot process is active.
+                if udid in self.active_command_windows and self.active_command_windows[udid].winfo_exists():
+                    win = self.active_command_windows[udid]
+                    if win.robot_process and win.robot_process.poll() is None:
+                        # If a test is actively running, show an error and stop.
+                        messagebox.showerror(
+                            title=translate("busy_device_execution_error_title"),
+                            message=translate("busy_device_execution_error_message", devices=device_str.replace(translate('device_busy'), '').strip()),
+                            parent=self.root
+                        )
+                        return False
+                    # If the window exists but no test is running, we will reuse it later.
+                    # No need to block the user.
 
             selected_indices = self.run_tab.selection_listbox.curselection()
             if not selected_indices:
                 self.show_toast(translate("open_file_error_title"), translate("no_test_file_selected"), "warning")
-                return
+                return False
 
             selected_filename = self.run_tab.selection_listbox.get(selected_indices[0])
             if selected_filename.startswith("["):  # It's a folder or back button
                 self.show_toast(translate("invalid_selection_title"), translate("invalid_selection_message"), "warning")
-                return
+                return False
 
             run_mode = self.run_mode_var.get()
             
@@ -392,15 +405,17 @@ class RobotRunnerApp:
 
             if not path_to_run.exists(): # Now path_to_run is a Path object, so .exists() works.
                 self.show_toast(translate("open_file_error_title"), translate("file_not_found_error", path=path_to_run), "danger")
-                return
+                return False
 
             # All checks passed, start the background thread
             thread = threading.Thread(target=self._run_test_thread, args=(selected_devices, str(path_to_run), run_mode))
             thread.daemon = True
             thread.start()
+            return True
 
         except Exception as e:
             messagebox.showerror(translate("execution_error"), translate("unexpected_error", error=e), parent=self.root)
+            return False
 
     def _run_test_thread(self, selected_devices: List[str], path_to_run: str, run_mode: str): # This method is now in RunTabPage
         """
@@ -427,11 +442,8 @@ class RobotRunnerApp:
                 
                 self.root.after(0, self.run_tab.run_button.config, {'text': translate("opening_udid", udid=udid)})
                 self.root.after(0, self._create_run_command_window, udid, path_to_run, run_mode)
-
-                # Automatically refresh the device list to show the "Busy" status.
-                self.root.after(2000, self._refresh_devices)
                 
-                time.sleep(2)
+                time.sleep(1.5)
         finally:
             # Restore the button to its original state after the loop
             self.root.after(0, self.run_tab.run_button.config, {'state': NORMAL, 'text': translate("run_test")})
@@ -439,14 +451,20 @@ class RobotRunnerApp:
     def _create_run_command_window(self, udid: str, path_to_run: str, run_mode: str): # This method is now in RunTabPage
         """Helper to safely create the RunCommandWindow from the main GUI thread."""
         from src.ui.run_command_window import RunCommandWindow
-        # Centralized Resource Management: If a window for this UDID already exists, close it before creating a new one.
+
+        # --- Smart Window Reuse ---
+        # If a window for this UDID already exists, reuse it for the new test.
         if udid in self.active_command_windows and self.active_command_windows[udid].winfo_exists():
             win = self.active_command_windows[udid]
-            win._on_close() # This will stop activities and remove the window from the dict.
-
-        # If no window exists, create a new one.
-        win = RunCommandWindow(self, udid, mode='test', run_path=path_to_run, run_mode=run_mode)
-        self.active_command_windows[udid] = win
+            win.run_path = path_to_run
+            win.run_mode = run_mode
+            win._repeat_test() # Use the repeat test logic to start the new test
+            win.lift() # Bring the existing window to the front
+            win.focus_force()
+        else:
+            # If no window exists, create a new one.
+            win = RunCommandWindow(self, udid, mode='test', run_path=path_to_run, run_mode=run_mode)
+            self.active_command_windows[udid] = win
 
     def _find_and_set_mdns_port(self, udid: str, ip_address: str):
         """
@@ -559,6 +577,20 @@ class RobotRunnerApp:
         if any(translate("no_devices_found") in s for s in selected_devices):
             self.show_toast(translate("open_file_error_title"), translate("no_device_selected"), "warning")
             return
+
+        # --- Busy Device Check ---
+        # Prevent opening the toolbox if a test is actively running on the selected device.
+        for device_str in selected_devices:
+            udid = device_str.split(" | ")[-1].split(" ")[0]
+            if udid in self.active_command_windows and self.active_command_windows[udid].winfo_exists():
+                win = self.active_command_windows[udid]
+                if win.robot_process and win.robot_process.poll() is None:
+                    messagebox.showerror(
+                        title=translate("busy_device_execution_error_title"),
+                        message=translate("busy_device_execution_error_message", devices=device_str.replace(translate('device_busy'), '').strip()),
+                        parent=self.root
+                    )
+                    return
 
         # Disable the button immediately
         self.run_tab.device_options_button.config(state=DISABLED)
