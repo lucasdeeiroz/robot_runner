@@ -28,6 +28,7 @@ MANIFEST
 
 # IDEs and editors
 .vscode/
+copilot-instructions.md
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -165,7 +166,4 @@ cython_debug/
 scrcpy*/
 recordings/
 screenshots/
-tests/
-suites/
-resources/
 logs/
