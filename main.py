@@ -109,6 +109,7 @@ class RobotRunnerApp:
     
     def _update_paths_from_settings(self):
         """Updates Path objects from the StringVars."""
+        self.scrcpy_path = Path(self.scrcpy_path_var.get())
         self.suites_dir = Path(self.suites_dir_var.get())
         self.tests_dir = Path(self.tests_dir_var.get())
         self.logs_dir = Path(self.logs_dir_var.get())
@@ -235,6 +236,7 @@ class RobotRunnerApp:
         """Creates necessary directories and files on startup."""
         try:
             CONFIG_DIR.mkdir(exist_ok=True)
+            self.scrcpy_path.mkdir(exist_ok=True)
             self.suites_dir.mkdir(exist_ok=True)
             self.tests_dir.mkdir(exist_ok=True)
             self.logs_dir.mkdir(exist_ok=True)
@@ -427,7 +429,7 @@ class RobotRunnerApp:
                 self.root.after(0, self._create_run_command_window, udid, path_to_run, run_mode)
 
                 # Automatically refresh the device list to show the "Busy" status.
-                self.root.after(500, self._refresh_devices)
+                self.root.after(2000, self._refresh_devices)
                 
                 time.sleep(2)
         finally:
