@@ -67,6 +67,7 @@ class SettingsTabPage(ttk.Frame):
             "scrcpy_options": self.model.scrcpy_options_var.get(),
             "robot_options": self.model.robot_options_var.get(),
             "logs_dir": self.model.logs_dir_var.get(),
+            "logcat_dir": self.model.logcat_dir_var.get(),
             "screenshots_dir": self.model.screenshots_dir_var.get(),
             "recordings_dir": self.model.recordings_dir_var.get(),
             "theme": self.model.theme_var.get(),
@@ -225,6 +226,9 @@ class SettingsTabPage(ttk.Frame):
 
         logs_selector = PathSelector(test_dirs_frame, translate("logs_dir"), self.model.logs_dir_var, translate("logs_dir_tooltip"))
         logs_selector.grid(row=2, column=0, columnspan=2, sticky="ew")
+
+        logcat_selector = PathSelector(test_dirs_frame, translate("logcat_dir"), self.model.logcat_dir_var, translate("logcat_dir_tooltip"))
+        logcat_selector.grid(row=3, column=0, columnspan=2, sticky="ew")
 
         # --- Robot Options ---
         ttk.Label(parent_frame, text=translate("robot_command_options"), font="-weight bold").grid(row=2, column=0, columnspan=2, sticky="w", pady=(10, 5))

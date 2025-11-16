@@ -98,6 +98,19 @@ class RunCommandWindow(ttk.Toplevel):
         self.filter_by_content_desc_var = ttk.BooleanVar(value=True)
         self.filter_by_scrollview_var = ttk.BooleanVar(value=True)
         self.filter_by_other_class_var = ttk.BooleanVar(value=False)
+
+        # --- Package Logging Attributes ---
+        self.package_log_is_visible = False
+        self.is_logging_package = False
+        self.package_log_thread = None
+        self.stop_package_log_event = threading.Event()
+        self.package_log_output_queue = Queue()
+        self.package_log_file: Optional[Path] = None
+        self.package_log_level_var = ttk.StringVar(value="Debug")
+        self.clear_logcat_before_start_var = ttk.BooleanVar(value=True)
+        self.LOG_LEVELS = {
+            "Verbose": "V", "Debug": "D", "Info": "I", "Warning": "W", "Error": "E"
+        }
         
         # --- Window Setup ---
         device_info = get_device_properties(self.udid) or {}
@@ -107,7 +120,7 @@ class RunCommandWindow(ttk.Toplevel):
         # Use the provided title, or generate one based on the mode.
         window_title = title or translate("running_title", suite=Path(run_path).name, version=device_version, model=device_model)
         self.title(window_title)
-        self.geometry("1200x800")
+        self.state('zoomed')  # Maximiza a janela na inicialização
         self.bind("<Configure>", self._on_window_resize)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
@@ -123,6 +136,7 @@ class RunCommandWindow(ttk.Toplevel):
         self.after(100, self._check_robot_output_queue)
         self.after(100, self._check_scrcpy_output_queue)
         self.after(100, self._check_performance_output_queue)
+        self.after(100, self._check_package_log_queue)
 
     def _setup_widgets(self):
         """Sets up the 3-pane widget layout for the window."""
@@ -195,6 +209,10 @@ class RunCommandWindow(ttk.Toplevel):
         self.toggle_perf_button.pack(fill=X, pady=5, padx=5)
         ToolTip(self.toggle_perf_button, text=translate("show_performance_tooltip"))
         
+        self.toggle_package_log_button = ttk.Button(self.center_pane_container, text=translate("show_package_log"), command=lambda: self._toggle_output_visibility('package_log'), bootstyle="secondary")
+        self.toggle_package_log_button.pack(fill=X, pady=5, padx=5)
+        ToolTip(self.toggle_package_log_button, text=translate("show_package_log_tooltip"))
+
         if self.mode == 'test':
             self._setup_test_mode_center_pane()
         else:
@@ -245,6 +263,7 @@ class RunCommandWindow(ttk.Toplevel):
         self.scrcpy_output_text.pack(fill=BOTH, expand=YES)
 
         self._setup_performance_output_frame()
+        self._setup_package_log_output_frame()
 
         if self.mode != 'test':
             self._setup_inspector_left_pane()
@@ -273,6 +292,34 @@ class RunCommandWindow(ttk.Toplevel):
         self.toggle_minimize_perf_button = ttk.Button(controls_frame, text=translate("minimize_performance"), command=self._toggle_performance_minimize, state=DISABLED, bootstyle="secondary")
         self.toggle_minimize_perf_button.grid(row=2, column=2, sticky="ew", padx=(5,0))
         ToolTip(self.toggle_minimize_perf_button, text=translate("minimize_performance_tooltip"))
+
+    def _setup_package_log_output_frame(self):
+        """Sets up the package-specific logcat output and controls."""
+        self.package_log_output_frame = ttk.Frame(self.output_paned_window, padding=5)
+        controls_frame = ttk.Frame(self.package_log_output_frame)
+        controls_frame.pack(side=TOP, fill=X, pady=(0, 5))
+        controls_frame.columnconfigure(1, weight=1) # Allow package combo to expand
+
+        self.package_log_output_text = ScrolledText(self.package_log_output_frame, wrap=WORD, state=DISABLED, autohide=True)
+        self.package_log_output_text.pack(fill=BOTH, expand=YES, padx=5, pady=(0,5))
+
+        # Row 0: Labels
+        ttk.Label(controls_frame, text=translate("app_package")).grid(row=0, column=0, columnspan=2, sticky="w", padx=5)
+        ttk.Label(controls_frame, text=translate("log_level")).grid(row=0, column=2, sticky="w", padx=5)
+
+        # Row 1: Comboboxes and Button
+        self.package_log_combo = ttk.Combobox(controls_frame, values=self.parent_app.app_packages_var.get().split(','), state="readonly", width=20)
+        self.package_log_combo.grid(row=1, column=0, columnspan=2, sticky="ew", padx=5)
+        if self.package_log_combo['values']: self.package_log_combo.set(self.package_log_combo['values'][0])
+        self.package_log_level_combo = ttk.Combobox(controls_frame, textvariable=self.package_log_level_var, values=list(self.LOG_LEVELS.keys()), state="readonly", width=10)
+        self.package_log_level_combo.grid(row=1, column=2, sticky="ew", padx=5)
+        self.log_package_button = ttk.Button(controls_frame, text=translate("start_logging"), command=self._toggle_package_logging, bootstyle="success")
+        self.log_package_button.grid(row=1, column=3, sticky="e", padx=5)
+
+        # Row 2: Clear logcat checkbox
+        clear_logcat_check = ttk.Checkbutton(controls_frame, text=translate("clear_logcat_on_start"), variable=self.clear_logcat_before_start_var, bootstyle="round-toggle")
+        clear_logcat_check.grid(row=2, column=0, columnspan=4, sticky="w", padx=5, pady=(5,0))
+        ToolTip(clear_logcat_check, translate("clear_logcat_on_start_tooltip"))
 
     def _setup_inspector_left_pane(self):
         """Sets up inspector-specific controls in the left pane."""
@@ -372,7 +419,8 @@ class RunCommandWindow(ttk.Toplevel):
         """Shows or hides a specific output frame in the left pane."""
         frame_map = {
             'scrcpy': (self.scrcpy_output_frame, self.toggle_scrcpy_out_button, self.scrcpy_output_is_visible),
-            'performance': (self.performance_output_frame, self.toggle_perf_button, self.performance_monitor_is_visible)
+            'performance': (self.performance_output_frame, self.toggle_perf_button, self.performance_monitor_is_visible),
+            'package_log': (self.package_log_output_frame, self.toggle_package_log_button, self.package_log_is_visible)
         }
         if self.mode == 'test':
             frame_map['robot'] = (self.robot_output_frame, self.toggle_robot_button, self.robot_output_is_visible)
@@ -383,8 +431,8 @@ class RunCommandWindow(ttk.Toplevel):
         
         frame, button, is_visible = frame_map[output_type]
         
-        show_keys = {'robot': 'show_test_output', 'scrcpy': 'show_scrcpy_output', 'performance': 'show_performance', 'inspector': 'show_inspector'}
-        hide_keys = {'robot': 'hide_test_output', 'scrcpy': 'hide_scrcpy_output', 'performance': 'hide_performance', 'inspector': 'stop_inspector'}
+        show_keys = {'robot': 'show_test_output', 'scrcpy': 'show_scrcpy_output', 'performance': 'show_performance', 'inspector': 'show_inspector', 'package_log': 'show_package_log'}
+        hide_keys = {'robot': 'hide_test_output', 'scrcpy': 'hide_scrcpy_output', 'performance': 'hide_performance', 'inspector': 'stop_inspector', 'package_log': 'hide_package_log'}
 
         if is_visible:
             self.output_paned_window.forget(frame)
@@ -398,6 +446,7 @@ class RunCommandWindow(ttk.Toplevel):
         elif output_type == 'scrcpy': self.scrcpy_output_is_visible = not is_visible
         elif output_type == 'performance': self.performance_monitor_is_visible = not is_visible
         elif output_type == 'inspector': self.inspector_is_visible = not is_visible
+        elif output_type == 'package_log': self.package_log_is_visible = not is_visible
 
         self._update_left_pane_visibility()
         self.after(10, self._apply_layout_rules)
@@ -1118,6 +1167,7 @@ class RunCommandWindow(ttk.Toplevel):
             self.is_monitoring = False
             self.monitor_button.config(text=translate("start_monitoring"), bootstyle="success")
             self.toggle_minimize_perf_button.config(state=DISABLED)
+            self._toggle_performance_minimize(force_maximize=True) # Ensure view is maximized
             self.app_package_combo.config(state="readonly")
             self.performance_output_queue.put(f"\n{translate('monitoring_stopped_by_user')}\n")
             self.last_performance_line_var.set("")
@@ -1147,9 +1197,12 @@ class RunCommandWindow(ttk.Toplevel):
         if self.is_monitoring and (not self.performance_thread or not self.performance_thread.is_alive()): self._stop_performance_monitor()
         self.after(500, self._check_performance_output_queue)
 
-    def _toggle_performance_minimize(self):
+    def _toggle_performance_minimize(self, force_maximize: bool = False):
         """Toggles the performance monitor view."""
         is_minimized = self.performance_monitor_is_minimized.get()
+        if force_maximize:
+            is_minimized = True # Force the "if is_minimized" block to run
+
         if is_minimized:
             self.minimized_performance_label.pack_forget()
             self.performance_output_text.pack(fill=BOTH, expand=YES, padx=5, pady=(0,5))
@@ -1159,6 +1212,114 @@ class RunCommandWindow(ttk.Toplevel):
             self.minimized_performance_label.pack(fill=X, padx=5, pady=5)
             self.toggle_minimize_perf_button.config(text=translate("maximize_performance"))
         self.performance_monitor_is_minimized.set(not is_minimized)
+
+    # --- Package Logging Methods ---
+    def _toggle_package_logging(self):
+        """Starts or stops logging for a specific package."""
+        if self.is_logging_package:
+            self._stop_package_logging()
+        else:
+            self._start_package_logging()
+
+    def _start_package_logging(self):
+        """Starts the logcat thread for the selected package."""
+        if not (app_package := self.package_log_combo.get()):
+            self.parent_app.show_toast(translate("input_error"), translate("select_app_package_warning"), bootstyle="warning")
+            return
+        
+        log_level_name = self.package_log_level_var.get()
+        log_level_code = self.LOG_LEVELS.get(log_level_name, "D") # Default to Debug
+
+        # Clear logcat if the option is selected
+        if self.clear_logcat_before_start_var.get():
+            self.package_log_output_queue.put(f"--- {translate('clearing_logcat_buffer')} ---\n")
+            execute_command(f"adb -s {self.udid} logcat -c")
+
+        device_info = get_device_properties(self.udid)
+        if not device_info:
+            self.package_log_output_queue.put(f"{translate('get_device_info_error', udid=self.udid)}\n")
+            return
+
+        # Create and prepare the log file
+        logcat_sub_dir = self.parent_app.logcat_dir_var.get() or "logcat_logs"
+        device_log_dir = self.parent_app.logs_dir / f"A{device_info['release']}_{device_info['model']}_{self.udid.split(':')[0]}" / logcat_sub_dir
+        device_log_dir.mkdir(parents=True, exist_ok=True)
+
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"logcat_{app_package.replace('.', '_')}_{self.udid.replace(':', '-')}_{timestamp}.txt"
+        self.package_log_file = device_log_dir / filename
+
+        header = f"--- Logcat for {app_package} (Level: {log_level_name}) on {self.udid} started at {timestamp} ---\n"
+        self.package_log_output_queue.put(header)
+        self.package_log_output_queue.put(f"--- {translate('log_file_saving_to', path=self.package_log_file)} ---\n\n")
+
+        self.is_logging_package = True
+        self.stop_package_log_event.clear()
+        self.log_package_button.config(text=translate("stop_logging"), bootstyle="danger")
+        self.package_log_combo.config(state=DISABLED)
+        self.package_log_level_combo.config(state=DISABLED)
+
+        # Clear previous logs
+        self.package_log_output_text.text.config(state=NORMAL)
+        self.package_log_output_text.text.delete("1.0", END)
+        self.package_log_output_text.text.config(state=DISABLED)
+
+        self.package_log_thread = threading.Thread(target=self._run_logcat_for_package, args=(app_package, log_level_code), daemon=True)
+        self.package_log_thread.start()
+
+    def _stop_package_logging(self):
+        """Stops the logcat thread."""
+        if self.is_logging_package:
+            self.stop_package_log_event.set()
+            self.is_logging_package = False
+            self.log_package_button.config(text=translate("start_logging"), bootstyle="success")
+            self.package_log_combo.config(state="readonly")
+            self.package_log_level_combo.config(state="readonly")
+            self.package_log_file = None # Stop writing to the file
+            self.package_log_output_queue.put(f"\n--- {translate('logging_stopped_by_user')} ---\n")
+
+    def _run_logcat_for_package(self, package_name: str, log_level: str):
+        """Executes 'adb logcat' for a specific package and pipes output to a queue."""
+        try:
+            # --- Adaptive Logcat Strategy ---
+            # 1. Try the modern '--app' method first. It's more robust if supported.
+            logcat_command = f"adb -s {self.udid} logcat --app={package_name} *:{log_level}"
+            process = subprocess.Popen(logcat_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding=OUTPUT_ENCODING, errors='replace', creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
+
+            # Check for immediate failure, which indicates an unsupported command on older Android.
+            time.sleep(0.5) # Give the process a moment to fail
+            if process.poll() is not None:
+                output = process.stdout.read() if process.stdout else ""
+                if "Unknown option" in output:
+                    self.package_log_output_queue.put(f"--- {translate('logcat_fallback_info')} ---\n")
+                    
+                    # 2. Fallback to the classic PID-based method for older devices.
+                    pid_command = f"adb -s {self.udid} shell pidof -s {package_name}"
+                    pid_process = subprocess.run(pid_command, shell=True, capture_output=True, text=True, encoding=OUTPUT_ENCODING, errors='replace')
+                    pid = pid_process.stdout.strip()
+
+                    if not pid or not pid.isdigit():
+                        self.package_log_output_queue.put(f"{translate('logcat_pid_error', package_name=package_name)}\n")
+                        return
+
+                    logcat_command = f"adb -s {self.udid} logcat --pid={pid} *:{log_level}"
+                    process = subprocess.Popen(logcat_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding=OUTPUT_ENCODING, errors='replace', creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
+                else:
+                    # The process failed for another reason
+                    self.package_log_output_queue.put(output)
+                    return
+
+            while not self.stop_package_log_event.is_set() and process.poll() is None:
+                line = process.stdout.readline() # type: ignore
+                if line: self.package_log_output_queue.put(line)
+                else: break
+            
+            if process.poll() is None: process.terminate()
+
+        except Exception as e:
+            self.package_log_output_queue.put(f"{translate('logcat_generic_error', error=e)}\n")
+        finally:
+            self.after(0, self._stop_package_logging)
 
     # --- Robot Test Methods ---
     def _on_test_finished(self):
@@ -1228,6 +1389,10 @@ class RunCommandWindow(ttk.Toplevel):
         if lines:
             self.robot_output_text.text.config(state=NORMAL)
             for line in lines:
+                 # Trigger device list refresh when Appium session actually starts.
+                 if "INFO" in line and "Opening application" in line:
+                     self.after(0, self.parent_app._refresh_devices)
+
                  if line.strip().startswith(("Output:", "Log:", "Report:")):
                     prefix, path = line.split(":", 1)
                     self.robot_output_text.text.insert(END, f"{prefix.strip() + ':': <8}")
@@ -1243,6 +1408,25 @@ class RunCommandWindow(ttk.Toplevel):
             self.robot_output_text.text.see(END)
             self.robot_output_text.text.config(state=DISABLED)
         self.after(500, self._check_robot_output_queue)
+
+    def _check_package_log_queue(self):
+        """Checks the package log queue and updates the text widget."""
+        lines = []
+        while not self.package_log_output_queue.empty():
+            try: lines.append(self.package_log_output_queue.get_nowait())
+            except Empty: pass
+        if lines:
+            self.package_log_output_text.text.config(state=NORMAL)
+            self.package_log_output_text.text.insert(END, "".join(lines))
+            self.package_log_output_text.text.see(END)
+            self.package_log_output_text.text.config(state=DISABLED)
+
+            # Write to the log file if it's active
+            if self.package_log_file:
+                with open(self.package_log_file, 'a', encoding=OUTPUT_ENCODING) as f:
+                    f.write("".join(lines))
+        
+        self.after(500, self._check_package_log_queue)
 
     def _open_file_path(self, path: str):
         """Opens a file path from a link."""
@@ -1282,6 +1466,8 @@ class RunCommandWindow(ttk.Toplevel):
         self.parent_app.shell_manager.close(self.udid)
         if self.udid in self.parent_app.active_command_windows:
             del self.parent_app.active_command_windows[self.udid]
+        # Refresh the main device list to remove the "Busy" status
+        self.parent_app.root.after(100, self.parent_app._refresh_devices)
         self.destroy()
 
     def _stop_all_activities(self):
@@ -1291,3 +1477,4 @@ class RunCommandWindow(ttk.Toplevel):
         if self.is_recording: self._stop_recording()
         if self.is_mirroring: self._stop_scrcpy()
         if self.is_inspecting: self._stop_inspector()
+        if self.is_logging_package: self._stop_package_logging()

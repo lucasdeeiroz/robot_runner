@@ -43,6 +43,12 @@ class RobotRunnerApp:
         self.root.title(translate("app_title"))
         self.root.geometry("1000x700")
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+
+        # Maximize the window on startup
+        if sys.platform == "win32":
+            self.root.state('zoomed')
+        else: # For macOS and Linux
+            self.root.attributes('-zoomed', True)
         
         # --- Language mapping ---
         self.LANGUAGES = {
@@ -86,6 +92,7 @@ class RobotRunnerApp:
         self.tests_dir_var = tk.StringVar()
         self.logs_dir_var = tk.StringVar()
         self.screenshots_dir_var = tk.StringVar()
+        self.logcat_dir_var = tk.StringVar()
         self.recordings_dir_var = tk.StringVar()
         self.theme_var = tk.StringVar()
         self.group_by_var = tk.StringVar(value=translate("group_by_device"))
@@ -226,11 +233,19 @@ class RobotRunnerApp:
     
     def _initialize_dirs_and_files(self):
         """Creates necessary directories and files on startup."""
-        CONFIG_DIR.mkdir(exist_ok=True)
-        self.suites_dir.mkdir(exist_ok=True)
-        self.tests_dir.mkdir(exist_ok=True)
-        self.logs_dir.mkdir(exist_ok=True)
-
+        try:
+            CONFIG_DIR.mkdir(exist_ok=True)
+            self.suites_dir.mkdir(exist_ok=True)
+            self.tests_dir.mkdir(exist_ok=True)
+            self.logs_dir.mkdir(exist_ok=True)
+            self.screenshots_dir.mkdir(exist_ok=True)
+            self.recordings_dir.mkdir(exist_ok=True)
+        except (OSError, PermissionError) as e:
+            messagebox.showerror(
+                translate("error_title"),
+                f"Failed to create a required directory. Please check your paths in settings.json and permissions.\n\nError: {e}"
+            )
+            self.root.destroy()
 
     def _get_expanded_path_setting(self, settings: Dict, key: str, default: str) -> str:
         """Gets a path from settings, expands custom and environment variables, and returns it."""
@@ -261,6 +276,7 @@ class RobotRunnerApp:
         self.robot_options_var.set(settings.get("robot_options", "--split-log"))
         self.logs_dir_var.set(self._get_expanded_path_setting(settings, "logs_dir", "logs"))
         self.screenshots_dir_var.set(self._get_expanded_path_setting(settings, "screenshots_dir", str(BASE_DIR / "screenshots")))
+        self.logcat_dir_var.set(self._get_expanded_path_setting(settings, "logcat_dir", "logcat_logs"))
         self.recordings_dir_var.set(self._get_expanded_path_setting(settings, "recordings_dir", str(BASE_DIR / "recordings")))
         self.theme_var.set(settings.get("theme", "darkly"))
         self.language_var.set(settings.get("language", "en_US"))
@@ -409,6 +425,9 @@ class RobotRunnerApp:
                 
                 self.root.after(0, self.run_tab.run_button.config, {'text': translate("opening_udid", udid=udid)})
                 self.root.after(0, self._create_run_command_window, udid, path_to_run, run_mode)
+
+                # Automatically refresh the device list to show the "Busy" status.
+                self.root.after(500, self._refresh_devices)
                 
                 time.sleep(2)
         finally:
