@@ -1284,8 +1284,8 @@ class RunCommandWindow(ttk.Toplevel):
             return
 
         # Create and prepare the log file
-        logcat_sub_dir = self.parent_app.logcat_dir_var.get() or "logcat_logs"
-        device_log_dir = self.parent_app.logs_dir / f"A{device_info['release']}_{device_info['model']}_{self.udid.split(':')[0]}" / logcat_sub_dir
+        logcat_base_dir = Path(self.parent_app.logcat_dir_var.get()) or "logcat_logs"
+        device_log_dir = logcat_base_dir / f"A{device_info['release']}_{device_info['model']}_{self.udid.split(':')[0]}"
         device_log_dir.mkdir(parents=True, exist_ok=True)
 
         is_all_packages = app_package == translate('all_packages_option')

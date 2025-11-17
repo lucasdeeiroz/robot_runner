@@ -113,6 +113,7 @@ class RobotRunnerApp:
         self.suites_dir = Path(self.suites_dir_var.get())
         self.tests_dir = Path(self.tests_dir_var.get())
         self.logs_dir = Path(self.logs_dir_var.get())
+        self.logcat_dir = Path(self.logcat_dir_var.get())
         self.screenshots_dir = Path(self.screenshots_dir_var.get())
         self.recordings_dir = Path(self.recordings_dir_var.get())
     
