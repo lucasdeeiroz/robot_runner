@@ -1464,10 +1464,15 @@ class RunCommandWindow(ttk.Toplevel):
         self._is_closing = True
         self._stop_all_activities()
         self.parent_app.shell_manager.close(self.udid)
+        
+        # Remove from local busy set for instant UI feedback
+        if self.udid in self.parent_app.local_busy_devices:
+            self.parent_app.local_busy_devices.remove(self.udid)
+            
         if self.udid in self.parent_app.active_command_windows:
             del self.parent_app.active_command_windows[self.udid]
-        # Refresh the main device list to remove the "Busy" status
-        self.parent_app.root.after(100, self.parent_app._refresh_devices)
+        # Trigger a fast UI update instead of a slow full refresh
+        self.parent_app.root.after(0, self.parent_app._update_device_list)
         self.destroy()
 
     def _stop_all_activities(self):

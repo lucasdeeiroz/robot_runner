@@ -66,6 +66,7 @@ class RobotRunnerApp:
         self._is_closing = False
         self.shell_manager = AdbShellManager()
         self.appium_version: Optional[str] = None
+        self.local_busy_devices = set() # Track devices locally for instant UI feedback
 
         self._setup_string_vars()
         self._load_settings()
@@ -421,13 +422,16 @@ class RobotRunnerApp:
             # 2. Schedule the creation of a RunCommandWindow for each device on the main thread
             for device_str in selected_devices:
                 udid_with_status = device_str.split(" | ")[-1]
-                udid = udid_with_status.split(" ")[0]
+                udid = udid_with_status.split(" ")[0] # Extracts UDID, e.g., "emulator-5554" from "emulator-5554 (Busy)"
+
+                # --- IMMEDIATE UI UPDATE ---
+                # Add to local busy set and refresh the listbox instantly
+                self.local_busy_devices.add(udid)
+                # Calling _update_device_list directly provides instant feedback
+                self.root.after(0, self._update_device_list)
                 
                 self.root.after(0, self.run_tab.run_button.config, {'text': translate("opening_udid", udid=udid)})
                 self.root.after(0, self._create_run_command_window, udid, path_to_run, run_mode)
-
-                # Automatically refresh the device list to show the "Busy" status.
-                self.root.after(500, self._refresh_devices)
                 
                 time.sleep(2)
         finally:
@@ -440,7 +444,11 @@ class RobotRunnerApp:
         # Centralized Resource Management: If a window for this UDID already exists, close it before creating a new one.
         if udid in self.active_command_windows and self.active_command_windows[udid].winfo_exists():
             win = self.active_command_windows[udid]
-            win._on_close() # This will stop activities and remove the window from the dict.
+            # We need to ensure the device is marked as not busy before creating a new window
+            if udid in self.local_busy_devices:
+                self.local_busy_devices.remove(udid)
+            win._on_close() # This will stop activities and remove the window from the dict
+            self.root.after(100, self._update_device_list) # Refresh UI after closing
 
         # If no window exists, create a new one.
         win = RunCommandWindow(self, udid, mode='test', run_path=path_to_run, run_mode=run_mode)
@@ -638,12 +646,17 @@ class RobotRunnerApp:
             for i, d in enumerate(self.devices):
                 # Adjust listbox height dynamically, with a max of 10
                 num_devices = len(self.devices)
+                udid = d.get('udid', '')
                 self.run_tab.device_listbox.config(height=min(num_devices, 10))
-                status_text = translate("device_busy") if d.get('status') == "Busy" else ""
-                device_string = f"Android {d['release']} | {d['model']} | {d['udid']} {status_text}"
+
+                # Check both Appium's status and our local "busy" tracker
+                is_busy = d.get('status') == "Busy" or udid in self.local_busy_devices
+                status_text = translate("device_busy") if is_busy else ""
+                
+                device_string = f"Android {d['release']} | {d['model']} | {udid} {status_text}"
                 self.run_tab.device_listbox.insert(END, device_string)
                 
-                color = "red" if d.get('status') == "Busy" else "#43b581" # Use a less jarring green
+                color = "red" if is_busy else "#43b581" # Use a less jarring green
                 self.run_tab.device_listbox.itemconfig(i, foreground=color)
 
             # Restore selection
@@ -661,7 +674,7 @@ class RobotRunnerApp:
         # Only set status to ready if it was refreshing, to not overwrite other statuses
         if translate("refreshing") in self.status_var.get():
             self.status_var.set(translate("ready"))
-        
+
     def _check_scrcpy_version(self): # This method is now in RunTabPage
         """Checks for scrcpy and offers to download if not found."""
         if sys.platform != "win32": return
