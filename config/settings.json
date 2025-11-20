@@ -1,23 +1,22 @@
 {
-    "appium_command": "--base-path=/wd/hub --relaxed-security",
-    "scrcpy_path": "scrcpy",
-    "suites_dir": "%CUR_DIR%\/suites",
-    "tests_dir": "%CUR_DIR%\/tests",
-    "scrcpy_options": "-m 1024 -b 2M --max-fps=30 --no-audio --stay-awake",
-    "robot_options": "--split-log",
-    "logs_dir": "%CUR_DIR%\/logs",
-    "logcat_dir": "%CUR_DIR%\/logcat_logs",
-    "screenshots_dir": "%USERPROFILE%\/Pictures/RobotRunner",
-    "recordings_dir": "%USERPROFILE%\/Videos/RobotRunner",
-    "theme": "darkly",
-    "language": "en_US",
-    "app_packages": "com.android.chrome, com.chrome.beta",
-    "common_adb_commands": [
-        "shell getprop ro.product.model",
-        "shell wm size",
-        "shell pm list packages -3",
-        "logcat -d",
-        "uninstall io.appium.uiautomator2.server",
-        "uninstall io.appium.uiautomator2.server.test"
-    ]
+  "appium_command": "--base-path=/wd/hub --relaxed-security",
+  "scrcpy_path": "scrcpy",
+  "suites_dir": "%CUR_DIR%/suites",
+  "tests_dir": "%CUR_DIR%/tests",
+  "scrcpy_options": "-m 1024 -b 2M --max-fps=30 --no-audio --stay-awake",
+  "robot_options": "--split-log",
+  "logs_dir": "%CUR_DIR%/logs",
+  "logcat_dir": "%CUR_DIR%/logcat_logs",
+  "screenshots_dir": "%USERPROFILE%/Pictures/RobotRunner",
+  "recordings_dir": "%USERPROFILE%/Videos/RobotRunner",
+  "theme": "darkly",
+  "language": "en_US",
+  "app_packages": "com.android.chrome, com.chrome.beta",
+  "common_adb_commands": [
+    "shell getprop ro.product.model",
+    "shell wm size",
+    "shell pm list packages -3",
+    "uninstall io.appium.uiautomator2.server",
+    "uninstall io.appium.uiautomator2.server.test"
+  ]
 }
