@@ -358,14 +358,17 @@ class RobotRunnerApp:
             if any(translate("no_devices_found") in s for s in selected_devices):
                 self.show_toast(translate("open_file_error_title"), translate("no_device_selected"), "warning")
                 return
-
-            # Check for busy devices
-            busy_devices_selected = [s for s in selected_devices if translate("device_busy") in s]
-            if busy_devices_selected:
-                if not messagebox.askyesno(translate("busy_device_warning_title"),
-                                           translate("busy_device_warning_message", devices=''.join(busy_devices_selected)),
-                                           parent=self.root):
-                    return
+            
+            # Check for busy devices and stop if any are selected.
+            # The user should not be able to start a new test on a busy device.
+            busy_devices_info = []
+            for device_str in selected_devices:
+                if translate("device_busy") in device_str:
+                    busy_devices_info.append(f"- {device_str.split(' | ')[1].strip()}") # Get model name
+            
+            if busy_devices_info:
+                messagebox.showwarning(translate("busy_device_warning_title"), translate("busy_device_execution_message", devices='\n'.join(busy_devices_info)), parent=self.root)
+                return
 
             selected_indices = self.run_tab.selection_listbox.curselection()
             if not selected_indices:
@@ -566,6 +569,17 @@ class RobotRunnerApp:
             self.show_toast(translate("open_file_error_title"), translate("no_device_selected"), "warning")
             return
 
+        # Check for busy devices and warn the user. Do not proceed if any are busy.
+        busy_devices_info = []
+        for device_str in selected_devices:
+            if translate("device_busy") in device_str:
+                # Extract model name for a cleaner message
+                busy_devices_info.append(f"- {device_str.split(' | ')[1].strip()}")
+        
+        if busy_devices_info:
+            messagebox.showwarning(translate("busy_device_warning_title"), translate("busy_device_toolbox_message", devices='\n'.join(busy_devices_info)), parent=self.root)
+            return
+
         # Disable the button immediately
         self.run_tab.device_options_button.config(state=DISABLED)
 
@@ -720,6 +734,7 @@ class RobotRunnerApp:
         thread = threading.Thread(target=self._appium_server_handler, args=(silent,))
         thread.daemon = True
         thread.start()
+
     def _appium_server_handler(self, silent: bool):
         """
         The core handler for running the Appium server process and piping its output.
