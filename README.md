@@ -154,16 +154,21 @@ You can create a standalone executable using `PyInstaller`.
     From the project root, run the following command. It ensures that the translation and configuration folders are included in the executable.
     ```sh
     # On Windows
-    pyinstaller --noconsole --onefile --add-data "locales;locales" --add-data "config;config" robot_runner.py
+    pyinstaller --clean --noconsole --onefile --add-data "src/locales;src/locales" --add-data "config;config" --icon="src/images/favicon.ico" robot_runner.py
 
     # On macOS/Linux
-    pyinstaller --noconsole --onefile --add-data "locales:locales" --add-data "config:config" robot_runner.py
+    pyinstaller --clean --noconsole --onefile --add-data "src/locales:src/locales" --add-data "config:config" --icon="src/images/favicon.ico" robot_runner.py
     ```
+    *   `--clean`: Forces the compiler to entirely rebuild the application without relying on previous cache.
     *   `--noconsole`: Prevents a console window from opening when running the application.
     *   `--onefile`: Bundles everything into a single executable file.
     *   `--add-data`: Includes necessary additional folders and files.
+    *   `--icon`: Applies the icon included in the source to the application.
 
-The executable will be created in the `dist/` folder.
+The executable will be created in the `dist/` folder. After the first build, you can build using the spec file:
+    ```
+    pyinstaller --clean ./robot_runner.spec
+    ```
 
 ## How to Contribute
 
