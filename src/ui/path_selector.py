@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import filedialog
 import ttkbootstrap as ttk
-from ttkbootstrap.constants import *
+from ttkbootstrap.constants import W, E
 from ttkbootstrap.tooltip import ToolTip
 
 from src.locales.i18n import gettext as translate

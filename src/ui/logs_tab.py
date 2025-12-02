@@ -1,6 +1,6 @@
-import tkinter as tk
+# import tkinter as tk
 import ttkbootstrap as ttk
-from ttkbootstrap.constants import *
+from ttkbootstrap.constants import BOTH, YES, LEFT, X
 from ttkbootstrap.tooltip import ToolTip
 
 from src.locales.i18n import gettext as translate

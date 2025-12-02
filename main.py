@@ -15,6 +15,7 @@ from tkinter import messagebox
 from lxml import etree as ET
 import ttkbootstrap as ttk
 from ttkbootstrap.scrolled import ScrolledText
+from ttkbootstrap.widgets.scrolled import ScrolledText
 from ttkbootstrap.constants import *
 
 # --- Internationalization Setup ---
