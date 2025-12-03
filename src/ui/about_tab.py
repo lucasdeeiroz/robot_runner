@@ -27,6 +27,9 @@ class AboutTabPage(ttk.Frame):
         ttk.Label(about_frame, text=translate("acknowledgements"), font="-weight bold").pack(anchor=W, pady=(10, 5))
         ttk.Label(about_frame, text=translate("acknowledgements_text"), justify=LEFT).pack(anchor=W, fill=X)
 
+        ttk.Label(about_frame, text=translate("colaborators"), font="-weight bold").pack(anchor=W, pady=(10, 5))
+        ttk.Label(about_frame, text=translate("colaborators_text"), justify=LEFT).pack(anchor=W, fill=X)
+
         ttk.Label(about_frame, text=translate("license"), font="-weight bold").pack(anchor=W, pady=(20, 5))
         license_frame = ttk.Frame(about_frame, padding=0, borderwidth=0)
         license_frame.pack(fill=BOTH, expand=YES)

@@ -394,36 +394,9 @@ class RunTabPage(ttk.Frame):
         self.timestamp_check = ttk.Checkbutton(run_frame, text=translate("do_not_overwrite_logs"), variable=self.app.timestamp_logs_var)
         self.timestamp_check.grid(row=0, column=2, sticky="e", padx=5, pady=5)
         ToolTip(self.timestamp_check, text=translate("timestamp_logs_tooltip"))
-        self.run_button = ttk.Button(run_frame, text=translate("run_test"), command=self._run_test_and_mark_busy, bootstyle="primary")
+        self.run_button = ttk.Button(run_frame, text=translate("run_test"), command=self.app._run_test, bootstyle="primary")
         self.run_button.grid(row=0, column=3, sticky="e", padx=5, pady=5)
         ToolTip(self.run_button, text=translate("run_test_tooltip"))
-
-    def _run_test_and_mark_busy(self):
-        """
-        Marks selected devices as busy in the UI immediately
-        before calling the actual test execution method.
-        """
-        selected_indices = self.device_listbox.curselection()
-        # First, call the test execution method. It contains all necessary validations,
-        # including checks for device selection and busy status.
-        # It returns True if the test execution is proceeding.
-        if self.app._run_test():
-            # If the test is running, now we mark the devices as busy in the UI.
-            # We use the originally selected indices to update the listbox.
-            original_indices = list(selected_indices)
-            busy_str = f" {translate('device_busy')}"
-
-            for i in original_indices:
-                device_str = self.device_listbox.get(i)
-                if busy_str not in device_str:
-                    # Update the item text and color without losing selection state
-                    self.device_listbox.delete(i)
-                    self.device_listbox.insert(i, f"{device_str}{busy_str}")
-                    self.device_listbox.itemconfig(i, foreground="red") # Explicitly set color
-            
-            # Re-apply selection to ensure it's visually consistent
-            for i in original_indices:
-                self.device_listbox.selection_set(i)
 
     def on_run_mode_change(self):
         """Handles the change of run mode."""

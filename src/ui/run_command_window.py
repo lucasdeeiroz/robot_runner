@@ -126,46 +126,6 @@ class RunCommandWindow(ttk.Toplevel):
 
         self._initialize_ui()
 
-    def _setup_ui_for_mode(self):
-        """Dynamically sets up or re-configures the UI based on the current mode."""
-        # Clear existing panes and center controls to rebuild them for the new mode
-        for pane in self.output_paned_window.panes():
-            self.output_paned_window.forget(pane)
-        
-        # --- Full Reset of Panes ---
-        # Forget all panes from the main window to ensure a clean state.
-        for pane in self.main_paned_window.panes():
-            self.main_paned_window.forget(pane)
-        
-        # Clear controls from the center pane.
-        for widget in self.center_pane_container.winfo_children():
-            widget.pack_forget()
-
-        # Reset visibility states to ensure a clean setup for the new mode
-        # --- Reset State Variables ---
-        self.robot_output_is_visible = (self.mode == 'test')
-        self.scrcpy_output_is_visible = False
-        self.performance_monitor_is_visible = False
-        self.inspector_is_visible = False
-        self.package_log_is_visible = False
-        self.robot_output_queue = Queue() # Re-initialize the queue for the new test run
-        # Re-setup all widgets, which will now respect the current `self.mode`
-
-        # --- Rebuild UI Components ---
-        self._setup_center_pane_controls()
-        self._setup_left_pane_outputs()
-        
-        # Add panes back in the correct order.
-        self.main_paned_window.add(self.left_pane_container, weight=3)
-        self.main_paned_window.add(self.center_pane_container, weight=0)
-
-        self._update_left_pane_visibility()
-
-        # Ensure the left pane is part of the main paned window
-        if self.left_pane_container not in self.main_paned_window.panes():
-            self.main_paned_window.insert(0, self.left_pane_container)
-        self.after(50, self._set_center_pane_width)
-
     def _initialize_ui(self):
         """Initializes the UI components."""
         self._setup_widgets()
@@ -478,10 +438,9 @@ class RunCommandWindow(ttk.Toplevel):
 
         if is_visible:
             self.output_paned_window.forget(frame)
-            if frame in self.output_paned_window.panes(): self.output_paned_window.forget(frame)
             button.config(text=translate(show_keys[output_type]))
         else:
-            if frame not in self.output_paned_window.panes(): self.output_paned_window.add(frame, weight=1)
+            self.output_paned_window.add(frame, weight=1)
             button.config(text=translate(hide_keys[output_type]))
 
         # Update state variable
@@ -1390,12 +1349,6 @@ class RunCommandWindow(ttk.Toplevel):
 
     def _reset_ui_for_test_run(self):
         """Resets the UI for a test run."""
-        # Ensure test-specific widgets exist before trying to configure them.
-        if not hasattr(self, 'robot_output_text'):
-            self._setup_left_pane_outputs()
-        if not hasattr(self, 'stop_test_button'):
-            self._setup_test_mode_center_pane()
-
         self.robot_output_text.text.config(state=NORMAL)
         self.robot_output_text.text.delete("1.0", END)
         self.robot_output_text.text.config(state=DISABLED)
@@ -1405,13 +1358,7 @@ class RunCommandWindow(ttk.Toplevel):
         self.stop_test_button.pack(fill=X, pady=5, padx=5)
 
     def _start_test(self):
-        # Update mode and title for reused windows
-        self.mode = 'test'
-        self.title(translate("running_title", suite=Path(self.run_path).name, version=get_device_properties(self.udid).get('release', ''), model=get_device_properties(self.udid).get('model', '')))
-        self._setup_ui_for_mode()
-        
         self._reset_ui_for_test_run()
-
         threading.Thread(target=self._run_robot_test, daemon=True).start()
 
     def _run_robot_test(self):
@@ -1451,11 +1398,7 @@ class RunCommandWindow(ttk.Toplevel):
             self.after(0, self.parent_app._on_period_change)
 
     def _check_robot_output_queue(self):
-        # This check now runs continuously, but only processes the queue if in 'test' mode.
-        # This makes it resilient to mode changes.
-        if self.mode != 'test':
-            self.after(500, self._check_robot_output_queue) # Re-schedule itself
-            return
+        if self.mode != 'test': return
         lines = []
         while not self.robot_output_queue.empty():
             try: lines.append(self.robot_output_queue.get_nowait())
@@ -1538,20 +1481,15 @@ class RunCommandWindow(ttk.Toplevel):
         self._is_closing = True
         self._stop_all_activities()
         self.parent_app.shell_manager.close(self.udid)
+        
+        # Remove from local busy set for instant UI feedback
+        if self.udid in self.parent_app.local_busy_devices:
+            self.parent_app.local_busy_devices.remove(self.udid)
+            
         if self.udid in self.parent_app.active_command_windows:
             del self.parent_app.active_command_windows[self.udid]
-
-        # --- Direct UI Update on Close ---
-        # Instead of a full refresh, directly find and update the device status in the main listbox.
-        # This provides immediate feedback to the user.
-        for i in range(self.parent_app.run_tab.device_listbox.size()):
-            device_str = self.parent_app.run_tab.device_listbox.get(i)
-            if self.udid in device_str:
-                new_device_str = device_str.replace(f" {translate('device_busy')}", "")
-                self.parent_app.run_tab.device_listbox.delete(i)
-                self.parent_app.run_tab.device_listbox.insert(i, new_device_str)
-                self.parent_app.run_tab.device_listbox.itemconfig(i, foreground="#43b581") # Reset color
-                break
+        # Trigger a fast UI update instead of a slow full refresh
+        self.parent_app.root.after(0, self.parent_app._update_device_list)
         self.destroy()
 
     def _stop_all_activities(self):
