@@ -69,6 +69,15 @@ A comprehensive desktop application, built with Python and Tkinter, for managing
 
 <img width="1015" height="749" alt="image" src="https://github.com/user-attachments/assets/8759cbe0-bf9d-4079-86ce-09d122584732" />
 
+*   **Allure Reporting:**
+    *   Generate beautiful, interactive Allure reports for your test runs.
+    *   View detailed steps, screenshots, and logs for each test case.
+    *   Integrated button to generate and view the report after execution.
+
+*   **Device Manager:**
+    *   A dedicated, maximized window to manage multiple devices simultaneously.
+    *   Open separate tabs for each device to run tests, mirror screens, or inspect UI independently.
+
 *   **Settings & Tools:**
     *   Start and stop the Appium server directly from the GUI.
     *   Configure paths for Scrcpy, project directories (suites, tests, logs), etc.

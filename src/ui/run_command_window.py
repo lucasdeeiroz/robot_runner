@@ -33,14 +33,14 @@ if sys.platform == "win32":
         win32gui = None
 
 
-class RunCommandWindow(ttk.Toplevel):
+class DeviceTab(ttk.Frame):
     """
     A unified Toplevel window for running tests and mirroring devices.
     Features a three-pane layout: Outputs, Controls, and Screen Mirror.
     """
-    def __init__(self, parent, udid: str, mode: str, run_path: Optional[str] = None, title: Optional[str] = None, run_mode: Optional[str] = None):
-        super().__init__(parent.root)
-        self.parent_app = parent
+    def __init__(self, parent_notebook, parent_app, udid: str, mode: str, run_path: Optional[str] = None, title: Optional[str] = None, run_mode: Optional[str] = None):
+        super().__init__(parent_notebook)
+        self.parent_app = parent_app
         self.udid = udid
         self.mode = mode
         self.run_path = run_path
@@ -119,10 +119,13 @@ class RunCommandWindow(ttk.Toplevel):
 
         # Use the provided title, or generate one based on the mode.
         window_title = title or translate("running_title", suite=Path(run_path).name, version=device_version, model=device_model)
-        self.title(window_title)
-        self.state('zoomed')  # Maximiza a janela na inicialização
+        # self.title(window_title) # Title is handled by the tab manager
+        # self.state('zoomed')  # Maximiza a janela na inicialização - Not needed for Frame
+
         self.bind("<Configure>", self._on_window_resize)
-        self.protocol("WM_DELETE_WINDOW", self._on_close)
+        self.bind("<Configure>", self._on_window_resize)
+        # self.protocol("WM_DELETE_WINDOW", self._on_close) # Not needed for Frame
+
 
         self._initialize_ui()
 
@@ -550,7 +553,7 @@ class RunCommandWindow(ttk.Toplevel):
         self.after(10, self._apply_layout_rules)
         self._on_window_resize() # Trigger layout recalculation with the new aspect ratio
 
-        if hasattr(self, 'inspect_button'): self.inspect_button.config(state=DISABLED)
+        if hasattr(self, 'inspect_button'): self.inspect_button.config(state=NORMAL)
         self.mirror_button.config(state=NORMAL, text=translate("stop_mirroring"), bootstyle="danger")
         ToolTip(self.mirror_button, text=translate("stop_mirroring_tooltip"))
 
@@ -592,7 +595,7 @@ class RunCommandWindow(ttk.Toplevel):
             self.aspect_ratio = get_device_aspect_ratio(self.udid)
         self.element_details_frame.pack(fill=BOTH, expand=YES, pady=5, padx=5)
         
-        self.mirror_button.config(state=DISABLED)
+        self.mirror_button.config(state=NORMAL)
         self.inspect_button.config(text=translate("stop_inspector"), bootstyle="danger")
         self.refresh_inspector_button.config(state=NORMAL)
 
@@ -635,7 +638,7 @@ class RunCommandWindow(ttk.Toplevel):
         self.screenshot_canvas.delete("all")
         for item in self.elements_tree.get_children(): self.elements_tree.delete(item)
         
-        self._update_xpath_buttons_state(None)
+        self._update_locator_buttons(None)
         self._populate_element_details(None)
 
         self.mirror_button.config(state=NORMAL)
@@ -801,7 +804,7 @@ class RunCommandWindow(ttk.Toplevel):
         self.screenshot_canvas.delete("highlight")
         selected = self.elements_tree.selection()
         if not selected:
-            self._update_xpath_buttons_state(None)
+            self._update_locator_buttons(None)
             self._populate_element_details(None)
             return
 
@@ -815,7 +818,7 @@ class RunCommandWindow(ttk.Toplevel):
             offset_x, offset_y = (self.screenshot_canvas.winfo_width() - curr_w) / 2, (self.screenshot_canvas.winfo_height() - curr_h) / 2
             self.screenshot_canvas.create_rectangle(scaled_x + offset_x, scaled_y + offset_y, scaled_x + scaled_w + offset_x, scaled_y + scaled_h + offset_y, outline="red", width=2, tags="highlight")
         
-        self._update_xpath_buttons_state(el_data)
+        self._update_locator_buttons(el_data)
         self._update_element_actions_state(bool(el_data))
         self._populate_element_details(el_data)
 
@@ -836,27 +839,62 @@ class RunCommandWindow(ttk.Toplevel):
             self._display_inspection_results(self.current_screenshot_path, self.current_dump_path)
             if self.elements_tree.selection(): self._on_element_select(None)
 
-    def _update_xpath_buttons_state(self, element_data: Optional[Dict]):
-        """Creates/updates XPath copy buttons."""
+    def _update_locator_buttons(self, element_data: Optional[Dict]):
+        """Creates/updates locator copy buttons (Accessibility ID, UiSelector, XPath)."""
         self.current_selected_element_data = element_data
         for button in self.xpath_buttons.values(): button.destroy()
         self.xpath_buttons.clear()
 
         if not element_data: return
 
-        for attr in ["resource-id", "text", "content-desc", "class"]:
-            if attr_value := element_data.get(attr):
-                display_value = (attr_value[:30] + '...') if len(attr_value) > 33 else attr_value
-                btn = ttk.Button(self.xpath_buttons_container, text=f"{attr.replace('_', ' ').title()}: {display_value}", command=lambda a=attr: self._copy_xpath(a))
-                ToolTip(btn, translate("copy_xpath_tooltip", attr=attr, value=attr_value))
-                btn.pack(side=TOP, fill=X, padx=2, pady=1)
-                self.xpath_buttons[attr] = btn
+        locators = self._generate_locators(element_data)
 
-    def _generate_xpath(self, attribute_type: str) -> str:
-        """Generates an XPath string for the selected element."""
-        if not self.current_selected_element_data or not (attr_value := self.current_selected_element_data.get(attribute_type)):
-            return ""
-        return f"//{attr_value}" if attribute_type == "class" else f"//*[@{attribute_type}='{attr_value}']"
+        for label, value, tooltip in locators:
+            btn = ttk.Button(self.xpath_buttons_container, text=label, command=lambda v=value: self._copy_locator(v))
+            ToolTip(btn, tooltip)
+            btn.pack(side=TOP, fill=X, padx=2, pady=1)
+            self.xpath_buttons[label] = btn
+
+    def _generate_locators(self, data: Dict) -> List[Tuple[str, str, str]]:
+        """Generates a list of (Label, Value, Tooltip) tuples for locators."""
+        locators = []
+        
+        # 1. Appium Accessibility ID
+        if content_desc := data.get("content-desc"):
+            locators.append(("Appium: Accessibility ID", content_desc, f"Copy content-desc: '{content_desc}'"))
+
+        # 2. UiAutomator2 UiSelectors
+        if res_id := data.get("resource-id"):
+            val = f'new UiSelector().resourceId("{res_id}")'
+            locators.append(("UiAutomator2: Resource ID", val, f"Copy UiSelector: {val}"))
+        
+        if text := data.get("text"):
+            val = f'new UiSelector().text("{text}")'
+            locators.append(("UiAutomator2: Text", val, f"Copy UiSelector: {val}"))
+            
+        if content_desc:
+            val = f'new UiSelector().description("{content_desc}")'
+            locators.append(("UiAutomator2: Description", val, f"Copy UiSelector: {val}"))
+            
+        if class_name := data.get("class"):
+            val = f'new UiSelector().className("{class_name}")'
+            locators.append(("UiAutomator2: Class Name", val, f"Copy UiSelector: {val}"))
+
+        # 3. XPath (Fallback/Specific)
+        for attr in ["resource-id", "text", "content-desc", "class"]:
+            if attr_value := data.get(attr):
+                xpath = f"//{attr_value}" if attr == "class" else f"//*[@{attr}='{attr_value}']"
+                display_val = (attr_value[:20] + '...') if len(attr_value) > 23 else attr_value
+                locators.append((f"XPath: {attr.replace('_', ' ').title()}", xpath, f"Copy XPath: {xpath}"))
+
+        return locators
+
+    def _copy_locator(self, value: str):
+        """Copies the locator value to clipboard."""
+        if value:
+            self.clipboard_clear()
+            self.clipboard_append(value)
+            self.parent_app.show_toast(translate("xpath_copied_title"), translate("xpath_copied_message", xpath=value), bootstyle="success")
 
     def _populate_element_details(self, element_data: Optional[Dict]):
         """Populates the element details text view."""
@@ -869,12 +907,7 @@ class RunCommandWindow(ttk.Toplevel):
                 self.element_details_text.text.insert(END, f"{value}\n")
         self.element_details_text.text.config(state=DISABLED)
 
-    def _copy_xpath(self, attribute_type: str):
-        """Generates XPath and copies it to clipboard."""
-        if xpath := self._generate_xpath(attribute_type):
-            self.clipboard_clear()
-            self.clipboard_append(xpath)
-            self.parent_app.show_toast(translate("xpath_copied_title"), translate("xpath_copied_message", xpath=xpath), bootstyle="success")
+
 
     def _perform_xpath_search(self):
         """Filters the element list based on an XPath query."""
@@ -922,7 +955,7 @@ class RunCommandWindow(ttk.Toplevel):
         else:
             self.elements_tree.selection_set("")
             self.screenshot_canvas.delete("highlight")
-            self._update_xpath_buttons_state(None)
+            self._update_locator_buttons(None)
 
     def _send_tap_to_device_and_refresh(self, x, y):
         """Sends a tap command and triggers an inspector refresh."""
@@ -1374,7 +1407,13 @@ class RunCommandWindow(ttk.Toplevel):
             
             ts_opt = " --timestampoutputs" if self.parent_app.timestamp_logs_var.get() else ""
             robot_opt = self.parent_app.robot_options_var.get()
-            base_cmd = f'robot{ts_opt} {robot_opt} --logtitle "{device_info["release"]} - {device_info["model"]}" -v udid:"{self.udid}" -v deviceName:"{device_info["model"]}" -v versao_OS:"{device_info["release"]}" -d "{self.cur_log_dir}" --name "{suite_name}"'
+            
+            allure_opt = ""
+            if self.parent_app.generate_allure_var.get():
+                allure_results_dir = self.cur_log_dir / "allure-results"
+                allure_opt = f' --listener "allure_robotframework;{allure_results_dir}"'
+
+            base_cmd = f'robot{ts_opt} {robot_opt}{allure_opt} --logtitle "{device_info["release"]} - {device_info["model"]}" -v udid:"{self.udid}" -v deviceName:"{device_info["model"]}" -v versao_OS:"{device_info["release"]}" -d "{self.cur_log_dir}" --name "{suite_name}"'
             
             # The self.run_path is already an absolute path, so it should be used directly.
             # Enclosing it in quotes handles paths with spaces.
@@ -1390,7 +1429,33 @@ class RunCommandWindow(ttk.Toplevel):
             for line in iter(self.robot_process.stdout.readline, ''):
                 self.robot_output_queue.put(line)
             self.robot_process.stdout.close()
-            self.robot_output_queue.put(translate("test_finished", code=self.robot_process.wait()) + "\n")
+            return_code = self.robot_process.wait()
+            self.robot_output_queue.put(translate("test_finished", code=return_code) + "\n")
+
+            if self.parent_app.generate_allure_var.get():
+                try:
+                    allure_results_dir = self.cur_log_dir / "allure-results"
+                    if allure_results_dir.exists():
+                        user_home = Path.home()
+                        allure_report_dir = user_home / "allure-report"
+                        
+                        self.robot_output_queue.put("Generating Allure Report...\n")
+                        result = subprocess.run(f'allure generate "{allure_results_dir}" -o "{allure_report_dir}"', 
+                                       check=True, 
+                                       shell=True,
+                                       capture_output=True,
+                                       text=True,
+                                       encoding=OUTPUT_ENCODING,
+                                       errors='replace',
+                                       creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
+                        self.robot_output_queue.put(f"Allure Report generated at: {allure_report_dir}\n")
+                        if result.stdout: self.robot_output_queue.put(f"Allure Output: {result.stdout}\n")
+                except subprocess.CalledProcessError as e:
+                    self.robot_output_queue.put(f"Error generating Allure Report: {e}\n")
+                    self.robot_output_queue.put(f"Allure Stderr: {e.stderr}\n")
+                    self.robot_output_queue.put(f"Allure Stdout: {e.stdout}\n")
+                except Exception as e:
+                    self.robot_output_queue.put(f"Error generating Allure Report: {e}\n")
         except Exception as e:
             self.robot_output_queue.put(translate("robot_run_fatal_error", error=e) + "\n")
         finally:
@@ -1486,10 +1551,12 @@ class RunCommandWindow(ttk.Toplevel):
         if self.udid in self.parent_app.local_busy_devices:
             self.parent_app.local_busy_devices.remove(self.udid)
             
-        if self.udid in self.parent_app.active_command_windows:
-            del self.parent_app.active_command_windows[self.udid]
         # Trigger a fast UI update instead of a slow full refresh
         self.parent_app.root.after(0, self.parent_app._update_device_list)
+        # Delegate removal to DeviceManager
+        if self.parent_app.device_manager:
+            self.parent_app.device_manager.remove_device_tab(self.udid)
+        
         self.destroy()
 
     def _stop_all_activities(self):

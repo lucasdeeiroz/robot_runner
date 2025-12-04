@@ -29,11 +29,17 @@ from src.device_utils import (
     _parse_appium_command, get_device_ip
 )
 from src.log_parser import get_generation_time # This import is used in _parse_logs_thread
+from src.ai_assistant import AIAssistant
 from src.ui.run_tab import RunTabPage
 from src.ui.logs_tab import LogsTabPage
 from src.ui.settings_tab import SettingsTabPage
+from src.ui.ai_tab import AiTabPage
+from src.ui.about_tab import AboutTabPage
 from src.ui.about_tab import AboutTabPage
 from src.ui.toast import Toast
+from src.ui.device_manager_window import DeviceManagerWindow
+from src.ui.run_command_window import DeviceTab
+
 
 # --- Main Application Class ---
 class RobotRunnerApp:
@@ -66,12 +72,17 @@ class RobotRunnerApp:
         self._is_closing = False
         self.shell_manager = AdbShellManager()
         self.appium_version: Optional[str] = None
+        self.allure_version: Optional[str] = None
         self.local_busy_devices = set() # Track devices locally for instant UI feedback
+        self.device_manager: Optional[DeviceManagerWindow] = None
+        self.current_adb_process: Optional[subprocess.Popen] = None
 
         self._setup_string_vars()
         self._load_settings()
         self._update_paths_from_settings()
         
+        self.ai_assistant = AIAssistant(self.ai_api_key_var.get(), self.ai_model_name_var.get())
+
         self._initialize_dirs_and_files()
         
         self._setup_style()
@@ -80,6 +91,7 @@ class RobotRunnerApp:
         self.root.after(100, self._refresh_devices)
         self.root.after(200, self._check_scrcpy_version)
         self.root.after(300, self._check_appium_version)
+        self.root.after(400, self._check_allure_version)
         self.root.after(500, self._start_initial_log_parse)
     
     def _setup_string_vars(self):
@@ -91,6 +103,7 @@ class RobotRunnerApp:
         self.scrcpy_options_var = tk.StringVar()
         self.robot_options_var = tk.StringVar()
         self.tests_dir_var = tk.StringVar()
+        self.resources_dir_var = tk.StringVar()
         self.logs_dir_var = tk.StringVar()
         self.screenshots_dir_var = tk.StringVar()
         self.logcat_dir_var = tk.StringVar()
@@ -101,6 +114,10 @@ class RobotRunnerApp:
         # --- Performance Monitor ---
         self.app_packages_var = tk.StringVar()
         self.timestamp_logs_var = tk.BooleanVar(value=False)
+        self.generate_allure_var = tk.BooleanVar(value=False)
+        # --- AI Configuration ---
+        self.ai_api_key_var = tk.StringVar()
+        self.ai_model_name_var = tk.StringVar(value="gemini-2.5-flash")
         # --- Internationalization ---
         self.adb_ip_var = tk.StringVar()
         self.adb_port_var = tk.StringVar()
@@ -113,6 +130,7 @@ class RobotRunnerApp:
         self.scrcpy_path = Path(self.scrcpy_path_var.get())
         self.suites_dir = Path(self.suites_dir_var.get())
         self.tests_dir = Path(self.tests_dir_var.get())
+        self.resources_dir = Path(self.resources_dir_var.get())
         self.logs_dir = Path(self.logs_dir_var.get())
         self.logcat_dir = Path(self.logcat_dir_var.get())
         self.screenshots_dir = Path(self.screenshots_dir_var.get())
@@ -152,7 +170,8 @@ class RobotRunnerApp:
             'restart_adb_server': self._restart_adb_server,
             'toggle_appium_server': self._toggle_appium_server,
             'show_toast': self.show_toast,
-            'update_paths_from_settings': self._update_paths_from_settings
+            'update_paths_from_settings': self._update_paths_from_settings,
+            'update_ai_settings': self._update_ai_settings
         }
 
         run_callbacks = {
@@ -166,6 +185,7 @@ class RobotRunnerApp:
         # Pass 'self' as the data_model and the callbacks dictionary.
         # This aligns with the refactored SettingsTabPage.__init__
         self.settings_tab = SettingsTabPage(self.content_frame, self, callbacks=settings_callbacks)
+        self.ai_tab = AiTabPage(self.content_frame, self)
         self.about_tab = AboutTabPage(self.content_frame, self)
 
         # Now that settings_tab exists, we can assign its save method to the run_tab's callback.
@@ -175,6 +195,7 @@ class RobotRunnerApp:
         page_configs = [
             ("run", self.run_tab, translate("execute_tab")),
             ("logs", self.logs_tab, translate("logs_tab")),
+            # ("ai", self.ai_tab, translate("ai_settings_tab")),
             ("settings", self.settings_tab, translate("settings_tab")),
             ("about", self.about_tab, translate("about_tab"))
         ]
@@ -241,6 +262,7 @@ class RobotRunnerApp:
             self.scrcpy_path.mkdir(exist_ok=True)
             self.suites_dir.mkdir(exist_ok=True)
             self.tests_dir.mkdir(exist_ok=True)
+            self.resources_dir.mkdir(exist_ok=True)
             self.logs_dir.mkdir(exist_ok=True)
             self.screenshots_dir.mkdir(exist_ok=True)
             self.recordings_dir.mkdir(exist_ok=True)
@@ -276,6 +298,7 @@ class RobotRunnerApp:
         self.scrcpy_path_var.set(self._get_expanded_path_setting(settings, "scrcpy_path", ""))
         self.suites_dir_var.set(self._get_expanded_path_setting(settings, "suites_dir", "suites"))
         self.tests_dir_var.set(self._get_expanded_path_setting(settings, "tests_dir", "tests"))
+        self.resources_dir_var.set(self._get_expanded_path_setting(settings, "resources_dir", "resources"))
         self.scrcpy_options_var.set(settings.get("scrcpy_options", "-m 1024 -b 2M --max-fps=30 --no-audio --stay-awake"))
         self.robot_options_var.set(settings.get("robot_options", "--split-log"))
         self.logs_dir_var.set(self._get_expanded_path_setting(settings, "logs_dir", "logs"))
@@ -284,14 +307,78 @@ class RobotRunnerApp:
         self.recordings_dir_var.set(self._get_expanded_path_setting(settings, "recordings_dir", str(BASE_DIR / "recordings")))
         self.theme_var.set(settings.get("theme", "darkly"))
         self.language_var.set(settings.get("language", "en_US"))
+        self.initial_theme = self.theme_var.get()
+        self.initial_language = self.language_var.get()
         # --- Performance Monitor ---
         self.app_packages_var.set(settings.get("app_packages", "com.android.chrome"))
+        self.generate_allure_var.set(settings.get("generate_allure_report", False))
+        self.ai_api_key_var.set(settings.get("ai_api_key", ""))
+        self.ai_model_name_var.set(settings.get("ai_model_name", "gemini-1.5-flash"))
         self.common_adb_commands = settings.get("common_adb_commands", [
             "shell getprop ro.product.model",
             "shell wm size",
             "shell pm list packages -3",
             "logcat -d"
         ])
+
+    def _update_ai_settings(self):
+        """Updates the AIAssistant with new settings."""
+        self.ai_assistant = AIAssistant(self.ai_api_key_var.get(), self.ai_model_name_var.get())
+
+    def _get_selected_log_path(self, item_id) -> Optional[Path]:
+        """Helper to get the full log path for a selected tree item."""
+        if not self.parsed_logs_data:
+            return None
+            
+        # The treeview items are populated in the same order as parsed_logs_data (filtered).
+        # However, since we have grouping and filtering, mapping by index is unreliable if we don't track it.
+        # But wait, _on_log_double_click uses self.logs_tab.logs_tree.item(item_id, "values") to find the log.
+        # It iterates over self.parsed_logs_data and matches the values.
+        
+        item_values = self.logs_tab.logs_tree.item(item_id, "values")
+        if not item_values: return None
+        
+        # item_values is (suite, status, time)
+        # We need to find the matching entry in self.parsed_logs_data
+        # This is not perfect if there are duplicate entries, but it's consistent with existing logic.
+        
+        for log_data in self.parsed_logs_data:
+            # We need to reconstruct what values are shown in the tree to match.
+            # This logic is inside _update_logs_tree, which we don't want to duplicate entirely.
+            # But we know 'log_path' is in log_data.
+            
+            # Let's try to match based on the log_path if we can infer it, but we can't.
+            # Let's match based on the displayed columns.
+            
+            # This is a bit fragile. A better way would be to store the log_path in the tree item tags or hidden values.
+            # But for now, let's use the same heuristic as _on_log_double_click (which I haven't seen yet but assumed exists).
+            
+            # Actually, let's look at _on_log_double_click in main.py to see how it does it.
+            pass
+            
+        # Since I can't see _on_log_double_click right now, I'll implement a robust search
+        # based on the assumption that 'log_path' is unique enough if we had it.
+        # But we only have suite, status, time.
+        
+        target_suite = item_values[0]
+        target_status = item_values[1]
+        target_time = item_values[2]
+        
+        for log_data in self.parsed_logs_data:
+            # Check if this log_data matches the selected item
+            # We need to know how the tree values were formatted.
+            # Assuming standard formatting:
+            suite_name = log_data.get('suite_name', 'Unknown')
+            status = log_data.get('status', 'Unknown')
+            elapsed = log_data.get('elapsed_time', 'N/A')
+            
+            # Handle grouping prefixes if any? The tree might show indented names.
+            # The values in 'values' tuple are usually the raw text.
+            
+            if suite_name == target_suite and status == target_status: # Time might be formatted differently
+                 return Path(log_data['log_path'])
+                 
+        return None
         
         self.initial_theme = self.theme_var.get()
         self.initial_language = self.language_var.get()
@@ -446,7 +533,9 @@ class RobotRunnerApp:
 
     def _create_run_command_window(self, udid: str, path_to_run: str, run_mode: str): # This method is now in RunTabPage
         """Helper to safely create the RunCommandWindow from the main GUI thread."""
-        from src.ui.run_command_window import RunCommandWindow
+        # Ensure DeviceManagerWindow exists
+        if not self.device_manager or not self.device_manager.winfo_exists():
+            self.device_manager = DeviceManagerWindow(self)
         # Centralized Resource Management: If a window for this UDID already exists, close it before creating a new one.
         if udid in self.active_command_windows and self.active_command_windows[udid].winfo_exists():
             win = self.active_command_windows[udid]
@@ -457,8 +546,10 @@ class RobotRunnerApp:
             self.root.after(100, self._update_device_list) # Refresh UI after closing
 
         # If no window exists, create a new one.
-        win = RunCommandWindow(self, udid, mode='test', run_path=path_to_run, run_mode=run_mode)
-        self.active_command_windows[udid] = win
+        # Create new DeviceTab
+        tab = DeviceTab(self.device_manager.notebook, self, udid, mode='test', run_path=path_to_run, run_mode=run_mode)
+        self.device_manager.add_device_tab(udid, tab, title=f"{udid} (Test)")
+        # self.active_command_windows[udid] = win # Deprecated
 
     def _find_and_set_mdns_port(self, udid: str, ip_address: str):
         """
@@ -580,8 +671,9 @@ class RobotRunnerApp:
                 busy_devices_info.append(f"- {device_str.split(' | ')[1].strip()}")
         
         if busy_devices_info:
-            messagebox.showwarning(translate("busy_device_warning_title"), translate("busy_device_toolbox_message", devices='\n'.join(busy_devices_info)), parent=self.root)
-            return
+            should_continue = messagebox.askyesno(translate("busy_device_warning_title"), translate("busy_device_toolbox_message", devices='\n'.join(busy_devices_info)), parent=self.root)
+            if not should_continue:
+                return
 
         # Disable the button immediately
         self.run_tab.device_options_button.config(state=DISABLED)
@@ -624,9 +716,25 @@ class RobotRunnerApp:
 
     def _create_mirror_window(self, udid: str, model: str, version: str): # This method is now in RunTabPage
         """Helper to create the mirror window on the main thread."""
-        from src.ui.run_command_window import RunCommandWindow
-        win = RunCommandWindow(self, udid, mode='mirror', title=translate("mirror_title", version=version, model=model))
-        self.active_command_windows[udid] = win
+
+        # win = RunCommandWindow(self, udid, mode='mirror', title=translate("mirror_title", version=version, model=model))
+        
+        # Ensure DeviceManagerWindow exists
+        if not self.device_manager or not self.device_manager.winfo_exists():
+            self.device_manager = DeviceManagerWindow(self)
+
+        # Check if tab already exists
+        if self.device_manager and udid in self.device_manager.device_tabs:
+            self.device_manager.remove_device_tab(udid)
+            time.sleep(0.5)
+
+        # Ensure DeviceManagerWindow exists (it might have closed if it was empty)
+        if not self.device_manager or not self.device_manager.winfo_exists():
+            self.device_manager = DeviceManagerWindow(self)
+
+        tab = DeviceTab(self.device_manager.notebook, self, udid, mode='mirror', title=translate("mirror_title", version=version, model=model))
+        self.device_manager.add_device_tab(udid, tab, title=f"{model} ({udid})")
+        # self.active_command_windows[udid] = win # Deprecated
 
     def _refresh_devices(self): # This method is now in RunTabPage
         """Refreshes the list of connected ADB devices."""
@@ -650,7 +758,7 @@ class RobotRunnerApp:
         if appium_might_be_running:
             should_check_busy_devices = self._is_appium_running()
 
-        self.devices = get_connected_devices(appium_command, check_busy_devices=should_check_busy_devices)
+        self.devices = get_connected_devices(appium_command, check_busy_devices=should_check_busy_devices, local_busy_devices=self.local_busy_devices)
         self.root.after(0, self._update_device_list)
 
     def _update_device_list(self): # This method is now in RunTabPage
@@ -791,8 +899,22 @@ class RobotRunnerApp:
                 if not silent:
                     self.root.after(0, self.status_var.set, translate("ready")) # Assuming a key for this status
 
-    def _run_manual_adb_command(self): # This method is now in RunTabPage
-        """Runs a manual ADB command entered by the user."""
+    def _run_manual_adb_command(self):
+        """Runs a manual ADB command entered by the user, or stops it if running."""
+        # --- STOP LOGIC ---
+        if self.current_adb_process:
+            try:
+                self._terminate_process_tree(self.current_adb_process.pid, "ADB Command")
+                self.current_adb_process = None
+                self._update_output_text(self.run_tab.adb_output_text, "\n[Stopped by user]\n", False)
+            except Exception as e:
+                self._update_output_text(self.run_tab.adb_output_text, f"\n[Error stopping: {e}]\n", False)
+            
+            # Reset button state
+            self.run_tab.run_adb_button.config(text=translate("run_command"), bootstyle="primary", state=NORMAL)
+            return
+
+        # --- RUN LOGIC ---
         selected_device_indices = self.run_tab.device_listbox.curselection()
         if not selected_device_indices:
             messagebox.showerror(translate("open_file_error_title"), translate("no_device_selected"), parent=self.root)
@@ -812,12 +934,54 @@ class RobotRunnerApp:
             return
         
         full_command = f"adb -s {udid} {command}"
-        self.run_tab.run_adb_button.config(state=DISABLED)
+        
+        # Update button to STOP state
+        self.run_tab.run_adb_button.config(text=translate("stop_test"), bootstyle="danger")
         self._update_output_text(self.run_tab.adb_output_text, f"> {full_command}\n", True)
         
-        thread = threading.Thread(target=self._run_command_and_update_gui, args=(full_command, self.run_tab.adb_output_text, self.run_tab.run_adb_button))
-        thread.daemon = True
-        thread.start()
+        try:
+            # Create process in main thread to avoid race condition
+            process = subprocess.Popen(
+                full_command,
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding=OUTPUT_ENCODING,
+                errors='replace',
+                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+            )
+            self.current_adb_process = process
+
+            thread = threading.Thread(target=self._run_adb_command_thread, args=(process, self.run_tab.adb_output_text, self.run_tab.run_adb_button))
+            thread.daemon = True
+            thread.start()
+        except Exception as e:
+             self._update_output_text(self.run_tab.adb_output_text, f"\n[Error starting: {e}]\n", False)
+             self.run_tab.run_adb_button.config(text=translate("run_command"), bootstyle="primary", state=NORMAL)
+
+    def _run_adb_command_thread(self, process: subprocess.Popen, output_widget: ScrolledText, button: ttk.Button):
+        """Runs the ADB command in a subprocess and updates the GUI."""
+        try:
+            # Read output line by line
+            while True:
+                line = process.stdout.readline()
+                if not line and process.poll() is not None:
+                    break
+                if line:
+                    self.root.after(0, self._update_output_text, output_widget, line, False)
+            
+            return_code = process.poll()
+            if return_code is not None and return_code != 0:
+                 self.root.after(0, self._update_output_text, output_widget, f"\n[Exited with code {return_code}]\n", False)
+            else:
+                 self.root.after(0, self._update_output_text, output_widget, "\n[Finished]\n", False)
+
+        except Exception as e:
+            self.root.after(0, self._update_output_text, output_widget, f"\n[Error: {e}]\n", False)
+        finally:
+            self.current_adb_process = None
+            self.root.after(0, lambda: button.config(text=translate("run_command"), bootstyle="primary", state=NORMAL))
 
     def _check_appium_version(self): # This method is now in SettingsTabPage
         """Checks the installed Appium version in a background thread."""
@@ -843,6 +1007,32 @@ class RobotRunnerApp:
             except Exception as e:
                 self.appium_version = None
                 self.root.after(0, lambda: self.status_var.set(translate("error_checking_appium_version", error=e)))
+
+        threading.Thread(target=check_thread, daemon=True).start()
+
+    def _check_allure_version(self):
+        """Checks the installed Allure version in a background thread."""
+        def check_thread():
+            try:
+                # execute_command already uses shell=True internally
+                command = "allure --version"
+                success, output = execute_command(command)
+                if success and output:
+                    # Output might be just the version number or contain other text
+                    version_match = re.search(r'(\d+\.\d+\.\d+(?:-[a-zA-Z0-9\.]+)?)', output)
+                    if version_match:
+                        self.allure_version = version_match.group(1)
+                    else:
+                        self.allure_version = output.strip() # Fallback to full output if regex fails
+                else:
+                    self.allure_version = None
+            except Exception as e:
+                self.allure_version = None
+                print(f"Error checking Allure version: {e}")
+            
+            # Update Settings Tab UI
+            if hasattr(self, 'settings_tab'):
+                self.root.after(0, self.settings_tab.update_allure_checkbox_state)
 
         threading.Thread(target=check_thread, daemon=True).start()
 

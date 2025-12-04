@@ -169,3 +169,5 @@ screenshots/
 logs/
 logcat*/
 frontend/
+.allure
+.gemini_cache

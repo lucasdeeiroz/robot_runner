@@ -13,11 +13,14 @@ from src.locales.i18n import gettext as translate
 from .app_utils import BASE_DIR, execute_command
 
 
-def get_connected_devices(appium_command: Optional[str] = None, check_busy_devices: bool = False) -> List[Dict[str, str]]:
+def get_connected_devices(appium_command: Optional[str] = None, check_busy_devices: bool = False, local_busy_devices: Optional[Set[str]] = None) -> List[Dict[str, str]]:
     """Returns a list of dictionaries, each representing a connected device."""
     busy_udids = set()
     if check_busy_devices:
         busy_udids = _get_busy_udids(appium_command)
+    
+    if local_busy_devices:
+        busy_udids.update(local_busy_devices)
 
     success, output = execute_command("adb devices -l")
     if not success:
