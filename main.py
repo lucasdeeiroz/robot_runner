@@ -72,7 +72,6 @@ class RobotRunnerApp:
         self._is_closing = False
         self.shell_manager = AdbShellManager()
         self.appium_version: Optional[str] = None
-        self.allure_version: Optional[str] = None
         self.local_busy_devices = set() # Track devices locally for instant UI feedback
         self.device_manager: Optional[DeviceManagerWindow] = None
         self.current_adb_process: Optional[subprocess.Popen] = None
@@ -91,7 +90,6 @@ class RobotRunnerApp:
         self.root.after(100, self._refresh_devices)
         self.root.after(200, self._check_scrcpy_version)
         self.root.after(300, self._check_appium_version)
-        self.root.after(400, self._check_allure_version)
         self.root.after(500, self._start_initial_log_parse)
     
     def _setup_string_vars(self):
@@ -114,7 +112,6 @@ class RobotRunnerApp:
         # --- Performance Monitor ---
         self.app_packages_var = tk.StringVar()
         self.timestamp_logs_var = tk.BooleanVar(value=False)
-        self.generate_allure_var = tk.BooleanVar(value=False)
         # --- AI Configuration ---
         self.ai_api_key_var = tk.StringVar()
         self.ai_model_name_var = tk.StringVar(value="gemini-2.5-flash")
@@ -311,7 +308,6 @@ class RobotRunnerApp:
         self.initial_language = self.language_var.get()
         # --- Performance Monitor ---
         self.app_packages_var.set(settings.get("app_packages", "com.android.chrome"))
-        self.generate_allure_var.set(settings.get("generate_allure_report", False))
         self.ai_api_key_var.set(settings.get("ai_api_key", ""))
         self.ai_model_name_var.set(settings.get("ai_model_name", "gemini-1.5-flash"))
         self.common_adb_commands = settings.get("common_adb_commands", [
@@ -1007,32 +1003,6 @@ class RobotRunnerApp:
             except Exception as e:
                 self.appium_version = None
                 self.root.after(0, lambda: self.status_var.set(translate("error_checking_appium_version", error=e)))
-
-        threading.Thread(target=check_thread, daemon=True).start()
-
-    def _check_allure_version(self):
-        """Checks the installed Allure version in a background thread."""
-        def check_thread():
-            try:
-                # execute_command already uses shell=True internally
-                command = "allure --version"
-                success, output = execute_command(command)
-                if success and output:
-                    # Output might be just the version number or contain other text
-                    version_match = re.search(r'(\d+\.\d+\.\d+(?:-[a-zA-Z0-9\.]+)?)', output)
-                    if version_match:
-                        self.allure_version = version_match.group(1)
-                    else:
-                        self.allure_version = output.strip() # Fallback to full output if regex fails
-                else:
-                    self.allure_version = None
-            except Exception as e:
-                self.allure_version = None
-                print(f"Error checking Allure version: {e}")
-            
-            # Update Settings Tab UI
-            if hasattr(self, 'settings_tab'):
-                self.root.after(0, self.settings_tab.update_allure_checkbox_state)
 
         threading.Thread(target=check_thread, daemon=True).start()
 

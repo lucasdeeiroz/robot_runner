@@ -86,8 +86,6 @@ class SettingsTabPage(ttk.Frame):
             "theme": self.model.theme_var.get(),
             "language": self.model.language_var.get(),
             "app_packages": self.model.app_packages_var.get(),
-            "generate_allure_report": self.model.generate_allure_var.get(),
-            "generate_allure_report": self.model.generate_allure_var.get(),
             "common_adb_commands": self.model.common_adb_commands,
             "ai_api_key": self.model.ai_api_key_var.get(),
             "ai_model_name": self.model.ai_model_name_var.get()
@@ -165,7 +163,7 @@ class SettingsTabPage(ttk.Frame):
         versions_frame.columnconfigure(1, weight=1)
 
         self.version_labels = {}
-        tools = ["ADB", "Appium", "UiAutomator2", "Scrcpy", "Robot Framework", "Allure"]
+        tools = ["ADB", "Appium", "UiAutomator2", "Scrcpy", "Robot Framework"]
         
         for i, tool in enumerate(tools):
             ttk.Label(versions_frame, text=f"{tool}:").grid(row=i, column=0, padx=5, pady=2, sticky=W)
@@ -310,10 +308,6 @@ class SettingsTabPage(ttk.Frame):
 
         self._update_version_label("Robot Framework", robot_version)
 
-        # Allure
-        allure_version = get_version(["allure", "--version"])
-        self._update_version_label("Allure", allure_version)
-
     def _update_version_label(self, tool, version):
         """Updates the version label in the UI thread."""
         if tool in self.version_labels:
@@ -427,22 +421,6 @@ class SettingsTabPage(ttk.Frame):
         robot_options_entry = ttk.Entry(robot_options_frame, textvariable=self.model.robot_options_var)
         robot_options_entry.pack(fill=X, expand=YES, padx=5, pady=5)
         ToolTip(robot_options_entry, translate("robot_options_tooltip"))
-
-        # --- Allure Report ---
-        self.allure_checkbox = ttk.Checkbutton(robot_options_frame, text=translate("generate_allure_report"), variable=self.model.generate_allure_var, state=DISABLED)
-        self.allure_checkbox.pack(fill=X, padx=5, pady=5)
-        ToolTip(self.allure_checkbox, translate("generate_allure_report_tooltip"))
-
-        # Check initial state (in case version was already fetched)
-        self.update_allure_checkbox_state()
-
-    def update_allure_checkbox_state(self):
-        """Updates the state of the Allure checkbox based on version detection."""
-        if getattr(self.model, 'allure_version', None):
-            self.allure_checkbox.config(state=NORMAL)
-        else:
-            self.allure_checkbox.config(state=DISABLED)
-            self.model.generate_allure_var.set(False) # Uncheck if disabled
 
     def _setup_ai_tab(self, parent_frame):
         """Populates the 'AI' settings tab."""

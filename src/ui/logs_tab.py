@@ -54,14 +54,6 @@ class LogsTabPage(ttk.Frame):
         self.reparse_button.pack(side=LEFT, padx=(0, 5))
         ToolTip(self.reparse_button, translate("reparse_tooltip"))
 
-        self.view_allure_button = ttk.Button(right_controls_frame, text=translate("view_allure_report"), command=self._view_allure_report, bootstyle="info", state=DISABLED)
-        self.view_allure_button.pack(side=LEFT)
-        ToolTip(self.view_allure_button, translate("view_allure_report_tooltip"))
-        
-        # Check initial state
-        if getattr(self.app, 'allure_version', None):
-             self.view_allure_button.config(state=NORMAL)
-
         self.progress_frame = ttk.Frame(self)
         self.progress_label = ttk.Label(self.progress_frame, text=translate("parsing"))
         self.progress_bar = ttk.Progressbar(self.progress_frame, mode='determinate')
@@ -73,37 +65,5 @@ class LogsTabPage(ttk.Frame):
         self.logs_tree.heading("status", text=translate("log_tree_status"))
         self.logs_tree.heading("time", text=translate("log_tree_time"))
         self.logs_tree.bind("<Double-1>", self.app._on_log_double_click)
-        self.logs_tree.bind("<<TreeviewSelect>>", self._on_tree_select)
+
         self.logs_tree.tag_configure("no_logs", foreground="gray")
-
-    def _on_tree_select(self, event):
-        """Updates the state of the View Allure Report button."""
-        # Enable if Allure is installed (version detected)
-        if getattr(self.app, 'allure_version', None):
-             self.view_allure_button.config(state=NORMAL)
-        else:
-             self.view_allure_button.config(state=DISABLED)
-
-    def _view_allure_report(self):
-        """Opens the Allure report."""
-        user_home = Path.home()
-        allure_report_dir = user_home / "allure-report"
-        
-        if allure_report_dir.exists():
-            try:
-                # Check if allure command exists
-                subprocess.run("allure --version", check=True, shell=True, capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
-                
-                # Open the report
-                threading.Thread(target=self._open_allure, args=(allure_report_dir,), daemon=True).start()
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                messagebox.showerror(translate("allure_not_found_title"), translate("allure_not_found_message"))
-        else:
-            messagebox.showinfo("Info", "No Allure report found.")
-
-    def _open_allure(self, report_dir):
-        """Runs allure open in a subprocess."""
-        try:
-            subprocess.run(f'allure open "{report_dir}"', shell=True, creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
-        except Exception as e:
-            print(f"Error opening allure report: {e}")

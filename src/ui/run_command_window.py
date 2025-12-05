@@ -1407,13 +1407,8 @@ class DeviceTab(ttk.Frame):
             
             ts_opt = " --timestampoutputs" if self.parent_app.timestamp_logs_var.get() else ""
             robot_opt = self.parent_app.robot_options_var.get()
-            
-            allure_opt = ""
-            if self.parent_app.generate_allure_var.get():
-                allure_results_dir = self.cur_log_dir / "allure-results"
-                allure_opt = f' --listener "allure_robotframework;{allure_results_dir}"'
 
-            base_cmd = f'robot{ts_opt} {robot_opt}{allure_opt} --logtitle "{device_info["release"]} - {device_info["model"]}" -v udid:"{self.udid}" -v deviceName:"{device_info["model"]}" -v versao_OS:"{device_info["release"]}" -d "{self.cur_log_dir}" --name "{suite_name}"'
+            base_cmd = f'robot{ts_opt} {robot_opt} --logtitle "{device_info["release"]} - {device_info["model"]}" -v udid:"{self.udid}" -v deviceName:"{device_info["model"]}" -v versao_OS:"{device_info["release"]}" -d "{self.cur_log_dir}" --name "{suite_name}"'
             
             # The self.run_path is already an absolute path, so it should be used directly.
             # Enclosing it in quotes handles paths with spaces.
@@ -1431,31 +1426,6 @@ class DeviceTab(ttk.Frame):
             self.robot_process.stdout.close()
             return_code = self.robot_process.wait()
             self.robot_output_queue.put(translate("test_finished", code=return_code) + "\n")
-
-            if self.parent_app.generate_allure_var.get():
-                try:
-                    allure_results_dir = self.cur_log_dir / "allure-results"
-                    if allure_results_dir.exists():
-                        user_home = Path.home()
-                        allure_report_dir = user_home / "allure-report"
-                        
-                        self.robot_output_queue.put("Generating Allure Report...\n")
-                        result = subprocess.run(f'allure generate "{allure_results_dir}" -o "{allure_report_dir}"', 
-                                       check=True, 
-                                       shell=True,
-                                       capture_output=True,
-                                       text=True,
-                                       encoding=OUTPUT_ENCODING,
-                                       errors='replace',
-                                       creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
-                        self.robot_output_queue.put(f"Allure Report generated at: {allure_report_dir}\n")
-                        if result.stdout: self.robot_output_queue.put(f"Allure Output: {result.stdout}\n")
-                except subprocess.CalledProcessError as e:
-                    self.robot_output_queue.put(f"Error generating Allure Report: {e}\n")
-                    self.robot_output_queue.put(f"Allure Stderr: {e.stderr}\n")
-                    self.robot_output_queue.put(f"Allure Stdout: {e.stdout}\n")
-                except Exception as e:
-                    self.robot_output_queue.put(f"Error generating Allure Report: {e}\n")
         except Exception as e:
             self.robot_output_queue.put(translate("robot_run_fatal_error", error=e) + "\n")
         finally:
