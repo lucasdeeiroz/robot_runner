@@ -12,7 +12,7 @@ from typing import List, Dict, Optional
 from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox
-from lxml import etree as ET
+
 import ttkbootstrap as ttk
 from ttkbootstrap.widgets.scrolled import ScrolledText
 from ttkbootstrap.constants import *
@@ -38,7 +38,7 @@ from src.ui.about_tab import AboutTabPage
 from src.ui.about_tab import AboutTabPage
 from src.ui.toast import Toast
 from src.ui.device_manager_window import DeviceManagerWindow
-from src.ui.run_command_window import DeviceTab
+
 
 
 # --- Main Application Class ---
@@ -529,7 +529,6 @@ class RobotRunnerApp:
 
     def _create_run_command_window(self, udid: str, path_to_run: str, run_mode: str): # This method is now in RunTabPage
         """Helper to safely create the RunCommandWindow from the main GUI thread."""
-        # Ensure DeviceManagerWindow exists
         if not self.device_manager or not self.device_manager.winfo_exists():
             self.device_manager = DeviceManagerWindow(self)
         # Centralized Resource Management: If a window for this UDID already exists, close it before creating a new one.
@@ -543,6 +542,7 @@ class RobotRunnerApp:
 
         # If no window exists, create a new one.
         # Create new DeviceTab
+        from src.ui.run_command_window import DeviceTab
         tab = DeviceTab(self.device_manager.notebook, self, udid, mode='test', run_path=path_to_run, run_mode=run_mode)
         self.device_manager.add_device_tab(udid, tab, title=f"{udid} (Test)")
         # self.active_command_windows[udid] = win # Deprecated
@@ -728,6 +728,7 @@ class RobotRunnerApp:
         if not self.device_manager or not self.device_manager.winfo_exists():
             self.device_manager = DeviceManagerWindow(self)
 
+        from src.ui.run_command_window import DeviceTab
         tab = DeviceTab(self.device_manager.notebook, self, udid, mode='mirror', title=translate("mirror_title", version=version, model=model))
         self.device_manager.add_device_tab(udid, tab, title=f"{model} ({udid})")
         # self.active_command_windows[udid] = win # Deprecated
@@ -1109,6 +1110,9 @@ class RobotRunnerApp:
 
     def _parse_logs_thread(self, period: str, silent: bool = False): # This method is now in LogsTabPage
         """Parses logs in a background thread based on the selected period."""
+        # Lazy import for performance
+        from lxml import etree as ET
+        
         # Recursively find all possible output.xml files, timestamped or not. This is the most robust way.
         all_xml_files = list(self.logs_dir.glob("**/output*.xml"))
         

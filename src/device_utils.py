@@ -13,6 +13,9 @@ from src.locales.i18n import gettext as translate
 from .app_utils import BASE_DIR, execute_command
 
 
+# --- Cache for device properties ---
+_DEVICE_PROPERTIES_CACHE: Dict[str, Dict[str, str]] = {}
+
 def get_connected_devices(appium_command: Optional[str] = None, check_busy_devices: bool = False, local_busy_devices: Optional[Set[str]] = None) -> List[Dict[str, str]]:
     """Returns a list of dictionaries, each representing a connected device."""
     busy_udids = set()
@@ -28,27 +31,47 @@ def get_connected_devices(appium_command: Optional[str] = None, check_busy_devic
     
     devices = []
     lines = output.strip().splitlines()[1:]
+    
+    # Identify currently connected UDIDs to clean up cache
+    connected_udids = set()
+
     for line in lines:
         if "device" in line and "unauthorized" not in line:
             parts = line.split()
             udid = parts[0]
+            connected_udids.add(udid)
+            
             properties = get_device_properties(udid)
             if properties:
                 properties['status'] = "Busy" if udid in busy_udids else "Available"
                 devices.append(properties)
+    
+    # Clean up cache for disconnected devices
+    for cached_udid in list(_DEVICE_PROPERTIES_CACHE.keys()):
+        if cached_udid not in connected_udids:
+            del _DEVICE_PROPERTIES_CACHE[cached_udid]
+
     return devices
 
 def get_device_properties(udid: str) -> Optional[Dict[str, str]]:
-    """Gets model and Android version for a given device UDID."""
+    """Gets model and Android version for a given device UDID, using cache if available."""
+    if udid in _DEVICE_PROPERTIES_CACHE:
+        return _DEVICE_PROPERTIES_CACHE[udid].copy()
+
     try:
-        model_cmd = f"adb -s {udid} shell getprop ro.product.model"
-        release_cmd = f"adb -s {udid} shell getprop ro.build.version.release"
+        # Optimized: Get both properties in a single shell command
+        cmd = f"adb -s {udid} shell \"getprop ro.product.model; echo '|'; getprop ro.build.version.release\""
+        success, output = execute_command(cmd)
         
-        success_model, model = execute_command(model_cmd)
-        success_release, release = execute_command(release_cmd)
-        
-        if success_model and success_release:
-            return {"udid": udid, "model": model, "release": release}
+        if success:
+            parts = output.split('|')
+            if len(parts) == 2:
+                model = parts[0].strip()
+                release = parts[1].strip()
+                
+                props = {"udid": udid, "model": model, "release": release}
+                _DEVICE_PROPERTIES_CACHE[udid] = props
+                return props
         return None
     except Exception:
         return None

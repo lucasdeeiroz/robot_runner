@@ -43,24 +43,39 @@ def run_performance_monitor(shell_manager: AdbShellManager, udid: str, app_packa
         last_timestamps = set()
         start_time = time.time()
 
-        while not stop_event.is_set():
-            # --- RAM Usage ---
-            ram_output = shell_manager.execute(udid, f"dumpsys meminfo {app_package}")
-            ram_mb = "N/A"
-            if "TOTAL" in ram_output and (match := re.search(r"TOTAL\s+(\d+)", ram_output)):
-                ram_mb = f"{int(match.group(1)) / 1024:.2f}"
+        tick = 0
+        cpu_percent = "N/A"
+        ram_mb = "N/A"
 
-            # --- CPU Usage ---
-            cpu_output = shell_manager.execute(udid, "top -n 1 -b")
-            cpu_percent = "N/A"
-            if "Error" not in cpu_output and "not found" not in cpu_output:
-                for line in cpu_output.splitlines():
-                    if app_package in line:
-                        parts = line.strip().split()
-                        cpu_percent = parts[8] if len(parts) > 8 else "N/A"
-                        break
+        while not stop_event.is_set():
+            tick += 1
             
-            # --- Graphics Info (Jank, GPU, Vsync) ---
+            # --- RAM & CPU Usage (Throttle: every 2 seconds) ---
+            if tick % 2 == 1: # Run on 1, 3, 5...
+                # RAM
+                ram_output = shell_manager.execute(udid, f"dumpsys meminfo {app_package}")
+                
+                if "TOTAL" in ram_output and (match := re.search(r"TOTAL\s+(\d+)", ram_output)):
+                   ram_mb = f"{int(match.group(1)) / 1024:.2f}"
+                
+                # CPU
+                cpu_output = shell_manager.execute(udid, "top -n 1 -b")
+                
+                if "Error" not in cpu_output and "not found" not in cpu_output:
+                    found_cpu = False
+                    for line in cpu_output.splitlines():
+                        if app_package in line:
+                            parts = line.strip().split()
+                            # Android top output format can vary, usually index 8 or 9 for CPU%
+                            # Using a heuristic if needed, but keeping original index 8 for now
+                            cpu_percent = parts[8] if len(parts) > 8 else "N/A"
+                            found_cpu = True
+                            break
+                    if not found_cpu:
+                         # Keep previous value or reset? Keeping previous to avoid flickering
+                         pass
+            
+            # --- Graphics Info (Jank, GPU, Vsync) - Run every second ---
             gfx_output = shell_manager.execute(udid, f"dumpsys gfxinfo {app_package}")
             jank_info = "0.00% (0/0)"
             if jank_match := re.search(r"Janky frames: (\d+) \(([\d.]+)%\)", gfx_output):
@@ -76,7 +91,7 @@ def run_performance_monitor(shell_manager: AdbShellManager, udid: str, app_packa
             missed_vsync_match = re.search(r"Number Missed Vsync: (\d+)", gfx_output)
             missed_vsync = missed_vsync_match.group(1) if missed_vsync_match else "N/A"
 
-            # --- FPS Calculation ---
+            # --- FPS Calculation - Run every second ---
             surface_name = get_surface_view_name(shell_manager, udid, app_package)
             surface_fps, last_timestamps = get_surface_fps(shell_manager, udid, surface_name, last_timestamps)
 

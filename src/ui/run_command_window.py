@@ -22,6 +22,7 @@ from src.app_utils import OUTPUT_ENCODING, execute_command
 from src.device_utils import get_device_aspect_ratio, get_device_properties
 from src.locales.i18n import gettext as translate
 from src.performance_monitor import run_performance_monitor
+from src.log_writer import LogWriter
 
 if sys.platform == "win32":
     try:
@@ -106,6 +107,10 @@ class DeviceTab(ttk.Frame):
         self.stop_package_log_event = threading.Event()
         self.package_log_output_queue = Queue()
         self.package_log_file: Optional[Path] = None
+        
+        # Async Log Writer
+        self.log_writer = LogWriter()
+        self.log_writer.start()
         self.package_log_level_var = ttk.StringVar(value="Debug")
         self.clear_logcat_before_start_var = ttk.BooleanVar(value=True)
         self.LOG_LEVELS = {
@@ -1024,14 +1029,16 @@ class DeviceTab(ttk.Frame):
         """Helper method to execute an ADB command in a thread."""
         cx, cy = x + width / 2, y + height / 2
         cmd = ""
-        if action_type == "click": cmd = f"adb -s {self.udid} shell input tap {int(cx)} {int(cy)}"
-        elif action_type == "long_click": cmd = f"adb -s {self.udid} shell input swipe {int(cx)} {int(cy)} {int(cx)} {int(cy)} 500"
-        elif action_type == "swipe_up": cmd = f"adb -s {self.udid} shell input swipe {int(cx)} {int(y + height * 0.8)} {int(cx)} {int(y + height * 0.2)} 400"
-        elif action_type == "swipe_down": cmd = f"adb -s {self.udid} shell input swipe {int(cx)} {int(y + height * 0.2)} {int(cx)} {int(y + height * 0.8)} 400"
-        elif action_type == "swipe_left": cmd = f"adb -s {self.udid} shell input swipe {int(x + width * 0.8)} {int(cy)} {int(x + width * 0.2)} {int(cy)} 400"
-        elif action_type == "swipe_right": cmd = f"adb -s {self.udid} shell input swipe {int(x + width * 0.2)} {int(cy)} {int(x + width * 0.8)} {int(cy)} 400"
+        if action_type == "click": cmd = f"input tap {int(cx)} {int(cy)}"
+        elif action_type == "long_click": cmd = f"input swipe {int(cx)} {int(cy)} {int(cx)} {int(cy)} 500"
+        elif action_type == "swipe_up": cmd = f"input swipe {int(cx)} {int(y + height * 0.8)} {int(cx)} {int(y + height * 0.2)} 400"
+        elif action_type == "swipe_down": cmd = f"input swipe {int(cx)} {int(y + height * 0.2)} {int(cx)} {int(y + height * 0.8)} 400"
+        elif action_type == "swipe_left": cmd = f"input swipe {int(x + width * 0.8)} {int(cy)} {int(x + width * 0.2)} {int(cy)} 400"
+        elif action_type == "swipe_right": cmd = f"input swipe {int(x + width * 0.2)} {int(cy)} {int(x + width * 0.8)} {int(cy)} 400"
 
-        if cmd and execute_command(cmd)[0]:
+        if cmd:
+            # Use persistent shell for lower latency
+            self.parent_app.shell_manager.execute(self.udid, cmd)
             self.parent_app.show_toast(translate("inspector"), translate("action_success_refreshing", action=action_type), bootstyle="info")
             self.scrcpy_output_queue.put(f"{translate('action_success_refreshing', action=action_type)}\n")
             self.after(500, self._start_inspection)
@@ -1157,14 +1164,19 @@ class DeviceTab(ttk.Frame):
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         dev_path, local_path = "/sdcard/screenshot.png", screenshots_dir / f"screenshot_{self.udid.replace(':', '-')}_{timestamp}.png"
         try:
-            if execute_command(f"adb -s {self.udid} shell screencap -p {dev_path}")[0] and \
-               execute_command(f"adb -s {self.udid} pull {dev_path} \"{local_path}\"")[0]:
+            # Use persistent shell for creation
+            self.parent_app.shell_manager.execute(self.udid, f"screencap -p {dev_path}")
+            
+            # Pull must still be done via ADB normal command
+            if execute_command(f"adb -s {self.udid} pull {dev_path} \"{local_path}\"")[0]:
                 self.parent_app.show_toast(translate("success_title"), translate("screenshot_saved_success", path=local_path), bootstyle="success")
                 self.scrcpy_output_queue.put(f"{translate('screenshot_saved_success', path=local_path)}\n")
             else: 
                 self.parent_app.show_toast(translate("error_title"), translate("capture_screenshot_error"), bootstyle="danger")
                 self.scrcpy_output_queue.put(f"{translate('capture_screenshot_error')}\n")
-            execute_command(f"adb -s {self.udid} shell rm {dev_path}")
+            
+            # Use persistent shell for cleanup
+            self.parent_app.shell_manager.execute(self.udid, f"rm {dev_path}")
         finally:
             self.after(0, lambda: self.screenshot_button.config(state=NORMAL, text=translate("take_screenshot")))
 
@@ -1257,9 +1269,14 @@ class DeviceTab(ttk.Frame):
 
     def _check_performance_output_queue(self):
         items = []
-        while not self.performance_output_queue.empty():
-            try: items.append(self.performance_output_queue.get_nowait())
+        max_batch = 100
+        count = 0
+        while not self.performance_output_queue.empty() and count < max_batch:
+            try: 
+                items.append(self.performance_output_queue.get_nowait())
+                count += 1
             except Empty: pass
+            
         if items:
             log_batch = []
             self.performance_output_text.text.config(state=NORMAL)
@@ -1272,11 +1289,20 @@ class DeviceTab(ttk.Frame):
                     line = item
                     if translate('monitoring_stopped_by_user') in item: self.last_performance_line_var.set("")
                 log_batch.append(line)
+            
             self.performance_output_text.text.insert(END, "".join(log_batch))
+            
+            # Truncate
+            max_lines = 2000
+            num_lines = int(self.performance_output_text.text.index('end-1c').split('.')[0])
+            if num_lines > max_lines:
+                 self.performance_output_text.text.delete("1.0", f"{num_lines - max_lines}.0")
+
             self.performance_output_text.text.see(END)
             self.performance_output_text.text.config(state=DISABLED)
             if self.performance_log_file:
-                with open(self.performance_log_file, 'a', encoding=OUTPUT_ENCODING) as f: f.write("".join(log_batch))
+                self.log_writer.write(self.performance_log_file, "".join(log_batch), encoding=OUTPUT_ENCODING)
+        
         if self.is_monitoring and (not self.performance_thread or not self.performance_thread.is_alive()): self._stop_performance_monitor()
         self.after(500, self._check_performance_output_queue)
 
@@ -1512,21 +1538,35 @@ class DeviceTab(ttk.Frame):
     def _check_package_log_queue(self):
         """Checks the package log queue and updates the text widget."""
         lines = []
-        while not self.package_log_output_queue.empty():
-            try: lines.append(self.package_log_output_queue.get_nowait())
+        # Limit processing to avoid freezing the UI if queue is huge
+        max_batch = 1000
+        count = 0
+        while not self.package_log_output_queue.empty() and count < max_batch:
+            try: 
+                lines.append(self.package_log_output_queue.get_nowait())
+                count += 1
             except Empty: pass
+            
         if lines:
             self.package_log_output_text.text.config(state=NORMAL)
             self.package_log_output_text.text.insert(END, "".join(lines))
+            
+            # Truncate if too long to save memory
+            max_lines = 5000
+            num_lines = int(self.package_log_output_text.text.index('end-1c').split('.')[0])
+            if num_lines > max_lines:
+                 self.package_log_output_text.text.delete("1.0", f"{num_lines - max_lines}.0")
+
             self.package_log_output_text.text.see(END)
             self.package_log_output_text.text.config(state=DISABLED)
 
             # Write to the log file if it's active
             if self.package_log_file:
-                with open(self.package_log_file, 'a', encoding=OUTPUT_ENCODING) as f:
-                    f.write("".join(lines))
+                self.log_writer.write(self.package_log_file, "".join(lines), encoding=OUTPUT_ENCODING)
         
-        self.after(500, self._check_package_log_queue)
+        # Check again sooner if we hit the batch limit, otherwise wait standard time
+        next_check = 100 if count >= max_batch else 500
+        self.after(next_check, self._check_package_log_queue)
 
     def _open_file_path(self, path: str):
         """Opens a file path from a link."""
@@ -1585,3 +1625,4 @@ class DeviceTab(ttk.Frame):
         if self.is_mirroring: self._stop_scrcpy()
         if self.is_inspecting: self._stop_inspector()
         if self.is_logging_package: self._stop_package_logging()
+        if hasattr(self, 'log_writer'): self.log_writer.stop()

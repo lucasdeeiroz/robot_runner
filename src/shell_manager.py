@@ -13,6 +13,7 @@ class AdbShellManager:
     """Manages persistent adb shell processes for multiple devices."""
     def __init__(self):
         self.shells: Dict[str, subprocess.Popen] = {}
+        self.shell_locks: Dict[str, threading.Lock] = {}
         self.lock = threading.Lock()
 
     def get_shell(self, udid: str) -> Optional[subprocess.Popen]:
@@ -35,6 +36,8 @@ class AdbShellManager:
                     creationflags=creationflags
                 )
                 self.shells[udid] = process
+                if udid not in self.shell_locks:
+                     self.shell_locks[udid] = threading.Lock()
                 return process
             except Exception:
                 return None
@@ -45,16 +48,30 @@ class AdbShellManager:
         if not process or process.poll() is not None:
             return f"Error: Shell for {udid} is not running."
 
-        return execute_on_persistent_shell(process, command)
+        # Acquire the lock for this specific device to prevent interleaved commands
+        device_lock = self.shell_locks.get(udid)
+        if device_lock:
+             with device_lock:
+                 return execute_on_persistent_shell(process, command)
+        else:
+             # Should practically not happen if get_shell works, but fallback safely
+             return execute_on_persistent_shell(process, command)
 
     def close(self, udid: str):
         """Closes the persistent shell for a specific UDID."""
         with self.lock:
-            if udid in self.shells and self.shells[udid].poll() is None:
-                self.shells[udid].terminate()
+            if udid in self.shells:
+                if self.shells[udid].poll() is None:
+                    self.shells[udid].terminate()
                 del self.shells[udid]
+            if udid in self.shell_locks:
+                del self.shell_locks[udid]
 
     def close_all(self):
         """Closes all active persistent shells."""
-        for udid in list(self.shells.keys()):
-            self.close(udid)
+        with self.lock:
+            for udid in list(self.shells.keys()):
+                if self.shells[udid].poll() is None:
+                    self.shells[udid].terminate()
+            self.shells.clear()
+            self.shell_locks.clear()
