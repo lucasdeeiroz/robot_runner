@@ -779,13 +779,49 @@ class DeviceTab(ttk.Frame):
             
             # Calculate Full XPath
             try:
-                tree = node.getroottree()
-                data["xpath"] = tree.getpath(node)
+                data["xpath"] = self._get_appium_xpath(node)
             except Exception:
                 data["xpath"] = ""
                 
             return data
         return None
+
+    def _get_appium_xpath(self, node) -> str:
+        """Generates an Appium-friendly XPath using class names and resource-ids."""
+        path_segments = []
+        current = node
+        
+        while current is not None:
+            res_id = current.get("resource-id")
+            class_name = current.get("class")
+            
+            # If we reached the hierarchy root, stop and return absolute path
+            if not class_name and current.tag == "hierarchy":
+                 return "/hierarchy" + "".join(path_segments)
+
+            if not class_name:
+                class_name = current.tag # Fallback
+
+            # Use resource-id as anchor if available
+            if res_id:
+                anchor = f'//{class_name}[@resource-id="{res_id}"]'
+                return anchor + "".join(path_segments)
+            
+            # Calculate index among preceding siblings with SAME class
+            # Note: Appium indices are 1-based
+            index = 1
+            for sib in current.itersiblings(preceding=True):
+                if sib.get("class") == class_name:
+                    index += 1
+            
+            segment = f"/{class_name}"
+            if index > 1:
+                segment += f"[{index}]"
+            
+            path_segments.insert(0, segment)
+            current = current.getparent()
+            
+        return "".join(path_segments)
 
     def _populate_elements_tree(self, elements_to_display: List[Dict]):
         """Populates the elements treeview."""
