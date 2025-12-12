@@ -1,4 +1,5 @@
 import sys
+import multiprocessing
 import ctypes
 import ttkbootstrap as ttk
 from pathlib import Path
@@ -20,6 +21,7 @@ from main import RobotRunnerApp
 
 # --- Main Execution ---
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     # High DPI awareness for Windows
     if sys.platform == "win32":
         try:
