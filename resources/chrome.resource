@@ -39,7 +39,7 @@ Fechar Aplicativo
 Instalar App No Celular
     [Documentation]    Inicia a sessão do Appium e instala o app através do ADB.
     [Arguments]             ${noReset}=${True}
-    Open Application        http://localhost:4723/wd/hub
+    Open Application        http://localhost:4723
     ...                     automationName=UiAutomator2
     ...                     udid=${udid}
     ...                     platformName=Android

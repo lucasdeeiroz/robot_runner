@@ -1,5 +1,5 @@
 {
-    "appium_command": "--base-path=/wd/hub --relaxed-security",
+    "appium_command": "--relaxed-security",
     "scrcpy_path": "scrcpy",
     "suites_dir": "%CUR_DIR%\/suites",
     "tests_dir": "%CUR_DIR%\/tests",

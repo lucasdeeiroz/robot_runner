@@ -776,6 +776,14 @@ class DeviceTab(ttk.Frame):
             data["display_title"] = title
             data["bounds_coords"] = self._parse_bounds(data.get("bounds"))
             data["accessibility_id"] = c_desc
+            
+            # Calculate Full XPath
+            try:
+                tree = node.getroottree()
+                data["xpath"] = tree.getpath(node)
+            except Exception:
+                data["xpath"] = ""
+                
             return data
         return None
 
@@ -886,6 +894,10 @@ class DeviceTab(ttk.Frame):
                 xpath = f"//{attr_value}" if attr == "class" else f"//*[@{attr}='{attr_value}']"
                 display_val = (attr_value[:20] + '...') if len(attr_value) > 23 else attr_value
                 locators.append((f"XPath: {attr.replace('_', ' ').title()}", xpath, f"Copy XPath: {xpath}"))
+
+        # 4. Full XPath
+        if full_xpath := data.get("xpath"):
+             locators.append(("Full XPath", full_xpath, f"Copy Full XPath: {full_xpath}"))
 
         return locators
 
