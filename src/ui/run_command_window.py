@@ -1336,6 +1336,8 @@ class DeviceTab(ttk.Frame):
             self.parent_app.show_toast(translate("input_error"), translate("select_app_package_warning"), bootstyle="warning")
             return
         
+        app_package = app_package.strip() # Sanitize input
+        
         log_level_name = self.package_log_level_var.get()
         log_level_code = self.LOG_LEVELS.get(log_level_name, "D") # Default to Debug
 
@@ -1392,22 +1394,25 @@ class DeviceTab(ttk.Frame):
 
     def _run_logcat_for_package(self, package_name: str, log_level: str):
         """Executes 'adb logcat' for a specific package and pipes output to a queue."""
+        package_name = package_name.strip()
         try:
             # Handle the "All" packages case
             if package_name == translate('all_packages_option'):
-                logcat_command = f"adb -s {self.udid} logcat *:{log_level}"
+                logcat_command = f"adb -s {self.udid} logcat \"*:{log_level}\""
+                self.package_log_output_queue.put(f"--- Debug: Executing {logcat_command} ---\n")
                 process = subprocess.Popen(logcat_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding=OUTPUT_ENCODING, errors='replace', creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
             else:
                 # --- Adaptive Logcat Strategy ---
                 # 1. Try the modern '--app' method first. It's more robust if supported.
-                logcat_command = f"adb -s {self.udid} logcat --app={package_name} *:{log_level}"
+                logcat_command = f"adb -s {self.udid} logcat --app={package_name} \"*:{log_level}\""
+                self.package_log_output_queue.put(f"--- Debug: Executing {logcat_command} ---\n")
                 process = subprocess.Popen(logcat_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding=OUTPUT_ENCODING, errors='replace', creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
     
                 # Check for immediate failure, which indicates an unsupported command on older Android.
                 time.sleep(0.5) # Give the process a moment to fail
                 if process.poll() is not None:
                     output = process.stdout.read() if process.stdout else ""
-                    if "Unknown option" in output:
+                    if "unknown option" in output.lower() or "unrecognized option" in output.lower():
                         self.package_log_output_queue.put(f"--- {translate('logcat_fallback_info', method='--app')} ---\n")
                         
                         # 2. Fallback to the classic PID-based method.
@@ -1416,7 +1421,8 @@ class DeviceTab(ttk.Frame):
                         pid = pid_process.stdout.strip()
     
                         if pid and pid.isdigit():
-                            logcat_command = f"adb -s {self.udid} logcat --pid={pid} *:{log_level}"
+                            logcat_command = f"adb -s {self.udid} logcat --pid={pid} \"*:{log_level}\""
+                            self.package_log_output_queue.put(f"--- Debug: Executing {logcat_command} ---\n")
                             process = subprocess.Popen(logcat_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding=OUTPUT_ENCODING, errors='replace', creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
                         else:
                             # 3. If PID also fails, stop the operation.
