@@ -4,6 +4,7 @@ from ttkbootstrap.constants import BOTH, END, YES, WORD, DISABLED, LEFT, X, W
 from ttkbootstrap.tooltip import ToolTip
 
 from src.locales.i18n import gettext as translate
+from src.version import __version__
 
 
 class AboutTabPage(ttk.Frame):
@@ -17,7 +18,7 @@ class AboutTabPage(ttk.Frame):
         about_frame = ttk.Frame(self)
         about_frame.pack(fill=BOTH, expand=YES, padx=10, pady=5)
 
-        title_label = ttk.Label(about_frame, text=translate("about_title"), font="-size 24 -weight bold")
+        title_label = ttk.Label(about_frame, text=f"{translate("about_title")} v{__version__}", font="-size 24 -weight bold")
         title_label.pack(pady=(0, 10))
         ToolTip(title_label, translate("app_author_tooltip"))
 

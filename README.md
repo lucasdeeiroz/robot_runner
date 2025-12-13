@@ -40,7 +40,7 @@ A comprehensive desktop application, built with Python and Tkinter, for managing
 
 *   **Screen Mirroring & Control (Windows):**
     *   Low-latency Scrcpy screen mirroring embedded directly into the application window.
-    *   Automatic download of the latest Scrcpy version if not found on the system.
+    *   **Smart Detection:** Automatically uses the system's installed Scrcpy if available in PATH; otherwise, offers to download it.
     *   Integrated controls to take screenshots and record the device screen.
 
 <img width="1365" height="989" alt="image" src="https://github.com/user-attachments/assets/a99e024a-5112-431f-a4fb-e4f08e93b79b" />
@@ -80,6 +80,7 @@ A comprehensive desktop application, built with Python and Tkinter, for managing
 
 *   **Settings & Tools:**
     *   Start and stop the Appium server directly from the GUI.
+    *   **Environment Diagnostics:** displays versions of installed tools (ADB, Appium, Python, Node.js, etc.) to help troubleshoot issues.
     *   Configure paths for Scrcpy, project directories (suites, tests, logs), etc.
     *   Customize the appearance with themes (light/dark) and change the application language.
 
