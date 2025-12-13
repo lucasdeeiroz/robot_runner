@@ -37,7 +37,7 @@ from src.ui.ai_tab import AiTabPage
 from src.ui.about_tab import AboutTabPage
 from src.ui.about_tab import AboutTabPage
 from src.ui.toast import Toast
-from src.ui.device_manager_window import DeviceManagerWindow
+
 
 
 
@@ -65,7 +65,7 @@ class RobotRunnerApp:
 
         self.devices: List[Dict[str, str]] = []
         self.appium_process: Optional[subprocess.Popen] = None
-        self.active_command_windows: Dict[str, tk.Toplevel] = {}
+
         self.parsed_logs_data: Optional[List[Dict]] = None
         self.ngrok_tunnel = None
         self.logs_tab_initialized = False
@@ -73,7 +73,7 @@ class RobotRunnerApp:
         self.shell_manager = AdbShellManager()
         self.appium_version: Optional[str] = None
         self.local_busy_devices = set() # Track devices locally for instant UI feedback
-        self.device_manager: Optional[DeviceManagerWindow] = None
+
         self.current_adb_process: Optional[subprocess.Popen] = None
 
         self._setup_string_vars()
@@ -392,9 +392,7 @@ class RobotRunnerApp:
             if hasattr(self, 'ngrok_tunnel') and self.ngrok_tunnel:
                 self.run_tab._stop_ngrok_host_session()
             
-            for window in list(self.active_command_windows.values()):
-                if window.winfo_exists():
-                    window._on_close()
+
             
             self.shell_manager.close_all()
 
@@ -530,15 +528,10 @@ class RobotRunnerApp:
     def _create_run_command_window(self, udid: str, path_to_run: str, run_mode: str): # This method is now in RunTabPage
         """Helper to safely create the RunCommandWindow from the main GUI thread."""
         if not self.run_tab or not self.run_tab.winfo_exists():
-            self.run_tab = RunCommandWindow(self)
-        # Centralized Resource Management: If a window for this UDID already exists, close it before creating a new one.
-        if udid in self.active_command_windows and self.active_command_windows[udid].winfo_exists():
-            win = self.active_command_windows[udid]
-            # We need to ensure the device is marked as not busy before creating a new window
-            if udid in self.local_busy_devices:
-                self.local_busy_devices.remove(udid)
-            win._on_close() # This will stop activities and remove the window from the dict
-            self.root.after(100, self._update_device_list) # Refresh UI after closing
+             # Basic fallback if run_tab is missing - though it should be caught by app state checks usually
+             # We cannot instantiate RunCommandWindow as it's deprecated. Just logging/toast.
+             print("Error: RunTabPage missing.")
+             return
 
         # If no window exists, create a new one.
         # Create new DeviceTab
@@ -553,7 +546,7 @@ class RobotRunnerApp:
         
         tab = DeviceTab(self.run_tab.sub_notebook, self, udid, mode='test', run_path=path_to_run, run_mode=run_mode)
         self.run_tab.add_device_tab(udid, tab, title=tab_title)
-        # self.active_command_windows[udid] = win # Deprecated
+
 
     def _find_and_set_mdns_port(self, udid: str, ip_address: str):
         """
@@ -700,10 +693,7 @@ class RobotRunnerApp:
                 device_info = next((d for d in self.devices if d.get('udid') == udid), None)
                 version = device_info.get('release', '') if device_info else ''
 
-                # Centralized Resource Management: If a window for this UDID already exists, close it before creating a new one.
-                if udid in self.active_command_windows and self.active_command_windows[udid].winfo_exists():
-                    self.root.after(0, self.active_command_windows[udid]._on_close)
-                    time.sleep(0.5) # Give it a moment to close
+
 
                 # Update button text on the main thread
                 self.root.after(0, lambda: self.run_tab.device_options_button.config(text=translate("opening_udid", udid=udid)))
@@ -742,7 +732,7 @@ class RobotRunnerApp:
         except (tk.TclError, ImportError, Exception) as e:
             print(f"Error creating device tab: {e}")
             self.show_toast(translate("open_file_error_title"), f"Failed to open toolbox: {e}", "danger")
-        # self.active_command_windows[udid] = win # Deprecated
+
 
     def _refresh_devices(self): # This method is now in RunTabPage
         """Refreshes the list of connected ADB devices."""

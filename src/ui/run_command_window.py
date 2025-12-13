@@ -1011,9 +1011,9 @@ class DeviceTab(ttk.Frame):
             
         # Trigger a fast UI update instead of a slow full refresh
         self.parent_app.root.after(0, self.parent_app._update_device_list)
-        # Delegate removal to DeviceManager
-        if self.parent_app.device_manager:
-            self.parent_app.device_manager.remove_device_tab(self.udid)
+        # Delegate removal to RunTabPage
+        if hasattr(self.parent_app, 'run_tab') and self.parent_app.run_tab:
+            self.parent_app.run_tab.remove_device_tab(self.udid)
         
         self.destroy()
 
