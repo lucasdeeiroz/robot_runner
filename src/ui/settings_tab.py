@@ -3,6 +3,7 @@ import subprocess
 import sys
 import re
 import webbrowser
+import platform
 # import tkinter as tk
 from tkinter import messagebox
 import ttkbootstrap as ttk
@@ -163,7 +164,7 @@ class SettingsTabPage(ttk.Frame):
         versions_frame.columnconfigure(1, weight=1)
 
         self.version_labels = {}
-        tools = ["ADB", "Appium", "UiAutomator2", "Scrcpy", "Robot Framework"]
+        tools = ["ADB", "Appium", "UiAutomator2", "Scrcpy", "Robot Framework", "Python", "Node.js"]
         
         for i, tool in enumerate(tools):
             ttk.Label(versions_frame, text=f"{tool}:").grid(row=i, column=0, padx=5, pady=2, sticky=W)
@@ -307,6 +308,14 @@ class SettingsTabPage(ttk.Frame):
                  robot_version = get_version([sys.executable, "-m", "robot", "--version"])
 
         self._update_version_label("Robot Framework", robot_version)
+
+        # Python
+        python_version = platform.python_version()
+        self._update_version_label("Python", python_version)
+
+        # Node.js
+        node_version = get_version(["node", "--version"])
+        self._update_version_label("Node.js", node_version)
 
     def _update_version_label(self, tool, version):
         """Updates the version label in the UI thread."""
