@@ -779,7 +779,7 @@ class RobotRunnerApp:
                 self.run_tab.device_listbox.insert(END, device_string)
                 
                 color = "red" if is_busy else "#43b581" # Use a less jarring green
-                self.run_tab.device_listbox.itemconfig(i, foreground=color)
+                self.run_tab.device_listbox.itemconfig(i, foreground=color, selectforeground=color)
 
             # Restore selection
             for index in selected_indices:
