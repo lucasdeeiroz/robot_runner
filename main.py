@@ -256,7 +256,7 @@ class RobotRunnerApp:
         """Creates necessary directories and files on startup."""
         try:
             CONFIG_DIR.mkdir(exist_ok=True)
-            self.scrcpy_path.mkdir(exist_ok=True)
+
             self.suites_dir.mkdir(exist_ok=True)
             self.tests_dir.mkdir(exist_ok=True)
             self.resources_dir.mkdir(exist_ok=True)

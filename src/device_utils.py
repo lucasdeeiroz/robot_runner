@@ -103,12 +103,10 @@ def find_scrcpy() -> Optional[Path]:
     if local_scrcpy.exists():
         return local_scrcpy
     
-    try:
-        creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
-        subprocess.run("scrcpy --version", shell=True, check=True, capture_output=True, creationflags=creationflags)
+    if shutil.which("scrcpy"):
         return Path("scrcpy")
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return None
+        
+    return None
 
 def _prompt_download_scrcpy(app_instance):
     """Asks the user if they want to download scrcpy."""
