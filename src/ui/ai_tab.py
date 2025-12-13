@@ -65,7 +65,7 @@ class AiTabPage(ttk.Frame):
         output_frame = ttk.Frame(self)
         output_frame.pack(fill=BOTH, expand=YES)
         
-        self.output_text = ScrolledText(output_frame, wrap=WORD, state=DISABLED)
+        self.output_text = ScrolledText(output_frame, wrap=WORD, state=DISABLED, autohide=False)
         self.output_text.pack(fill=BOTH, expand=YES)
 
     def _map_project(self):

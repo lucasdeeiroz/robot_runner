@@ -232,7 +232,7 @@ class DeviceTab(ttk.Frame):
     def _setup_inspector_center_pane(self):
         """Sets up inspector-specific controls in the center pane."""
         self.element_details_frame = ttk.Frame(self.center_pane_container, padding=5)
-        self.element_details_text = ScrolledText(self.element_details_frame, wrap=WORD, state=DISABLED, autohide=True)
+        self.element_details_text = ScrolledText(self.element_details_frame, wrap=WORD, state=DISABLED, autohide=False)
         self.element_details_text.pack(fill=BOTH, expand=YES)
         self.element_details_text.text.tag_configure("bold", font="-weight bold")
         
@@ -259,7 +259,7 @@ class DeviceTab(ttk.Frame):
         """Sets up the various output frames in the left pane."""
         if self.mode == 'test':
             self.robot_output_frame = ttk.Frame(self.output_paned_window, padding=5)
-            self.robot_output_text = ScrolledText(self.robot_output_frame, wrap=WORD, state=DISABLED, autohide=True)
+            self.robot_output_text = ScrolledText(self.robot_output_frame, wrap=WORD, state=DISABLED, autohide=False)
             self.robot_output_text.pack(fill=BOTH, expand=YES)
             self.robot_output_text.text.tag_config("PASS", foreground="green")
             self.robot_output_text.text.tag_config("FAIL", foreground="red")
@@ -267,7 +267,7 @@ class DeviceTab(ttk.Frame):
             self.output_paned_window.add(self.robot_output_frame, weight=1)
 
         self.scrcpy_output_frame = ttk.Frame(self.output_paned_window, padding=5)
-        self.scrcpy_output_text = ScrolledText(self.scrcpy_output_frame, wrap=WORD, state=DISABLED, autohide=True)
+        self.scrcpy_output_text = ScrolledText(self.scrcpy_output_frame, wrap=WORD, state=DISABLED, autohide=False)
         self.scrcpy_output_text.pack(fill=BOTH, expand=YES)
 
         self._setup_performance_output_frame()
@@ -283,7 +283,7 @@ class DeviceTab(ttk.Frame):
         controls_frame.pack(side=TOP, fill=X, pady=(0, 5), padx=5)
         controls_frame.columnconfigure(0, weight=1)
 
-        self.performance_output_text = ScrolledText(self.performance_output_frame, wrap=WORD, state=DISABLED, autohide=True)
+        self.performance_output_text = ScrolledText(self.performance_output_frame, wrap=WORD, state=DISABLED, autohide=False)
         self.performance_output_text.pack(fill=BOTH, expand=YES, padx=5, pady=(0,5))
         self.minimized_performance_label = ttk.Label(self.performance_output_frame, textvariable=self.last_performance_line_var, font=("Courier", 9))
         
@@ -308,7 +308,7 @@ class DeviceTab(ttk.Frame):
         controls_frame.pack(side=TOP, fill=X, pady=(0, 5))
         controls_frame.columnconfigure(1, weight=1) # Allow package combo to expand
 
-        self.package_log_output_text = ScrolledText(self.package_log_output_frame, wrap=WORD, state=DISABLED, autohide=True)
+        self.package_log_output_text = ScrolledText(self.package_log_output_frame, wrap=WORD, state=DISABLED, autohide=False)
         self.package_log_output_text.pack(fill=BOTH, expand=YES, padx=5, pady=(0,5))
 
         # Row 0: Labels

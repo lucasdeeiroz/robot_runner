@@ -34,7 +34,7 @@ class AboutTabPage(ttk.Frame):
         license_frame = ttk.Frame(about_frame, padding=0, borderwidth=0)
         license_frame.pack(fill=BOTH, expand=YES)
         
-        license_text_widget = ScrolledText(license_frame, wrap=WORD, autohide=True)
+        license_text_widget = ScrolledText(license_frame, wrap=WORD, autohide=False)
         license_text_widget.pack(fill=BOTH, expand=YES)
         license_text_widget.text.insert(END, translate("mit_license_text"))
         license_text_widget.text.config(state=DISABLED)

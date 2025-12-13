@@ -345,7 +345,7 @@ class SettingsTabPage(ttk.Frame):
         output_frame.grid(row=3, column=0, sticky="nsew")
         output_frame.rowconfigure(0, weight=1)
         output_frame.columnconfigure(0, weight=1)
-        self.appium_output_text = ScrolledText(output_frame, wrap=WORD, state=DISABLED, autohide=True)
+        self.appium_output_text = ScrolledText(output_frame, wrap=WORD, state=DISABLED, autohide=False)
         self.appium_output_text.pack(fill=BOTH, expand=YES)
 
         parent_frame.rowconfigure(3, weight=1) # Make the output area expand

@@ -169,7 +169,7 @@ class RunTabPage(ttk.Frame):
         output_frame.grid(row=4, column=0, columnspan=2, sticky="nsew", pady=5)
         output_frame.rowconfigure(0, weight=1)
         output_frame.columnconfigure(0, weight=1)
-        self.adb_output_text = ScrolledText(output_frame, wrap=WORD, state=DISABLED, autohide=True)
+        self.adb_output_text = ScrolledText(output_frame, wrap=WORD, state=DISABLED, autohide=False)
         self.adb_output_text.grid(row=0, column=0, sticky="nsew")
         
         # Add a placeholder text
