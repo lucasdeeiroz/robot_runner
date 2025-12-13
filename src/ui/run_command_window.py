@@ -50,7 +50,6 @@ class DeviceTab(ttk.Frame):
         # --- State Attributes ---
         self._is_closing = False
         self.is_mirroring = False
-        self.is_inspecting = False
 
         # --- Robot Test Attributes ---
         self.robot_process = None
@@ -80,25 +79,6 @@ class DeviceTab(ttk.Frame):
         self.performance_log_file = None
         self.performance_monitor_is_minimized = ttk.BooleanVar(value=False)
         self.last_performance_line_var = ttk.StringVar()
-        
-        # --- Inspector Attributes ---
-        self.inspector_is_visible = False
-        self.elements_data_map = {}
-        self.is_inspection_running = False
-        self.current_selected_element_data = None
-        self.auto_refresh_thread = None
-        self.inspector_auto_refresh_var = ttk.BooleanVar(value=False)
-        self.stop_auto_refresh_event = threading.Event()
-        self.last_ui_dump_hash = None
-        self.all_elements_list: List[Dict] = []
-        self.current_dump_path: Optional[Path] = None
-        self.xpath_search_var = ttk.StringVar()
-        
-        self.filter_by_resource_id_var = ttk.BooleanVar(value=True)
-        self.filter_by_text_var = ttk.BooleanVar(value=True)
-        self.filter_by_content_desc_var = ttk.BooleanVar(value=True)
-        self.filter_by_scrollview_var = ttk.BooleanVar(value=True)
-        self.filter_by_other_class_var = ttk.BooleanVar(value=False)
 
         # --- Package Logging Attributes ---
         self.package_log_is_visible = False
@@ -171,11 +151,9 @@ class DeviceTab(ttk.Frame):
         # --- Panes inside Left Pane ---
         self._setup_left_pane_outputs()
 
-        # --- 3. Right Pane (Screen Mirror / Inspector) ---
+        # --- 3. Right Pane (Screen Mirror) ---
         self.right_pane_container = ttk.Frame(self.main_paned_window, padding=5)
         self.embed_frame = self.right_pane_container
-        if self.mode != 'test':
-            self._setup_inspector_right_pane()
 
         # --- Add panes and set initial state ---
         self.main_paned_window.add(self.left_pane_container, weight=3)
@@ -183,7 +161,7 @@ class DeviceTab(ttk.Frame):
 
         self._update_left_pane_visibility()
 
-        if self.mode != 'test':
+        if self.mode == 'mirror':
              self.after(100, lambda: self.main_paned_window.sashpos(0, 0))
         
         self.after(50, self._set_center_pane_width)
@@ -223,22 +201,11 @@ class DeviceTab(ttk.Frame):
 
         if self.mode == 'test':
             self._setup_test_mode_center_pane()
-        else:
-            self.inspect_button = ttk.Button(self.center_pane_container, text=translate("start_inspector"), command=self._toggle_inspector_mode, bootstyle="primary")
-            self.inspect_button.pack(fill=X, pady=5, padx=5)
-            ToolTip(self.inspect_button, translate("inspector_tooltip"))
-            self._setup_inspector_center_pane()
-
-    def _setup_inspector_center_pane(self):
-        """Sets up inspector-specific controls in the center pane."""
-        self.element_details_frame = ttk.Frame(self.center_pane_container, padding=5)
-        self.element_details_text = ScrolledText(self.element_details_frame, wrap=WORD, state=DISABLED, autohide=False)
-        self.element_details_text.pack(fill=BOTH, expand=YES)
-        self.element_details_text.text.tag_configure("bold", font="-weight bold")
-        
-        self.xpath_buttons_container = ttk.Frame(self.center_pane_container)
-        self.xpath_buttons = {}
-        self.xpath_buttons_container.pack(side=BOTTOM, fill=X, pady=5, padx=5)
+        elif self.mode == 'toolbox':
+            # Toolbox might want a close button too
+            self.close_button = ttk.Button(self.center_pane_container, text=translate("close"), command=self._on_close)
+            self.close_button.pack(fill=X, pady=5, padx=5)
+            ToolTip(self.close_button, text=translate("close_window_tooltip"))
 
     def _setup_test_mode_center_pane(self):
         """Sets up test-mode-specific controls in the center pane."""
@@ -272,9 +239,6 @@ class DeviceTab(ttk.Frame):
 
         self._setup_performance_output_frame()
         self._setup_package_log_output_frame()
-
-        if self.mode != 'test':
-            self._setup_inspector_left_pane()
 
     def _setup_performance_output_frame(self):
         """Sets up the performance monitor output and controls."""
@@ -331,90 +295,6 @@ class DeviceTab(ttk.Frame):
         clear_logcat_check.grid(row=2, column=0, columnspan=4, sticky="w", padx=5, pady=(5,0))
         ToolTip(clear_logcat_check, translate("clear_logcat_on_start_tooltip"))
 
-    def _setup_inspector_left_pane(self):
-        """Sets up inspector-specific controls in the left pane."""
-        self.inspector_controls_frame = ttk.Frame(self.output_paned_window)
-
-        top_controls = ttk.Frame(self.inspector_controls_frame)
-        top_controls.pack(side=TOP, fill=X, pady=(0, 5))
-        top_controls.columnconfigure(0, weight=1)
-
-        self.refresh_inspector_button = ttk.Button(top_controls, text=translate("refresh"), command=self._start_inspection, state=DISABLED)
-        self.refresh_inspector_button.grid(row=0, column=0, sticky="ew", padx=(0, 5))
-        ToolTip(self.refresh_inspector_button, translate("refresh_tooltip"))
-
-        self.filter_menubutton = ttk.Menubutton(top_controls, text=translate("inspector_filter_attributes"), bootstyle="outline-toolbutton")
-        self.filter_menubutton.grid(row=0, column=1, sticky="ew", padx=5)
-        filter_menu = ttk.Menu(self.filter_menubutton, tearoff=False)
-        ToolTip(self.filter_menubutton, text=translate("filter_elements_by_attributes_tooltip"))
-        self.filter_menubutton["menu"] = filter_menu
-        filter_menu.add_checkbutton(label=translate("filter_by_resource_id"), variable=self.filter_by_resource_id_var, command=self._update_element_tree_view)
-        filter_menu.add_checkbutton(label=translate("filter_by_text"), variable=self.filter_by_text_var, command=self._update_element_tree_view)
-        filter_menu.add_checkbutton(label=translate("filter_by_content_desc"), variable=self.filter_by_content_desc_var, command=self._update_element_tree_view)
-        filter_menu.add_checkbutton(label=translate("filter_by_scrollview"), variable=self.filter_by_scrollview_var, command=self._update_element_tree_view)
-        filter_menu.add_checkbutton(label=translate("filter_by_other_class"), variable=self.filter_by_other_class_var, command=self._update_element_tree_view)
-
-        self.auto_refresh_check = ttk.Checkbutton(top_controls, text=translate("inspector_auto_refresh"), variable=self.inspector_auto_refresh_var, bootstyle="round-toggle")
-        self.auto_refresh_check.grid(row=0, column=2, sticky="e")
-        ToolTip(self.auto_refresh_check, translate("inspector_auto_refresh_tooltip"))
-
-        search_frame = ttk.Frame(self.inspector_controls_frame, padding=5)
-        search_frame.pack(side=TOP, fill=X, pady=5)
-        search_frame.columnconfigure(0, weight=1)
-        self.xpath_search_entry = ttk.Entry(search_frame, textvariable=self.xpath_search_var)
-        self.xpath_search_entry.grid(row=0, column=0, sticky="ew", padx=(0, 5))
-        ToolTip(self.xpath_search_entry, translate("search_tooltip"))
-        search_button_frame = ttk.Frame(search_frame)
-        search_button_frame.grid(row=0, column=1, sticky="e")
-        self.search_button = ttk.Button(search_button_frame, text=translate("search_button"), command=self._perform_xpath_search, bootstyle="primary")
-        self.search_button.pack(side=LEFT)
-        ToolTip(self.search_button, text=translate("search_inspector_element_tooltip"))
-        self.clear_search_button = ttk.Button(search_button_frame, text=translate("clear_button"), command=self._clear_xpath_search, bootstyle="secondary")
-        self.clear_search_button.pack(side=LEFT, padx=(5, 0))
-        ToolTip(self.clear_search_button, text=translate("clear_tooltip"))
-
-        elements_list_frame = ttk.Frame(self.inspector_controls_frame, padding=5)
-        elements_list_frame.pack(side=TOP, fill=BOTH, expand=YES)
-        self.elements_tree = ttk.Treeview(elements_list_frame, columns=("title",), show="headings")
-        self.elements_tree.heading("title", text=translate("element"))
-        self.elements_tree.column("title", width=300, anchor=W)
-        self.elements_tree.pack(fill=BOTH, expand=YES)
-        self.elements_tree.bind("<<TreeviewSelect>>", self._on_element_select)
-        self.elements_tree.bind("<Button-1>", self._on_treeview_click)
-
-        ttk.Label(self.inspector_controls_frame, text=translate("inspector_element_actions"), font="-weight bold").pack(side=TOP, fill=X, pady=(10, 2), padx=5)
-        actions_frame = ttk.Frame(self.inspector_controls_frame, padding=(5,0,5,5))
-        actions_frame.pack(side=TOP, fill=X)
-        actions_frame.columnconfigure((0, 1, 2, 3), weight=1) # type: ignore
-        self.action_click_button = ttk.Button(actions_frame, text=translate("action_click"), command=lambda: self._perform_element_action("click"), state=DISABLED)
-        self.action_click_button.grid(row=0, column=0, columnspan=2, sticky="ew", padx=2, pady=2)
-        ToolTip(self.action_click_button, text=translate("action_click_tooltip"))
-        self.action_long_click_button = ttk.Button(actions_frame, text=translate("action_long_click"), command=lambda: self._perform_element_action("long_click"), state=DISABLED)
-        self.action_long_click_button.grid(row=0, column=2, columnspan=2, sticky="ew", padx=2, pady=2)
-        ToolTip(self.action_long_click_button, text=translate("action_long_click_tooltip"))
-        self.action_swipe_up_button = ttk.Button(actions_frame, text=translate("action_swipe_up"), command=lambda: self._perform_element_action("swipe_up"), state=DISABLED)
-        self.action_swipe_up_button.grid(row=1, column=0, sticky="ew", padx=2, pady=2)
-        ToolTip(self.action_swipe_up_button, text=translate("action_swipe_up_tooltip"))
-        self.action_swipe_down_button = ttk.Button(actions_frame, text=translate("action_swipe_down"), command=lambda: self._perform_element_action("swipe_down"), state=DISABLED)
-        self.action_swipe_down_button.grid(row=1, column=1, sticky="ew", padx=2, pady=2)
-        ToolTip(self.action_swipe_down_button, text=translate("action_swipe_down_tooltip"))
-        self.action_swipe_left_button = ttk.Button(actions_frame, text=translate("action_swipe_left"), command=lambda: self._perform_element_action("swipe_left"), state=DISABLED)
-        self.action_swipe_left_button.grid(row=1, column=2, sticky="ew", padx=2, pady=2)
-        ToolTip(self.action_swipe_left_button, text=translate("action_swipe_left_tooltip"))
-        self.action_swipe_right_button = ttk.Button(actions_frame, text=translate("action_swipe_right"), command=lambda: self._perform_element_action("swipe_right"), state=DISABLED)
-        self.action_swipe_right_button.grid(row=1, column=3, sticky="ew", padx=2, pady=2)
-        ToolTip(self.action_swipe_right_button, text=translate("action_swipe_right_tooltip"))
-
-    def _setup_inspector_right_pane(self):
-        """Sets up the inspector's screenshot canvas in the right pane."""
-        self.inspector_paned_window = ttk.Panedwindow(self.right_pane_container, orient=VERTICAL)
-        self.screenshot_canvas_frame = ttk.Frame(self.inspector_paned_window)
-        self.screenshot_canvas = ttk.Canvas(self.screenshot_canvas_frame, bg="black")
-        self.screenshot_canvas.pack(fill=BOTH, expand=YES)
-        self.screenshot_image_tk = None
-        self.screenshot_canvas.bind("<Button-1>", self._on_canvas_click)
-        self.screenshot_canvas.bind("<Configure>", self._on_inspector_canvas_resize)
-
     # --- Visibility & Layout Toggles ---
     def _update_left_pane_visibility(self):
         """Shows/hides the placeholder in the left pane based on content."""
@@ -434,15 +314,13 @@ class DeviceTab(ttk.Frame):
         }
         if self.mode == 'test':
             frame_map['robot'] = (self.robot_output_frame, self.toggle_robot_button, self.robot_output_is_visible)
-        else:
-            frame_map['inspector'] = (self.inspector_controls_frame, self.inspect_button, self.inspector_is_visible)
         
         if output_type not in frame_map: return
         
         frame, button, is_visible = frame_map[output_type]
         
-        show_keys = {'robot': 'show_test_output', 'scrcpy': 'show_scrcpy_output', 'performance': 'show_performance', 'inspector': 'show_inspector', 'package_log': 'show_package_log'}
-        hide_keys = {'robot': 'hide_test_output', 'scrcpy': 'hide_scrcpy_output', 'performance': 'hide_performance', 'inspector': 'stop_inspector', 'package_log': 'hide_package_log'}
+        show_keys = {'robot': 'show_test_output', 'scrcpy': 'show_scrcpy_output', 'performance': 'show_performance', 'package_log': 'show_package_log'}
+        hide_keys = {'robot': 'hide_test_output', 'scrcpy': 'hide_scrcpy_output', 'performance': 'hide_performance', 'package_log': 'hide_package_log'}
 
         if is_visible:
             self.output_paned_window.forget(frame)
@@ -455,7 +333,6 @@ class DeviceTab(ttk.Frame):
         if output_type == 'robot': self.robot_output_is_visible = not is_visible
         elif output_type == 'scrcpy': self.scrcpy_output_is_visible = not is_visible
         elif output_type == 'performance': self.performance_monitor_is_visible = not is_visible
-        elif output_type == 'inspector': self.inspector_is_visible = not is_visible
         elif output_type == 'package_log': self.package_log_is_visible = not is_visible
 
         self._update_left_pane_visibility()
@@ -527,7 +404,6 @@ class DeviceTab(ttk.Frame):
     def _toggle_mirroring(self):
         if self.is_mirroring: self._stop_scrcpy()
         else:
-            if self.is_inspecting: self._stop_inspector()
             self.set_aspect_ratio()
 
     def set_aspect_ratio(self):
@@ -558,7 +434,6 @@ class DeviceTab(ttk.Frame):
         self.after(10, self._apply_layout_rules)
         self._on_window_resize() # Trigger layout recalculation with the new aspect ratio
 
-        if hasattr(self, 'inspect_button'): self.inspect_button.config(state=NORMAL)
         self.mirror_button.config(state=NORMAL, text=translate("stop_mirroring"), bootstyle="danger")
         ToolTip(self.mirror_button, text=translate("stop_mirroring_tooltip"))
 
@@ -583,487 +458,6 @@ class DeviceTab(ttk.Frame):
             self.scrcpy_output_queue.put(translate("scrcpy_stopped_by_user") + "\n")
 
         self.scrcpy_process = None
-        if hasattr(self, 'inspect_button'): self.inspect_button.config(state=NORMAL)
-
-    # --- Inspector Core Methods ---
-    def _toggle_inspector_mode(self):
-        if self.is_inspecting: self._stop_inspector()
-        else:
-            if self.is_mirroring: self._stop_scrcpy()
-            self._start_inspector()
-
-    def _start_inspector(self):
-        """Configures the UI for inspector mode."""
-        if self.is_inspecting: return
-        self.is_inspecting = True
-        if self.aspect_ratio is None:
-            self.aspect_ratio = get_device_aspect_ratio(self.udid)
-        self.element_details_frame.pack(fill=BOTH, expand=YES, pady=5, padx=5)
-        
-        self.mirror_button.config(state=NORMAL)
-        self.inspect_button.config(text=translate("stop_inspector"), bootstyle="danger")
-        self.refresh_inspector_button.config(state=NORMAL)
-
-        self.main_paned_window.add(self.right_pane_container, weight=5)
-        self.update_idletasks()
-        
-        self.inspector_paned_window.pack(fill=BOTH, expand=YES)
-        try: self.inspector_paned_window.add(self.screenshot_canvas_frame, weight=3) # type: ignore
-        except tk.TclError: pass
-
-        self.stop_auto_refresh_event.clear()
-        self.auto_refresh_thread = threading.Thread(target=self._auto_refresh_inspector_thread, daemon=True)
-        self.auto_refresh_thread.start()
-
-        self._toggle_output_visibility('inspector')
-        self.after(50, self._wait_for_canvas_and_inspect)
-
-    def _wait_for_canvas_and_inspect(self):
-        """Waits until the inspector canvas has a valid size before inspecting."""
-        if not self.is_inspecting: return
-        if self.screenshot_canvas.winfo_width() > 1: self._start_inspection()
-        else: self.after(50, self._wait_for_canvas_and_inspect)
-
-    def _stop_inspector(self):
-        if not self.is_inspecting: return
-        self.is_inspecting = False
-        self.element_details_frame.pack_forget()
-
-        self.main_paned_window.forget(self.right_pane_container)
-        
-        # Properly remove the pane to prevent "already added" error on restart.
-        # ttkbootstrap.PanedWindow does not have a 'forget' method, but 'remove' is used for panes.
-        try: self.inspector_paned_window.remove(self.screenshot_canvas_frame) # type: ignore
-        except tk.TclError: pass
-
-        self.stop_auto_refresh_event.set()
-        self.last_ui_dump_hash = None
-        self._toggle_output_visibility('inspector')
-
-        self.screenshot_canvas.delete("all")
-        for item in self.elements_tree.get_children(): self.elements_tree.delete(item)
-        
-        self._update_locator_buttons(None)
-        self._populate_element_details(None)
-
-        self.mirror_button.config(state=NORMAL)
-        self.inspect_button.config(text=translate("start_inspector"), bootstyle="primary")
-        self.refresh_inspector_button.config(state=DISABLED)
-
-        self.after(10, self._apply_layout_rules)
-
-    def _auto_refresh_inspector_thread(self):
-        """Checks for UI changes in the background and triggers a refresh."""
-        while not self.stop_auto_refresh_event.wait(5.0):
-            if not self.is_inspecting or not self.inspector_auto_refresh_var.get() or self.refresh_inspector_button['state'] == DISABLED:
-                continue
-            try:
-                device_dump_path = "/sdcard/window_dump_autorefresh.xml"
-                local_dump_path = self.parent_app.logs_dir / f"window_dump_autorefresh_{self.udid.replace(':', '-')}.xml"
-                if execute_command(f"adb -s {self.udid} shell uiautomator dump {device_dump_path}")[0] and \
-                   execute_command(f"adb -s {self.udid} pull {device_dump_path} \"{local_dump_path}\"")[0]:
-                    execute_command(f"adb -s {self.udid} shell rm {device_dump_path}")
-                    with open(local_dump_path, 'r', encoding='utf-8') as f: current_hash = hash(f.read())
-                    local_dump_path.unlink(missing_ok=True)
-                    if self.last_ui_dump_hash is not None and current_hash != self.last_ui_dump_hash:
-                        self.scrcpy_output_queue.put(f"{translate('ui_change_detected_refreshing')}\n")
-                        self.after(0, self._start_inspection)
-            except Exception as e: print(f"Error in inspector auto-refresh thread: {e}")
-
-    def _start_inspection(self):
-        if getattr(self, 'is_inspection_running', False): return
-        self.is_inspection_running = True
-
-        self.refresh_inspector_button.config(state=DISABLED, text=translate("refreshing"))
-        self.inspect_button.config(state=DISABLED, text=translate("refreshing"))
-        self.screenshot_canvas.delete("all")
-        self.xpath_search_var.set("")
-
-        self.screenshot_canvas.update_idletasks()
-        w, h = self.screenshot_canvas.winfo_width(), self.screenshot_canvas.winfo_height()
-        if w <= 1:
-            self.after(50, self._start_inspection)
-            return
-        self.screenshot_canvas.create_text(w / 2, h / 2, text=translate("inspector_updating_screen"), font=("Helvetica", 16), fill=self.parent_app.style.colors.fg, tags="loading_text")
-
-        for item in self.elements_tree.get_children(): self.elements_tree.delete(item)
-        self.elements_data_map = {}
-        
-        threading.Thread(target=self._perform_inspection_thread, daemon=True).start()
-
-    def _perform_inspection_thread(self):
-        try:
-            shell_manager = self.parent_app.shell_manager
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            
-            # 1. Screenshot
-            dev_sc_path = "/sdcard/inspector_screenshot.png"
-            local_sc_path = self.parent_app.screenshots_dir / f"inspector_screenshot_{self.udid.replace(':', '-')}_{timestamp}.png"
-            self.scrcpy_output_queue.put(f"{translate('inspector_screenshot_info')}\n")
-            shell_manager.execute(self.udid, f"screencap -p {dev_sc_path}")
-            if not execute_command(f"adb -s {self.udid} pull {dev_sc_path} \"{local_sc_path}\"")[0]:
-                self.scrcpy_output_queue.put(f"{translate('pull_screenshot_error')}\n")
-                return
-            shell_manager.execute(self.udid, f"rm {dev_sc_path}")
-
-            # 2. UI Dump
-            dev_dump_path = "/sdcard/window_dump.xml"
-            local_dump_path = self.parent_app.logs_dir / f"window_dump_{self.udid.replace(':', '-')}.xml"
-            self.scrcpy_output_queue.put(f"{translate('get_ui_dump_info')}\n")
-            if not shell_manager.execute(self.udid, f"uiautomator dump {dev_dump_path}"):
-                self.scrcpy_output_queue.put(f"{translate('get_ui_dump_error')}\n")
-                return
-            if execute_command(f"adb -s {self.udid} pull {dev_dump_path} \"{local_dump_path}\"")[0]:
-                self.scrcpy_output_queue.put(f"{translate('ui_dump_saved_success', path=local_dump_path)}\n")
-            else:
-                self.scrcpy_output_queue.put(f"{translate('pull_ui_dump_error')}\n")
-                return
-            shell_manager.execute(self.udid, f"rm {dev_dump_path}")
-
-            with open(local_dump_path, 'r', encoding='utf-8') as f: self.last_ui_dump_hash = hash(f.read())
-
-            # 3. Process and display
-            self.after(0, self._display_inspection_results, local_sc_path, local_dump_path)
-        except Exception as e:
-            self.scrcpy_output_queue.put(translate("fatal_inspection_error", error=e) + "\n")
-            self.after(0, self._on_inspection_finished)
-
-    def _on_inspection_finished(self):
-        """Resets the state after an inspection attempt."""
-        self.is_inspection_running = False
-        if self.is_inspecting:
-            self.refresh_inspector_button.config(state=NORMAL, text=translate("refresh"))
-            self.inspect_button.config(state=NORMAL, text=translate("stop_inspector"))
-            
-    def _display_inspection_results(self, screenshot_path: Path, dump_path: Path):
-        try:
-            self.current_screenshot_path = screenshot_path
-            self.current_dump_path = dump_path
-
-            img = Image.open(screenshot_path)
-            self.screenshot_original_size = img.size
-            self.screenshot_canvas.update_idletasks()
-            canvas_w, canvas_h = self.screenshot_canvas.winfo_width(), self.screenshot_canvas.winfo_height()
-            if canvas_w <= 1: 
-                self.after(100, self._display_inspection_results, screenshot_path, dump_path)
-                return
-
-            img_w, img_h = img.size
-            aspect = img_w / img_h if img_h > 0 else 1
-            new_w, new_h = (canvas_w, int(canvas_w / aspect)) if (canvas_w / aspect) <= canvas_h else (int(canvas_h * aspect), canvas_h)
-            img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
-            
-            self.screenshot_current_size = img.size
-            self.screenshot_image_tk = ImageTk.PhotoImage(img)
-            self.screenshot_canvas.create_image(canvas_w / 2, canvas_h / 2, image=self.screenshot_image_tk, anchor=CENTER, tags="screenshot")
-
-            parser = ET.XMLParser(recover=True)
-            root = ET.parse(dump_path, parser).getroot()
-            self.all_elements_list = [self._parse_and_store_node(node) for node in root.iter() if self._parse_and_store_node(node)]
-            self._update_element_tree_view()
-        except Exception as e:
-            self.scrcpy_output_queue.put(translate("display_screenshot_error", error=e) + "\n")
-        finally:
-            self._on_inspection_finished()
-
-    def _parse_and_store_node(self, node: ET.Element) -> Optional[Dict]:
-        """Parses an XML node and returns its data dictionary if valid."""
-        data = dict(node.attrib)
-        res_id, c_desc, text, n_class = data.get("resource-id"), data.get("content-desc"), data.get("text"), data.get("class")
-        
-        title = ""
-        if res_id: title = f"id={res_id.split('/')[-1]}"
-        elif c_desc: title = f"desc={c_desc}"
-        elif text: title = f"text={(text[:40] + '...') if len(text) > 43 else text}"
-        elif n_class: title = f"class={n_class.split('.')[-1]}"
-
-        if title:
-            data["display_title"] = title
-            data["bounds_coords"] = self._parse_bounds(data.get("bounds"))
-            data["accessibility_id"] = c_desc
-            
-            # Calculate Full XPath
-            try:
-                data["xpath"] = self._get_appium_xpath(node)
-            except Exception:
-                data["xpath"] = ""
-                
-            return data
-        return None
-
-    def _get_appium_xpath(self, node) -> str:
-        """Generates an Appium-friendly XPath using class names and resource-ids."""
-        path_segments = []
-        current = node
-        
-        while current is not None:
-            res_id = current.get("resource-id")
-            class_name = current.get("class")
-            
-            # If we reached the hierarchy root, stop and return absolute path
-            if not class_name and current.tag == "hierarchy":
-                 return "/hierarchy" + "".join(path_segments)
-
-            if not class_name:
-                class_name = current.tag # Fallback
-
-            # Use resource-id as anchor if available
-            if res_id:
-                anchor = f'//{class_name}[@resource-id="{res_id}"]'
-                return anchor + "".join(path_segments)
-            
-            # Calculate index among preceding siblings with SAME class
-            # Note: Appium indices are 1-based
-            index = 1
-            for sib in current.itersiblings(preceding=True):
-                if sib.get("class") == class_name:
-                    index += 1
-            
-            segment = f"/{class_name}"
-            if index > 1:
-                segment += f"[{index}]"
-            
-            path_segments.insert(0, segment)
-            current = current.getparent()
-            
-        return "".join(path_segments)
-
-    def _populate_elements_tree(self, elements_to_display: List[Dict]):
-        """Populates the elements treeview."""
-        for item in self.elements_tree.get_children(): self.elements_tree.delete(item)
-        self.elements_data_map.clear()
-
-        if not elements_to_display:
-            self.elements_tree.insert("", END, values=(translate("no_elements_found"),), tags=("no_elements",))
-            return
-
-        for el_data in elements_to_display:
-            item_id = self.elements_tree.insert("", END, values=(el_data.get("display_title", "Unknown"),), tags=("element",))
-            self.elements_data_map[item_id] = el_data
-
-    def _parse_bounds(self, bounds_str: str) -> Optional[Tuple[int, int, int, int]]:
-        if not bounds_str: return None
-        parts = re.findall(r'\d+', bounds_str)
-        if len(parts) == 4:
-            x1, y1, x2, y2 = map(int, parts)
-            return x1, y1, x2 - x1, y2 - y1
-        return None
-
-    def _on_element_select(self, event):
-        self.screenshot_canvas.delete("highlight")
-        selected = self.elements_tree.selection()
-        if not selected:
-            self._update_locator_buttons(None)
-            self._populate_element_details(None)
-            return
-
-        el_data = self.elements_data_map.get(selected[0])
-        if el_data and (bounds := el_data.get("bounds_coords")):
-            x, y, w, h = bounds
-            orig_w, orig_h = self.screenshot_original_size
-            curr_w, curr_h = self.screenshot_current_size
-            scale_x, scale_y = curr_w / orig_w, curr_h / orig_h
-            scaled_x, scaled_y, scaled_w, scaled_h = x * scale_x, y * scale_y, w * scale_x, h * scale_y
-            offset_x, offset_y = (self.screenshot_canvas.winfo_width() - curr_w) / 2, (self.screenshot_canvas.winfo_height() - curr_h) / 2
-            self.screenshot_canvas.create_rectangle(scaled_x + offset_x, scaled_y + offset_y, scaled_x + scaled_w + offset_x, scaled_y + scaled_h + offset_y, outline="red", width=2, tags="highlight")
-        
-        self._update_locator_buttons(el_data)
-        self._update_element_actions_state(bool(el_data))
-        self._populate_element_details(el_data)
-
-    def _update_element_actions_state(self, enabled: bool):
-        """Enables or disables all element action buttons."""
-        state = NORMAL if enabled else DISABLED
-        for button in [self.action_click_button, self.action_long_click_button, self.action_swipe_up_button, self.action_swipe_down_button, self.action_swipe_left_button, self.action_swipe_right_button]:
-            button.config(state=state)
-
-    def _on_treeview_click(self, event):
-        """Deselects item if user clicks on an empty area."""
-        if not self.elements_tree.identify_row(event.y): self.elements_tree.selection_set("")
-
-    def _on_inspector_canvas_resize(self, event=None):
-        """Redraws screenshot and highlight on canvas resize."""
-        self.screenshot_canvas.delete("highlight")
-        if self.is_inspecting and hasattr(self, 'current_screenshot_path') and self.current_screenshot_path:
-            self._display_inspection_results(self.current_screenshot_path, self.current_dump_path)
-            if self.elements_tree.selection(): self._on_element_select(None)
-
-    def _update_locator_buttons(self, element_data: Optional[Dict]):
-        """Creates/updates locator copy buttons (Accessibility ID, UiSelector, XPath)."""
-        self.current_selected_element_data = element_data
-        for button in self.xpath_buttons.values(): button.destroy()
-        self.xpath_buttons.clear()
-
-        if not element_data: return
-
-        locators = self._generate_locators(element_data)
-
-        for label, value, tooltip in locators:
-            btn = ttk.Button(self.xpath_buttons_container, text=label, command=lambda v=value: self._copy_locator(v))
-            ToolTip(btn, tooltip)
-            btn.pack(side=TOP, fill=X, padx=2, pady=1)
-            self.xpath_buttons[label] = btn
-
-    def _generate_locators(self, data: Dict) -> List[Tuple[str, str, str]]:
-        """Generates a list of (Label, Value, Tooltip) tuples for locators."""
-        locators = []
-        
-        # 1. Appium Accessibility ID
-        if content_desc := data.get("content-desc"):
-            locators.append(("Appium: Accessibility ID", content_desc, f"Copy content-desc: '{content_desc}'"))
-
-        # 2. UiAutomator2 UiSelectors
-        if res_id := data.get("resource-id"):
-            val = f'new UiSelector().resourceId("{res_id}")'
-            locators.append(("UiAutomator2: Resource ID", val, f"Copy UiSelector: {val}"))
-        
-        if text := data.get("text"):
-            val = f'new UiSelector().text("{text}")'
-            locators.append(("UiAutomator2: Text", val, f"Copy UiSelector: {val}"))
-            
-        if content_desc:
-            val = f'new UiSelector().description("{content_desc}")'
-            locators.append(("UiAutomator2: Description", val, f"Copy UiSelector: {val}"))
-            
-        if class_name := data.get("class"):
-            val = f'new UiSelector().className("{class_name}")'
-            locators.append(("UiAutomator2: Class Name", val, f"Copy UiSelector: {val}"))
-
-        # 3. XPath (Fallback/Specific)
-        for attr in ["resource-id", "text", "content-desc", "class"]:
-            if attr_value := data.get(attr):
-                xpath = f"//{attr_value}" if attr == "class" else f"//*[@{attr}='{attr_value}']"
-                display_val = (attr_value[:20] + '...') if len(attr_value) > 23 else attr_value
-                locators.append((f"XPath: {attr.replace('_', ' ').title()}", xpath, f"Copy XPath: {xpath}"))
-
-        # 4. Full XPath
-        if full_xpath := data.get("xpath"):
-             locators.append(("Full XPath", full_xpath, f"Copy Full XPath: {full_xpath}"))
-
-        return locators
-
-    def _copy_locator(self, value: str):
-        """Copies the locator value to clipboard."""
-        if value:
-            self.clipboard_clear()
-            self.clipboard_append(value)
-            self.parent_app.show_toast(translate("xpath_copied_title"), translate("xpath_copied_message", xpath=value), bootstyle="success")
-
-    def _populate_element_details(self, element_data: Optional[Dict]):
-        """Populates the element details text view."""
-        self.element_details_text.text.config(state=NORMAL)
-        self.element_details_text.text.delete("1.0", END)
-        if element_data:
-            attrs_to_show = {k: v for k, v in element_data.items() if k not in ["bounds_coords", "display_title"] and v}
-            for key, value in sorted(attrs_to_show.items()):
-                self.element_details_text.text.insert(END, f"{key.replace('_', ' ').title()}: ", "bold")
-                self.element_details_text.text.insert(END, f"{value}\n")
-        self.element_details_text.text.config(state=DISABLED)
-
-
-
-    def _perform_xpath_search(self):
-        """Filters the element list based on an XPath query."""
-        if not (xpath_query := self.xpath_search_var.get()) or not self.current_dump_path: return
-        try:
-            root = ET.parse(self.current_dump_path, ET.XMLParser(recover=True)).getroot()
-            found_bounds = {node.get("bounds") for node in root.xpath(xpath_query)}
-            search_results = [el for el in self.all_elements_list if el.get("bounds") in found_bounds]
-            self._populate_elements_tree(self._apply_inspector_filter(source_list=search_results))
-        except ET.XPathSyntaxError as e:
-            self.parent_app.show_toast(translate("invalid_xpath_title"), translate("invalid_xpath_message", error=e), bootstyle="danger")
-
-    def _clear_xpath_search(self):
-        """Clears the XPath search."""
-        self.xpath_search_var.set("")
-        self._update_element_tree_view()
-
-    def _on_canvas_click(self, event):
-        """Handles clicks on the inspector screenshot canvas."""
-        if not self.is_inspecting or not hasattr(self, 'screenshot_original_size'): return
-
-        canvas_w, canvas_h = self.screenshot_canvas.winfo_width(), self.screenshot_canvas.winfo_height()
-        curr_w, curr_h = self.screenshot_current_size
-        orig_w, orig_h = self.screenshot_original_size
-        offset_x, offset_y = (canvas_w - curr_w) / 2, (canvas_h - curr_h) / 2
-        click_x, click_y = event.x - offset_x, event.y - offset_y
-
-        best_match = None
-        if 0 <= click_x < curr_w and 0 <= click_y < curr_h:
-            orig_click_x, orig_click_y = click_x * (orig_w / curr_w), click_y * (orig_h / curr_h)
-            smallest_area = float('inf')
-            for item_id, el_data in self.elements_data_map.items():
-                if (bounds := el_data.get("bounds_coords")):
-                    x, y, w, h = bounds
-                    if x <= orig_click_x < x + w and y <= orig_click_y < y + h and (area := w * h) < smallest_area:
-                        smallest_area, best_match = area, {"item_id": item_id, "element_data": el_data}
-
-        if best_match:
-            if self.elements_tree.selection() and self.elements_tree.selection()[0] == best_match["item_id"]:
-                x, y, w, h = best_match["element_data"]["bounds_coords"]
-                threading.Thread(target=self._send_tap_to_device_and_refresh, args=(x + w / 2, y + h / 2), daemon=True).start()
-            else:
-                self.elements_tree.selection_set(best_match["item_id"])
-                self.elements_tree.see(best_match["item_id"])
-        else:
-            self.elements_tree.selection_set("")
-            self.screenshot_canvas.delete("highlight")
-            self._update_locator_buttons(None)
-
-    def _send_tap_to_device_and_refresh(self, x, y):
-        """Sends a tap command and triggers an inspector refresh."""
-        self.scrcpy_output_queue.put(f"{translate('tap_info', x=int(x), y=int(y))}\n")
-        if execute_command(f"adb -s {self.udid} shell input tap {int(x)} {int(y)}")[0]:
-            self.parent_app.show_toast(translate("inspector"), translate("tap_success_refreshing"), bootstyle="info")
-            self.scrcpy_output_queue.put(f"{translate('tap_success_refreshing')}\n")
-            self.after(500, self._start_inspection)
-
-    def _perform_element_action(self, action_type: str):
-        """Performs an action on the selected element."""
-        if not self.current_selected_element_data or not (bounds := self.current_selected_element_data.get("bounds_coords")): return
-        self._update_element_actions_state(False)
-        self.scrcpy_output_queue.put(translate("performing_action", action=action_type) + "\n")
-        threading.Thread(target=self._execute_action_and_refresh, args=(action_type, *bounds), daemon=True).start()
-
-    def _execute_action_and_refresh(self, action_type: str, x, y, width, height):
-        """Helper method to execute an ADB command in a thread."""
-        cx, cy = x + width / 2, y + height / 2
-        cmd = ""
-        if action_type == "click": cmd = f"input tap {int(cx)} {int(cy)}"
-        elif action_type == "long_click": cmd = f"input swipe {int(cx)} {int(cy)} {int(cx)} {int(cy)} 500"
-        elif action_type == "swipe_up": cmd = f"input swipe {int(cx)} {int(y + height * 0.8)} {int(cx)} {int(y + height * 0.2)} 400"
-        elif action_type == "swipe_down": cmd = f"input swipe {int(cx)} {int(y + height * 0.2)} {int(cx)} {int(y + height * 0.8)} 400"
-        elif action_type == "swipe_left": cmd = f"input swipe {int(x + width * 0.8)} {int(cy)} {int(x + width * 0.2)} {int(cy)} 400"
-        elif action_type == "swipe_right": cmd = f"input swipe {int(x + width * 0.2)} {int(cy)} {int(x + width * 0.8)} {int(cy)} 400"
-
-        if cmd:
-            # Use persistent shell for lower latency
-            self.parent_app.shell_manager.execute(self.udid, cmd)
-            self.parent_app.show_toast(translate("inspector"), translate("action_success_refreshing", action=action_type), bootstyle="info")
-            self.scrcpy_output_queue.put(f"{translate('action_success_refreshing', action=action_type)}\n")
-            self.after(500, self._start_inspection)
-        self.after(0, self._update_element_actions_state, True)
-
-    def _apply_inspector_filter(self, source_list: Optional[List[Dict]] = None) -> List[Dict]:
-        """Filters a list of UI elements based on attribute filters."""
-        use_list = source_list if source_list is not None else self.all_elements_list
-        if not use_list: return []
-        filters = {"resource-id": self.filter_by_resource_id_var.get(), "accessibility_id": self.filter_by_content_desc_var.get(), "text": self.filter_by_text_var.get(), "scrollview": self.filter_by_scrollview_var.get(), "other_class": self.filter_by_other_class_var.get()}
-        if not any(filters.values()): return use_list
-        
-        filtered = []
-        for el in use_list:
-            if (filters["resource-id"] and el.get("resource-id")) or \
-               (filters["accessibility_id"] and el.get("accessibility_id")) or \
-               (filters["text"] and el.get("text")) or \
-               (filters["scrollview"] and "ScrollView" in el.get("class", "")) or \
-               (filters["other_class"] and el.get("class") and "ScrollView" not in el.get("class", "") and not (el.get("resource-id") or el.get("accessibility_id") or el.get("text"))):
-                filtered.append(el)
-        return filtered
-
-    def _update_element_tree_view(self):
-        """Applies filters and updates the treeview."""
-        if self.is_inspecting: self._populate_elements_tree(self._apply_inspector_filter())
 
     # --- Scrcpy Feature Methods ---
     def _run_and_embed_scrcpy(self, container_id: int):
@@ -1629,6 +1023,5 @@ class DeviceTab(ttk.Frame):
         if self.is_monitoring: self._stop_performance_monitor()
         if self.is_recording: self._stop_recording()
         if self.is_mirroring: self._stop_scrcpy()
-        if self.is_inspecting: self._stop_inspector()
         if self.is_logging_package: self._stop_package_logging()
         if hasattr(self, 'log_writer'): self.log_writer.stop()

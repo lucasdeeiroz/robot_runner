@@ -32,6 +32,7 @@
     "appium_settings_tab": "Appium",
     "mirror_settings_tab": "Espejo",
     "inspector_settings_tab": "Inspector",
+    "inspector_sub_tab": "Inspector",
     "app_package": "Paquete de App:",
     "app_packages_label": "Paquetes de Apps:",
     "app_packages_tooltip": "Lista de paquetes de aplicaciones separados por coma para el monitor de rendimiento.",
@@ -833,5 +834,6 @@
     "ai_generate_test": "Generar Prueba",
     "ai_content_automated_test": "Prueba Automatizada",
     "ai_content_manual_test": "Prueba Manual",
-    "ai_content_bug_report": "Informe de Error"
+    "ai_content_bug_report": "Informe de Error",
+    "no_device_selected_inspector": "Ningún dispositivo seleccionado. Por favor, seleccione un dispositivo para inspeccionar."
 }

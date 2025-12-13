@@ -529,8 +529,8 @@ class RobotRunnerApp:
 
     def _create_run_command_window(self, udid: str, path_to_run: str, run_mode: str): # This method is now in RunTabPage
         """Helper to safely create the RunCommandWindow from the main GUI thread."""
-        if not self.device_manager or not self.device_manager.winfo_exists():
-            self.device_manager = DeviceManagerWindow(self)
+        if not self.run_tab or not self.run_tab.winfo_exists():
+            self.run_tab = RunCommandWindow(self)
         # Centralized Resource Management: If a window for this UDID already exists, close it before creating a new one.
         if udid in self.active_command_windows and self.active_command_windows[udid].winfo_exists():
             win = self.active_command_windows[udid]
@@ -543,8 +543,16 @@ class RobotRunnerApp:
         # If no window exists, create a new one.
         # Create new DeviceTab
         from src.ui.run_command_window import DeviceTab
-        tab = DeviceTab(self.device_manager.notebook, self, udid, mode='test', run_path=path_to_run, run_mode=run_mode)
-        self.device_manager.add_device_tab(udid, tab, title=f"{udid} (Test)")
+        
+        # Get device info for title
+        device_info = next((d for d in self.devices if d.get('udid') == udid), {})
+        version = device_info.get('release', '')
+        suite_name = Path(path_to_run).stem if path_to_run else "Unknown"
+        
+        tab_title = f"A{version} - {udid} - {suite_name}"
+        
+        tab = DeviceTab(self.run_tab.sub_notebook, self, udid, mode='test', run_path=path_to_run, run_mode=run_mode)
+        self.run_tab.add_device_tab(udid, tab, title=tab_title)
         # self.active_command_windows[udid] = win # Deprecated
 
     def _find_and_set_mdns_port(self, udid: str, ip_address: str):
@@ -713,24 +721,27 @@ class RobotRunnerApp:
     def _create_mirror_window(self, udid: str, model: str, version: str): # This method is now in RunTabPage
         """Helper to create the mirror window on the main thread."""
 
-        # win = RunCommandWindow(self, udid, mode='mirror', title=translate("mirror_title", version=version, model=model))
+        if not self.run_tab or not hasattr(self.run_tab, 'sub_notebook') or not self.run_tab.winfo_exists() or not self.run_tab.sub_notebook.winfo_exists():
+            print("RunTab or sub_notebook not available. Creating failed.")
+            self.show_toast(translate("error_title"), "RunTab unavailable. Please restart app.", "danger")
+            return
+
+        # Check if tab already exists - ensuring we clear old mirror/toolbox tabs
+        if self.run_tab and udid in self.run_tab.device_tabs:
+            self.run_tab.remove_device_tab(udid)
+            # Avoid blocking sleep on main thread
         
-        # Ensure DeviceManagerWindow exists
-        if not self.device_manager or not self.device_manager.winfo_exists():
-            self.device_manager = DeviceManagerWindow(self)
-
-        # Check if tab already exists
-        if self.device_manager and udid in self.device_manager.device_tabs:
-            self.device_manager.remove_device_tab(udid)
-            time.sleep(0.5)
-
-        # Ensure DeviceManagerWindow exists (it might have closed if it was empty)
-        if not self.device_manager or not self.device_manager.winfo_exists():
-            self.device_manager = DeviceManagerWindow(self)
-
-        from src.ui.run_command_window import DeviceTab
-        tab = DeviceTab(self.device_manager.notebook, self, udid, mode='mirror', title=translate("mirror_title", version=version, model=model))
-        self.device_manager.add_device_tab(udid, tab, title=f"{model} ({udid})")
+        try:
+            # Use 'toolbox' mode to enable full UI features without auto-start test
+            from src.ui.run_command_window import DeviceTab
+            
+            tab_title = f"A{version} - {udid}"
+            
+            tab = DeviceTab(self.run_tab.sub_notebook, self, udid, mode='toolbox', title=translate("mirror_title", version=version, model=model))
+            self.run_tab.add_device_tab(udid, tab, title=tab_title)
+        except (tk.TclError, ImportError, Exception) as e:
+            print(f"Error creating device tab: {e}")
+            self.show_toast(translate("open_file_error_title"), f"Failed to open toolbox: {e}", "danger")
         # self.active_command_windows[udid] = win # Deprecated
 
     def _refresh_devices(self): # This method is now in RunTabPage

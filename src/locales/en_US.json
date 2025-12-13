@@ -194,6 +194,7 @@
     "inspector_search_xpath": "Search by XPath",
     "inspector_settings": "Inspector Settings",
     "inspector_settings_tab": "Inspector",
+    "inspector_sub_tab": "Inspector",
     "inspector_tooltip": "Starts the UI element inspector.",
     "inspector_updating_screen": "Updating screen...",
     "invalid_selection_message": "Please select a valid test or suite file to run.",
@@ -834,5 +835,6 @@
     "ai_generate_test": "Generate Test",
     "ai_content_automated_test": "Automated Test",
     "ai_content_manual_test": "Manual Test",
-    "ai_content_bug_report": "Bug Report"
+    "ai_content_bug_report": "Bug Report",
+    "no_device_selected_inspector": "No device selected. Please select a device to inspect."
 }
