@@ -1,13 +1,11 @@
 import json
 import subprocess
 import sys
-import re
 import webbrowser
 import platform
-# import tkinter as tk
 from tkinter import messagebox
 import ttkbootstrap as ttk
-from ttkbootstrap.constants import BOTH, YES, WORD, DISABLED, RIGHT, BOTTOM, X, W, NORMAL
+from ttkbootstrap.constants import BOTH, YES, WORD, DISABLED, RIGHT, BOTTOM, X, W
 from ttkbootstrap.scrolled import ScrolledText
 from ttkbootstrap.tooltip import ToolTip
 
@@ -29,12 +27,11 @@ class SettingsTabPage(ttk.Frame):
         self._setup_widgets()
 
     def _setup_widgets(self):
-        # --- Container for the save button, packed FIRST to reserve space at the bottom ---
-        button_container = ttk.Frame(self)
-        button_container.pack(side=BOTTOM, fill=X, pady=(10, 0))
-        save_button = ttk.Button(button_container, text=translate("save_settings"), command=self._save_settings, bootstyle="primary")
-        save_button.pack(side=RIGHT) # Align to the right within its container
-        ToolTip(save_button, translate("save_settings_tooltip"))
+        settings_frame = ttk.Frame(self, padding=10)
+        settings_frame.pack(fill=BOTH)
+        settings_frame.columnconfigure(1, weight=1)
+        
+        ttk.Label(settings_frame, text=translate("settings_tab"), font="-weight bold").grid(row=0, column=0, sticky="w", pady=(0, 5))
 
         # Main notebook for settings categories
         # Packed SECOND to fill the remaining space
@@ -68,6 +65,14 @@ class SettingsTabPage(ttk.Frame):
         self._setup_monitor_tab(monitor_tab)
         self._setup_tests_tab(tests_tab)
         self._setup_ai_tab(ai_tab)
+        
+        # --- Container for the save button, packed FIRST to reserve space at the bottom ---
+        button_container = ttk.Frame(self, padding=10)
+        button_container.pack(side=BOTTOM, fill=X, pady=(10, 0))
+        
+        save_button = ttk.Button(button_container, text=translate("save_settings"), command=self._save_settings, bootstyle="primary")
+        save_button.pack(side=RIGHT) # Align to the right within its container
+        ToolTip(save_button, translate("save_settings_tooltip"))
 
     def _save_settings(self):
         """Saves current settings to the settings.json file."""

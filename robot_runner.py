@@ -1,8 +1,12 @@
 import sys
 import multiprocessing
 import ctypes
-import ttkbootstrap as ttk
 from pathlib import Path
+import ttkbootstrap as ttk
+from src.locales.i18n import load_language
+from src.locales.i18n import set_language_base_path
+from src.app_utils import load_language_setting, load_theme_setting
+from main import RobotRunnerApp
 
 # Adds the project directory to sys.path to allow relative imports
 if __name__ == '__main__':
@@ -14,10 +18,6 @@ if __name__ == '__main__':
         # Running in a normal Python environment
         BASE_DIR = Path(__file__).resolve().parent
     sys.path.insert(0, str(BASE_DIR.parent))
-from src.locales.i18n import load_language
-from src.locales.i18n import set_language_base_path
-from src.app_utils import load_language_setting, load_theme_setting
-from main import RobotRunnerApp
 
 # --- Main Execution ---
 if __name__ == "__main__":

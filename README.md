@@ -40,7 +40,7 @@ A comprehensive desktop application, built with Python and Tkinter, for managing
 
 *   **Screen Mirroring & Control (Windows):**
     *   Low-latency Scrcpy screen mirroring embedded directly into the application window.
-    *   **Smart Detection:** Automatically uses the system's installed Scrcpy if available in PATH; otherwise, offers to download it.
+    *   **Smart Detection:** Prioritizes the system's installed Scrcpy if available in the PATH. If not found, offers to download and configure a local version.
     *   Integrated controls to take screenshots and record the device screen.
 
 <img width="1365" height="989" alt="image" src="https://github.com/user-attachments/assets/a99e024a-5112-431f-a4fb-e4f08e93b79b" />
@@ -80,7 +80,7 @@ A comprehensive desktop application, built with Python and Tkinter, for managing
 
 *   **Settings & Tools:**
     *   Start and stop the Appium server directly from the GUI.
-    *   **Environment Diagnostics:** displays versions of installed tools (ADB, Appium, Python, Node.js, etc.) to help troubleshoot issues.
+    *   **Environment Diagnostics:** Displays the detected versions of **Python**, **Node.js**, **ADB**, and **Appium** to ensure a correct environment setup.
     *   Configure paths for Scrcpy, project directories (suites, tests, logs), etc.
     *   Customize the appearance with themes (light/dark) and change the application language.
 
@@ -164,10 +164,10 @@ You can create a standalone executable using `PyInstaller`.
     From the project root, run the following command. It ensures that the translation and configuration folders are included in the executable.
     ```sh
     # On Windows
-    pyinstaller --clean --noconsole --onefile --add-data "src/locales;src/locales" --add-data "config;config" --icon="src/images/favicon.ico" robot_runner.py
+    pyinstaller --clean --noconsole --onefile --add-data "src/locales;src/locales" --add-data "config;config" --add-data "src/images;src/images" --icon="src/images/favicon.ico" robot_runner.py
 
     # On macOS/Linux
-    pyinstaller --clean --noconsole --onefile --add-data "src/locales:src/locales" --add-data "config:config" --icon="src/images/favicon.ico" robot_runner.py
+    pyinstaller --clean --noconsole --onefile --add-data "src/locales:src/locales" --add-data "config:config" --add-data "src/images:src/images" --icon="src/images/favicon.ico" robot_runner.py
     ```
     *   `--clean`: Forces the compiler to entirely rebuild the application without relying on previous cache.
     *   `--noconsole`: Prevents a console window from opening when running the application.

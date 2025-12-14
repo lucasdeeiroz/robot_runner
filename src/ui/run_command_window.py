@@ -5,15 +5,12 @@ import sys
 import threading
 import time
 import signal
-import re
 from pathlib import Path
 from queue import Empty, Queue
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 
 import tkinter as tk
 import ttkbootstrap as ttk
-from lxml import etree as ET
-from PIL import Image, ImageTk
 from ttkbootstrap.constants import BOTH, END, YES, WORD, NORMAL, DISABLED, LEFT, HORIZONTAL, VERTICAL, BOTTOM, TOP, SUNKEN, CENTER, X, W
 from ttkbootstrap.scrolled import ScrolledText
 from ttkbootstrap.tooltip import ToolTip
@@ -1011,9 +1008,9 @@ class DeviceTab(ttk.Frame):
             
         # Trigger a fast UI update instead of a slow full refresh
         self.parent_app.root.after(0, self.parent_app._update_device_list)
-        # Delegate removal to RunTabPage
-        if hasattr(self.parent_app, 'run_tab') and self.parent_app.run_tab:
-            self.parent_app.run_tab.remove_device_tab(self.udid)
+        # Delegate removal to TestsTabPage (now the container for device tabs)
+        if hasattr(self.parent_app, 'tests_tab') and self.parent_app.tests_tab:
+            self.parent_app.tests_tab.remove_device_tab(self.udid)
         
         self.destroy()
 

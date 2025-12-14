@@ -15,7 +15,7 @@ from tkinter import messagebox
 
 import ttkbootstrap as ttk
 from ttkbootstrap.widgets.scrolled import ScrolledText
-from ttkbootstrap.constants import *
+from ttkbootstrap.constants import SUNKEN, TOP, LEFT, X, YES, END, DISABLED, NORMAL
 
 # --- Internationalization Setup ---
 from src.locales.i18n import gettext as translate
@@ -26,19 +26,16 @@ from src.app_utils import (
 )
 from src.device_utils import (
     get_connected_devices, find_scrcpy, _prompt_download_scrcpy,
-    _parse_appium_command, get_device_ip
+    _parse_appium_command
 )
 from src.log_parser import get_generation_time # This import is used in _parse_logs_thread
 from src.ai_assistant import AIAssistant
 from src.ui.run_tab import RunTabPage
-from src.ui.logs_tab import LogsTabPage
+from src.ui.tests_tab import TestsTabPage
 from src.ui.settings_tab import SettingsTabPage
 from src.ui.ai_tab import AiTabPage
 from src.ui.about_tab import AboutTabPage
-from src.ui.about_tab import AboutTabPage
 from src.ui.toast import Toast
-
-
 
 
 # --- Main Application Class ---
@@ -68,7 +65,7 @@ class RobotRunnerApp:
 
         self.parsed_logs_data: Optional[List[Dict]] = None
         self.ngrok_tunnel = None
-        self.logs_tab_initialized = False
+        self.tests_tab_initialized = False
         self._is_closing = False
         self.shell_manager = AdbShellManager()
         self.appium_version: Optional[str] = None
@@ -178,7 +175,7 @@ class RobotRunnerApp:
 
         # Create pages
         self.run_tab = RunTabPage(self.content_frame, self, callbacks=run_callbacks)
-        self.logs_tab = LogsTabPage(self.content_frame, self)
+        self.tests_tab = TestsTabPage(self.content_frame, self)
         # Pass 'self' as the data_model and the callbacks dictionary.
         # This aligns with the refactored SettingsTabPage.__init__
         self.settings_tab = SettingsTabPage(self.content_frame, self, callbacks=settings_callbacks)
@@ -191,7 +188,7 @@ class RobotRunnerApp:
         # Page and button configuration
         page_configs = [
             ("run", self.run_tab, translate("execute_tab")),
-            ("logs", self.logs_tab, translate("logs_tab")),
+            ("tests", self.tests_tab, translate("tests_tab")),
             # ("ai", self.ai_tab, translate("ai_settings_tab")),
             ("settings", self.settings_tab, translate("settings_tab")),
             ("about", self.about_tab, translate("about_tab"))
@@ -247,9 +244,9 @@ class RobotRunnerApp:
     
     def _on_tab_change(self, page_name: str):
         """Callback for when a notebook tab is changed."""
-        if page_name == "logs" and not self.logs_tab_initialized:
-            self.logs_tab.setup_widgets()
-            self.logs_tab_initialized = True
+        if page_name == "tests" and not self.tests_tab_initialized:
+            self.tests_tab.setup_widgets()
+            self.tests_tab_initialized = True
             self._on_period_change()
     
     def _initialize_dirs_and_files(self):
@@ -331,7 +328,7 @@ class RobotRunnerApp:
         # But wait, _on_log_double_click uses self.logs_tab.logs_tree.item(item_id, "values") to find the log.
         # It iterates over self.parsed_logs_data and matches the values.
         
-        item_values = self.logs_tab.logs_tree.item(item_id, "values")
+        item_values = self.tests_tab.logs_tree.item(item_id, "values")
         if not item_values: return None
         
         # item_values is (suite, status, time)
@@ -527,10 +524,11 @@ class RobotRunnerApp:
 
     def _create_run_command_window(self, udid: str, path_to_run: str, run_mode: str): # This method is now in RunTabPage
         """Helper to safely create the RunCommandWindow from the main GUI thread."""
-        if not self.run_tab or not self.run_tab.winfo_exists():
-             # Basic fallback if run_tab is missing - though it should be caught by app state checks usually
-             # We cannot instantiate RunCommandWindow as it's deprecated. Just logging/toast.
-             print("Error: RunTabPage missing.")
+        # Ensure Tests tab is visible and initialized
+        self._show_page("tests")
+        
+        if not self.tests_tab or not self.tests_tab.winfo_exists():
+             print("Error: TestsTab missing.")
              return
 
         # If no window exists, create a new one.
@@ -544,8 +542,8 @@ class RobotRunnerApp:
         
         tab_title = f"A{version} - {udid} - {suite_name}"
         
-        tab = DeviceTab(self.run_tab.sub_notebook, self, udid, mode='test', run_path=path_to_run, run_mode=run_mode)
-        self.run_tab.add_device_tab(udid, tab, title=tab_title)
+        tab = DeviceTab(self.tests_tab.sub_notebook, self, udid, mode='test', run_path=path_to_run, run_mode=run_mode)
+        self.tests_tab.add_device_tab(udid, tab, title=tab_title)
 
 
     def _find_and_set_mdns_port(self, udid: str, ip_address: str):
@@ -710,15 +708,18 @@ class RobotRunnerApp:
 
     def _create_mirror_window(self, udid: str, model: str, version: str): # This method is now in RunTabPage
         """Helper to create the mirror window on the main thread."""
+        
+        # Ensure Tests tab is visible and initialized
+        self._show_page("tests")
 
-        if not self.run_tab or not hasattr(self.run_tab, 'sub_notebook') or not self.run_tab.winfo_exists() or not self.run_tab.sub_notebook.winfo_exists():
-            print("RunTab or sub_notebook not available. Creating failed.")
-            self.show_toast(translate("error_title"), "RunTab unavailable. Please restart app.", "danger")
+        if not self.tests_tab or not hasattr(self.tests_tab, 'sub_notebook') or not self.tests_tab.winfo_exists() or not self.tests_tab.sub_notebook.winfo_exists():
+            # This should not happen if _show_page works, but keeping safety check
+            print("TestsTab or sub_notebook not available after switch. Creating failed.")
             return
 
         # Check if tab already exists - ensuring we clear old mirror/toolbox tabs
-        if self.run_tab and udid in self.run_tab.device_tabs:
-            self.run_tab.remove_device_tab(udid)
+        if self.tests_tab and udid in self.tests_tab.device_tabs:
+            self.tests_tab.remove_device_tab(udid)
             # Avoid blocking sleep on main thread
         
         try:
@@ -727,8 +728,8 @@ class RobotRunnerApp:
             
             tab_title = f"A{version} - {udid}"
             
-            tab = DeviceTab(self.run_tab.sub_notebook, self, udid, mode='toolbox', title=translate("mirror_title", version=version, model=model))
-            self.run_tab.add_device_tab(udid, tab, title=tab_title)
+            tab = DeviceTab(self.tests_tab.sub_notebook, self, udid, mode='toolbox', title=translate("mirror_title", version=version, model=model))
+            self.tests_tab.add_device_tab(udid, tab, title=tab_title)
         except (tk.TclError, ImportError, Exception) as e:
             print(f"Error creating device tab: {e}")
             self.show_toast(translate("open_file_error_title"), f"Failed to open toolbox: {e}", "danger")
@@ -797,6 +798,10 @@ class RobotRunnerApp:
         # Only set status to ready if it was refreshing, to not overwrite other statuses
         if translate("refreshing") in self.status_var.get():
             self.status_var.set(translate("ready"))
+            
+        # If a device is selected, update inspector button states (e.g. if it became busy)
+        if self.run_tab.device_listbox.curselection():
+            self.run_tab._update_inspector_ui_state()
 
     def _check_scrcpy_version(self): # This method is now in RunTabPage
         """Checks for scrcpy and offers to download if not found."""
@@ -1057,16 +1062,16 @@ class RobotRunnerApp:
 
     def _start_log_reparse(self): # This method is now in LogsTabPage
         """Starts the log parsing process based on the selected period."""
-        if not self.logs_tab_initialized:
-            self.logs_tab.setup_widgets()
-            self.logs_tab_initialized = True
+        if not self.tests_tab_initialized:
+            self.tests_tab.setup_widgets()
+            self.tests_tab_initialized = True
 
-        self.logs_tab.group_by_combobox.config(state=DISABLED)
-        self.logs_tab.period_combobox.config(state=DISABLED)
-        self.logs_tab.reparse_button.config(state=DISABLED)
-        self.logs_tab.progress_frame.pack(fill=X, pady=5)
-        self.logs_tab.progress_label.pack(side=LEFT, padx=(0, 5))
-        self.logs_tab.progress_bar.pack(side=LEFT, fill=X, expand=YES)
+        self.tests_tab.group_by_combobox.config(state=DISABLED)
+        self.tests_tab.period_combobox.config(state=DISABLED)
+        self.tests_tab.reparse_button.config(state=DISABLED)
+        self.tests_tab.progress_frame.pack(fill=X, pady=5)
+        self.tests_tab.progress_label.pack(side=LEFT, padx=(0, 5))
+        self.tests_tab.progress_bar.pack(side=LEFT, fill=X, expand=YES)
 
         selected_period = self.log_period_var.get()
         thread = threading.Thread(target=self._parse_logs_thread, args=(selected_period,))
@@ -1083,13 +1088,13 @@ class RobotRunnerApp:
     
     def _on_period_change(self, event=None):
         """Handles period selection change by attempting to load a cache file."""
-        if not self.logs_tab_initialized: return
+        if not self.tests_tab_initialized: return
 
         period = self.log_period_var.get()
         cache_file = self._get_cache_path_for_period(period)
 
-        for item in self.logs_tab.logs_tree.get_children():
-            self.logs_tab.logs_tree.delete(item)
+        for item in self.tests_tab.logs_tree.get_children():
+            self.tests_tab.logs_tree.delete(item)
         self.parsed_logs_data = []
 
         if cache_file.exists():
@@ -1099,14 +1104,14 @@ class RobotRunnerApp:
                 
                 mtime = os.path.getmtime(cache_file)
                 mtime_str = datetime.datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
-                self.logs_tab.log_cache_info_label.config(text=translate("cache_from_date", date=mtime_str))
+                self.tests_tab.log_cache_info_label.config(text=translate("cache_from_date", date=mtime_str))
                 
                 self._display_logs(self.parsed_logs_data)
             except (json.JSONDecodeError, IOError) as e:
-                self.logs_tab.log_cache_info_label.config(text=translate("cache_load_error", error=e))
+                self.tests_tab.log_cache_info_label.config(text=translate("cache_load_error", error=e))
                 self.parsed_logs_data = []
         else:
-            self.logs_tab.log_cache_info_label.config(text=translate("no_cache_for_period"))
+            self.tests_tab.log_cache_info_label.config(text=translate("no_cache_for_period"))
             self._display_logs([])
 
     def _parse_logs_thread(self, period: str, silent: bool = False): # This method is now in LogsTabPage
@@ -1220,34 +1225,34 @@ class RobotRunnerApp:
         """Updates the progress bar and label from the main thread."""
         if total > 0:
             percentage = (current / total) * 100
-            self.logs_tab.progress_bar['value'] = percentage
-            self.logs_tab.progress_label.config(text=translate("parsing_progress", current=current, total=total))
+            self.tests_tab.progress_bar['value'] = percentage
+            self.tests_tab.progress_label.config(text=translate("parsing_progress", current=current, total=total))
         else:
-            self.logs_tab.progress_label.config(text=translate("no_log_files_found"))
-            self.logs_tab.progress_bar['value'] = 100
+            self.tests_tab.progress_label.config(text=translate("no_log_files_found"))
+            self.tests_tab.progress_bar['value'] = 100
 
     def _finalize_parsing(self, results): # This method is now in LogsTabPage
         """Called on the main thread after parsing is complete."""
         self.parsed_logs_data = results
-        self.logs_tab.progress_label.pack_forget()
-        self.logs_tab.progress_bar.pack_forget()
-        self.logs_tab.progress_frame.pack_forget()
-        self.logs_tab.group_by_combobox.config(state="readonly")
-        self.logs_tab.period_combobox.config(state="readonly")
-        self.logs_tab.reparse_button.config(state=NORMAL)
+        self.tests_tab.progress_label.pack_forget()
+        self.tests_tab.progress_bar.pack_forget()
+        self.tests_tab.progress_frame.pack_forget()
+        self.tests_tab.group_by_combobox.config(state="readonly")
+        self.tests_tab.period_combobox.config(state="readonly")
+        self.tests_tab.reparse_button.config(state=NORMAL)
         
         now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        self.logs_tab.log_cache_info_label.config(text=translate("parsing_complete", count=len(results)))
+        self.tests_tab.log_cache_info_label.config(text=translate("parsing_complete", count=len(results)))
         
         self._display_logs(results)
 
     def _display_logs(self, log_data: List[Dict]): # This method is now in LogsTabPage
         """Displays the parsed log data in the Treeview."""
-        for item in self.logs_tab.logs_tree.get_children():
-            self.logs_tab.logs_tree.delete(item)
+        for item in self.tests_tab.logs_tree.get_children():
+            self.tests_tab.logs_tree.delete(item)
 
         if not log_data:
-            self.logs_tab.logs_tree.insert("", END, values=(translate("no_logs_found"), "", ""), tags=("no_logs",))
+            self.tests_tab.logs_tree.insert("", END, values=(translate("no_logs_found"), "", ""), tags=("no_logs",))
             return
 
         group_by = self.group_by_var.get()
@@ -1267,7 +1272,7 @@ class RobotRunnerApp:
             grouped_data[key].append(result)
 
         for group, results in sorted(grouped_data.items()):
-            parent_id = self.logs_tab.logs_tree.insert("", END, text=group, values=(group, "", ""), open=True)
+            parent_id = self.tests_tab.logs_tree.insert("", END, text=group, values=(group, "", ""), open=True)
 
             if group_by == translate("group_by_device"):
                 suites_in_group = {}
@@ -1277,19 +1282,19 @@ class RobotRunnerApp:
                         suites_in_group[suite_key] = []
                     suites_in_group[suite_key].append(res)
                 
-                self.logs_tab.logs_tree.heading("suite", text=translate("log_tree_suite_test"))
+                self.tests_tab.logs_tree.heading("suite", text=translate("log_tree_suite_test"))
                 for suite_name, tests in sorted(suites_in_group.items()):
                     indented_suite_name = f"    {suite_name}"
-                    suite_id = self.logs_tab.logs_tree.insert(parent_id, END, text=suite_name, values=(indented_suite_name, "", ""), open=True)
+                    suite_id = self.tests_tab.logs_tree.insert(parent_id, END, text=suite_name, values=(indented_suite_name, "", ""), open=True)
                     for test in tests:
                         test_display_name = f"        - {test['test']}"
-                        self.logs_tab.logs_tree.insert(suite_id, END, values=(test_display_name, test["status"], test["time"]),
+                        self.tests_tab.logs_tree.insert(suite_id, END, values=(test_display_name, test["status"], test["time"]),
                                               tags=(test["status"], test["log_path"]))
             else:
                 if group_by == translate("group_by_suite"):
-                    self.logs_tab.logs_tree.heading("suite", text=translate("log_tree_test"))
+                    self.tests_tab.logs_tree.heading("suite", text=translate("log_tree_test"))
                 elif group_by == translate("group_by_status"):
-                    self.logs_tab.logs_tree.heading("suite", text=translate("log_tree_device_suite"))
+                    self.tests_tab.logs_tree.heading("suite", text=translate("log_tree_device_suite"))
 
                 for result in results:
                     first_col_val = result["test"]
@@ -1297,12 +1302,12 @@ class RobotRunnerApp:
                         first_col_val = f'{result["device"]} / {result["suite"]}'
                     
                     indented_val = f"    {first_col_val}"
-                    self.logs_tab.logs_tree.insert(parent_id, END, values=(indented_val, result["status"], result["time"]),
+                    self.tests_tab.logs_tree.insert(parent_id, END, values=(indented_val, result["status"], result["time"]),
                                           tags=(result["status"], result["log_path"]))
         
-        self.logs_tab.logs_tree.tag_configure("PASS", foreground="green")
-        self.logs_tab.logs_tree.tag_configure("FAIL", foreground="red")
-        self.logs_tab.logs_tree.tag_configure("SKIP", foreground="orange")
+        self.tests_tab.logs_tree.tag_configure("PASS", foreground="green")
+        self.tests_tab.logs_tree.tag_configure("FAIL", foreground="red")
+        self.tests_tab.logs_tree.tag_configure("SKIP", foreground="orange")
     
     def _on_group_by_selected(self, event=None):
         """Handles changing the grouping of logs."""
@@ -1312,8 +1317,8 @@ class RobotRunnerApp:
     def _on_log_double_click(self, event):
         """Opens the log.html file in the default web browser."""
         try:
-            item_id = self.logs_tab.logs_tree.selection()[0]
-            item_tags = self.logs_tab.logs_tree.item(item_id, "tags")
+            item_id = self.tests_tab.logs_tree.selection()[0]
+            item_tags = self.tests_tab.logs_tree.item(item_id, "tags")
             if "no_logs" in item_tags: return # Do nothing for the placeholder message
             if len(item_tags) > 1:
                 log_path = item_tags[1]

@@ -1,5 +1,4 @@
 import threading
-import time
 from queue import Queue, Empty
 from pathlib import Path
 from typing import Optional

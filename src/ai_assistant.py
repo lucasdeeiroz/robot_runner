@@ -1,5 +1,3 @@
-import os
-import json
 from pathlib import Path
 from typing import List, Dict, Optional
 import google.generativeai as genai

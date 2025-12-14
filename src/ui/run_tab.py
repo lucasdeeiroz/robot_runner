@@ -1,23 +1,22 @@
 import tkinter as tk
 import threading
 import sys
-# from pathlib import Path
 import time
 from tkinter import messagebox
 import datetime
 import re
+import queue
 import xml.etree.ElementTree as ET
-# from typing import List
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
 import ttkbootstrap as ttk
-from ttkbootstrap.constants import BOTH, END, YES, WORD, NORMAL, DISABLED, LEFT, HORIZONTAL, VERTICAL, BOTTOM, TOP, SUNKEN, CENTER, EXTENDED, X, W
-from typing import Dict
+from ttkbootstrap.constants import BOTH, END, YES, WORD, NORMAL, DISABLED, LEFT, HORIZONTAL, VERTICAL, BOTTOM, TOP, CENTER, EXTENDED, X, W
 from ttkbootstrap.scrolled import ScrolledText
 from ttkbootstrap.tooltip import ToolTip
 from PIL import Image, ImageTk
 
 from src.app_utils import execute_command
 from src.locales.i18n import gettext as translate
-# from src.ui.toast import Toast
 from src.device_utils import get_device_ip, get_device_aspect_ratio
 
 try:
@@ -70,30 +69,36 @@ class RunTabPage(ttk.Frame):
         self.filter_by_other_class_var = ttk.BooleanVar(value=False)
 
         self.remote_conn_mode_var = tk.StringVar(value="host")
+        self.scrcpy_output_queue = queue.Queue() # Initialize the queue
         self._setup_widgets()
         self.on_run_mode_change()
 
     def _setup_widgets(self):
-        device_frame = ttk.Frame(self, padding=10)
-        device_frame.pack(fill=X, pady=5)
-        device_frame.columnconfigure(0, weight=1)
+        # Main Header with Title and Device List
+        header_frame = ttk.Frame(self, padding=(10, 10, 10, 0)) # Bottom padding 0 to stay close to tabs
+        header_frame.pack(fill=X)
+        header_frame.columnconfigure(1, weight=1) # Make column 1 (Listbox) expand
+        header_frame.rowconfigure(1, weight=0)
+
+        # Title
+        ttk.Label(header_frame, text=translate("run_tab"), font="-weight bold").grid(row=0, column=0, sticky="w", padx=(0, 20))
         
-        ttk.Label(device_frame, text=translate("select_devices"), font="-weight bold").grid(row=0, column=0, sticky="w", pady=(0, 5))
-        listbox_frame = ttk.Frame(device_frame)
-        listbox_frame.grid(row=1, column=0, sticky="nsew")
-        listbox_frame.columnconfigure(0, weight=1)
-        
-        self.device_listbox = tk.Listbox(listbox_frame, selectmode=EXTENDED, exportselection=False, height=4)
-        self.device_listbox.pack(side=LEFT, fill=BOTH, expand=YES)
+        # Label "Select Devices" (Small) inside the list container, or skip it to save space? 
+        # User wanted "compact". Let's put the label and listbox in a tight column.
+        ttk.Label(header_frame, text=translate("select_devices"), font="-size 8").grid(row=1, column=0, sticky="w")
+
+        self.device_listbox = tk.Listbox(header_frame, selectmode=EXTENDED, exportselection=False, height=3)
+        self.device_listbox.grid(row=1, column=1, sticky="ew") # Removed invalid weight=1
         ToolTip(self.device_listbox, translate("devices_tooltip"))
         self.device_listbox.bind("<<ListboxSelect>>", self._on_device_select)
-        
-        self.refresh_button = ttk.Button(device_frame, text=translate("refresh"), command=self.app._refresh_devices, bootstyle="secondary")
-        self.refresh_button.grid(row=1, column=1, sticky="e", padx=5)
+
+        # Refresh Button
+        self.refresh_button = ttk.Button(header_frame, text=translate("refresh"), command=self.app._refresh_devices, bootstyle="secondary-outline")
+        self.refresh_button.grid(row=1, column=2, sticky="ne", padx=(10, 0))
         ToolTip(self.refresh_button, translate("refresh_devices_tooltip"))
 
         self.sub_notebook = ttk.Notebook(self)
-        self.sub_notebook.pack(fill=BOTH, expand=YES, pady=5)
+        self.sub_notebook.pack(fill=BOTH, expand=YES, pady=(5, 5))
         tests_tab = ttk.Frame(self.sub_notebook, padding=10)
         connect_tab = ttk.Frame(self.sub_notebook, padding=10)
         inspector_tab = ttk.Frame(self.sub_notebook, padding=10)
@@ -110,42 +115,14 @@ class RunTabPage(ttk.Frame):
         self._setup_commands_tab(commands_tab)
         # self.protocol("WM_DELETE_WINDOW", self._on_close) # Invalid for Frame
 
-
-    def add_device_tab(self, udid: str, tab_widget: ttk.Frame, title: str):
-        """Adds a new tab for a device."""
-        self.sub_notebook.add(tab_widget, text=title)
-        self.device_tabs[udid] = tab_widget
-        self.sub_notebook.select(tab_widget)
-
-    def remove_device_tab(self, udid: str):
-        """Removes a device tab."""
-        if udid in self.device_tabs:
-            tab = self.device_tabs[udid]
-            try:
-                self.sub_notebook.forget(tab)
-            except tk.TclError:
-                pass # Tab might already be destroyed or not managed
-            del self.device_tabs[udid]
-            
-            # Update busy state in parent app
-            if hasattr(self.parent_app, 'local_busy_devices') and udid in self.parent_app.local_busy_devices:
-                self.parent_app.local_busy_devices.remove(udid)
-                if hasattr(self.parent_app, '_update_device_list'):
-                    self.parent_app.root.after(100, self.parent_app._update_device_list)
-
-
-
-    def focus_device_tab(self, udid: str):
-        """Focuses the tab for the given UDID."""
-        if udid in self.device_tabs:
-            self.sub_notebook.select(self.device_tabs[udid])
-
     def _setup_adb_tab(self, parent_frame: ttk.Frame):
         """Sets up the widgets for the ADB sub-tab."""
-        # Add a spacer frame that will expand, keeping all other widgets packed at the top.
+        # Wireless/Remote Connection Section ONLY (Device list is back in main header)
+        
+        # Spacer for layout
         spacer = ttk.Frame(parent_frame)
-        spacer.grid(row=10, column=0, sticky="nsew") # Place it at a high row index
-        parent_frame.rowconfigure(10, weight=1)
+        spacer.grid(row=20, column=0, sticky="nsew") 
+        parent_frame.rowconfigure(20, weight=1)
         parent_frame.columnconfigure(0, weight=1)
 
         ttk.Label(parent_frame, text=translate("wireless_adb"), font="-weight bold").grid(row=0, column=0, sticky="w", pady=(0, 5))
@@ -154,6 +131,7 @@ class RunTabPage(ttk.Frame):
         wireless_frame.columnconfigure(0, weight=2)
         wireless_frame.columnconfigure(1, weight=1)
         wireless_frame.columnconfigure(2, weight=1)
+
 
         ttk.Label(wireless_frame, text=translate("ip_address")).grid(row=1, column=0, sticky="w", padx=5)
         ttk.Label(wireless_frame, text=translate("port")).grid(row=1, column=1, sticky=W, padx=5)
@@ -168,7 +146,6 @@ class RunTabPage(ttk.Frame):
         self.code_entry = ttk.Entry(wireless_frame, width=8)
         self.code_entry.grid(row=2, column=2, sticky="ew", padx=5, pady=(0, 5))
         ToolTip(self.code_entry, text=translate("wireless_code_tooltip"))
-        
         
         button_frame = ttk.Frame(wireless_frame)
         button_frame.grid(row=3, column=0, columnspan=3, sticky="ew", pady=5)
@@ -192,9 +169,13 @@ class RunTabPage(ttk.Frame):
 
     def _setup_inspector_tab(self, parent_frame: ttk.Frame):
         """Sets up the widgets for the Inspector sub-tab."""
+        parent_frame.rowconfigure(1, weight=1)
+        parent_frame.columnconfigure(0, weight=1)
+
+        ttk.Label(parent_frame, text=translate("inspect_screen"), font="-weight bold").grid(row=0, column=0, sticky="w", pady=(0, 5))
         # Main container for the 3-pane inspector layout
         self.main_paned_window = ttk.Panedwindow(parent_frame, orient=HORIZONTAL)
-        self.main_paned_window.pack(fill=BOTH, expand=YES)
+        self.main_paned_window.grid(row=1, column=0, sticky="nsew")
 
         # 1. Left controls container
         self.output_paned_window = ttk.Frame(self.main_paned_window)
@@ -238,7 +219,6 @@ class RunTabPage(ttk.Frame):
         self.inspect_button = ttk.Button(top_controls, text=translate("start_inspector"), command=self._toggle_inspector, bootstyle="primary")
         self.inspect_button.grid(row=0, column=1, sticky="ew", padx=5)
         # ToolTip added dynamically based on state
-
 
         self.filter_menubutton = ttk.Menubutton(top_controls, text=translate("inspector_filter_attributes"), bootstyle="outline-toolbutton")
         self.filter_menubutton.grid(row=0, column=2, sticky="ew", padx=5)
@@ -333,8 +313,6 @@ class RunTabPage(ttk.Frame):
             self._stop_inspector()
         else:
             self._start_inspector()
-
-
 
     def _start_inspector(self):
         """Configures the UI for inspector mode."""
@@ -558,7 +536,6 @@ class RunTabPage(ttk.Frame):
         # Adjust sash again if image dimensions changed significantly
         self.after(10, self._adjust_inspector_sash)
 
-
     def _parse_and_store_node(self, node: ET.Element) -> Optional[Dict]:
         """Parses an XML node and returns its data dictionary if valid."""
         data = dict(node.attrib)
@@ -752,8 +729,6 @@ class RunTabPage(ttk.Frame):
                 self.element_details_text.text.insert(END, f"{key.replace('_', ' ').title()}: ", "bold")
                 self.element_details_text.text.insert(END, f"{value}\n")
         self.element_details_text.text.config(state=DISABLED)
-
-
 
     def _perform_xpath_search(self):
         """Filters the element list based on an XPath query."""
@@ -1179,6 +1154,52 @@ class RunTabPage(ttk.Frame):
         else:
             # For USB devices, fetch the IP and then try to find the wireless debugging port via mDNS.
             threading.Thread(target=self._fetch_ip_and_find_port, args=(udid,), daemon=True).start()
+            
+        self._update_inspector_ui_state()
+
+    def _is_current_device_busy(self) -> bool:
+        """Checks if the currently selected device is marked as busy."""
+        if not self.device_listbox.curselection(): return False
+        selected_text = self.device_listbox.get(self.device_listbox.curselection()[0])
+        return translate("device_busy") in selected_text
+
+    def _update_inspector_ui_state(self):
+        """Updates the state of inspector buttons based on device busy status."""
+        is_busy = self._is_current_device_busy()
+        
+        # 1. Refresh Button
+        # Enabled only if inspecting AND not busy
+        if self.is_inspecting and not is_busy:
+            self.refresh_inspector_button.config(state=NORMAL)
+        else:
+            self.refresh_inspector_button.config(state=DISABLED)
+            
+        # 2. Inspect Button
+        # If busy:
+        #   - If already inspecting: Enable (allow stop)
+        #   - If not inspecting: Disable (prevent start)
+        # If not busy:
+        #   - Enable (allow start/stop)
+        if is_busy and not self.is_inspecting:
+            self.inspect_button.config(state=DISABLED)
+        else:
+            # When inspecting, it's always enabled (Stop) unless some other logic disables it (e.g. refreshing)
+            # When not inspecting and not busy, it's enabled (Start)
+            # We must be careful not to override "refreshing" state if it was set elsewhere, 
+            # but usually this is called on selection change or device list update.
+            # For now, we enforce NORMAL if it wasn't explicitly disabled by an ongoing action?
+            # Creating a robust check:
+            if self.inspect_button['text'] not in [translate("refreshing"), translate("checking_appium")]: 
+                 self.inspect_button.config(state=NORMAL)
+
+        # 3. Action Buttons
+        # If busy, disable all. If not busy, defer to element selection logic.
+        if is_busy:
+            self._update_element_actions_state(False)
+        elif self.elements_tree.selection():
+            # If not busy and element selected, enable
+            self._update_element_actions_state(True)
+
 
     def _fetch_ip_and_find_port(self, udid: str):
         """Fetches the IP of a USB device and then searches for its mDNS wireless port."""
