@@ -1280,41 +1280,76 @@ class RunCommandWindow(ttk.Toplevel):
 
     def _run_logcat_for_package(self, package_name: str, log_level: str):
         """Executes 'adb logcat' for a specific package and pipes output to a queue."""
+        package_name = package_name.strip()
         try:
-            # --- Adaptive Logcat Strategy ---
-            # 1. Try the modern '--app' method first. It's more robust if supported.
-            logcat_command = f"adb -s {self.udid} logcat --app={package_name} *:{log_level}"
-            process = subprocess.Popen(logcat_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding=OUTPUT_ENCODING, errors='replace', creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
+            # Handle the "All" packages case
+            if package_name == translate('all_packages_option'):
+                logcat_command = f"adb -s {self.udid} logcat \"*:{log_level}\""
+                self.package_log_output_queue.put(f"--- Debug: Executing {logcat_command} ---\n")
+                process = subprocess.Popen(logcat_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding=OUTPUT_ENCODING, errors='replace', creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
+                
+                while not self.stop_package_log_event.is_set():
+                    line = process.stdout.readline()
+                    if not line:
+                        if process.poll() is not None: break
+                        continue
+                    self.package_log_output_queue.put(line)
 
-            # Check for immediate failure, which indicates an unsupported command on older Android.
-            time.sleep(0.5) # Give the process a moment to fail
-            if process.poll() is not None:
-                output = process.stdout.read() if process.stdout else ""
-                if "Unknown option" in output:
-                    self.package_log_output_queue.put(f"--- {translate('logcat_fallback_info')} ---\n")
+                if process.poll() is None: process.terminate()
+
+            else:
+                # --- Adaptive Logcat Strategy ---
+                # 1. Try the modern '--app' method first.
+                logcat_command = f"adb -s {self.udid} logcat --app={package_name} \"*:{log_level}\""
+                self.package_log_output_queue.put(f"--- Debug: Executing {logcat_command} ---\n")
+                process = subprocess.Popen(logcat_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding=OUTPUT_ENCODING, errors='replace', creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
+
+                fallback_needed = False
+                
+                # Monitor output for errors or valid logs
+                while not self.stop_package_log_event.is_set():
+                    line = process.stdout.readline()
+                    if not line:
+                        if process.poll() is not None: break
+                        continue
                     
-                    # 2. Fallback to the classic PID-based method for older devices.
+                    # Check for immediate failure indicating unsupported flag
+                    if "unrecognized option" in line.lower() or "unknown option" in line.lower():
+                        fallback_needed = True
+                        break
+                    
+                    self.package_log_output_queue.put(line)
+
+                # Clean up if we stopped reading (either fallback or user stop)
+                if process.poll() is None: process.terminate()
+
+                if fallback_needed:
+                    self.package_log_output_queue.put(f"--- {translate('logcat_fallback_info', method='--app')} ---\n")
+                    
+                    # 2. Fallback to the classic PID-based method.
                     pid_command = f"adb -s {self.udid} shell pidof -s {package_name}"
-                    pid_process = subprocess.run(pid_command, shell=True, capture_output=True, text=True, encoding=OUTPUT_ENCODING, errors='replace')
+                    pid_process = subprocess.run(pid_command, shell=True, capture_output=True, text=True, encoding=OUTPUT_ENCODING, errors='replace', creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
                     pid = pid_process.stdout.strip()
 
-                    if not pid or not pid.isdigit():
-                        self.package_log_output_queue.put(f"{translate('logcat_pid_error', package_name=package_name)}\n")
+                    if pid and pid.isdigit():
+                        logcat_command = f"adb -s {self.udid} logcat --pid={pid} \"*:{log_level}\""
+                        self.package_log_output_queue.put(f"--- Debug: Executing {logcat_command} ---\n")
+                        process = subprocess.Popen(logcat_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding=OUTPUT_ENCODING, errors='replace', creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
+                        
+                        while not self.stop_package_log_event.is_set():
+                            line = process.stdout.readline()
+                            if not line:
+                                if process.poll() is not None: break
+                                continue
+                            self.package_log_output_queue.put(line)
+                            
+                        if process.poll() is None: process.terminate()
+
+                    else:
+                        # 3. If PID also fails, stop the operation.
+                        self.package_log_output_queue.put(f"--- {translate('logcat_pid_error', package_name=package_name)} ---\n")
+                        self.after(0, self._stop_package_logging)
                         return
-
-                    logcat_command = f"adb -s {self.udid} logcat --pid={pid} *:{log_level}"
-                    process = subprocess.Popen(logcat_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding=OUTPUT_ENCODING, errors='replace', creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
-                else:
-                    # The process failed for another reason
-                    self.package_log_output_queue.put(output)
-                    return
-
-            while not self.stop_package_log_event.is_set() and process.poll() is None:
-                line = process.stdout.readline() # type: ignore
-                if line: self.package_log_output_queue.put(line)
-                else: break
-            
-            if process.poll() is None: process.terminate()
 
         except Exception as e:
             self.package_log_output_queue.put(f"{translate('logcat_generic_error', error=e)}\n")
