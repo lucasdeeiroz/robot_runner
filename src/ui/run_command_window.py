@@ -4,6 +4,7 @@ import subprocess
 import sys
 import threading
 import time
+import shlex
 import signal
 from pathlib import Path
 from queue import Empty, Queue
@@ -460,13 +461,17 @@ class DeviceTab(ttk.Frame):
     def _run_and_embed_scrcpy(self, container_id: int):
         """Runs scrcpy, captures output, and embeds its window."""
         try:
-            cmd_template = self.parent_app.scrcpy_path_var.get() + " -s {udid} --window-title=\"{title}\""
+            scrcpy_executable = self.parent_app.scrcpy_path_var.get()
             self.unique_title = f"scrcpy_{int(time.time() * 1000)}"
             scrcpy_opt = self.parent_app.scrcpy_options_var.get()
-            command = f'{cmd_template.format(udid=self.udid, title=self.unique_title)} {scrcpy_opt}'
+            
+            cmd_list = [scrcpy_executable, "-s", self.udid, "--window-title", self.unique_title]
+            if scrcpy_opt:
+                 cmd_list.extend(shlex.split(scrcpy_opt, posix=(sys.platform!="win32")))
+
             creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
             
-            self.scrcpy_process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding=OUTPUT_ENCODING, errors='replace', creationflags=creationflags)
+            self.scrcpy_process = subprocess.Popen(cmd_list, shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding=OUTPUT_ENCODING, errors='replace', creationflags=creationflags)
             threading.Thread(target=self._pipe_scrcpy_output_to_queue, daemon=True).start()
             
             # Give scrcpy a moment to initialize, especially on the first run. This helps prevent race conditions.
@@ -789,9 +794,9 @@ class DeviceTab(ttk.Frame):
         try:
             # Handle the "All" packages case
             if package_name == translate('all_packages_option'):
-                logcat_command = f"adb -s {self.udid} logcat \"*:{log_level}\""
-                self.package_log_output_queue.put(f"--- Debug: Executing {logcat_command} ---\n")
-                process = subprocess.Popen(logcat_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding=OUTPUT_ENCODING, errors='replace', creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
+                logcat_cmd = ["adb", "-s", self.udid, "logcat", f"*:{log_level}"]
+                self.package_log_output_queue.put(f"--- Debug: Executing {' '.join(logcat_cmd)} ---\n")
+                process = subprocess.Popen(logcat_cmd, shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding=OUTPUT_ENCODING, errors='replace', creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
                 
                 while not self.stop_package_log_event.is_set():
                     line = process.stdout.readline()
@@ -805,9 +810,9 @@ class DeviceTab(ttk.Frame):
             else:
                 # --- Adaptive Logcat Strategy ---
                 # 1. Try the modern '--app' method first.
-                logcat_command = f"adb -s {self.udid} logcat --app={package_name} \"*:{log_level}\""
-                self.package_log_output_queue.put(f"--- Debug: Executing {logcat_command} ---\n")
-                process = subprocess.Popen(logcat_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding=OUTPUT_ENCODING, errors='replace', creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
+                logcat_cmd = ["adb", "-s", self.udid, "logcat", f"--app={package_name}", f"*:{log_level}"]
+                self.package_log_output_queue.put(f"--- Debug: Executing {' '.join(logcat_cmd)} ---\n")
+                process = subprocess.Popen(logcat_cmd, shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding=OUTPUT_ENCODING, errors='replace', creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
 
                 fallback_needed = False
                 
@@ -832,14 +837,14 @@ class DeviceTab(ttk.Frame):
                     self.package_log_output_queue.put(f"--- {translate('logcat_fallback_info', method='--app')} ---\n")
                     
                     # 2. Fallback to the classic PID-based method.
-                    pid_command = f"adb -s {self.udid} shell pidof -s {package_name}"
-                    pid_process = subprocess.run(pid_command, shell=True, capture_output=True, text=True, encoding=OUTPUT_ENCODING, errors='replace', creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
+                    pid_cmd = ["adb", "-s", self.udid, "shell", "pidof", "-s", package_name]
+                    pid_process = subprocess.run(pid_cmd, shell=False, capture_output=True, text=True, encoding=OUTPUT_ENCODING, errors='replace', creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
                     pid = pid_process.stdout.strip()
 
                     if pid and pid.isdigit():
-                        logcat_command = f"adb -s {self.udid} logcat --pid={pid} \"*:{log_level}\""
-                        self.package_log_output_queue.put(f"--- Debug: Executing {logcat_command} ---\n")
-                        process = subprocess.Popen(logcat_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding=OUTPUT_ENCODING, errors='replace', creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
+                        logcat_cmd = ["adb", "-s", self.udid, "logcat", f"--pid={pid}", f"*:{log_level}"]
+                        self.package_log_output_queue.put(f"--- Debug: Executing {' '.join(logcat_cmd)} ---\n")
+                        process = subprocess.Popen(logcat_cmd, shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding=OUTPUT_ENCODING, errors='replace', creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
                         
                         while not self.stop_package_log_event.is_set():
                             line = process.stdout.readline()
@@ -898,22 +903,33 @@ class DeviceTab(ttk.Frame):
             self.cur_log_dir = self.parent_app.logs_dir / f"A{device_info['release']}_{device_info['model']}_{self.udid.split(':')[0]}" / suite_name
             self.cur_log_dir.mkdir(parents=True, exist_ok=True)
             
-            ts_opt = " --timestampoutputs" if self.parent_app.timestamp_logs_var.get() else ""
-            robot_opt = self.parent_app.robot_options_var.get()
-
-            base_cmd = f'robot{ts_opt} {robot_opt} --logtitle "{device_info["release"]} - {device_info["model"]}" -v udid:"{self.udid}" -v deviceName:"{device_info["model"]}" -v versao_OS:"{device_info["release"]}" -d "{self.cur_log_dir}" --name "{suite_name}"'
+            cmd_list = ["robot"]
+            if self.parent_app.timestamp_logs_var.get():
+                cmd_list.append("--timestampoutputs")
             
-            # The self.run_path is already an absolute path, so it should be used directly.
-            # Enclosing it in quotes handles paths with spaces.
-            if self.run_mode == "Suite":
-                command = f'{base_cmd} --argumentfile "{self.run_path}"'
-            else:
-                command = f'{base_cmd} "{self.run_path}"'
+            robot_opt = self.parent_app.robot_options_var.get()
+            if robot_opt:
+                cmd_list.extend(shlex.split(robot_opt, posix=(sys.platform!="win32")))
 
-            self.robot_output_queue.put(translate("executing_command", command=command))
+            cmd_list.extend([
+                "--logtitle", f"{device_info['release']} - {device_info['model']}",
+                "-v", f"udid:{self.udid}",
+                "-v", f"deviceName:{device_info['model']}",
+                "-v", f"versao_OS:{device_info['release']}",
+                "-d", str(self.cur_log_dir),
+                "--name", suite_name
+            ])
+
+            if self.run_mode == "Suite":
+                cmd_list.extend(["--argumentfile", str(self.run_path)])
+            else:
+                cmd_list.append(str(self.run_path))
+            
+            readable_command = ' '.join(cmd_list) 
+            self.robot_output_queue.put(translate("executing_command", command=readable_command))
 
             creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
-            self.robot_process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding=OUTPUT_ENCODING, errors='replace', creationflags=creationflags)
+            self.robot_process = subprocess.Popen(cmd_list, shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding=OUTPUT_ENCODING, errors='replace', creationflags=creationflags)
             for line in iter(self.robot_process.stdout.readline, ''):
                 self.robot_output_queue.put(line)
             self.robot_process.stdout.close()

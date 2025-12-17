@@ -24,9 +24,10 @@ class AdbShellManager:
 
             try:
                 creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+                cmd = ["adb", "-s", udid, "shell"]
                 process = subprocess.Popen(
-                    f"adb -s {udid} shell",
-                    shell=True,
+                    cmd,
+                    shell=False,
                     stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,

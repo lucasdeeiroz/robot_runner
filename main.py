@@ -36,6 +36,7 @@ from src.ui.settings_tab import SettingsTabPage
 from src.ui.ai_tab import AiTabPage
 from src.ui.about_tab import AboutTabPage
 from src.ui.toast import Toast
+from src.version import __version__
 
 
 # --- Main Application Class ---
@@ -43,7 +44,7 @@ class RobotRunnerApp:
     ''' Main application window '''
     def __init__(self, root: ttk.Window):
         self.root = root
-        self.root.title(translate("app_title"))
+        self.root.title(f"{translate("app_title")} v{__version__}")
         self.root.geometry("1000x700")
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 

@@ -17,12 +17,31 @@ SETTINGS_FILE = BASE_DIR / "config" / "settings.json"
 OUTPUT_ENCODING = 'mbcs' if sys.platform == "win32" else 'utf-8'
 
 
-def execute_command(command: str) -> Tuple[bool, str]:
+import shlex
+import shutil
+
+def execute_command(command: str | list) -> Tuple[bool, str]:
     """Executes a shell command and returns its success status and output."""
     try:
+        if isinstance(command, str):
+            # Split the command string into a list of arguments, handling quotes
+            # posix=False is generally better for Windows paths with backslashes if not using shell=True
+            args = shlex.split(command, posix=(sys.platform != "win32"))
+        else:
+            args = command
+
+        # Fix for Windows: .cmd and .bat files cannot be executed directly with shell=False
+        if sys.platform == "win32" and args:
+            executable = args[0]
+            full_path = shutil.which(executable)
+            if full_path:
+                ext = Path(full_path).suffix.lower()
+                if ext in ['.cmd', '.bat']:
+                    args = ["cmd", "/c"] + args
+
         process = subprocess.run(
-            command,
-            shell=True,
+            args,
+            shell=False,
             check=True,
             capture_output=True,
             text=True,
@@ -34,7 +53,8 @@ def execute_command(command: str) -> Tuple[bool, str]:
     except subprocess.CalledProcessError as e:
         return False, e.stdout.strip() + "\n" + e.stderr.strip()
     except FileNotFoundError:
-        return False, f"Error: Command not found. Make sure '{command.split()[0]}' is in your system's PATH."
+        cmd_name = args[0] if isinstance(args, list) and args else str(command)
+        return False, f"Error: Command not found. Make sure '{cmd_name}' is in your system's PATH."
     except Exception as e:
         return False, f"An unexpected error occurred: {e}"
 

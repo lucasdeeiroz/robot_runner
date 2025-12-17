@@ -23,7 +23,7 @@ def get_connected_devices(appium_command: Optional[str] = None, check_busy_devic
     if local_busy_devices:
         busy_udids.update(local_busy_devices)
 
-    success, output = execute_command("adb devices -l")
+    success, output = execute_command(["adb", "devices", "-l"])
     if not success:
         return []
     
@@ -34,8 +34,8 @@ def get_connected_devices(appium_command: Optional[str] = None, check_busy_devic
     connected_udids = set()
 
     for line in lines:
-        if "device" in line and "unauthorized" not in line:
-            parts = line.split()
+        parts = line.split()
+        if len(parts) >= 2 and parts[1] == "device":
             udid = parts[0]
             connected_udids.add(udid)
             
@@ -58,7 +58,7 @@ def get_device_properties(udid: str) -> Optional[Dict[str, str]]:
 
     try:
         # Optimized: Get both properties in a single shell command
-        cmd = f"adb -s {udid} shell \"getprop ro.product.model; echo '|'; getprop ro.build.version.release\""
+        cmd = ["adb", "-s", udid, "shell", "getprop ro.product.model; echo '|'; getprop ro.build.version.release"]
         success, output = execute_command(cmd)
         
         if success:
@@ -76,7 +76,7 @@ def get_device_properties(udid: str) -> Optional[Dict[str, str]]:
 
 def get_device_ip(udid: str) -> Optional[str]:
     """Gets the wlan0 IP address for a given device UDID."""
-    command = f"adb -s {udid} shell ip -f inet addr show wlan0"
+    command = ["adb", "-s", udid, "shell", "ip", "-f", "inet", "addr", "show", "wlan0"]
     success, output = execute_command(command)
     if success:
         match = re.search(r'inet (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/', output)
@@ -86,7 +86,7 @@ def get_device_ip(udid: str) -> Optional[str]:
 
 def get_device_aspect_ratio(udid: str) -> Optional[float]:
     """Gets the device's physical screen aspect ratio using 'wm size'."""
-    success, output = execute_command(f"adb -s {udid} shell wm size")
+    success, output = execute_command(["adb", "-s", udid, "shell", "wm", "size"])
     if success:
         match = re.search(r'Physical size:\s*(\d+)x(\d+)', output)
         if match:
