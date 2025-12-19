@@ -171,3 +171,4 @@ logcat*/
 frontend/
 .allure
 .gemini_cache
+!tauri_app/src/lib/
