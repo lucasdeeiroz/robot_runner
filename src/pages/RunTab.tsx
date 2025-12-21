@@ -80,7 +80,9 @@ export function RunTab({ onNavigate }: RunTabProps) {
     };
 
     const handleOpenToolbox = (device: Device) => {
-        addToolboxSession(device.udid, device.model);
+        const ver = device.android_version ? `Android ${device.android_version}` : device.udid;
+        const name = `${device.model} (${ver})`;
+        addToolboxSession(device.udid, name);
         if (onNavigate) {
             onNavigate('tests');
         }

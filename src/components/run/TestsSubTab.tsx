@@ -92,9 +92,8 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                 // Avoid duplicate UDID if model already contains it
                 let devName = deviceObj?.model || "Device";
                 if (deviceUdid && deviceUdid !== 'local') {
-                    if (!devName.includes(deviceUdid)) {
-                        devName = `${devName} (${deviceUdid})`;
-                    }
+                    const ver = deviceObj?.android_version ? `Android ${deviceObj.android_version}` : deviceUdid;
+                    devName = `${devName} (${ver})`;
                 } else {
                     devName = "Local/Web";
                 }
