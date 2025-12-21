@@ -1,47 +1,91 @@
-# Robot Runner - Modern Application
+# Robot Runner
 
-A modernized desktop application for Android automation, rewriting the legacy Python version with **Tauri**, **React**, and **TypeScript**. It combines the power of Robot Framework, Appium, Scrcpy, and AI assistance into a sleek, high-performance interface.
+**Robot Runner** is a modern, high-performance desktop application designed to streamline Android automation with **Robot Framework** and **Appium**. Built with **Tauri v2**, **React**, and **TypeScript**, it offers a native, resource-efficient experience for QA engineers and developers.
 
-## 🚀 Features
+## 🚀 Key Features
 
-*   **⚡ Modern Tech Stack:** Built with Tauri v2 (Rust), React 19, and TypeScript for native performance and a small footprint.
-*   **📱 Device Management:** 
-    *   Real-time detection of USB and Wireless devices.
-    *   One-click wireless connection (QR Code / Pairing Code).
-    *   Remote connection support via **ngrok**.
-*   **🤖 AI Assistant:** 
-    *   Integrated Google Gemini AI to help write, debug, and explain Robot Framework tests.
-    *   Context-aware chat related to your test files and logs.
-*   **🔍 Advanced Inspector:**
-    *   Real-time UI hierarchy inspection.
-    *   Bi-directional element selection (Tree ↔ Screenshot).
-    *   Swipe and Tap simulation directly from the inspector.
-*   **📺 Screen Mirroring:** Embedded high-performance screen mirroring using `scrcpy`.
-*   **📊 Performance Monitoring:**
-    *   Real-time CPU, RAM, and Battery stats.
-    *   Record performance sessions to CSV.
-*   **📜 History & Reporting:**
-    *   Comprehensive test history with filtering and grouping.
-    *   Automatic Allure report generation.
-    *   Smart log caching for instant loading.
+### 📱 Device Management
+*   **Real-time Detection:** Automatically detects devices connected via USB or Wi-Fi.
+*   **Wireless Connection:** Connect devices wirelessly effortlessly using **QR Code** or **Pairing Code** (Android 11+).
+*   **Remote Access:** Full support for remote devices via **ngrok** tunneling.
+*   **Device Diagnostics:** Built-in toolbox to fix common ADB issues, restart servers, and check device details.
+
+### ⚡ Test Execution
+*   **Flexible Running Modes:**
+    *   **File Mode:** Select and run individual `.robot` files.
+    *   **Folder Mode:** Execute all tests within a specific directory.
+    *   **Argument Files:** Run complex test suites defined in `.args` or `.txt` files.
+*   **Smart Automation Root:** Define a specific working directory ("Automation Root") to resolve relative paths correctly in your argument files.
+*   **Live Logs:** View Appium and Robot Framework logs in real-time within the app.
+
+### 🛠️ Advanced Tools
+*   **Configuration Profiles:** Create and switch between multiple configuration profiles (e.g., "Work", "Personal", "Project A") to manage different path setups and settings instantly.
+*   **Inspector:** A powerful UI Inspector to visualize the app hierarchy, select elements, and generate XPaths/IDs bi-directionally (Screenshot ↔ Tree).
+*   **Screen Mirroring:** Embedded high-performance screen mirroring powered by `scrcpy` (works over USB and Wi-Fi).
+*   **Performance Monitoring:** Track CPU, RAM, and Battery usage of your device in real-time and export session data to CSV.
+
+### 📜 History & Reports
+*   **Historical Logs:** Access past test runs, grouped by **Date**, **Device**, or **OS Version**.
+*   **Re-run Capabilities:** Quickly re-run any test from the history with the exact same parameters.
+*   **Logcat Viewer:** integrated Logcat viewer with filtering and search capabilities.
+
+### 🌍 Internationalization
+*   Fully translated into **English**, **Portuguese (Brazil)**, and **Spanish**.
+
+---
+
+## ⚙️ Configuring Your Automation Project
+
+To use Robot Runner with your project, you need to configure the paths in the **Settings** tab.
+
+### 1. Project Structure
+Robot Runner works best with a standard Robot Framework structure. Recommended structure:
+```
+my-automation-project/    # Your Automation Root
+├── suites/               # Your .robot test files
+├── resources/            # Resource files (.resource, .py, variables)
+├── args/                 # Argument files for complex runs
+└── results/              # Output directory (handled by Runner)
+```
+
+### 2. Setting Up Paths
+Go to **Settings > Paths** and configure:
+*   **Suites Directory:** Point to your `suites/` folder. This is where the File Explorer will open by default.
+*   **Automation Root (Optional):** If your project uses relative paths (e.g., `Resource  ../resources/common.robot`), set this to your project's root folder (`my-automation-project/`). This ensures all imports resolve correctly during execution.
+
+### 3. Appium Configuration
+*   Ensure **Appium** is installed (`npm install -g appium`).
+*   In **Settings > Appium**, configure the Host (default: `127.0.0.1`) and Port (default: `4723`).
+*   Robot Runner will attempt to automaticall start Appium if it's not running.
+*   If you use a custom Appium configuration, you can set arguments in the **Appium Arguments** field.
+
+### 4. Running Tests
+1.  Go to the **Run** tab.
+2.  Select your target **Device**.
+3.  Choose your mode:
+    *   **File:** Browse and select a `.robot` file.
+    *   **Folder:** Select a folder to run all tests inside it.
+    *   **Args:** Select an argument file to run a specific configuration.
+4.  Click **Run**.
+
+### 5. History
+Go to **History** tab to view past test runs. You can:
+*   **View Logs:** View the logs for any test run.
+*   **View Report:** View the report for any test run.
+*   **Organize:** Organize your test runs by date, device, or OS version.
+
+---
 
 ## 🛠️ Prerequisites
 
-Before running the application, ensure you have the following installed:
+*   **Node.js** (v18+) & **npm**
+*   **Python** (3.8+) with `robotframework` and `robotframework-appiumlibrary` installed.
+*   **Appium Server** (`npm install -g appium`)
+*   **UiAutomator2 Driver** (`appium driver install uiautomator2`)
+*   **Android SDK Platform-Tools** (`adb` in system PATH)
+*   **Scrcpy** (Optional, for screen mirroring, in system PATH) - [Download](https://github.com/Genymobile/scrcpy)
 
-1.  **Node.js** (v18+) and **npm**: [Download](https://nodejs.org/)
-2.  **Rust** (latest stable): [Install Rust](https://www.rust-lang.org/tools/install)
-3.  **Android Studio** (or just Command Line Tools):
-    *   Ensure `adb` is in your system PATH.
-    *   Ensure `ANDROID_HOME` environment variable is set.
-4.  **Appium**:
-    ```bash
-    npm install -g appium
-    appium driver install uiautomator2
-    ```
-5.  **Scrcpy**: [Download](https://github.com/Genymobile/scrcpy) and add to PATH.
-
-## 💻 Development Setup
+## 💻 Building from Source
 
 1.  **Clone the repository:**
     ```bash
@@ -49,13 +93,12 @@ Before running the application, ensure you have the following installed:
     cd robot_runner
     ```
 
-2.  **Install frontend dependencies:**
+2.  **Install dependencies:**
     ```bash
     npm install
     ```
 
 3.  **Run in Development Mode:**
-    This command starts the React dev server and the Tauri Rust backend.
     ```bash
     npm run tauri dev
     ```
@@ -64,29 +107,7 @@ Before running the application, ensure you have the following installed:
     ```bash
     npm run tauri build
     ```
-    The installer will be located in `src-tauri/target/release/bundle/nsis/`.
-
-## 📁 Project Structure
-
-*   `src/`: React frontend code.
-    *   `src/components/`: Reusable UI components.
-    *   `src/pages/`: Main application views (Run, Tests, AI, Settings).
-    *   `src/lib/`: Utilities, state management, and settings logic.
-    *   `src/i18n/`: Localization files (en, pt, es).
-*   `src-tauri/`: Rust backend code.
-    *   `src/lib.rs`: Main entry point and command registration.
-    *   `src/adb/`: ADB interaction logic.
-    *   `src/runner/`: Test execution logic using subprocesses.
-
-## 🤝 Contributing
-
-1.  Fork the repository.
-2.  Create a feature branch (`git checkout -b feature/amazing-feature`).
-3.  Commit your changes (`git commit -m 'Add amazing feature'`).
-4.  Push to the branch (`git push origin feature/amazing-feature`).
-5.  Open a Pull Request.
 
 ## 📄 License
-
 This project is licensed under the MIT License.
 Copyright (c) 2025 Lucas de Eiroz Rodrigues
