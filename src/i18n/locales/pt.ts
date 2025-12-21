@@ -171,7 +171,26 @@ export const pt = {
             },
             folder_select: "Selecionar Pasta",
             dir_label: "Diretório {{key}}",
-            not_set: "Não definido"
+            not_set: "Não definido",
+            profiles: {
+                title: "Perfis de Configuração",
+                create: "Novo Perfil",
+                rename: "Renomear Perfil",
+                delete: "Excluir Perfil",
+                name_placeholder: "Nome do Perfil",
+                confirm_delete: "Tem certeza que deseja excluir este perfil? Isso não pode ser desfeito.",
+                default: "Padrão"
+            },
+            path_labels: {
+                suites: "Diretório de Suítes",
+                tests: "Diretório de Testes",
+                resources: "Diretório de Recursos",
+                logs: "Diretório de Logs",
+                logcat: "Diretório do Logcat",
+                screenshots: "Diretório de Capturas de Tela",
+                recordings: "Diretório de Gravações",
+                automationRoot: "Raiz da Automação (Working Dir)"
+            }
         },
         toolbox: {
             tabs: {
@@ -245,7 +264,9 @@ export const pt = {
                 clear: "Limpar",
                 delete: "Excluir Log",
                 open_launcher: "Abrir no Iniciador"
-            }
+            },
+            unknown_os: "SO Desconhecido",
+            unknown_model: "Modelo Desconhecido"
         },
         console: {
             waiting: "Aguardando saída..."

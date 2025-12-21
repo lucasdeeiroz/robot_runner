@@ -8,9 +8,8 @@ import clsx from "clsx";
 import { useTranslation } from "react-i18next";
 
 export function SettingsPage() {
-    const { settings, updateSetting, loading, profiles, activeProfileId, createProfile, switchProfile, renameProfile, deleteProfile } = useSettings();
+    const { settings, updateSetting, loading, profiles, activeProfileId, createProfile, switchProfile, renameProfile, deleteProfile, systemVersions, checkSystemVersions } = useSettings();
     const { t, i18n } = useTranslation();
-    const [systemVersions, setSystemVersions] = useState<SystemVersions | null>(null);
 
     // Profile Management Details
     const [showProfileModal, setShowProfileModal] = useState(false);
@@ -35,12 +34,9 @@ export function SettingsPage() {
     const [showAppiumLogs, setShowAppiumLogs] = useState(false);
     const logsEndRef = useRef<HTMLDivElement>(null);
 
-    // ... (Appium Listeners and other effects remain same)
-
     useEffect(() => {
-        invoke<SystemVersions>('get_system_versions')
-            .then(setSystemVersions)
-            .catch(err => console.error("Failed to fetch versions:", err));
+        // Cached System Versions
+        checkSystemVersions();
 
         // Initial status check
         checkAppiumStatus();
@@ -62,6 +58,9 @@ export function SettingsPage() {
             unlistenPromise.then(unlisten => unlisten());
         };
     }, []);
+
+    // ... rest of the component
+
 
     // Auto-scroll logs
     useEffect(() => {
@@ -145,7 +144,7 @@ export function SettingsPage() {
                 <div className="flex items-center justify-between">
                     <h2 className="text-xl font-semibold flex items-center gap-2">
                         <Users size={20} className="text-purple-500" />
-                        {t('settings.profiles.title', 'Profiles')}
+                        {t('settings.profiles.title')}
                     </h2>
                     <div className="flex items-center gap-2">
                         <select
@@ -154,30 +153,32 @@ export function SettingsPage() {
                             className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-sm min-w-[150px]"
                         >
                             {profiles.map(p => (
-                                <option key={p.id} value={p.id}>{p.name}</option>
+                                <option key={p.id} value={p.id}>
+                                    {p.id === 'default' && p.name === 'Default' ? t('settings.profiles.default') : p.name}
+                                </option>
                             ))}
                         </select>
                         <button
                             onClick={() => { setIsRenaming(false); setNewProfileName(""); setShowProfileModal(true); }}
                             className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-md"
-                            title={t('settings.profiles.create', 'New Profile')}
+                            title={t('settings.profiles.create')}
                         >
                             <Plus size={18} />
                         </button>
                         <button
                             onClick={() => { setIsRenaming(true); setNewProfileName(profiles.find(p => p.id === activeProfileId)?.name || ""); setShowProfileModal(true); }}
                             className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-md"
-                            title={t('settings.profiles.rename', 'Rename Profile')}
+                            title={t('settings.profiles.rename')}
                         >
                             <Edit2 size={18} />
                         </button>
                         {profiles.length > 1 && (
                             <button
                                 onClick={() => {
-                                    if (confirm(t('settings.profiles.confirm_delete', 'Are you sure you want to delete this profile?'))) deleteProfile(activeProfileId);
+                                    if (confirm(t('settings.profiles.confirm_delete'))) deleteProfile(activeProfileId);
                                 }}
                                 className="p-2 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 rounded-md"
-                                title={t('settings.profiles.delete', 'Delete Profile')}
+                                title={t('settings.profiles.delete')}
                             >
                                 <Trash2 size={18} />
                             </button>
@@ -198,7 +199,7 @@ export function SettingsPage() {
                             type="text"
                             value={newProfileName}
                             onChange={(e) => setNewProfileName(e.target.value)}
-                            placeholder={t('settings.profiles.name_placeholder', 'Profile Name')}
+                            placeholder={t('settings.profiles.name_placeholder')}
                             className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-lg px-4 py-2 mb-4 outline-none focus:border-blue-500"
                         />
                         <div className="flex justify-end gap-2">
@@ -207,14 +208,14 @@ export function SettingsPage() {
                                 onClick={() => setShowProfileModal(false)}
                                 className="px-4 py-2 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
                             >
-                                {t('common.cancel', 'Cancel')}
+                                {t('common.cancel')}
                             </button>
                             <button
                                 type="submit"
                                 disabled={!newProfileName.trim()}
                                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50"
                             >
-                                {t('common.save', 'Save')}
+                                {t('common.save')}
                             </button>
                         </div>
                     </form>
@@ -300,7 +301,7 @@ export function SettingsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {(Object.keys(settings.paths) as Array<keyof typeof settings.paths>).map((key) => (
                             <div key={key}>
-                                <label className="block text-sm text-zinc-400 mb-1 capitalize">{t('settings.dir_label', { key })}</label>
+                                <label className="block text-sm text-zinc-400 mb-1 capitalize">{t(`settings.path_labels.${key}` as any)}</label>
                                 <div className="flex gap-2">
                                     <input
                                         type="text"
@@ -467,12 +468,4 @@ export function SettingsPage() {
     );
 }
 
-interface SystemVersions {
-    adb: string;
-    node: string;
-    python: string;
-    scrcpy: string;
-    appium: string;
-    robot: string;
-    uiautomator2: string;
-}
+

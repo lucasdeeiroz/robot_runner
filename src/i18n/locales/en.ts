@@ -171,7 +171,26 @@ export const en = {
             },
             folder_select: "Select Folder",
             dir_label: "{{key}} Directory",
-            not_set: "Not set"
+            not_set: "Not set",
+            profiles: {
+                title: "Configuration Profiles",
+                create: "Create Profile",
+                rename: "Rename Profile",
+                delete: "Delete Profile",
+                name_placeholder: "Profile Name",
+                confirm_delete: "Are you sure you want to delete this profile? This cannot be undone.",
+                default: "Default"
+            },
+            path_labels: {
+                suites: "Suites Directory",
+                tests: "Tests Directory",
+                resources: "Resources Directory",
+                logs: "Logs Directory",
+                logcat: "Logcat Directory",
+                screenshots: "Screenshots Directory",
+                recordings: "Recordings Directory",
+                automationRoot: "Automation Root (Working Dir)"
+            }
         },
         toolbox: {
             tabs: {
@@ -245,7 +264,9 @@ export const en = {
                 clear: "Clear",
                 delete: "Delete Log",
                 open_launcher: "Open in Launcher"
-            }
+            },
+            unknown_os: "Unknown OS",
+            unknown_model: "Unknown Model"
         },
         console: {
             waiting: "Waiting for output..."

@@ -167,7 +167,26 @@ export const es = {
             },
             folder_select: "Seleccionar Carpeta",
             dir_label: "Directorio {{key}}",
-            not_set: "No definido"
+            not_set: "No definido",
+            profiles: {
+                title: "Perfiles de Configuración",
+                create: "Crear Perfil",
+                rename: "Renombrar Perfil",
+                delete: "Eliminar Perfil",
+                name_placeholder: "Nombre del Perfil",
+                confirm_delete: "¿Estás seguro de que deseas eliminar este perfil? Esto no se puede deshacer.",
+                default: "Predeterminado"
+            },
+            path_labels: {
+                suites: "Directorio de Suites",
+                tests: "Directorio de Pruebas",
+                resources: "Directorio de Recursos",
+                logs: "Directorio de Logs",
+                logcat: "Directorio de Logcat",
+                screenshots: "Directorio de Capturas de Pantalla",
+                recordings: "Directorio de Grabaciones",
+                automationRoot: "Raíz de Automatización (Working Dir)"
+            }
         },
         toolbox: {
             tabs: {
@@ -240,7 +259,9 @@ export const es = {
                 clear: "Limpiar",
                 delete: "Eliminar Log",
                 open_launcher: "Abrir en Lanzador"
-            }
+            },
+            unknown_os: "SO Desconocido",
+            unknown_model: "Modelo Desconocido"
         },
         console: {
             waiting: "Esperando salida..."

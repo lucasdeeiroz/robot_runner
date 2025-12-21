@@ -115,7 +115,7 @@ export function TestsPage() {
             });
         } else if (groupBy === 'os_version') {
             filteredHistory.forEach(log => {
-                const ver = log.android_version ? `Android ${log.android_version}` : 'Unknown OS';
+                const ver = log.android_version ? `Android ${log.android_version}` : t('tests_page.unknown_os');
                 if (!groups[ver]) groups[ver] = [];
                 groups[ver].push(log);
             });
@@ -209,7 +209,7 @@ export function TestsPage() {
                                             {(log.device_model || log.device_udid) && (
                                                 <div className="flex items-center gap-1 text-zinc-400">
                                                     {log.android_version ? `Android ${log.android_version} • ` : ''}
-                                                    {log.device_model || 'Unknown Model'}
+                                                    {log.device_model || t('tests_page.unknown_model')}
                                                     {log.device_udid ? ` (${log.device_udid})` : ''}
                                                 </div>
                                             )}
