@@ -61,7 +61,25 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                 });
 
                 // Poll for readiness
-                const baseUrl = `http://${settings.appiumHost}:${settings.appiumPort}/wd/hub/status`;
+                // Appium 3.x uses /status by default, Legacy uses /wd/hub/status.
+                // We check if --base-path is present in args.
+                let basePath = "";
+                const argsLower = settings.tools.appiumArgs.toLowerCase();
+                const basePathMatch = argsLower.match(/--base-path[=\s]([^\s]+)/);
+
+                if (basePathMatch) {
+                    basePath = basePathMatch[1]; // e.g. /wd/hub
+                } else if (settings.tools.appiumArgs.includes("/wd/hub")) {
+                    // Fallback loose check if they just typed it without full arg (unlikely but safe)
+                    basePath = "/wd/hub";
+                }
+
+                // Remove trailing slash if user added it
+                if (basePath.endsWith('/')) basePath = basePath.slice(0, -1);
+
+                const statusPath = `${basePath}/status`;
+                const baseUrl = `http://${settings.appiumHost}:${settings.appiumPort}${statusPath}`;
+
                 for (let i = 0; i < 20; i++) {
                     try {
                         const controller = new AbortController();
