@@ -30,6 +30,7 @@ export interface AppSettings {
         scrcpyArgs: string;
         robotArgs: string;
         appPackage: string; // for monitoring/logcat filtering
+        ngrokToken: string;
     };
 }
 
@@ -52,7 +53,8 @@ const DEFAULT_SETTINGS: AppSettings = {
         appiumArgs: '--relaxed-security',
         scrcpyArgs: '',
         robotArgs: '',
-        appPackage: ''
+        appPackage: '',
+        ngrokToken: ''
     }
 };
 

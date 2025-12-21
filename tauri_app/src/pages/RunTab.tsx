@@ -1,31 +1,44 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Play, Wifi, ScanEye, Terminal, Smartphone, RefreshCw } from "lucide-react";
+import { Play, Wifi, Smartphone, RefreshCw, Wrench, ScanEye } from "lucide-react";
 import clsx from "clsx";
+import { useTranslation } from "react-i18next";
 import { TestsSubTab } from "../components/run/TestsSubTab";
 import { ConnectSubTab } from "../components/run/ConnectSubTab";
 import { InspectorSubTab } from "../components/run/InspectorSubTab";
-import { CommandsSubTab } from "../components/run/CommandsSubTab";
+import { useTestSessions } from "@/lib/testSessionStore";
 
-export interface Device {
-    udid: string;
-    model: string;
-    is_emulator: boolean;
+import { Device } from "@/lib/types";
+// Removing local interface Device definition
+
+type TabType = 'tests' | 'connect' | 'inspector';
+
+interface RunTabProps {
+    onNavigate?: (page: string) => void;
 }
 
-type TabType = 'tests' | 'connect' | 'inspector' | 'commands';
-
-export function RunTab() {
+export function RunTab({ onNavigate }: RunTabProps) {
+    const { t } = useTranslation();
     const [activeTab, setActiveTab] = useState<TabType>('tests');
     const [devices, setDevices] = useState<Device[]>([]);
     const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
     const [isDeviceDropdownOpen, setIsDeviceDropdownOpen] = useState(false);
     const [loadingDevices, setLoadingDevices] = useState(false);
 
+    const { sessions, addToolboxSession } = useTestSessions();
+    // Only 'test' type sessions mark device as busy
+    const busyDeviceIds = sessions.filter(s => s.status === 'running' && s.type === 'test').map(s => s.deviceUdid);
+
     useEffect(() => {
         loadDevices();
-        // Close dropdown on click outside logic could be added here, but simple toggle is fine for now
     }, []);
+
+    // Enforce single selection when switching away from 'tests' tab
+    useEffect(() => {
+        if (activeTab !== 'tests' && selectedDevices.length > 1) {
+            setSelectedDevices([selectedDevices[0]]);
+        }
+    }, [activeTab]);
 
     const loadDevices = async () => {
         setLoadingDevices(true);
@@ -33,13 +46,9 @@ export function RunTab() {
             const list = await invoke<Device[]>('get_connected_devices');
             setDevices(list);
 
-            // Auto-select logic:
-            // If nothing selected, select first.
-            // If previously selected devices are gone, filter them out.
             if (selectedDevices.length === 0 && list.length > 0) {
                 setSelectedDevices([list[0].udid]);
             } else {
-                // Keep only those that still exist
                 const valid = selectedDevices.filter(id => list.find(d => d.udid === id));
                 if (valid.length === 0 && list.length > 0) {
                     setSelectedDevices([list[0].udid]);
@@ -56,11 +65,25 @@ export function RunTab() {
     };
 
     const toggleDevice = (udid: string) => {
-        setSelectedDevices(prev =>
-            prev.includes(udid)
-                ? prev.filter(id => id !== udid)
-                : [...prev, udid]
-        );
+        if (activeTab === 'tests') {
+            // Multi-select allowed
+            setSelectedDevices(prev =>
+                prev.includes(udid)
+                    ? prev.filter(id => id !== udid)
+                    : [...prev, udid]
+            );
+        } else {
+            // Single-select required
+            setSelectedDevices([udid]);
+            setIsDeviceDropdownOpen(false); // Close dropdown for better UX
+        }
+    };
+
+    const handleOpenToolbox = (device: Device) => {
+        addToolboxSession(device.udid, device.model);
+        if (onNavigate) {
+            onNavigate('tests');
+        }
     };
 
     return (
@@ -72,25 +95,19 @@ export function RunTab() {
                         active={activeTab === 'tests'}
                         onClick={() => setActiveTab('tests')}
                         icon={<Play size={16} />}
-                        label="Tests"
+                        label={t('run_tab.launcher')}
                     />
                     <TabButton
                         active={activeTab === 'connect'}
                         onClick={() => setActiveTab('connect')}
                         icon={<Wifi size={16} />}
-                        label="Connect"
+                        label={t('run_tab.connect')}
                     />
                     <TabButton
                         active={activeTab === 'inspector'}
                         onClick={() => setActiveTab('inspector')}
                         icon={<ScanEye size={16} />}
-                        label="Inspector"
-                    />
-                    <TabButton
-                        active={activeTab === 'commands'}
-                        onClick={() => setActiveTab('commands')}
-                        icon={<Terminal size={16} />}
-                        label="Commands"
+                        label={t('run_tab.inspector')}
                     />
                 </div>
 
@@ -106,38 +123,56 @@ export function RunTab() {
                         <Smartphone size={18} className={clsx("shrink-0", selectedDevices.length > 0 ? "text-blue-500" : "text-zinc-400")} />
                         <div className="w-48 text-sm font-medium text-zinc-900 dark:text-zinc-200 truncate">
                             {selectedDevices.length === 0
-                                ? "No Device Selected"
+                                ? t('run_tab.device.no_device')
                                 : selectedDevices.length === 1
                                     ? devices.find(d => d.udid === selectedDevices[0])?.model || selectedDevices[0]
-                                    : `${selectedDevices.length} Devices Selected`
+                                    : t('run_tab.device.selected_count', { count: selectedDevices.length })
                             }
                         </div>
                         {/* Dropdown Panel */}
                         {isDeviceDropdownOpen && (
                             <div
-                                className="absolute top-full right-0 mt-2 w-64 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl p-2 z-50 flex flex-col gap-1"
+                                className="absolute top-full right-0 mt-2 w-72 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl p-2 z-50 flex flex-col gap-1"
                                 onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside
                             >
-                                <div className="text-xs font-semibold text-zinc-500 px-2 py-1 uppercase tracking-wider">Select Devices</div>
+                                <div className="text-xs font-semibold text-zinc-500 px-2 py-1 uppercase tracking-wider">{t('run_tab.device.select')}</div>
                                 {devices.map(d => (
                                     <div
                                         key={d.udid}
-                                        onClick={() => toggleDevice(d.udid)}
-                                        className="flex items-center gap-3 px-2 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md cursor-pointer"
+                                        className="flex items-center justify-between px-2 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md group"
                                     >
-                                        <div className={clsx(
-                                            "w-4 h-4 rounded border flex items-center justify-center transition-colors",
-                                            selectedDevices.includes(d.udid)
-                                                ? "bg-blue-500 border-blue-500 text-white"
-                                                : "border-zinc-300 dark:border-zinc-600"
-                                        )}>
-                                            {selectedDevices.includes(d.udid) && <RefreshCw size={10} className="hidden" /> /* Just a placeholder check */}
-                                            {selectedDevices.includes(d.udid) && <div className="w-2 h-2 bg-white rounded-full" />}
+                                        <div
+                                            className="flex items-center gap-3 cursor-pointer flex-1 min-w-0"
+                                            onClick={() => toggleDevice(d.udid)}
+                                        >
+                                            <div className={clsx(
+                                                "w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0",
+                                                selectedDevices.includes(d.udid)
+                                                    ? "bg-blue-500 border-blue-500 text-white"
+                                                    : "border-zinc-300 dark:border-zinc-600"
+                                            )}>
+                                                {selectedDevices.includes(d.udid) && <div className="w-2 h-2 bg-white rounded-full" />}
+                                            </div>
+                                            <div className="flex flex-col overflow-hidden">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200 truncate">{d.model}</span>
+                                                    {busyDeviceIds.includes(d.udid) && (
+                                                        <span className="text-[10px] bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">
+                                                            {t('run_tab.device.busy')}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <span className="text-xs text-zinc-500 truncate" title={d.udid}>{d.udid}</span>
+                                            </div>
                                         </div>
-                                        <div className="flex flex-col overflow-hidden">
-                                            <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200 truncate">{d.model}</span>
-                                            <span className="text-xs text-zinc-500 truncate" title={d.udid}>{d.udid}</span>
-                                        </div>
+
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handleOpenToolbox(d); setIsDeviceDropdownOpen(false); }}
+                                            className="p-1.5 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
+                                            title="Open Toolbox"
+                                        >
+                                            <Wrench size={16} />
+                                        </button>
                                     </div>
                                 ))}
                                 {devices.length === 0 && (
@@ -150,7 +185,7 @@ export function RunTab() {
                     <button
                         onClick={(e) => { e.stopPropagation(); loadDevices(); }}
                         className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-md transition-colors text-zinc-500"
-                        title="Refresh Devices"
+                        title={t('run_tab.device.refresh')}
                     >
                         <RefreshCw size={14} className={loadingDevices ? "animate-spin" : ""} />
                     </button>
@@ -159,21 +194,17 @@ export function RunTab() {
 
             {/* Main Content Area */}
             <div className="flex-1 min-h-0 bg-white dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 overflow-hidden relative z-10">
-                {activeTab === 'tests' && (
-                    <TestsSubTab selectedDevices={selectedDevices} />
-                )}
+                <div className={clsx("h-full", activeTab === 'tests' ? "block" : "hidden")}>
+                    <TestsSubTab selectedDevices={selectedDevices} devices={devices} onNavigate={onNavigate} />
+                </div>
 
-                {activeTab === 'connect' && (
-                    <ConnectSubTab onDeviceConnected={loadDevices} />
-                )}
+                <div className={clsx("h-full", activeTab === 'connect' ? "block" : "hidden")}>
+                    <ConnectSubTab onDeviceConnected={loadDevices} selectedDevice={selectedDevices[0]} />
+                </div>
 
-                {activeTab === 'inspector' && (
+                <div className={clsx("h-full", activeTab === 'inspector' ? "block" : "hidden")}>
                     <InspectorSubTab selectedDevice={selectedDevices[0] || ""} />
-                )}
-
-                {activeTab === 'commands' && (
-                    <CommandsSubTab selectedDevice={selectedDevices[0] || ""} />
-                )}
+                </div>
             </div>
         </div>
     );

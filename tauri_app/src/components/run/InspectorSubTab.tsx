@@ -1,8 +1,10 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { RefreshCw, LayoutTemplate, Maximize, Check, Scan } from 'lucide-react';
+import { RefreshCw, Maximize, Check, Scan, MousePointerClick, Move, Home, ArrowLeft, Rows } from 'lucide-react';
 import { XMLParser } from 'fast-xml-parser';
 import clsx from 'clsx';
+import { useTranslation } from 'react-i18next';
 import { InspectorNode, transformXmlToTree, findNodeAtCoords, generateXPath } from '@/lib/inspectorUtils';
 
 interface InspectorSubTabProps {
@@ -10,15 +12,19 @@ interface InspectorSubTabProps {
 }
 
 export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
+    const { t } = useTranslation();
     const [screenshot, setScreenshot] = useState<string | null>(null);
-    const [xmlData, setXmlData] = useState<string | null>(null);
     const [rootNode, setRootNode] = useState<InspectorNode | null>(null);
     const [selectedNode, setSelectedNode] = useState<InspectorNode | null>(null);
     const [hoveredNode, setHoveredNode] = useState<InspectorNode | null>(null);
 
     const [loading, setLoading] = useState(false);
-    const [viewMode, setViewMode] = useState<'properties' | 'xml'>('properties');
+    // const [viewMode, setViewMode] = useState<'properties' | 'xml'>('properties');
     const [copied, setCopied] = useState<string | null>(null);
+
+    // Interaction Mode
+    const [interactionMode, setInteractionMode] = useState<'inspect' | 'tap' | 'swipe'>('inspect');
+    const [swipeStart, setSwipeStart] = useState<{ x: number, y: number } | null>(null);
 
     const imgRef = useRef<HTMLImageElement>(null);
 
@@ -28,7 +34,7 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
         } else {
             // Reset if no device
             setScreenshot(null);
-            setXmlData(null);
+            // setXmlData(null); // Removed unused state
             setRootNode(null);
             setSelectedNode(null);
         }
@@ -44,7 +50,7 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
             setScreenshot(b64);
 
             const xml = await invoke<string>('get_xml_dump', { deviceId: selectedDevice });
-            setXmlData(xml);
+            // setXmlData(xml); // Removed unused state
 
             // Parse XML
             const parser = new XMLParser({
@@ -59,31 +65,79 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
 
         } catch (e) {
             console.error("Inspector error:", e);
-            // alert(`Inspector failed: ${e}`); // Maybe too intrusive for auto-load
+            // alert(`Inspector failed: ${ e } `); // Maybe too intrusive for auto-load
         } finally {
             setLoading(false);
         }
     };
 
-    const handleImageMouseMove = (e: React.MouseEvent<HTMLImageElement>) => {
-        if (!processMouseInteraction(e, true)) return;
+    const sendAdbInput = async (cmd: string) => {
+        if (!selectedDevice) return;
+        const args = ['shell', 'input', ...cmd.split(' ')];
+        try {
+            await invoke('run_adb_command', { device: selectedDevice, args });
+            // Optional: Auto-refresh after input?
+            // setTimeout(refreshAll, 1000); 
+        } catch (e) {
+            console.error("Input failed", e);
+        }
+    };
+
+    const getCoords = (e: React.MouseEvent<HTMLImageElement>) => {
+        if (!imgRef.current) return null;
+        const rect = imgRef.current.getBoundingClientRect();
+        const scaleX = imgRef.current.naturalWidth / rect.width;
+        const scaleY = imgRef.current.naturalHeight / rect.height;
+        return {
+            x: Math.round((e.clientX - rect.left) * scaleX),
+            y: Math.round((e.clientY - rect.top) * scaleY)
+        };
+    };
+
+    const handleImageMouseDown = (e: React.MouseEvent<HTMLImageElement>) => {
+        if (interactionMode === 'swipe') {
+            const coords = getCoords(e);
+            if (coords) setSwipeStart(coords);
+        }
+    };
+
+    const handleImageMouseUp = (e: React.MouseEvent<HTMLImageElement>) => {
+        if (interactionMode === 'swipe' && swipeStart) {
+            const end = getCoords(e);
+            if (end) {
+                // Determine duration based on distance? Or fixed.
+                sendAdbInput(`swipe ${swipeStart.x} ${swipeStart.y} ${end.x} ${end.y} 500`);
+            }
+            setSwipeStart(null);
+        }
     };
 
     const handleImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
-        if (!processMouseInteraction(e, false)) return;
+        const coords = getCoords(e);
+        if (!coords) return;
+
+        if (interactionMode === 'tap') {
+            sendAdbInput(`tap ${coords.x} ${coords.y} `);
+        } else if (interactionMode === 'inspect') {
+            if (!processMouseInteraction(e, false)) return;
+        }
+    };
+
+    const handleImageMouseMove = (e: React.MouseEvent<HTMLImageElement>) => {
+        if (interactionMode === 'inspect') {
+            processMouseInteraction(e, true);
+        }
     };
 
     const processMouseInteraction = (e: React.MouseEvent<HTMLImageElement>, isHover: boolean) => {
         if (!rootNode || !imgRef.current) return false;
 
-        const rect = imgRef.current.getBoundingClientRect();
-        const scaleX = imgRef.current.naturalWidth / rect.width;
-        const scaleY = imgRef.current.naturalHeight / rect.height;
+        // Re-use logic or call getCoords? 
+        // Logic below matches existing logic but I extracted getCoords for reuse.
+        const coords = getCoords(e);
+        if (!coords) return false;
 
-        const x = (e.clientX - rect.left) * scaleX;
-        const y = (e.clientY - rect.top) * scaleY;
-
-        const node = findNodeAtCoords(rootNode, x, y);
+        const node = findNodeAtCoords(rootNode, coords.x, coords.y);
 
         if (isHover) {
             if (node !== hoveredNode) setHoveredNode(node);
@@ -119,14 +173,14 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
         return (
             <div className="h-full flex flex-col items-center justify-center text-zinc-400">
                 <Scan size={48} className="mb-4 opacity-20" />
-                <p>Select a device to start Inspector</p>
+                <p>{t('inspector.empty')}</p>
             </div>
         );
     }
 
     return (
         <div className="h-full flex flex-col space-y-4">
-            {/* Toolbar */}
+            {/* Toolbar - Now at the Top */}
             <div className="bg-zinc-50 dark:bg-black/20 p-2 rounded-lg border border-zinc-200 dark:border-zinc-800 flex items-center justify-between shrink-0">
                 <div className="flex gap-2">
                     <button
@@ -135,36 +189,69 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
                         className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-700 text-sm font-medium transition-colors disabled:opacity-50"
                     >
                         <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-                        Refresh Source
+                        {t('inspector.refresh')}
                     </button>
-                    {/* Add Swipe/Tap buttons here later */}
+                    <div className="h-6 w-px bg-zinc-300 dark:bg-zinc-700 mx-2 self-center" />
+
+                    <div className="flex bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-md">
+                        <button
+                            onClick={() => setInteractionMode('inspect')}
+                            className={clsx("p-1.5 rounded-sm transition-all", interactionMode === 'inspect' ? "bg-white dark:bg-zinc-600 shadow-sm text-blue-600 dark:text-blue-400" : "text-zinc-400 hover:text-zinc-600")}
+                            title={t('inspector.modes.inspect')}
+                        >
+                            <Scan size={16} />
+                        </button>
+                        <button
+                            onClick={() => setInteractionMode('tap')}
+                            className={clsx("p-1.5 rounded-sm transition-all", interactionMode === 'tap' ? "bg-white dark:bg-zinc-600 shadow-sm text-green-600 dark:text-green-400" : "text-zinc-400 hover:text-zinc-600")}
+                            title={t('inspector.modes.tap')}
+                        >
+                            <MousePointerClick size={16} />
+                        </button>
+                        <button
+                            onClick={() => setInteractionMode('swipe')}
+                            className={clsx("p-1.5 rounded-sm transition-all", interactionMode === 'swipe' ? "bg-white dark:bg-zinc-600 shadow-sm text-orange-600 dark:text-orange-400" : "text-zinc-400 hover:text-zinc-600")}
+                            title={t('inspector.modes.swipe')}
+                        >
+                            <Move size={16} />
+                        </button>
+                    </div>
+
+                    <div className="flex gap-1 ml-2">
+                        <button onClick={() => sendAdbInput('keyevent 3')} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-zinc-500" title="Home"><Home size={16} /></button>
+                        <button onClick={() => sendAdbInput('keyevent 4')} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-zinc-500" title="Back"><ArrowLeft size={16} /></button>
+                        <button onClick={() => sendAdbInput('keyevent 187')} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-zinc-500" title="Recents"><Rows size={16} /></button>
+                    </div>
                 </div>
                 <div className="text-xs text-zinc-400">
-                    {loading ? "Fetching device state..." : "Ready"}
+                    {loading ? t('inspector.status.fetching') : t('inspector.status.ready')}
                 </div>
             </div>
 
-            {/* Content */}
-            <div className="flex-1 grid grid-cols-2 gap-4 min-h-0 overflow-hidden">
-                {/* Screenshot View */}
-                <div className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 flex items-center justify-center overflow-auto shadow-inner relative">
+            {/* Main Content: Split View */}
+            <div className="flex-1 grid grid-cols-[auto_1fr] gap-4 min-h-0 overflow-hidden">
+                {/* Left: Device Screen (Adaptive) */}
+                <div className="bg-zinc-100 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 flex items-center justify-center overflow-hidden relative">
                     {screenshot ? (
-                        <div className="relative inline-block">
+                        <div className="relative h-full w-full flex items-center justify-center">
                             <img
                                 ref={imgRef}
-                                src={`data:image/png;base64,${screenshot}`}
+                                src={`data: image / png; base64, ${screenshot} `}
                                 alt="Device Screenshot"
-                                className="max-h-[calc(100vh-16rem)] object-contain shadow-lg rounded-md select-none"
+                                className="h-full w-auto object-contain shadow-lg rounded-md select-none max-w-full"
                                 onMouseMove={handleImageMouseMove}
                                 onClick={handleImageClick}
+                                onMouseDown={handleImageMouseDown}
+                                onMouseUp={handleImageMouseUp}
                                 draggable={false}
                             />
-                            {/* Hover Highlight */}
+                            {/* Highlights overlaid on top (using absolute positioning based on cached rects logic) */}
+                            {/* Note: The previous logic relied on client rects which might be tricky if image scales. */}
+                            {/* Ideally we should map coordinates relative to image natural size to displayed size. */}
                             <div
                                 className="absolute border-2 border-blue-400 pointer-events-none transition-all duration-75 z-10"
                                 style={{ ...getHighlighterStyle(hoveredNode, '#60a5fa'), display: hoveredNode?.bounds ? 'block' : 'none' }}
                             />
-                            {/* Selected Highlight */}
                             <div
                                 className="absolute border-2 border-red-500 pointer-events-none z-20"
                                 style={{ ...getHighlighterStyle(selectedNode, '#ef4444'), display: selectedNode?.bounds ? 'block' : 'none' }}
@@ -173,95 +260,65 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
                     ) : (
                         <div className="text-zinc-400 flex flex-col items-center">
                             {loading ? <RefreshCw className="animate-spin mb-2 opacity-50" size={32} /> : <Maximize size={32} className="mb-2 opacity-50" />}
-                            <p>{loading ? "Loading..." : "No screenshot"}</p>
+                            <p>{loading ? t('inspector.status.loading') : t('inspector.status.no_screenshot')}</p>
                         </div>
                     )}
                 </div>
 
-                {/* Properties View */}
-                <div className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-0 flex flex-col overflow-hidden shadow-sm dark:shadow-none">
-                    <div className="flex border-b border-zinc-200 dark:border-zinc-800 shrink-0">
-                        <button
-                            className={clsx(
-                                "flex-1 px-4 py-3 text-sm font-medium border-b-2 transition-colors",
-                                viewMode === 'properties'
-                                    ? "border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-500/10"
-                                    : "border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
-                            )}
-                            onClick={() => setViewMode('properties')}
-                        >
-                            Node Properties
-                        </button>
-                        <button
-                            className={clsx(
-                                "flex-1 px-4 py-3 text-sm font-medium border-b-2 transition-colors",
-                                viewMode === 'xml'
-                                    ? "border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-500/10"
-                                    : "border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
-                            )}
-                            onClick={() => setViewMode('xml')}
-                        >
-                            XML Source
-                        </button>
+                {/* Right: Properties Scroll View */}
+                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl flex flex-col overflow-hidden shadow-sm dark:shadow-none h-full">
+                    <div className="flex border-b border-zinc-200 dark:border-zinc-800 shrink-0 bg-zinc-50 dark:bg-zinc-800/50">
+                        <div className="px-4 py-3 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                            {t('inspector.properties')}
+                        </div>
                     </div>
 
-                    <div className="flex-1 overflow-auto p-0">
-                        {viewMode === 'xml' ? (
-                            xmlData ? (
-                                <pre className="p-4 font-mono text-xs text-zinc-600 dark:text-zinc-300 whitespace-pre-wrap break-all">{xmlData}</pre>
-                            ) : (
-                                <div className="text-zinc-400 text-center mt-20">No XML Dump loaded</div>
-                            )
-                        ) : (
-                            selectedNode ? (
-                                <div className="p-4 space-y-4">
-                                    {/* Quick Copy Action Buttons */}
-                                    <div className="grid grid-cols-2 gap-2">
+                    <div className="flex-1 overflow-y-auto custom-scrollbar p-0">
+                        {selectedNode ? (
+                            <div className="p-4 space-y-6">
+                                {/* Quick Copy Actions */}
+                                <div className="space-y-4">
+                                    <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">{t('inspector.attributes.identifiers')}</h3>
+                                    <div className="grid grid-cols-1 gap-2">
                                         <CopyButton
-                                            label="XPath"
+                                            label={t('inspector.attributes.xpath')}
                                             value={generateXPath(selectedNode)}
                                             onCopy={(v) => copyToClipboard(v, 'xpath')}
                                             active={copied === 'xpath'}
                                         />
                                         <CopyButton
-                                            label="Resource ID"
+                                            label={t('inspector.attributes.resource_id')}
                                             value={selectedNode.attributes['resource-id']}
                                             onCopy={(v) => copyToClipboard(v, 'rid')}
                                             active={copied === 'rid'}
                                         />
-                                        <CopyButton
-                                            label="Access ID"
-                                            value={selectedNode.attributes['content-desc']}
-                                            onCopy={(v) => copyToClipboard(v, 'aid')}
-                                            active={copied === 'aid'}
-                                        />
-                                        <CopyButton
-                                            label="Class"
-                                            value={selectedNode.attributes['class']}
-                                            onCopy={(v) => copyToClipboard(v, 'class')}
-                                            active={copied === 'class'}
-                                        />
                                     </div>
+                                </div>
 
-                                    {/* Attributes Table */}
-                                    <div>
-                                        <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2 block">All Attributes</span>
-                                        <div className="grid grid-cols-[1fr,2fr] gap-px bg-zinc-200 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden">
-                                            {Object.entries(selectedNode.attributes).map(([key, value]) => (
-                                                <div key={key} className="contents">
-                                                    <div className="bg-white dark:bg-zinc-900 p-2 text-xs font-medium text-zinc-500 border-b border-zinc-100 dark:border-zinc-800/50 last:border-0">{key}</div>
-                                                    <div className="bg-white dark:bg-zinc-900 p-2 text-xs text-zinc-800 dark:text-zinc-300 font-mono border-b border-zinc-100 dark:border-zinc-800/50 last:border-0 break-all">{value}</div>
+                                {/* All Attributes */}
+                                <div>
+                                    <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">{t('inspector.attributes.all')}</h3>
+                                    <div className="border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden text-sm">
+                                        {Object.entries(selectedNode.attributes)
+                                            .sort(([a], [b]) => a.localeCompare(b))
+                                            .map(([key, value]) => (
+                                                <div key={key} className="flex flex-col border-b border-zinc-100 dark:border-zinc-800 last:border-0">
+                                                    <div className="bg-zinc-50 dark:bg-zinc-800/50 px-3 py-1.5 text-xs text-zinc-500 font-medium break-all">
+                                                        {key}
+                                                    </div>
+                                                    <div className="bg-white dark:bg-zinc-900 px-3 py-2 font-mono text-zinc-700 dark:text-zinc-300 break-all">
+                                                        {String(value)}
+                                                    </div>
                                                 </div>
                                             ))}
-                                        </div>
                                     </div>
                                 </div>
-                            ) : (
-                                <div className="flex flex-col items-center justify-center h-full text-zinc-400">
-                                    <LayoutTemplate size={32} className="mb-2 opacity-50" />
-                                    <p>Select an element on the screenshot</p>
-                                </div>
-                            )
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center h-full text-zinc-400 p-8 text-center">
+                                <Scan size={48} className="mb-4 opacity-20" />
+                                <p className="text-sm">{t('inspector.select_element')}</p>
+                            </div>
                         )}
                     </div>
                 </div>

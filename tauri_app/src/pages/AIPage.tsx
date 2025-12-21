@@ -10,12 +10,15 @@ interface Message {
     timestamp: Date;
 }
 
+import { useTranslation } from "react-i18next";
+
 export function AIPage() {
+    const { t } = useTranslation();
     const [messages, setMessages] = useState<Message[]>([
         {
             id: 'welcome',
             role: 'assistant',
-            text: "Hello! I'm your Robot Framework assistant. accessible via Google Gemini. How can I help you write or debug your tests today?",
+            text: t('ai_page.welcome'),
             timestamp: new Date()
         }
     ]);
@@ -57,7 +60,7 @@ export function AIPage() {
             const errorMsg: Message = {
                 id: (Date.now() + 1).toString(),
                 role: 'assistant',
-                text: "Sorry, I encountered an error connecting to the AI service.",
+                text: t('ai_page.error'),
                 timestamp: new Date()
             };
             setMessages(prev => [...prev, errorMsg]);
@@ -78,9 +81,9 @@ export function AIPage() {
             {/* Header */}
             <div className="mb-4">
                 <h1 className="text-2xl font-bold flex items-center gap-2 text-gray-900 dark:text-white">
-                    <Cpu className="text-blue-500 dark:text-blue-400" /> AI Assistant
+                    <Cpu className="text-blue-500 dark:text-blue-400" /> {t('ai_page.title')}
                 </h1>
-                <p className="text-zinc-500 dark:text-zinc-400 text-sm">Powered by Google Gemini</p>
+                <p className="text-zinc-500 dark:text-zinc-400 text-sm">{t('ai_page.powered_by')}</p>
             </div>
 
             {/* Chat Area */}
@@ -117,7 +120,7 @@ export function AIPage() {
                                 <Bot size={16} className="text-purple-600 dark:text-white" />
                             </div>
                             <div className="bg-zinc-100 dark:bg-zinc-800 p-3 rounded-lg text-sm text-zinc-500 dark:text-zinc-400">
-                                Thinking...
+                                {t('ai_page.thinking')}
                             </div>
                         </div>
                     )}
@@ -130,7 +133,7 @@ export function AIPage() {
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={handleKeyDown}
-                            placeholder="Ask about Robot Framework..."
+                            placeholder={t('ai_page.placeholder')}
                             className="flex-1 bg-white dark:bg-black/40 border border-zinc-300 dark:border-zinc-700 rounded-lg px-4 py-2 text-gray-900 dark:text-zinc-200 focus:border-blue-500 outline-none"
                             disabled={loading}
                         />

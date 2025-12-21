@@ -8,6 +8,7 @@ pub struct Device {
     pub state: String, // "device", "offline", "unauthorized"
     pub product: String,
     pub transport_id: String,
+    pub android_version: Option<String>,
 }
 
 #[tauri::command]
@@ -38,12 +39,22 @@ pub fn get_connected_devices() -> Result<Vec<Device>, String> {
         let state = parts[1].to_string();
 
         if state == "device" {
-            // Get model and other details
+            // Get model
             let model_output = Command::new("adb")
-                .args(&["-s", &udid, "shell", "getprop ro.product.model"])
+                .args(&["-s", &udid, "shell", "getprop", "ro.product.model"])
                 .output();
 
             let model = match model_output {
+                Ok(out) => String::from_utf8_lossy(&out.stdout).trim().to_string(),
+                Err(_) => "Unknown".to_string(),
+            };
+
+            // Get Android Version
+            let ver_output = Command::new("adb")
+                .args(&["-s", &udid, "shell", "getprop", "ro.build.version.release"])
+                .output();
+
+            let android_version = match ver_output {
                 Ok(out) => String::from_utf8_lossy(&out.stdout).trim().to_string(),
                 Err(_) => "Unknown".to_string(),
             };
@@ -52,8 +63,9 @@ pub fn get_connected_devices() -> Result<Vec<Device>, String> {
                 udid,
                 model,
                 state,
-                product: "".to_string(), // Placeholder, not always needed
+                product: "".to_string(),
                 transport_id: "".to_string(),
+                android_version: Some(android_version),
             });
         } else {
              devices.push(Device {
@@ -62,6 +74,7 @@ pub fn get_connected_devices() -> Result<Vec<Device>, String> {
                 state,
                 product: "".to_string(),
                 transport_id: "".to_string(),
+                android_version: None,
             });
         }
     }

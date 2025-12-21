@@ -1,0 +1,292 @@
+export const en = {
+    translation: {
+        sidebar: {
+            run: "Run",
+            tests: "Tests",
+            ai_assistant: "AI Assistant",
+            settings: "Settings",
+            about: "About"
+        },
+        run_tab: {
+            launcher: "Launcher",
+            connect: "Connect",
+            inspector: "Inspector",
+            commands: "Commands",
+            device: {
+                no_device: "No Device Selected",
+                selected_count: "{{count}} Devices Selected",
+                select: "Select Devices",
+                busy: "Busy",
+                refresh: "Refresh Devices"
+            }
+        },
+        tests: {
+            mode: {
+                file: "Test File",
+                folder: "Test Folder",
+                args: "Argument File"
+            },
+            target: "Target",
+            no_selection: "No valid selection",
+            run_all: "Run All Tests",
+            run_selected: "Run Selected Test",
+            status: {
+                checking: "Checking Appium...",
+                starting: "Starting Appium...",
+                launching: "Launching Tests...",
+                redirecting: "Redirecting...",
+                failed: "Launch failed"
+            },
+            alerts: {
+                busy: "The following devices are currently busy running a test:\n{{devices}}\n\nPlease wait for them to finish."
+            },
+            options: {
+                dont_overwrite: "Don't Overwrite Logs"
+            }
+        },
+        connect: {
+            wireless: {
+                title: "Wireless Connection",
+                desc: "Connect to devices via Wi-Fi ADB"
+            },
+            remote: {
+                title: "Remote Access (Ngrok)",
+                desc: "Expose Appium Server to the internet"
+            },
+            labels: {
+                ip: "IP Address",
+                port: "Port",
+                code: "Pairing Code (Optional)",
+                config: "Configuration",
+                expose_port: "Expose Port",
+                token: "Token",
+                missing_token: "Missing (Check Settings)"
+            },
+            actions: {
+                connect: "Connect",
+                pair: "Pair",
+                disconnect: "Disconnect",
+                start_tunnel: "Start Public Tunnel",
+                stop_tunnel: "Stop Tunnel",
+                copy: "Copied!"
+            },
+            status: {
+                tunnel_active: "Tunnel Active",
+                starting_ngrok: "Starting Ngrok Tunnel..."
+            }
+        },
+        inspector: {
+            empty: "Select a device to start Inspector",
+            refresh: "Refresh Source",
+            modes: {
+                inspect: "Inspect Mode",
+                tap: "Tap Mode",
+                swipe: "Swipe Mode"
+            },
+            status: {
+                fetching: "Fetching device state...",
+                ready: "Ready",
+                loading: "Loading...",
+                no_screenshot: "No screenshot"
+            },
+            properties: "Node Properties",
+            select_element: "Select an element on the screenshot",
+            attributes: {
+                all: "All Attributes",
+                xpath: "XPath",
+                resource_id: "Resource ID",
+                access_id: "Access ID",
+                class: "Class"
+            }
+        },
+        commands: {
+            empty: "Select a device to execute commands",
+            placeholder: "Enter ADB command (e.g. 'shell ls -la')",
+            waiting: "Waiting for commands...",
+            clear: "Clear Console",
+            quick: "Quick",
+            saved: "Saved",
+            actions: {
+                save: "Save",
+                send: "Send",
+                delete_confirm: "Delete this saved command?"
+            },
+            modal: {
+                title: "Save Custom Command",
+                label: "Label",
+                placeholder: "e.g. List Files",
+                command: "Command",
+                cancel: "Cancel",
+                save: "Save Command"
+            }
+        },
+        common: {
+            cancel: "Cancel",
+            save: "Save",
+            delete: "Delete",
+            edit: "Edit",
+            ok: "OK",
+            search: "Search...",
+            loading: "Loading..."
+        },
+        settings: {
+            title: "Settings",
+            description: "Configure application preferences and integrations.",
+            paths: "Path Configuration",
+            tools: "Tool Options",
+            general: "General",
+            language: "Language",
+            appearance: {
+                title: "Appearance",
+                theme: "App Theme",
+                light: "Light",
+                dark: "Dark"
+            },
+            appium: {
+                title: "Appium Server",
+                running: "Running (PID: {{pid}})",
+                stopped: "Stopped",
+                start: "Start Server",
+                stop: "Stop Server",
+                logs: "Toggle Logs",
+                waiting: "Waiting for logs...",
+                host: "Host",
+                port: "Port"
+            },
+            tool_config: {
+                appium_args: "Appium Arguments",
+                scrcpy_args: "Scrcpy Arguments",
+                robot_args: "Robot Framework Arguments",
+                app_package: "App Package (Monitoring)",
+                ngrok_token: "Ngrok Auth Token"
+            },
+            ai: {
+                title: "AI Integration (Google Gemini)",
+                key: "API Key",
+                placeholder: "Enter your Gemini API Key"
+            },
+            system: {
+                title: "System Versions",
+                checking: "Checking system versions..."
+            },
+            folder_select: "Select Folder",
+            dir_label: "{{key}} Directory",
+            not_set: "Not set"
+        },
+        toolbox: {
+            tabs: {
+                console: "Test Console",
+                logcat: "Logcat",
+                commands: "Commands",
+                mirror: "Mirror",
+                performance: "Performance"
+            },
+            actions: {
+                screenshot: "Take Screenshot",
+                start_recording: "Start Screen Recording",
+                stop_recording: "Stop Recording",
+                stop_execution: "Stop Execution",
+                rerun: "Re-run"
+            }
+        },
+        file_explorer: {
+            up: "Go Up",
+            loading: "Loading...",
+            error: "Failed to load directory",
+            reset: "Reset to Root",
+            empty: "Empty directory",
+            current: "Current directory",
+            no_selection: "No selection",
+            cancel: "Cancel",
+            select_file: "Select File",
+            select_folder: "Select Folder",
+            select_generic: "Select"
+        },
+        about: {
+            description: "Information about Robot Runner and its creators.",
+            long_description: "A modern, cross-platform GUI for Robot Framework and Appium, designed to simplify test automation workflows.",
+            developed_by: "Developed by",
+            lead: "Lead Developer",
+            powered_by: "Powered by"
+        },
+        ai_page: {
+            title: "AI Assistant",
+            powered_by: "Powered by Google Gemini",
+            welcome: "Hello! I'm your Robot Framework assistant, accessible via Google Gemini. How can I help you write or debug your tests today?",
+            placeholder: "Ask about Robot Framework or your test results...",
+            thinking: "Thinking...",
+            error: "Sorry, I encountered an error connecting to the AI service."
+        },
+        tests_page: {
+            monitoring: "Test Monitoring",
+            toolbox: "Device Toolbox",
+            history: "History",
+            loading: "Loading history...",
+            no_logs: "No execution logs found.",
+            report: "Report",
+            open_folder: "Open Folder",
+            session_not_found: "Session not found.",
+            close_tab: "Close Tab",
+            filter: {
+                search: "Search logs...",
+                period: "Period",
+                group_by: "Group By",
+                status: "Status",
+                device: "Device",
+                suite: "Suite",
+                all_time: "All Time",
+                today: "Today",
+                last_7_days: "Last 7 Days",
+                last_30_days: "Last 30 Days",
+                os_version: "OS Version"
+            },
+            actions: {
+                refresh: "Refresh List",
+                clear: "Clear",
+                delete: "Delete Log",
+                open_launcher: "Open in Launcher"
+            }
+        },
+        console: {
+            waiting: "Waiting for output..."
+        },
+        logcat: {
+            start: "Start",
+            stop: "Stop",
+            filter: "Filter App",
+            no_packages: "No packages configured",
+            level: "Log Level",
+            clear: "Clear Logs",
+            lines: "lines",
+            no_logs: "No logs captured",
+            select_device: "Select a device to view logs",
+            saving: "Saving logs to:"
+        },
+        scrcpy: {
+            title: "Screen Mirroring",
+            description: "Launch Scrcpy to mirror and control this device's screen in a separate window.",
+            start: "Start Mirroring",
+            starting: "Starting...",
+            note: "Note: Scrcpy must be installed on your system's PATH. The mirror window runs independently.",
+            error: "Failed to start Scrcpy. Ensure it's installed and in your PATH."
+        },
+        performance: {
+            title: "Device Performance",
+            auto_on: "Auto-Refresh On",
+            auto_off: "Auto-Refresh Off",
+            refresh: "Refresh Now",
+            cpu: "CPU Usage",
+            ram: "RAM Usage",
+            battery: "Battery",
+            load: "load",
+            used: "used",
+            loading: "Loading stats...",
+            error: "Failed to fetch device stats",
+            start_record: "Start Recording",
+            stop_record: "Stop Recording",
+            recording: "Recording...",
+            record_error: "Failed to record",
+            select_device: "Select a device to view performance stats."
+        }
+    }
+};

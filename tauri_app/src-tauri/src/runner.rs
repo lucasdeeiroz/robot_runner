@@ -4,22 +4,54 @@ use std::io::{BufRead, BufReader};
 use std::thread;
 use std::sync::Mutex;
 use std::time::Duration;
+use std::collections::HashMap;
+use chrono;
 
-pub struct TestState(pub Mutex<Option<Child>>);
+pub struct TestState(pub Mutex<HashMap<String, Child>>);
 
 #[tauri::command]
-pub fn stop_robot_test(state: State<'_, TestState>) -> Result<String, String> {
-    let mut child_guard = state.0.lock().map_err(|e| e.to_string())?;
+pub fn stop_robot_test(state: State<'_, TestState>, run_id: String) -> Result<String, String> {
+    let mut procs = state.0.lock().map_err(|e| e.to_string())?;
     
-    if let Some(child) = child_guard.as_mut() {
-        child.kill().map_err(|e| format!("Failed to kill process: {}", e))?;
-        return Ok("Test stopped".to_string());
+    if let Some(mut child) = procs.remove(&run_id) {
+         // Handle Windows Process Tree Killing
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            let pid = child.id();
+            let _ = Command::new("taskkill")
+                .args(&["/F", "/T", "/PID", &pid.to_string()])
+                .creation_flags(0x08000000) // CREATE_NO_WINDOW
+                .output();
+                
+            let _ = child.kill();
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+             let _ = child.kill();
+        }
+
+        let _ = child.wait();
+        return Ok(format!("Test {} stopped", run_id));
     }
-    Err("No test running".to_string())
+    Err(format!("Test {} not running", run_id))
+}
+
+#[derive(serde::Serialize, Clone)]
+struct TestOutput {
+    run_id: String,
+    message: String,
+}
+
+#[derive(serde::Serialize, Clone)]
+struct TestFinished {
+    run_id: String,
+    status: String,
 }
 
 #[tauri::command]
-pub fn run_robot_test(app: AppHandle, state: State<'_, TestState>, test_path: String, output_dir: String, device: Option<String>) -> Result<String, String> {
+pub fn run_robot_test(app: AppHandle, state: State<'_, TestState>, run_id: String, test_path: Option<String>, output_dir: String, device: Option<String>, arguments_file: Option<String>, timestamp_outputs: Option<bool>) -> Result<String, String> {
     // Resolve absolute path for output_dir to ensure clean logs
     let abs_output_dir = std::fs::canonicalize(&output_dir)
         .map(|p| {
@@ -34,17 +66,58 @@ pub fn run_robot_test(app: AppHandle, state: State<'_, TestState>, test_path: St
         .unwrap_or_else(|_| output_dir.clone());
 
     let mut args = vec!["-d", &abs_output_dir, "--console", "verbose"];
+
+    if let Some(true) = timestamp_outputs {
+        args.push("--timestampoutputs");
+    }
+
+    if let Some(arg_file) = &arguments_file {
+        args.push("-A");
+        args.push(arg_file);
+    }
     
-    let device_arg; // Extend lifetime
+    let device_arg; 
     if let Some(d) = &device {
         device_arg = format!("udid:{}", d);
         args.push("-v");
         args.push(&device_arg);
     }
     
-    args.push(&test_path);
+    // Only add test_path if it is provided
+    if let Some(tp) = &test_path {
+        if !tp.is_empty() {
+            args.push(tp);
+        }
+    }
 
-    let mut child = Command::new("robot")
+
+
+    // Write metadata.json for history
+    let metadata_path = std::path::Path::new(&abs_output_dir).join("metadata.json");
+    let meta_device = device.clone().unwrap_or("Local/Unknown".to_string());
+    
+    // Simple JSON construction to avoid pulling extra deps if possible, or use serde_json
+    // We already use serde elsewhere, so let's use a struct or format!
+    // But wait, runner.rs might not have serde_json imported.
+    // simpler to just format! string.
+    let metadata_json = format!(
+        r#"{{
+            "run_id": "{}",
+            "device_udid": "{}",
+            "test_path": "{}",
+            "timestamp": "{}" 
+        }}"#, 
+        run_id, 
+        meta_device.replace("\\", "\\\\").replace("\"", "\\\""), 
+        test_path.clone().unwrap_or_default().replace("\\", "\\\\").replace("\"", "\\\""),
+        chrono::Local::now().to_rfc3339()
+    );
+
+    // Create dir if not exists (Robot does it, but we do it before Robot)
+    let _ = std::fs::create_dir_all(&abs_output_dir);
+    let _ = std::fs::write(metadata_path, metadata_json);
+
+    let mut child = Command::new("robot") // Keeping generic "robot" relies on PATH.
         .args(&args)
         .env("PYTHONIOENCODING", "utf-8")
         .stdout(Stdio::piped())
@@ -55,88 +128,93 @@ pub fn run_robot_test(app: AppHandle, state: State<'_, TestState>, test_path: St
     let stdout = child.stdout.take().ok_or("Failed to open stdout")?;
     let stderr = child.stderr.take().ok_or("Failed to open stderr")?;
 
-    // Streaming threads (std out/err)
-    // We can just let them run until EOF (when child closes pipes)
+    // Streaming threads
     let app_handle = app.clone();
+    let rid = run_id.clone();
     thread::spawn(move || {
         let mut reader = BufReader::new(stdout);
         let mut buf = Vec::new();
         while let Ok(n) = reader.read_until(b'\n', &mut buf) {
             if n == 0 { break; }
             let line = String::from_utf8_lossy(&buf).to_string();
-            let _ = app_handle.emit("test-output", line.trim_end());
+            let _ = app_handle.emit("test-output", TestOutput { 
+                run_id: rid.clone(), 
+                message: line.trim_end().to_string() 
+            });
             buf.clear();
         }
     });
 
     let app_handle_err = app.clone();
+    let rid_err = run_id.clone();
     thread::spawn(move || {
         let mut reader = BufReader::new(stderr);
         let mut buf = Vec::new();
         while let Ok(n) = reader.read_until(b'\n', &mut buf) {
             if n == 0 { break; }
             let line = String::from_utf8_lossy(&buf).to_string();
-            let _ = app_handle_err.emit("test-output", format!("STDERR: {}", line.trim_end()));
+            let _ = app_handle_err.emit("test-output", TestOutput { 
+                run_id: rid_err.clone(), 
+                message: format!("STDERR: {}", line.trim_end()) 
+            });
             buf.clear();
         }
     });
 
     // Store child in state
     {
-        let mut guard = state.0.lock().map_err(|e| e.to_string())?;
-        if guard.is_some() {
-             return Err("A test is already running".to_string());
+        let mut procs = state.0.lock().map_err(|e| e.to_string())?;
+        if procs.contains_key(&run_id) {
+             return Err(format!("Run ID {} already exists", run_id));
         }
-        *guard = Some(child);
+        procs.insert(run_id.clone(), child);
     }
 
     // Monitoring thread
-    // using Arc to share state with thread
     let app_handle_finish = app.clone();
-    // We cannot pass 'state' (State wrapper) to thread directly easily??
-    // Actually State wraps an Arc/reference to the managed state.
-    // But State itself is not Send if it holds a reference? 
-    // State<T> implements Clone, but it's bound to the lifetime of the request?
-    // In Tauri v2, State is usually Clone and Send?
-    // Wait, State<'r, T> has lifetime. I can't move it to a thread.
-    // I need to clone the INNER Arc/Data if possible.
-    // Actually, I can use app.state::<TestState>() inside the thread?
-    // YES. `app` is AppHandle, can retrieve state.
+    let rid_monitor = run_id.clone();
     
     thread::spawn(move || {
         loop {
             thread::sleep(Duration::from_millis(500));
             
             let state = app_handle_finish.state::<TestState>();
-            let mut guard: std::sync::MutexGuard<Option<Child>> = match state.0.lock() {
+            let mut procs: std::sync::MutexGuard<HashMap<String, Child>> = match state.0.lock() {
                 Ok(g) => g,
-                Err(_) => break, // Poisoned
+                Err(_) => break, 
             };
 
-            if let Some(child) = guard.as_mut() {
+            // Check if process exists and is running
+            let mut finished = false;
+            let mut status_msg = String::new();
+
+            if let Some(child) = procs.get_mut(&rid_monitor) {
                 match child.try_wait() {
                     Ok(Some(status)) => {
-                        let _ = app_handle_finish.emit("test-finished", format!("Exit Code: {}", status));
-                        *guard = None; // clear
-                        break;
+                        finished = true;
+                        status_msg = format!("Exit Code: {}", status);
                     },
-                    Ok(None) => {
-                        // Still running
-                    },
+                    Ok(None) => {}, // Still running
                     Err(e) => {
-                         let _ = app_handle_finish.emit("test-finished", format!("Error checking status: {}", e));
-                         *guard = None;
-                         break;
+                        finished = true;
+                        status_msg = format!("Error checking status: {}", e);
                     }
                 }
             } else {
-                // Should not happen if we set it above, unless stopped externally and cleared?
-                // If None, it means it was stopped?
-                // But stop logic does not clear it?
-                // The loop should handle it.
-                // If stop command kills it, try_wait will eventually return exit status (even if killed).
-                // Or maybe kill doesn't wait.
-                // If stopped, we should probably verify.
+                // Removed from map (stopped externally)
+                break;
+            }
+
+            if finished {
+                // Remove from map
+                procs.remove(&rid_monitor);
+                // Drop lock before emitting? No, try_wait is fast.
+                drop(procs); 
+
+                let _ = app_handle_finish.emit("test-finished", TestFinished { 
+                    run_id: rid_monitor, 
+                    status: status_msg 
+                });
                 break;
             }
         }

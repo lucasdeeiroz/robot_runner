@@ -3,13 +3,14 @@ import { useState } from 'react';
 import {
     PlayCircle,
     Settings,
-    Smartphone,
-    Box,
     Cpu,
     Menu,
     FileText,
+    Info,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+import { useTranslation } from "react-i18next";
 
 interface SidebarProps {
     activePage: string;
@@ -18,14 +19,14 @@ interface SidebarProps {
 
 export function Sidebar({ activePage, onNavigate }: SidebarProps) {
     const [collapsed, setCollapsed] = useState(false);
+    const { t } = useTranslation();
 
     const navItems = [
-        { id: 'run', label: 'Run', icon: PlayCircle },
-        { id: 'devices', label: 'Devices', icon: Smartphone },
-        { id: 'logs', label: 'Logs', icon: FileText },
-        { id: 'inspector', label: 'Inspector', icon: Box },
-        { id: 'ai', label: 'AI Assistant', icon: Cpu },
-        { id: 'settings', label: 'Settings', icon: Settings },
+        { id: 'run', label: t('sidebar.run'), icon: PlayCircle },
+        { id: 'tests', label: t('sidebar.tests'), icon: FileText },
+        { id: 'ai', label: t('sidebar.ai_assistant'), icon: Cpu },
+        { id: 'settings', label: t('sidebar.settings'), icon: Settings },
+        { id: 'about', label: t('sidebar.about'), icon: Info },
     ];
 
     return (
