@@ -5,7 +5,7 @@ use tauri::command;
 use regex::Regex;
 use std::process::Command;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TestLog {
     path: String,
     suite_name: String,
@@ -39,23 +39,48 @@ pub fn get_test_tests_history(custom_path: Option<String>, refresh: Option<bool>
     // Identify the primary log directory (first valid one) to store cache
     let primary_dir = candidates.iter().find(|p| p.exists() && p.is_dir());
     let cache_file = primary_dir.map(|p| p.join("history_cache.json"));
+    
+    let force_refresh = refresh.unwrap_or(false);
 
-    let refresh = refresh.unwrap_or(false);
+    // Cache State
+    let mut cache_map: std::collections::HashMap<String, TestLog> = std::collections::HashMap::new();
+    let mut cache_mtime = std::time::SystemTime::UNIX_EPOCH;
 
-    // 1. Try to load from cache if not forcing refresh
-    if !refresh {
-        if let Some(ref cache_path) = cache_file {
-            if cache_path.exists() {
-                println!("Loading logs from cache: {:?}", cache_path);
-                if let Ok(content) = fs::read_to_string(cache_path) {
-                    if let Ok(cached_logs) = serde_json::from_str::<Vec<TestLog>>(&content) {
-                        return Ok(cached_logs);
-                    } else {
-                        println!("Failed to parse cache, falling back to scan.");
+    // Always try to load cache first to build the map, even if force_refresh is true?
+    // Actually if force_refresh is true, we might want to re-parse everything regardless of mtime.
+    // But the user asked for "only new metadata", effectively "incremental update".
+    // So "Refresh" button should probably behave as "Scan for changes".
+    // True "Force Rebuild" might be a separate concern, but for now assuming "Refresh" = "Incremental Update".
+
+    if let Some(ref cache_path) = cache_file {
+        if cache_path.exists() {
+            if let Ok(metadata) = fs::metadata(cache_path) {
+                if let Ok(modified) = metadata.modified() {
+                    cache_mtime = modified;
+                }
+            }
+
+            println!("Loading logs from cache: {:?}", cache_path);
+            if let Ok(content) = fs::read_to_string(cache_path) {
+                if let Ok(cached_logs) = serde_json::from_str::<Vec<TestLog>>(&content) {
+                    for log in cached_logs {
+                        // Use xml_path as unique key
+                        cache_map.insert(log.xml_path.clone(), log);
                     }
+                } else {
+                    println!("Failed to parse cache, falling back to full scan.");
                 }
             }
         }
+    }
+    
+    // If forcing complete re-parse (ignoring timestamps), we could clear cache_map here.
+    // But "refresh" usually means "check for new stuff".
+    if force_refresh {
+         // Maybe user WANTS to re-parse modified files even if timestamp logic fails? 
+         // For now, let's trust mtime. If force_refresh is true, we still use cache if file unmodified.
+         // If we strictly want to invalid cache, we would reset cache_mtime to UNIX_EPOCH.
+         // Let's assume standard incremental behavior.
     }
 
     let mut logs = Vec::new();
@@ -74,21 +99,37 @@ pub fn get_test_tests_history(custom_path: Option<String>, refresh: Option<bool>
         println!("Scanning logs in: {:?}", abs_base);
         
         if base_path.exists() && base_path.is_dir() {
-            // Walkdir manual recursive for depth=2 or 3 (support legacy folder structure)
-            // 1. Root/output.xml
-            // 2. Root/RunID/output.xml
-            // 3. Root/A{ver}_{model}_{udid}/{Suite}/output.xml
-            
-            
+            // Walkdir manual recursive
             let walker = walkdir::WalkDir::new(&base_path).min_depth(1).max_depth(5).follow_links(true);
             for entry in walker.into_iter().filter_map(|e| e.ok()) {
                 let fname = entry.file_name().to_string_lossy();
                 if fname.starts_with("output") && fname.ends_with(".xml") {
                     let xml_path = entry.path();
-                    let parent = xml_path.parent().unwrap_or(Path::new("")); // e.g. SuiteFolder or RunID
-                    
-                    if let Some(log) = parse_log_entry(&parent, &xml_path) {
-                        logs.push(log);
+                    let xml_path_str = xml_path.to_string_lossy().to_string();
+                    let parent = xml_path.parent().unwrap_or(Path::new(""));
+
+                    // Check mtime
+                    let mut use_cache = false;
+                    if let Some(cached_log) = cache_map.get(&xml_path_str) {
+                         if let Ok(meta) = fs::metadata(xml_path) {
+                             if let Ok(modified) = meta.modified() {
+                                 // If XML file is OLDER than cache file, assume it hasn't changed since cache was written.
+                                 // Adding a small buffer or just strict comparison.
+                                 // If modified <= cache_mtime: reuse
+                                 if modified <= cache_mtime {
+                                     use_cache = true;
+                                     logs.push(cached_log.clone());
+                                 }
+                             }
+                         }
+                    }
+
+                    if !use_cache {
+                        // Parse
+                        // println!("Parsing new/modified log: {:?}", xml_path);
+                        if let Some(log) = parse_log_entry(&parent, &xml_path) {
+                            logs.push(log);
+                        }
                     }
                 }
             }
@@ -98,7 +139,7 @@ pub fn get_test_tests_history(custom_path: Option<String>, refresh: Option<bool>
     // Sort by timestamp desc
     logs.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
 
-    // 2. Save to cache
+    // 2. Save new cache (Atomically if possible, but standard write is fine)
     if let Some(ref cache_path) = cache_file {
         if let Ok(json) = serde_json::to_string_pretty(&logs) {
             let _ = fs::write(cache_path, json);
