@@ -38,6 +38,7 @@ pub fn run() {
             inspector::get_xml_dump,
             logs::get_test_tests_history,
             logs::open_log_folder,
+            logs::open_path,
             adb::wireless::adb_connect,
             adb::wireless::adb_pair,
             adb::wireless::adb_disconnect,

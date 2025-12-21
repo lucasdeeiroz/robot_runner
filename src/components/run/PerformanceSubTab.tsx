@@ -27,6 +27,7 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
     // Recording State
     const [isRecording, setIsRecording] = useState(false);
     const [recordingPath, setRecordingPath] = useState<string | null>(null);
+    const [lastRecording, setLastRecording] = useState<string | null>(null);
 
     useEffect(() => {
         let interval: NodeJS.Timeout;
@@ -59,9 +60,11 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
 
     const toggleRecording = async () => {
         if (isRecording) {
+            if (recordingPath) setLastRecording(recordingPath);
             setIsRecording(false);
             setRecordingPath(null);
         } else {
+            setLastRecording(null); // Clear previous message
             // Start recording
             // Filename: performance_<device>_<timestamp>.csv
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -151,6 +154,19 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
             {error && (
                 <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-3 rounded-md text-sm mb-4 border border-red-100 dark:border-red-900/50">
                     {error}
+                </div>
+            )}
+
+            {lastRecording && (
+                <div className="bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 p-3 rounded-md text-sm mb-4 border border-green-100 dark:border-green-900/50 flex items-center gap-2">
+                    <span>{t('performance.saved', 'Recorded saved to:')}</span>
+                    <span
+                        className="underline cursor-pointer hover:text-green-900 dark:hover:text-green-100 font-mono break-all"
+                        onClick={() => invoke('open_path', { path: lastRecording })}
+                        title={t('common.open_file', "Click to open file")}
+                    >
+                        {lastRecording}
+                    </span>
                 </div>
             )}
 

@@ -287,3 +287,32 @@ pub fn open_log_folder(path: String) -> Result<(), String> {
     }
     Ok(())
 }
+
+#[command]
+pub fn open_path(path: String) -> Result<(), String> {
+    println!("Opening path: {}", path);
+    
+    #[cfg(target_os = "windows")]
+    {
+        let clean_path = path.replace("/", "\\");
+        Command::new("explorer")
+            .arg(clean_path)
+            .spawn()
+            .map_err(|e| format!("Failed to open explorer: {}", e))?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .arg(path)
+            .spawn()
+            .map_err(|e| format!("Failed to open finder: {}", e))?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        Command::new("xdg-open")
+            .arg(path)
+            .spawn()
+            .map_err(|e| format!("Failed to open xdg-open: {}", e))?;
+    }
+    Ok(())
+}

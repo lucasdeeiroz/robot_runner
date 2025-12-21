@@ -234,24 +234,24 @@ export function ToolboxView({ session }: ToolboxViewProps) {
 
             {/* Tool Content */}
             <div className="flex-1 min-h-0 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden relative">
-                {activeTool === 'console' && session.type === 'test' && (
-                    <div className="h-full flex flex-col">
-                        <div className="p-2 border-b border-zinc-100 dark:border-zinc-800 text-xs text-zinc-500 font-mono">
-                            {session.testPath}
-                        </div>
-                        <RunConsole logs={session.logs} isRunning={session.status === 'running'} />
+                <div className={clsx("h-full flex flex-col", activeTool === 'console' && session.type === 'test' ? "block" : "hidden")}>
+                    <div className="p-2 border-b border-zinc-100 dark:border-zinc-800 text-xs text-zinc-500 font-mono">
+                        {session.testPath}
                     </div>
-                )}
+                    <RunConsole logs={session.logs} isRunning={session.status === 'running'} />
+                </div>
 
-                {activeTool === 'logcat' && (
+                <div className={clsx("h-full", activeTool === 'logcat' ? "block" : "hidden")}>
                     <LogcatSubTab selectedDevice={session.deviceUdid} />
-                )}
-                {activeTool === 'commands' && (
+                </div>
+
+                <div className={clsx("h-full", activeTool === 'commands' ? "block" : "hidden")}>
                     <CommandsSubTab selectedDevice={session.deviceUdid} />
-                )}
-                {activeTool === 'performance' && (
+                </div>
+
+                <div className={clsx("h-full", activeTool === 'performance' ? "block" : "hidden")}>
                     <PerformanceSubTab selectedDevice={session.deviceUdid} />
-                )}
+                </div>
             </div>
         </div>
     );

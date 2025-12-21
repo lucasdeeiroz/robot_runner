@@ -18,6 +18,7 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
     const [logs, setLogs] = useState<string[]>([]);
     const listRef = useRef<HTMLDivElement>(null);
     const { settings } = useSettings();
+    const [currentDumpFile, setCurrentDumpFile] = useState<string | null>(null);
 
     // Auto-stop when unmounting or changing device?
     useEffect(() => {
@@ -75,7 +76,7 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
 
     const [filterApp, setFilterApp] = useState(false);
     const [selectedPackage, setSelectedPackage] = useState("");
-    const [logLevel, setLogLevel] = useState("V");
+    const [logLevel, setLogLevel] = useState("E");
 
     // Parse packages from settings
     const packages = settings.tools.appPackage
@@ -102,6 +103,7 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
             dumpFile = `${settings.paths.logcat}/logcat_${sanDevice}_${timestamp}.txt`;
         }
+        setCurrentDumpFile(dumpFile);
 
         const activeFilter = filterApp && selectedPackage ? selectedPackage : null;
         console.log("Filter App:", filterApp, "Package:", activeFilter, "Level:", logLevel);
@@ -130,6 +132,10 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
         try {
             await invoke('stop_logcat', { device: selectedDevice });
             setIsStreaming(false);
+            if (currentDumpFile) {
+                setLogs(prev => [...prev, `Saved logcat to: ${currentDumpFile}`]);
+                setCurrentDumpFile(null);
+            }
         } catch (e) {
             console.error("Failed to stop logcat", e);
         }
@@ -240,7 +246,17 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
                 ) : (
                     logs.map((log, i) => (
                         <div key={i} className="whitespace-pre-wrap hover:bg-white/5 px-1 rounded break-all">
-                            {log}
+                            {log.startsWith('Saved logcat to: ') ? (
+                                <span
+                                    className="text-blue-400 underline cursor-pointer hover:text-blue-300"
+                                    onClick={() => invoke('open_path', { path: log.replace('Saved logcat to: ', '') })}
+                                    title={t('logcat.open_file', 'Click to open file')}
+                                >
+                                    {log}
+                                </span>
+                            ) : (
+                                log
+                            )}
                         </div>
                     ))
                 )}
