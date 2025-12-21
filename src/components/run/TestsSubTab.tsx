@@ -89,7 +89,15 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                 const devModel = deviceObj ? deviceObj.model.replace(/\s+/g, '') : "UnknownModel";
                 const devVer = deviceObj ? deviceObj.android_version || "0" : "0";
 
-                const devName = deviceUdid ? `${deviceObj?.model || 'Device'} (${deviceUdid})` : "Local/Web";
+                // Avoid duplicate UDID if model already contains it
+                let devName = deviceObj?.model || "Device";
+                if (deviceUdid && deviceUdid !== 'local') {
+                    if (!devName.includes(deviceUdid)) {
+                        devName = `${devName} (${deviceUdid})`;
+                    }
+                } else {
+                    devName = "Local/Web";
+                }
 
                 // Prepare Args
                 let testPathArg: string | null = null;
@@ -101,7 +109,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     argFileArg = selectedPath;
                 }
 
-                addSession(runId, deviceUdid || "local", devName, testPathArg || argFileArg || "Unknown", argFileArg);
+                addSession(runId, deviceUdid || "local", devName, testPathArg || argFileArg || "Unknown", argFileArg, devModel, devVer);
 
                 // Construct Legacy Path: {base}/A{ver}_{model}_{udid}/{runId}/
                 // Actually user said: {logs_folder}/A{AndroidVersion}_{ModelName}_{DeviceUdid}/{SuiteName}/

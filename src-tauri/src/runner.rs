@@ -51,7 +51,7 @@ struct TestFinished {
 }
 
 #[tauri::command]
-pub fn run_robot_test(app: AppHandle, state: State<'_, TestState>, run_id: String, test_path: Option<String>, output_dir: String, device: Option<String>, arguments_file: Option<String>, timestamp_outputs: Option<bool>) -> Result<String, String> {
+pub fn run_robot_test(app: AppHandle, state: State<'_, TestState>, run_id: String, test_path: Option<String>, output_dir: String, device: Option<String>, arguments_file: Option<String>, timestamp_outputs: Option<bool>, device_model: Option<String>, android_version: Option<String>) -> Result<String, String> {
     // Resolve absolute path for output_dir to ensure clean logs
     let abs_output_dir = std::fs::canonicalize(&output_dir)
         .map(|p| {
@@ -95,22 +95,25 @@ pub fn run_robot_test(app: AppHandle, state: State<'_, TestState>, run_id: Strin
     // Write metadata.json for history
     let metadata_path = std::path::Path::new(&abs_output_dir).join("metadata.json");
     let meta_device = device.clone().unwrap_or("Local/Unknown".to_string());
+    let meta_model = device_model.unwrap_or_default();
+    let meta_version = android_version.unwrap_or_default();
     
-    // Simple JSON construction to avoid pulling extra deps if possible, or use serde_json
-    // We already use serde elsewhere, so let's use a struct or format!
-    // But wait, runner.rs might not have serde_json imported.
-    // simpler to just format! string.
+    // Simple JSON construction format!
     let metadata_json = format!(
         r#"{{
             "run_id": "{}",
             "device_udid": "{}",
             "test_path": "{}",
-            "timestamp": "{}" 
+            "timestamp": "{}",
+            "device_model": "{}",
+            "android_version": "{}"
         }}"#, 
         run_id, 
         meta_device.replace("\\", "\\\\").replace("\"", "\\\""), 
         test_path.clone().unwrap_or_default().replace("\\", "\\\\").replace("\"", "\\\""),
-        chrono::Local::now().to_rfc3339()
+        chrono::Local::now().to_rfc3339(),
+        meta_model.replace("\\", "\\\\").replace("\"", "\\\""),
+        meta_version.replace("\\", "\\\\").replace("\"", "\\\"")
     );
 
     // Create dir if not exists (Robot does it, but we do it before Robot)

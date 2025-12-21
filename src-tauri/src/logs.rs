@@ -175,6 +175,18 @@ fn parse_log_entry(folder_path: &Path, xml_path: &Path) -> Option<TestLog> {
                    meta_timestamp = caps.get(1).map(|m| m.as_str().to_string());
                }
              }
+             let re_model = Regex::new(r#""device_model"\s*:\s*"([^"]+)""#).ok();
+             if let Some(re) = re_model {
+               if let Some(caps) = re.captures(&meta_content) {
+                   device_model = caps.get(1).map(|m| m.as_str().to_string());
+               }
+             }
+             let re_ver = Regex::new(r#""android_version"\s*:\s*"([^"]+)""#).ok();
+             if let Some(re) = re_ver {
+               if let Some(caps) = re.captures(&meta_content) {
+                   android_version = caps.get(1).map(|m| m.as_str().to_string());
+               }
+             }
         }
     }
 
