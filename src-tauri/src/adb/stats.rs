@@ -45,9 +45,14 @@ fn run_adb_shell(device: &str, command: &str) -> String {
     let mut full_args = vec!["-s", device, "shell"];
     full_args.extend(args);
 
-    let output = Command::new(program)
-        .args(&full_args)
-        .output();
+    let mut cmd = Command::new(program);
+    cmd.args(&full_args);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    let output = cmd.output();
 
     match output {
         Ok(o) => String::from_utf8_lossy(&o.stdout).to_string(),

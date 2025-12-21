@@ -13,9 +13,16 @@ pub struct Device {
 
 #[tauri::command]
 pub fn get_connected_devices() -> Result<Vec<Device>, String> {
-    let output = Command::new("adb")
-        .args(&["devices", "-l"])
-        .output()
+    let mut cmd = Command::new("adb");
+    cmd.args(&["devices", "-l"]);
+    
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000); 
+    }
+
+    let output = cmd.output()
         .map_err(|e| format!("Failed to execute adb: {}", e))?;
 
     if !output.status.success() {
@@ -40,9 +47,14 @@ pub fn get_connected_devices() -> Result<Vec<Device>, String> {
 
         if state == "device" {
             // Get model
-            let model_output = Command::new("adb")
-                .args(&["-s", &udid, "shell", "getprop", "ro.product.model"])
-                .output();
+            let mut model_cmd = Command::new("adb");
+            model_cmd.args(&["-s", &udid, "shell", "getprop", "ro.product.model"]);
+            #[cfg(target_os = "windows")]
+            {
+                use std::os::windows::process::CommandExt;
+                model_cmd.creation_flags(0x08000000);
+            }
+            let model_output = model_cmd.output();
 
             let model = match model_output {
                 Ok(out) => String::from_utf8_lossy(&out.stdout).trim().to_string(),
@@ -50,9 +62,14 @@ pub fn get_connected_devices() -> Result<Vec<Device>, String> {
             };
 
             // Get Android Version
-            let ver_output = Command::new("adb")
-                .args(&["-s", &udid, "shell", "getprop", "ro.build.version.release"])
-                .output();
+            let mut ver_cmd = Command::new("adb");
+            ver_cmd.args(&["-s", &udid, "shell", "getprop", "ro.build.version.release"]);
+            #[cfg(target_os = "windows")]
+            {
+                use std::os::windows::process::CommandExt;
+                ver_cmd.creation_flags(0x08000000);
+            }
+            let ver_output = ver_cmd.output();
 
             let android_version = match ver_output {
                 Ok(out) => String::from_utf8_lossy(&out.stdout).trim().to_string(),

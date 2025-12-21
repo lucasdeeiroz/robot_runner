@@ -6,10 +6,14 @@ pub async fn get_device_ip(serial: String) -> Result<String, String> {
     let adb_path = "adb";
 
     // Strategy 1: ip route (reliable on most modern Androids)
-    let output = Command::new(&adb_path)
-        .args(&["-s", &serial, "shell", "ip", "route"])
-        .output()
-        .map_err(|e| e.to_string())?;
+    let mut cmd_route = Command::new(&adb_path);
+    cmd_route.args(&["-s", &serial, "shell", "ip", "route"]);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd_route.creation_flags(0x08000000);
+    }
+    let output = cmd_route.output().map_err(|e| e.to_string())?;
 
     if output.status.success() {
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -28,10 +32,14 @@ pub async fn get_device_ip(serial: String) -> Result<String, String> {
     }
 
     // Strategy 2: ifconfig (older devices)
-    let output_ifconfig = Command::new(&adb_path)
-        .args(&["-s", &serial, "shell", "ifconfig", "wlan0"])
-        .output()
-        .map_err(|e| e.to_string())?;
+    let mut cmd_ifconfig = Command::new(&adb_path);
+    cmd_ifconfig.args(&["-s", &serial, "shell", "ifconfig", "wlan0"]);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd_ifconfig.creation_flags(0x08000000);
+    }
+    let output_ifconfig = cmd_ifconfig.output().map_err(|e| e.to_string())?;
 
     if output_ifconfig.status.success() {
         let stdout = String::from_utf8_lossy(&output_ifconfig.stdout);

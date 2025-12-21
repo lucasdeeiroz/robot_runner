@@ -21,9 +21,14 @@ impl Default for ShellState {
 
 #[command]
 pub fn get_adb_version() -> Result<String, String> {
-    let output = Command::new("adb")
-        .arg("version")
-        .output()
+    let mut cmd = Command::new("adb");
+    cmd.arg("version");
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    let output = cmd.output()
         .map_err(|e| format!("Failed to execute adb: {}", e))?;
 
     if output.status.success() {
@@ -143,9 +148,11 @@ pub fn restart_adb_server() -> Result<String, String> {
 pub fn is_adb_server_running() -> bool {
     #[cfg(target_os = "windows")]
     {
-        let output = Command::new("tasklist")
-            .args(&["/FI", "IMAGENAME eq adb.exe", "/NH"])
-            .output();
+        let mut cmd = Command::new("tasklist");
+        cmd.args(&["/FI", "IMAGENAME eq adb.exe", "/NH"]);
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+        let output = cmd.output();
             
         if let Ok(o) = output {
              let s = String::from_utf8_lossy(&o.stdout);

@@ -7,10 +7,14 @@ use std::time::Duration;
 #[tauri::command]
 pub async fn save_screenshot(device: String, path: String) -> Result<String, String> {
     // execute adb exec-out screencap -p
-    let output = Command::new("adb")
-        .args(&["-s", &device, "exec-out", "screencap", "-p"])
-        .output()
-        .map_err(|e| format!("Failed to run adb: {}", e))?;
+    let mut cmd = Command::new("adb");
+    cmd.args(&["-s", &device, "exec-out", "screencap", "-p"]);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    let output = cmd.output().map_err(|e| format!("Failed to run adb: {}", e))?;
 
     if !output.status.success() {
         return Err(format!("ADB Screenshot failed: {}", String::from_utf8_lossy(&output.stderr)));
@@ -53,35 +57,53 @@ pub async fn stop_screen_recording(device: String, local_path: String) -> Result
     // We use 'pkill -2 -l screenrecord' (matches name exactly? no -l is signal list? pkill -2 -f screenrecord?)
     // 'killall -2 screenrecord' is common.
     
-    let kill_output = Command::new("adb")
-        .args(&["-s", &device, "shell", "pkill", "-2", "screenrecord"])
-        .output()
-        .map_err(|e| format!("Failed to run pkill: {}", e))?;
+    let mut cmd_kill = Command::new("adb");
+    cmd_kill.args(&["-s", &device, "shell", "pkill", "-2", "screenrecord"]);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd_kill.creation_flags(0x08000000);
+    }
+    let kill_output = cmd_kill.output().map_err(|e| format!("Failed to run pkill: {}", e))?;
         
     // If pkill fails (e.g. old android), try killall
     if !kill_output.status.success() {
-         let _ = Command::new("adb")
-            .args(&["-s", &device, "shell", "killall", "-2", "screenrecord"])
-            .output();
+         let mut cmd_killall = Command::new("adb");
+         cmd_killall.args(&["-s", &device, "shell", "killall", "-2", "screenrecord"]);
+         #[cfg(target_os = "windows")]
+         {
+            use std::os::windows::process::CommandExt;
+            cmd_killall.creation_flags(0x08000000);
+         }
+         let _ = cmd_killall.output();
     }
 
     // 2. Wait a bit for file to finalize
     thread::sleep(Duration::from_secs(2));
 
     // 3. Pull the file
-    let pull_output = Command::new("adb")
-        .args(&["-s", &device, "pull", "/sdcard/robot_runner_rec.mp4", &local_path])
-        .output()
-        .map_err(|e| format!("Failed to pull video: {}", e))?;
+    let mut cmd_pull = Command::new("adb");
+    cmd_pull.args(&["-s", &device, "pull", "/sdcard/robot_runner_rec.mp4", &local_path]);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd_pull.creation_flags(0x08000000);
+    }
+    let pull_output = cmd_pull.output().map_err(|e| format!("Failed to pull video: {}", e))?;
 
     if !pull_output.status.success() {
         return Err(format!("Failed to pull video: {}", String::from_utf8_lossy(&pull_output.stderr)));
     }
 
     // 4. Delete temp file
-    let _ = Command::new("adb")
-        .args(&["-s", &device, "shell", "rm", "/sdcard/robot_runner_rec.mp4"])
-        .output();
+    let mut cmd_rm = Command::new("adb");
+    cmd_rm.args(&["-s", &device, "shell", "rm", "/sdcard/robot_runner_rec.mp4"]);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd_rm.creation_flags(0x08000000);
+    }
+    let _ = cmd_rm.output();
 
     Ok(local_path)
 }

@@ -6,10 +6,14 @@ pub fn adb_connect(ip: String, port: String) -> Result<String, String> {
     let target = format!("{}:{}", ip, port);
     println!("ADB Connecting to {}", target);
     
-    let output = Command::new("adb")
-        .args(&["connect", &target])
-        .output()
-        .map_err(|e| format!("Failed to execute adb: {}", e))?;
+    let mut cmd = Command::new("adb");
+    cmd.args(&["connect", &target]);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    let output = cmd.output().map_err(|e| format!("Failed to execute adb: {}", e))?;
         
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -27,10 +31,14 @@ pub fn adb_pair(ip: String, port: String, code: String) -> Result<String, String
     let target = format!("{}:{}", ip, port);
     println!("ADB Pairing with {} using code {}", target, code);
     
-    let output = Command::new("adb")
-        .args(&["pair", &target, &code])
-        .output()
-        .map_err(|e| format!("Failed to execute adb: {}", e))?;
+    let mut cmd = Command::new("adb");
+    cmd.args(&["pair", &target, &code]);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    let output = cmd.output().map_err(|e| format!("Failed to execute adb: {}", e))?;
         
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -45,10 +53,14 @@ pub fn adb_pair(ip: String, port: String, code: String) -> Result<String, String
 #[command]
 pub fn adb_disconnect(ip: String, port: String) -> Result<String, String> {
     let target = format!("{}:{}", ip, port);
-    let output = Command::new("adb")
-        .args(&["disconnect", &target])
-        .output()
-        .map_err(|e| format!("Failed to execute adb: {}", e))?;
+    let mut cmd = Command::new("adb");
+    cmd.args(&["disconnect", &target]);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    let output = cmd.output().map_err(|e| format!("Failed to execute adb: {}", e))?;
         
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     Ok(stdout)

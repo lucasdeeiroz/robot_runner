@@ -117,8 +117,16 @@ pub fn run_robot_test(app: AppHandle, state: State<'_, TestState>, run_id: Strin
     let _ = std::fs::create_dir_all(&abs_output_dir);
     let _ = std::fs::write(metadata_path, metadata_json);
 
-    let mut child = Command::new("robot") // Keeping generic "robot" relies on PATH.
-        .args(&args)
+    let mut cmd = Command::new("robot"); // Keeping generic "robot" relies on PATH.
+    cmd.args(&args);
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+
+    let mut child = cmd
         .env("PYTHONIOENCODING", "utf-8")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
