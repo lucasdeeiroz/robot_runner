@@ -68,7 +68,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
 
             {/* Footer */}
             <div className="p-4 border-t border-zinc-200 dark:border-zinc-800">
-                {!collapsed && <div className="text-xs text-zinc-500">v2.0.0-alpha</div>}
+                {!collapsed && <div className="text-xs text-zinc-500">v2.0.1</div>}
             </div>
         </div>
     );

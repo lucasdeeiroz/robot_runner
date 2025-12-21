@@ -1,13 +1,14 @@
 {
   "name": "robot_runner",
   "private": true,
-  "version": "2.0.0",
+  "version": "2.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "set-version": "node scripts/bump_version.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
