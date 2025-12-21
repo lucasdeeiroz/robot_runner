@@ -1,5 +1,5 @@
 import { useSettings } from "@/lib/settings";
-import { Moon, Sun, Key, Globe, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal } from "lucide-react";
+import { Moon, Sun, Key, Globe, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2 } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -8,9 +8,14 @@ import clsx from "clsx";
 import { useTranslation } from "react-i18next";
 
 export function SettingsPage() {
-    const { settings, updateSetting, loading } = useSettings();
+    const { settings, updateSetting, loading, profiles, activeProfileId, createProfile, switchProfile, renameProfile, deleteProfile } = useSettings();
     const { t, i18n } = useTranslation();
     const [systemVersions, setSystemVersions] = useState<SystemVersions | null>(null);
+
+    // Profile Management Details
+    const [showProfileModal, setShowProfileModal] = useState(false);
+    const [newProfileName, setNewProfileName] = useState("");
+    const [isRenaming, setIsRenaming] = useState(false);
 
     // Sync settings language with i18n
     useEffect(() => {
@@ -29,6 +34,8 @@ export function SettingsPage() {
     const [appiumLogs, setAppiumLogs] = useState<string[]>([]);
     const [showAppiumLogs, setShowAppiumLogs] = useState(false);
     const logsEndRef = useRef<HTMLDivElement>(null);
+
+    // ... (Appium Listeners and other effects remain same)
 
     useEffect(() => {
         invoke<SystemVersions>('get_system_versions')
@@ -106,16 +113,114 @@ export function SettingsPage() {
         }
     };
 
+    const handleProfileSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newProfileName.trim()) return;
+
+        if (isRenaming) {
+            renameProfile(activeProfileId, newProfileName);
+        } else {
+            createProfile(newProfileName);
+        }
+        setShowProfileModal(false);
+        setNewProfileName("");
+        setIsRenaming(false);
+    };
+
     if (loading) {
         return <div className="p-8 text-center text-zinc-500">Loading settings...</div>;
     }
 
     return (
         <div className="max-w-4xl mx-auto space-y-8 pb-12">
-            <div>
-                <h1 className="text-3xl font-bold mb-2">{t('settings.title')}</h1>
-                <p className="text-zinc-400">{t('settings.description')}</p>
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold mb-2">{t('settings.title')}</h1>
+                    <p className="text-zinc-400">{t('settings.description')}</p>
+                </div>
             </div>
+
+            {/* Profile Manager Section */}
+            <section className="bg-zinc-100 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-semibold flex items-center gap-2">
+                        <Users size={20} className="text-purple-500" />
+                        {t('settings.profiles.title', 'Profiles')}
+                    </h2>
+                    <div className="flex items-center gap-2">
+                        <select
+                            value={activeProfileId}
+                            onChange={(e) => switchProfile(e.target.value)}
+                            className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-sm min-w-[150px]"
+                        >
+                            {profiles.map(p => (
+                                <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                        </select>
+                        <button
+                            onClick={() => { setIsRenaming(false); setNewProfileName(""); setShowProfileModal(true); }}
+                            className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-md"
+                            title={t('settings.profiles.create', 'New Profile')}
+                        >
+                            <Plus size={18} />
+                        </button>
+                        <button
+                            onClick={() => { setIsRenaming(true); setNewProfileName(profiles.find(p => p.id === activeProfileId)?.name || ""); setShowProfileModal(true); }}
+                            className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-md"
+                            title={t('settings.profiles.rename', 'Rename Profile')}
+                        >
+                            <Edit2 size={18} />
+                        </button>
+                        {profiles.length > 1 && (
+                            <button
+                                onClick={() => {
+                                    if (confirm(t('settings.profiles.confirm_delete', 'Are you sure you want to delete this profile?'))) deleteProfile(activeProfileId);
+                                }}
+                                className="p-2 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 rounded-md"
+                                title={t('settings.profiles.delete', 'Delete Profile')}
+                            >
+                                <Trash2 size={18} />
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </section>
+
+            {/* Modal for Create/Rename */}
+            {showProfileModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <form onSubmit={handleProfileSubmit} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 w-full max-w-sm shadow-2xl">
+                        <h3 className="text-lg font-bold mb-4">
+                            {isRenaming ? t('settings.profiles.rename') : t('settings.profiles.create')}
+                        </h3>
+                        <input
+                            autoFocus
+                            type="text"
+                            value={newProfileName}
+                            onChange={(e) => setNewProfileName(e.target.value)}
+                            placeholder={t('settings.profiles.name_placeholder', 'Profile Name')}
+                            className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-lg px-4 py-2 mb-4 outline-none focus:border-blue-500"
+                        />
+                        <div className="flex justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setShowProfileModal(false)}
+                                className="px-4 py-2 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                            >
+                                {t('common.cancel', 'Cancel')}
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={!newProfileName.trim()}
+                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50"
+                            >
+                                {t('common.save', 'Save')}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
 
             <div className="grid gap-6">
                 {/* Appium Server Config & Control */}

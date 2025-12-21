@@ -20,6 +20,22 @@ interface TestLog {
     log_html_path: string;
 }
 
+const formatDate = (dateStr: string) => {
+    try {
+        const date = new Date(dateStr);
+        return new Intl.DateTimeFormat(undefined, {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+        }).format(date);
+    } catch (e) {
+        return dateStr;
+    }
+};
+
 export function TestsPage() {
     const { t } = useTranslation();
     const { sessions, activeSessionId, setActiveSessionId, clearSession } = useTestSessions();
@@ -185,7 +201,7 @@ export function TestsPage() {
 
                                         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-500">
                                             <div className="flex items-center gap-1">
-                                                <Calendar size={12} /> {log.timestamp}
+                                                <Calendar size={12} /> {formatDate(log.timestamp)}
                                             </div>
                                             <div className="flex items-center gap-1">
                                                 <Clock size={12} /> {log.duration}
