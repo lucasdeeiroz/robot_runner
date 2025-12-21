@@ -1,2 +1,0 @@
-src/components/run/TestsSubTab.tsx(5,40): error TS6133: 'RefreshCw' is declared but its value is never read.
-src/pages/RunTab.tsx(3,64): error TS6133: 'AlertCircle' is declared but its value is never read.
