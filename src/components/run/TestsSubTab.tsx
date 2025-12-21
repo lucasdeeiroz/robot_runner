@@ -142,13 +142,21 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     ? `${settings.paths.logs}/${legacyFolder}`
                     : `../test_results/${legacyFolder}`;
 
+                // Determine Working Directory for Argument Files
+                // User requirement: When select arg file, execute from automationRoot if set.
+                let workingDir = null;
+                if (mode === 'args' && settings.paths.automationRoot) {
+                    workingDir = settings.paths.automationRoot;
+                }
+
                 invoke("run_robot_test", {
                     runId,
                     testPath: testPathArg, // Now optional
                     outputDir: logDir,
                     device: deviceUdid === 'Start local Server' ? null : deviceUdid,
                     argumentsFile: argFileArg,
-                    timestampOutputs: dontOverwrite
+                    timestampOutputs: dontOverwrite,
+                    workingDir
                 }).catch(e => {
                     console.error("Launch failed", e);
                 });

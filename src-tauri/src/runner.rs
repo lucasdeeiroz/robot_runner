@@ -51,7 +51,7 @@ struct TestFinished {
 }
 
 #[tauri::command]
-pub fn run_robot_test(app: AppHandle, state: State<'_, TestState>, run_id: String, test_path: Option<String>, output_dir: String, device: Option<String>, arguments_file: Option<String>, timestamp_outputs: Option<bool>, device_model: Option<String>, android_version: Option<String>) -> Result<String, String> {
+pub fn run_robot_test(app: AppHandle, state: State<'_, TestState>, run_id: String, test_path: Option<String>, output_dir: String, device: Option<String>, arguments_file: Option<String>, timestamp_outputs: Option<bool>, device_model: Option<String>, android_version: Option<String>, working_dir: Option<String>) -> Result<String, String> {
     // Resolve absolute path for output_dir to ensure clean logs
     let abs_output_dir = std::fs::canonicalize(&output_dir)
         .map(|p| {
@@ -71,16 +71,16 @@ pub fn run_robot_test(app: AppHandle, state: State<'_, TestState>, run_id: Strin
         args.push("--timestampoutputs");
     }
 
-    if let Some(arg_file) = &arguments_file {
-        args.push("-A");
-        args.push(arg_file);
-    }
-    
     let device_arg; 
     if let Some(d) = &device {
         device_arg = format!("udid:{}", d);
         args.push("-v");
         args.push(&device_arg);
+    }
+    
+    if let Some(arg_file) = &arguments_file {
+        args.push("-A");
+        args.push(arg_file);
     }
     
     // Only add test_path if it is provided
@@ -89,8 +89,6 @@ pub fn run_robot_test(app: AppHandle, state: State<'_, TestState>, run_id: Strin
             args.push(tp);
         }
     }
-
-
 
     // Write metadata.json for history
     let metadata_path = std::path::Path::new(&abs_output_dir).join("metadata.json");
@@ -122,6 +120,12 @@ pub fn run_robot_test(app: AppHandle, state: State<'_, TestState>, run_id: Strin
 
     let mut cmd = Command::new("robot"); // Keeping generic "robot" relies on PATH.
     cmd.args(&args);
+
+    if let Some(wd) = working_dir {
+        if !wd.is_empty() {
+            cmd.current_dir(wd);
+        }
+    }
 
     #[cfg(target_os = "windows")]
     {
