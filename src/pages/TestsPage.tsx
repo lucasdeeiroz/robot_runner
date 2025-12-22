@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useTestSessions } from "@/lib/testSessionStore";
 import { useSettings } from "@/lib/settings";
 import { ToolboxView } from "../components/run/ToolboxView";
-import { XCircle, FileText, Folder, Calendar, RefreshCw, ChevronDown, ChevronRight, CheckCircle, Clock } from 'lucide-react';
+import { HistoryCharts } from "../components/history/HistoryCharts";
+import { XCircle, FileText, Folder, Calendar, RefreshCw, ChevronDown, ChevronRight, CheckCircle, Clock, PieChart } from 'lucide-react';
 import clsx from 'clsx';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from "react-i18next";
@@ -45,6 +46,7 @@ export function TestsPage() {
     const [filterText, setFilterText] = useState("");
     const [filterPeriod, setFilterPeriod] = useState("all_time");
     const [groupBy, setGroupBy] = useState("none");
+    const [showCharts, setShowCharts] = useState(false);
     const [loadingHistory, setLoadingHistory] = useState(false);
 
     const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
@@ -330,6 +332,18 @@ export function TestsPage() {
                                 <option value="os_version">{t('tests_page.filter.os_version') || "Versão do SO"}</option>
                             </select>
                             <button
+                                onClick={() => setShowCharts(!showCharts)}
+                                className={clsx(
+                                    "px-3 py-1.5 rounded-md flex items-center gap-2 text-sm font-medium transition-colors ml-2",
+                                    showCharts
+                                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                                        : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                                )}
+                                title={showCharts ? t('tests_page.charts.hide') : t('tests_page.charts.show')}
+                            >
+                                <PieChart size={16} />
+                            </button>
+                            <button
                                 onClick={() => loadHistory(true)}
                                 className="p-1.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md"
                                 title={t('tests_page.actions.refresh')}
@@ -339,6 +353,10 @@ export function TestsPage() {
                         </div>
 
                         <div className="flex-1 overflow-y-auto pr-2">
+                            {showCharts && (
+                                <HistoryCharts logs={filteredHistory} groupBy={groupBy} />
+                            )}
+
                             {loadingHistory && <div className="text-center p-4 text-zinc-500">{t('tests_page.loading')}</div>}
 
                             {!loadingHistory && filteredHistory.length === 0 && (

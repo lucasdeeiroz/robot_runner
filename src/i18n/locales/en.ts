@@ -272,7 +272,14 @@ export const en = {
                 open_launcher: "Open in Launcher"
             },
             unknown_os: "Unknown OS",
-            unknown_model: "Unknown Model"
+            unknown_model: "Unknown Model",
+            charts: {
+                status_distribution: "Status Distribution",
+                group_performance: "Performance by {{group}}",
+                select_group: "Select a 'Group By' option to view performance breakdown",
+                show: "Show Charts",
+                hide: "Hide Charts"
+            }
         },
         console: {
             waiting: "Waiting for output..."

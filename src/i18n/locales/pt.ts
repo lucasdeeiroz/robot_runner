@@ -272,7 +272,14 @@ export const pt = {
                 open_launcher: "Abrir no Iniciador"
             },
             unknown_os: "SO Desconhecido",
-            unknown_model: "Modelo Desconhecido"
+            unknown_model: "Modelo Desconhecido",
+            charts: {
+                status_distribution: "Distribuição de Status",
+                group_performance: "Desempenho por {{group}}",
+                select_group: "Selecione uma opção de 'Agrupar por' para ver detalhes",
+                show: "Mostrar Gráficos",
+                hide: "Ocultar Gráficos"
+            }
         },
         console: {
             waiting: "Aguardando saída..."
