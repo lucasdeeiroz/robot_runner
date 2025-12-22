@@ -35,14 +35,14 @@ export function DeviceList() {
                 <h2 className="text-xl font-semibold flex items-center gap-2">
                     <Smartphone className="text-blue-500" />
                     Connected Devices
-                    <span className="text-sm font-normal text-zinc-500 bg-zinc-900 px-2 py-0.5 rounded-full border border-zinc-800">
+                    <span className="text-sm font-normal text-zinc-500 bg-zinc-100 dark:bg-zinc-900 px-2 py-0.5 rounded-full border border-zinc-200 dark:border-zinc-800">
                         {devices.length}
                     </span>
                 </h2>
                 <button
                     onClick={fetchDevices}
                     disabled={loading}
-                    className="p-2 hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-white transition-colors disabled:opacity-50"
+                    className="p-2 hover:bg-zinc-800 rounded-xl text-zinc-400 hover:text-white transition-all active:scale-95 disabled:opacity-50"
                     title="Refresh Devices"
                 >
                     <RefreshCw size={20} className={loading ? "animate-spin" : ""} />

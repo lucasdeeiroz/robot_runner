@@ -124,6 +124,20 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                     Object.keys(migrated.profiles).forEach(pid => {
                         migrated.profiles[pid].settings = deepMerge(DEFAULT_SETTINGS, migrated.profiles[pid].settings);
                     });
+
+                    // Validate activeProfileId
+                    if (!migrated.profiles[migrated.activeProfileId]) {
+                        console.warn(`[Settings] Active profile '${migrated.activeProfileId}' not found. Resetting to default.`);
+                        const availableIds = Object.keys(migrated.profiles);
+                        if (availableIds.length > 0) {
+                            migrated.activeProfileId = migrated.profiles['default'] ? 'default' : availableIds[0];
+                        } else {
+                            // Should not happen if we found profiles, but just in case
+                            migrated.profiles = { 'default': { id: 'default', name: 'Default', settings: DEFAULT_SETTINGS } };
+                            migrated.activeProfileId = 'default';
+                        }
+                    }
+
                     setStoreData(migrated);
                 } else {
                     // It's the old flat format. Migrate to Default Profile.
@@ -156,6 +170,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const updateSetting = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
         const activeId = storeData.activeProfileId;
         const currentProfile = storeData.profiles[activeId];
+
+        console.log(`[Settings] Updating ${key} to ${value} for profile ${activeId}`);
+
+        if (!currentProfile) {
+            console.error('[Settings] Active profile not found!');
+            return;
+        }
 
         const updatedSettings = { ...currentProfile.settings, [key]: value };
         const updatedProfile = { ...currentProfile, settings: updatedSettings };

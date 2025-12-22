@@ -145,9 +145,9 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
                     <button
                         onClick={toggleRecording}
                         className={clsx(
-                            "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all border",
+                            "flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-medium transition-all duration-200 active:scale-95 border",
                             isRecording
-                                ? "bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800"
+                                ? "bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800 shadow-sm"
                                 : "bg-white text-zinc-600 hover:bg-zinc-50 dark:bg-zinc-800 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 shadow-sm"
                         )}
                         title={isRecording ? t('performance.stop_record') : t('performance.start_record')}
@@ -164,7 +164,7 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
                                 setSelectedPackage(e.target.value);
                                 if (isRecording) toggleRecording();
                             }}
-                            className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md py-1.5 pl-8 pr-8 text-sm appearance-none cursor-pointer focus:ring-2 focus:ring-blue-500 outline-none"
+                            className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl py-1.5 pl-8 pr-8 text-sm appearance-none cursor-pointer focus:ring-2 focus:ring-blue-500/30 outline-none transition-all hover:bg-zinc-100 dark:hover:bg-zinc-700/50"
                         >
                             <option value="">{t('performance.system_only', 'System Only')}</option>
                             {appPackages.map(pkg => (
@@ -179,7 +179,7 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
                     <button
                         onClick={() => setAutoRefresh(!autoRefresh)}
                         className={clsx(
-                            "text-xs px-2 py-1 rounded border transition-colors",
+                            "text-xs px-2 py-1 rounded-lg border transition-all active:scale-95",
                             autoRefresh ? "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800" : "bg-zinc-50 text-zinc-500 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700"
                         )}
                     >
@@ -187,7 +187,7 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
                     </button>
                     <button
                         onClick={fetchStats}
-                        className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors"
+                        className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all active:scale-95"
                         title={t('performance.refresh')}
                     >
                         <RefreshCw size={16} className="text-zinc-500" />

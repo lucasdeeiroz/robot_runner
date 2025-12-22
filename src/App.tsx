@@ -19,8 +19,10 @@ function App() {
   useEffect(() => {
     // Apply theme
     const root = window.document.documentElement;
+    console.log('[App] Applying theme:', settings.theme);
     root.classList.remove('light', 'dark');
     root.classList.add(settings.theme);
+    console.log('[App] Root classes:', root.className);
   }, [settings.theme]);
 
   return (

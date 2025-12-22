@@ -9,9 +9,15 @@ interface LayoutProps {
 
 export function Layout({ children, activePage, onNavigate }: LayoutProps) {
     return (
-        <div className="flex h-screen bg-zinc-950 text-white overflow-hidden">
+        <div
+            className="flex h-screen overflow-hidden transition-colors duration-300"
+            style={{ backgroundColor: 'var(--bg-app)', color: 'var(--text-app)' }}
+        >
             <Sidebar activePage={activePage} onNavigate={onNavigate} />
-            <main className="flex-1 overflow-auto bg-zinc-950 p-6">
+            <main
+                className="flex-1 overflow-auto p-6 transition-colors duration-300"
+                style={{ backgroundColor: 'var(--bg-app)' }}
+            >
                 {children}
             </main>
         </div>
