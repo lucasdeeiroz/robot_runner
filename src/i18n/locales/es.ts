@@ -93,7 +93,13 @@ export const es = {
                 xpath: "XPath",
                 resource_id: "Resource ID",
                 access_id: "Access ID",
-                class: "Clase"
+                class: "Clase",
+                identifiers: "Identificadores"
+            },
+            nav: {
+                home: "Inicio",
+                back: "Atrás",
+                recents: "Recientes"
             }
         },
         commands: {

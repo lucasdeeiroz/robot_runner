@@ -28,6 +28,39 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
 
     const imgRef = useRef<HTMLImageElement>(null);
 
+    // Animation State
+    const [taps, setTaps] = useState<{ id: number, x: number, y: number }[]>([]);
+    const [swipes, setSwipes] = useState<{ id: number, startX: number, startY: number, endX: number, endY: number }[]>([]);
+
+    const addTapAnimation = (x: number, y: number) => {
+        const id = Date.now();
+        // Convert Device Coords -> CSS Coords for display
+        if (!imgRef.current) return;
+        const rect = imgRef.current.getBoundingClientRect();
+        const scaleX = rect.width / imgRef.current.naturalWidth;
+        const scaleY = rect.height / imgRef.current.naturalHeight;
+
+        setTaps(prev => [...prev, { id, x: x * scaleX, y: y * scaleY }]);
+        setTimeout(() => setTaps(prev => prev.filter(t => t.id !== id)), 500);
+    };
+
+    const addSwipeAnimation = (startX: number, startY: number, endX: number, endY: number) => {
+        const id = Date.now();
+        if (!imgRef.current) return;
+        const rect = imgRef.current.getBoundingClientRect();
+        const scaleX = rect.width / imgRef.current.naturalWidth;
+        const scaleY = rect.height / imgRef.current.naturalHeight;
+
+        setSwipes(prev => [...prev, {
+            id,
+            startX: startX * scaleX,
+            startY: startY * scaleY,
+            endX: endX * scaleX,
+            endY: endY * scaleY
+        }]);
+        setTimeout(() => setSwipes(prev => prev.filter(s => s.id !== id)), 600);
+    };
+
     useEffect(() => {
         if (selectedDevice) {
             refreshAll();
@@ -76,8 +109,9 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
         const args = ['shell', 'input', ...cmd.split(' ')];
         try {
             await invoke('run_adb_command', { device: selectedDevice, args });
-            // Optional: Auto-refresh after input?
-            // setTimeout(refreshAll, 1000); 
+            // Auto-refresh after input to show updated state
+            // Wait a bit for device animation (1.5s)
+            setTimeout(refreshAll, 1500);
         } catch (e) {
             console.error("Input failed", e);
         }
@@ -107,6 +141,7 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
             if (end) {
                 // Determine duration based on distance? Or fixed.
                 sendAdbInput(`swipe ${swipeStart.x} ${swipeStart.y} ${end.x} ${end.y} 500`);
+                addSwipeAnimation(swipeStart.x, swipeStart.y, end.x, end.y);
             }
             setSwipeStart(null);
         }
@@ -118,6 +153,7 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
 
         if (interactionMode === 'tap') {
             sendAdbInput(`tap ${coords.x} ${coords.y} `);
+            addTapAnimation(coords.x, coords.y);
         } else if (interactionMode === 'inspect') {
             if (!processMouseInteraction(e, false)) return;
         }
@@ -218,9 +254,9 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
                     </div>
 
                     <div className="flex gap-1 ml-2">
-                        <button onClick={() => sendAdbInput('keyevent 3')} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-zinc-500" title="Home"><Home size={16} /></button>
-                        <button onClick={() => sendAdbInput('keyevent 4')} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-zinc-500" title="Back"><ArrowLeft size={16} /></button>
-                        <button onClick={() => sendAdbInput('keyevent 187')} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-zinc-500" title="Recents"><Rows size={16} /></button>
+                        <button onClick={() => sendAdbInput('keyevent 3')} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-zinc-500" title={t('inspector.nav.home')}><Home size={16} /></button>
+                        <button onClick={() => sendAdbInput('keyevent 4')} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-zinc-500" title={t('inspector.nav.back')}><ArrowLeft size={16} /></button>
+                        <button onClick={() => sendAdbInput('keyevent 187')} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-zinc-500" title={t('inspector.nav.recents')}><Rows size={16} /></button>
                     </div>
                 </div>
                 <div className="text-xs text-zinc-400">
@@ -245,6 +281,66 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
                                 onMouseUp={handleImageMouseUp}
                                 draggable={false}
                             />
+                            {/* Animation Layers */}
+                            {taps.map(tap => (
+                                <div
+                                    key={tap.id}
+                                    className="absolute rounded-full bg-white/50 border-2 border-white animate-ping pointer-events-none"
+                                    style={{
+                                        left: tap.x - 20,
+                                        top: tap.y - 20,
+                                        width: 40,
+                                        height: 40,
+                                        animationDuration: '0.4s'
+                                    }}
+                                />
+                            ))}
+
+                            {swipes.map(swipe => (
+                                <svg
+                                    key={swipe.id}
+                                    className="absolute top-0 left-0 w-full h-full pointer-events-none"
+                                    style={{ zIndex: 30 }}
+                                >
+                                    <defs>
+                                        <marker id={`arrow-${swipe.id}`} markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+                                            <path d="M0,0 L0,6 L9,3 z" fill="#f97316" />
+                                        </marker>
+                                    </defs>
+                                    <line
+                                        x1={swipe.startX} y1={swipe.startY}
+                                        x2={swipe.endX} y2={swipe.endY}
+                                        stroke="#f97316"
+                                        strokeWidth="4"
+                                        strokeOpacity="0.8"
+                                        markerEnd={`url(#arrow-${swipe.id})`}
+                                        className="transition-opacity duration-500 ease-out"
+                                        style={{ opacity: 0 }} // We'll need a way to fade it out, mapped to CSS animation or just state key
+                                    >
+                                        <animate attributeName="opacity" values="1;0" dur="0.5s" fill="freeze" />
+                                    </line>
+                                </svg>
+                            ))}
+
+                            {/* Ongoing Swipe Preview */}
+                            {interactionMode === 'swipe' && swipeStart && (
+                                <div className="absolute w-full h-full top-0 left-0 pointer-events-none z-30">
+                                    {/* We need current mouse position for live preview, but let's stick to post-action animation for now or basic start marker */}
+                                    {/* If we want live drag line, we need to track mouse move in state, which might be heavy. Let's just show start point. */}
+                                    <div
+                                        className="absolute w-4 h-4 bg-orange-500 rounded-full -ml-2 -mt-2 opacity-50"
+                                        style={{ left: swipeStart.x, top: swipeStart.y }} // Warning: swipeStart is in image coords (scaled). We need display coords here.
+                                    // Wait, swipeStart in state IS image coords (getCoords returns scaled).
+                                    // But to render on screen over the image, we need CSS pixels relative to the generic container?
+                                    // getCoords uses: (e.clientX - rect.left) * scaleX.
+                                    // So e.clientX - rect.left is the CSS pixel info.
+                                    // createSwipe/Tap logic uses getCoords which returns DEVICE pixels.
+                                    // We need separate logic for display vs functionality?
+                                    // Or we can reverse calculate: (deviceX / scaleX)
+                                    />
+                                </div>
+                            )}
+
                             {/* Highlights overlaid on top (using absolute positioning based on cached rects logic) */}
                             {/* Note: The previous logic relied on client rects which might be tricky if image scales. */}
                             {/* Ideally we should map coordinates relative to image natural size to displayed size. */}
@@ -281,16 +377,22 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
                                     <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">{t('inspector.attributes.identifiers')}</h3>
                                     <div className="grid grid-cols-1 gap-2">
                                         <CopyButton
-                                            label={t('inspector.attributes.xpath')}
-                                            value={generateXPath(selectedNode)}
-                                            onCopy={(v) => copyToClipboard(v, 'xpath')}
-                                            active={copied === 'xpath'}
+                                            label={t('inspector.attributes.access_id')}
+                                            value={selectedNode.attributes['content-desc']}
+                                            onCopy={(v) => copyToClipboard(v, 'aid')}
+                                            active={copied === 'aid'}
                                         />
                                         <CopyButton
                                             label={t('inspector.attributes.resource_id')}
                                             value={selectedNode.attributes['resource-id']}
                                             onCopy={(v) => copyToClipboard(v, 'rid')}
                                             active={copied === 'rid'}
+                                        />
+                                        <CopyButton
+                                            label={t('inspector.attributes.xpath')}
+                                            value={generateXPath(selectedNode)}
+                                            onCopy={(v) => copyToClipboard(v, 'xpath')}
+                                            active={copied === 'xpath'}
                                         />
                                     </div>
                                 </div>

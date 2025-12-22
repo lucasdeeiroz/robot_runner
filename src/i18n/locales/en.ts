@@ -96,7 +96,13 @@ export const en = {
                 xpath: "XPath",
                 resource_id: "Resource ID",
                 access_id: "Access ID",
-                class: "Class"
+                class: "Class",
+                identifiers: "Identifiers"
+            },
+            nav: {
+                home: "Home",
+                back: "Back",
+                recents: "Recents"
             }
         },
         commands: {

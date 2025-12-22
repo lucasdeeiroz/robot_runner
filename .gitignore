@@ -172,6 +172,7 @@ frontend/
 .allure
 .gemini_cache
 !tauri_app/src/lib/
+!src/lib/
 
 # Logs
 logs

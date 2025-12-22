@@ -105,7 +105,13 @@ export const pt = {
                 xpath: "XPath",
                 resource_id: "Resource ID",
                 access_id: "Access ID",
-                class: "Classe"
+                class: "Classe",
+                identifiers: "Identificadores"
+            },
+            nav: {
+                home: "Início",
+                back: "Voltar",
+                recents: "Recentes"
             }
         },
         commands: {
