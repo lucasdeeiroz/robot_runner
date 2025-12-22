@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
-import { Activity, Cpu, Battery, CircuitBoard, RefreshCw, Play, Square } from "lucide-react";
+import { Activity, Cpu, Battery, CircuitBoard, RefreshCw, Play, Square, Package as PackageIcon, Eye } from "lucide-react";
 import clsx from "clsx";
 import { useSettings } from "@/lib/settings";
 
@@ -9,11 +9,18 @@ interface PerformanceSubTabProps {
     selectedDevice: string;
 }
 
+interface AppStats {
+    cpu_usage: number;
+    ram_used: number;
+    fps: number;
+}
+
 interface DeviceStats {
     cpu_usage: number;
     ram_used: number;
     ram_total: number;
     battery_level: number;
+    app_stats?: AppStats;
 }
 
 export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
@@ -23,6 +30,7 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
     // const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [autoRefresh, setAutoRefresh] = useState(true);
+    const [selectedPackage, setSelectedPackage] = useState<string>("");
 
     // Recording State
     const [isRecording, setIsRecording] = useState(false);
@@ -36,12 +44,21 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
             interval = setInterval(fetchStats, 2000); // Poll every 2s
         }
         return () => clearInterval(interval);
-    }, [selectedDevice, autoRefresh]);
+    }, [selectedDevice, autoRefresh, selectedPackage]);
 
-    // Recording Logic: Save data when stats update and recording is active
+    // Recording Logic
     useEffect(() => {
         if (isRecording && stats && recordingPath) {
-            const line = `${new Date().toISOString()},${stats.cpu_usage.toFixed(2)},${stats.ram_used},${stats.battery_level}\n`;
+            let line = `${new Date().toISOString()},${stats.cpu_usage.toFixed(2)},${stats.ram_used},${stats.battery_level}`;
+
+            // Add App stats if present
+            if (stats.app_stats) {
+                line += `,${stats.app_stats.cpu_usage.toFixed(2)},${stats.app_stats.ram_used},${stats.app_stats.fps}`;
+            } else {
+                line += ",,,"; // Empty placeholders
+            }
+            line += "\n";
+
             invoke('save_file', { path: recordingPath, content: line, append: true })
                 .catch(e => console.error("Failed to save perf data", e));
         }
@@ -49,7 +66,10 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
 
     const fetchStats = async () => {
         try {
-            const data = await invoke<DeviceStats>('get_device_stats', { device: selectedDevice });
+            const data = await invoke<DeviceStats>('get_device_stats', {
+                device: selectedDevice,
+                package: selectedPackage || null
+            });
             setStats(data);
             setError(null);
         } catch (e) {
@@ -64,25 +84,21 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
             setIsRecording(false);
             setRecordingPath(null);
         } else {
-            setLastRecording(null); // Clear previous message
-            // Start recording
-            // Filename: performance_<device>_<timestamp>.csv
+            setLastRecording(null);
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
             const safeDeviceName = selectedDevice.replace(/[^a-zA-Z0-9]/g, '_');
             const filename = `performance_${safeDeviceName}_${timestamp}.csv`;
-
-            // Use configured logcat path or default logic
-            // Note: settings.paths.logs is usually set to a valid directory.
-            // If user has a specific "logcat" folder configured, we should use it.
-            // Assuming settings structure has it or we default to logs.
-            // Current settings implementation might only have 'logs' path widely used.
             const dir = settings.paths.logs || ".";
-            // Ensure separator.
             const path = dir.endsWith('\\') || dir.endsWith('/') ? `${dir}${filename}` : `${dir}/${filename}`;
 
             try {
-                // Write Header
-                const header = "Timestamp,CPU_%,RAM_KB,Battery_%\n";
+                // Header based on selection
+                let header = "Timestamp,System_CPU_%,System_RAM_KB,Battery_%";
+                if (selectedPackage) {
+                    header += `,App_CPU_%,App_RAM_KB,FPS`;
+                }
+                header += "\n";
+
                 await invoke('save_file', { path, content: header, append: false });
                 setRecordingPath(path);
                 setIsRecording(true);
@@ -104,17 +120,27 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
         return "text-red-500";
     };
 
+    // Parse configured packages
+    const appPackages = settings.tools.appPackage
+        ? settings.tools.appPackage.split(',').map((p: string) => p.trim()).filter(Boolean)
+        : [];
+
     if (!selectedDevice) {
         return <div className="p-8 text-center text-zinc-400">{t('performance.select_device')}</div>;
     }
 
     return (
         <div className="h-full flex flex-col p-4 overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-medium flex items-center gap-2">
-                    <Activity size={20} className="text-blue-500" />
-                    {t('performance.title')}
-                </h2>
+            <div className="flex flex-wrap items-center justify-between mb-6 gap-4">
+                <div className="flex items-center gap-4">
+                    <h2 className="text-lg font-medium flex items-center gap-2">
+                        <Activity size={20} className="text-blue-500" />
+                        {t('performance.title')}
+                    </h2>
+
+
+                </div>
+
                 <div className="flex items-center gap-2">
                     <button
                         onClick={toggleRecording}
@@ -129,6 +155,24 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
                         {isRecording ? <Square size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
                         {isRecording ? t('performance.recording') : "REC"}
                     </button>
+
+                    {/* Package Selector */}
+                    <div className="relative">
+                        <select
+                            value={selectedPackage}
+                            onChange={(e) => {
+                                setSelectedPackage(e.target.value);
+                                if (isRecording) toggleRecording();
+                            }}
+                            className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md py-1.5 pl-8 pr-8 text-sm appearance-none cursor-pointer focus:ring-2 focus:ring-blue-500 outline-none"
+                        >
+                            <option value="">{t('performance.system_only', 'System Only')}</option>
+                            {appPackages.map(pkg => (
+                                <option key={pkg} value={pkg}>{pkg}</option>
+                            ))}
+                        </select>
+                        <PackageIcon size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+                    </div>
 
                     <div className="h-4 w-px bg-zinc-300 dark:bg-zinc-700 mx-1" />
 
@@ -175,43 +219,91 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
                     <p>{t('performance.loading')}</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {/* CPU Card */}
-                    <Card title={t('performance.cpu')} icon={<Cpu size={24} className="text-blue-500" />}>
-                        <div className="flex items-end gap-2 mt-2">
-                            <span className="text-4xl font-bold text-zinc-800 dark:text-zinc-100">
-                                {stats.cpu_usage.toFixed(1)}%
-                            </span>
-                            <span className="text-sm text-zinc-500 mb-1">{t('performance.load')}</span>
-                        </div>
-                        <ProgressBar value={stats.cpu_usage} max={100} color="bg-blue-500" />
-                    </Card>
+                <div className="space-y-6">
+                    {/* System Stats Section */}
+                    <div>
+                        <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3 ml-1">{t('performance.device_stats', 'Device Performance')}</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {/* CPU Card */}
+                            <Card title={t('performance.cpu')} icon={<Cpu size={24} className="text-blue-500" />}>
+                                <div className="flex items-end gap-2 mt-2">
+                                    <span className="text-4xl font-bold text-zinc-800 dark:text-zinc-100">
+                                        {stats.cpu_usage.toFixed(1)}%
+                                    </span>
+                                    <span className="text-sm text-zinc-500 mb-1">{t('performance.load')}</span>
+                                </div>
+                                <ProgressBar value={stats.cpu_usage} max={100} color="bg-blue-500" />
+                            </Card>
 
-                    {/* RAM Card */}
-                    <Card title={t('performance.ram')} icon={<CircuitBoard size={24} className="text-purple-500" />}>
-                        <div className="flex items-end gap-2 mt-2">
-                            <span className="text-3xl font-bold text-zinc-800 dark:text-zinc-100">
-                                {formatBytes(stats.ram_used)}
-                            </span>
-                            <span className="text-xs text-zinc-500 mb-1">
-                                / {formatBytes(stats.ram_total)}
-                            </span>
-                        </div>
-                        <ProgressBar value={stats.ram_used} max={stats.ram_total} color="bg-purple-500" />
-                        <div className="text-xs text-right mt-1 text-zinc-400">
-                            {((stats.ram_used / stats.ram_total) * 100).toFixed(1)}% {t('performance.used')}
-                        </div>
-                    </Card>
+                            {/* RAM Card */}
+                            <Card title={t('performance.ram')} icon={<CircuitBoard size={24} className="text-purple-500" />}>
+                                <div className="flex items-end gap-2 mt-2">
+                                    <span className="text-3xl font-bold text-zinc-800 dark:text-zinc-100">
+                                        {formatBytes(stats.ram_used)}
+                                    </span>
+                                    <span className="text-xs text-zinc-500 mb-1">
+                                        / {formatBytes(stats.ram_total)}
+                                    </span>
+                                </div>
+                                <ProgressBar value={stats.ram_used} max={stats.ram_total} color="bg-purple-500" />
+                                <div className="text-xs text-right mt-1 text-zinc-400">
+                                    {((stats.ram_used / stats.ram_total) * 100).toFixed(1)}% {t('performance.used')}
+                                </div>
+                            </Card>
 
-                    {/* Battery Card */}
-                    <Card title={t('performance.battery')} icon={<Battery size={24} className={getBatteryColor(stats.battery_level)} />}>
-                        <div className="flex items-end gap-2 mt-2">
-                            <span className={clsx("text-4xl font-bold", getBatteryColor(stats.battery_level))}>
-                                {stats.battery_level}%
-                            </span>
+                            {/* Battery Card */}
+                            <Card title={t('performance.battery')} icon={<Battery size={24} className={getBatteryColor(stats.battery_level)} />}>
+                                <div className="flex items-end gap-2 mt-2">
+                                    <span className={clsx("text-4xl font-bold", getBatteryColor(stats.battery_level))}>
+                                        {stats.battery_level}%
+                                    </span>
+                                </div>
+                                <ProgressBar value={stats.battery_level} max={100} color={getBatteryColor(stats.battery_level).replace("text-", "bg-")} />
+                            </Card>
                         </div>
-                        <ProgressBar value={stats.battery_level} max={100} color={getBatteryColor(stats.battery_level).replace("text-", "bg-")} />
-                    </Card>
+                    </div>
+
+                    {/* Check if app stats are available (only if package selected and backend returned it) */}
+                    {selectedPackage && stats.app_stats && (
+                        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3 ml-1 flex items-center gap-2">
+                                {t('performance.app_stats', 'App Performance')}: <span className="normal-case text-blue-600 dark:text-blue-400 font-mono">{selectedPackage}</span>
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {/* App CPU */}
+                                <Card title={`${t('performance.cpu')} (App)`} icon={<Cpu size={24} className="text-orange-500" />}>
+                                    <div className="flex items-end gap-2 mt-2">
+                                        <span className="text-4xl font-bold text-zinc-800 dark:text-zinc-100">
+                                            {stats.app_stats.cpu_usage.toFixed(1)}%
+                                        </span>
+                                    </div>
+                                    <ProgressBar value={stats.app_stats.cpu_usage} max={100} color="bg-orange-500" />
+                                </Card>
+
+                                {/* App RAM */}
+                                <Card title={`${t('performance.ram')} (App)`} icon={<CircuitBoard size={24} className="text-pink-500" />}>
+                                    <div className="flex items-end gap-2 mt-2">
+                                        <span className="text-3xl font-bold text-zinc-800 dark:text-zinc-100">
+                                            {formatBytes(stats.app_stats.ram_used)}
+                                        </span>
+                                    </div>
+                                    {/* Using Device Total RAM as baseline for bar */}
+                                    <ProgressBar value={stats.app_stats.ram_used} max={stats.ram_total} color="bg-pink-500" />
+                                </Card>
+
+                                {/* App FPS */}
+                                <Card title="FPS" icon={<Eye size={24} className="text-green-500" />}>
+                                    <div className="flex items-end gap-2 mt-2">
+                                        <span className="text-4xl font-bold text-zinc-800 dark:text-zinc-100">
+                                            {stats.app_stats.fps}
+                                        </span>
+                                        <span className="text-sm text-zinc-500 mb-1">fps</span>
+                                    </div>
+                                    <ProgressBar value={stats.app_stats.fps} max={120} color="bg-green-500" />
+                                </Card>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

@@ -320,7 +320,10 @@ export const pt = {
             stop_record: "Parar Gravação",
             recording: "Gravando...",
             record_error: "Falha ao gravar",
-            select_device: "Selecione um dispositivo para ver estatísticas de desempenho."
+            select_device: "Selecione um dispositivo para ver estatísticas de desempenho.",
+            system_only: "Somente Sistema",
+            device_stats: "Desempenho do Dispositivo",
+            app_stats: "Desempenho do Aplicativo"
         }
     }
 };

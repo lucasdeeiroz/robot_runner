@@ -311,7 +311,10 @@ export const es = {
             used: "usado",
             loading: "Cargando estadísticas...",
             error: "Fallo al obtener estadísticas del dispositivo",
-            select_device: "Seleccione un dispositivo para ver estadísticas de rendimiento."
+            select_device: "Seleccione un dispositivo para ver estadísticas de rendimiento.",
+            system_only: "Solo Sistema",
+            device_stats: "Rendimiento del Dispositivo",
+            app_stats: "Rendimiento de Aplicación"
         }
     }
 };

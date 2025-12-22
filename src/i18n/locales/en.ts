@@ -320,7 +320,10 @@ export const en = {
             stop_record: "Stop Recording",
             recording: "Recording...",
             record_error: "Failed to record",
-            select_device: "Select a device to view performance stats."
+            select_device: "Select a device to view performance stats.",
+            system_only: "System Only",
+            device_stats: "Device Performance",
+            app_stats: "App Performance"
         }
     }
 };
