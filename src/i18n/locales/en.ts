@@ -231,7 +231,8 @@ export const en = {
             description: "Information about Robot Runner and its creators.",
             long_description: "A modern, cross-platform GUI for Robot Framework and Appium, designed to simplify test automation workflows.",
             developed_by: "Developed by",
-            lead: "Lead Developer",
+            lead: "Principal Developer",
+            collaborator: "Collaborating Developer",
             powered_by: "Powered by"
         },
         ai_page: {

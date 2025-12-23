@@ -1,10 +1,10 @@
-import { Github, Info } from "lucide-react";
+import { Github, Bot } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 
 export function AboutPage() {
     const { t } = useTranslation();
-    const appVersion = "2.0.1";
+    const appVersion = "2.0.2";
 
     return (
         <div className="max-w-4xl mx-auto space-y-8 pb-12">
@@ -17,7 +17,7 @@ export function AboutPage() {
                 {/* Main Info Card */}
                 <div className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-8 flex flex-col items-center text-center shadow-sm">
                     <div className="w-20 h-20 bg-blue-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-blue-500/20 dark:shadow-blue-900/20">
-                        <Info size={40} className="text-white" />
+                        <Bot size={40} className="text-white" />
                     </div>
 
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
@@ -37,13 +37,24 @@ export function AboutPage() {
                         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
                             {t('about.developed_by')}
                         </h3>
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center text-xl">
-                                👨‍💻
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center text-xl">
+                                    👨‍💻
+                                </div>
+                                <div>
+                                    <div className="font-medium text-gray-900 dark:text-white">Lucas de Eiroz</div>
+                                    <div className="text-sm text-zinc-500">{t('about.lead')}</div>
+                                </div>
                             </div>
-                            <div>
-                                <div className="font-medium text-gray-900 dark:text-white">Lucas de Eiroz</div>
-                                <div className="text-sm text-zinc-500">{t('about.lead')}</div>
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center text-xl">
+                                    👩‍💻
+                                </div>
+                                <div>
+                                    <div className="font-medium text-gray-900 dark:text-white">Alessandra Gomes de Almeida</div>
+                                    <div className="text-sm text-zinc-500">{t('about.collaborator')}</div>
+                                </div>
                             </div>
                         </div>
                     </section>

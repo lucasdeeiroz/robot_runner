@@ -227,7 +227,8 @@ export const es = {
             description: "Información sobre Robot Runner y sus creadores.",
             long_description: "Una interfaz gráfica moderna y multiplataforma para Robot Framework y Appium, diseñada para simplificar los flujos de automatización de pruebas.",
             developed_by: "Desarrollado por",
-            lead: "Desarrollador Líder",
+            lead: "Desarrollador Principal",
+            collaborator: "Desarrolladora Colaboradora",
             powered_by: "Desarrollado con"
         },
         ai_page: {
