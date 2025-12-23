@@ -1,6 +1,6 @@
 use std::fs;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use tauri::command;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -13,7 +13,11 @@ pub struct FileEntry {
 #[command]
 pub fn list_directory(path: Option<String>) -> Result<Vec<FileEntry>, String> {
     let target_path = if let Some(p) = path {
-        if p.is_empty() { ".".to_string() } else { p }
+        if p.is_empty() {
+            ".".to_string()
+        } else {
+            p
+        }
     } else {
         ".".to_string()
     };
@@ -25,7 +29,7 @@ pub fn list_directory(path: Option<String>) -> Result<Vec<FileEntry>, String> {
         let entry = entry.map_err(|e| e.to_string())?;
         let path_buf = entry.path();
         let metadata = fs::metadata(&path_buf).map_err(|e| e.to_string())?;
-        
+
         // Skip hidden files/dirs (starting with dot)
         let name = entry.file_name().to_string_lossy().to_string();
         if name.starts_with('.') {
@@ -56,7 +60,7 @@ pub fn list_directory(path: Option<String>) -> Result<Vec<FileEntry>, String> {
 #[command]
 pub fn save_file(path: String, content: String, append: bool) -> Result<(), String> {
     use std::io::Write;
-    
+
     let mut file = if append {
         fs::OpenOptions::new()
             .create(true)
@@ -67,6 +71,7 @@ pub fn save_file(path: String, content: String, append: bool) -> Result<(), Stri
         fs::File::create(&path).map_err(|e| e.to_string())?
     };
 
-    file.write_all(content.as_bytes()).map_err(|e| e.to_string())?;
+    file.write_all(content.as_bytes())
+        .map_err(|e| e.to_string())?;
     Ok(())
 }

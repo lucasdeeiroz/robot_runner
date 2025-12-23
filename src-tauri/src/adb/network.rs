@@ -45,10 +45,10 @@ pub async fn get_device_ip(serial: String) -> Result<String, String> {
         let stdout = String::from_utf8_lossy(&output_ifconfig.stdout);
         // Example: "inet addr:192.168.1.5 ..."
         if let Some(start) = stdout.find("inet addr:") {
-             let rest = &stdout[start + 10..];
-             if let Some(end) = rest.find(' ') {
-                 return Ok(rest[0..end].to_string());
-             }
+            let rest = &stdout[start + 10..];
+            if let Some(end) = rest.find(' ') {
+                return Ok(rest[0..end].to_string());
+            }
         }
     }
 

@@ -1,20 +1,20 @@
-use tauri::{AppHandle, Emitter, State, Manager};
-use std::process::{Command, Stdio, Child};
-use std::io::{BufRead, BufReader};
-use std::thread;
-use std::sync::Mutex;
-use std::time::Duration;
-use std::collections::HashMap;
 use chrono;
+use std::collections::HashMap;
+use std::io::{BufRead, BufReader};
+use std::process::{Child, Command, Stdio};
+use std::sync::Mutex;
+use std::thread;
+use std::time::Duration;
+use tauri::{AppHandle, Emitter, Manager, State};
 
 pub struct TestState(pub Mutex<HashMap<String, Child>>);
 
 #[tauri::command]
 pub fn stop_robot_test(state: State<'_, TestState>, run_id: String) -> Result<String, String> {
     let mut procs = state.0.lock().map_err(|e| e.to_string())?;
-    
+
     if let Some(mut child) = procs.remove(&run_id) {
-         // Handle Windows Process Tree Killing
+        // Handle Windows Process Tree Killing
         #[cfg(target_os = "windows")]
         {
             use std::os::windows::process::CommandExt;
@@ -23,13 +23,13 @@ pub fn stop_robot_test(state: State<'_, TestState>, run_id: String) -> Result<St
                 .args(&["/F", "/T", "/PID", &pid.to_string()])
                 .creation_flags(0x08000000) // CREATE_NO_WINDOW
                 .output();
-                
+
             let _ = child.kill();
         }
 
         #[cfg(not(target_os = "windows"))]
         {
-             let _ = child.kill();
+            let _ = child.kill();
         }
 
         let _ = child.wait();
@@ -51,7 +51,19 @@ struct TestFinished {
 }
 
 #[tauri::command]
-pub fn run_robot_test(app: AppHandle, state: State<'_, TestState>, run_id: String, test_path: Option<String>, output_dir: String, device: Option<String>, arguments_file: Option<String>, timestamp_outputs: Option<bool>, device_model: Option<String>, android_version: Option<String>, working_dir: Option<String>) -> Result<String, String> {
+pub fn run_robot_test(
+    app: AppHandle,
+    state: State<'_, TestState>,
+    run_id: String,
+    test_path: Option<String>,
+    output_dir: String,
+    device: Option<String>,
+    arguments_file: Option<String>,
+    timestamp_outputs: Option<bool>,
+    device_model: Option<String>,
+    android_version: Option<String>,
+    working_dir: Option<String>,
+) -> Result<String, String> {
     // Resolve absolute path for output_dir to ensure clean logs
     let abs_output_dir = std::fs::canonicalize(&output_dir)
         .map(|p| {
@@ -71,18 +83,18 @@ pub fn run_robot_test(app: AppHandle, state: State<'_, TestState>, run_id: Strin
         args.push("--timestampoutputs");
     }
 
-    let device_arg; 
+    let device_arg;
     if let Some(d) = &device {
         device_arg = format!("udid:{}", d);
         args.push("-v");
         args.push(&device_arg);
     }
-    
+
     if let Some(arg_file) = &arguments_file {
         args.push("-A");
         args.push(arg_file);
     }
-    
+
     // Only add test_path if it is provided
     if let Some(tp) = &test_path {
         if !tp.is_empty() {
@@ -95,7 +107,7 @@ pub fn run_robot_test(app: AppHandle, state: State<'_, TestState>, run_id: Strin
     let meta_device = device.clone().unwrap_or("Local/Unknown".to_string());
     let meta_model = device_model.unwrap_or_default();
     let meta_version = android_version.unwrap_or_default();
-    
+
     // Simple JSON construction format!
     let metadata_json = format!(
         r#"{{
@@ -105,10 +117,14 @@ pub fn run_robot_test(app: AppHandle, state: State<'_, TestState>, run_id: Strin
             "timestamp": "{}",
             "device_model": "{}",
             "android_version": "{}"
-        }}"#, 
-        run_id, 
-        meta_device.replace("\\", "\\\\").replace("\"", "\\\""), 
-        test_path.clone().unwrap_or_default().replace("\\", "\\\\").replace("\"", "\\\""),
+        }}"#,
+        run_id,
+        meta_device.replace("\\", "\\\\").replace("\"", "\\\""),
+        test_path
+            .clone()
+            .unwrap_or_default()
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\""),
         chrono::Local::now().to_rfc3339(),
         meta_model.replace("\\", "\\\\").replace("\"", "\\\""),
         meta_version.replace("\\", "\\\\").replace("\"", "\\\"")
@@ -138,7 +154,12 @@ pub fn run_robot_test(app: AppHandle, state: State<'_, TestState>, run_id: Strin
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| format!("Failed to start robot: {}. Make sure 'robot' is requested in PATH.", e))?;
+        .map_err(|e| {
+            format!(
+                "Failed to start robot: {}. Make sure 'robot' is requested in PATH.",
+                e
+            )
+        })?;
 
     let stdout = child.stdout.take().ok_or("Failed to open stdout")?;
     let stderr = child.stderr.take().ok_or("Failed to open stderr")?;
@@ -150,12 +171,17 @@ pub fn run_robot_test(app: AppHandle, state: State<'_, TestState>, run_id: Strin
         let mut reader = BufReader::new(stdout);
         let mut buf = Vec::new();
         while let Ok(n) = reader.read_until(b'\n', &mut buf) {
-            if n == 0 { break; }
+            if n == 0 {
+                break;
+            }
             let line = String::from_utf8_lossy(&buf).to_string();
-            let _ = app_handle.emit("test-output", TestOutput { 
-                run_id: rid.clone(), 
-                message: line.trim_end().to_string() 
-            });
+            let _ = app_handle.emit(
+                "test-output",
+                TestOutput {
+                    run_id: rid.clone(),
+                    message: line.trim_end().to_string(),
+                },
+            );
             buf.clear();
         }
     });
@@ -166,12 +192,17 @@ pub fn run_robot_test(app: AppHandle, state: State<'_, TestState>, run_id: Strin
         let mut reader = BufReader::new(stderr);
         let mut buf = Vec::new();
         while let Ok(n) = reader.read_until(b'\n', &mut buf) {
-            if n == 0 { break; }
+            if n == 0 {
+                break;
+            }
             let line = String::from_utf8_lossy(&buf).to_string();
-            let _ = app_handle_err.emit("test-output", TestOutput { 
-                run_id: rid_err.clone(), 
-                message: format!("STDERR: {}", line.trim_end()) 
-            });
+            let _ = app_handle_err.emit(
+                "test-output",
+                TestOutput {
+                    run_id: rid_err.clone(),
+                    message: format!("STDERR: {}", line.trim_end()),
+                },
+            );
             buf.clear();
         }
     });
@@ -180,7 +211,7 @@ pub fn run_robot_test(app: AppHandle, state: State<'_, TestState>, run_id: Strin
     {
         let mut procs = state.0.lock().map_err(|e| e.to_string())?;
         if procs.contains_key(&run_id) {
-             return Err(format!("Run ID {} already exists", run_id));
+            return Err(format!("Run ID {} already exists", run_id));
         }
         procs.insert(run_id.clone(), child);
     }
@@ -188,15 +219,15 @@ pub fn run_robot_test(app: AppHandle, state: State<'_, TestState>, run_id: Strin
     // Monitoring thread
     let app_handle_finish = app.clone();
     let rid_monitor = run_id.clone();
-    
+
     thread::spawn(move || {
         loop {
             thread::sleep(Duration::from_millis(500));
-            
+
             let state = app_handle_finish.state::<TestState>();
             let mut procs: std::sync::MutexGuard<HashMap<String, Child>> = match state.0.lock() {
                 Ok(g) => g,
-                Err(_) => break, 
+                Err(_) => break,
             };
 
             // Check if process exists and is running
@@ -208,8 +239,8 @@ pub fn run_robot_test(app: AppHandle, state: State<'_, TestState>, run_id: Strin
                     Ok(Some(status)) => {
                         finished = true;
                         status_msg = format!("Exit Code: {}", status);
-                    },
-                    Ok(None) => {}, // Still running
+                    }
+                    Ok(None) => {} // Still running
                     Err(e) => {
                         finished = true;
                         status_msg = format!("Error checking status: {}", e);
@@ -224,12 +255,15 @@ pub fn run_robot_test(app: AppHandle, state: State<'_, TestState>, run_id: Strin
                 // Remove from map
                 procs.remove(&rid_monitor);
                 // Drop lock before emitting? No, try_wait is fast.
-                drop(procs); 
+                drop(procs);
 
-                let _ = app_handle_finish.emit("test-finished", TestFinished { 
-                    run_id: rid_monitor, 
-                    status: status_msg 
-                });
+                let _ = app_handle_finish.emit(
+                    "test-finished",
+                    TestFinished {
+                        run_id: rid_monitor,
+                        status: status_msg,
+                    },
+                );
                 break;
             }
         }

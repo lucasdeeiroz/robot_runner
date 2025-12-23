@@ -147,7 +147,12 @@ export const en = {
                 theme: "App Theme",
                 light: "Light",
                 dark: "Dark",
-                primary_color: "Primary Color"
+                primary_color: "Primary Color",
+                sidebar_logo: "Sidebar Logo",
+                logo_light: "Light Mode Logo",
+                logo_dark: "Dark Mode Logo",
+                use_default: "Default (Text)",
+                logo_hint: "Recommended: PNG, Height 40px, Max Width 200px"
             },
             appium: {
                 title: "Appium Server",

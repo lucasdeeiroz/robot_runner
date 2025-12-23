@@ -21,6 +21,8 @@ export interface AppSettings {
     language: string;
     geminiApiKey: string;
     primaryColor: string;
+    customLogoLight?: string;
+    customLogoDark?: string;
 
     // Appium
     appiumHost: string;

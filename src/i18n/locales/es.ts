@@ -144,7 +144,12 @@ export const es = {
                 theme: "Tema de la App",
                 light: "Claro",
                 dark: "Oscuro",
-                primary_color: "Color Primario"
+                primary_color: "Color Primario",
+                sidebar_logo: "Logo de la Barra Lateral",
+                logo_light: "Logo Modo Claro",
+                logo_dark: "Logo Modo Oscuro",
+                use_default: "Predeterminado (Texto)",
+                logo_hint: "Recomendado: PNG, Altura 40px, Ancho Máx 200px"
             },
             appium: {
                 title: "Servidor Appium",

@@ -1,6 +1,6 @@
-use std::process::{Command, Child, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
-use tauri::{State, Emitter};
+use tauri::{Emitter, State};
 
 // State to hold the Appium process
 pub struct AppiumState(pub Mutex<Option<Child>>);
@@ -20,19 +20,31 @@ pub fn get_appium_status(state: State<'_, AppiumState>) -> AppiumStatus {
             Ok(Some(_)) => {
                 // It has exited
                 *child_guard = None; // Clean up
-                AppiumStatus { running: false, pid: None }
+                AppiumStatus {
+                    running: false,
+                    pid: None,
+                }
             }
             Ok(None) => {
                 // Still running
-                AppiumStatus { running: true, pid: Some(child.id()) }
+                AppiumStatus {
+                    running: true,
+                    pid: Some(child.id()),
+                }
             }
             Err(_) => {
-                 *child_guard = None;
-                 AppiumStatus { running: false, pid: None }
+                *child_guard = None;
+                AppiumStatus {
+                    running: false,
+                    pid: None,
+                }
             }
         }
     } else {
-        AppiumStatus { running: false, pid: None }
+        AppiumStatus {
+            running: false,
+            pid: None,
+        }
     }
 }
 
@@ -42,10 +54,10 @@ pub fn start_appium_server(
     host: String,
     port: u32,
     args: String, // Extra args string
-    app_handle: tauri::AppHandle
+    app_handle: tauri::AppHandle,
 ) -> Result<String, String> {
     let mut child_guard = state.0.lock().unwrap();
-    
+
     // Check if already running
     if let Some(child) = &mut *child_guard {
         if let Ok(None) = child.try_wait() {
@@ -60,7 +72,7 @@ pub fn start_appium_server(
     let cmd = "appium";
 
     let mut command = Command::new(cmd);
-    
+
     // Add Host and Port
     command.arg("--address").arg(&host);
     command.arg("--port").arg(&port.to_string());
@@ -88,7 +100,7 @@ pub fn start_appium_server(
         Ok(mut child) => {
             let stdout = child.stdout.take();
             let stderr = child.stderr.take();
-            
+
             // Store the child
             *child_guard = Some(child);
 
@@ -120,7 +132,7 @@ pub fn start_appium_server(
 
             Ok("Appium started".to_string())
         }
-        Err(e) => Err(format!("Failed to start appium: {}", e))
+        Err(e) => Err(format!("Failed to start appium: {}", e)),
     }
 }
 
@@ -137,18 +149,18 @@ pub fn stop_appium_server(state: State<'_, AppiumState>) -> Result<String, Strin
                 .args(&["/F", "/T", "/PID", &pid.to_string()])
                 .creation_flags(0x08000000) // CREATE_NO_WINDOW
                 .output();
-                
+
             // We still call child.kill() / wait just to be sure Rust knows it's gone
             let _ = child.kill();
         }
 
         #[cfg(not(target_os = "windows"))]
         {
-             let _ = child.kill();
+            let _ = child.kill();
         }
-        
+
         let _ = child.wait(); // Prevent zombie process
-        
+
         Ok("Appium stopped".to_string())
     } else {
         Ok("Appium was not running".to_string())

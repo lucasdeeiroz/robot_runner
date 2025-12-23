@@ -1,10 +1,10 @@
 mod adb;
-mod runner;
+mod appium;
 mod inspector;
 mod logs;
-mod system;
-mod appium;
 mod ngrok;
+mod runner;
+mod system;
 
 mod files;
 
@@ -16,14 +16,19 @@ fn greet(name: &str) -> String {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .manage(adb::shell::ShellState::default())
-        .manage(runner::TestState(std::sync::Mutex::new(std::collections::HashMap::new())))
+        .manage(runner::TestState(std::sync::Mutex::new(
+            std::collections::HashMap::new(),
+        )))
         .manage(appium::AppiumState(std::sync::Mutex::new(None)))
         .manage(ngrok::NgrokState(std::sync::Mutex::new(None)))
-        .manage(adb::logcat::LogcatState(std::sync::Mutex::new(std::collections::HashMap::new())))
+        .manage(adb::logcat::LogcatState(std::sync::Mutex::new(
+            std::collections::HashMap::new(),
+        )))
         .invoke_handler(tauri::generate_handler![
             greet,
             adb::shell::get_adb_version,

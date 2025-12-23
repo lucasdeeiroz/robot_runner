@@ -15,14 +15,15 @@ pub struct Device {
 pub fn get_connected_devices() -> Result<Vec<Device>, String> {
     let mut cmd = Command::new("adb");
     cmd.args(&["devices", "-l"]);
-    
+
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000); 
+        cmd.creation_flags(0x08000000);
     }
 
-    let output = cmd.output()
+    let output = cmd
+        .output()
         .map_err(|e| format!("Failed to execute adb: {}", e))?;
 
     if !output.status.success() {
@@ -76,7 +77,7 @@ pub fn get_connected_devices() -> Result<Vec<Device>, String> {
                 Err(_) => "Unknown".to_string(),
             };
 
-             devices.push(Device {
+            devices.push(Device {
                 udid,
                 model,
                 state,
@@ -85,7 +86,7 @@ pub fn get_connected_devices() -> Result<Vec<Device>, String> {
                 android_version: Some(android_version),
             });
         } else {
-             devices.push(Device {
+            devices.push(Device {
                 udid,
                 model: "Unknown".to_string(),
                 state,

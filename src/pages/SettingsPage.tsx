@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
+import { readFile } from "@tauri-apps/plugin-fs";
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
 
@@ -27,6 +28,37 @@ export function SettingsPage() {
             i18n.changeLanguage(langMap[settings.language] || 'en');
         }
     }, [settings.language, i18n]);
+
+    const handleLogoUpload = async (key: 'customLogoLight' | 'customLogoDark') => {
+        try {
+            const selected = await open({
+                filters: [{ name: 'Image', extensions: ['png', 'jpg', 'svg'] }]
+            });
+            if (selected) {
+                const path = selected as string;
+                try {
+                    // Read file content immediately while we have dynamic permission
+                    // We store the Base64 string to bypass filesystem permission issues on restart
+                    const data = await readFile(path);
+
+                    const base64 = btoa(
+                        new Uint8Array(data).reduce((data, byte) => data + String.fromCharCode(byte), '')
+                    );
+
+                    const ext = path.split('.').pop()?.toLowerCase();
+                    const mime = ext === 'svg' ? 'image/svg+xml' : (ext === 'jpg' || ext === 'jpeg') ? 'image/jpeg' : 'image/png';
+                    const dataUri = `data:${mime};base64,${base64}`;
+
+                    updateSetting(key, dataUri);
+                } catch (readErr) {
+                    console.error("Failed to read logo file", readErr);
+                    alert("Failed to read logo file. Please try again.");
+                }
+            }
+        } catch (e) {
+            console.error("Failed to select logo", e);
+        }
+    };
 
     // Appium State
     const [appiumStatus, setAppiumStatus] = useState<{ running: boolean, pid?: number }>({ running: false });
@@ -58,8 +90,6 @@ export function SettingsPage() {
             unlistenPromise.then(unlisten => unlisten());
         };
     }, []);
-
-    // ... rest of the component
 
 
     // Auto-scroll logs
@@ -129,11 +159,6 @@ export function SettingsPage() {
     if (loading) {
         return <div className="p-8 text-center text-zinc-500">Loading settings...</div>;
     }
-
-    // ... imports remain the same
-
-    // To save space in this Replace call, I will rewrite the render return primarily.
-    // Since ReplaceFileContent replaces a block, I'll target the main return statement.
 
     return (
         <div className="max-w-4xl mx-auto space-y-8 pb-12">
@@ -358,10 +383,13 @@ export function SettingsPage() {
 
                 {/* Appearance & General */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+
                     <section className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
                         <h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-white tracking-tight">
                             <Moon size={20} className="text-primary" /> {t('settings.appearance.title')}
                         </h2>
+                        {/* Theme Toggle */}
                         <div className="flex items-center justify-between">
                             <span className="text-zinc-600 dark:text-zinc-300">{t('settings.appearance.theme')}</span>
                             <div className="flex bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl">
@@ -380,6 +408,7 @@ export function SettingsPage() {
                             </div>
                         </div>
 
+                        {/* Primary Color */}
                         <div className="mt-6">
                             <h3 className="text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-3">{t('settings.appearance.primary_color')}</h3>
                             <div className="flex flex-wrap gap-3">
@@ -407,6 +436,71 @@ export function SettingsPage() {
                                         )}
                                     </button>
                                 ))}
+                            </div>
+                        </div>
+
+                        {/* Sidebar Logo */}
+                        <div className="mt-6 pt-6 border-t border-zinc-100 dark:border-zinc-800">
+                            <h3 className="text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-3">{t('settings.appearance.sidebar_logo')}</h3>
+                            <div className="space-y-4">
+                                {/* Light Mode Logo */}
+                                <div>
+                                    <label className="block text-xs text-zinc-500 mb-1">{t('settings.appearance.logo_light')}</label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={settings.customLogoLight || ''}
+                                            readOnly
+                                            placeholder={t('settings.appearance.use_default')}
+                                            className="flex-1 bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-zinc-100"
+                                        />
+                                        <button
+                                            onClick={() => handleLogoUpload('customLogoLight')}
+                                            className="px-3 py-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 rounded-xl transition-all"
+                                        >
+                                            <FolderOpen size={16} />
+                                        </button>
+                                        {settings.customLogoLight && (
+                                            <button
+                                                onClick={() => updateSetting('customLogoLight', undefined)}
+                                                className="px-3 py-2 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 text-red-500 rounded-xl transition-all"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Dark Mode Logo */}
+                                <div>
+                                    <label className="block text-xs text-zinc-500 mb-1">{t('settings.appearance.logo_dark')}</label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={settings.customLogoDark || ''}
+                                            readOnly
+                                            placeholder={t('settings.appearance.use_default')}
+                                            className="flex-1 bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-zinc-100"
+                                        />
+                                        <button
+                                            onClick={() => handleLogoUpload('customLogoDark')}
+                                            className="px-3 py-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 rounded-xl transition-all"
+                                        >
+                                            <FolderOpen size={16} />
+                                        </button>
+                                        {settings.customLogoDark && (
+                                            <button
+                                                onClick={() => updateSetting('customLogoDark', undefined)}
+                                                className="px-3 py-2 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 text-red-500 rounded-xl transition-all"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                                <p className="text-[10px] text-zinc-400">
+                                    {t('settings.appearance.logo_hint')}
+                                </p>
                             </div>
                         </div>
                     </section>
@@ -468,8 +562,6 @@ export function SettingsPage() {
                     </div>
                 </section>
             </div>
-        </div>
+        </div >
     );
 }
-
-
