@@ -5,6 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 
 import { useSettings } from "@/lib/settings";
 import clsx from "clsx";
+import { feedback } from "@/lib/feedback";
 
 interface LogcatSubTabProps {
     selectedDevice: string;
@@ -134,6 +135,7 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
             setIsStreaming(false);
             if (currentDumpFile) {
                 setLogs(prev => [...prev, `Saved logcat to: ${currentDumpFile}`]);
+                feedback.toast.success('feedback.logcat_saved');
                 setCurrentDumpFile(null);
             }
         } catch (e) {

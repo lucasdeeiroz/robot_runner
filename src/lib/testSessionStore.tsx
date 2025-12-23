@@ -3,6 +3,7 @@ import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 import { useSettings } from './settings';
 import { v4 as uuidv4 } from 'uuid';
+import { feedback } from './feedback';
 
 export interface TestSession {
     runId: string;
@@ -61,6 +62,14 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
             const { run_id, status } = event.payload;
             setSessions(prev => prev.map(s => {
                 if (s.runId === run_id) {
+                    // Feedback
+                    // Backend sends "Exit Code: 0" for success
+                    if (status.includes('Exit Code: 0') || status.includes('exit code: 0')) {
+                        feedback.notify('feedback.test_passed', 'feedback.details.device', { device: s.deviceName });
+                    } else {
+                        feedback.notify('feedback.test_failed', 'feedback.details.device', { device: s.deviceName });
+                    }
+
                     return {
                         ...s,
                         status: 'finished',
@@ -95,6 +104,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
             }
         ]);
         setActiveSessionId(runId);
+        feedback.toast.info('feedback.test_started'); // New key needed or use raw? Let's use raw or add key. User asked for notifications. Toast is good for start.
     }, []);
 
     const addToolboxSession = useCallback((deviceUdid: string, deviceName: string) => {

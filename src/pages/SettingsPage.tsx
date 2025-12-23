@@ -7,6 +7,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { readFile } from "@tauri-apps/plugin-fs";
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
+import { feedback } from "@/lib/feedback";
 
 export function SettingsPage() {
     const { settings, updateSetting, loading, profiles, activeProfileId, createProfile, switchProfile, renameProfile, deleteProfile, systemVersions, checkSystemVersions } = useSettings();
@@ -112,6 +113,7 @@ export function SettingsPage() {
         try {
             if (appiumStatus.running) {
                 await invoke('stop_appium_server');
+                feedback.toast.info('feedback.appium_stopped');
             } else {
                 await invoke('start_appium_server', {
                     host: settings.appiumHost,
@@ -119,6 +121,7 @@ export function SettingsPage() {
                     args: settings.tools.appiumArgs
                 });
                 setShowAppiumLogs(true);
+                feedback.toast.success('feedback.appium_started');
             }
             checkAppiumStatus();
         } catch (e) {
@@ -175,7 +178,7 @@ export function SettingsPage() {
                     <div className="flex items-center gap-2">
                         <select
                             value={activeProfileId}
-                            onChange={(e) => switchProfile(e.target.value)}
+                            onChange={(e) => { switchProfile(e.target.value); feedback.toast.success('feedback.profile_changed'); }}
                             className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-1.5 text-sm min-w-[150px] outline-none focus:ring-2 focus:ring-primary/20 text-gray-900 dark:text-zinc-100"
                         >
                             {profiles.map(p => (

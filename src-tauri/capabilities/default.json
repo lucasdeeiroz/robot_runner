@@ -12,7 +12,8 @@
     "store:default",
     "fs:default",
     "fs:allow-read-file",
-    "fs:allow-exists"
+    "fs:allow-exists",
+    "notification:default"
   ],
   "scopes": [
     {

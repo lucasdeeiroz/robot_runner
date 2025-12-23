@@ -331,6 +331,31 @@ export const en = {
             system_only: "System Only",
             device_stats: "Device Performance",
             app_stats: "App Performance"
+        },
+        feedback: {
+            success: "Success",
+            error: "Error",
+            saved: "Saved successfully",
+            test_started: "Test Execution Started",
+            test_finished: "Test Execution Finished",
+            test_passed: "Test Suite Passed",
+            test_failed: "Test Suite Failed",
+            appium_started: "Appium Server Started",
+            appium_stopped: "Appium Server Stopped",
+            adb_connected: "Wireless ADB Connected",
+            remote_connected: "Remote Access Connected",
+            recording_saved: "Screen Recording Saved",
+            inspector_updated: "Inspector Updated",
+            logcat_saved: "Logcat Saved",
+            performance_saved: "Performance Stats Saved",
+            mirror_launched: "Device Mirror Launched",
+            screenshot_saved: "Screenshot Saved",
+            profile_changed: "Settings Profile Changed",
+            details: {
+                device: "Device: {{device}}",
+                path: "Path: {{path}}",
+                url: "URL: {{url}}"
+            }
         }
     }
 };

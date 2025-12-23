@@ -4,6 +4,7 @@ import { Wifi, Link, Unplug, Globe, Copy } from "lucide-react";
 import clsx from "clsx";
 import { useSettings } from "@/lib/settings";
 import { useTranslation } from "react-i18next";
+import { feedback } from "@/lib/feedback";
 
 interface ConnectSubTabProps {
     onDeviceConnected: () => void;
@@ -54,6 +55,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
             });
             setNgrokUrl(url);
             setStatusMsg({ text: t('connect.status.tunnel_active'), type: 'success' });
+            feedback.notify('feedback.remote_connected', 'feedback.details.url', { url });
         } catch (e) {
             console.error(e);
             setStatusMsg({ text: `Ngrok Error: ${e}`, type: 'error' });
@@ -102,6 +104,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
             if (action === 'connect') {
                 // Wait a bit for device to appear in list
                 setTimeout(() => onDeviceConnected(), 2000);
+                feedback.notify('feedback.adb_connected', 'feedback.details.device', { device: ip });
             }
 
         } catch (e) {

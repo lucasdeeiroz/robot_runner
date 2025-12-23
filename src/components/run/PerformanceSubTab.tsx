@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Activity, Cpu, Battery, CircuitBoard, RefreshCw, Play, Square, Package as PackageIcon, Eye } from "lucide-react";
 import clsx from "clsx";
 import { useSettings } from "@/lib/settings";
+import { feedback } from "@/lib/feedback";
 
 interface PerformanceSubTabProps {
     selectedDevice: string;
@@ -80,7 +81,10 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
 
     const toggleRecording = async () => {
         if (isRecording) {
-            if (recordingPath) setLastRecording(recordingPath);
+            if (recordingPath) {
+                setLastRecording(recordingPath);
+                feedback.toast.success('feedback.performance_saved');
+            }
             setIsRecording(false);
             setRecordingPath(null);
         } else {

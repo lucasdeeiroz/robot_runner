@@ -6,6 +6,7 @@ import { XMLParser } from 'fast-xml-parser';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { InspectorNode, transformXmlToTree, findNodeAtCoords, generateXPath } from '@/lib/inspectorUtils';
+import { feedback } from "@/lib/feedback";
 
 interface InspectorSubTabProps {
     selectedDevice: string;
@@ -95,6 +96,7 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
             // Transform
             const root = jsonObj.hierarchy ? transformXmlToTree(jsonObj.hierarchy) : transformXmlToTree(jsonObj);
             setRootNode(root);
+            feedback.toast.success('feedback.inspector_updated');
 
         } catch (e) {
             console.error("Inspector error:", e);

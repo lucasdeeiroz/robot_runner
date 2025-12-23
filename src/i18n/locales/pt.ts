@@ -331,6 +331,31 @@ export const pt = {
             system_only: "Somente Sistema",
             device_stats: "Desempenho do Dispositivo",
             app_stats: "Desempenho do Aplicativo"
+        },
+        feedback: {
+            success: "Sucesso",
+            error: "Erro",
+            saved: "Salvo com sucesso",
+            test_started: "Execução de Teste Iniciada",
+            test_finished: "Execução de Teste Finalizada",
+            test_passed: "Suíte de Teste Aprovada",
+            test_failed: "Suíte de Teste Falhou",
+            appium_started: "Servidor Appium Iniciado",
+            appium_stopped: "Servidor Appium Parado",
+            adb_connected: "ADB Sem Fio Conectado",
+            remote_connected: "Acesso Remoto Conectado",
+            recording_saved: "Gravação de Tela Salva",
+            inspector_updated: "Inspetor Atualizado",
+            logcat_saved: "Logcat Salvo",
+            performance_saved: "Estatísticas de Desempenho Salvas",
+            mirror_launched: "Espelhamento Iniciado",
+            screenshot_saved: "Captura de Tela Salva",
+            profile_changed: "Perfil de Configuração Alterado",
+            details: {
+                device: "Dispositivo: {{device}}",
+                path: "Caminho: {{path}}",
+                url: "URL: {{url}}"
+            }
         }
     }
 };

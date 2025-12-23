@@ -8,6 +8,7 @@ import { AboutPage } from "./pages/AboutPage";
 import { useSettings } from "@/lib/settings";
 import { TestSessionProvider } from "@/lib/testSessionStore";
 import { useTranslation } from "react-i18next";
+import { Toaster } from 'sonner';
 import clsx from "clsx";
 import "./App.css";
 
@@ -44,6 +45,7 @@ function App() {
 
   return (
     <TestSessionProvider>
+      <Toaster richColors position="bottom-right" theme={settings.theme === 'dark' ? 'dark' : 'light'} />
       <Layout activePage={activePage} onNavigate={setActivePage}>
         <div className="max-w-7xl mx-auto h-full flex flex-col">
           {/* Added h-full and removed mb-8 header for tab pages to control their own layout */}

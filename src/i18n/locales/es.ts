@@ -322,6 +322,28 @@ export const es = {
             system_only: "Solo Sistema",
             device_stats: "Rendimiento del Dispositivo",
             app_stats: "Rendimiento de Aplicación"
+        },
+        feedback: {
+            success: "Éxito",
+            error: "Error",
+            saved: "Guardado exitosamente",
+            test_finished: "Ejecución de Prueba Finalizada",
+            test_passed: "Suite de Prueba Aprobada",
+            test_failed: "Suite de Prueba Fallida",
+            adb_connected: "ADB Inalámbrico Conectado",
+            remote_connected: "Acceso Remoto Conectado",
+            recording_saved: "Grabación de Pantalla Guardada",
+            inspector_updated: "Inspector Actualizado",
+            logcat_saved: "Logcat Guardado",
+            performance_saved: "Estadísticas de Rendimiento Guardadas",
+            mirror_launched: "Espejo Iniciado",
+            screenshot_saved: "Captura de Pantalla Guardada",
+            profile_changed: "Perfil de Configuración Cambiado",
+            details: {
+                device: "Dispositivo: {{device}}",
+                path: "Ruta: {{path}}",
+                url: "URL: {{url}}"
+            }
         }
     }
 };

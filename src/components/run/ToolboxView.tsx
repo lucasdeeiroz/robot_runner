@@ -11,6 +11,7 @@ import { CommandsSubTab } from "./CommandsSubTab";
 import { PerformanceSubTab } from "./PerformanceSubTab";
 import { RunConsole } from "./RunConsole";
 import { TestSession, useTestSessions } from "@/lib/testSessionStore";
+import { feedback } from "@/lib/feedback";
 
 interface ToolboxViewProps {
     session: TestSession;
@@ -72,6 +73,7 @@ export function ToolboxView({ session }: ToolboxViewProps) {
             if (filePath) {
                 await invoke('save_screenshot', { device: session.deviceUdid, path: filePath });
                 console.log("Screenshot saved to:", filePath);
+                feedback.toast.success('feedback.screenshot_saved');
             }
         } catch (e) {
             console.error("Screenshot failed:", e);
@@ -100,6 +102,7 @@ export function ToolboxView({ session }: ToolboxViewProps) {
                 if (filePath) {
                     setIsRecording(false);
                     await invoke('stop_screen_recording', { device: session.deviceUdid, localPath: filePath });
+                    feedback.notify('feedback.recording_saved', 'feedback.details.path', { path: filePath });
                 }
             } catch (e) {
                 console.error("Stop recording failed:", e);
@@ -124,6 +127,7 @@ export function ToolboxView({ session }: ToolboxViewProps) {
                 device: session.deviceUdid,
                 args: settings.tools.scrcpyArgs || null
             });
+            feedback.toast.success('feedback.mirror_launched');
         } catch (e) {
             console.error("Failed to open Scrcpy:", e);
             alert(`${t('scrcpy.error')}: ${e}`);
