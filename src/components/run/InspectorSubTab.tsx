@@ -232,21 +232,21 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
                     <div className="flex bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-md">
                         <button
                             onClick={() => setInteractionMode('inspect')}
-                            className={clsx("p-1.5 rounded-sm transition-all", interactionMode === 'inspect' ? "bg-white dark:bg-zinc-600 shadow-sm text-blue-600 dark:text-blue-400" : "text-zinc-400 hover:text-zinc-600")}
+                            className={clsx("p-1.5 rounded-sm transition-all", interactionMode === 'inspect' ? "bg-white dark:bg-zinc-600 shadow-sm text-primary" : "text-zinc-400 hover:text-zinc-600")}
                             title={t('inspector.modes.inspect')}
                         >
                             <Scan size={16} />
                         </button>
                         <button
                             onClick={() => setInteractionMode('tap')}
-                            className={clsx("p-1.5 rounded-sm transition-all", interactionMode === 'tap' ? "bg-white dark:bg-zinc-600 shadow-sm text-green-600 dark:text-green-400" : "text-zinc-400 hover:text-zinc-600")}
+                            className={clsx("p-1.5 rounded-sm transition-all", interactionMode === 'tap' ? "bg-white dark:bg-zinc-600 shadow-sm text-primary" : "text-zinc-400 hover:text-zinc-600")}
                             title={t('inspector.modes.tap')}
                         >
                             <MousePointerClick size={16} />
                         </button>
                         <button
                             onClick={() => setInteractionMode('swipe')}
-                            className={clsx("p-1.5 rounded-sm transition-all", interactionMode === 'swipe' ? "bg-white dark:bg-zinc-600 shadow-sm text-orange-600 dark:text-orange-400" : "text-zinc-400 hover:text-zinc-600")}
+                            className={clsx("p-1.5 rounded-sm transition-all", interactionMode === 'swipe' ? "bg-white dark:bg-zinc-600 shadow-sm text-primary" : "text-zinc-400 hover:text-zinc-600")}
                             title={t('inspector.modes.swipe')}
                         >
                             <Move size={16} />

@@ -20,6 +20,7 @@ export interface AppSettings {
     theme: 'dark' | 'light';
     language: string;
     geminiApiKey: string;
+    primaryColor: string;
 
     // Appium
     appiumHost: string;
@@ -51,6 +52,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     theme: 'dark',
     language: 'en_US',
     geminiApiKey: '',
+    primaryColor: 'blue',
     appiumHost: '127.0.0.1',
     appiumPort: 4723,
     paths: {

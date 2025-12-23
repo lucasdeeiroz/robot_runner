@@ -134,7 +134,7 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
             <div className="flex flex-wrap items-center justify-between mb-6 gap-4">
                 <div className="flex items-center gap-4">
                     <h2 className="text-lg font-medium flex items-center gap-2">
-                        <Activity size={20} className="text-blue-500" />
+                        <Activity size={20} className="text-primary" />
                         {t('performance.title')}
                     </h2>
 
@@ -164,7 +164,7 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
                                 setSelectedPackage(e.target.value);
                                 if (isRecording) toggleRecording();
                             }}
-                            className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl py-1.5 pl-8 pr-8 text-sm appearance-none cursor-pointer focus:ring-2 focus:ring-blue-500/30 outline-none transition-all hover:bg-zinc-100 dark:hover:bg-zinc-700/50"
+                            className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl py-1.5 pl-8 pr-8 text-sm appearance-none cursor-pointer focus:ring-2 focus:ring-primary/30 outline-none transition-all hover:bg-zinc-100 dark:hover:bg-zinc-700/50"
                         >
                             <option value="">{t('performance.system_only', 'System Only')}</option>
                             {appPackages.map(pkg => (
@@ -180,7 +180,7 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
                         onClick={() => setAutoRefresh(!autoRefresh)}
                         className={clsx(
                             "text-xs px-2 py-1 rounded-lg border transition-all active:scale-95",
-                            autoRefresh ? "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800" : "bg-zinc-50 text-zinc-500 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700"
+                            autoRefresh ? "bg-primary/10 text-primary border-primary/20 dark:text-primary dark:border-primary/50" : "bg-zinc-50 text-zinc-500 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700"
                         )}
                     >
                         {autoRefresh ? t('performance.auto_on') : t('performance.auto_off')}
@@ -225,7 +225,7 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
                         <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3 ml-1">{t('performance.device_stats', 'Device Performance')}</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {/* CPU Card */}
-                            <Card title={t('performance.cpu')} icon={<Cpu size={24} className="text-blue-500" />}>
+                            <Card title={t('performance.cpu')} icon={<Cpu size={24} className="text-primary" />}>
                                 <div className="flex items-end gap-2 mt-2">
                                     <span className="text-4xl font-bold text-zinc-800 dark:text-zinc-100">
                                         {stats.cpu_usage.toFixed(1)}%
@@ -267,7 +267,7 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
                     {selectedPackage && stats.app_stats && (
                         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                             <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3 ml-1 flex items-center gap-2">
-                                {t('performance.app_stats', 'App Performance')}: <span className="normal-case text-blue-600 dark:text-blue-400 font-mono">{selectedPackage}</span>
+                                {t('performance.app_stats', 'App Performance')}: <span className="normal-case text-primary dark:text-blue-400 font-mono">{selectedPackage}</span>
                             </h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {/* App CPU */}

@@ -222,7 +222,7 @@ export function TestsPage() {
                                 <div className="flex items-center gap-2 shrink-0 border-t sm:border-t-0 sm:border-l border-zinc-100 dark:border-zinc-700 pt-3 sm:pt-0 sm:pl-3">
                                     <button
                                         onClick={() => openLog(log.log_html_path)}
-                                        className="flex items-center gap-2 px-3 py-1.5 bg-zinc-100 hover:bg-blue-50 text-zinc-600 hover:text-blue-600 dark:bg-zinc-800 dark:hover:bg-blue-900/20 dark:text-zinc-400 dark:hover:text-blue-400 rounded-md text-xs font-medium transition-colors"
+                                        className="flex items-center gap-2 px-3 py-1.5 bg-zinc-100 hover:bg-primary/10 text-zinc-600 hover:text-primary dark:bg-zinc-800 dark:hover:bg-blue-900/20 dark:text-zinc-400 dark:hover:text-blue-400 rounded-md text-xs font-medium transition-colors"
                                         title={log.log_html_path}
                                     >
                                         <FileText size={14} /> {t('tests_page.report')}
@@ -259,7 +259,7 @@ export function TestsPage() {
                     className={clsx(
                         "px-4 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap",
                         subTab === 'history'
-                            ? "bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-400 shadow-sm"
+                            ? "bg-white dark:bg-zinc-700 text-primary shadow-sm"
                             : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-white/50 dark:hover:bg-zinc-700/50"
                     )}
                 >
@@ -274,7 +274,7 @@ export function TestsPage() {
                         <div key={s.runId} className={clsx(
                             "group flex items-center gap-2 pl-3 pr-2 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap border border-transparent",
                             subTab === s.runId
-                                ? "bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-400 shadow-sm border-zinc-200 dark:border-zinc-600"
+                                ? "bg-white dark:bg-zinc-700 text-primary shadow-sm border-zinc-200 dark:border-zinc-600"
                                 : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-white/50 dark:hover:bg-zinc-700/50"
                         )}>
                             <button onClick={() => handleTabChange(s.runId)} className="flex items-center gap-2">
@@ -336,7 +336,7 @@ export function TestsPage() {
                                 className={clsx(
                                     "px-3 py-1.5 rounded-md flex items-center gap-2 text-sm font-medium transition-colors ml-2",
                                     showCharts
-                                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                                        ? "bg-primary/10 text-primary"
                                         : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
                                 )}
                                 title={showCharts ? t('tests_page.charts.hide') : t('tests_page.charts.show')}

@@ -146,7 +146,8 @@ export const en = {
                 title: "Appearance",
                 theme: "App Theme",
                 light: "Light",
-                dark: "Dark"
+                dark: "Dark",
+                primary_color: "Primary Color"
             },
             appium: {
                 title: "Appium Server",

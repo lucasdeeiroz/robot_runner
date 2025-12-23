@@ -117,7 +117,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
             <div className="bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
                 <div className="flex items-center gap-3 mb-6">
                     <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                        <Wifi className="text-blue-600 dark:text-blue-400" size={24} />
+                        <Wifi size={24} className="text-primary mb-2" />
                     </div>
                     <div>
                         <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">{t('connect.wireless.title')}</h2>
@@ -162,7 +162,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                     <button
                         onClick={() => handleAction('connect')}
                         disabled={loading || !ip || !port}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-6 py-2 bg-primary hover:opacity-90 text-white rounded-xl disabled:opacity-50 transition-all active:scale-95 flex items-center gap-2 font-medium shadow-lg shadow-primary/20 disabled:cursor-not-allowed"
                     >
                         <Link size={18} /> {t('connect.actions.connect')}
                     </button>

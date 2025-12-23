@@ -54,7 +54,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                         className={cn(
                             "w-full flex items-center p-2 rounded-xl transition-all duration-200 active:scale-95",
                             activePage === item.id
-                                ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                                ? "bg-primary text-white shadow-md shadow-primary/20"
                                 : "text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-white",
                             collapsed ? "justify-center" : "gap-3"
                         )}

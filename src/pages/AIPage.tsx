@@ -81,7 +81,7 @@ export function AIPage() {
             {/* Header */}
             <div className="mb-4">
                 <h1 className="text-2xl font-bold flex items-center gap-2 text-gray-900 dark:text-white">
-                    <Cpu className="text-blue-500 dark:text-blue-400" /> {t('ai_page.title')}
+                    <Cpu className="text-primary" /> {t('ai_page.title')}
                 </h1>
                 <p className="text-zinc-500 dark:text-zinc-400 text-sm">{t('ai_page.powered_by')}</p>
             </div>
@@ -101,14 +101,14 @@ export function AIPage() {
                         >
                             <div className={clsx(
                                 "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
-                                msg.role === 'user' ? "bg-blue-600" : "bg-purple-100 dark:bg-purple-600"
+                                msg.role === 'user' ? "bg-primary" : "bg-purple-100 dark:bg-purple-600"
                             )}>
                                 {msg.role === 'user' ? <User size={16} className="text-white" /> : <Bot size={16} className="text-purple-600 dark:text-white" />}
                             </div>
 
                             <div className={clsx(
                                 "p-3 rounded-lg text-sm whitespace-pre-wrap",
-                                msg.role === 'user' ? "bg-blue-600/20 text-gray-900 dark:text-blue-100" : "bg-zinc-100 dark:bg-zinc-800 text-gray-800 dark:text-zinc-100"
+                                msg.role === 'user' ? "bg-primary/20 text-gray-900 dark:text-blue-100" : "bg-zinc-100 dark:bg-zinc-800 text-gray-800 dark:text-zinc-100"
                             )}>
                                 {msg.text}
                             </div>
@@ -134,13 +134,13 @@ export function AIPage() {
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={handleKeyDown}
                             placeholder={t('ai_page.placeholder')}
-                            className="flex-1 bg-white dark:bg-black/40 border border-zinc-300 dark:border-zinc-700 rounded-lg px-4 py-2 text-gray-900 dark:text-zinc-200 focus:border-blue-500 outline-none"
+                            className="flex-1 bg-white dark:bg-black/40 border border-zinc-300 dark:border-zinc-700 rounded-lg px-4 py-2 text-gray-900 dark:text-zinc-200 focus:border-primary outline-none"
                             disabled={loading}
                         />
                         <button
                             onClick={handleSend}
                             disabled={loading || !input.trim()}
-                            className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white p-2 rounded-lg transition-colors"
+                            className="bg-primary hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-white p-2 rounded-lg transition-colors"
                         >
                             <Send size={20} />
                         </button>

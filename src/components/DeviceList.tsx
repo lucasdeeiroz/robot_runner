@@ -33,7 +33,7 @@ export function DeviceList() {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold flex items-center gap-2">
-                    <Smartphone className="text-blue-500" />
+                    <Smartphone className="text-primary" />
                     Connected Devices
                     <span className="text-sm font-normal text-zinc-500 bg-zinc-100 dark:bg-zinc-900 px-2 py-0.5 rounded-full border border-zinc-200 dark:border-zinc-800">
                         {devices.length}

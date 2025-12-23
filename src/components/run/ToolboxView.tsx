@@ -221,7 +221,7 @@ export function ToolboxView({ session }: ToolboxViewProps) {
                             {session.status === 'finished' && (
                                 <button
                                     onClick={handleRerun}
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-md text-sm font-medium hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-primary hover:opacity-90 text-white rounded-md text-sm font-medium transition-colors cursor-pointer"
                                 >
                                     <RefreshCcw size={16} />
                                     {t('toolbox.actions.rerun')}
@@ -264,7 +264,7 @@ function ToolButton({ active, onClick, icon, label }: { active: boolean, onClick
             className={clsx(
                 "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200",
                 active
-                    ? "bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-400 shadow-sm"
+                    ? "bg-white dark:bg-zinc-700 text-primary shadow-sm"
                     : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-white/50 dark:hover:bg-zinc-700/50"
             )}
         >

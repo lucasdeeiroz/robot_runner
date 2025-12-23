@@ -22,8 +22,25 @@ function App() {
     console.log('[App] Applying theme:', settings.theme);
     root.classList.remove('light', 'dark');
     root.classList.add(settings.theme);
+
+    // Apply primary color
+    // Defines a palette of available colors - we can move this to a constant later if reused in SettingsPage
+    const colors: Record<string, string> = {
+      blue: '#2563eb', // blue-600
+      red: '#dc2626', // red-600
+      green: '#16a34a', // green-600
+      purple: '#9333ea', // purple-600
+      orange: '#ea580c', // orange-600
+      cyan: '#0891b2', // cyan-600
+      pink: '#db2777', // pink-600
+    };
+
+    // Default to blue if invalid
+    const colorHex = colors[settings.primaryColor] || colors['blue'];
+    root.style.setProperty('--color-primary', colorHex);
+
     console.log('[App] Root classes:', root.className);
-  }, [settings.theme]);
+  }, [settings.theme, settings.primaryColor]);
 
   return (
     <TestSessionProvider>

@@ -160,7 +160,7 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
                         "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed",
                         isStreaming
                             ? "bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
-                            : "bg-green-600 text-white hover:bg-green-500 shadow-sm"
+                            : "bg-primary text-white hover:opacity-90 shadow-sm"
                     )}
                 >
                     {isStreaming ? (
@@ -181,7 +181,7 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
                         type="checkbox"
                         checked={filterApp}
                         onChange={(e) => setFilterApp(e.target.checked)}
-                        className="rounded bg-zinc-200 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 text-purple-600 focus:ring-purple-500"
+                        className="rounded bg-zinc-200 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 text-primary focus:ring-primary"
                     />
                     {t('logcat.filter')}
                 </label>
@@ -191,7 +191,7 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
                         <select
                             value={selectedPackage}
                             onChange={(e) => setSelectedPackage(e.target.value)}
-                            className="text-xs bg-zinc-200 dark:bg-zinc-700 border-none rounded px-2 py-1 text-zinc-700 dark:text-zinc-200 focus:ring-1 focus:ring-purple-500 outline-none"
+                            className="text-xs bg-zinc-200 dark:bg-zinc-700 border-none rounded px-2 py-1 text-zinc-700 dark:text-zinc-200 focus:ring-1 focus:ring-primary outline-none"
                         >
                             {packages.map((pkg, i) => (
                                 <option key={i} value={pkg}>{pkg}</option>
@@ -207,7 +207,7 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
                 <select
                     value={logLevel}
                     onChange={(e) => setLogLevel(e.target.value)}
-                    className="text-xs bg-zinc-200 dark:bg-zinc-700 border-none rounded px-2 py-1 text-zinc-700 dark:text-zinc-200 focus:ring-1 focus:ring-purple-500 outline-none"
+                    className="text-xs bg-zinc-200 dark:bg-zinc-700 border-none rounded px-2 py-1 text-zinc-700 dark:text-zinc-200 focus:ring-1 focus:ring-primary outline-none"
                     title={t('logcat.level')}
                 >
                     <option value="V">Verbose</option>
@@ -248,7 +248,7 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
                         <div key={i} className="whitespace-pre-wrap hover:bg-white/5 px-1 rounded break-all">
                             {log.startsWith('Saved logcat to: ') ? (
                                 <span
-                                    className="text-blue-400 underline cursor-pointer hover:text-blue-300"
+                                    className="text-primary underline cursor-pointer hover:opacity-80"
                                     onClick={() => invoke('open_path', { path: log.replace('Saved logcat to: ', '') })}
                                     title={t('logcat.open_file', 'Click to open file')}
                                 >

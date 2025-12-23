@@ -1,8 +1,12 @@
 @import "tailwindcss";
 
-/* Force dark variant to rely on .dark class, overriding system preference */
-@variant dark (&:where(.dark, .dark *));
+/* Define theme variable mapping to CSS variable */
+@theme {
+  --color-primary: var(--color-primary);
+}
 
+/* Custom dark variant for class strategy */
+@custom-variant dark (&:where(.dark, .dark *));
 
 
 :root {
@@ -22,10 +26,13 @@
   /* zinc-50 */
   --text-app: #18181b;
   /* zinc-900 */
+  --color-primary: #2563eb;
+  /* blue-600 */
 }
 
 html.dark {
   --bg-app: #09090b;
+  /* zinc-950 */
   /* zinc-950 */
   --text-app: #ffffff;
 }

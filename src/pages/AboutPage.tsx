@@ -16,14 +16,14 @@ export function AboutPage() {
             <div className="grid gap-6">
                 {/* Main Info Card */}
                 <div className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-8 flex flex-col items-center text-center shadow-sm">
-                    <div className="w-20 h-20 bg-blue-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-blue-500/20 dark:shadow-blue-900/20">
+                    <div className="w-20 h-20 bg-primary rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-primary/20 dark:shadow-blue-900/20">
                         <Bot size={40} className="text-white" />
                     </div>
 
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
                         Robot Runner
                     </h2>
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 text-blue-600 dark:text-blue-400 text-sm font-medium">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium">
                         v{appVersion}
                     </div>
                     <p className="mt-6 text-zinc-500 dark:text-zinc-400 max-w-lg mx-auto leading-relaxed">

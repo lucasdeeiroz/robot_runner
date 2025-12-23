@@ -259,8 +259,8 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                         <div className={clsx(
                             "w-5 h-5 rounded border flex items-center justify-center transition-colors shadow-sm",
                             dontOverwrite
-                                ? "bg-blue-600 border-blue-600 text-white"
-                                : "bg-zinc-50 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600 group-hover:border-blue-400"
+                                ? "bg-primary border-primary text-white"
+                                : "bg-zinc-50 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600 group-hover:border-primary"
                         )}>
                             {dontOverwrite && <div className="w-2.5 h-2.5 bg-white rounded-sm" />}
                         </div>
@@ -279,10 +279,10 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     onClick={handleRun}
                     disabled={!selectedPath || isLaunching}
                     className={clsx(
-                        "px-8 py-3 rounded-lg font-bold text-sm flex items-center gap-2 transition-all shadow-lg shadow-blue-500/20",
                         !selectedPath || isLaunching
                             ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-400 cursor-not-allowed shadow-none"
-                            : "bg-blue-600 hover:bg-blue-500 text-white active:scale-[0.98]"
+                            : "bg-primary hover:opacity-90 text-white active:scale-[0.98]",
+                        "px-8 py-3 rounded-lg font-bold text-sm flex items-center gap-2 transition-all shadow-lg shadow-primary/20"
                     )}
                 >
                     {isLaunching ? (
@@ -309,7 +309,7 @@ function ModeButton({ active, onClick, icon, label }: { active: boolean, onClick
             className={clsx(
                 "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200",
                 active
-                    ? "bg-white dark:bg-zinc-700 text-purple-600 dark:text-purple-400 shadow-sm"
+                    ? "bg-white dark:bg-zinc-700 text-primary shadow-sm"
                     : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
             )}
         >

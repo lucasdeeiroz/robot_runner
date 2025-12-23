@@ -122,7 +122,7 @@ export function RunTab({ onNavigate }: RunTabProps) {
                             setIsDeviceDropdownOpen(!isDeviceDropdownOpen);
                         }}
                     >
-                        <Smartphone size={18} className={clsx("shrink-0", selectedDevices.length > 0 ? "text-blue-500" : "text-zinc-400")} />
+                        <Smartphone size={18} className={clsx("shrink-0", selectedDevices.length > 0 ? "text-primary" : "text-zinc-400")} />
                         <div className="w-48 text-sm font-medium text-zinc-900 dark:text-zinc-200 truncate">
                             {selectedDevices.length === 0
                                 ? t('run_tab.device.no_device')
@@ -150,7 +150,7 @@ export function RunTab({ onNavigate }: RunTabProps) {
                                             <div className={clsx(
                                                 "w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0",
                                                 selectedDevices.includes(d.udid)
-                                                    ? "bg-blue-500 border-blue-500 text-white"
+                                                    ? "bg-primary border-primary text-white"
                                                     : "border-zinc-300 dark:border-zinc-600"
                                             )}>
                                                 {selectedDevices.includes(d.udid) && <div className="w-2 h-2 bg-white rounded-full" />}
@@ -170,7 +170,7 @@ export function RunTab({ onNavigate }: RunTabProps) {
 
                                         <button
                                             onClick={(e) => { e.stopPropagation(); handleOpenToolbox(d); setIsDeviceDropdownOpen(false); }}
-                                            className="p-1.5 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
+                                            className="p-1.5 text-zinc-400 hover:text-primary hover:bg-primary/10 dark:hover:bg-primary/20 rounded transition-colors"
                                             title="Open Toolbox"
                                         >
                                             <Wrench size={16} />
@@ -219,7 +219,7 @@ function TabButton({ active, onClick, icon, label }: { active: boolean, onClick:
             className={clsx(
                 "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200",
                 active
-                    ? "bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-400 shadow-sm"
+                    ? "bg-white dark:bg-zinc-700 text-primary shadow-sm"
                     : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-white/50 dark:hover:bg-zinc-700/50"
             )}
         >

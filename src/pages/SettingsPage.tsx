@@ -144,14 +144,14 @@ export function SettingsPage() {
             <section className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
                 <div className="flex items-center justify-between">
                     <h2 className="text-xl font-semibold flex items-center gap-2 text-gray-900 dark:text-white tracking-tight">
-                        <Users size={20} className="text-purple-500" />
+                        <Users size={20} className="text-primary" />
                         {t('settings.profiles.title')}
                     </h2>
                     <div className="flex items-center gap-2">
                         <select
                             value={activeProfileId}
                             onChange={(e) => switchProfile(e.target.value)}
-                            className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-1.5 text-sm min-w-[150px] outline-none focus:ring-2 focus:ring-blue-500/20 text-gray-900 dark:text-zinc-100"
+                            className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-1.5 text-sm min-w-[150px] outline-none focus:ring-2 focus:ring-primary/20 text-gray-900 dark:text-zinc-100"
                         >
                             {profiles.map(p => (
                                 <option key={p.id} value={p.id}>
@@ -201,7 +201,7 @@ export function SettingsPage() {
                             value={newProfileName}
                             onChange={(e) => setNewProfileName(e.target.value)}
                             placeholder={t('settings.profiles.name_placeholder')}
-                            className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 mb-4 outline-none focus:ring-2 focus:ring-blue-500/20 text-gray-900 dark:text-zinc-100"
+                            className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 mb-4 outline-none focus:ring-2 focus:ring-primary/20 text-gray-900 dark:text-zinc-100"
                         />
                         <div className="flex justify-end gap-2">
                             <button
@@ -214,7 +214,7 @@ export function SettingsPage() {
                             <button
                                 type="submit"
                                 disabled={!newProfileName.trim()}
-                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl disabled:opacity-50 transition-all active:scale-95"
+                                className="px-4 py-2 bg-primary hover:opacity-90 text-white rounded-xl disabled:opacity-50 transition-all active:scale-95"
                             >
                                 {t('common.save')}
                             </button>
@@ -229,7 +229,7 @@ export function SettingsPage() {
                 <section className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-xl font-semibold flex items-center gap-2 text-gray-900 dark:text-white tracking-tight">
-                            <Server size={20} className="text-green-500" /> {t('settings.appium.title')}
+                            <Server size={20} className="text-primary" /> {t('settings.appium.title')}
                         </h2>
                         <div className="flex items-center gap-2">
                             <div className={clsx("flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold border",
@@ -242,7 +242,7 @@ export function SettingsPage() {
 
                             <button
                                 onClick={() => setShowAppiumLogs(!showAppiumLogs)}
-                                className={clsx("p-2 rounded-xl transition-all active:scale-95", showAppiumLogs ? "bg-blue-50 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400" : "hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400")}
+                                className={clsx("p-2 rounded-xl transition-all active:scale-95", showAppiumLogs ? "bg-primary/10 text-primary" : "hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400")}
                                 title={t('settings.appium.logs')}
                             >
                                 <Terminal size={18} />
@@ -269,7 +269,7 @@ export function SettingsPage() {
                                 value={settings.appiumHost}
                                 onChange={(e) => updateSetting('appiumHost', e.target.value)}
                                 disabled={appiumStatus.running}
-                                className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-blue-500/20 outline-none disabled:opacity-50"
+                                className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-primary/20 outline-none disabled:opacity-50"
                             />
                         </div>
                         <div>
@@ -279,7 +279,7 @@ export function SettingsPage() {
                                 value={settings.appiumPort}
                                 onChange={(e) => updateSetting('appiumPort', Number(e.target.value))}
                                 disabled={appiumStatus.running}
-                                className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-blue-500/20 outline-none disabled:opacity-50"
+                                className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-primary/20 outline-none disabled:opacity-50"
                             />
                         </div>
                     </div>
@@ -299,7 +299,7 @@ export function SettingsPage() {
                 {/* Path Configuration */}
                 <section className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
                     <h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-white tracking-tight">
-                        <FolderOpen size={20} className="text-orange-500" /> {t('settings.paths')}
+                        <FolderOpen size={20} className="text-primary" /> {t('settings.paths')}
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {(Object.keys(settings.paths) as Array<keyof typeof settings.paths>).map((key) => (
@@ -329,7 +329,7 @@ export function SettingsPage() {
                 {/* Tool Options */}
                 <section className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
                     <h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-white tracking-tight">
-                        <Wrench size={20} className="text-blue-500" /> {t('settings.tools')}
+                        <Wrench size={20} className="text-primary" /> {t('settings.tools')}
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {['appiumArgs', 'scrcpyArgs', 'robotArgs', 'appPackage'].map((key) => (
@@ -339,7 +339,7 @@ export function SettingsPage() {
                                     type="text"
                                     value={(settings.tools as any)[key]}
                                     onChange={(e) => updateSetting('tools', { ...settings.tools, [key]: e.target.value })}
-                                    className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                                    className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-primary/20 outline-none"
                                 />
                             </div>
                         ))}
@@ -350,7 +350,7 @@ export function SettingsPage() {
                                 value={settings.tools.ngrokToken}
                                 onChange={(e) => updateSetting('tools', { ...settings.tools, ngrokToken: e.target.value })}
                                 placeholder="28... (Ngrok Authtoken)"
-                                className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-blue-500/20 outline-none font-mono"
+                                className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-primary/20 outline-none font-mono"
                             />
                         </div>
                     </div>
@@ -360,14 +360,14 @@ export function SettingsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <section className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
                         <h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-white tracking-tight">
-                            <Moon size={20} className="text-purple-500" /> {t('settings.appearance.title')}
+                            <Moon size={20} className="text-primary" /> {t('settings.appearance.title')}
                         </h2>
                         <div className="flex items-center justify-between">
                             <span className="text-zinc-600 dark:text-zinc-300">{t('settings.appearance.theme')}</span>
                             <div className="flex bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl">
                                 <button
                                     onClick={() => updateSetting('theme', 'light')}
-                                    className={`p-2 rounded-lg transition-all active:scale-95 ${settings.theme === 'light' ? 'bg-white shadow text-blue-600' : 'text-zinc-400 hover:text-gray-900 dark:hover:text-white'}`}
+                                    className={`p-2 rounded-lg transition-all active:scale-95 ${settings.theme === 'light' ? 'bg-white shadow text-primary' : 'text-zinc-400 hover:text-gray-900 dark:hover:text-white'}`}
                                 >
                                     <Sun size={18} />
                                 </button>
@@ -379,18 +379,48 @@ export function SettingsPage() {
                                 </button>
                             </div>
                         </div>
+
+                        <div className="mt-6">
+                            <h3 className="text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-3">{t('settings.appearance.primary_color')}</h3>
+                            <div className="flex flex-wrap gap-3">
+                                {[
+                                    { id: 'blue', hex: '#2563eb' },
+                                    { id: 'red', hex: '#dc2626' },
+                                    { id: 'green', hex: '#16a34a' },
+                                    { id: 'purple', hex: '#9333ea' },
+                                    { id: 'orange', hex: '#ea580c' },
+                                    { id: 'cyan', hex: '#0891b2' },
+                                    { id: 'pink', hex: '#db2777' },
+                                ].map((color) => (
+                                    <button
+                                        key={color.id}
+                                        onClick={() => updateSetting('primaryColor', color.id)}
+                                        className={clsx(
+                                            "w-8 h-8 rounded-full transition-all active:scale-95 ring-offset-2 ring-offset-white dark:ring-offset-zinc-900 flex items-center justify-center",
+                                            settings.primaryColor === color.id ? "ring-2 scale-110" : "hover:scale-105"
+                                        )}
+                                        style={{ backgroundColor: color.hex, borderColor: color.hex, '--tw-ring-color': color.hex } as any}
+                                        title={color.id.charAt(0).toUpperCase() + color.id.slice(1)}
+                                    >
+                                        {settings.primaryColor === color.id && (
+                                            <div className="w-2.5 h-2.5 bg-white rounded-full shadow-sm" />
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                     </section>
 
                     <section className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
                         <h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-white tracking-tight">
-                            <Globe size={20} className="text-blue-500" /> {t('settings.general')}
+                            <Globe size={20} className="text-primary" /> {t('settings.general')}
                         </h2>
                         <div>
                             <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">{t('settings.language')}</label>
                             <select
                                 value={settings.language}
                                 onChange={(e) => updateSetting('language', e.target.value)}
-                                className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                                className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-primary/20 outline-none"
                             >
                                 <option value="en_US">English (US)</option>
                                 <option value="pt_BR">Português (Brasil)</option>
@@ -403,7 +433,7 @@ export function SettingsPage() {
                 {/* AI Integration */}
                 <section className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
                     <h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-white tracking-tight">
-                        <Key size={20} className="text-yellow-500" /> {t('settings.ai.title')}
+                        <Key size={20} className="text-primary" /> {t('settings.ai.title')}
                     </h2>
                     <div className="space-y-4">
                         <div>
@@ -413,7 +443,7 @@ export function SettingsPage() {
                                 value={settings.geminiApiKey}
                                 onChange={(e) => updateSetting('geminiApiKey', e.target.value)}
                                 placeholder={t('settings.ai.placeholder')}
-                                className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                                className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-primary/20 outline-none"
                             />
                         </div>
                     </div>
@@ -422,7 +452,7 @@ export function SettingsPage() {
                 {/* System Versions */}
                 <section className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
                     <h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-white tracking-tight">
-                        <Monitor size={20} className="text-pink-500" /> {t('settings.system.title')}
+                        <Monitor size={20} className="text-primary" /> {t('settings.system.title')}
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {systemVersions ? (
