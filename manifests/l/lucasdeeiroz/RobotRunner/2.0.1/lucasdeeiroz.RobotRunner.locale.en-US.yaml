@@ -2,7 +2,7 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.10.0.schema.json
 
 PackageIdentifier: lucasdeeiroz.RobotRunner
-PackageVersion: 2.0.1
+PackageVersion: 2.0.3
 PackageLocale: en-US
 Publisher: Lucas de Eiroz Rodrigues
 PublisherUrl: https://github.com/lucasdeeiroz
