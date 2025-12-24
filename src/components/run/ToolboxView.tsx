@@ -35,7 +35,8 @@ export function ToolboxView({ session }: ToolboxViewProps) {
 
     const { stopSession, rerunSession } = useTestSessions();
     const { t } = useTranslation();
-    const { settings } = useSettings();
+    const { settings, systemCheckStatus } = useSettings();
+    const isMirrorDisabled = systemCheckStatus?.missingMirroring?.length > 0;
     const [isRecording, setIsRecording] = useState(false);
     const [recordingTime, setRecordingTime] = useState(0);
 
@@ -183,8 +184,14 @@ export function ToolboxView({ session }: ToolboxViewProps) {
                     <div className="flex bg-zinc-100 dark:bg-zinc-800/50 p-1 rounded-lg border border-zinc-200 dark:border-zinc-800 mr-2">
                         <button
                             onClick={handleScrcpy}
-                            className="p-1.5 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-white dark:hover:bg-zinc-700 rounded-md transition-all"
-                            title={t('scrcpy.title')}
+                            disabled={isMirrorDisabled}
+                            className={clsx(
+                                "p-1.5 rounded-md transition-all",
+                                isMirrorDisabled
+                                    ? "text-zinc-300 dark:text-zinc-600 cursor-not-allowed"
+                                    : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-white dark:hover:bg-zinc-700"
+                            )}
+                            title={isMirrorDisabled ? t('startup.mirroring.description') : t('scrcpy.title')}
                         >
                             <Cast size={18} />
                         </button>

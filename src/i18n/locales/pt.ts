@@ -356,6 +356,27 @@ export const pt = {
                 path: "Caminho: {{path}}",
                 url: "URL: {{url}}"
             }
+        },
+        startup: {
+            loading: "Inicializando aplicação...",
+            checking: "Verificando ferramentas do sistema...",
+            critical: {
+                title: "Ferramentas Críticas Ausentes",
+                description: "As seguintes ferramentas são necessárias para executar esta aplicação:",
+                action: "Sair da Aplicação"
+            },
+            testing: {
+                title: "Ferramentas de Teste Ausentes",
+                description: "Algumas ferramentas necessárias para automação estão faltando:",
+                note: "Você ainda pode usar outros recursos, mas a execução de testes será desativada.",
+                action: "Configurar"
+            },
+            mirroring: {
+                title: "Ferramenta de Espelhamento Ausente",
+                description: "O Scrcpy é necessário para o espelhamento de tela:",
+                note: "O espelhamento de tela será desativado.",
+                action: "Continuar"
+            }
         }
     }
 };

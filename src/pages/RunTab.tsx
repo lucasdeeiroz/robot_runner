@@ -8,18 +8,35 @@ import { ConnectSubTab } from "../components/run/ConnectSubTab";
 import { InspectorSubTab } from "../components/run/InspectorSubTab";
 import { useTestSessions } from "@/lib/testSessionStore";
 
+import { useSettings } from "@/lib/settings";
 import { Device } from "@/lib/types";
-// Removing local interface Device definition
 
 type TabType = 'tests' | 'connect' | 'inspector';
 
 interface RunTabProps {
     onNavigate?: (page: string) => void;
+    initialTab?: TabType;
 }
 
-export function RunTab({ onNavigate }: RunTabProps) {
+export function RunTab({ onNavigate, initialTab }: RunTabProps) {
     const { t } = useTranslation();
-    const [activeTab, setActiveTab] = useState<TabType>('tests');
+    const { systemCheckStatus } = useSettings();
+
+    // Initialize activeTab with initialTab if provided, else default to 'tests'
+    // But if 'tests' is disabled (missing tools), default to 'connect'?
+    const [activeTab, setActiveTab] = useState<TabType>(() => {
+        if (initialTab) return initialTab;
+        if (systemCheckStatus?.missingTesting?.length > 0) return 'connect';
+        return 'tests';
+    });
+
+    // React to initialTab changes if they come later (e.g. redirect)
+    useEffect(() => {
+        if (initialTab) {
+            setActiveTab(initialTab);
+        }
+    }, [initialTab]);
+
     const [devices, setDevices] = useState<Device[]>([]);
     const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
     const [isDeviceDropdownOpen, setIsDeviceDropdownOpen] = useState(false);
@@ -28,6 +45,8 @@ export function RunTab({ onNavigate }: RunTabProps) {
     const { sessions, addToolboxSession } = useTestSessions();
     // Only 'test' type sessions mark device as busy
     const busyDeviceIds = sessions.filter(s => s.status === 'running' && s.type === 'test').map(s => s.deviceUdid);
+
+    const isLauncherDisabled = systemCheckStatus?.missingTesting?.length > 0;
 
     useEffect(() => {
         loadDevices();
@@ -95,9 +114,10 @@ export function RunTab({ onNavigate }: RunTabProps) {
                 <div className="flex bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg">
                     <TabButton
                         active={activeTab === 'tests'}
-                        onClick={() => setActiveTab('tests')}
+                        onClick={() => !isLauncherDisabled && setActiveTab('tests')}
                         icon={<Play size={16} />}
                         label={t('run_tab.launcher')}
+                        disabled={isLauncherDisabled}
                     />
                     <TabButton
                         active={activeTab === 'connect'}
@@ -212,15 +232,18 @@ export function RunTab({ onNavigate }: RunTabProps) {
     );
 }
 
-function TabButton({ active, onClick, icon, label }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string }) {
+function TabButton({ active, onClick, icon, label, disabled }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string, disabled?: boolean }) {
     return (
         <button
             onClick={onClick}
+            disabled={disabled}
             className={clsx(
                 "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200",
                 active
                     ? "bg-white dark:bg-zinc-700 text-primary shadow-sm"
-                    : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-white/50 dark:hover:bg-zinc-700/50"
+                    : disabled
+                        ? "text-zinc-300 dark:text-zinc-600 cursor-not-allowed"
+                        : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-white/50 dark:hover:bg-zinc-700/50"
             )}
         >
             {icon}

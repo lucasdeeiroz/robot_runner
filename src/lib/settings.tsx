@@ -99,6 +99,30 @@ interface SettingsContextType {
     checkSystemVersions: () => Promise<void>;
 }
 
+// Initial Check Status Interface
+export interface SystemCheckStatus {
+    loading: boolean;
+    complete: boolean;
+    missingCritical: string[]; // node, adb
+    missingTesting: string[]; // python, robot, appium, uiautomator2
+    missingMirroring: string[]; // scrcpy
+}
+
+interface SettingsContextType {
+    settings: AppSettings;
+    activeProfileId: string;
+    profiles: Profile[];
+    updateSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
+    createProfile: (name: string) => void;
+    switchProfile: (id: string) => void;
+    renameProfile: (id: string, name: string) => void;
+    deleteProfile: (id: string) => void;
+    loading: boolean;
+    systemVersions: SystemVersions | null;
+    checkSystemVersions: () => Promise<void>;
+    systemCheckStatus: SystemCheckStatus;
+}
+
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
@@ -261,13 +285,49 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
     const [systemVersions, setSystemVersions] = useState<SystemVersions | null>(null);
 
+    const [systemCheckStatus, setSystemCheckStatus] = useState<SystemCheckStatus>({
+        loading: false,
+        complete: false,
+        missingCritical: [],
+        missingTesting: [],
+        missingMirroring: []
+    });
+
     const checkSystemVersions = async () => {
-        if (systemVersions) return;
+        // If already loading, skip? No, forcing check might be needed.
+        setSystemCheckStatus(prev => ({ ...prev, loading: true }));
         try {
             const versions = await invoke<SystemVersions>('get_system_versions');
             setSystemVersions(versions);
+
+            const missingCritical: string[] = [];
+            const missingTesting: string[] = [];
+            const missingMirroring: string[] = [];
+
+            // Critical Tools
+            if (versions.node === 'Not Found') missingCritical.push('Node.js');
+            if (versions.adb === 'Not Found') missingCritical.push('ADB');
+
+            // Testing Tools
+            if (versions.python === 'Not Found') missingTesting.push('Python');
+            if (versions.robot === 'Not Found') missingTesting.push('Robot Framework');
+            if (versions.appium === 'Not Found') missingTesting.push('Appium');
+            if (versions.uiautomator2 === 'Not Found') missingTesting.push('UiAutomator2');
+
+            // Mirroring Tools
+            if (versions.scrcpy === 'Not Found') missingMirroring.push('Scrcpy');
+
+            setSystemCheckStatus({
+                loading: false,
+                complete: true,
+                missingCritical,
+                missingTesting,
+                missingMirroring
+            });
+
         } catch (e) {
             console.error("Failed to load system versions", e);
+            setSystemCheckStatus(prev => ({ ...prev, loading: false }));
         }
     };
 
@@ -283,7 +343,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             deleteProfile,
             loading,
             systemVersions,
-            checkSystemVersions
+            checkSystemVersions,
+            systemCheckStatus
         }}>
             {children}
         </SettingsContext.Provider>

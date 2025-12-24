@@ -356,6 +356,27 @@ export const en = {
                 path: "Path: {{path}}",
                 url: "URL: {{url}}"
             }
+        },
+        startup: {
+            loading: "Initializing application...",
+            checking: "Checking system tools...",
+            critical: {
+                title: "Missing Critical Tools",
+                description: "The following tools are required to run this application:",
+                action: "Exit Application"
+            },
+            testing: {
+                title: "Missing Testing Tools",
+                description: "Some tools required for automation are missing:",
+                note: "You can still use other features, but running tests will be disabled.",
+                action: "Configure in Settings"
+            },
+            mirroring: {
+                title: "Missing Mirroring Tool",
+                description: "Scrcpy is required for screen mirroring:",
+                note: "Screen mirroring will be disabled.",
+                action: "Continue"
+            }
         }
     }
 };

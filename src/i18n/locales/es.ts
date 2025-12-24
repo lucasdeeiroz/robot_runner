@@ -344,6 +344,27 @@ export const es = {
                 path: "Ruta: {{path}}",
                 url: "URL: {{url}}"
             }
+        },
+        startup: {
+            loading: "Inicializando aplicación...",
+            checking: "Verificando herramientas del sistema...",
+            critical: {
+                title: "Herramientas Críticas Faltantes",
+                description: "Las siguientes herramientas son necesarias para ejecutar esta aplicación:",
+                action: "Salir de la Aplicación"
+            },
+            testing: {
+                title: "Herramientas de Prueba Faltantes",
+                description: "Faltan algunas herramientas necesarias para la automatización:",
+                note: "Aún puede usar otras funciones, pero la ejecución de pruebas estará deshabilitada.",
+                action: "Configurar"
+            },
+            mirroring: {
+                title: "Herramienta de Duplicación Faltante",
+                description: "Scrcpy es necesario para la duplicación de pantalla:",
+                note: "La duplicación de pantalla estará deshabilitada.",
+                action: "Continuar"
+            }
         }
     }
 };
