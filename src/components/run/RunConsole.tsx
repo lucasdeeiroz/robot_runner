@@ -81,7 +81,7 @@ export function RunConsole({ logs, isRunning }: RunConsoleProps) {
 
             if (statusInfo) {
                 // Found a status line (END of a test block)
-                const { namePrefix, status } = statusInfo;
+                const { status } = statusInfo;
 
                 // Determine Test Name:
                 // If buffer is NOT empty, first line is Name.
