@@ -11,7 +11,6 @@
     "set-version": "node scripts/bump_version.js"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2.4.2",
     "@tauri-apps/plugin-fs": "^2.4.4",

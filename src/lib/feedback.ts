@@ -9,7 +9,7 @@ export const feedback = {
         error: (msgKey: string, options?: any) => toast.error(i18next.t(msgKey) as string, options),
         info: (msgKey: string, options?: any) => toast.info(i18next.t(msgKey) as string, options),
         loading: (msgKey: string, options?: any) => toast.loading(i18next.t(msgKey) as string, options),
-        dismiss: (id: string | number) => toast.dismiss(id),
+        dismiss: (id?: string | number) => toast.dismiss(id),
         // Raw string support if needed (for dynamic messages not in i18n)
         raw: {
             success: (msg: string) => toast.success(msg),

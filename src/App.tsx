@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { Layout } from "./components/Layout";
 import { RunTab } from "./pages/RunTab";
 import { TestsPage } from "./pages/TestsPage";
-import { AIPage } from "./pages/AIPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { AboutPage } from "./pages/AboutPage";
 import { useSettings } from "@/lib/settings";
@@ -50,7 +49,7 @@ function App() {
         <div className="max-w-7xl mx-auto h-full flex flex-col">
           {/* Added h-full and removed mb-8 header for tab pages to control their own layout */}
 
-          {activePage !== 'tests' && activePage !== 'run' && activePage !== 'about' && activePage !== 'ai' && activePage !== 'settings' && (
+          {activePage !== 'tests' && activePage !== 'run' && activePage !== 'about' && activePage !== 'settings' && (
             <header className="mb-8 shrink-0">
               <h1 className="text-3xl font-bold mb-2 capitalize">{activePage}</h1>
               <p className="text-zinc-400">{t('settings.description')}</p>
@@ -62,12 +61,11 @@ function App() {
               <RunTab onNavigate={setActivePage} />
             </div>
             {activePage === 'tests' && <TestsPage />}
-            {activePage === 'ai' && <AIPage />}
             {activePage === 'settings' && <SettingsPage />}
             {activePage === 'about' && <AboutPage />}
 
             {/* Placeholder for other pages */}
-            {activePage !== 'run' && activePage !== 'tests' && activePage !== 'ai' && activePage !== 'settings' && activePage !== 'about' && (
+            {activePage !== 'run' && activePage !== 'tests' && activePage !== 'settings' && activePage !== 'about' && (
               <div className="p-12 text-center border-2 border-dashed border-zinc-800 rounded-lg">
                 <p className="text-zinc-500">Module {activePage} coming soon...</p>
               </div>

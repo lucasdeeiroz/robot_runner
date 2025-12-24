@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 import {
     PlayCircle,
     Settings,
-    Cpu,
     Menu,
     FileText,
     Info,
@@ -100,7 +99,6 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
     const navItems = [
         { id: 'run', label: t('sidebar.run'), icon: PlayCircle },
         { id: 'tests', label: t('sidebar.tests'), icon: FileText },
-        { id: 'ai', label: t('sidebar.ai_assistant'), icon: Cpu },
         { id: 'settings', label: t('sidebar.settings'), icon: Settings },
         { id: 'about', label: t('sidebar.about'), icon: Info },
     ];

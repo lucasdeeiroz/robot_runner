@@ -1,5 +1,5 @@
 import { useSettings } from "@/lib/settings";
-import { Moon, Sun, Key, Globe, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2 } from "lucide-react";
+import { Moon, Sun, Globe, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2 } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -526,25 +526,6 @@ export function SettingsPage() {
                         </div>
                     </section>
                 </div>
-
-                {/* AI Integration */}
-                <section className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
-                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-white tracking-tight">
-                        <Key size={20} className="text-primary" /> {t('settings.ai.title')}
-                    </h2>
-                    <div className="space-y-4">
-                        <div>
-                            <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">{t('settings.ai.key')}</label>
-                            <input
-                                type="password"
-                                value={settings.geminiApiKey}
-                                onChange={(e) => updateSetting('geminiApiKey', e.target.value)}
-                                placeholder={t('settings.ai.placeholder')}
-                                className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-primary/20 outline-none"
-                            />
-                        </div>
-                    </div>
-                </section>
 
                 {/* System Versions */}
                 <section className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
