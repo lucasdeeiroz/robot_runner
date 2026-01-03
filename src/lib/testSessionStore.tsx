@@ -194,14 +194,21 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
             }
 
             // Run Test
+            console.log("Invoking run_robot_test for Re-run", {
+                runId: newRunId,
+                working_dir: settings.paths.automationRoot,
+                outputDir
+            });
+
             await invoke("run_robot_test", {
                 runId: newRunId,
-                testPath: session.testPath,
+                testPath: session.testPath === session.argumentsFile ? null : session.testPath,
                 outputDir: outputDir,
                 device: session.deviceUdid === 'local' ? null : session.deviceUdid,
                 argumentsFile: session.argumentsFile,
                 deviceModel: session.deviceModel, // Pass deviceModel
-                androidVersion: session.androidVersion // Pass androidVersion
+                androidVersion: session.androidVersion, // Pass androidVersion
+                workingDir: settings.paths.automationRoot // Pass configured automation root (camelCase for Tauri)
             });
 
         } catch (e) {
