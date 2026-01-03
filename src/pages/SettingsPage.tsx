@@ -165,8 +165,6 @@ export function SettingsPage() {
 
     return (
         <div className="space-y-8 pb-12">
-            <div className="flex items-center justify-between">
-            </div>
 
             {/* Profile Manager Section */}
             <section className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
