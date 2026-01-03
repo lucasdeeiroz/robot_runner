@@ -328,7 +328,7 @@ export function SettingsPage() {
                         <FolderOpen size={20} className="text-primary" /> {t('settings.paths')}
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {(Object.keys(settings.paths) as Array<keyof typeof settings.paths>).map((key) => (
+                        {(['automationRoot', 'resources', 'tests', 'suites', 'logs', 'logcat', 'screenshots', 'recordings'] as Array<keyof typeof settings.paths>).map((key) => (
                             <div key={key}>
                                 <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1 capitalize">{t(`settings.path_labels.${key}` as any)}</label>
                                 <div className="flex gap-2">
