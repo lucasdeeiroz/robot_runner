@@ -7,7 +7,7 @@ export function AboutPage() {
     const appVersion = "2.0.4";
 
     return (
-        <div className="max-w-4xl mx-auto space-y-8 pb-12">
+        <div className="space-y-8 pb-12">
 
 
             <div className="grid gap-6">
