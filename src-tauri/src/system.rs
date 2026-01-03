@@ -17,6 +17,7 @@ pub struct SystemVersions {
     pub robot: String,
     pub python: String,
     pub node: String,
+    pub appium_lib: String,
 }
 
 #[command]
@@ -59,6 +60,13 @@ pub fn get_system_versions() -> SystemVersions {
         "Not Found".to_string()
     };
 
+    // Check robotframework-appiumlibrary using direct python import
+    // This is more robust than parsing pip show output
+    let appium_lib = get_version("python", &[
+        "-c", 
+        "import importlib.metadata; print(importlib.metadata.version('robotframework-appiumlibrary'))"
+    ]);
+
     SystemVersions {
         adb,
         appium,
@@ -67,8 +75,10 @@ pub fn get_system_versions() -> SystemVersions {
         robot,
         python,
         node,
+        appium_lib, // Serialized as appium_lib
     }
 }
+
 
 fn extract_version(input: &str, pattern: &str) -> String {
     if input == "Not Found" {

@@ -183,7 +183,17 @@ export const en = {
             },
             system: {
                 title: "System Versions",
-                checking: "Checking system versions..."
+                checking: "Checking versions...",
+                tools: {
+                    adb: "ADB",
+                    node: "Node.js",
+                    python: "Python",
+                    robot: "Robot Framework",
+                    appium: "Appium Server",
+                    uiautomator2: "UiAutomator2 Driver",
+                    scrcpy: "Scrcpy",
+                    appium_lib: "Appium Library (Python)"
+                }
             },
             folder_select: "Select Folder",
             dir_label: "{{key}} Directory",

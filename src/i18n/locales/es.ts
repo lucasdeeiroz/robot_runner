@@ -179,7 +179,17 @@ export const es = {
             },
             system: {
                 title: "Versiones del Sistema",
-                checking: "Verificando versiones..."
+                checking: "Verificando versiones...",
+                tools: {
+                    adb: "ADB",
+                    node: "Node.js",
+                    python: "Python",
+                    robot: "Robot Framework",
+                    appium: "Servidor Appium",
+                    uiautomator2: "Driver UiAutomator2",
+                    scrcpy: "Scrcpy",
+                    appium_lib: "Biblioteca Appium (Python)"
+                }
             },
             folder_select: "Seleccionar Carpeta",
             dir_label: "Directorio {{key}}",

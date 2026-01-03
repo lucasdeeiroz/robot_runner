@@ -534,7 +534,9 @@ export function SettingsPage() {
                         {systemVersions ? (
                             Object.entries(systemVersions).map(([key, value]) => (
                                 <div key={key} className="bg-zinc-50 dark:bg-black/20 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800/50">
-                                    <span className="block text-xs uppercase text-zinc-500 font-bold mb-1">{key}</span>
+                                    <span className="block text-xs uppercase text-zinc-500 font-bold mb-1">
+                                        {t(`settings.system.tools.${key}` as any) || key}
+                                    </span>
                                     <span className="text-sm font-mono text-gray-900 dark:text-zinc-300 truncate block" title={value}>{value}</span>
                                 </div>
                             ))

@@ -183,7 +183,17 @@ export const pt = {
             },
             system: {
                 title: "Versões do Sistema",
-                checking: "Verificando versões..."
+                checking: "Verificando versões...",
+                tools: {
+                    adb: "ADB",
+                    node: "Node.js",
+                    python: "Python",
+                    robot: "Robot Framework",
+                    appium: "Appium Server",
+                    uiautomator2: "UiAutomator2 Driver",
+                    scrcpy: "Scrcpy",
+                    appium_lib: "Appium Library (Python)"
+                }
             },
             folder_select: "Selecionar Pasta",
             dir_label: "Diretório {{key}}",
