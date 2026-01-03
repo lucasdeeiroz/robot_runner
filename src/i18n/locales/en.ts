@@ -243,7 +243,23 @@ export const en = {
             developed_by: "Developed by",
             lead: "Principal Developer",
             collaborator: "Collaborating Developer",
-            powered_by: "Powered by"
+            powered_by: "Powered by",
+            tools_title: "Tools Used",
+            tools_desc: "Robot Runner is built on top of open-source giants:",
+            tools_list: {
+                tauri: { name: "Tauri", desc: "Lightweight framework for building secure desktop apps using web technologies." },
+                react: { name: "React", desc: "JavaScript library for building dynamic and responsive user interfaces." },
+                rust: { name: "Rust", desc: "Systems language providing critical performance and memory safety for the backend." },
+                vite: { name: "Vite", desc: "Next-generation build tool enabling an ultra-fast development environment." },
+                appium: { name: "Appium", desc: "Leading automation platform for native, hybrid, and mobile web testing." },
+                robot: { name: "Robot Framework", desc: "Generic open source automation framework for acceptance testing." },
+                tailwind: { name: "TailwindCSS", desc: "Utility-first CSS framework for rapid and consistent styling." },
+                lucide: { name: "Lucide", desc: "Beautiful and consistent vector icon library." }
+            },
+            legal_title: "Terms & License",
+            license: "MIT License",
+            license_desc: "Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the 'Software'), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.",
+            disclaimer: "The software is provided 'as is', without warranty of any kind, express or implied."
         },
         ai_page: {
             title: "AI Assistant",

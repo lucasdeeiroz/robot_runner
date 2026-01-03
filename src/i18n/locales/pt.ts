@@ -243,7 +243,23 @@ export const pt = {
             developed_by: "Desenvolvido por",
             lead: "Desenvolvedor Principal",
             collaborator: "Desenvolvedora Colaboradora",
-            powered_by: "Desenvolvido com"
+            powered_by: "Desenvolvido com",
+            tools_title: "Ferramentas Utilizadas",
+            tools_desc: "O Robot Runner é construído sobre gigantes de código aberto:",
+            tools_list: {
+                tauri: { name: "Tauri", desc: "Framework leve para construção de aplicativos desktop seguros usando tecnologias web." },
+                react: { name: "React", desc: "Biblioteca JavaScript para criar interfaces de usuário dinâmicas e responsivas." },
+                rust: { name: "Rust", desc: "Linguagem de sistemas que oferece performance crítica e segurança de memória para o backend." },
+                vite: { name: "Vite", desc: "Ferramenta de build de próxima geração que proporciona um ambiente de desenvolvimento ultrarrápido." },
+                appium: { name: "Appium", desc: "Plataforma de automação líder para testes nativos, híbridos e web móveis." },
+                robot: { name: "Robot Framework", desc: "Framework de automação genérico e keywords-driven para testes de aceitação." },
+                tailwind: { name: "TailwindCSS", desc: "Framework CSS utilitário para estilização rápida e consistente." },
+                lucide: { name: "Lucide", desc: "Biblioteca de ícones vetoriais bonita e consistente." }
+            },
+            legal_title: "Termos e Licença",
+            license: "Licença MIT",
+            license_desc: "A permissão é concedida, gratuitamente, a qualquer pessoa que obtenha uma cópia deste software e dos arquivos de documentação associados (o 'Software'), para lidar com o Software sem restrições, incluindo, sem limitação, os direitos de usar, copiar, modificar, mesclar, publicar, distribuir, sublicenciar e/ou vender cópias do Software, e permitir que as pessoas a quem o Software é fornecido o façam, sujeito às seguintes condições: O aviso de direitos autorais acima e este aviso de permissão devem ser incluídos em todas as cópias ou partes substanciais do Software.",
+            disclaimer: "O software é fornecido 'como está', sem garantia de qualquer tipo, expressa ou implícita."
         },
         ai_page: {
             title: "Assistente IA",
