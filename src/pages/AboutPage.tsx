@@ -4,14 +4,11 @@ import { useTranslation } from "react-i18next";
 
 export function AboutPage() {
     const { t } = useTranslation();
-    const appVersion = "2.0.3";
+    const appVersion = "2.0.4";
 
     return (
         <div className="max-w-4xl mx-auto space-y-8 pb-12">
-            <div>
-                <h1 className="text-3xl font-bold mb-2">{t('sidebar.about')}</h1>
-                <p className="text-zinc-400">{t('about.description')}</p>
-            </div>
+
 
             <div className="grid gap-6">
                 {/* Main Info Card */}

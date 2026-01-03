@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Layout } from "./components/Layout";
 import { RunTab } from "./pages/RunTab";
 import { TestsPage } from "./pages/TestsPage";
@@ -13,6 +14,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import "./App.css";
 
 function App() {
+  const { t } = useTranslation();
   const [activePage, setActivePage] = useState("run");
   const { settings, checkSystemVersions, systemCheckStatus } = useSettings();
 
@@ -36,6 +38,23 @@ function App() {
   const handleCriticalExit = async () => {
     await getCurrentWindow().close();
   };
+
+  const getHeaderInfo = () => {
+    switch (activePage) {
+      case 'run':
+        return { title: t('sidebar.run'), description: t('sidebar.description_run') };
+      case 'tests':
+        return { title: t('sidebar.tests'), description: t('sidebar.description_tests') };
+      case 'settings':
+        return { title: t('sidebar.settings'), description: t('sidebar.description_settings') };
+      case 'about':
+        return { title: t('sidebar.about'), description: t('sidebar.description_about') };
+      default:
+        return { title: 'Robot Runner', description: 'Test Automation & Device Management' };
+    }
+  };
+
+  const { title, description } = getHeaderInfo();
 
   const handleTestingRedirect = () => {
     setInitialSubTab('connect');
@@ -106,10 +125,10 @@ function App() {
           <div className="flex items-center justify-between px-8 py-6 shrink-0 z-50">
             <div className="flex flex-col">
               <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                Robot Runner
+                {title}
                 {/* <span className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full font-medium tracking-wider uppercase">Beta</span> */}
               </h1>
-              <p className="text-sm text-zinc-500 font-medium">Test Automation & Device Management</p>
+              <p className="text-sm text-zinc-500 font-medium">{description}</p>
             </div>
 
             {/* Global Actions / Status can go here */}

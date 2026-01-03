@@ -2,10 +2,14 @@ export const es = {
     translation: {
         sidebar: {
             run: "Ejecutar",
+            description_run: "Gestión de dispositivos y ejecución de automatización.",
             tests: "Pruebas",
+            description_tests: "Historial de ejecuciones y análisis de resultados.",
             ai_assistant: "Asistente IA",
-            settings: "Ajustes",
-            about: "Acerca de"
+            settings: "Configuración",
+            description_settings: "Configure las preferencias e integraciones de la aplicación.",
+            about: "Acerca de",
+            description_about: "Información sobre Robot Runner y sus creadores."
         },
         run_tab: {
             launcher: "Lanzador",
