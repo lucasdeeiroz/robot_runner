@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { PlayCircle, FileText, Settings, Info, Box } from "lucide-react";
 import { Layout } from "./components/Layout";
 import { RunTab } from "./pages/RunTab";
 import { TestsPage } from "./pages/TestsPage";
@@ -42,19 +43,19 @@ function App() {
   const getHeaderInfo = () => {
     switch (activePage) {
       case 'run':
-        return { title: t('sidebar.run'), description: t('sidebar.description_run') };
+        return { title: t('sidebar.run'), description: t('sidebar.description_run'), Icon: PlayCircle };
       case 'tests':
-        return { title: t('sidebar.tests'), description: t('sidebar.description_tests') };
+        return { title: t('sidebar.tests'), description: t('sidebar.description_tests'), Icon: FileText };
       case 'settings':
-        return { title: t('sidebar.settings'), description: t('sidebar.description_settings') };
+        return { title: t('sidebar.settings'), description: t('sidebar.description_settings'), Icon: Settings };
       case 'about':
-        return { title: t('sidebar.about'), description: t('sidebar.description_about') };
+        return { title: t('sidebar.about'), description: t('sidebar.description_about'), Icon: Info };
       default:
-        return { title: 'Robot Runner', description: 'Test Automation & Device Management' };
+        return { title: 'Robot Runner', description: 'Test Automation & Device Management', Icon: Box };
     }
   };
 
-  const { title, description } = getHeaderInfo();
+  const { title, description, Icon } = getHeaderInfo();
 
   const handleTestingRedirect = () => {
     setInitialSubTab('connect');
@@ -79,33 +80,32 @@ function App() {
   }, [systemCheckStatus]);
 
 
-  // Apply theme class to body/html
-  if (typeof window !== 'undefined') {
+  // Apply theme and primary color
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // Theme logic
     if (settings.theme === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
 
-    // Set primary color css variable
+    // Primary Color Logic
     const colors: Record<string, string> = {
-      blue: '221.2 83.2% 53.3%',
-      indigo: '226 71% 55%', // Simplified
-      violet: '255 60% 60%', // Simplified
-      emerald: '142.1 76.2% 36.3%',
-      rose: '343 88% 55%', // Simplified
-      amber: '48 96% 53%' // Simplified
+      blue: '#2563eb',
+      red: '#dc2626',
+      green: '#16a34a',
+      purple: '#9333ea',
+      orange: '#ea580c',
+      cyan: '#0891b2',
+      pink: '#db2777',
     };
 
-    // This is a simplification. Ideally update CSS variables in root.
-    // For now assuming blue/tailwind default is used or handled by index.css logic
-    // We update the --primary HSL values
-    if (colors[settings.primaryColor]) {
-      document.documentElement.style.setProperty('--primary', colors[settings.primaryColor]);
-      // Also update ring/border colors if needed
-      // This relies on index.css using var(--primary)
-    }
-  }
+    const color = colors[settings.primaryColor] || colors.blue;
+    document.documentElement.style.setProperty('--color-primary', color);
+
+  }, [settings.theme, settings.primaryColor]);
 
   return (
     <TestSessionProvider>
@@ -122,7 +122,10 @@ function App() {
         <div className="max-w-7xl mx-auto h-full flex flex-col">
           {/* Header area - handled by Layout usually, but title is here? */}
           {/* App Title Header */}
-          <div className="flex items-center justify-between px-8 py-6 shrink-0 z-50">
+          <div className="flex items-center gap-4 px-8 py-6 shrink-0 z-50">
+            <div className="h-[52px] w-[52px] flex items-center justify-center rounded-2xl bg-primary/10">
+              <Icon size={32} className="text-[var(--color-primary)]" />
+            </div>
             <div className="flex flex-col">
               <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                 {title}
@@ -130,8 +133,6 @@ function App() {
               </h1>
               <p className="text-sm text-zinc-500 font-medium">{description}</p>
             </div>
-
-            {/* Global Actions / Status can go here */}
           </div>
 
 
