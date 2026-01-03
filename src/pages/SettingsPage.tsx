@@ -164,9 +164,7 @@ export function SettingsPage() {
     }
 
     return (
-        <div className="max-w-4xl mx-auto space-y-8 pb-12">
-            <div className="flex items-center justify-between">
-            </div>
+        <div className="space-y-8 pb-12">
 
             {/* Profile Manager Section */}
             <section className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
@@ -330,7 +328,7 @@ export function SettingsPage() {
                         <FolderOpen size={20} className="text-primary" /> {t('settings.paths')}
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {(Object.keys(settings.paths) as Array<keyof typeof settings.paths>).map((key) => (
+                        {(['automationRoot', 'resources', 'tests', 'suites', 'logs', 'logcat', 'screenshots', 'recordings'] as Array<keyof typeof settings.paths>).map((key) => (
                             <div key={key}>
                                 <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1 capitalize">{t(`settings.path_labels.${key}` as any)}</label>
                                 <div className="flex gap-2">
@@ -536,7 +534,9 @@ export function SettingsPage() {
                         {systemVersions ? (
                             Object.entries(systemVersions).map(([key, value]) => (
                                 <div key={key} className="bg-zinc-50 dark:bg-black/20 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800/50">
-                                    <span className="block text-xs uppercase text-zinc-500 font-bold mb-1">{key}</span>
+                                    <span className="block text-xs uppercase text-zinc-500 font-bold mb-1">
+                                        {t(`settings.system.tools.${key}` as any) || key}
+                                    </span>
                                     <span className="text-sm font-mono text-gray-900 dark:text-zinc-300 truncate block" title={value}>{value}</span>
                                 </div>
                             ))

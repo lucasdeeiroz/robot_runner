@@ -4,14 +4,11 @@ import { useTranslation } from "react-i18next";
 
 export function AboutPage() {
     const { t } = useTranslation();
-    const appVersion = "2.0.3";
+    const appVersion = "2.0.4";
 
     return (
-        <div className="max-w-4xl mx-auto space-y-8 pb-12">
-            <div>
-                <h1 className="text-3xl font-bold mb-2">{t('sidebar.about')}</h1>
-                <p className="text-zinc-400">{t('about.description')}</p>
-            </div>
+        <div className="space-y-8 pb-12">
+
 
             <div className="grid gap-6">
                 {/* Main Info Card */}
@@ -31,13 +28,82 @@ export function AboutPage() {
                     </p>
                 </div>
 
-                {/* Credits */}
+                {/* Content Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                    {/* Tools & Tech (Now Left/Top) */}
                     <section className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
+                        <h3 className="text-lg font-semibold mb-2 flex items-center gap-2 text-gray-900 dark:text-white">
+                            {t('about.tools_title')}
+                        </h3>
+                        <p className="text-sm text-zinc-500 mb-4">
+                            {t('about.tools_desc')}
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {[
+                                { key: 'tauri', url: 'https://tauri.app' },
+                                { key: 'react', url: 'https://react.dev' },
+                                { key: 'rust', url: 'https://www.rust-lang.org' },
+                                { key: 'vite', url: 'https://vitejs.dev' },
+                                { key: 'appium', url: 'https://appium.io' },
+                                { key: 'robot', url: 'https://robotframework.org' },
+                                { key: 'tailwind', url: 'https://tailwindcss.com' },
+                                { key: 'lucide', url: 'https://lucide.dev' }
+                            ].map(tool => (
+                                <a
+                                    key={tool.key}
+                                    href={tool.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="block p-3 bg-zinc-50 dark:bg-black/20 rounded-lg border border-zinc-100 dark:border-zinc-800 hover:border-primary/30 transition-all hover:scale-[1.02] cursor-pointer"
+                                >
+                                    <div className="font-semibold text-sm text-gray-900 dark:text-zinc-200 mb-1 flex items-center justify-between">
+                                        {t(`about.tools_list.${tool.key}.name` as any)}
+                                        <span className="text-zinc-300 dark:text-zinc-600">↗</span>
+                                    </div>
+                                    <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-snug">
+                                        {t(`about.tools_list.${tool.key}.desc` as any)}
+                                    </p>
+                                </a>
+                            ))}
+                        </div>
+                    </section>
+
+                    {/* Legal & License (Now Right/Top) */}
+                    <section className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm flex flex-col">
+                        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
+                            <Github size={20} className="text-primary" /> {t('about.legal_title')}
+                        </h3>
+
+                        <div className="space-y-4 flex-1">
+                            <div className="p-4 bg-zinc-50 dark:bg-black/20 rounded-lg border border-zinc-100 dark:border-zinc-800/50">
+                                <div className="font-medium text-gray-900 dark:text-white mb-1 flex items-center gap-2">
+                                    {t('about.license')}
+                                    <span className="text-[10px] uppercase font-bold bg-green-100 text-green-700 px-1.5 py-0.5 rounded border border-green-200">Open Source</span>
+                                </div>
+                                <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                                    {t('about.license_desc')}
+                                </p>
+                            </div>
+
+                            <p className="text-xs text-zinc-400 text-center italic mt-4">
+                                {t('about.disclaimer')}
+                            </p>
+                        </div>
+
+                        <div className="flex justify-center pt-6 text-zinc-500 text-sm gap-6 mt-auto">
+                            <a href="https://github.com/lucasdeeiroz/robot_runner" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors flex items-center gap-2">
+                                <Github size={16} /> Repository
+                            </a>
+                        </div>
+                    </section>
+
+                    {/* Credits (Now Bottom Full Width) */}
+                    <section className="md:col-span-2 bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
                         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
                             {t('about.developed_by')}
                         </h3>
-                        <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="flex items-center gap-4">
                                 <div className="w-12 h-12 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center text-xl">
                                     👨‍💻
@@ -58,26 +124,6 @@ export function AboutPage() {
                             </div>
                         </div>
                     </section>
-
-                    <section className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
-                        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
-                            {t('about.powered_by')}
-                        </h3>
-                        <div className="flex flex-wrap gap-2">
-                            {['Tauri', 'React', 'Rust', 'Vite', 'Appium', 'Robot Framework'].map(tech => (
-                                <span key={tech} className="px-3 py-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg text-xs font-medium text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
-                                    {tech}
-                                </span>
-                            ))}
-                        </div>
-                    </section>
-                </div>
-
-                {/* Footer */}
-                <div className="flex justify-center pt-8 text-zinc-500 text-sm gap-6">
-                    <a href="https://github.com/lucasdeeiroz" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors flex items-center gap-2">
-                        <Github size={16} /> GitHub
-                    </a>
                 </div>
             </div>
         </div >

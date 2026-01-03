@@ -2,10 +2,14 @@ export const es = {
     translation: {
         sidebar: {
             run: "Ejecutar",
+            description_run: "Gestión de dispositivos y ejecución de automatización.",
             tests: "Pruebas",
+            description_tests: "Historial de ejecuciones y análisis de resultados.",
             ai_assistant: "Asistente IA",
-            settings: "Ajustes",
-            about: "Acerca de"
+            settings: "Configuración",
+            description_settings: "Configure las preferencias e integraciones de la aplicación.",
+            about: "Acerca de",
+            description_about: "Información sobre Robot Runner y sus creadores."
         },
         run_tab: {
             launcher: "Lanzador",
@@ -175,7 +179,17 @@ export const es = {
             },
             system: {
                 title: "Versiones del Sistema",
-                checking: "Verificando versiones..."
+                checking: "Verificando versiones...",
+                tools: {
+                    adb: "ADB",
+                    node: "Node.js",
+                    python: "Python",
+                    robot: "Robot Framework",
+                    appium: "Servidor Appium",
+                    uiautomator2: "Driver UiAutomator2",
+                    scrcpy: "Scrcpy",
+                    appium_lib: "Biblioteca Appium (Python)"
+                }
             },
             folder_select: "Seleccionar Carpeta",
             dir_label: "Directorio {{key}}",
@@ -235,7 +249,23 @@ export const es = {
             developed_by: "Desarrollado por",
             lead: "Desarrollador Principal",
             collaborator: "Desarrolladora Colaboradora",
-            powered_by: "Desarrollado con"
+            powered_by: "Desarrollado con",
+            tools_title: "Herramientas Utilizadas",
+            tools_desc: "Robot Runner está construido sobre gigantes de código abierto:",
+            tools_list: {
+                tauri: { name: "Tauri", desc: "Framework ligero para crear aplicaciones de escritorio seguras con tecnologías web." },
+                react: { name: "React", desc: "Biblioteca JavaScript para construir interfaces de usuario dinámicas y receptivas." },
+                rust: { name: "Rust", desc: "Lenguaje de sistemas que ofrece rendimiento crítico y seguridad de memoria para el backend." },
+                vite: { name: "Vite", desc: "Herramienta de compilación de próxima generación para un desarrollo ultrarrápido." },
+                appium: { name: "Appium", desc: "Plataforma de automatización líder para pruebas móviles nativas, híbridas y web." },
+                robot: { name: "Robot Framework", desc: "Framework de automatización genérico para pruebas de aceptación." },
+                tailwind: { name: "TailwindCSS", desc: "Framework CSS de utilidad primero para un estilo rápido y consistente." },
+                lucide: { name: "Lucide", desc: "Biblioteca de iconos vectoriales hermosa y consistente." }
+            },
+            legal_title: "Términos y Licencia",
+            license: "Licencia MIT",
+            license_desc: "Por la presente se otorga permiso, sin cargo, a cualquier persona que obtenga una copia de este software y los archivos de documentación asociados (el 'Software'), para utilizar el Software sin restricciones, incluidos, entre otros, los derechos de uso, copia, modificación, fusión, publicación, distribución, sublicencia y/o venta de copias del Software, y para permitir a las personas a quienes se les proporcione el Software que lo hagan, sujeto a las siguientes condiciones: El aviso de derechos de autor anterior y este aviso de permiso se incluirán en todas las copias o partes sustanciales del Software.",
+            disclaimer: "El software se proporciona 'tal cual', sin garantía de ningún tipo, expresa o implícita."
         },
         ai_page: {
             title: "Asistente IA",

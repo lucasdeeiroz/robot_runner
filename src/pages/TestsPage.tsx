@@ -245,12 +245,6 @@ export function TestsPage() {
 
     return (
         <div className="h-full flex flex-col space-y-4">
-            {/* Header */}
-            <div className="flex items-center justify-between shrink-0 mb-2">
-                <h1 className="text-2xl font-bold">
-                    {activeSession?.type === 'toolbox' ? t('tests_page.toolbox') : t('tests_page.monitoring')}
-                </h1>
-            </div>
 
             {/* Tabs */}
             <div className="flex bg-zinc-100 dark:bg-zinc-800/50 p-1 rounded-lg w-full overflow-x-auto no-scrollbar gap-1 border border-zinc-200 dark:border-zinc-800 shrink-0">

@@ -11,6 +11,7 @@ export interface SystemVersions {
     appium: string;
     robot: string;
     uiautomator2: string;
+    appium_lib: string;
 }
 
 // Initialize the store
