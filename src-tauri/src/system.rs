@@ -1,6 +1,7 @@
 use regex::Regex;
 use serde::Serialize;
 use serde_json::Value;
+#[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 use std::process::Command;
 use tauri::command;

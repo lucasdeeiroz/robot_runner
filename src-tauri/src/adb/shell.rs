@@ -119,6 +119,7 @@ pub fn stop_adb_command(state: State<'_, ShellState>, id: String) -> Result<(), 
 
 #[command]
 pub fn restart_adb_server() -> Result<String, String> {
+    #[cfg(target_os = "windows")]
     use std::os::windows::process::CommandExt;
 
     // Kill

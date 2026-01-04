@@ -1,9 +1,12 @@
 use std::process::{Command, Stdio};
+#[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 use std::sync::Mutex;
 use tauri::{command, State};
 
 // Constants
+// Constants
+#[cfg(target_os = "windows")]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 // Wrapper for Tauri State management
@@ -20,32 +23,35 @@ pub async fn start_ngrok(
         if !auth_token.is_empty() {
              let mut cmd = Command::new("ngrok");
              cmd.args(&["config", "add-authtoken", auth_token]);
+             #[cfg(target_os = "windows")]
              cmd.creation_flags(CREATE_NO_WINDOW);
              let _ = cmd.output().map_err(|e| format!("Failed to set authtoken: {}", e))?;
         }
     }
 
     // 2. Stop existing if any (using the state)
-    // We can't call stop_ngrok directly easily if it requires State, 
-    // so we just implement the logic inline or split logic.
     {
         let mut lock = state.0.lock().map_err(|_| "Failed to lock mutex")?;
         if let Some(pid) = *lock {
-             let _ = Command::new("taskkill")
-                .args(&["/F", "/PID", &pid.to_string()])
-                .creation_flags(CREATE_NO_WINDOW)
-                .output();
+             let mut cmd = Command::new("taskkill");
+             cmd.args(&["/F", "/PID", &pid.to_string()]);
+             #[cfg(target_os = "windows")]
+             cmd.creation_flags(CREATE_NO_WINDOW);
+             let _ = cmd.output();
              *lock = None;
         }
     }
 
     // 3. Start ngrok tcp <port>
-    let mut child = Command::new("ngrok")
-        .args(&["tcp", &port.to_string(), "--log=stdout"])
+    let mut child_cmd = Command::new("ngrok");
+    child_cmd.args(&["tcp", &port.to_string(), "--log=stdout"])
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .creation_flags(CREATE_NO_WINDOW)
-        .spawn()
+        .stderr(Stdio::piped());
+    
+    #[cfg(target_os = "windows")]
+    child_cmd.creation_flags(CREATE_NO_WINDOW);
+    
+    let mut child = child_cmd.spawn()
         .map_err(|e| format!("Failed to start ngrok: {}", e))?;
 
     let child_id = child.id();
@@ -53,6 +59,45 @@ pub async fn start_ngrok(
         let mut lock = state.0.lock().map_err(|_| "Failed to lock mutex")?;
         *lock = Some(child_id);
     }
+// ...
+#[command]
+pub async fn stop_ngrok(state: State<'_, NgrokState>) -> Result<(), String> {
+    let mut lock = state.0.lock().map_err(|_| "Failed to lock mutex")?;
+    
+    if let Some(pid) = *lock {
+        #[cfg(target_os = "windows")]
+        {
+            let _ = Command::new("taskkill")
+                .args(&["/F", "/PID", &pid.to_string()])
+                .creation_flags(CREATE_NO_WINDOW)
+                .output();
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+             let _ = Command::new("kill")
+                .arg(pid.to_string())
+                .output();
+        }
+        *lock = None;
+    }
+    
+    // Safety net
+    #[cfg(target_os = "windows")]
+    {
+        let _ = Command::new("taskkill")
+            .args(&["/F", "/IM", "ngrok.exe"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output();
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = Command::new("pkill")
+            .arg("ngrok")
+            .output();
+    }
+        
+    Ok(())
+}
 
     // 4. Parse output for URL
     let stdout = child.stdout.take().ok_or("Failed to capture stdout")?;
