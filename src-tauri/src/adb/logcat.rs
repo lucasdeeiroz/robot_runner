@@ -39,10 +39,13 @@ pub fn start_logcat(
         println!("Logcat: Looking up PID for package: {}", pkg);
         // Try to find PID
         // adb -s <device> shell pidof -s <package>
-        let pid_output = Command::new("adb")
-            .args(&["-s", &device, "shell", "pidof", "-s", pkg])
-            .creation_flags(0x08000000)
-            .output();
+        // adb -s <device> shell pidof -s <package>
+        let mut cmd = Command::new("adb");
+        cmd.args(&["-s", &device, "shell", "pidof", "-s", pkg]);
+        #[cfg(target_os = "windows")]
+        cmd.creation_flags(0x08000000);
+        
+        let pid_output = cmd.output();
 
         match pid_output {
             Ok(output) => {

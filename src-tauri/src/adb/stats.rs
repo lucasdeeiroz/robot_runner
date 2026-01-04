@@ -60,7 +60,6 @@ pub async fn get_device_stats(
 }
 
 fn run_adb_shell(device: &str, command: &str) -> String {
-    #[cfg(target_os = "windows")]
     let program = "adb";
 
     // Split command for arguments
