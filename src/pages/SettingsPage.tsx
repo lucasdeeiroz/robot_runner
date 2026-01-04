@@ -10,7 +10,7 @@ import { useTranslation } from "react-i18next";
 import { feedback } from "@/lib/feedback";
 
 export function SettingsPage() {
-    const { settings, updateSetting, loading, profiles, activeProfileId, createProfile, switchProfile, renameProfile, deleteProfile, systemVersions, checkSystemVersions } = useSettings();
+    const { settings, updateSetting, loading, profiles, activeProfileId, createProfile, switchProfile, renameProfile, deleteProfile, systemVersions, checkSystemVersions, systemCheckStatus } = useSettings();
     const { t, i18n } = useTranslation();
 
     // Profile Management Details
@@ -270,6 +270,7 @@ export function SettingsPage() {
                                 onClick={() => setShowAppiumLogs(!showAppiumLogs)}
                                 className={clsx("p-2 rounded-xl transition-all active:scale-95", showAppiumLogs ? "bg-primary/10 text-primary" : "hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400")}
                                 title={t('settings.appium.logs')}
+                                disabled={!appiumStatus.running && systemCheckStatus?.missingAppium?.length > 0}
                             >
                                 <Terminal size={18} />
                             </button>
@@ -281,6 +282,7 @@ export function SettingsPage() {
                                         ? "bg-red-500 hover:bg-red-600 shadow-red-500/20"
                                         : "bg-green-600 hover:bg-green-700 shadow-green-500/20"
                                 )}
+                                disabled={!appiumStatus.running && systemCheckStatus?.missingAppium?.length > 0}
                             >
                                 {appiumStatus.running ? <><Square size={16} fill="currentColor" /> {t('settings.appium.stop')}</> : <><Play size={16} fill="currentColor" /> {t('settings.appium.start')}</>}
                             </button>
@@ -288,24 +290,24 @@ export function SettingsPage() {
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 mb-4">
-                        <div>
+                        <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
                             <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">{t('settings.appium.host')}</label>
                             <input
                                 type="text"
                                 value={settings.appiumHost}
                                 onChange={(e) => updateSetting('appiumHost', e.target.value)}
-                                disabled={appiumStatus.running}
-                                className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-primary/20 outline-none disabled:opacity-50"
+                                disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
+                                className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-primary/20 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                             />
                         </div>
-                        <div>
+                        <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
                             <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">{t('settings.appium.port')}</label>
                             <input
                                 type="number"
                                 value={settings.appiumPort}
                                 onChange={(e) => updateSetting('appiumPort', Number(e.target.value))}
-                                disabled={appiumStatus.running}
-                                className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-primary/20 outline-none disabled:opacity-50"
+                                disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
+                                className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-primary/20 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                             />
                         </div>
                     </div>
@@ -328,27 +330,34 @@ export function SettingsPage() {
                         <FolderOpen size={20} className="text-primary" /> {t('settings.paths')}
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {(['automationRoot', 'resources', 'tests', 'suites', 'logs', 'logcat', 'screenshots', 'recordings'] as Array<keyof typeof settings.paths>).map((key) => (
-                            <div key={key}>
-                                <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1 capitalize">{t(`settings.path_labels.${key}` as any)}</label>
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={settings.paths[key]}
-                                        readOnly
-                                        className="flex-1 bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-gray-900 dark:text-zinc-300 font-mono text-xs sm:text-sm"
-                                        placeholder={t('settings.not_set')}
-                                    />
-                                    <button
-                                        onClick={() => handleSelectFolder(key)}
-                                        className="px-3 py-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 rounded-xl text-zinc-600 dark:text-zinc-300 transition-all active:scale-95"
-                                        title={t('settings.folder_select')}
-                                    >
-                                        <FolderOpen size={16} />
-                                    </button>
+                        {(['automationRoot', 'resources', 'tests', 'suites', 'logs', 'logcat', 'screenshots', 'recordings'] as Array<keyof typeof settings.paths>).map((key) => {
+                            const isTestingPath = ['automationRoot', 'resources', 'tests', 'suites'].includes(key);
+                            const isDisabled = isTestingPath && systemCheckStatus?.missingTesting?.length > 0;
+                            return (
+                                <div key={key}>
+                                    <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1 capitalize">{t(`settings.path_labels.${key}` as any)}</label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={settings.paths[key]}
+                                            readOnly
+                                            className="flex-1 bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-gray-900 dark:text-zinc-300 font-mono text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                            placeholder={t('settings.not_set')}
+                                            disabled={isDisabled}
+                                            title={isDisabled ? "Testing dependencies missing" : ""}
+                                        />
+                                        <button
+                                            onClick={() => handleSelectFolder(key)}
+                                            className="px-3 py-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 rounded-xl text-zinc-600 dark:text-zinc-300 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            title={t('settings.folder_select')}
+                                            disabled={isDisabled}
+                                        >
+                                            <FolderOpen size={16} />
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </section>
 
@@ -358,17 +367,26 @@ export function SettingsPage() {
                         <Wrench size={20} className="text-primary" /> {t('settings.tools')}
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {['appiumArgs', 'scrcpyArgs', 'robotArgs', 'appPackage'].map((key) => (
-                            <div key={key}>
-                                <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">{t(`settings.tool_config.${key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)}` as any)}</label>
-                                <input
-                                    type="text"
-                                    value={(settings.tools as any)[key]}
-                                    onChange={(e) => updateSetting('tools', { ...settings.tools, [key]: e.target.value })}
-                                    className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-primary/20 outline-none"
-                                />
-                            </div>
-                        ))}
+                        {['appiumArgs', 'robotArgs', 'scrcpyArgs', 'appPackage'].map((key) => {
+                            let isDisabled = false;
+                            if (key === 'appiumArgs' && systemCheckStatus?.missingAppium?.length > 0) isDisabled = true;
+                            if (key === 'robotArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
+                            if (key === 'scrcpyArgs' && systemCheckStatus?.missingMirroring?.length > 0) isDisabled = true;
+
+                            return (
+                                <div key={key}>
+                                    <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">{t(`settings.tool_config.${key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)}` as any)}</label>
+                                    <input
+                                        type="text"
+                                        value={(settings.tools as any)[key]}
+                                        onChange={(e) => updateSetting('tools', { ...settings.tools, [key]: e.target.value })}
+                                        className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-primary/20 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                                        disabled={isDisabled}
+                                        title={isDisabled ? "Dependency missing" : ""}
+                                    />
+                                </div>
+                            );
+                        })}
                         <div className="col-span-1 md:col-span-2">
                             <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">{t('settings.tool_config.ngrok_token')}</label>
                             <input
@@ -532,12 +550,12 @@ export function SettingsPage() {
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {systemVersions ? (
-                            Object.entries(systemVersions).map(([key, value]) => (
+                            (['adb', 'node', 'appium', 'uiautomator2', 'python', 'robot', 'appium_lib', 'scrcpy'] as Array<keyof typeof systemVersions>).map((key) => (
                                 <div key={key} className="bg-zinc-50 dark:bg-black/20 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800/50">
                                     <span className="block text-xs uppercase text-zinc-500 font-bold mb-1">
                                         {t(`settings.system.tools.${key}` as any) || key}
                                     </span>
-                                    <span className="text-sm font-mono text-gray-900 dark:text-zinc-300 truncate block" title={value}>{value}</span>
+                                    <span className="text-sm font-mono text-gray-900 dark:text-zinc-300 truncate block" title={systemVersions[key]}>{systemVersions[key]}</span>
                                 </div>
                             ))
                         ) : (

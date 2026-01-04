@@ -6,12 +6,12 @@ import { invoke } from '@tauri-apps/api/core';
 export interface SystemVersions {
     adb: string;
     node: string;
-    python: string;
-    scrcpy: string;
     appium: string;
-    robot: string;
     uiautomator2: string;
+    python: string;
+    robot: string;
     appium_lib: string;
+    scrcpy: string;
 }
 
 // Initialize the store
@@ -57,20 +57,20 @@ const DEFAULT_SETTINGS: AppSettings = {
     appiumHost: '127.0.0.1',
     appiumPort: 4723,
     paths: {
-        suites: '',
-        tests: '',
-        resources: '',
-        logs: '',
-        logcat: 'logcat',
-        screenshots: 'screenshots',
-        recordings: 'recordings',
         automationRoot: '',
+        resources: '',
+        tests: '',
+        suites: '',
+        logs: '',
+        logcat: '',
+        screenshots: '',
+        recordings: '',
     },
     tools: {
         appiumArgs: '--relaxed-security',
-        scrcpyArgs: '',
-        robotArgs: '',
-        appPackage: '',
+        scrcpyArgs: '-m 1024 -b 2M --max-fps=30 --no-audio --stay-awake',
+        robotArgs: '--split-log',
+        appPackage: 'com.android.chrome, com.chrome.beta',
         ngrokToken: ''
     }
 };
@@ -104,8 +104,9 @@ interface SettingsContextType {
 export interface SystemCheckStatus {
     loading: boolean;
     complete: boolean;
-    missingCritical: string[]; // node, adb
-    missingTesting: string[]; // python, robot, appium, uiautomator2
+    missingCritical: string[]; // adb
+    missingAppium: string[]; // node, appium, uiautomator2
+    missingTesting: string[]; // python, robot, appiumlib
     missingMirroring: string[]; // scrcpy
 }
 
@@ -290,6 +291,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         loading: false,
         complete: false,
         missingCritical: [],
+        missingAppium: [],
         missingTesting: [],
         missingMirroring: []
     });
@@ -302,18 +304,22 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             setSystemVersions(versions);
 
             const missingCritical: string[] = [];
+            const missingAppium: string[] = [];
             const missingTesting: string[] = [];
             const missingMirroring: string[] = [];
 
             // Critical Tools
-            if (versions.node === 'Not Found') missingCritical.push('Node.js');
             if (versions.adb === 'Not Found') missingCritical.push('ADB');
+
+            // Appium Tools
+            if (versions.node === 'Not Found') missingAppium.push('Node.js');
+            if (versions.appium === 'Not Found') missingAppium.push('Appium (Node.js)');
+            if (versions.uiautomator2 === 'Not Found') missingAppium.push('UiAutomator2 (Appium)');
 
             // Testing Tools
             if (versions.python === 'Not Found') missingTesting.push('Python');
-            if (versions.robot === 'Not Found') missingTesting.push('Robot Framework');
-            if (versions.appium === 'Not Found') missingTesting.push('Appium');
-            if (versions.uiautomator2 === 'Not Found') missingTesting.push('UiAutomator2');
+            if (versions.robot === 'Not Found') missingTesting.push('Robot Framework (Python)');
+            if (versions.appium_lib === 'Not Found') missingTesting.push('AppiumLibrary (Robot Framework)');
 
             // Mirroring Tools
             if (versions.scrcpy === 'Not Found') missingMirroring.push('Scrcpy');
@@ -322,6 +328,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                 loading: false,
                 complete: true,
                 missingCritical,
+                missingAppium,
                 missingTesting,
                 missingMirroring
             });

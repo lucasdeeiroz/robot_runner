@@ -25,18 +25,32 @@ export function RunTab({ onNavigate, initialTab }: RunTabProps) {
     // Initialize activeTab with initialTab if provided, else default to 'tests'
     // But if 'tests' is disabled (missing tools), default to 'connect'?
     const [activeTab, setActiveTab] = useState<TabType>(() => {
-        if (initialTab) return initialTab;
+        if (initialTab && !(initialTab === 'tests' && systemCheckStatus?.missingAppium?.length > 0 || systemCheckStatus?.missingTesting?.length > 0)) return initialTab;
         if (systemCheckStatus?.missingTesting?.length > 0) return 'connect';
         return 'tests';
     });
 
+    // Safety check if status updates later
+    useEffect(() => {
+        if (activeTab === 'tests' && (systemCheckStatus?.missingAppium?.length > 0 || systemCheckStatus?.missingTesting?.length > 0)) {
+            setActiveTab('connect');
+        }
+    }, [systemCheckStatus, activeTab]);
+
     // React to initialTab changes if they come later (e.g. redirect)
     useEffect(() => {
         if (initialTab) {
-            setActiveTab(initialTab);
+            if (initialTab === 'tests' && (systemCheckStatus?.missingAppium?.length > 0 || systemCheckStatus?.missingTesting?.length > 0)) {
+                setActiveTab('connect');
+            } else {
+                setActiveTab(initialTab);
+            }
         }
     }, [initialTab]);
 
+    // ...
+
+    // State for devices (Restored)
     const [devices, setDevices] = useState<Device[]>([]);
     const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
     const [isDeviceDropdownOpen, setIsDeviceDropdownOpen] = useState(false);
