@@ -27,12 +27,6 @@ pub fn get_system_versions() -> SystemVersions {
 
     let node = get_version("node", &["--version"]); // Usually just vX.X.X
 
-    let python_raw = get_version("python", &["--version"]);
-    let python = extract_version(&python_raw, r"Python ([\d\.]+)");
-
-    let scrcpy_raw = get_version("scrcpy", &["--version"]);
-    let scrcpy = extract_version(&scrcpy_raw, r"scrcpy ([\d\.]+)");
-
     // Check Appium and determine command
     let (appium_raw, appium_cmd) = if let Some(v) = try_get_version("appium", &["--version"]) {
         (v, "appium")
@@ -42,6 +36,16 @@ pub fn get_system_versions() -> SystemVersions {
         ("Not Found".to_string(), "appium")
     };
     let appium = appium_raw; // usually just X.X.X
+
+    // Check UiAutomator2 using the found Appium command
+    let uiautomator2 = if appium != "Not Found" {
+        check_uiautomator2(appium_cmd)
+    } else {
+        "Not Found".to_string()
+    };
+
+    let python_raw = get_version("python", &["--version"]);
+    let python = extract_version(&python_raw, r"Python ([\d\.]+)");
 
     // Check Robot - Output often exits with 1, so use loose check
     let robot_raw = if let Some(v) = try_get_version_loose("robot", &["--version"]) {
@@ -53,19 +57,15 @@ pub fn get_system_versions() -> SystemVersions {
     };
     let robot = extract_version(&robot_raw, r"Robot Framework ([\d\.]+)");
 
-    // Check UiAutomator2 using the found Appium command
-    let uiautomator2 = if appium != "Not Found" {
-        check_uiautomator2(appium_cmd)
-    } else {
-        "Not Found".to_string()
-    };
-
     // Check robotframework-appiumlibrary using direct python import
     // This is more robust than parsing pip show output
     let appium_lib = get_version("python", &[
         "-c", 
         "import importlib.metadata; print(importlib.metadata.version('robotframework-appiumlibrary'))"
     ]);
+
+    let scrcpy_raw = get_version("scrcpy", &["--version"]);
+    let scrcpy = extract_version(&scrcpy_raw, r"scrcpy ([\d\.]+)");
 
     SystemVersions {
         adb,
@@ -91,6 +91,14 @@ fn extract_version(input: &str, pattern: &str) -> String {
             }
         }
     }
+    
+    // Filter out common Windows CMD error messages
+    // This handles cases where `strict=false` allows shell errors to pass through
+    let lower_input = input.to_lowercase();
+    if lower_input.contains("is not recognized") || lower_input.contains("não é reconhecido") {
+        return "Not Found".to_string();
+    }
+
     input.to_string()
 }
 

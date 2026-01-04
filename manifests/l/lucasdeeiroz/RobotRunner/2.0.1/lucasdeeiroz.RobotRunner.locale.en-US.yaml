@@ -1,8 +1,8 @@
 # Created using wingetcreate 1.10.3.0
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.10.0.schema.json
 
-PackageIdentifier: lucasdeeiroz.RobotRunner
-PackageVersion: 2.0.3
+PackageIdentifier: com.lucasdeeiroz.robotrunner
+PackageVersion: 2.0.70
 PackageLocale: en-US
 Publisher: Lucas de Eiroz Rodrigues
 PublisherUrl: https://github.com/lucasdeeiroz

@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 
 export function AboutPage() {
     const { t } = useTranslation();
-    const appVersion = "2.0.6";
+    const appVersion = "2.0.70";
 
     return (
         <div className="space-y-8 pb-12">

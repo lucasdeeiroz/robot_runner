@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Robot Runner",
-  "version": "2.0.6",
-  "identifier": "com.lucas.robotrunner",
+  "version": "2.0.70",
+  "identifier": "com.lucasdeeiroz.robotrunner",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -31,6 +31,7 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "publisher": "Lucas de Eiroz Rodrigues"
   }
 }
