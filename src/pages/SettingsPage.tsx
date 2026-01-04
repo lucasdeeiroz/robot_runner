@@ -391,10 +391,12 @@ export function SettingsPage() {
                             <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">{t('settings.tool_config.ngrok_token')}</label>
                             <input
                                 type="password"
-                                value={settings.tools.ngrokToken}
+                                value={settings.tools.ngrokToken || ''}
                                 onChange={(e) => updateSetting('tools', { ...settings.tools, ngrokToken: e.target.value })}
-                                placeholder="28... (Ngrok Authtoken)"
-                                className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-primary/20 outline-none font-mono"
+                                className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-primary/20 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                                placeholder="Authorization Token"
+                                disabled={systemCheckStatus?.missingTunnelling?.length > 0}
+                                title={systemCheckStatus?.missingTunnelling?.length > 0 ? "Ngrok not found" : ""}
                             />
                         </div>
                     </div>
@@ -550,7 +552,7 @@ export function SettingsPage() {
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {systemVersions ? (
-                            (['adb', 'node', 'appium', 'uiautomator2', 'python', 'robot', 'appium_lib', 'scrcpy'] as Array<keyof typeof systemVersions>).map((key) => (
+                            (['adb', 'node', 'appium', 'uiautomator2', 'python', 'robot', 'appium_lib', 'scrcpy', 'ngrok'] as Array<keyof typeof systemVersions>).map((key) => (
                                 <div key={key} className="bg-zinc-50 dark:bg-black/20 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800/50">
                                     <span className="block text-xs uppercase text-zinc-500 font-bold mb-1">
                                         {t(`settings.system.tools.${key}` as any) || key}

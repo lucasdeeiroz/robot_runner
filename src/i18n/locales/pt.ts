@@ -64,7 +64,7 @@ export const pt = {
             },
             remote: {
                 title: "Acesso Remoto (Ngrok)",
-                desc: "Expor servidor Appium na internet"
+                desc: "Expor Dispositivo ADB na internet"
             },
             labels: {
                 ip: "Endereço IP",
@@ -81,11 +81,30 @@ export const pt = {
                 disconnect: "Desconectar",
                 start_tunnel: "Iniciar Túnel Público",
                 stop_tunnel: "Parar Túnel",
-                copy: "Copiado!"
+                copy: "Copiado!",
+                paste_url: "Colar URL"
             },
             status: {
                 tunnel_active: "Túnel Ativo",
-                starting_ngrok: "Iniciando Túnel Ngrok..."
+                starting_ngrok: "Iniciando Túnel Ngrok...",
+                pasted: "Colado da área de transferência",
+                clipboard_invalid: "Formato inválido na área de transferência",
+                clipboard_error: "Permissão da área de transferência negada",
+                auto_ip: "IP Auto-detectado: {{ip}}",
+                ip_not_found: "Não foi possível detectar o IP via ADB",
+                select_device_first: "Selecione um dispositivo para expor",
+                forwarding: "Encaminhando para localhost:5555 (ADB)",
+                executing_connect: "Conectando...",
+                executing_pair: "Emparelhando...",
+                executing_disconnect: "Desconectando...",
+                connection_failed: "Falha na conexão",
+                pairing_failed: "Falha no emparelhamento",
+                connection_success: "Conectado a {{target}}",
+                pairing_success: "Emparelhado com sucesso com {{target}}",
+                disconnection_success: "Desconectado de {{target}}",
+                disconnected_all: "Todos os dispositivos desconectados",
+                tunnel_stopped: "Túnel Ngrok Parado",
+                tunnel_stop_error: "Erro ao parar Ngrok"
             }
         },
         inspector: {
@@ -192,7 +211,8 @@ export const pt = {
                     python: "Python",
                     robot: "Robot Framework (Python)",
                     appium_lib: "Appium Library (Robot Framework)",
-                    scrcpy: "Scrcpy"
+                    scrcpy: "Scrcpy",
+                    ngrok: "Ngrok (Túneis)"
                 }
             },
             folder_select: "Selecionar Pasta",

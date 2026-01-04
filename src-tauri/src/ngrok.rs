@@ -1,93 +1,101 @@
-use regex::Regex;
-use std::io::{BufRead, BufReader};
-use std::process::{Child, Command, Stdio};
+use std::process::{Command, Stdio};
+use std::os::windows::process::CommandExt;
 use std::sync::Mutex;
-use std::thread;
-use std::time::Duration;
 use tauri::{command, State};
 
-pub struct NgrokState(pub Mutex<Option<Child>>);
+// Constants
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+// Wrapper for Tauri State management
+pub struct NgrokState(pub Mutex<Option<u32>>);
 
 #[command]
-pub fn start_ngrok(
+pub async fn start_ngrok(
     state: State<'_, NgrokState>,
-    port: u16,
-    token: Option<String>,
+    port: u16, 
+    token: Option<String>
 ) -> Result<String, String> {
-    let mut state_lock = state.0.lock().map_err(|e| e.to_string())?;
-
-    // Stop existing if any
-    if let Some(mut child) = state_lock.take() {
-        let _ = child.kill();
-    }
-
-    let mut cmd = Command::new("ngrok");
-    cmd.arg("http").arg(port.to_string()).arg("--log=stdout");
-
-    if let Some(t) = token {
-        if !t.trim().is_empty() {
-            cmd.arg("--authtoken").arg(t);
+    // 1. Configure Auth Token if provided
+    if let Some(auth_token) = &token {
+        if !auth_token.is_empty() {
+             let mut cmd = Command::new("ngrok");
+             cmd.args(&["config", "add-authtoken", auth_token]);
+             cmd.creation_flags(CREATE_NO_WINDOW);
+             let _ = cmd.output().map_err(|e| format!("Failed to set authtoken: {}", e))?;
         }
     }
 
-    // Windows: Create No Window
-    #[cfg(target_os = "windows")]
+    // 2. Stop existing if any (using the state)
+    // We can't call stop_ngrok directly easily if it requires State, 
+    // so we just implement the logic inline or split logic.
     {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000);
+        let mut lock = state.0.lock().map_err(|_| "Failed to lock mutex")?;
+        if let Some(pid) = *lock {
+             let _ = Command::new("taskkill")
+                .args(&["/F", "/PID", &pid.to_string()])
+                .creation_flags(CREATE_NO_WINDOW)
+                .output();
+             *lock = None;
+        }
     }
 
-    let mut child = cmd.stdout(Stdio::piped()).spawn().map_err(|e| {
-        format!(
-            "Failed to start ngrok: {}. Make sure 'ngrok' is in PATH.",
-            e
-        )
-    })?;
+    // 3. Start ngrok tcp <port>
+    let mut child = Command::new("ngrok")
+        .args(&["tcp", &port.to_string(), "--log=stdout"])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn()
+        .map_err(|e| format!("Failed to start ngrok: {}", e))?;
 
+    let child_id = child.id();
+    {
+        let mut lock = state.0.lock().map_err(|_| "Failed to lock mutex")?;
+        *lock = Some(child_id);
+    }
+
+    // 4. Parse output for URL
     let stdout = child.stdout.take().ok_or("Failed to capture stdout")?;
+    let reader = std::io::BufReader::new(stdout);
+    use std::io::BufRead;
 
-    // Spawn thread to read URL? Or read blocking for a few seconds?
-    // We need to return the URL. So we wait.
+    let start = std::time::Instant::now();
+    for line in reader.lines() {
+        if start.elapsed().as_secs() > 10 {
+            let _ = child.kill();
+            return Err("Timed out waiting for ngrok URL".to_string());
+        }
 
-    let (tx, rx) = std::sync::mpsc::channel();
-
-    thread::spawn(move || {
-        let reader = BufReader::new(stdout);
-        let re = Regex::new(r"url=(https?://[^ ]+)").unwrap();
-
-        for line in reader.lines() {
-            if let Ok(l) = line {
-                if let Some(caps) = re.captures(&l) {
-                    if let Some(url) = caps.get(1) {
-                        let _ = tx.send(url.as_str().to_string());
-                        break;
-                    }
+        if let Ok(l) = line {
+            if let Some(idx) = l.find("url=") {
+                let url = l[idx+4..].split_whitespace().next().unwrap_or("").to_string();
+                if !url.is_empty() {
+                     return Ok(url);
                 }
-            } else {
-                break;
             }
         }
-    });
+    }
 
-    // Wait for URL (timeout 10s)
-    let url = rx.recv_timeout(Duration::from_secs(10)).map_err(|_| {
-        let _ = child.kill(); // Kill if timeout
-        "Timeout waiting for Ngrok URL. Check your token or network.".to_string()
-    })?;
-
-    *state_lock = Some(child);
-
-    Ok(url)
+    Err("Ngrok started but no URL found".to_string())
 }
 
 #[command]
-pub fn stop_ngrok(state: State<'_, NgrokState>) -> Result<(), String> {
-    let mut state_lock = state.0.lock().map_err(|e| e.to_string())?;
-
-    if let Some(mut child) = state_lock.take() {
-        let _ = child.kill();
-        Ok(())
-    } else {
-        Ok(()) // Already stopped
+pub async fn stop_ngrok(state: State<'_, NgrokState>) -> Result<(), String> {
+    let mut lock = state.0.lock().map_err(|_| "Failed to lock mutex")?;
+    
+    if let Some(pid) = *lock {
+        let _ = Command::new("taskkill")
+            .args(&["/F", "/PID", &pid.to_string()])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output();
+        *lock = None;
     }
+    
+    // Safety net
+    let _ = Command::new("taskkill")
+        .args(&["/F", "/IM", "ngrok.exe"])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output();
+        
+    Ok(())
 }

@@ -18,6 +18,7 @@ pub struct SystemVersions {
     pub python: String,
     pub node: String,
     pub appium_lib: String,
+    pub ngrok: String,
 }
 
 #[command]
@@ -67,6 +68,9 @@ pub fn get_system_versions() -> SystemVersions {
     let scrcpy_raw = get_version("scrcpy", &["--version"]);
     let scrcpy = extract_version(&scrcpy_raw, r"scrcpy ([\d\.]+)");
 
+    let ngrok_raw = get_version("ngrok", &["--version"]);
+    let ngrok = extract_version(&ngrok_raw, r"ngrok version ([\d\.]+)");
+
     SystemVersions {
         adb,
         appium,
@@ -75,7 +79,8 @@ pub fn get_system_versions() -> SystemVersions {
         robot,
         python,
         node,
-        appium_lib, // Serialized as appium_lib
+        appium_lib,
+        ngrok,
     }
 }
 

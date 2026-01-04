@@ -12,6 +12,7 @@ export interface SystemVersions {
     robot: string;
     appium_lib: string;
     scrcpy: string;
+    ngrok: string;
 }
 
 // Initialize the store
@@ -104,10 +105,11 @@ interface SettingsContextType {
 export interface SystemCheckStatus {
     loading: boolean;
     complete: boolean;
-    missingCritical: string[]; // adb
-    missingAppium: string[]; // node, appium, uiautomator2
-    missingTesting: string[]; // python, robot, appiumlib
-    missingMirroring: string[]; // scrcpy
+    missingCritical: string[]; // Only ADB
+    missingAppium: string[]; // Node, Appium, UiAutomator2 -- affects Appium Settings & Controls
+    missingTesting: string[]; // Python, Robot, AppiumLibrary -- affects Launcher Tab
+    missingMirroring: string[]; // Scrcpy -- affects Mirroring options
+    missingTunnelling: string[]; // Ngrok -- affects Connect Tab remote features
 }
 
 interface SettingsContextType {
@@ -293,7 +295,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         missingCritical: [],
         missingAppium: [],
         missingTesting: [],
-        missingMirroring: []
+        missingMirroring: [],
+        missingTunnelling: []
     });
 
     const checkSystemVersions = async () => {
@@ -307,9 +310,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             const missingAppium: string[] = [];
             const missingTesting: string[] = [];
             const missingMirroring: string[] = [];
+            const missingTunnelling: string[] = [];
 
             // Critical Tools
-            if (versions.adb === 'Not Found') missingCritical.push('ADB');
+            if (versions.adb === 'Not Found') {
+                missingCritical.push('ADB');
+            }
 
             // Appium Tools
             if (versions.node === 'Not Found') missingAppium.push('Node.js');
@@ -324,13 +330,17 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             // Mirroring Tools
             if (versions.scrcpy === 'Not Found') missingMirroring.push('Scrcpy');
 
+            // Tunnelling Tools
+            if (versions.ngrok === 'Not Found') missingTunnelling.push('Ngrok');
+
             setSystemCheckStatus({
                 loading: false,
                 complete: true,
                 missingCritical,
                 missingAppium,
                 missingTesting,
-                missingMirroring
+                missingMirroring,
+                missingTunnelling
             });
 
         } catch (e) {
