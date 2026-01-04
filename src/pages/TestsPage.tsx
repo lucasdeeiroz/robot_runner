@@ -66,7 +66,7 @@ export function TestsPage() {
     const loadHistory = async (refresh: boolean = false) => {
         setLoadingHistory(true);
         try {
-            const logs = await invoke<TestLog[]>('get_test_tests_history', {
+            const logs = await invoke<TestLog[]>('get_test_history', {
                 customPath: settings.paths.logs || null,
                 refresh: refresh
             });

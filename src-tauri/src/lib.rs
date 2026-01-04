@@ -42,7 +42,7 @@ pub fn run() {
             runner::stop_robot_test,
             inspector::get_screenshot,
             inspector::get_xml_dump,
-            logs::get_test_tests_history,
+            logs::get_test_history,
             logs::open_log_folder,
             logs::open_path,
             adb::wireless::adb_connect,
