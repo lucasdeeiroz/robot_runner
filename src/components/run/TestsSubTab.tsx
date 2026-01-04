@@ -203,7 +203,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
     };
 
     return (
-        <div className="h-full flex flex-col gap-6 p-6 max-w-4xl mx-auto w-full">
+        <div className="h-full flex flex-col gap-6 p-6 max-w-4xl mx-auto w-full overflow-y-auto">
             {/* Mode Selection */}
             <div className="flex justify-center bg-zinc-100 dark:bg-zinc-800 p-1.5 rounded-xl shrink-0 self-center shadow-sm">
                 <ModeButton active={mode === 'file'} onClick={() => { setMode('file'); setSelectedPath(""); }} icon={<FileCode size={18} />} label={t('tests.mode.file')} />

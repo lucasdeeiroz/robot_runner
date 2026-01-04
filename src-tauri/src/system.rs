@@ -23,7 +23,7 @@ pub struct SystemVersions {
 }
 
 #[command]
-pub fn get_system_versions() -> SystemVersions {
+pub async fn get_system_versions() -> SystemVersions {
     let adb_raw = get_version("adb", &["--version"]);
     let adb = extract_version(&adb_raw, r"Android Debug Bridge version ([\d\.]+)");
 
