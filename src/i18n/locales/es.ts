@@ -183,12 +183,12 @@ export const es = {
                 tools: {
                     adb: "ADB",
                     node: "Node.js",
+                    appium: "Appium Server (Node.js)",
+                    uiautomator2: "UiAutomator2 Driver (Appium)",
                     python: "Python",
-                    robot: "Robot Framework",
-                    appium: "Servidor Appium",
-                    uiautomator2: "Driver UiAutomator2",
-                    scrcpy: "Scrcpy",
-                    appium_lib: "Biblioteca Appium (Python)"
+                    robot: "Robot Framework (Python)",
+                    appium_lib: "Appium Library (Robot Framework)",
+                    scrcpy: "Scrcpy"
                 }
             },
             folder_select: "Seleccionar Carpeta",
