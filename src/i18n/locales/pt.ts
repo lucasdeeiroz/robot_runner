@@ -187,12 +187,12 @@ export const pt = {
                 tools: {
                     adb: "ADB",
                     node: "Node.js",
+                    appium: "Appium Server (Node.js)",
+                    uiautomator2: "UiAutomator2 Driver (Appium)",
                     python: "Python",
-                    robot: "Robot Framework",
-                    appium: "Appium Server",
-                    uiautomator2: "UiAutomator2 Driver",
-                    scrcpy: "Scrcpy",
-                    appium_lib: "Appium Library (Python)"
+                    robot: "Robot Framework (Python)",
+                    appium_lib: "Appium Library (Robot Framework)",
+                    scrcpy: "Scrcpy"
                 }
             },
             folder_select: "Selecionar Pasta",
