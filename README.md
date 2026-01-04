@@ -34,6 +34,35 @@
 
 ---
 
+## 📥 Installation
+
+### Windows
+You can install Robot Runner using **WinGet** (recommended) or by downloading the installer from GitHub.
+
+**Option 1: WinGet (Recommended)**
+Open PowerShell or Command Prompt and run:
+```powershell
+winget install lucasdeeiroz.RobotRunner
+```
+
+**Option 2: GitHub Releases**
+Download the latest version from the [Releases Page](https://github.com/lucasdeeiroz/robot_runner/releases).
+*   **Installer (.exe / .msi):** Standard installation wizard.
+*   **Portable (.exe):** Standalone executable (no installation required).
+
+### Linux
+Robot Runner is available for major Linux distributions. Download the appropriate file from [Releases](https://github.com/lucasdeeiroz/robot_runner/releases):
+*   **.AppImage:** Universal Linux package (recommended). Make it executable (`chmod +x`) and run.
+*   **.deb:** For Debian/Ubuntu-based systems (`sudo dpkg -i ...`).
+*   **.rpm:** For Fedora/RHEL-based systems (`sudo rpm -i ...`).
+
+### macOS
+Download for macOS from [Releases](https://github.com/lucasdeeiroz/robot_runner/releases):
+*   **.dmg:** Standard disk image installer. Drag to Applications.
+*   **.app.tar.gz:** Compressed application bundle.
+
+---
+
 ## ⚙️ Configuring Your Automation Project
 
 To use Robot Runner with your project, you need to configure the paths in the **Settings** tab.
