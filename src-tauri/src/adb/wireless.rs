@@ -24,6 +24,7 @@ pub fn adb_connect(ip: String, port: String) -> Result<String, String> {
     if !output.status.success()
         || stdout.contains("unable to connect")
         || stdout.contains("failed to connect")
+        || stdout.contains("cannot connect to")
     {
         return Err(format!("Connection failed: {} {}", stdout, stderr));
     }
@@ -59,9 +60,17 @@ pub fn adb_pair(ip: String, port: String, code: String) -> Result<String, String
 
 #[command]
 pub fn adb_disconnect(ip: String, port: String) -> Result<String, String> {
-    let target = format!("{}:{}", ip, port);
     let mut cmd = Command::new("adb");
-    cmd.args(&["disconnect", &target]);
+    
+    if ip.is_empty() {
+        println!("ADB Disconnecting All");
+        cmd.arg("disconnect");
+    } else {
+        let target = format!("{}:{}", ip, port);
+        println!("ADB Disconnecting from {}", target);
+        cmd.args(&["disconnect", &target]);
+    }
+
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;

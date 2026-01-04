@@ -1,5 +1,5 @@
 import { useSettings } from "@/lib/settings";
-import { Moon, Sun, Globe, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2 } from "lucide-react";
+import { Moon, Sun, Globe, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2, ExternalLink } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -8,6 +8,7 @@ import { readFile } from "@tauri-apps/plugin-fs";
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
 import { feedback } from "@/lib/feedback";
+import { TOOL_LINKS } from "@/lib/tools";
 
 export function SettingsPage() {
     const { settings, updateSetting, loading, profiles, activeProfileId, createProfile, switchProfile, renameProfile, deleteProfile, systemVersions, checkSystemVersions, systemCheckStatus } = useSettings();
@@ -53,7 +54,7 @@ export function SettingsPage() {
                     updateSetting(key, dataUri);
                 } catch (readErr) {
                     console.error("Failed to read logo file", readErr);
-                    alert("Failed to read logo file. Please try again.");
+                    feedback.toast.error("Failed to read logo file. Please try again.");
                 }
             }
         } catch (e) {
@@ -124,9 +125,10 @@ export function SettingsPage() {
                 feedback.toast.success('feedback.appium_started');
             }
             checkAppiumStatus();
-        } catch (e) {
+        } catch (e: any) {
             console.error('Failed to toggle appium:', e);
-            alert(`Failed to toggle appium: ${e}`);
+            let errStr = String(e).replace(/^Error:/, '').trim();
+            feedback.toast.error('common.error_occurred', { error: errStr });
         }
     };
 
@@ -391,10 +393,12 @@ export function SettingsPage() {
                             <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">{t('settings.tool_config.ngrok_token')}</label>
                             <input
                                 type="password"
-                                value={settings.tools.ngrokToken}
+                                value={settings.tools.ngrokToken || ''}
                                 onChange={(e) => updateSetting('tools', { ...settings.tools, ngrokToken: e.target.value })}
-                                placeholder="28... (Ngrok Authtoken)"
-                                className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-primary/20 outline-none font-mono"
+                                className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-primary/20 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                                placeholder="Authorization Token"
+                                disabled={systemCheckStatus?.missingTunnelling?.length > 0}
+                                title={systemCheckStatus?.missingTunnelling?.length > 0 ? "Ngrok not found" : ""}
                             />
                         </div>
                     </div>
@@ -550,12 +554,25 @@ export function SettingsPage() {
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {systemVersions ? (
-                            (['adb', 'node', 'appium', 'uiautomator2', 'python', 'robot', 'appium_lib', 'scrcpy'] as Array<keyof typeof systemVersions>).map((key) => (
-                                <div key={key} className="bg-zinc-50 dark:bg-black/20 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800/50">
-                                    <span className="block text-xs uppercase text-zinc-500 font-bold mb-1">
-                                        {t(`settings.system.tools.${key}` as any) || key}
+                            (['adb', 'node', 'appium', 'uiautomator2', 'python', 'robot', 'appium_lib', 'scrcpy', 'ngrok'] as Array<keyof typeof systemVersions>).map((key) => (
+                                <div key={key} className="bg-zinc-50 dark:bg-black/20 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800/50 flex flex-col justify-between group h-20 transition-all hover:bg-zinc-100 dark:hover:bg-zinc-800/50">
+                                    <div className="flex items-center justify-between">
+                                        <span className="block text-xs uppercase text-zinc-500 font-bold">
+                                            {t(`settings.system.tools.${key}` as any) || key}
+                                        </span>
+                                        <a
+                                            href={TOOL_LINKS[key as keyof typeof TOOL_LINKS]}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-zinc-400 hover:text-primary transition-colors opacity-0 group-hover:opacity-100"
+                                            title="View Documentation/Download"
+                                        >
+                                            <ExternalLink size={14} />
+                                        </a>
+                                    </div>
+                                    <span className="text-sm font-mono text-gray-900 dark:text-zinc-300 truncate block mt-1" title={systemVersions[key]}>
+                                        {systemVersions[key]}
                                     </span>
-                                    <span className="text-sm font-mono text-gray-900 dark:text-zinc-300 truncate block" title={systemVersions[key]}>{systemVersions[key]}</span>
                                 </div>
                             ))
                         ) : (

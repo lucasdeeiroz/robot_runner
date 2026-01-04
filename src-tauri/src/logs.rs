@@ -20,23 +20,22 @@ pub struct TestLog {
 }
 
 #[command]
-pub fn get_test_tests_history(
+pub fn get_test_history(
     custom_path: Option<String>,
     refresh: Option<bool>,
 ) -> Result<Vec<TestLog>, String> {
-    // Assumption: logs are in "../test_results" relative to the app execution
-    // Or we can assume a fixed path. For now, let's look at the project root "test_results".
-
-    let mut candidates = vec![
-        PathBuf::from("../test_results"),
-        PathBuf::from("test_results"),
-    ];
+    let mut candidates = Vec::new();
 
     if let Some(path) = custom_path {
         if !path.is_empty() {
-            // Prepend custom path to check it first
-            candidates.insert(0, PathBuf::from(path));
+             candidates.push(PathBuf::from(path));
         }
+    }
+
+    // Only add defaults if no custom path provided (or if we want to fallback? usually override is best)
+    if candidates.is_empty() {
+        candidates.push(PathBuf::from("../test_results"));
+        candidates.push(PathBuf::from("test_results"));
     }
 
     // Identify the primary log directory (first valid one) to store cache

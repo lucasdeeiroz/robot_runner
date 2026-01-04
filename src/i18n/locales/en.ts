@@ -55,7 +55,7 @@ export const en = {
             },
             remote: {
                 title: "Remote Access (Ngrok)",
-                desc: "Expose Appium Server to the internet"
+                desc: "Expose ADB Device to the internet"
             },
             labels: {
                 ip: "IP Address",
@@ -72,11 +72,31 @@ export const en = {
                 disconnect: "Disconnect",
                 start_tunnel: "Start Public Tunnel",
                 stop_tunnel: "Stop Tunnel",
-                copy: "Copied!"
+                copy: "Copied!",
+                paste_url: "Paste URL"
             },
             status: {
                 tunnel_active: "Tunnel Active",
-                starting_ngrok: "Starting Ngrok Tunnel..."
+                starting_ngrok: "Starting Ngrok Tunnel...",
+                pasted: "Pasted from clipboard",
+                clipboard_invalid: "Invalid format in clipboard",
+                clipboard_error: "Clipboard permission denied",
+                auto_ip: "Auto-detected IP: {{ip}}",
+                ip_not_found: "Could not detect Device IP via ADB",
+                select_device_first: "Select a device to expose",
+                forwarding: "Forwarding to localhost:5555 (ADB)",
+                executing_connect: "Connecting...",
+                executing_pair: "Pairing...",
+                executing_disconnect: "Disconnecting...",
+                connection_failed: "Connection failed",
+                pairing_failed: "Pairing failed",
+                connection_success: "Connected to {{target}}",
+                pairing_success: "Successfully paired with {{target}}",
+                disconnection_success: "Disconnected from {{target}}",
+                disconnected_all: "Disconnected all devices",
+                tunnel_stopped: "Ngrok Tunnel Stopped",
+                tunnel_stop_error: "Error stopping Ngrok",
+                tunnel_start_error: "Error starting Ngrok"
             }
         },
         inspector: {
@@ -133,6 +153,7 @@ export const en = {
         common: {
             cancel: "Cancel",
             save: "Save",
+            error_occurred: "An error occurred: {{error}}",
             delete: "Delete",
             edit: "Edit",
             ok: "OK",
@@ -192,7 +213,8 @@ export const en = {
                     python: "Python",
                     robot: "Robot Framework (Python)",
                     appium_lib: "Appium Library (Robot Framework)",
-                    scrcpy: "Scrcpy"
+                    scrcpy: "Scrcpy",
+                    ngrok: "Ngrok (Tunnelling)"
                 }
             },
             folder_select: "Select Folder",

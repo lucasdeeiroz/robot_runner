@@ -2,6 +2,7 @@ import { SystemCheckStatus } from "@/lib/settings";
 import { Loader2, AlertTriangle, XCircle, MonitorX } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Modal } from "@/components/common/Modal";
+import { TOOL_LINKS } from "@/lib/tools";
 
 interface SystemCheckOverlayProps {
     status: SystemCheckStatus;
@@ -33,6 +34,8 @@ export function SystemCheckOverlay({ status, onCriticalExit, onTestingRedirect, 
 
     // Critical Tools Check
     if (status.missingCritical.length > 0) {
+        const isAdbMissing = status.missingCritical.some(t => t.toLowerCase().includes('adb'));
+
         return (
             <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
                 <div className="bg-white dark:bg-zinc-900 rounded-xl max-w-md w-full p-6 border border-zinc-200 dark:border-zinc-800 shadow-2xl space-y-6">
@@ -50,6 +53,18 @@ export function SystemCheckOverlay({ status, onCriticalExit, onTestingRedirect, 
                                 <li key={tool} className="font-medium">{tool}</li>
                             ))}
                         </ul>
+                        {isAdbMissing && (
+                            <div className="mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-700 flex justify-center">
+                                <a
+                                    href={TOOL_LINKS.adb}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-medium"
+                                >
+                                    Download ADB Platform Tools
+                                </a>
+                            </div>
+                        )}
                     </div>
 
                     <button

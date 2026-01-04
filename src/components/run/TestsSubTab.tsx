@@ -188,9 +188,11 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                 setLaunchStatus("");
             }, 500);
 
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
-            setLaunchStatus(`${t('tests.status.failed')}: ${e}`);
+            let errStr = String(e);
+            if (errStr.includes("Error:")) errStr = errStr.replace("Error:", "").trim();
+            setLaunchStatus(`${t('tests.status.failed')}: ${errStr}`);
             setIsLaunching(false);
         }
     };

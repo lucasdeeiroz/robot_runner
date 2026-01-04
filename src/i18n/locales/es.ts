@@ -52,7 +52,7 @@ export const es = {
             },
             remote: {
                 title: "Acceso Remoto (Ngrok)",
-                desc: "Exponer servidor Appium a internet"
+                desc: "Exponer Dispositivo ADB a internet"
             },
             labels: {
                 ip: "Dirección IP",
@@ -69,11 +69,31 @@ export const es = {
                 disconnect: "Desconectar",
                 start_tunnel: "Iniciar Túnel Público",
                 stop_tunnel: "Detener Túnel",
-                copy: "¡Copiado!"
+                copy: "¡Copiado!",
+                paste_url: "Pegar URL"
             },
             status: {
                 tunnel_active: "Túnel Activo",
-                starting_ngrok: "Iniciando Túnel Ngrok..."
+                starting_ngrok: "Iniciando Túnel Ngrok...",
+                pasted: "Pegado del portapapeles",
+                clipboard_invalid: "Formato inválido en portapapeles",
+                clipboard_error: "Permiso de portapapeles denegado",
+                auto_ip: "IP Auto-detectada: {{ip}}",
+                ip_not_found: "No se pudo detectar la IP del dispositivo vía ADB",
+                select_device_first: "Seleccione un dispositivo para exponer",
+                forwarding: "Redirigiendo a localhost:5555 (ADB)",
+                executing_connect: "Conectando...",
+                executing_pair: "Emparejando...",
+                executing_disconnect: "Desconectando...",
+                connection_failed: "Conexión fallida",
+                pairing_failed: "Emparejamiento fallido",
+                connection_success: "Conectado a {{target}}",
+                pairing_success: "Emparejado con éxito con {{target}}",
+                disconnection_success: "Desconectado de {{target}}",
+                disconnected_all: "Desconectados todos los dispositivos",
+                tunnel_stopped: "Túnel Ngrok Detenido",
+                tunnel_stop_error: "Error deteniendo Ngrok",
+                tunnel_start_error: "Error iniciando Ngrok"
             }
         },
         inspector: {
@@ -130,6 +150,7 @@ export const es = {
         common: {
             cancel: "Cancelar",
             save: "Guardar",
+            error_occurred: "Ocurrió un error: {{error}}",
             delete: "Eliminar",
             edit: "Editar",
             ok: "Aceptar",
@@ -170,7 +191,8 @@ export const es = {
                 appium_args: "Argumentos Appium",
                 scrcpy_args: "Argumentos Scrcpy",
                 robot_args: "Argumentos Robot Framework",
-                app_package: "Paquete de App (Monitoreo)"
+                app_package: "Paquete de App (Monitoreo)",
+                ngrok_token: "Token de Autenticación Ngrok"
             },
             ai: {
                 title: "Integración IA (Google Gemini)",
@@ -188,7 +210,8 @@ export const es = {
                     python: "Python",
                     robot: "Robot Framework (Python)",
                     appium_lib: "Appium Library (Robot Framework)",
-                    scrcpy: "Scrcpy"
+                    scrcpy: "Scrcpy",
+                    ngrok: "Ngrok (Túneles)"
                 }
             },
             folder_select: "Seleccionar Carpeta",
