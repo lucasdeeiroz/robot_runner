@@ -119,7 +119,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
             feedback.notify('feedback.remote_connected', 'feedback.details.url', { url });
         } catch (e) {
             console.error(e);
-            setNgrokStatusMsg({ text: `Ngrok Error: ${e}`, type: 'error' });
+            setNgrokStatusMsg({ text: `${t('connect.status.tunnel_start_error')}: ${e}`, type: 'error' });
         } finally {
             setNgrokLoading(false);
         }

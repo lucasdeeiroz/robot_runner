@@ -92,7 +92,8 @@ export const es = {
                 disconnection_success: "Desconectado de {{target}}",
                 disconnected_all: "Desconectados todos los dispositivos",
                 tunnel_stopped: "Túnel Ngrok Detenido",
-                tunnel_stop_error: "Error deteniendo Ngrok"
+                tunnel_stop_error: "Error deteniendo Ngrok",
+                tunnel_start_error: "Error iniciando Ngrok"
             }
         },
         inspector: {
@@ -149,6 +150,7 @@ export const es = {
         common: {
             cancel: "Cancelar",
             save: "Guardar",
+            error_occurred: "Ocurrió un error: {{error}}",
             delete: "Eliminar",
             edit: "Editar",
             ok: "Aceptar",

@@ -95,7 +95,8 @@ export const en = {
                 disconnection_success: "Disconnected from {{target}}",
                 disconnected_all: "Disconnected all devices",
                 tunnel_stopped: "Ngrok Tunnel Stopped",
-                tunnel_stop_error: "Error stopping Ngrok"
+                tunnel_stop_error: "Error stopping Ngrok",
+                tunnel_start_error: "Error starting Ngrok"
             }
         },
         inspector: {
@@ -152,6 +153,7 @@ export const en = {
         common: {
             cancel: "Cancel",
             save: "Save",
+            error_occurred: "An error occurred: {{error}}",
             delete: "Delete",
             edit: "Edit",
             ok: "OK",

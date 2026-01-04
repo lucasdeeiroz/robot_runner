@@ -27,6 +27,7 @@ export const pt = {
         common: {
             cancel: "Cancelar",
             save: "Salvar",
+            error_occurred: "Ocorreu um erro: {{error}}",
             delete: "Excluir",
             edit: "Editar",
             ok: "OK",
@@ -104,7 +105,8 @@ export const pt = {
                 disconnection_success: "Desconectado de {{target}}",
                 disconnected_all: "Todos os dispositivos desconectados",
                 tunnel_stopped: "Túnel Ngrok Parado",
-                tunnel_stop_error: "Erro ao parar Ngrok"
+                tunnel_stop_error: "Erro ao parar Ngrok",
+                tunnel_start_error: "Erro ao iniciar Ngrok"
             }
         },
         inspector: {
