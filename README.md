@@ -5,10 +5,10 @@
 ## 🚀 Key Features
 
 ### 📱 Device Management
-*   **Real-time Detection:** Automatically detects devices connected via USB or Wi-Fi.
-*   **Wireless Connection:** Connect devices wirelessly effortlessly using **QR Code** or **Pairing Code** (Android 11+).
+*   **ADB Devices Detection:** Detects Android devices connected via USB or Wi-Fi.
+*   **Wireless Connection:** Connect devices wirelessly effortlessly using **Pairing Code** (Android 11+).
 *   **Remote Access:** Full support for remote devices via **ngrok** tunneling.
-*   **Device Diagnostics:** Built-in toolbox to fix common ADB issues, restart servers, and check device details.
+*   **Device Diagnostics:** Built-in toolbox to analyze app/system performance, get app/system logs, and send ADB commands to the device.
 
 ### ⚡ Test Execution
 *   **Flexible Running Modes:**
@@ -19,8 +19,8 @@
 *   **Live Logs:** View Appium and Robot Framework logs in real-time within the app.
 
 ### 🛠️ Advanced Tools
-*   **Configuration Profiles:** Create and switch between multiple configuration profiles (e.g., "Work", "Personal", "Project A") to manage different path setups and settings instantly.
-*   **Inspector:** A powerful UI Inspector to visualize the app hierarchy, select elements, and generate XPaths/IDs bi-directionally (Screenshot ↔ Tree).
+*   **Configuration Profiles:** Create and switch between multiple configuration profiles (e.g., "Work Project", "App B", "Personal Project") to manage different path setups and settings instantly.
+*   **Inspector:** A powerful UI Inspector to visualize, select and copy locators from elements.
 *   **Screen Mirroring:** Embedded high-performance screen mirroring powered by `scrcpy` (works over USB and Wi-Fi).
 *   **Performance Monitoring:** Track CPU, RAM, and Battery usage of your device in real-time and export session data to CSV.
 
