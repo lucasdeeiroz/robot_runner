@@ -12,7 +12,6 @@ jobs:
     runs-on: ubuntu-22.04
     outputs:
       release_id: ${{ steps.create_release.outputs.id }}
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
     steps:
       - uses: actions/checkout@v4
       - name: Create Release
@@ -73,11 +72,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'Robot Runner ${{ github.ref_name }}'
-          releaseBody: 'See the assets to download this version and install.'
+          # tagName, releaseName, releaseBody, releaseId REMOVED to prevent auto-upload
+          # We manually upload renamed artifacts in the next steps.
           args: ${{ matrix.args }}
-          releaseId: ${{ needs.create-release.outputs.release_id }}
 
       # Custom Artifact Renaming & Upload
       - name: Rename and Upload Artifacts (Windows)
@@ -143,6 +140,7 @@ jobs:
       - name: Upload Renamed Assets
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ github.ref_name }}
           files: |
             Robot.Runner_*
         env:
@@ -166,7 +164,19 @@ jobs:
           
           # Only run if token exists
           if ($env:GITHUB_TOKEN) {
-            .\wingetcreate.exe update lucasdeeiroz.RobotRunner --version $VERSION --urls $URL --token $env:GITHUB_TOKEN
+            # Update manifest locally first
+            .\wingetcreate.exe update lucasdeeiroz.RobotRunner --version $VERSION --urls $URL --out .
+            
+            # Find the generated manifest directory (it creates a structure like manifests/m/...)
+            $manifestDir = Get-ChildItem -Path . -Recurse -Directory | Where-Object { $_.Name -eq $VERSION } | Select-Object -First 1
+            
+            if ($manifestDir) {
+                 Write-Host "Submitting manifest from $($manifestDir.FullName)"
+                 .\wingetcreate.exe submit $manifestDir.FullName --token $env:GITHUB_TOKEN
+            } else {
+                 Write-Error "Could not find generated manifest directory."
+                 exit 1
+            }
           } else {
             Write-Warning "WINGET_TOKEN not set. Skipping submission."
           }
