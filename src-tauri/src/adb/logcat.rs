@@ -13,6 +13,7 @@ use std::os::windows::process::CommandExt;
 pub struct LogcatProcess {
     child: Child,
     buffer: Arc<Mutex<Vec<String>>>,
+    output_file: Option<String>,
 }
 
 pub struct LogcatState(pub Mutex<HashMap<String, LogcatProcess>>);
@@ -50,6 +51,26 @@ pub fn start_logcat(
                 if pid.is_empty() {
                     return Err(format!("APP_NOT_RUNNING:{}", pkg));
                 }
+                
+                // Check process state to ensure it's not a cached/zombie process (Android 16+ behavior)
+                // Read oom_score_adj: >= 900 usually means CACHED_APP
+                let mut oom_cmd = Command::new("adb");
+                oom_cmd.args(&["-s", &device, "shell", "cat", &format!("/proc/{}/oom_score_adj", pid)]);
+                #[cfg(target_os = "windows")]
+                oom_cmd.creation_flags(0x08000000);
+
+                // We treat errors (e.g. permission denied) as "Assuming Running" to be safe
+                if let Ok(oom_output) = oom_cmd.output() {
+                    let score_str = String::from_utf8_lossy(&oom_output.stdout).trim().to_string();
+                    if let Ok(score) = score_str.parse::<i32>() {
+                        // 900 is CACHED_APP_MIN_ADJ. If it's cached, we treat as closed.
+                        if score >= 900 {
+                            println!("Logcat: Process {} ({}) is cached (score {}), treating as stopped.", pkg, pid, score);
+                            return Err(format!("APP_NOT_RUNNING:{}", pkg));
+                        }
+                    }
+                }
+                
                 pid_filter = Some(pid);
             }
             Err(e) => {
@@ -101,14 +122,16 @@ pub fn start_logcat(
 
     // Create shared buffer
     let mut vec_with_trace = Vec::new();
+    vec_with_trace.push(format!("--- Logcat started for device: {} ---", device));
     vec_with_trace.push(cmd_trace);
     let buffer = Arc::new(Mutex::new(vec_with_trace));
     let buffer_clone = buffer.clone();
 
     // Prepare file writer
-    let mut file_writer = if let Some(path) = output_file {
+    // Use ref path to avoid moving output_file
+    let mut file_writer = if let Some(ref path) = output_file {
         println!("Logcat: Writing to file '{}'", path);
-        match OpenOptions::new().create(true).append(true).open(&path) {
+        match OpenOptions::new().create(true).append(true).open(path) {
             Ok(f) => Some(f),
             Err(e) => {
                 println!("Logcat: Failed to open output file: {}", e);
@@ -149,7 +172,7 @@ pub fn start_logcat(
         println!("Logcat thread finished for {}", dev_id);
     });
 
-    procs.insert(device.clone(), LogcatProcess { child, buffer });
+    procs.insert(device.clone(), LogcatProcess { child, buffer, output_file: output_file.clone() });
 
     Ok("Logcat started".to_string())
 }
@@ -174,21 +197,57 @@ pub fn is_logcat_active(state: State<'_, LogcatState>, device: String) -> Result
     Ok(procs.contains_key(&device))
 }
 
+#[derive(serde::Serialize)]
+pub struct LogcatDetails {
+    pub is_active: bool,
+    pub output_file: Option<String>,
+}
+
+#[tauri::command]
+pub fn get_logcat_details(
+    state: State<'_, LogcatState>,
+    device: String,
+) -> Result<LogcatDetails, String> {
+    let procs = state.0.lock().map_err(|e| e.to_string())?;
+    
+    if let Some(process) = procs.get(&device) {
+        Ok(LogcatDetails {
+            is_active: true,
+            output_file: process.output_file.clone(),
+        })
+    } else {
+        Ok(LogcatDetails {
+            is_active: false,
+            output_file: None,
+        })
+    }
+}
+
 #[tauri::command]
 pub fn fetch_logcat_buffer(
     state: State<'_, LogcatState>,
     device: String,
-) -> Result<Vec<String>, String> {
+    offset: usize,
+) -> Result<(Vec<String>, usize), String> {
     let procs = state.0.lock().map_err(|e| e.to_string())?;
 
     if let Some(process) = procs.get(&device) {
-        let mut buf = process.buffer.lock().map_err(|e| e.to_string())?;
-        // Return all lines and clear the buffer
-        let lines = buf.clone();
-        buf.clear();
-        Ok(lines)
+        let buf = process.buffer.lock().map_err(|e| e.to_string())?;
+        
+        // If offset is larger than buffer (e.g. buffer was capped/rotated), return everything? 
+        // Or if buffer is a simple Vec that grows and gets trimmed?
+        // Let's assume simple Vec with capping.
+        // If offset > len, return empty and new offset = len?
+        // If offset < len, return slice.
+        
+        let len = buf.len();
+        if offset >= len {
+            return Ok((Vec::new(), len));
+        }
+        
+        let new_lines = buf[offset..].to_vec();
+        Ok((new_lines, len))
     } else {
-        // Return empty if not running (or error? Empty is safer for polling)
-        Ok(Vec::new())
+        Ok((Vec::new(), 0))
     }
 }

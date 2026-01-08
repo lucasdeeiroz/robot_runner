@@ -165,32 +165,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
         }
     };
 
-    const GridToolItem = ({ title, children, className, onHide }: { id: string, title: React.ReactNode, children: React.ReactNode, className?: string, onHide?: () => void }) => {
-        return (
-            <div className={clsx(
-                "flex flex-col border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900 overflow-hidden shadow-sm transition-all duration-300 min-h-0",
-                className
-            )}>
-                <div className="flex items-center justify-between px-3 py-2 bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-100 dark:border-zinc-800 shrink-0">
-                    <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-200 flex items-center gap-2">
-                        {title}
-                    </span>
-                    {onHide && (
-                        <button
-                            onClick={onHide}
-                            className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded"
-                            title={t('common.minimize')}
-                        >
-                            <Minimize2 size={14} />
-                        </button>
-                    )}
-                </div>
-                <div className="flex-1 min-h-0 relative">
-                    {children}
-                </div>
-            </div>
-        );
-    };
+
 
     const handleToolClick = (tool: ToolTab) => {
         if (isGridView) {
@@ -372,6 +347,8 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                                     id={tool}
                                     title={titleMap[tool]}
                                     className={clsx(isOddIn2Col && "md:col-span-2")}
+                                    onHide={() => handleToolClick(tool)}
+                                    minimizeLabel={t('common.minimize')}
                                 >
                                     {tool === 'console' && (
                                         <div className="h-full flex flex-col">
@@ -381,7 +358,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                                             <RunConsole logs={session.logs} isRunning={session.status === 'running'} />
                                         </div>
                                     )}
-                                    {tool === 'logcat' && <LogcatSubTab selectedDevice={session.deviceUdid} />}
+                                    {tool === 'logcat' && <LogcatSubTab key={session.deviceUdid} selectedDevice={session.deviceUdid} />}
                                     {tool === 'commands' && <CommandsSubTab selectedDevice={session.deviceUdid} />}
                                     {tool === 'performance' && <PerformanceSubTab selectedDevice={session.deviceUdid} />}
                                 </GridToolItem>
@@ -399,7 +376,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                     </div>
 
                     <div className={clsx("h-full", activeTool === 'logcat' ? "block" : "hidden")}>
-                        <LogcatSubTab selectedDevice={session.deviceUdid} />
+                        <LogcatSubTab key={session.deviceUdid} selectedDevice={session.deviceUdid} />
                     </div>
 
                     <div className={clsx("h-full", activeTool === 'commands' ? "block" : "hidden")}>
@@ -410,8 +387,9 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                         <PerformanceSubTab selectedDevice={session.deviceUdid} />
                     </div>
                 </div>
-            )}
-        </div>
+            )
+            }
+        </div >
     );
 }
 
@@ -430,5 +408,32 @@ function ToolButton({ active, onClick, icon, label, showLabel = true }: { active
             {icon}
             {showLabel && <span>{label}</span>}
         </button>
+    );
+}
+
+function GridToolItem({ title, children, className, onHide, minimizeLabel }: { id: string, title: React.ReactNode, children: React.ReactNode, className?: string, onHide?: () => void, minimizeLabel?: string }) {
+    return (
+        <div className={clsx(
+            "flex flex-col border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900 overflow-hidden shadow-sm transition-all duration-300 min-h-0",
+            className
+        )}>
+            <div className="flex items-center justify-between px-3 py-2 bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-100 dark:border-zinc-800 shrink-0">
+                <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-200 flex items-center gap-2">
+                    {title}
+                </span>
+                {onHide && (
+                    <button
+                        onClick={onHide}
+                        className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded"
+                        title={minimizeLabel || "Minimize"}
+                    >
+                        <Minimize2 size={14} />
+                    </button>
+                )}
+            </div>
+            <div className="flex-1 min-h-0 relative">
+                {children}
+            </div>
+        </div>
     );
 }

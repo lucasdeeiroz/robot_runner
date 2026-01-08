@@ -47,30 +47,50 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
 
     // Check status on mount
     useEffect(() => {
+        setLogs([]); // Explicitly clear logs when device changes (or mounts)
         if (selectedDevice) {
-            invoke('is_logcat_active', { device: selectedDevice })
-                .then((isActive) => {
-                    if (isActive) setIsStreaming(true);
+            // Restore state
+            invoke<{ is_active: boolean, output_file: string | null }>('get_logcat_details', { device: selectedDevice })
+                .then((details) => {
+                    if (details.is_active) setIsStreaming(true);
+                    if (details.output_file) setCurrentDumpFile(details.output_file);
                 })
                 .catch(console.error);
         }
     }, [selectedDevice]);
 
-    // Setup polling (no more listeners)
+    // Setup polling with offset
     useEffect(() => {
         let interval: NodeJS.Timeout;
+        let pollingOffset = 0; // Local offset for this session
 
         if (isStreaming && selectedDevice) {
-            console.log("Starting polling for", selectedDevice);
+            // Check if we have logs already (restored from mount) to set initial offset?
+            // Usually internal buffer is cleared on new component mount, so we start from 0
+            // and get full history from backend.
+
             interval = setInterval(async () => {
                 try {
-                    const newLines = await invoke<string[]>('fetch_logcat_buffer', { device: selectedDevice });
+                    const result = await invoke<[string[], number]>('fetch_logcat_buffer', {
+                        device: selectedDevice,
+                        offset: pollingOffset
+                    });
+                    const newLines = result[0];
+                    const totalLen = result[1];
+
                     if (newLines && newLines.length > 0) {
                         setLogs(prev => {
                             const updated = [...prev, ...newLines];
                             if (updated.length > 5000) return updated.slice(-5000);
                             return updated;
                         });
+                        pollingOffset = totalLen;
+                    } else if (totalLen < pollingOffset) {
+                        // Buffer reset? Reset offset
+                        pollingOffset = 0;
+                    } else {
+                        // Resync offset
+                        pollingOffset = totalLen;
                     }
                 } catch (e) {
                     console.error("Polling error:", e);
@@ -148,10 +168,18 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
         }
     };
 
+    // Track mount status
+    const isMounted = useRef(true);
+    useEffect(() => {
+        isMounted.current = true;
+        return () => { isMounted.current = false; };
+    }, []);
+
     const stopLogcat = async () => {
         console.log("Stopping logcat for", selectedDevice);
         try {
             await invoke('stop_logcat', { device: selectedDevice });
+            if (!isMounted.current) return; // Prevent state update if unmounted
             setIsStreaming(false);
             if (currentDumpFile) {
                 setLogs(prev => [...prev, `Saved logcat to: ${currentDumpFile}`]);
@@ -204,22 +232,25 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
                         value={selectedPackage}
                         onChange={(e) => setSelectedPackage(e.target.value)}
                         className={clsx(
-                            "appearance-none pl-8 pr-8 py-1.5 rounded-lg text-sm font-medium border transition-all outline-none cursor-pointer",
-                            "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 hover:border-zinc-300 dark:hover:border-zinc-600 focus:ring-2 focus:ring-primary/20",
-                            "w-44"
+                            "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 rounded-md py-1.5 text-xs focus:ring-2 focus:ring-primary/20 outline-none transition-all",
+                            isNarrow ? "px-2" : "pl-8 pr-2",
+                            "truncate",
+                            isNarrow ? "w-48" : "w-40" // Fixed width for visibility
                         )}
-                        title={t('performance.select_app', "Select App")}
+                        disabled={isStreaming}
                     >
-                        <option value="">{t('performance.system_only', "System Only")}</option>
-                        {packages.map((pkg) => (
-                            <option key={pkg} value={pkg}>
-                                {pkg}
-                            </option>
-                        ))}
+                        <option value="">{t('logcat.entire_system')}</option>
+                        {(settings.tools?.appPackage ? settings.tools.appPackage.split(',') : []).map((pkg) => {
+                            const p = pkg.trim();
+                            return p ? <option key={p} value={p}>{p}</option> : null;
+                        })}
                     </select>
                     <PackageIcon
                         size={14}
-                        className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none"
+                        className={clsx(
+                            "absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none",
+                            isNarrow ? "hidden" : "block"
+                        )}
                     />
                 </div>
 

@@ -91,19 +91,42 @@ function CustomLogo({ path }: { path: string }) {
     return <img src={src} alt="Logo" className="h-8 object-contain" />;
 }
 
+
+import { checkForUpdates } from '@/lib/updater';
+
 export function Sidebar({ activePage, onNavigate }: SidebarProps) {
     const { settings } = useSettings();
     const [collapsed, setCollapsed] = useState(false);
     const { t } = useTranslation();
+    const [updateAvailable, setUpdateAvailable] = useState(false);
+    const [appVersion, setAppVersion] = useState("...");
 
     useEffect(() => {
         const handleResize = () => {
+            // Auto-collapse on small screens
             if (window.innerWidth < 1024) {
                 setCollapsed(true);
+            }
+            // Auto-expand on large screens (if not explicitly collapsed by user? Hard to track user intent without more state. 
+            // Let's just auto-expand if really wide, e.g., > 1600, assuming ample space implies sidebar should be visible)
+            // User request: "Quando o conteúdo da tela chegar a sua largura máxima, expandir a sidebar automaticamente"
+            // Suggests we should prioritize visibility on large screens.
+            if (window.innerWidth > 1400) {
+                setCollapsed(false);
             }
         };
         handleResize(); // Check on mount
         window.addEventListener('resize', handleResize);
+
+        // Check for updates
+        checkForUpdates().then(info => {
+            setAppVersion(info.currentVersion);
+            if (info.available) {
+                console.log("Update available:", info.latestVersion);
+                setUpdateAvailable(true);
+            }
+        });
+
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
@@ -111,7 +134,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
         { id: 'run', label: t('sidebar.run'), icon: PlayCircle },
         { id: 'tests', label: t('sidebar.tests'), icon: FileText },
         { id: 'settings', label: t('sidebar.settings'), icon: Settings },
-        { id: 'about', label: t('sidebar.about'), icon: Info },
+        { id: 'about', label: t('sidebar.about'), icon: Info, hasBadge: updateAvailable },
     ];
 
     return (
@@ -145,7 +168,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                         key={item.id}
                         onClick={() => onNavigate(item.id)}
                         className={cn(
-                            "w-full flex items-center p-2 rounded-xl transition-all duration-200 active:scale-95",
+                            "w-full flex items-center p-2 rounded-xl transition-all duration-200 active:scale-95 relative",
                             activePage === item.id
                                 ? "bg-primary text-white shadow-md shadow-primary/20"
                                 : "text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-white",
@@ -153,7 +176,15 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                         )}
                         title={collapsed ? item.label : undefined}
                     >
-                        <item.icon size={20} />
+                        <div className="relative">
+                            <item.icon size={20} />
+                            {item.hasBadge && (
+                                <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                                </span>
+                            )}
+                        </div>
                         {!collapsed && <span className="font-medium">{item.label}</span>}
                     </button>
                 ))}
@@ -161,7 +192,10 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
 
             {/* Footer */}
             <div className="p-4 border-t border-zinc-200 dark:border-zinc-800">
-                {!collapsed && <div className="text-xs text-zinc-500">v2.0.75</div>}
+                {!collapsed && <div className="text-xs text-zinc-500 flex justify-between items-center">
+                    <span>v{appVersion}</span>
+                    {updateAvailable && <span className="text-red-500 font-bold text-[10px] bg-red-100 dark:bg-red-900/30 px-1.5 py-0.5 rounded">UPDATE</span>}
+                </div>}
             </div>
         </div>
     );

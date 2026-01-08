@@ -197,6 +197,8 @@ export const en = {
                 scrcpy_args: "Scrcpy Arguments",
                 robot_args: "Robot Framework Arguments",
                 app_packages: "App Packages",
+                add_package: "Add Package",
+                add_package_placeholder: "Add package (Press Enter)",
                 ngrok_token: "Ngrok Auth Token"
             },
             ai: {
@@ -295,7 +297,12 @@ export const en = {
             legal_title: "Terms & License",
             license: "MIT License",
             license_desc: "Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the 'Software'), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.",
-            disclaimer: "The software is provided 'as is', without warranty of any kind, express or implied."
+            disclaimer: "The software is provided 'as is', without warranty of any kind, express or implied.",
+            update_check: "Check for Updates",
+            update_available: "New version available: {{version}}",
+            update_not_available: "You are up to date",
+            update_error: "Failed to check for updates",
+            checking: "Checking..."
         },
         ai_page: {
             title: "AI Assistant",
@@ -351,6 +358,7 @@ export const en = {
             start: "Start",
             stop: "Stop",
             filter: "Filter App",
+            entire_system: "Entire System",
             no_packages: "No packages configured",
             level: "Log Level",
             clear: "Clear Logs",
@@ -387,7 +395,7 @@ export const en = {
             recording: "Recording...",
             record_error: "Failed to record",
             select_device: "Select a device to view performance stats.",
-            system_only: "System Only",
+            system_only: "Entire System",
             device_stats: "Device Performance",
             app_stats: "App Performance",
             auto: "Auto"

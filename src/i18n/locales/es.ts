@@ -197,6 +197,8 @@ export const es = {
                 scrcpy_args: "Argumentos Scrcpy",
                 robot_args: "Argumentos Robot Framework",
                 app_packages: "Paquetes de Aplicaciones",
+                add_package: "Añadir Paquete",
+                add_package_placeholder: "Añadir paquete (Presione Enter)",
                 ngrok_token: "Token de Autenticación Ngrok"
             },
             ai: {
@@ -295,7 +297,12 @@ export const es = {
             legal_title: "Términos y Licencia",
             license: "Licencia MIT",
             license_desc: "Por la presente se otorga permiso, sin cargo, a cualquier persona que obtenga una copia de este software y los archivos de documentación asociados (el 'Software'), para utilizar el Software sin restricciones, incluidos, entre otros, los derechos de uso, copia, modificación, fusión, publicación, distribución, sublicencia y/o venta de copias del Software, y para permitir a las personas a quienes se les proporcione el Software que lo hagan, sujeto a las siguientes condiciones: El aviso de derechos de autor anterior y este aviso de permiso se incluirán en todas las copias o partes sustanciales del Software.",
-            disclaimer: "El software se proporciona 'tal cual', sin garantía de ningún tipo, expresa o implícita."
+            disclaimer: "El software se proporciona 'tal cual', sin garantía de ningún tipo, expresa o implícita.",
+            update_check: "Buscar Actualizaciones",
+            update_available: "Nueva versión disponible: {{version}}",
+            update_not_available: "Estás actualizado",
+            update_error: "Fallo al buscar actualizaciones",
+            checking: "Verificando..."
         },
         ai_page: {
             title: "Asistente IA",
@@ -325,7 +332,8 @@ export const es = {
                 all_time: "Todo el tiempo",
                 today: "Hoy",
                 last_7_days: "Últimos 7 días",
-                last_30_days: "Últimos 30 días"
+                last_30_days: "Últimos 30 días",
+                os_version: "Versión del SO"
             },
             actions: {
                 refresh: "Actualizar Lista",
@@ -350,6 +358,7 @@ export const es = {
             start: "Iniciar",
             stop: "Detener",
             filter: "Filtrar App",
+            entire_system: "Sistema Completo",
             no_packages: "Ningún paquete configurado",
             level: "Nivel de Log",
             clear: "Limpiar Logs",
@@ -386,7 +395,7 @@ export const es = {
             recording: "Grabando...",
             record_error: "Fallo al grabar",
             select_device: "Seleccione un dispositivo para ver estadísticas de rendimiento.",
-            system_only: "Solo Sistema",
+            system_only: "Sistema Completo",
             device_stats: "Rendimiento del Dispositivo",
             app_stats: "Rendimiento de la Aplicación",
             auto: "Auto"
