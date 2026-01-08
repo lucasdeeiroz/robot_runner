@@ -80,7 +80,6 @@ export function SystemCheckOverlay({ status, onCriticalExit, onTestingRedirect, 
     }
 
     // Testing Tools Check
-    // If we haven't acknowledged it yet
     if (status.missingTesting.length > 0) {
         return (
             <Modal
@@ -120,11 +119,6 @@ export function SystemCheckOverlay({ status, onCriticalExit, onTestingRedirect, 
 
     // Mirroring Tools Check (Scrcpy)
     if (status.missingMirroring.length > 0) {
-        // Priority: Critical > Testing > Mirroring.
-        // If we are here, Critical is clean. Testing is clean OR acknowledged/redirected?
-        // Wait, if Testing redirected, we essentially unmount this component or `onTestingRedirect` handles the navigation and this component might still be mounted?
-        // Actually, `App.tsx` logic will determine if we stay on overlay.
-        // If we define that this component manages the *sequence* of modals:
 
         return (
             <Modal

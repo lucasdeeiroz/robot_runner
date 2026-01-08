@@ -39,8 +39,6 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
         if (!containerRef.current) return;
         const observer = new ResizeObserver((entries) => {
             for (const entry of entries) {
-                // Using 660px as threshold to match RunTab alignment if needed, or 600px generic.
-                // RunTab used 660px, so 660px is safer.
                 setIsNarrow(entry.contentRect.width < 660);
             }
         });
@@ -78,9 +76,6 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     args: settings.tools.appiumArgs
                 });
 
-                // Poll for readiness
-                // Appium 3.x uses /status by default, Legacy uses /wd/hub/status.
-                // We check if --base-path is present in args.
                 let basePath = "";
                 const argsLower = settings.tools.appiumArgs.toLowerCase();
                 const basePathMatch = argsLower.match(/--base-path[=\s]([^\s]+)/);
@@ -146,14 +141,6 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
 
                 addSession(runId, deviceUdid || "local", devName, testPathArg || argFileArg || "Unknown", argFileArg, devModel, devVer);
 
-                // Construct Legacy Path: {base}/A{ver}_{model}_{udid}/{runId}/
-                // Actually user said: {logs_folder}/A{AndroidVersion}_{ModelName}_{DeviceUdid}/{SuiteName}/
-                // We rely on backend to append SuiteName if passed, but testPathArg implies suite.
-                // However, `outputDir` in robot is where validation output goes.
-                // If we want {SuiteName} as subfolder, we should append it here or let Robot do it?
-                // Robot -d puts report IN that dir.
-                // So we should construct: base/A{ver}_{model}_{udid}/{SuiteName}
-
                 // Extract Suite Name from path
                 let suiteName = "UnknownSuite";
                 if (testPathArg) {
@@ -178,8 +165,6 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     ? `${settings.paths.logs}/${legacyFolder}`
                     : `../test_results/${legacyFolder}`;
 
-                // Determine Working Directory for Argument Files
-                // User requirement: When select arg file, execute from automationRoot if set.
                 let workingDir = null;
                 if (mode === 'args' && settings.paths.automationRoot) {
                     workingDir = settings.paths.automationRoot;
@@ -344,4 +329,3 @@ function ModeButton({ active, onClick, icon, label, hideText }: { active: boolea
         </button>
     );
 }
-// END OF UPDATED COMPONENT

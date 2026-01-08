@@ -65,9 +65,6 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
         let pollingOffset = 0; // Local offset for this session
 
         if (isStreaming && selectedDevice) {
-            // Check if we have logs already (restored from mount) to set initial offset?
-            // Usually internal buffer is cleared on new component mount, so we start from 0
-            // and get full history from backend.
 
             interval = setInterval(async () => {
                 try {

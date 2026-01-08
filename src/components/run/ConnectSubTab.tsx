@@ -30,23 +30,12 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
     const fetchDeviceIp = async () => {
         if (!selectedDevice) return;
         try {
-            // Retrieve IP directly using shell command
-            // Retrieve all IPs for parsing prioritization in JS
             const output = await invoke<string>('run_adb_command', {
                 device: selectedDevice,
                 args: ['shell', 'ip -f inet addr show']
             });
-
-            // Parse all interfaces and IPs
-            // Format example: "    inet 192.168.1.5/24 ... scope global wlan0"
-            // or "21: wlan0    inet 192.168.1.5/24 ..."
-
-            // We'll extract all "inet IP ... interface" tuples if possible, or just search lines
             const lines = output.split('\n');
             let foundIp: string | null = null;
-
-            // Priority list: wlan > eth > others
-            // Exclude: rmnet, lo, tun, docker
 
             const candidates: { ip: string, iface: string, priority: number }[] = [];
 
@@ -54,9 +43,6 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                 const match = line.match(/inet\s+(\d+\.\d+\.\d+\.\d+)\/(\d+)/);
                 if (match && match[1] && match[1] !== '127.0.0.1') {
                     const ip = match[1];
-                    // Attempt to guess interface from same line or context
-                    // Simple approach: check if line contains interface name common patterns
-                    // In "ip addr show", interface name is usually at the end "scope global wlan0" or "dev wlan0"
 
                     let priority = 0;
                     if (line.includes('wlan')) priority = 10;
@@ -111,7 +97,6 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
             }
 
             // 1. Forward Local ADB Port (5555) -> Device (devicePort)
-            // Backend run_adb_command appends -s <device> automatically, so we just pass the rest
             await invoke('run_adb_command', {
                 device: selectedDevice,
                 args: ['forward', 'tcp:5555', `tcp:${devicePort}`]

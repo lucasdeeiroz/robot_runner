@@ -159,7 +159,6 @@ pub fn start_logcat(
                 // Push to buffer
                 if let Ok(mut buf) = buffer_clone.lock() {
                     buf.push(l);
-                    // Optional: cap buffer size if not consumed fast enough?
                     if buf.len() > 10000 {
                         buf.drain(0..1000); // Remove oldest
                     }
@@ -233,12 +232,6 @@ pub fn fetch_logcat_buffer(
 
     if let Some(process) = procs.get(&device) {
         let buf = process.buffer.lock().map_err(|e| e.to_string())?;
-        
-        // If offset is larger than buffer (e.g. buffer was capped/rotated), return everything? 
-        // Or if buffer is a simple Vec that grows and gets trimmed?
-        // Let's assume simple Vec with capping.
-        // If offset > len, return empty and new offset = len?
-        // If offset < len, return slice.
         
         let len = buf.len();
         if offset >= len {

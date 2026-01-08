@@ -2,8 +2,6 @@ import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Folder, File, ChevronRight, CornerLeftUp, Loader2 } from "lucide-react";
 import clsx from "clsx";
-// Actually, for file explorer, simpler to just use backend for path manipulation OR basic string splitting if we assume valid paths.
-// Let's rely on backend `list_directory` returning full paths, and we just modify string for "Up".
 
 interface FileEntry {
     name: string;
@@ -62,39 +60,10 @@ export function FileExplorer({ initialPath = ".", onSelect, onCancel, selectionM
     };
 
     const handleUp = async () => {
-        // Simple "Up" logic: verify if we can use '..'
-        // Better: specific backend command `get_parent`? 
-        // Or just navigate to ".." and let backend resolve it.
-        // If currentPath is ".", ".." works.
-        // If currentPath is "C:/Foo/Bar", "C:/Foo/Bar/.." works.
-        // Backend `list_directory` usually resolves canonical paths?
-        // Let's try appending "/.." or just simply splitting string.
-
-        // Robust way: Ask backend to resolve? 
-        // Existing `list_directory` implementation calls `fs::read_dir(path)`.
-        // If we pass `path + "/.."`, `fs::read_dir` usually handles it (on Windows/Linux).
-        // Let's rely on backend handling ".."
-
-        // Wait, if we keep appending "/..", path gets ugly.
-        // It's better if `list_directory` returned the `canonical` path or `parent`.
-        // For now, let's just pop the last segment if possible, or use ".." 
-
-        // Quick dirty fix: String manipulation for visual path.
-        // If path contains separators, remove last part.
-
-        // Only safe cross-platform way without extra backend cmds:
-        // Pass ".." relative to current if we strictly trust backend.
-        // But for UI "Address Bar", we want the real path.
-        // Let's assume the user starts with a valid absolute path or "."
-
-        // Let's try simple string logic for now, if it fails, we might need a `resolve_path` command.
-        // Windows uses `\`, Linux `/`.
         const isWindows = currentPath.includes('\\');
         const separator = isWindows ? '\\' : '/';
 
         if (currentPath === '.' || currentPath === '/' || currentPath.endsWith(':\\')) {
-            // Already at root-ish or relative root.
-            // Maybe can't go up from "." in this simple view without context.
             return;
         }
 
@@ -102,18 +71,12 @@ export function FileExplorer({ initialPath = ".", onSelect, onCancel, selectionM
         parts.pop();
         const parent = parts.join(separator) || (isWindows ? currentPath.split(separator)[0] /* Drive root? */ : '/');
 
-        // If empty string resulted (e.g. from "C:/"), default to Drive root or just stay?
-        // Actually best way: use `tauri-plugin-fs` or just implement `get_parent` in rust?
-        // Let's implement `up` in frontend via naive string split for now.
-
         if (parent === currentPath) return; // Can't go up
         setCurrentPath(parent);
     };
 
     const handleEntryClick = (entry: FileEntry) => {
         if (entry.is_dir) {
-            // Setup double click? Or single click select, double click nav?
-            // Let's do: Single click selects, Double click navigates.
             if (selectedEntry?.path === entry.path) {
                 // Double click (simulated by second click logic)
                 handleNavigate(entry.path);

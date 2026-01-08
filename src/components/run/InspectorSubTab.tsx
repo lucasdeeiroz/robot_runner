@@ -93,13 +93,10 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
         if (!selectedDevice) return;
         setLoading(true);
         try {
-            // Parallel fetch could be faster but let's do sequential for reliability first or Promise.all
-            // Taking screenshot first so user sees something while XML parses
             const b64 = await invoke<string>('get_screenshot', { deviceId: selectedDevice });
             setScreenshot(b64);
 
             const xml = await invoke<string>('get_xml_dump', { deviceId: selectedDevice });
-            // setXmlData(xml); // Removed unused state
 
             // Parse XML
             const parser = new XMLParser({
@@ -127,7 +124,6 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
         try {
             await invoke('run_adb_command', { device: selectedDevice, args });
             // Auto-refresh after input to show updated state
-            // Wait a bit for device animation (1.5s)
             setTimeout(refreshAll, 1500);
         } catch (e) {
             console.error("Input failed", e);
@@ -184,9 +180,6 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
 
     const processMouseInteraction = (e: React.MouseEvent<HTMLImageElement>, isHover: boolean) => {
         if (!rootNode || !imgRef.current) return false;
-
-        // Re-use logic or call getCoords? 
-        // Logic below matches existing logic but I extracted getCoords for reuse.
         const coords = getCoords(e);
         if (!coords) return false;
 
@@ -343,25 +336,12 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
                             {/* Ongoing Swipe Preview */}
                             {interactionMode === 'swipe' && swipeStart && (
                                 <div className="absolute w-full h-full top-0 left-0 pointer-events-none z-30">
-                                    {/* We need current mouse position for live preview, but let's stick to post-action animation for now or basic start marker */}
-                                    {/* If we want live drag line, we need to track mouse move in state, which might be heavy. Let's just show start point. */}
                                     <div
                                         className="absolute w-4 h-4 bg-orange-500 rounded-full -ml-2 -mt-2 opacity-50"
-                                        style={{ left: swipeStart.x, top: swipeStart.y }} // Warning: swipeStart is in image coords (scaled). We need display coords here.
-                                    // Wait, swipeStart in state IS image coords (getCoords returns scaled).
-                                    // But to render on screen over the image, we need CSS pixels relative to the generic container?
-                                    // getCoords uses: (e.clientX - rect.left) * scaleX.
-                                    // So e.clientX - rect.left is the CSS pixel info.
-                                    // createSwipe/Tap logic uses getCoords which returns DEVICE pixels.
-                                    // We need separate logic for display vs functionality?
-                                    // Or we can reverse calculate: (deviceX / scaleX)
+                                        style={{ left: swipeStart.x, top: swipeStart.y }}
                                     />
                                 </div>
                             )}
-
-                            {/* Highlights overlaid on top (using absolute positioning based on cached rects logic) */}
-                            {/* Note: The previous logic relied on client rects which might be tricky if image scales. */}
-                            {/* Ideally we should map coordinates relative to image natural size to displayed size. */}
                             <div
                                 className="absolute border-2 border-blue-400 pointer-events-none transition-all duration-75 z-10"
                                 style={{ ...getHighlighterStyle(hoveredNode, '#60a5fa'), display: hoveredNode?.bounds ? 'block' : 'none' }}
