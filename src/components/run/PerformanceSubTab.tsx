@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import { Activity, Cpu, Battery, CircuitBoard, RefreshCw, Play, Square, Package as PackageIcon, Eye } from "lucide-react";
@@ -32,6 +32,21 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
     const [error, setError] = useState<string | null>(null);
     const [autoRefresh, setAutoRefresh] = useState(true);
     const [selectedPackage, setSelectedPackage] = useState<string>("");
+
+    // Responsive State
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [isNarrow, setIsNarrow] = useState(false);
+
+    useEffect(() => {
+        if (!containerRef.current) return;
+        const observer = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                setIsNarrow(entry.contentRect.width < 500);
+            }
+        });
+        observer.observe(containerRef.current);
+        return () => observer.disconnect();
+    }, []);
 
     // Recording State
     const [isRecording, setIsRecording] = useState(false);
@@ -134,7 +149,7 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
     }
 
     return (
-        <div className="h-full flex flex-col p-4 overflow-y-auto">
+        <div ref={containerRef} className="h-full flex flex-col p-4 overflow-y-auto">
             <div className="flex flex-wrap items-center justify-between mb-6 gap-4">
                 <div className="flex items-center gap-4">
                     <h2 className="text-lg font-medium flex items-center gap-2">
@@ -157,7 +172,7 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
                         title={isRecording ? t('performance.stop_record') : t('performance.start_record')}
                     >
                         {isRecording ? <Square size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
-                        {isRecording ? t('performance.recording') : "REC"}
+                        {!isNarrow && (isRecording ? t('performance.recording') : "REC")}
                     </button>
 
                     {/* Package Selector */}
@@ -187,7 +202,7 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
                             autoRefresh ? "bg-primary/10 text-primary border-primary/20 dark:text-primary dark:border-primary/50" : "bg-zinc-50 text-zinc-500 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700"
                         )}
                     >
-                        {autoRefresh ? t('performance.auto_on') : t('performance.auto_off')}
+                        {t('performance.auto', "Auto")}
                     </button>
                     <button
                         onClick={fetchStats}

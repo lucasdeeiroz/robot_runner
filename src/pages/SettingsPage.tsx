@@ -9,6 +9,7 @@ import clsx from "clsx";
 import { useTranslation } from "react-i18next";
 import { feedback } from "@/lib/feedback";
 import { TOOL_LINKS } from "@/lib/tools";
+import { Modal } from "@/components/common/Modal";
 
 export function SettingsPage() {
     const { settings, updateSetting, loading, profiles, activeProfileId, createProfile, switchProfile, renameProfile, deleteProfile, systemVersions, checkSystemVersions, systemCheckStatus } = useSettings();
@@ -18,6 +19,22 @@ export function SettingsPage() {
     const [showProfileModal, setShowProfileModal] = useState(false);
     const [newProfileName, setNewProfileName] = useState("");
     const [isRenaming, setIsRenaming] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+
+    // Responsive State
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [isNarrow, setIsNarrow] = useState(false);
+
+    useEffect(() => {
+        if (!containerRef.current) return;
+        const observer = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                setIsNarrow(entry.contentRect.width < 600);
+            }
+        });
+        observer.observe(containerRef.current);
+        return () => observer.disconnect();
+    }, []);
 
     // Sync settings language with i18n
     useEffect(() => {
@@ -66,7 +83,7 @@ export function SettingsPage() {
     const [appiumStatus, setAppiumStatus] = useState<{ running: boolean, pid?: number }>({ running: false });
     const [appiumLogs, setAppiumLogs] = useState<string[]>([]);
     const [showAppiumLogs, setShowAppiumLogs] = useState(false);
-    const logsEndRef = useRef<HTMLDivElement>(null);
+    const logsContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         // Cached System Versions
@@ -98,8 +115,8 @@ export function SettingsPage() {
 
     // Auto-scroll logs
     useEffect(() => {
-        if (showAppiumLogs && logsEndRef.current) {
-            logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        if (showAppiumLogs && logsContainerRef.current) {
+            logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
         }
     }, [appiumLogs, showAppiumLogs]);
 
@@ -167,8 +184,46 @@ export function SettingsPage() {
         return <div className="p-8 text-center text-zinc-500">Loading settings...</div>;
     }
 
+    const handleDeleteClick = (profileId: string) => {
+        setShowDeleteConfirm(profileId);
+    };
+
+    const confirmDeleteInfo = () => {
+        if (showDeleteConfirm) {
+            deleteProfile(showDeleteConfirm);
+            setShowDeleteConfirm(null);
+            feedback.toast.success(t('feedback.success'));
+        }
+    };
+
     return (
-        <div className="space-y-8 pb-12">
+        <div ref={containerRef} className="space-y-8 animate-in fade-in duration-500 pb-12">
+            {/* Delete Confirmation Modal */}
+            <Modal
+                isOpen={!!showDeleteConfirm}
+                onClose={() => setShowDeleteConfirm(null)}
+                title={t('settings.profiles.delete')}
+            >
+                <div className="space-y-4">
+                    <p className="text-zinc-600 dark:text-zinc-400">
+                        {t('settings.profiles.confirm_delete')}
+                    </p>
+                    <div className="flex justify-end gap-2 mt-6">
+                        <button
+                            onClick={() => setShowDeleteConfirm(null)}
+                            className="px-4 py-2 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 font-medium"
+                        >
+                            {t('common.cancel')}
+                        </button>
+                        <button
+                            onClick={confirmDeleteInfo}
+                            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
+                        >
+                            {t('common.delete')}
+                        </button>
+                    </div>
+                </div>
+            </Modal>
 
             {/* Profile Manager Section */}
             <section className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
@@ -191,27 +246,27 @@ export function SettingsPage() {
                         </select>
                         <button
                             onClick={() => { setIsRenaming(false); setNewProfileName(""); setShowProfileModal(true); }}
-                            className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all active:scale-95 text-zinc-500 dark:text-zinc-400 hover:text-gray-900 dark:hover:text-white"
+                            className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all active:scale-95 text-zinc-500 dark:text-zinc-400 hover:text-gray-900 dark:hover:text-white flex items-center gap-2"
                             title={t('settings.profiles.create')}
                         >
                             <Plus size={18} />
+                            {!isNarrow && <span className="text-sm font-medium">{t('settings.profiles.create')}</span>}
                         </button>
                         <button
                             onClick={() => { setIsRenaming(true); setNewProfileName(profiles.find(p => p.id === activeProfileId)?.name || ""); setShowProfileModal(true); }}
-                            className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all active:scale-95 text-zinc-500 dark:text-zinc-400 hover:text-gray-900 dark:hover:text-white"
+                            className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all active:scale-95 text-zinc-500 dark:text-zinc-400 hover:text-gray-900 dark:hover:text-white flex items-center gap-2"
                             title={t('settings.profiles.rename')}
                         >
                             <Edit2 size={18} />
+                            {!isNarrow && <span className="text-sm font-medium">{t('settings.profiles.rename')}</span>}
                         </button>
                         {profiles.length > 1 && (
                             <button
-                                onClick={() => {
-                                    if (confirm(t('settings.profiles.confirm_delete'))) deleteProfile(activeProfileId);
-                                }}
-                                className="p-2 hover:bg-red-50 dark:hover:bg-red-900/30 text-red-500 rounded-xl transition-all active:scale-95"
+                                onClick={() => handleDeleteClick(activeProfileId)}
+                                className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
                                 title={t('settings.profiles.delete')}
                             >
-                                <Trash2 size={18} />
+                                <Trash2 size={16} />
                             </button>
                         )}
                     </div>
@@ -315,15 +370,30 @@ export function SettingsPage() {
                             />
                         </div>
                     </div>
+                    <div className="mb-4">
+                        <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
+                            <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">{t('settings.tool_config.appium_args')}</label>
+                            <input
+                                type="text"
+                                value={settings.tools.appiumArgs}
+                                onChange={(e) => updateSetting('tools', { ...settings.tools, appiumArgs: e.target.value })}
+                                disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
+                                className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-primary/20 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                                placeholder="--allow-insecure chromedriver"
+                            />
+                        </div>
+                    </div>
 
                     {/* Logs Output */}
                     {showAppiumLogs && (
-                        <div className="mt-4 bg-zinc-900 border border-zinc-800 rounded-xl p-3 font-mono text-xs h-64 overflow-auto custom-scrollbar shadow-inner">
+                        <div
+                            ref={logsContainerRef}
+                            className="mt-4 bg-zinc-900 border border-zinc-800 rounded-xl p-3 font-mono text-xs h-64 overflow-auto custom-scrollbar shadow-inner"
+                        >
                             {appiumLogs.length === 0 && <span className="text-zinc-500 italic">{t('settings.appium.waiting')}</span>}
                             {appiumLogs.map((log, i) => (
                                 <div key={i} className="text-zinc-300 whitespace-pre-wrap border-b border-zinc-800/50 pb-0.5 mb-0.5">{log}</div>
                             ))}
-                            <div ref={logsEndRef} />
                         </div>
                     )}
                 </section>
@@ -371,9 +441,8 @@ export function SettingsPage() {
                         <Wrench size={20} className="text-primary" /> {t('settings.tools')}
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {['appiumArgs', 'robotArgs', 'scrcpyArgs', 'appPackage'].map((key) => {
+                        {['robotArgs', 'scrcpyArgs'].map((key) => {
                             let isDisabled = false;
-                            if (key === 'appiumArgs' && systemCheckStatus?.missingAppium?.length > 0) isDisabled = true;
                             if (key === 'robotArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
                             if (key === 'scrcpyArgs' && systemCheckStatus?.missingMirroring?.length > 0) isDisabled = true;
 
@@ -391,6 +460,45 @@ export function SettingsPage() {
                                 </div>
                             );
                         })}
+                        {/* App Packages List */}
+                        <div className="col-span-1 md:col-span-2">
+                            <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">{t('settings.tool_config.app_packages')}</label>
+                            <div className="bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 min-h-[42px] flex flex-wrap gap-2 items-center">
+                                {settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean).map((pkg, idx) => (
+                                    <div key={idx} className="flex items-center gap-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2 py-1 rounded-lg text-sm text-zinc-700 dark:text-zinc-300">
+                                        <span>{pkg}</span>
+                                        <button
+                                            onClick={() => {
+                                                const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
+                                                const next = current.filter((_, i) => i !== idx).join(', ');
+                                                updateSetting('tools', { ...settings.tools, appPackage: next });
+                                            }}
+                                            className="hover:text-red-500 p-0.5 rounded-full transition-colors"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+                                        </button>
+                                    </div>
+                                ))}
+                                <input
+                                    type="text"
+                                    placeholder="Add package (Press Enter)"
+                                    className="flex-1 min-w-[150px] bg-transparent outline-none text-gray-900 dark:text-zinc-300 text-sm"
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            const val = e.currentTarget.value.trim();
+                                            if (val) {
+                                                const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
+                                                if (!current.includes(val)) {
+                                                    const next = [...current, val].join(', ');
+                                                    updateSetting('tools', { ...settings.tools, appPackage: next });
+                                                }
+                                                e.currentTarget.value = '';
+                                            }
+                                        }
+                                    }}
+                                />
+                            </div>
+                        </div>
                         <div className="col-span-1 md:col-span-2">
                             <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">{t('settings.tool_config.ngrok_token')}</label>
                             <input

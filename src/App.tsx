@@ -58,14 +58,17 @@ function App() {
   const { title, description, Icon } = getHeaderInfo();
 
   const handleTestingRedirect = () => {
-    setInitialSubTab('connect');
-    setActivePage('run');
+    setActivePage('settings');
     setInitialCheckDismissed(true);
   };
 
   const handleMirroringContinue = () => {
     setInitialSubTab('tests'); // Default to Launcher (tests)
     setActivePage('run');
+    setInitialCheckDismissed(true);
+  };
+
+  const handleDismiss = () => {
     setInitialCheckDismissed(true);
   };
 
@@ -116,6 +119,7 @@ function App() {
           onCriticalExit={handleCriticalExit}
           onTestingRedirect={handleTestingRedirect}
           onMirroringContinue={handleMirroringContinue}
+          onDismiss={handleDismiss}
         />
       )}
       <Layout activePage={activePage} onNavigate={setActivePage}>

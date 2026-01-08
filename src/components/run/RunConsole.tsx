@@ -52,17 +52,18 @@ type LinearNode = TextNode | TestNode | SuiteEndNode;
 
 export function RunConsole({ logs, isRunning }: RunConsoleProps) {
     const { t } = useTranslation();
-    const bottomRef = useRef<HTMLDivElement>(null);
+
 
     // State for toggles (Set of IDs)
     const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
+    const containerRef = useRef<HTMLDivElement>(null);
 
     // Auto-scroll on new logs
     useEffect(() => {
-        if (bottomRef.current) {
-            bottomRef.current.scrollIntoView({ behavior: "smooth" });
+        if (containerRef.current) {
+            containerRef.current.scrollTop = containerRef.current.scrollHeight;
         }
-    }, [logs]);
+    }, [logs, isRunning]); // Added isRunning to ensure scroll on start/stop/update
 
     // Parse logs into Tree
     const tree = useMemo(() => {
@@ -482,7 +483,7 @@ export function RunConsole({ logs, isRunning }: RunConsoleProps) {
     };
 
     return (
-        <div className="h-full bg-black/90 rounded-lg p-4 font-mono text-sm overflow-auto border border-zinc-800 shadow-inner custom-scrollbar">
+        <div ref={containerRef} className="h-full bg-black/90 rounded-lg p-4 font-mono text-sm overflow-auto border border-zinc-800 shadow-inner custom-scrollbar">
             {logs.length === 0 && (
                 <div className="text-zinc-500 italic opacity-50 select-none">{t('console.waiting')}</div>
             )}
@@ -495,7 +496,6 @@ export function RunConsole({ logs, isRunning }: RunConsoleProps) {
                     Processing...
                 </div>
             )}
-            <div ref={bottomRef} />
         </div>
     );
 }

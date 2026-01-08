@@ -19,6 +19,21 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
     const [selectedNode, setSelectedNode] = useState<InspectorNode | null>(null);
     const [hoveredNode, setHoveredNode] = useState<InspectorNode | null>(null);
 
+    // Responsive State
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [isNarrow, setIsNarrow] = useState(false);
+
+    useEffect(() => {
+        if (!containerRef.current) return;
+        const observer = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                setIsNarrow(entry.contentRect.width < 660);
+            }
+        });
+        observer.observe(containerRef.current);
+        return () => observer.disconnect();
+    }, []);
+
     const [loading, setLoading] = useState(false);
     // const [viewMode, setViewMode] = useState<'properties' | 'xml'>('properties');
     const [copied, setCopied] = useState<string | null>(null);
@@ -217,7 +232,7 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
     }
 
     return (
-        <div className="h-full flex flex-col space-y-4">
+        <div ref={containerRef} className="h-full flex flex-col space-y-4">
             {/* Toolbar - Now at the Top */}
             <div className="bg-zinc-50 dark:bg-black/20 p-2 rounded-lg border border-zinc-200 dark:border-zinc-800 flex items-center justify-between shrink-0">
                 <div className="flex gap-2">
@@ -225,9 +240,10 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
                         onClick={refreshAll}
                         disabled={loading}
                         className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-700 text-sm font-medium transition-colors disabled:opacity-50"
+                        title={t('inspector.refresh')}
                     >
                         <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-                        {t('inspector.refresh')}
+                        {!isNarrow && t('inspector.refresh')}
                     </button>
                     <div className="h-6 w-px bg-zinc-300 dark:bg-zinc-700 mx-2 self-center" />
 

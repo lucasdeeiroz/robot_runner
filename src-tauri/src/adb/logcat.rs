@@ -39,24 +39,18 @@ pub fn start_logcat(
         println!("Logcat: Looking up PID for package: {}", pkg);
         // Try to find PID
         // adb -s <device> shell pidof -s <package>
-        // adb -s <device> shell pidof -s <package>
-        let mut cmd = Command::new("adb");
-        cmd.args(&["-s", &device, "shell", "pidof", "-s", pkg]);
+        let mut pidof_cmd = Command::new("adb");
+        pidof_cmd.args(&["-s", &device, "shell", "pidof", "-s", pkg]);
         #[cfg(target_os = "windows")]
-        cmd.creation_flags(0x08000000);
-        
-        let pid_output = cmd.output();
-
-        match pid_output {
+        pidof_cmd.creation_flags(0x08000000);
+        // Execute logic
+        match pidof_cmd.output() {
             Ok(output) => {
-                let pid_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                if !pid_str.is_empty() {
-                    println!("Logcat: Found PID {} for package {}", pid_str, pkg);
-                    pid_filter = Some(pid_str);
-                } else {
-                    println!("Logcat: Package {} not running (no PID found)", pkg);
-                    return Err(format!("App {} is not running", pkg));
+                let pid = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if pid.is_empty() {
+                    return Err(format!("APP_NOT_RUNNING:{}", pkg));
                 }
+                pid_filter = Some(pid);
             }
             Err(e) => {
                 println!("Logcat: Failed to run pidof: {}", e);
