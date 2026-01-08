@@ -43,6 +43,9 @@ export const es = {
             },
             alerts: {
                 busy: "Los siguientes dispositivos están ocupados:\n{{devices}}\n\nEspere a que terminen."
+            },
+            options: {
+                dont_overwrite: "No sobrescribir logs"
             }
         },
         connect: {
@@ -155,7 +158,9 @@ export const es = {
             edit: "Editar",
             ok: "Aceptar",
             search: "Buscar...",
-            loading: "Cargando..."
+            loading: "Cargando...",
+            minimize: "Minimizar",
+            close: "Cerrar"
         },
         settings: {
             title: "Ajustes",
@@ -191,7 +196,7 @@ export const es = {
                 appium_args: "Argumentos Appium",
                 scrcpy_args: "Argumentos Scrcpy",
                 robot_args: "Argumentos Robot Framework",
-                app_package: "Paquete de App (Monitoreo)",
+                app_packages: "Paquetes de Aplicaciones",
                 ngrok_token: "Token de Autenticación Ngrok"
             },
             ai: {
@@ -250,7 +255,9 @@ export const es = {
                 start_recording: "Grabar Pantalla",
                 stop_recording: "Detener Grabación",
                 stop_execution: "Detener Ejecución",
-                rerun: "Re-ejecutar"
+                rerun: "Re-ejecutar",
+                switch_to_grid: "Cambiar a Cuadrícula",
+                switch_to_tabs: "Cambiar a Pestañas"
             }
         },
         file_explorer: {
@@ -349,7 +356,10 @@ export const es = {
             lines: "líneas",
             no_logs: "Ningún log capturado",
             select_device: "Seleccione un dispositivo para ver logs",
-            saving: "Guardando logs en:"
+            saving: "Guardando logs en:",
+            errors: {
+                app_not_running: "La aplicación no se está ejecutando: {{pkg}}"
+            }
         },
         scrcpy: {
             title: "Duplicación de Pantalla",
@@ -371,18 +381,26 @@ export const es = {
             used: "usado",
             loading: "Cargando estadísticas...",
             error: "Fallo al obtener estadísticas del dispositivo",
+            start_record: "Iniciar Grabación",
+            stop_record: "Detener Grabación",
+            recording: "Grabando...",
+            record_error: "Fallo al grabar",
             select_device: "Seleccione un dispositivo para ver estadísticas de rendimiento.",
             system_only: "Solo Sistema",
             device_stats: "Rendimiento del Dispositivo",
-            app_stats: "Rendimiento de Aplicación"
+            app_stats: "Rendimiento de la Aplicación",
+            auto: "Auto"
         },
         feedback: {
             success: "Éxito",
             error: "Error",
             saved: "Guardado exitosamente",
+            test_started: "Ejecución de Prueba Iniciada",
             test_finished: "Ejecución de Prueba Finalizada",
             test_passed: "Suite de Prueba Aprobada",
             test_failed: "Suite de Prueba Fallida",
+            appium_started: "Servidor Appium Iniciado",
+            appium_stopped: "Servidor Appium Detenido",
             adb_connected: "ADB Inalámbrico Conectado",
             remote_connected: "Acceso Remoto Conectado",
             recording_saved: "Grabación de Pantalla Guardada",

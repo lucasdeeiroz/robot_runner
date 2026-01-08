@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Play, FolderOpen, FileText, FileCode } from "lucide-react";
+import { Play, FolderOpen, FileText, FileCode, History } from "lucide-react";
 import { useSettings } from "@/lib/settings";
 import { useTestSessions } from "@/lib/testSessionStore";
 import { Device } from "@/lib/types";
@@ -31,14 +31,32 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
     const [isLaunching, setIsLaunching] = useState(false);
     const [dontOverwrite, setDontOverwrite] = useState(false);
 
+    // Responsive State
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [isNarrow, setIsNarrow] = useState(false);
+
+    useEffect(() => {
+        if (!containerRef.current) return;
+        const observer = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                // Using 660px as threshold to match RunTab alignment if needed, or 600px generic.
+                // RunTab used 660px, so 660px is safer.
+                setIsNarrow(entry.contentRect.width < 660);
+            }
+        });
+        observer.observe(containerRef.current);
+        return () => observer.disconnect();
+    }, []);
+
     const { settings } = useSettings();
     const { addSession, sessions } = useTestSessions();
 
-    const handleRun = async () => {
-        if (!selectedPath) return;
+    const handleRun = async (pathOverride?: string) => {
+        const targetPath = typeof pathOverride === 'string' ? pathOverride : selectedPath;
+        if (!targetPath) return;
 
         // Check for busy devices
-        const busyDeviceIds = sessions.filter(s => s.status === 'running').map(s => s.deviceUdid);
+        const busyDeviceIds = sessions.filter(s => s.status === 'running' && s.type === 'test').map(s => s.deviceUdid);
         const conflictingDevices = selectedDevices.filter(d => busyDeviceIds.includes(d));
 
         if (conflictingDevices.length > 0) {
@@ -121,9 +139,9 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                 let argFileArg: string | null = null;
 
                 if (mode === 'file' || mode === 'folder') {
-                    testPathArg = selectedPath;
+                    testPathArg = targetPath;
                 } else if (mode === 'args') {
-                    argFileArg = selectedPath;
+                    argFileArg = targetPath;
                 }
 
                 addSession(runId, deviceUdid || "local", devName, testPathArg || argFileArg || "Unknown", argFileArg, devModel, devVer);
@@ -203,108 +221,113 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
     };
 
     return (
-        <div className="h-full flex flex-col gap-6 p-6 max-w-4xl mx-auto w-full overflow-y-auto">
-            {/* Mode Selection */}
-            <div className="flex justify-center bg-zinc-100 dark:bg-zinc-800 p-1.5 rounded-xl shrink-0 self-center shadow-sm">
-                <ModeButton active={mode === 'file'} onClick={() => { setMode('file'); setSelectedPath(""); }} icon={<FileCode size={18} />} label={t('tests.mode.file')} />
-                <ModeButton active={mode === 'folder'} onClick={() => { setMode('folder'); setSelectedPath(""); }} icon={<FolderOpen size={18} />} label={t('tests.mode.folder')} />
-                <ModeButton active={mode === 'args'} onClick={() => { setMode('args'); setSelectedPath(""); }} icon={<FileText size={18} />} label={t('tests.mode.args')} />
-            </div>
-
-            {/* Embedded File Explorer */}
-            <div className="flex-1 min-h-[400px] border border-zinc-200 dark:border-zinc-700 rounded-2xl overflow-hidden shadow-sm bg-white dark:bg-zinc-900/50">
-                <FileExplorer
-                    initialPath={getInitialPath()}
-                    selectionMode={mode === 'folder' ? 'directory' : 'file'}
-                    allowHideFooter={true}
-                    onCancel={() => { }} // Not used in embedded mode
-                    onSelect={() => { }} // Not actually used as we track via selectionChange
-                    onSelectionChange={(entry: FileEntry | null) => {
-                        if (entry) {
-                            if (mode === 'folder') {
-                                // For folder mode, if they click a folder, that IS the selection?
-                                // Or do they enter it?
-                                // Usually if you click it, it highlights.
-                                // If I click a folder in explorer, I select it.
-                                // Double click enters it.
-                                if (entry.is_dir) setSelectedPath(entry.path);
-                                else setSelectedPath(""); // Can't select file in folder mode
-                            } else {
-                                // File mode
-                                if (!entry.is_dir) {
-                                    // Check extension?
-                                    if (mode === 'file' && !entry.name.endsWith('.robot')) {
-                                        setSelectedPath("");
-                                    } else if (mode === 'args' && !(entry.name.endsWith('.txt') || entry.name.endsWith('.args'))) {
-                                        setSelectedPath("");
-                                    } else {
-                                        setSelectedPath(entry.path);
-                                    }
-                                } else {
-                                    // Clicking folder in file mode -> don't select it as target
-                                    // But maybe we want to select it to navigate?
-                                    // Navigation is handled by double-click in FileExplorer.
-                                    setSelectedPath("");
-                                }
+        <div ref={containerRef} className="h-full flex flex-col gap-4 p-4 w-full overflow-y-auto">
+            {/* Main Content Area: Explorer + Side Menu */}
+            <div className="flex-1 min-h-0 flex gap-4">
+                {/* Embedded File Explorer */}
+                <div className="flex-1 border border-zinc-200 dark:border-zinc-700 rounded-2xl overflow-hidden shadow-sm bg-white dark:bg-zinc-900/50">
+                    <FileExplorer
+                        initialPath={getInitialPath()}
+                        selectionMode={mode === 'folder' ? 'directory' : 'file'}
+                        allowHideFooter={true}
+                        onCancel={() => { }} // Not used in embedded mode
+                        onSelect={(path) => {
+                            if (mode !== 'folder') {
+                                handleRun(path);
                             }
-                        } else {
-                            setSelectedPath("");
-                        }
-                    }}
-                />
-            </div>
-
-            {/* Run Button Area */}
-            <div className="shrink-0 flex items-center gap-4 bg-white dark:bg-zinc-900/50 p-4 border border-zinc-200 dark:border-zinc-700 rounded-xl">
-                <div className="flex-1 min-w-0 flex items-center">
-                    <label className="flex items-center gap-2 cursor-pointer select-none group">
-                        <div className={clsx(
-                            "w-5 h-5 rounded border flex items-center justify-center transition-colors shadow-sm",
-                            dontOverwrite
-                                ? "bg-primary border-primary text-white"
-                                : "bg-zinc-50 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600 group-hover:border-primary"
-                        )}>
-                            {dontOverwrite && <div className="w-2.5 h-2.5 bg-white rounded-sm" />}
-                        </div>
-                        <input
-                            type="checkbox"
-                            checked={dontOverwrite}
-                            onChange={(e) => setDontOverwrite(e.target.checked)}
-                            className="hidden"
-                        />
-                        <span className="text-sm font-medium text-zinc-600 dark:text-zinc-300 group-hover:text-zinc-900 dark:group-hover:text-zinc-100 transition-colors">
-                            {t('tests.options.dont_overwrite', "Não sobrescrever logs")}
-                        </span>
-                    </label>
+                        }}
+                        onSelectionChange={(entry: FileEntry | null) => {
+                            if (entry) {
+                                if (mode === 'folder') {
+                                    if (entry.is_dir) setSelectedPath(entry.path);
+                                    else setSelectedPath("");
+                                } else {
+                                    if (!entry.is_dir) {
+                                        if (mode === 'file' && !entry.name.endsWith('.robot')) {
+                                            setSelectedPath("");
+                                        } else if (mode === 'args' && !(entry.name.endsWith('.txt') || entry.name.endsWith('.args'))) {
+                                            setSelectedPath("");
+                                        } else {
+                                            setSelectedPath(entry.path);
+                                        }
+                                    } else {
+                                        setSelectedPath("");
+                                    }
+                                }
+                            } else {
+                                setSelectedPath("");
+                            }
+                        }}
+                    />
                 </div>
-                <button
-                    onClick={handleRun}
-                    disabled={!selectedPath || isLaunching}
-                    className={clsx(
-                        !selectedPath || isLaunching
-                            ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-400 cursor-not-allowed shadow-none"
-                            : "bg-primary hover:opacity-90 text-white active:scale-[0.98]",
-                        "px-8 py-3 rounded-lg font-bold text-sm flex items-center gap-2 transition-all shadow-lg shadow-primary/20"
-                    )}
-                >
-                    {isLaunching ? (
-                        <>
-                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            {launchStatus}
-                        </>
-                    ) : (
-                        <>
-                            <Play size={18} fill="currentColor" />
-                            {mode === 'folder' ? t('tests.run_all') : t('tests.run_selected')}
-                        </>
-                    )}
-                </button>
+
+                {/* Vertical Sidebar: Mode Selection + Run Controls */}
+                <div className={clsx(
+                    "flex flex-col gap-6 shrink-0 h-full transition-all duration-300",
+                    isNarrow ? "w-fit" : "w-[200px]"
+                )}>
+                    {/* Mode Selection */}
+                    <div className="flex flex-col gap-2 bg-zinc-100 dark:bg-zinc-800 p-1.5 rounded-xl shadow-sm">
+                        <ModeButton active={mode === 'file'} onClick={() => { setMode('file'); setSelectedPath(""); }} icon={<FileCode size={18} />} label={t('tests.mode.file')} hideText={isNarrow} />
+                        <ModeButton active={mode === 'folder'} onClick={() => { setMode('folder'); setSelectedPath(""); }} icon={<FolderOpen size={18} />} label={t('tests.mode.folder')} hideText={isNarrow} />
+                        <ModeButton active={mode === 'args'} onClick={() => { setMode('args'); setSelectedPath(""); }} icon={<FileText size={18} />} label={t('tests.mode.args')} hideText={isNarrow} />
+                    </div>
+
+                    <div className="flex-1" /> {/* Spacer */}
+
+                    {/* Run Controls */}
+                    <div className="flex flex-col gap-4">
+                        <button
+                            onClick={() => setDontOverwrite(!dontOverwrite)}
+                            className={clsx(
+                                "flex items-center gap-2 px-4 py-3 rounded-xl transition-all duration-200 border shadow-sm select-none",
+                                dontOverwrite
+                                    ? "bg-amber-100 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-100"
+                                    : "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 hover:border-zinc-300 dark:hover:border-zinc-600"
+                            )}
+                            title={t('tests.options.dont_overwrite', "Não sobrescrever logs")}
+                        >
+                            <History size={18} className={clsx(dontOverwrite ? "text-amber-600 dark:text-amber-400" : "text-current")} />
+                            {!isNarrow && <span className="text-sm font-medium">{t('tests.options.dont_overwrite', "Não sobrescrever logs")}</span>}
+                        </button>
+
+                        <button
+                            onClick={() => handleRun()}
+                            disabled={!selectedPath || isLaunching}
+                            title={mode === 'folder' ? t('tests.run_all') : t('tests.run_selected')}
+                            className={clsx(
+                                !selectedPath || isLaunching
+                                    ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-400 cursor-not-allowed shadow-none"
+                                    : "bg-primary hover:opacity-90 text-white active:scale-[0.98]",
+                                "w-full py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-primary/20"
+                            )}
+                        >
+                            {isLaunching ? (
+                                <>
+                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    {launchStatus}
+                                </>
+                            ) : (
+                                <>
+                                    <Play size={18} fill="currentColor" />
+                                    {!isNarrow && (
+                                        <span>
+                                            {mode === 'folder' ? t('tests.run_all') : t('tests.run_selected')}
+                                        </span>
+                                    )}
+                                </>
+                            )}
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
+
+
     );
 }
 
-function ModeButton({ active, onClick, icon, label }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string }) {
+function ModeButton({ active, onClick, icon, label, hideText }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string, hideText?: boolean }) {
     return (
         <button
             onClick={onClick}
@@ -314,9 +337,10 @@ function ModeButton({ active, onClick, icon, label }: { active: boolean, onClick
                     ? "bg-white dark:bg-zinc-700 text-primary shadow-sm"
                     : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
             )}
+            title={label}
         >
             {icon}
-            <span>{label}</span>
+            {!hideText && <span>{label}</span>}
         </button>
     );
 }

@@ -158,7 +158,9 @@ export const en = {
             edit: "Edit",
             ok: "OK",
             search: "Search...",
-            loading: "Loading..."
+            loading: "Loading...",
+            minimize: "Minimize",
+            close: "Close"
         },
         settings: {
             title: "Settings",
@@ -194,7 +196,7 @@ export const en = {
                 appium_args: "Appium Arguments",
                 scrcpy_args: "Scrcpy Arguments",
                 robot_args: "Robot Framework Arguments",
-                app_package: "App Package (Monitoring)",
+                app_packages: "App Packages",
                 ngrok_token: "Ngrok Auth Token"
             },
             ai: {
@@ -253,7 +255,9 @@ export const en = {
                 start_recording: "Start Screen Recording",
                 stop_recording: "Stop Recording",
                 stop_execution: "Stop Execution",
-                rerun: "Re-run"
+                rerun: "Re-run",
+                switch_to_grid: "Switch to Grid View",
+                switch_to_tabs: "Switch to Tab View"
             }
         },
         file_explorer: {
@@ -353,7 +357,10 @@ export const en = {
             lines: "lines",
             no_logs: "No logs captured",
             select_device: "Select a device to view logs",
-            saving: "Saving logs to:"
+            saving: "Saving logs to:",
+            errors: {
+                app_not_running: "App is not running: {{pkg}}"
+            }
         },
         scrcpy: {
             title: "Screen Mirroring",
@@ -382,7 +389,8 @@ export const en = {
             select_device: "Select a device to view performance stats.",
             system_only: "System Only",
             device_stats: "Device Performance",
-            app_stats: "App Performance"
+            app_stats: "App Performance",
+            auto: "Auto"
         },
         feedback: {
             success: "Success",

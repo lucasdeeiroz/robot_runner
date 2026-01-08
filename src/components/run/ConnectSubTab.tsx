@@ -102,11 +102,19 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
         }
         setNgrokLoading(true);
         try {
-            // 1. Forward ADB Port (5555) -> Device (5555)
+            // Determine device port (default 5555, or extract from IP:PORT)
+            let devicePort = "5555";
+            // Match :digits that might be at end or followed by whitespace
+            const portMatch = selectedDevice.trim().match(/:(\d+)\b/);
+            if (portMatch && portMatch[1]) {
+                devicePort = portMatch[1];
+            }
+
+            // 1. Forward Local ADB Port (5555) -> Device (devicePort)
             // Backend run_adb_command appends -s <device> automatically, so we just pass the rest
             await invoke('run_adb_command', {
                 device: selectedDevice,
-                args: ['forward', 'tcp:5555', 'tcp:5555']
+                args: ['forward', 'tcp:5555', `tcp:${devicePort}`]
             });
 
             // 2. Start Ngrok on port 5555

@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTestSessions } from "@/lib/testSessionStore";
 import { useSettings } from "@/lib/settings";
 import { ToolboxView } from "../components/run/ToolboxView";
 import { HistoryCharts } from "../components/history/HistoryCharts";
-import { XCircle, FileText, Folder, Calendar, RefreshCw, ChevronDown, ChevronRight, CheckCircle, Clock, PieChart } from 'lucide-react';
+import { XCircle, FileText, Folder, Calendar, RefreshCw, ChevronDown, ChevronRight, CheckCircle, Clock, PieChart, LayoutGrid, Minimize2 } from 'lucide-react';
 import clsx from 'clsx';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from "react-i18next";
@@ -50,6 +50,111 @@ export function TestsPage() {
     const [loadingHistory, setLoadingHistory] = useState(false);
 
     const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+    const [isGridView, setIsGridView] = useState(false);
+    // Track visible sessions in Grid View. Default to all active session IDs.
+    const [visibleGridSessions, setVisibleGridSessions] = useState<Set<string>>(new Set());
+
+    // Smart Grid State
+    const gridContainerRef = useRef<HTMLDivElement>(null);
+    const [gridCols, setGridCols] = useState(1);
+
+    // History Responsive State
+    const historyContainerRef = useRef<HTMLDivElement>(null);
+    const [isHistoryNarrow, setIsHistoryNarrow] = useState(false);
+
+    useEffect(() => {
+        if (!historyContainerRef.current) return;
+        const observer = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                setIsHistoryNarrow(entry.contentRect.width < 500);
+            }
+        });
+        observer.observe(historyContainerRef.current);
+        return () => observer.disconnect();
+    }, [subTab]);
+
+    // Filter visible sessions for Grid View
+    const visibleSessions = sessions.filter(s => visibleGridSessions.has(s.runId));
+
+    useEffect(() => {
+        if (!isGridView) return;
+
+        const updateGrid = () => {
+            if (!gridContainerRef.current) return;
+            const width = gridContainerRef.current.offsetWidth;
+            const minWidth = 360; // Increased min-width to avoid crowding
+            const count = visibleSessions.length;
+            if (count === 0) return;
+
+            const maxCols = Math.max(1, Math.floor(width / minWidth));
+
+            // If only 1 col fits, accept it.
+            if (maxCols === 1) {
+                setGridCols(1);
+                return;
+            }
+
+            let bestCols = maxCols;
+            let minWaste = Infinity;
+
+            // Iterate down to 2. We skip 1 to avoid "stacking" unless necessary.
+            // We use <= to prefer FEWER columns (wider items) if waste is equal.
+            for (let c = maxCols; c >= 2; c--) {
+                const rows = Math.ceil(count / c);
+                const slots = rows * c;
+                const waste = slots - count;
+
+                if (waste <= minWaste) {
+                    minWaste = waste;
+                    bestCols = c;
+                }
+            }
+            setGridCols(bestCols);
+        };
+
+        const observer = new ResizeObserver(updateGrid);
+        if (gridContainerRef.current) observer.observe(gridContainerRef.current);
+        // Also run on session count change
+        updateGrid();
+
+        return () => observer.disconnect();
+    }, [isGridView, visibleSessions.length]);
+
+    // Auto-disable grid if items drop below 2
+    useEffect(() => {
+        if (isGridView && visibleSessions.length < 2) {
+            setIsGridView(false);
+            if (visibleSessions.length === 1) {
+                // Switch to that session tab
+                setSubTab(visibleSessions[0].runId);
+            }
+            // Reset grid visibility so it can be re-opened populated
+            setVisibleGridSessions(new Set(sessions.map(s => s.runId)));
+        }
+    }, [isGridView, visibleSessions.length]);
+
+    // Sync visibleGridSessions when sessions change (e.g. new session added)
+    // We want new sessions to appear by default? Or only if user selects?
+    // Let's default to SHOWING new sessions if we are in Grid Mode?
+    // Or just Init with valid IDs.
+    useEffect(() => {
+        setVisibleGridSessions(prev => {
+            const next = new Set(prev);
+            sessions.forEach(s => {
+                if (!prev.has(s.runId)) next.add(s.runId);
+            });
+            return next;
+        });
+    }, [sessions.length]);
+
+    const toggleGridSession = (id: string) => {
+        setVisibleGridSessions(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
 
     useEffect(() => {
         if (activeSessionId !== 'dashboard') {
@@ -177,7 +282,7 @@ export function TestsPage() {
                 {isExpanded && (
                     <div className="space-y-3 pl-1">
                         {logs.map((log, i) => (
-                            <div key={i} className="flex flex-col sm:flex-row gap-4 p-4 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-700/50 rounded-lg hover:border-blue-200 dark:hover:border-blue-700 transition-colors shadow-sm">
+                            <div key={i} className="flex flex-row items-center gap-4 p-4 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-700/50 rounded-lg hover:border-blue-200 dark:hover:border-blue-700 transition-colors shadow-sm">
                                 <div className="flex gap-4 items-start min-w-0 flex-1">
                                     <div className={clsx(
                                         "w-10 h-10 rounded-full flex items-center justify-center shrink-0 mt-1",
@@ -219,13 +324,13 @@ export function TestsPage() {
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-2 shrink-0 border-t sm:border-t-0 sm:border-l border-zinc-100 dark:border-zinc-700 pt-3 sm:pt-0 sm:pl-3">
+                                <div className="flex items-center gap-2 shrink-0 border-l border-zinc-100 dark:border-zinc-700 pl-3">
                                     <button
                                         onClick={() => openLog(log.log_html_path)}
                                         className="flex items-center gap-2 px-3 py-1.5 bg-zinc-100 hover:bg-primary/10 text-zinc-600 hover:text-primary dark:bg-zinc-800 dark:hover:bg-blue-900/20 dark:text-zinc-400 dark:hover:text-blue-400 rounded-md text-xs font-medium transition-colors"
-                                        title={log.log_html_path}
+                                        title={isHistoryNarrow ? t('tests_page.report') : log.log_html_path}
                                     >
-                                        <FileText size={14} /> {t('tests_page.report')}
+                                        <FileText size={14} /> {!isHistoryNarrow && t('tests_page.report')}
                                     </button>
                                     <button
                                         onClick={() => openLog(log.path)}
@@ -243,137 +348,241 @@ export function TestsPage() {
         );
     };
 
-    return (
-        <div className="h-full flex flex-col space-y-4">
-
-            {/* Tabs */}
-            <div className="flex bg-zinc-100 dark:bg-zinc-800/50 p-1 rounded-lg w-full overflow-x-auto no-scrollbar gap-1 border border-zinc-200 dark:border-zinc-800 shrink-0">
-                <button
-                    onClick={() => handleTabChange('history')}
-                    className={clsx(
-                        "px-4 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap",
-                        subTab === 'history'
-                            ? "bg-white dark:bg-zinc-700 text-primary shadow-sm"
-                            : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-white/50 dark:hover:bg-zinc-700/50"
-                    )}
-                >
-                    {t('tests_page.history')}
-                </button>
-
-                {sessions.map(s => {
-                    const isSuccess = s.exitCode && (s.exitCode.includes("exit code: 0") || s.exitCode === "0");
-                    const isFailed = s.status === 'finished' && !isSuccess;
-
-                    return (
-                        <div key={s.runId} className={clsx(
-                            "group flex items-center gap-2 pl-3 pr-2 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap border border-transparent",
-                            subTab === s.runId
-                                ? "bg-white dark:bg-zinc-700 text-primary shadow-sm border-zinc-200 dark:border-zinc-600"
-                                : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-white/50 dark:hover:bg-zinc-700/50"
-                        )}>
-                            <button onClick={() => handleTabChange(s.runId)} className="flex items-center gap-2">
-                                {s.type === 'toolbox' && <span className="w-2.5 h-2.5 rounded-full bg-zinc-400" />}
-                                {s.type === 'test' && s.status === 'running' && <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse" />}
-                                {s.type === 'test' && s.status === 'finished' && isSuccess && <span className="w-2.5 h-2.5 rounded-full bg-green-500" />}
-                                {s.type === 'test' && isFailed && <span className="w-2.5 h-2.5 rounded-full bg-red-500" />}
-                                {s.type === 'test' && s.status === 'error' && <span className="w-2.5 h-2.5 rounded-full bg-red-500" />}
-                                <span>{s.deviceName}</span>
-                            </button>
+    const GridItem = ({ title, children, onClose, onHide, className }: { title: React.ReactNode, children: React.ReactNode, onClose?: () => void, onHide?: () => void, className?: string }) => {
+        return (
+            <div className={clsx(
+                "flex flex-col border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900 overflow-hidden shadow-sm transition-all duration-300 min-h-0", // min-h-0 allows flex shrink/grow properly
+                className
+            )}>
+                <div className="flex items-center justify-between px-3 py-2 bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-100 dark:border-zinc-800 shrink-0">
+                    <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-200 flex items-center gap-2 max-w-[80%] truncate">
+                        {title}
+                    </span>
+                    <div className="flex items-center gap-1">
+                        {onHide && (
                             <button
-                                onClick={(e) => { e.stopPropagation(); clearSession(s.runId); }}
-                                className="opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity p-0.5 rounded"
-                                title={t('tests_page.close_tab')}
+                                onClick={onHide}
+                                className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded"
+                                title={t('common.minimize')} // Visually minimize implies hiding from grid per user req
+                            >
+                                <Minimize2 size={14} />
+                            </button>
+                        )}
+                        {onClose && (
+                            <button
+                                onClick={onClose}
+                                className="p-1 text-zinc-400 hover:text-red-500 rounded"
+                                title={t('common.close')}
                             >
                                 <XCircle size={14} />
                             </button>
-                        </div>
-                    );
-                })}
+                        )}
+                    </div>
+                </div>
+                <div className="flex-1 min-h-0 relative">
+                    {children}
+                </div>
+            </div>
+        );
+    };
+
+    return (
+        <div className="h-full flex flex-col space-y-4">
+
+
+            {/* View Toggle (Grid/Tabs) */}
+            <div className="absolute top-4 right-4 z-10 hidden md:block">
+                {/* Need to position this outside relative container? Actually place it in tabs row? */}
+            </div>
+
+            {/* Modified Tabs Row with Grid Toggle */}
+            <div className="flex items-center gap-2">
+                <div className="flex-1 flex bg-zinc-100 dark:bg-zinc-800/50 p-1 rounded-lg overflow-x-auto no-scrollbar gap-1 border border-zinc-200 dark:border-zinc-800 shrink-0">
+                    <button
+                        onClick={() => {
+                            if (isGridView) setIsGridView(false);
+                            handleTabChange('history');
+                        }}
+                        className={clsx(
+                            "px-4 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap",
+                            !isGridView && subTab === 'history'
+                                ? "bg-white dark:bg-zinc-700 text-primary shadow-sm"
+                                : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-white/50 dark:hover:bg-zinc-700/50"
+                        )}
+                    >
+                        {t('tests_page.history')}
+                    </button>
+
+                    {sessions.map(s => {
+                        const isSuccess = s.exitCode && (s.exitCode.includes("exit code: 0") || s.exitCode === "0");
+                        const isFailed = s.status === 'finished' && !isSuccess;
+                        const isSelected = isGridView ? visibleGridSessions.has(s.runId) : subTab === s.runId;
+
+                        return (
+                            <div key={s.runId} className={clsx(
+                                "group flex items-center gap-2 pl-3 pr-2 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap border border-transparent cursor-pointer", // Added cursor-pointer
+                                isSelected
+                                    ? "bg-white dark:bg-zinc-700 text-primary shadow-sm border-zinc-200 dark:border-zinc-600"
+                                    : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-white/50 dark:hover:bg-zinc-700/50"
+                            )}
+                                onClick={() => {
+                                    if (isGridView) {
+                                        toggleGridSession(s.runId);
+                                    } else {
+                                        handleTabChange(s.runId);
+                                    }
+                                }}
+                            >
+                                <div className="flex items-center gap-2">
+                                    {/* Removed nested button to avoid click conflict, handled by parent div */}
+                                    {s.type === 'toolbox' && <span className="w-2.5 h-2.5 rounded-full bg-zinc-400" />}
+                                    {s.type === 'test' && s.status === 'running' && <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse" />}
+                                    {s.type === 'test' && s.status === 'finished' && isSuccess && <span className="w-2.5 h-2.5 rounded-full bg-green-500" />}
+                                    {s.type === 'test' && isFailed && <span className="w-2.5 h-2.5 rounded-full bg-red-500" />}
+                                    {s.type === 'test' && s.status === 'error' && <span className="w-2.5 h-2.5 rounded-full bg-red-500" />}
+                                    <span>{s.deviceName}</span>
+                                </div>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); clearSession(s.runId); }}
+                                    className="opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity p-0.5 rounded"
+                                    title={t('tests_page.close_tab')}
+                                >
+                                    <XCircle size={14} />
+                                </button>
+                            </div>
+                        );
+                    })}
+                </div>
+                {sessions.length >= 2 && (
+                    <button
+                        onClick={() => setIsGridView(!isGridView)}
+                        className={clsx(
+                            "p-2 rounded-lg border transition-all shrink-0",
+                            isGridView
+                                ? "bg-primary/10 border-primary text-primary"
+                                : "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                        )}
+                        title={isGridView ? t('toolbox.actions.switch_to_tabs') : t('toolbox.actions.switch_to_grid')}
+                    >
+                        <LayoutGrid size={20} />
+                    </button>
+                )}
             </div>
 
             {/* Content */}
-            <div className="flex-1 min-h-0 bg-white dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 overflow-hidden relative">
-                {subTab === 'history' ? (
-                    <div className="h-full flex flex-col">
-                        {/* Filters Bar */}
-                        <div className="flex flex-wrap gap-4 mb-4 pb-4 border-b border-zinc-100 dark:border-zinc-800">
-                            <input
-                                type="text"
-                                placeholder={t('tests_page.filter.search')}
-                                value={filterText}
-                                onChange={(e) => setFilterText(e.target.value)}
-                                className="flex-1 min-w-[200px] bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-1.5 text-sm"
-                            />
-                            <select
-                                value={filterPeriod}
-                                onChange={(e) => setFilterPeriod(e.target.value)}
-                                className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-1.5 text-sm"
+            {isGridView ? (
+                <div
+                    ref={gridContainerRef}
+                    className="flex-1 min-h-0 overflow-y-auto grid gap-4 pb-4 content-start"
+                    style={{ gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`, gridAutoRows: 'minmax(480px, 1fr)' }}
+                >
+                    {/* Session Grid Items */}
+                    {visibleSessions.map((s) => {
+                        return (
+                            <GridItem
+                                key={s.runId}
+                                className="min-w-0 h-full"
+                                title={
+                                    <div className="flex items-center gap-2">
+                                        {s.type === 'toolbox' && <span className="w-2 h-2 rounded-full bg-zinc-400" />}
+                                        {s.type === 'test' && s.status === 'running' && <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />}
+                                        {s.type === 'test' && s.status === 'finished' && <span className={clsx("w-2 h-2 rounded-full", (s.exitCode?.includes("0") || s.exitCode === "0") ? "bg-green-500" : "bg-red-500")} />}
+                                        <span>{s.deviceName}</span>
+                                    </div>
+                                }
+                                onClose={() => clearSession(s.runId)}
+                                onHide={() => toggleGridSession(s.runId)}
                             >
-                                <option value="all_time">{t('tests_page.filter.all_time')}</option>
-                                <option value="today">{t('tests_page.filter.today')}</option>
-                                <option value="last_7_days">{t('tests_page.filter.last_7_days')}</option>
-                                <option value="last_30_days">{t('tests_page.filter.last_30_days')}</option>
-                            </select>
-                            <select
-                                value={groupBy}
-                                onChange={(e) => setGroupBy(e.target.value)}
-                                className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-1.5 text-sm"
-                            >
-                                <option value="none">{t('tests_page.filter.group_by')}: {t('tests_page.filter.all_time').replace('Todo o período', 'Nenhum')}</option>
-                                <option value="status">{t('tests_page.filter.status')}</option>
-                                <option value="device">{t('tests_page.filter.device')}</option>
-                                <option value="suite">{t('tests_page.filter.suite')}</option>
-                                <option value="os_version">{t('tests_page.filter.os_version') || "Versão do SO"}</option>
-                            </select>
-                            <button
-                                onClick={() => setShowCharts(!showCharts)}
-                                className={clsx(
-                                    "px-3 py-1.5 rounded-md flex items-center gap-2 text-sm font-medium transition-colors ml-2",
-                                    showCharts
-                                        ? "bg-primary/10 text-primary"
-                                        : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                                <ToolboxView session={s} isCompact={true} />
+                            </GridItem>
+                        );
+                    })}
+                </div>
+            ) : (
+                <div ref={historyContainerRef} className="flex-1 min-h-0 bg-white dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 overflow-hidden relative">
+                    {subTab === 'history' ? (
+                        <div className="h-full flex flex-col">
+                            {/* All Filters Logic ... (same as before) */}
+                            <div className="flex flex-wrap gap-4 mb-4 pb-4 border-b border-zinc-100 dark:border-zinc-800">
+                                <input
+                                    type="text"
+                                    placeholder={t('tests_page.filter.search')}
+                                    value={filterText}
+                                    onChange={(e) => setFilterText(e.target.value)}
+                                    className="flex-1 min-w-[200px] bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-1.5 text-sm"
+                                />
+                                <select
+                                    value={filterPeriod}
+                                    onChange={(e) => setFilterPeriod(e.target.value)}
+                                    className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-1.5 text-sm"
+                                >
+                                    <option value="all_time">{t('tests_page.filter.all_time')}</option>
+                                    <option value="today">{t('tests_page.filter.today')}</option>
+                                    <option value="last_7_days">{t('tests_page.filter.last_7_days')}</option>
+                                    <option value="last_30_days">{t('tests_page.filter.last_30_days')}</option>
+                                </select>
+                                <select
+                                    value={groupBy}
+                                    onChange={(e) => setGroupBy(e.target.value)}
+                                    className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-1.5 text-sm"
+                                >
+                                    <option value="none">{t('tests_page.filter.group_by')}: {t('tests_page.filter.all_time').replace('Todo o período', 'Nenhum')}</option>
+                                    <option value="status">{t('tests_page.filter.status')}</option>
+                                    <option value="device">{t('tests_page.filter.device')}</option>
+                                    <option value="suite">{t('tests_page.filter.suite')}</option>
+                                    <option value="os_version">{t('tests_page.filter.os_version') || "Versão do SO"}</option>
+                                </select>
+                                <button
+                                    onClick={() => setShowCharts(!showCharts)}
+                                    className={clsx(
+                                        "px-3 py-1.5 rounded-md flex items-center gap-2 text-sm font-medium transition-colors ml-2",
+                                        showCharts
+                                            ? "bg-primary/10 text-primary"
+                                            : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                                    )}
+                                    title={showCharts ? t('tests_page.charts.hide') : t('tests_page.charts.show')}
+                                >
+                                    <PieChart size={16} />
+                                </button>
+                                <button
+                                    onClick={() => loadHistory(true)}
+                                    className="p-1.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md"
+                                    title={t('tests_page.actions.refresh')}
+                                >
+                                    <RefreshCw size={16} className={loadingHistory ? "animate-spin" : ""} />
+                                </button>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto pr-2">
+                                {showCharts && (
+                                    <HistoryCharts logs={filteredHistory} groupBy={groupBy} />
                                 )}
-                                title={showCharts ? t('tests_page.charts.hide') : t('tests_page.charts.show')}
-                            >
-                                <PieChart size={16} />
-                            </button>
-                            <button
-                                onClick={() => loadHistory(true)}
-                                className="p-1.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md"
-                                title={t('tests_page.actions.refresh')}
-                            >
-                                <RefreshCw size={16} className={loadingHistory ? "animate-spin" : ""} />
-                            </button>
-                        </div>
 
-                        <div className="flex-1 overflow-y-auto pr-2">
-                            {showCharts && (
-                                <HistoryCharts logs={filteredHistory} groupBy={groupBy} />
-                            )}
+                                {loadingHistory && <div className="text-center p-4 text-zinc-500">{t('tests_page.loading')}</div>}
 
-                            {loadingHistory && <div className="text-center p-4 text-zinc-500">{t('tests_page.loading')}</div>}
+                                {!loadingHistory && filteredHistory.length === 0 && (
+                                    <div className="h-full flex flex-col items-center justify-center text-zinc-400">
+                                        <p>{t('tests_page.no_logs')}</p>
+                                    </div>
+                                )}
 
-                            {!loadingHistory && filteredHistory.length === 0 && (
-                                <div className="h-full flex flex-col items-center justify-center text-zinc-400">
-                                    <p>{t('tests_page.no_logs')}</p>
+                                <div className="space-y-6">
+                                    {Object.entries(groupedHistory()).map(([group, logs]) => (
+                                        logs.length > 0 && renderGroup(group, logs)
+                                    ))}
                                 </div>
-                            )}
-
-                            <div className="space-y-6">
-                                {Object.entries(groupedHistory()).map(([group, logs]) => (
-                                    logs.length > 0 && renderGroup(group, logs)
-                                ))}
                             </div>
                         </div>
-                    </div>
-                ) : activeSession ? (
-                    <ToolboxView session={activeSession} />
-                ) : (
-                    <div className="h-full flex items-center justify-center text-zinc-400">
-                        {t('tests_page.session_not_found')}
-                    </div>
-                )}
-            </div>
-        </div>
+                    ) : activeSession ? (
+                        <ToolboxView session={activeSession} />
+                    ) : (
+                        <div className="h-full flex items-center justify-center text-zinc-400">
+                            {t('tests_page.session_not_found')}
+                        </div>
+                    )}
+                </div>
+            )
+            }
+        </div >
     );
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Play, Wifi, Smartphone, RefreshCw, Wrench, ScanEye } from "lucide-react";
 import clsx from "clsx";
@@ -21,6 +21,19 @@ interface RunTabProps {
 export function RunTab({ onNavigate, initialTab }: RunTabProps) {
     const { t } = useTranslation();
     const { systemCheckStatus } = useSettings();
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [isNarrow, setIsNarrow] = useState(false);
+
+    useEffect(() => {
+        if (!containerRef.current) return;
+        const observer = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                setIsNarrow(entry.contentRect.width < 660);
+            }
+        });
+        observer.observe(containerRef.current);
+        return () => observer.disconnect();
+    }, []);
 
     // Initialize activeTab with initialTab if provided, else default to 'tests'
     // But if 'tests' is disabled (missing tools), default to 'connect'?
@@ -122,7 +135,7 @@ export function RunTab({ onNavigate, initialTab }: RunTabProps) {
     };
 
     return (
-        <div className="h-full flex flex-col space-y-4" onClick={() => isDeviceDropdownOpen && setIsDeviceDropdownOpen(false)}>
+        <div ref={containerRef} className="h-full flex flex-col space-y-4" onClick={() => isDeviceDropdownOpen && setIsDeviceDropdownOpen(false)}>
             {/* Header / Device Selection Bar */}
             <div className="flex items-center justify-between bg-white dark:bg-zinc-900/50 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm dark:shadow-none shrink-0 z-20 relative">
                 <div className="flex bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg">
@@ -132,18 +145,21 @@ export function RunTab({ onNavigate, initialTab }: RunTabProps) {
                         icon={<Play size={16} />}
                         label={t('run_tab.launcher')}
                         disabled={isLauncherDisabled}
+                        hideText={isNarrow}
                     />
                     <TabButton
                         active={activeTab === 'connect'}
                         onClick={() => setActiveTab('connect')}
                         icon={<Wifi size={16} />}
                         label={t('run_tab.connect')}
+                        hideText={isNarrow}
                     />
                     <TabButton
                         active={activeTab === 'inspector'}
                         onClick={() => setActiveTab('inspector')}
                         icon={<ScanEye size={16} />}
                         label={t('run_tab.inspector')}
+                        hideText={isNarrow}
                     />
                 </div>
 
@@ -246,7 +262,7 @@ export function RunTab({ onNavigate, initialTab }: RunTabProps) {
     );
 }
 
-function TabButton({ active, onClick, icon, label, disabled }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string, disabled?: boolean }) {
+function TabButton({ active, onClick, icon, label, disabled, hideText }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string, disabled?: boolean, hideText?: boolean }) {
     return (
         <button
             onClick={onClick}
@@ -259,9 +275,10 @@ function TabButton({ active, onClick, icon, label, disabled }: { active: boolean
                         ? "text-zinc-300 dark:text-zinc-600 cursor-not-allowed"
                         : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-white/50 dark:hover:bg-zinc-700/50"
             )}
+            title={label}
         >
             {icon}
-            <span>{label}</span>
+            {!hideText && <span>{label}</span>}
         </button>
     );
 }

@@ -96,6 +96,17 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
     const [collapsed, setCollapsed] = useState(false);
     const { t } = useTranslation();
 
+    useEffect(() => {
+        const handleResize = () => {
+            if (window.innerWidth < 1024) {
+                setCollapsed(true);
+            }
+        };
+        handleResize(); // Check on mount
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
     const navItems = [
         { id: 'run', label: t('sidebar.run'), icon: PlayCircle },
         { id: 'tests', label: t('sidebar.tests'), icon: FileText },
@@ -150,7 +161,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
 
             {/* Footer */}
             <div className="p-4 border-t border-zinc-200 dark:border-zinc-800">
-                {!collapsed && <div className="text-xs text-zinc-500">v2.0.74</div>}
+                {!collapsed && <div className="text-xs text-zinc-500">v2.0.75</div>}
             </div>
         </div>
     );

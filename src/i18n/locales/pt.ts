@@ -32,7 +32,9 @@ export const pt = {
             edit: "Editar",
             ok: "OK",
             search: "Buscar...",
-            loading: "Carregando..."
+            loading: "Carregando...",
+            minimize: "Minimizar",
+            close: "Fechar"
         },
         tests: {
             mode: {
@@ -194,7 +196,7 @@ export const pt = {
                 appium_args: "Argumentos Appium",
                 scrcpy_args: "Argumentos Scrcpy",
                 robot_args: "Argumentos Robot Framework",
-                app_package: "Pacote do App (Monitoramento)",
+                app_packages: "Pacotes de Apps",
                 ngrok_token: "Token Autenticação Ngrok"
             },
             ai: {
@@ -253,7 +255,9 @@ export const pt = {
                 start_recording: "Gravar Tela",
                 stop_recording: "Parar Gravação",
                 stop_execution: "Parar Execução",
-                rerun: "Re-executar"
+                rerun: "Re-executar",
+                switch_to_grid: "Alternar para Grade",
+                switch_to_tabs: "Alternar para Abas"
             }
         },
         file_explorer: {
@@ -353,7 +357,10 @@ export const pt = {
             lines: "linhas",
             no_logs: "Nenhum log capturado",
             select_device: "Selecione um dispositivo para ver logs",
-            saving: "Salvando logs em:"
+            saving: "Salvando logs em:",
+            errors: {
+                app_not_running: "O aplicativo não está rodando: {{pkg}}"
+            }
         },
         scrcpy: {
             title: "Espelhamento de Tela",
@@ -382,7 +389,8 @@ export const pt = {
             select_device: "Selecione um dispositivo para ver estatísticas de desempenho.",
             system_only: "Somente Sistema",
             device_stats: "Desempenho do Dispositivo",
-            app_stats: "Desempenho do Aplicativo"
+            app_stats: "Desempenho do Aplicativo",
+            auto: "Auto"
         },
         feedback: {
             success: "Sucesso",

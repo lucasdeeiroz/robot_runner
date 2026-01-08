@@ -9,9 +9,10 @@ interface SystemCheckOverlayProps {
     onCriticalExit: () => void;
     onTestingRedirect: () => void;
     onMirroringContinue: () => void;
+    onDismiss: () => void;
 }
 
-export function SystemCheckOverlay({ status, onCriticalExit, onTestingRedirect, onMirroringContinue }: SystemCheckOverlayProps) {
+export function SystemCheckOverlay({ status, onCriticalExit, onTestingRedirect, onMirroringContinue, onDismiss }: SystemCheckOverlayProps) {
     const { t } = useTranslation();
 
     // We can derive the current state to show based on priority
@@ -84,7 +85,7 @@ export function SystemCheckOverlay({ status, onCriticalExit, onTestingRedirect, 
         return (
             <Modal
                 isOpen={true}
-                onClose={() => { }} // Block closing via escape/click outside by doing nothing? Or generic handler
+                onClose={onDismiss}
                 title={t('startup.testing.title')}
                 className="max-w-md"
             >
@@ -128,7 +129,7 @@ export function SystemCheckOverlay({ status, onCriticalExit, onTestingRedirect, 
         return (
             <Modal
                 isOpen={true}
-                onClose={() => { }}
+                onClose={onDismiss}
                 title={t('startup.mirroring.title')}
                 className="max-w-md"
             >

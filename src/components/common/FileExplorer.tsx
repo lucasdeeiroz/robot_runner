@@ -194,7 +194,7 @@ export function FileExplorer({ initialPath = ".", onSelect, onCancel, selectionM
                             <div
                                 key={entry.path}
                                 onClick={() => handleEntryClick(entry)}
-                                onDoubleClick={entry.is_dir ? () => handleNavigate(entry.path) : undefined}
+                                onDoubleClick={() => entry.is_dir ? handleNavigate(entry.path) : onSelect(entry.path)}
                                 className={clsx(
                                     "flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer text-sm select-none transition-colors",
                                     selectedEntry?.path === entry.path

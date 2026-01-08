@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Play, Square, Eraser, AlignLeft } from "lucide-react";
+import { Play, Square, Eraser, AlignLeft, Package as PackageIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -20,6 +20,21 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
     const listRef = useRef<HTMLDivElement>(null);
     const { settings } = useSettings();
     const [currentDumpFile, setCurrentDumpFile] = useState<string | null>(null);
+
+    // Responsive State
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [isNarrow, setIsNarrow] = useState(false);
+
+    useEffect(() => {
+        if (!containerRef.current) return;
+        const observer = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                setIsNarrow(entry.contentRect.width < 500); // Threshold for Logcat toolbar
+            }
+        });
+        observer.observe(containerRef.current);
+        return () => observer.disconnect();
+    }, []);
 
     // Auto-stop when unmounting or changing device?
     useEffect(() => {
@@ -75,7 +90,6 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
         }
     }, [logs]);
 
-    const [filterApp, setFilterApp] = useState(false);
     const [selectedPackage, setSelectedPackage] = useState("");
     const [logLevel, setLogLevel] = useState("E");
 
@@ -106,8 +120,8 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
         }
         setCurrentDumpFile(dumpFile);
 
-        const activeFilter = filterApp && selectedPackage ? selectedPackage : null;
-        console.log("Filter App:", filterApp, "Package:", activeFilter, "Level:", logLevel);
+        const activeFilter = selectedPackage || null;
+        console.log("Package:", activeFilter, "Level:", logLevel);
 
         try {
             setLogs([]); // Clear previous logs for clarity
@@ -124,7 +138,13 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
             }
         } catch (e) {
             console.error("Failed to start logcat", e);
-            alert(`Failed to start logcat: ${e}`);
+            const errStr = String(e);
+            if (errStr.startsWith("APP_NOT_RUNNING:")) {
+                const pkg = errStr.split(":")[1];
+                feedback.toast.error(t('logcat.errors.app_not_running', { pkg }));
+            } else {
+                feedback.toast.error(`${t('common.error_occurred', { error: errStr })}`);
+            }
         }
     };
 
@@ -153,7 +173,7 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
     }
 
     return (
-        <div className="h-full flex flex-col space-y-4">
+        <div ref={containerRef} className="h-full flex flex-col space-y-4">
             {/* Toolbar */}
             <div className="flex items-center gap-2 p-2 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg border border-zinc-200 dark:border-zinc-700">
                 <button
@@ -167,44 +187,43 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
                 >
                     {isStreaming ? (
                         <>
-                            <Square size={14} fill="currentColor" /> {t('logcat.stop')}
+                            <Square size={14} fill="currentColor" /> {!isNarrow && t('logcat.stop')}
                         </>
                     ) : (
                         <>
-                            <Play size={14} fill="currentColor" /> {t('logcat.start')}
+                            <Play size={14} fill="currentColor" /> {!isNarrow && t('logcat.start')}
                         </>
                     )}
                 </button>
 
-                <div className="h-6 w-px bg-zinc-300 dark:bg-zinc-700 mx-2" />
+                <div className="h-6 w-px bg-zinc-300 dark:bg-zinc-700 mx-1" />
 
-                <label className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400 cursor-pointer select-none">
-                    <input
-                        type="checkbox"
-                        checked={filterApp}
-                        onChange={(e) => setFilterApp(e.target.checked)}
-                        className="rounded bg-zinc-200 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 text-primary focus:ring-primary"
+                {/* Package Selector */}
+                <div className="relative">
+                    <select
+                        value={selectedPackage}
+                        onChange={(e) => setSelectedPackage(e.target.value)}
+                        className={clsx(
+                            "appearance-none pl-8 pr-8 py-1.5 rounded-lg text-sm font-medium border transition-all outline-none cursor-pointer",
+                            "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 hover:border-zinc-300 dark:hover:border-zinc-600 focus:ring-2 focus:ring-primary/20",
+                            "w-44"
+                        )}
+                        title={t('performance.select_app', "Select App")}
+                    >
+                        <option value="">{t('performance.system_only', "System Only")}</option>
+                        {packages.map((pkg) => (
+                            <option key={pkg} value={pkg}>
+                                {pkg}
+                            </option>
+                        ))}
+                    </select>
+                    <PackageIcon
+                        size={14}
+                        className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none"
                     />
-                    {t('logcat.filter')}
-                </label>
+                </div>
 
-                {filterApp && (
-                    packages.length > 0 ? (
-                        <select
-                            value={selectedPackage}
-                            onChange={(e) => setSelectedPackage(e.target.value)}
-                            className="text-xs bg-zinc-200 dark:bg-zinc-700 border-none rounded px-2 py-1 text-zinc-700 dark:text-zinc-200 focus:ring-1 focus:ring-primary outline-none"
-                        >
-                            {packages.map((pkg, i) => (
-                                <option key={i} value={pkg}>{pkg}</option>
-                            ))}
-                        </select>
-                    ) : (
-                        <span className="text-xs text-amber-500 italic px-1">{t('logcat.no_packages')}</span>
-                    )
-                )}
-
-                <div className="h-6 w-px bg-zinc-300 dark:bg-zinc-700 mx-2" />
+                <div className="h-6 w-px bg-zinc-300 dark:bg-zinc-700 mx-1" />
 
                 <select
                     value={logLevel}
@@ -221,7 +240,7 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
                     <option value="S">Silent</option>
                 </select>
 
-                <div className="h-6 w-px bg-zinc-300 dark:bg-zinc-700 mx-2" />
+                <div className="h-6 w-px bg-zinc-300 dark:bg-zinc-700 mx-1" />
 
                 <button
                     className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-md text-zinc-600 dark:text-zinc-400"
