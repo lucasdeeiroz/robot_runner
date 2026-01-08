@@ -185,7 +185,7 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
                             }}
                             className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl py-1.5 pl-8 pr-8 text-sm appearance-none cursor-pointer focus:ring-2 focus:ring-primary/30 outline-none transition-all hover:bg-zinc-100 dark:hover:bg-zinc-700/50"
                         >
-                            <option value="">{t('performance.system_only', 'System Only')}</option>
+                            <option value="">{t('performance.system_only', 'Entire System')}</option>
                             {appPackages.map(pkg => (
                                 <option key={pkg} value={pkg}>{pkg}</option>
                             ))}

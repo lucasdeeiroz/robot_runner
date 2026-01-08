@@ -17,15 +17,13 @@ import "./App.css";
 function App() {
   const { t } = useTranslation();
   const [activePage, setActivePage] = useState("run");
-  const { settings, checkSystemVersions, systemCheckStatus } = useSettings();
+  const { settings, checkSystemVersions, systemCheckStatus, loading: settings_loading } = useSettings();
 
   // State to track if we should show the overlay or if it has been dismissed/handled
   const [initialCheckDismissed, setInitialCheckDismissed] = useState(false);
   const [initialSubTab, setInitialSubTab] = useState<'tests' | 'connect' | 'inspector' | undefined>(undefined);
 
-  useEffect(() => {
-    checkSystemVersions();
-  }, []);
+  // Initial check moved to dependence on settings_loading
 
   // Determine if we should show the overlay
   const showOverlay = !initialCheckDismissed && (
@@ -83,7 +81,7 @@ function App() {
   }, [systemCheckStatus]);
 
 
-  // Apply theme and primary color
+  // Apply theme and primary color immediately when settings change or load
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -109,6 +107,18 @@ function App() {
     document.documentElement.style.setProperty('--color-primary', color);
 
   }, [settings.theme, settings.primaryColor]);
+
+  // Only check system versions AFTER settings are loaded
+  useEffect(() => {
+    if (!settings_loading) {
+      checkSystemVersions();
+    }
+  }, [settings_loading]);
+
+  // Prevent rendering (and thus flash) until settings are loaded
+  if (settings_loading) {
+    return null; // Or a minimal loading spinner matching the system theme background if possible, but null is safest for "no flash" if the HTML bg is neutral or handled by index.html
+  }
 
   return (
     <TestSessionProvider>

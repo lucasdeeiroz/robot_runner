@@ -1,10 +1,33 @@
-import { Github, Bot } from "lucide-react";
+import { Github, Bot, RefreshCcw } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { feedback } from '@/lib/feedback';
+import { checkForUpdates } from '@/lib/updater';
+import { useState } from "react";
+import clsx from "clsx";
 
 
 export function AboutPage() {
     const { t } = useTranslation();
-    const appVersion = "2.0.75";
+    const appVersion = "2.0.76";
+    const [isChecking, setIsChecking] = useState(false);
+
+    const handleCheckUpdate = async () => {
+        if (isChecking) return;
+        setIsChecking(true);
+        try {
+            const update = await checkForUpdates();
+            if (update.available) {
+                feedback.toast.success(t('about.update_available', { version: update.latestVersion }));
+            } else {
+                feedback.toast.info(t('about.update_not_available'));
+            }
+        } catch (error) {
+            console.error(error);
+            feedback.toast.error(t('about.update_error'));
+        } finally {
+            setIsChecking(false);
+        }
+    };
 
     return (
         <div className="space-y-8 pb-12">
@@ -20,8 +43,17 @@ export function AboutPage() {
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
                         Robot Runner
                     </h2>
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium">
-                        v{appVersion}
+                    <div className="inline-flex items-center gap-2 pl-3 pr-1.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium">
+                        <span>v{appVersion}</span>
+                        <div className="w-px h-3 bg-primary/20 mx-0.5" />
+                        <button
+                            onClick={handleCheckUpdate}
+                            disabled={isChecking}
+                            title={isChecking ? t('about.checking') : t('about.update_check')}
+                            className="p-1 rounded-full hover:bg-primary/10 text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <RefreshCcw size={13} className={clsx({ "animate-spin": isChecking })} />
+                        </button>
                     </div>
                     <p className="mt-6 text-zinc-500 dark:text-zinc-400 max-w-lg mx-auto leading-relaxed">
                         {t('about.long_description')}

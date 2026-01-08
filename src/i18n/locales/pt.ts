@@ -197,6 +197,8 @@ export const pt = {
                 scrcpy_args: "Argumentos Scrcpy",
                 robot_args: "Argumentos Robot Framework",
                 app_packages: "Pacotes de Apps",
+                add_package: "Adicionar Pacote",
+                add_package_placeholder: "Adicionar pacote (Pressione Enter)",
                 ngrok_token: "Token Autenticação Ngrok"
             },
             ai: {
@@ -295,7 +297,12 @@ export const pt = {
             legal_title: "Termos e Licença",
             license: "Licença MIT",
             license_desc: "A permissão é concedida, gratuitamente, a qualquer pessoa que obtenha uma cópia deste software e dos arquivos de documentação associados (o 'Software'), para lidar com o Software sem restrições, incluindo, sem limitação, os direitos de usar, copiar, modificar, mesclar, publicar, distribuir, sublicenciar e/ou vender cópias do Software, e permitir que as pessoas a quem o Software é fornecido o façam, sujeito às seguintes condições: O aviso de direitos autorais acima e este aviso de permissão devem ser incluídos em todas as cópias ou partes substanciais do Software.",
-            disclaimer: "O software é fornecido 'como está', sem garantia de qualquer tipo, expressa ou implícita."
+            disclaimer: "O software é fornecido 'como está', sem garantia de qualquer tipo, expressa ou implícita.",
+            update_check: "Verificar Atualizações",
+            update_available: "Nova versão disponível: {{version}}",
+            update_not_available: "Você está atualizado",
+            update_error: "Falha ao verificar atualizações",
+            checking: "Verificando..."
         },
         ai_page: {
             title: "Assistente IA",
@@ -351,6 +358,7 @@ export const pt = {
             start: "Iniciar",
             stop: "Parar",
             filter: "Filtrar App",
+            entire_system: "Sistema Inteiro",
             no_packages: "Nenhum pacote configurado",
             level: "Nível de Log",
             clear: "Limpar Logs",
@@ -387,7 +395,7 @@ export const pt = {
             recording: "Gravando...",
             record_error: "Falha ao gravar",
             select_device: "Selecione um dispositivo para ver estatísticas de desempenho.",
-            system_only: "Somente Sistema",
+            system_only: "Sistema Inteiro",
             device_stats: "Desempenho do Dispositivo",
             app_stats: "Desempenho do Aplicativo",
             auto: "Auto"

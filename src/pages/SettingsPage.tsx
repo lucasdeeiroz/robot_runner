@@ -481,7 +481,7 @@ export function SettingsPage() {
                                 ))}
                                 <input
                                     type="text"
-                                    placeholder="Add package (Press Enter)"
+                                    placeholder={t('settings.tool_config.add_package_placeholder')}
                                     className="flex-1 min-w-[150px] bg-transparent outline-none text-gray-900 dark:text-zinc-300 text-sm"
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter') {

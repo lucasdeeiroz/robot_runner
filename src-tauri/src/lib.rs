@@ -17,6 +17,7 @@ fn greet(name: &str) -> String {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
@@ -63,6 +64,7 @@ pub fn run() {
             adb::logcat::stop_logcat,
             adb::logcat::fetch_logcat_buffer,
             adb::logcat::is_logcat_active,
+            adb::logcat::get_logcat_details,
             // Stats
             adb::stats::get_device_stats,
             // Scrcpy
