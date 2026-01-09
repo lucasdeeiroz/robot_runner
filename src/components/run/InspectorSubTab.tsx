@@ -5,7 +5,7 @@ import { RefreshCw, Maximize, Check, Scan, MousePointerClick, Move, Home, ArrowL
 import { XMLParser } from 'fast-xml-parser';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
-import { InspectorNode, transformXmlToTree, findNodeAtCoords, generateXPath } from '@/lib/inspectorUtils';
+import { InspectorNode, transformXmlToTree, findNodesAtCoords, generateXPath } from '@/lib/inspectorUtils';
 import { feedback } from "@/lib/feedback";
 
 interface InspectorSubTabProps {
@@ -178,17 +178,34 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
         }
     };
 
+    const [availableNodes, setAvailableNodes] = useState<InspectorNode[]>([]);
+
+    // ...
+
     const processMouseInteraction = (e: React.MouseEvent<HTMLImageElement>, isHover: boolean) => {
         if (!rootNode || !imgRef.current) return false;
         const coords = getCoords(e);
         if (!coords) return false;
 
-        const node = findNodeAtCoords(rootNode, coords.x, coords.y);
+        const candidates = findNodesAtCoords(rootNode, coords.x, coords.y);
+        if (candidates.length === 0) return false;
+
+        const best = candidates[0];
 
         if (isHover) {
-            if (node !== hoveredNode) setHoveredNode(node);
+            if (best !== hoveredNode) setHoveredNode(best);
         } else {
-            setSelectedNode(node);
+            // Click Logic: Find all nodes with EXACT same bounds as best
+            const exactMatches = candidates.filter((c: InspectorNode) =>
+                c.bounds && best.bounds &&
+                c.bounds.x === best.bounds.x &&
+                c.bounds.y === best.bounds.y &&
+                c.bounds.w === best.bounds.w &&
+                c.bounds.h === best.bounds.h
+            );
+
+            setAvailableNodes(exactMatches);
+            setSelectedNode(exactMatches[0]);
         }
         return true;
     };
@@ -361,10 +378,30 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
 
                 {/* Right: Properties Scroll View */}
                 <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl flex flex-col overflow-hidden shadow-sm dark:shadow-none h-full">
-                    <div className="flex border-b border-zinc-200 dark:border-zinc-800 shrink-0 bg-zinc-50 dark:bg-zinc-800/50">
-                        <div className="px-4 py-3 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-                            {t('inspector.properties')}
-                        </div>
+                    <div className="flex flex-col border-b border-zinc-200 dark:border-zinc-800 shrink-0 bg-zinc-50 dark:bg-zinc-800/50">
+                        {availableNodes.length > 1 ? (
+                            <div className="flex overflow-x-auto custom-scrollbar">
+                                {availableNodes.map((node) => (
+                                    <button
+                                        key={node.id}
+                                        onClick={() => setSelectedNode(node)}
+                                        className={clsx(
+                                            "px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
+                                            selectedNode === node
+                                                ? "border-primary text-primary bg-white dark:bg-zinc-900"
+                                                : "border-transparent text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                                        )}
+                                    >
+                                        {node.tagName}
+                                        {node.attributes['resource-id'] && <span className="ml-2 text-xs opacity-50 truncate max-w-[100px] inline-block align-bottom">{node.attributes['resource-id'].split('/').pop()}</span>}
+                                    </button>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="px-4 py-3 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                                {t('inspector.properties')}
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex-1 overflow-y-auto custom-scrollbar p-0">

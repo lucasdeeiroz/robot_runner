@@ -12,6 +12,7 @@ import { useSettings } from "@/lib/settings";
 import { readFile } from '@tauri-apps/plugin-fs';
 
 import { useTranslation } from "react-i18next";
+import { getVersion } from '@tauri-apps/api/app';
 
 interface SidebarProps {
     activePage: string;
@@ -113,13 +114,21 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
         window.addEventListener('resize', handleResize);
 
         // Check for updates
-        checkForUpdates().then(info => {
-            setAppVersion(info.currentVersion);
-            if (info.available) {
-                console.log("Update available:", info.latestVersion);
-                setUpdateAvailable(true);
-            }
-        });
+        checkForUpdates()
+            .then(info => {
+                setAppVersion(info.currentVersion);
+                if (info.available) {
+                    console.log("Update available:", info.latestVersion);
+                    setUpdateAvailable(true);
+                }
+            })
+            .catch(async () => {
+                try {
+                    setAppVersion(await getVersion());
+                } catch {
+                    setAppVersion("2.0.76"); // Ultimate fallback
+                }
+            });
 
         return () => window.removeEventListener('resize', handleResize);
     }, []);
