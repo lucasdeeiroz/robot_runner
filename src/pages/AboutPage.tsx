@@ -4,25 +4,34 @@ import { feedback } from '@/lib/feedback';
 import { checkForUpdates } from '@/lib/updater';
 import { useState } from "react";
 import clsx from "clsx";
+import packageJson from '../../package.json';
 
 
 export function AboutPage() {
     const { t } = useTranslation();
-    const appVersion = "2.0.77";
+    const appVersion = packageJson.version;
     const [isChecking, setIsChecking] = useState(false);
+    const [updateAvailable, setUpdateAvailable] = useState(false);
 
     const handleCheckUpdate = async () => {
         if (isChecking) return;
         setIsChecking(true);
         try {
+            console.log("[AboutPage] Calling checkForUpdates()...");
             const update = await checkForUpdates();
+            console.log("[AboutPage] Update result:", update);
+
+            console.log("[AboutPage] Update result:", update);
+
             if (update.available) {
+                setUpdateAvailable(true);
                 feedback.toast.success(t('about.update_available', { version: update.latestVersion }));
             } else {
+                setUpdateAvailable(false);
                 feedback.toast.info(t('about.update_not_available'));
             }
         } catch (error) {
-            console.error(error);
+            console.error("[AboutPage] Error:", error);
             feedback.toast.error(t('about.update_error'));
         } finally {
             setIsChecking(false);
@@ -54,6 +63,17 @@ export function AboutPage() {
                         >
                             <RefreshCcw size={13} className={clsx({ "animate-spin": isChecking })} />
                         </button>
+
+                        {updateAvailable && (
+                            <a
+                                href="https://github.com/lucasdeeiroz/robot_runner/releases/latest"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="ml-2 text-[10px] bg-primary text-white px-2 py-0.5 rounded-full font-bold hover:bg-primary/90 transition-colors animate-pulse no-underline"
+                            >
+                                {t('about.update_badge')}
+                            </a>
+                        )}
                     </div>
                     <p className="mt-6 text-zinc-500 dark:text-zinc-400 max-w-lg mx-auto leading-relaxed">
                         {t('about.long_description')}
@@ -141,7 +161,7 @@ export function AboutPage() {
                                     👨‍💻
                                 </div>
                                 <div>
-                                    <div className="font-medium text-gray-900 dark:text-white">Lucas de Eiroz</div>
+                                    <div className="font-medium text-gray-900 dark:text-white">Lucas de Eiroz Rodrigues</div>
                                     <div className="text-sm text-zinc-500">{t('about.lead')}</div>
                                 </div>
                             </div>

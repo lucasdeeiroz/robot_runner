@@ -35,16 +35,6 @@ const files = [
         path: path.join(rootDir, 'src-tauri', 'Cargo.toml'),
         regex: /^version\s*=\s*"[^"]+"/m,
         replacement: `version = "${newVersion}"`
-    },
-    {
-        path: path.join(rootDir, 'src', 'components', 'Sidebar.tsx'),
-        regex: /<div className="text-xs text-zinc-500">v[^<]+<\/div>/,
-        replacement: `<div className="text-xs text-zinc-500">v${newVersion}</div>`
-    },
-    {
-        path: path.join(rootDir, 'src', 'pages', 'AboutPage.tsx'),
-        regex: /const appVersion = "[^"]+";/,
-        replacement: `const appVersion = "${newVersion}";`
     }
 ];
 
