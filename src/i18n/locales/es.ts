@@ -302,7 +302,8 @@ export const es = {
             update_available: "Nueva versión disponible: {{version}}",
             update_not_available: "Estás actualizado",
             update_error: "Fallo al buscar actualizaciones",
-            checking: "Verificando..."
+            checking: "Verificando...",
+            update_badge: "ACTUALIZACIÓN"
         },
         ai_page: {
             title: "Asistente IA",

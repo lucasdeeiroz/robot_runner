@@ -1,7 +1,7 @@
 
 import { getVersion } from '@tauri-apps/api/app';
-import { fetch } from '@tauri-apps/plugin-http';
-import semver from 'semver';
+// import { fetch } from '@tauri-apps/plugin-http'; // Using native fetch for CORS support
+import { gt } from 'semver';
 
 interface GitHubRelease {
     tag_name: string;
@@ -21,6 +21,7 @@ export async function checkForUpdates(): Promise<UpdateInfo> {
     let currentVersion = '0.0.0';
     try {
         currentVersion = await getVersion();
+        console.log("[Updater] Current version:", currentVersion);
     } catch (e) {
         console.error("Failed to get app version:", e);
     }
@@ -40,8 +41,10 @@ export async function checkForUpdates(): Promise<UpdateInfo> {
 
         const data = await response.json() as GitHubRelease;
         const latestTag = data.tag_name.replace(/^v/, ''); // Remove 'v' prefix if present
+        console.log("[Updater] Latest tag from GitHub:", data.tag_name, "Parsed:", latestTag);
 
-        const available = semver.gt(latestTag, currentVersion);
+        const available = gt(latestTag, currentVersion);
+        console.log("[Updater] Update available?", available);
 
         return {
             available,
@@ -57,7 +60,7 @@ export async function checkForUpdates(): Promise<UpdateInfo> {
             currentVersion, // Return the actual version even if update check fails
             latestVersion: currentVersion,
             url: '',
-            notes: ''
+            notes: `Error check: ${e instanceof Error ? e.message : String(e)}`
         };
     }
 }

@@ -13,6 +13,7 @@ import { readFile } from '@tauri-apps/plugin-fs';
 
 import { useTranslation } from "react-i18next";
 import { getVersion } from '@tauri-apps/api/app';
+import packageJson from '../../package.json';
 
 interface SidebarProps {
     activePage: string;
@@ -126,7 +127,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                 try {
                     setAppVersion(await getVersion());
                 } catch {
-                    setAppVersion("2.0.76"); // Ultimate fallback
+                    setAppVersion(packageJson.version); // Ultimate fallback (dynamic)
                 }
             });
 
@@ -137,7 +138,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
         { id: 'run', label: t('sidebar.run'), icon: PlayCircle },
         { id: 'tests', label: t('sidebar.tests'), icon: FileText },
         { id: 'settings', label: t('sidebar.settings'), icon: Settings },
-        { id: 'about', label: t('sidebar.about'), icon: Info, hasBadge: updateAvailable },
+        { id: 'about', label: t('sidebar.about'), icon: Info },
     ];
 
     return (
@@ -181,12 +182,6 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                     >
                         <div className="relative">
                             <item.icon size={20} />
-                            {item.hasBadge && (
-                                <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
-                                </span>
-                            )}
                         </div>
                         {!collapsed && <span className="font-medium">{item.label}</span>}
                     </button>

@@ -75,19 +75,21 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
                     const newLines = result[0];
                     const totalLen = result[1];
 
-                    if (newLines && newLines.length > 0) {
-                        setLogs(prev => {
-                            const updated = [...prev, ...newLines];
-                            if (updated.length > 5000) return updated.slice(-5000);
-                            return updated;
-                        });
-                        pollingOffset = totalLen;
-                    } else if (totalLen < pollingOffset) {
-                        // Buffer reset? Reset offset
+                    if (totalLen < pollingOffset) {
+                        // Buffer reset on device?
                         pollingOffset = 0;
-                    } else if (totalLen > pollingOffset) {
-                        // Resync offset if needed (should have been covered by newLines, but failsafe)
-                        pollingOffset = totalLen;
+                    } else {
+                        if (newLines && newLines.length > 0) {
+                            setLogs(prev => {
+                                const updated = [...prev, ...newLines];
+                                if (updated.length > 5000) return updated.slice(-5000);
+                                return updated;
+                            });
+                        }
+                        // Only update offset if it actually grew
+                        if (totalLen > pollingOffset) {
+                            pollingOffset = totalLen;
+                        }
                     }
                 } catch (e) {
                     console.error("Polling error:", e);
