@@ -98,7 +98,6 @@ export function TestsPage() {
             let minWaste = Infinity;
 
             // Iterate down to 2. We skip 1 to avoid "stacking" unless necessary.
-            // We use <= to prefer FEWER columns (wider items) if waste is equal.
             for (let c = maxCols; c >= 2; c--) {
                 const rows = Math.ceil(count / c);
                 const slots = rows * c;
@@ -134,9 +133,6 @@ export function TestsPage() {
     }, [isGridView, visibleSessions.length]);
 
     // Sync visibleGridSessions when sessions change (e.g. new session added)
-    // We want new sessions to appear by default? Or only if user selects?
-    // Let's default to SHOWING new sessions if we are in Grid Mode?
-    // Or just Init with valid IDs.
     useEffect(() => {
         setVisibleGridSessions(prev => {
             const next = new Set(prev);

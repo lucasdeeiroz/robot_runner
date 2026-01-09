@@ -12,6 +12,7 @@ import { useSettings } from "@/lib/settings";
 import { readFile } from '@tauri-apps/plugin-fs';
 
 import { useTranslation } from "react-i18next";
+import { getVersion } from '@tauri-apps/api/app';
 
 interface SidebarProps {
     activePage: string;
@@ -34,7 +35,6 @@ function CustomLogo({ path }: { path: string }) {
                 }
 
                 // If path is already a data URI (Base64), use it directly
-                // This allows us to store the image data in settings and bypass fs permissions on restart
                 if (path.startsWith('data:')) {
                     if (active) setSrc(path);
                     return;
@@ -49,8 +49,6 @@ function CustomLogo({ path }: { path: string }) {
                 } catch (e) {
                     lastError = e;
                     // If explicit path fails, try force-converting to Windows backslashes
-                    // This often solves the "forbidden path" issue if scope expects backslashes
-                    // but path has forward slashes (common in JS).
                     if (path.includes('/')) {
                         try {
                             const winPath = path.replace(/\//g, '\\');
@@ -108,9 +106,6 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                 setCollapsed(true);
             }
             // Auto-expand on large screens (if not explicitly collapsed by user? Hard to track user intent without more state. 
-            // Let's just auto-expand if really wide, e.g., > 1600, assuming ample space implies sidebar should be visible)
-            // User request: "Quando o conteúdo da tela chegar a sua largura máxima, expandir a sidebar automaticamente"
-            // Suggests we should prioritize visibility on large screens.
             if (window.innerWidth > 1400) {
                 setCollapsed(false);
             }
@@ -119,13 +114,21 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
         window.addEventListener('resize', handleResize);
 
         // Check for updates
-        checkForUpdates().then(info => {
-            setAppVersion(info.currentVersion);
-            if (info.available) {
-                console.log("Update available:", info.latestVersion);
-                setUpdateAvailable(true);
-            }
-        });
+        checkForUpdates()
+            .then(info => {
+                setAppVersion(info.currentVersion);
+                if (info.available) {
+                    console.log("Update available:", info.latestVersion);
+                    setUpdateAvailable(true);
+                }
+            })
+            .catch(async () => {
+                try {
+                    setAppVersion(await getVersion());
+                } catch {
+                    setAppVersion("2.0.76"); // Ultimate fallback
+                }
+            });
 
         return () => window.removeEventListener('resize', handleResize);
     }, []);

@@ -124,7 +124,7 @@ pub fn start_appium_server(
                     let reader = BufReader::new(err);
                     for line in reader.lines() {
                         if let Ok(l) = line {
-                            let _ = handle.emit("appium-output", l); // Unified event or separate 'appium-error'?
+                            let _ = handle.emit("appium-output", l);
                         }
                     }
                 });

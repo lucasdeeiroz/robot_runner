@@ -65,9 +65,6 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
         let pollingOffset = 0; // Local offset for this session
 
         if (isStreaming && selectedDevice) {
-            // Check if we have logs already (restored from mount) to set initial offset?
-            // Usually internal buffer is cleared on new component mount, so we start from 0
-            // and get full history from backend.
 
             interval = setInterval(async () => {
                 try {
@@ -88,8 +85,8 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
                     } else if (totalLen < pollingOffset) {
                         // Buffer reset? Reset offset
                         pollingOffset = 0;
-                    } else {
-                        // Resync offset
+                    } else if (totalLen > pollingOffset) {
+                        // Resync offset if needed (should have been covered by newLines, but failsafe)
                         pollingOffset = totalLen;
                     }
                 } catch (e) {
@@ -235,7 +232,8 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
                             "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 rounded-md py-1.5 text-xs focus:ring-2 focus:ring-primary/20 outline-none transition-all",
                             isNarrow ? "px-2" : "pl-8 pr-2",
                             "truncate",
-                            isNarrow ? "w-48" : "w-40" // Fixed width for visibility
+                            isNarrow ? "w-48" : "w-40", // Fixed width for visibility
+                            "disabled:opacity-50 disabled:cursor-not-allowed"
                         )}
                         disabled={isStreaming}
                     >

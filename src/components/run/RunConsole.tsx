@@ -102,49 +102,15 @@ export function RunConsole({ logs, isRunning }: RunConsoleProps) {
                     activeFailGroupId = null;
                 }
 
-                // If we are building a test buffer, valid test output shouldn't have [System] lines inserted in the middle usually?
-                // Actually, if we have [System] lines, they are instantaneous, so flush buffer text if any, then flush system line.
-                // BUT, if we effectively split the buffer, we might lose the "Test Name" if it was printed before [System].
-                // Robot: "Test Name" -> [System] (Unlikely) -> " ... " -> | PASS |
-                // More likely: [System] -> [System] -> "Test Name" -> ...
-
-                // Safe bet: If we see these lines, treat them as TextNodes immediately.
-                // But check if we are in "Error Capture" mode.
-
                 if (activeFailGroupId) {
-                    // Add to the failed test's logs if it's NOT a hard separator?
-                    // If it's a [System] line, it's likely global, so maybe don't add to test?
-                    // Let's stick to: Separator ends error capture. System lines are just logged.
-                    // But if we are capturing error, we technically want to capture everything until the next test starts or suite ends?
-                    // Robot errors can be multi-line.
 
                     if (separator) {
                         activeFailGroupId = null;
                         processBufferAsText();
                         linearNodes.push({ type: 'text', content: log, id: `sep-${i}` });
                     } else {
-                        // It's a system/error line. Include in the test logs? 
-                        // Or break out? User wants "Error message" part of test.
-                        // System logs are probably not "Error messages" of the test.
-                        // So we push to general linear text.
-                        // processBufferAsText(); 
-                        // linearNodes.push({ type: 'text', content: log, id: `sys-${i}` });
-
-                        // Wait, if I push to linearNodes, it breaks the 'test-group' container visually?
-                        // Yes. The TestGroup renders its `logs`. 
-                        // If I push a text node now, it will be a sibling of the TestGroup.
-                        // So it appears OUTSIDE the test.
-                        // If the user wants it INSIDE, I must push to `logs`.
-
-                        // Robot Error messages are NOT [System] lines. They are plain text.
-                        // So `isSystem` check handling is fine for [System].
-
-                        // If normal text (Error message), it falls through to "normal line" logic below, which checks activeFailGroupId first.
-                        // So this block is strictly for System/Separator.
 
                         if (isSystem || isError) {
-                            // If we are capturing, maybe we should stop capturing?
-                            // No, let's keep capturing normal text. But System lines should probably be outside.
                             activeFailGroupId = null;
                             processBufferAsText();
                             linearNodes.push({ type: 'text', content: log, id: `sys-${i}` });
@@ -184,9 +150,7 @@ export function RunConsole({ logs, isRunning }: RunConsoleProps) {
                     // Suite End
                     if (activeFailGroupId) activeFailGroupId = null; // Safety
 
-                    // Ensure buffer is processed. 
-                    // Note: Suite End lines usually don't have predecessors in the buffer that belong to them specifically, 
-                    // except maybe teardown?
+                    // Ensure buffer is processed.
                     processBufferAsText();
 
                     linearNodes.push({
@@ -203,22 +167,15 @@ export function RunConsole({ logs, isRunning }: RunConsoleProps) {
                     if (activeFailGroupId) activeFailGroupId = null; // New test ending closes previous failure capture if any (should have been closed by separator, but just in case)
 
                     // Test Name Logic
-                    // We need to filter the buffer to find the likely Name candidate.
-                    // Buffer might contain "noise" if our previous filters failed or if there's random stdout.
-                    // Strategy: The *first* non-empty line in buffer is the Name.
-                    // If buffer is empty, use the namePrefix from the status line.
 
                     let testName = name; // Use extracted name
                     let logsStartIdx = 0;
 
                     // Cleanup buffer for name search
-                    // Find first non-empty line
                     const nameIdx = buffer.findIndex(l => l.trim().length > 0 && !l.startsWith('[System]') && !isSeparator(l));
 
                     if (nameIdx !== -1) {
-                        // Found a preceding line. Does it match the extracted name?
                         const bufferLine = buffer[nameIdx].trim();
-                        // The buffer line might also contain " :: "
                         let bufferName = bufferLine;
                         let bufferDoc = undefined;
 
@@ -227,10 +184,6 @@ export function RunConsole({ logs, isRunning }: RunConsoleProps) {
                             bufferName = parts[0].trim();
                             bufferDoc = parts.slice(1).join(" :: ").trim();
                         }
-
-                        // Logic: If status-line name is empty or we prefer buffer name (usually longer/cleaner)
-                        // If testName (from status) is empty, definitely use buffer.
-                        // If testName exists, check if bufferName looks like it.
                         if (!testName || bufferName.includes(testName) || testName.includes(bufferName)) {
                             testName = bufferName;
                             // If we didn't get doc from status line, maybe we got it from buffer?
@@ -264,12 +217,7 @@ export function RunConsole({ logs, isRunning }: RunConsoleProps) {
                     buffer = [];
                 }
             } else {
-                // Not a status line.
-                // If we are in "Error Capture" mode (activeFailGroupId), append to that test.
                 if (activeFailGroupId) {
-                    // We need to find the node in linearNodes.
-                    // Since it was just pushed (or recently pushed), it's at the end or close to it.
-                    // Optimization: We know ID.
 
                     const targetNode = linearNodes.find(n => n.id === activeFailGroupId);
                     if (targetNode && targetNode.type === 'test') {
@@ -290,8 +238,6 @@ export function RunConsole({ logs, isRunning }: RunConsoleProps) {
 
         linearNodes.forEach(node => {
             if (node.type === 'suite-end') {
-                // Collect children from stack
-                // Scan backwards for a matching "Start" text node or hit a boundary
                 const cleanName = node.name.replace(/\.\.\.$/, '').trim();
 
                 let foundStart = false;
@@ -311,13 +257,7 @@ export function RunConsole({ logs, isRunning }: RunConsoleProps) {
                 }
 
                 if (!foundStart) {
-                    // Safety fallback: if no start found, maybe we popped everything.
-                    // Ideally log this.
                 }
-
-                // Create Suite Node
-                // Logic: "Parent.Child" -> "Child" for display
-                // The nesting structure (children array) provides the hierarchy.
                 const displayName = node.name.split('.').pop() || node.name;
 
                 const suiteNode: SuiteNode = {
@@ -404,9 +344,6 @@ export function RunConsole({ logs, isRunning }: RunConsoleProps) {
             const isFailed = node.status === 'FAIL';
             const isUserToggled = collapsedIds.has(node.id); // If in set, it is TOGGLED (inverted from default)
 
-            // Logic:
-            // Fail -> Default Open. Toggled -> Closed.
-            // Pass -> Default Closed. Toggled -> Open.
             const isOpen = isFailed ? !isUserToggled : isUserToggled;
 
             return (

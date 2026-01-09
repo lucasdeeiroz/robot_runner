@@ -5,7 +5,7 @@ import { RefreshCw, Maximize, Check, Scan, MousePointerClick, Move, Home, ArrowL
 import { XMLParser } from 'fast-xml-parser';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
-import { InspectorNode, transformXmlToTree, findNodeAtCoords, generateXPath } from '@/lib/inspectorUtils';
+import { InspectorNode, transformXmlToTree, findNodesAtCoords, generateXPath } from '@/lib/inspectorUtils';
 import { feedback } from "@/lib/feedback";
 
 interface InspectorSubTabProps {
@@ -93,13 +93,10 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
         if (!selectedDevice) return;
         setLoading(true);
         try {
-            // Parallel fetch could be faster but let's do sequential for reliability first or Promise.all
-            // Taking screenshot first so user sees something while XML parses
             const b64 = await invoke<string>('get_screenshot', { deviceId: selectedDevice });
             setScreenshot(b64);
 
             const xml = await invoke<string>('get_xml_dump', { deviceId: selectedDevice });
-            // setXmlData(xml); // Removed unused state
 
             // Parse XML
             const parser = new XMLParser({
@@ -127,7 +124,6 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
         try {
             await invoke('run_adb_command', { device: selectedDevice, args });
             // Auto-refresh after input to show updated state
-            // Wait a bit for device animation (1.5s)
             setTimeout(refreshAll, 1500);
         } catch (e) {
             console.error("Input failed", e);
@@ -182,20 +178,34 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
         }
     };
 
+    const [availableNodes, setAvailableNodes] = useState<InspectorNode[]>([]);
+
+    // ...
+
     const processMouseInteraction = (e: React.MouseEvent<HTMLImageElement>, isHover: boolean) => {
         if (!rootNode || !imgRef.current) return false;
-
-        // Re-use logic or call getCoords? 
-        // Logic below matches existing logic but I extracted getCoords for reuse.
         const coords = getCoords(e);
         if (!coords) return false;
 
-        const node = findNodeAtCoords(rootNode, coords.x, coords.y);
+        const candidates = findNodesAtCoords(rootNode, coords.x, coords.y);
+        if (candidates.length === 0) return false;
+
+        const best = candidates[0];
 
         if (isHover) {
-            if (node !== hoveredNode) setHoveredNode(node);
+            if (best !== hoveredNode) setHoveredNode(best);
         } else {
-            setSelectedNode(node);
+            // Click Logic: Find all nodes with EXACT same bounds as best
+            const exactMatches = candidates.filter((c: InspectorNode) =>
+                c.bounds && best.bounds &&
+                c.bounds.x === best.bounds.x &&
+                c.bounds.y === best.bounds.y &&
+                c.bounds.w === best.bounds.w &&
+                c.bounds.h === best.bounds.h
+            );
+
+            setAvailableNodes(exactMatches);
+            setSelectedNode(exactMatches[0]);
         }
         return true;
     };
@@ -343,25 +353,12 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
                             {/* Ongoing Swipe Preview */}
                             {interactionMode === 'swipe' && swipeStart && (
                                 <div className="absolute w-full h-full top-0 left-0 pointer-events-none z-30">
-                                    {/* We need current mouse position for live preview, but let's stick to post-action animation for now or basic start marker */}
-                                    {/* If we want live drag line, we need to track mouse move in state, which might be heavy. Let's just show start point. */}
                                     <div
                                         className="absolute w-4 h-4 bg-orange-500 rounded-full -ml-2 -mt-2 opacity-50"
-                                        style={{ left: swipeStart.x, top: swipeStart.y }} // Warning: swipeStart is in image coords (scaled). We need display coords here.
-                                    // Wait, swipeStart in state IS image coords (getCoords returns scaled).
-                                    // But to render on screen over the image, we need CSS pixels relative to the generic container?
-                                    // getCoords uses: (e.clientX - rect.left) * scaleX.
-                                    // So e.clientX - rect.left is the CSS pixel info.
-                                    // createSwipe/Tap logic uses getCoords which returns DEVICE pixels.
-                                    // We need separate logic for display vs functionality?
-                                    // Or we can reverse calculate: (deviceX / scaleX)
+                                        style={{ left: swipeStart.x, top: swipeStart.y }}
                                     />
                                 </div>
                             )}
-
-                            {/* Highlights overlaid on top (using absolute positioning based on cached rects logic) */}
-                            {/* Note: The previous logic relied on client rects which might be tricky if image scales. */}
-                            {/* Ideally we should map coordinates relative to image natural size to displayed size. */}
                             <div
                                 className="absolute border-2 border-blue-400 pointer-events-none transition-all duration-75 z-10"
                                 style={{ ...getHighlighterStyle(hoveredNode, '#60a5fa'), display: hoveredNode?.bounds ? 'block' : 'none' }}
@@ -381,10 +378,30 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
 
                 {/* Right: Properties Scroll View */}
                 <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl flex flex-col overflow-hidden shadow-sm dark:shadow-none h-full">
-                    <div className="flex border-b border-zinc-200 dark:border-zinc-800 shrink-0 bg-zinc-50 dark:bg-zinc-800/50">
-                        <div className="px-4 py-3 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-                            {t('inspector.properties')}
-                        </div>
+                    <div className="flex flex-col border-b border-zinc-200 dark:border-zinc-800 shrink-0 bg-zinc-50 dark:bg-zinc-800/50">
+                        {availableNodes.length > 1 ? (
+                            <div className="flex overflow-x-auto custom-scrollbar">
+                                {availableNodes.map((node) => (
+                                    <button
+                                        key={node.id}
+                                        onClick={() => setSelectedNode(node)}
+                                        className={clsx(
+                                            "px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
+                                            selectedNode === node
+                                                ? "border-primary text-primary bg-white dark:bg-zinc-900"
+                                                : "border-transparent text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                                        )}
+                                    >
+                                        {node.tagName}
+                                        {node.attributes['resource-id'] && <span className="ml-2 text-xs opacity-50 truncate max-w-[100px] inline-block align-bottom">{node.attributes['resource-id'].split('/').pop()}</span>}
+                                    </button>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="px-4 py-3 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                                {t('inspector.properties')}
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex-1 overflow-y-auto custom-scrollbar p-0">

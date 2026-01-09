@@ -48,8 +48,6 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
     // If session type changes (rare but possible), reset default
     useEffect(() => {
         if (session.type === 'test' && activeTool !== 'console') {
-            // Keep user selection if they navigated away, or reset? 
-            // Let's stick to user selection unless invalid.
         }
     }, [session.type]);
 
@@ -389,7 +387,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                 </div>
             )
             }
-        </div >
+        </div>
     );
 }
 

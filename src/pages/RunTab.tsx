@@ -35,8 +35,6 @@ export function RunTab({ onNavigate, initialTab }: RunTabProps) {
         return () => observer.disconnect();
     }, []);
 
-    // Initialize activeTab with initialTab if provided, else default to 'tests'
-    // But if 'tests' is disabled (missing tools), default to 'connect'?
     const [activeTab, setActiveTab] = useState<TabType>(() => {
         if (initialTab && !(initialTab === 'tests' && systemCheckStatus?.missingAppium?.length > 0 || systemCheckStatus?.missingTesting?.length > 0)) return initialTab;
         if (systemCheckStatus?.missingTesting?.length > 0) return 'connect';

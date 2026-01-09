@@ -8,7 +8,7 @@ import clsx from "clsx";
 
 export function AboutPage() {
     const { t } = useTranslation();
-    const appVersion = "2.0.76";
+    const appVersion = "2.0.77";
     const [isChecking, setIsChecking] = useState(false);
 
     const handleCheckUpdate = async () => {

@@ -134,7 +134,6 @@ function App() {
       )}
       <Layout activePage={activePage} onNavigate={setActivePage}>
         <div className="max-w-7xl mx-auto h-full flex flex-col">
-          {/* Header area - handled by Layout usually, but title is here? */}
           {/* App Title Header */}
           <div className="flex items-center gap-4 px-8 py-6 shrink-0 z-50">
             <div className="h-[52px] w-[52px] flex items-center justify-center rounded-2xl bg-primary/10">

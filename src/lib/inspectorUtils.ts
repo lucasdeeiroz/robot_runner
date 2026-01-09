@@ -89,31 +89,38 @@ export function transformXmlToTree(rawNode: any, parent?: InspectorNode): Inspec
 }
 
 /**
- * Finds the deepest node that contains the given coordinates.
+ * Finds all nodes that contain the given coordinates.
+ * Returns an array sorted by area (ascending).
  */
-export function findNodeAtCoords(node: InspectorNode, x: number, y: number): InspectorNode | null {
-    // Check if point is inside current node (if it has bounds)
-    if (node.bounds) {
-        if (x < node.bounds.x || x > node.bounds.x + node.bounds.w ||
-            y < node.bounds.y || y > node.bounds.y + node.bounds.h) {
-            return null;
+export function findNodesAtCoords(node: InspectorNode, x: number, y: number): InspectorNode[] {
+    const candidates: InspectorNode[] = [];
+
+    function traverse(currentNode: InspectorNode) {
+        // If node has bounds, check intersection
+        if (currentNode.bounds) {
+            const { x: bx, y: by, w, h } = currentNode.bounds;
+            if (x >= bx && x <= bx + w && y >= by && y <= by + h) {
+                candidates.push(currentNode);
+            }
+        }
+
+        // Always verify children
+        if (currentNode.children) {
+            currentNode.children.forEach(traverse);
         }
     }
 
-    // Search children (reverse order for z-index)
-    // Even if this node has no bounds (like root hierarchy), we search children
-    if (node.children) {
-        for (let i = node.children.length - 1; i >= 0; i--) {
-            const found = findNodeAtCoords(node.children[i], x, y);
-            if (found) return found;
-        }
-    }
+    traverse(node);
 
-    // If we are here:
-    // 1. It matched our bounds (if we had them)
-    // 2. None of our children claimed the point
-    // So it's us, BUT only if we have bounds (don't return invisible container)
-    return node.bounds ? node : null;
+    // Sort by area (ascending)
+    candidates.sort((a, b) => {
+        const areaA = (a.bounds?.w || 0) * (a.bounds?.h || 0);
+        const areaB = (b.bounds?.w || 0) * (b.bounds?.h || 0);
+
+        return areaA - areaB;
+    });
+
+    return candidates;
 }
 
 /**

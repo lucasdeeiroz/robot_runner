@@ -39,10 +39,6 @@ pub async fn start_screen_recording(device: String) -> Result<String, String> {
     // We use /sdcard/robot_runner_rec.mp4 as a temp file
     // "screenrecord" typically runs until 3 mins or SIGINT.
 
-    // We spawn it detached.
-    // Note: On Windows, pure spawn might leave a console window?
-    // We'll use the same trick as Scrcpy or creation flags if needed.
-
     let mut cmd = Command::new("adb");
     cmd.args(&[
         "-s",
@@ -68,8 +64,6 @@ pub async fn start_screen_recording(device: String) -> Result<String, String> {
 #[tauri::command]
 pub async fn stop_screen_recording(device: String, local_path: String) -> Result<String, String> {
     // 1. Send SIGINT (2) to screenrecord to make it finalize the MP4
-    // We use 'pkill -2 -l screenrecord' (matches name exactly? no -l is signal list? pkill -2 -f screenrecord?)
-    // 'killall -2 screenrecord' is common.
 
     let mut cmd_kill = Command::new("adb");
     cmd_kill.args(&["-s", &device, "shell", "pkill", "-2", "screenrecord"]);

@@ -32,7 +32,7 @@ pub fn get_test_history(
         }
     }
 
-    // Only add defaults if no custom path provided (or if we want to fallback? usually override is best)
+
     if candidates.is_empty() {
         candidates.push(PathBuf::from("../test_results"));
         candidates.push(PathBuf::from("test_results"));
@@ -48,12 +48,6 @@ pub fn get_test_history(
     let mut cache_map: std::collections::HashMap<String, TestLog> =
         std::collections::HashMap::new();
     let mut cache_mtime = std::time::SystemTime::UNIX_EPOCH;
-
-    // Always try to load cache first to build the map, even if force_refresh is true?
-    // Actually if force_refresh is true, we might want to re-parse everything regardless of mtime.
-    // But the user asked for "only new metadata", effectively "incremental update".
-    // So "Refresh" button should probably behave as "Scan for changes".
-    // True "Force Rebuild" might be a separate concern, but for now assuming "Refresh" = "Incremental Update".
 
     if let Some(ref cache_path) = cache_file {
         if cache_path.exists() {
@@ -77,13 +71,7 @@ pub fn get_test_history(
         }
     }
 
-    // If forcing complete re-parse (ignoring timestamps), we could clear cache_map here.
-    // But "refresh" usually means "check for new stuff".
     if force_refresh {
-        // Maybe user WANTS to re-parse modified files even if timestamp logic fails?
-        // For now, let's trust mtime. If force_refresh is true, we still use cache if file unmodified.
-        // If we strictly want to invalid cache, we would reset cache_mtime to UNIX_EPOCH.
-        // Let's assume standard incremental behavior.
     }
 
     let mut logs = Vec::new();
