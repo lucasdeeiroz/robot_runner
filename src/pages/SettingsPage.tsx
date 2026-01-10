@@ -1,5 +1,6 @@
 import { useSettings } from "@/lib/settings";
 import { Moon, Sun, Globe, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2, ExternalLink } from "lucide-react";
+import { Switch } from "@/components/common/Switch";
 import { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -653,6 +654,21 @@ export function SettingsPage() {
                                 <option value="pt_BR">Português (Brasil)</option>
                                 <option value="es_ES">Español</option>
                             </select>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-4 border-t border-zinc-100 dark:border-zinc-800 mt-4">
+                            <div>
+                                <label className="block text-sm text-zinc-700 dark:text-zinc-300 font-medium mb-1">
+                                    {t('settings.recycle_device_views')}
+                                </label>
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                                    {t('settings.recycle_device_views_desc', { defaultValue: "Reuse existing tabs when running tests on the same device" })}
+                                </p>
+                            </div>
+                            <Switch
+                                checked={settings.recycleDeviceViews}
+                                onCheckedChange={(c: boolean) => updateSetting('recycleDeviceViews', c)}
+                            />
                         </div>
                     </section>
                 </div>

@@ -168,6 +168,8 @@ export const en = {
             paths: "Path Configuration",
             tools: "Tool Options",
             general: "General",
+            recycle_device_views: "Recycle Device Screen",
+            recycle_device_views_desc: "Reuse existing tabs when running tests on the same device",
             language: "Language",
             appearance: {
                 title: "Appearance",

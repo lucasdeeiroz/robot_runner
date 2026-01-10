@@ -21,9 +21,14 @@ interface ToolboxViewProps {
 type ToolTab = 'console' | 'logcat' | 'performance' | 'commands';
 
 export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
+    const { stopSession, rerunSession, setSessionActiveTool } = useTestSessions();
+    const { t } = useTranslation();
+    const { settings, systemCheckStatus } = useSettings();
+    const isMirrorDisabled = systemCheckStatus?.missingMirroring?.length > 0;
+
     // Default to 'console' if it's a test session, otherwise 'logcat' or 'performance'
     const [activeTool, setActiveTool] = useState<ToolTab>(
-        session.type === 'test' ? 'console' : 'logcat'
+        (session.lastActiveTool as ToolTab) || (session.type === 'test' ? 'console' : 'logcat')
     );
     const [isGridView, setIsGridView] = useState(false);
     // Default visible tools in grid: Console and Logcat
@@ -45,16 +50,30 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
         return () => observer.disconnect();
     }, []);
 
-    // If session type changes (rare but possible), reset default
+    // If session type/run changes (recycling), switch to console
+    // If session run changes (new test via recycling), switch to console
     useEffect(() => {
-        if (session.type === 'test' && activeTool !== 'console') {
+        if (session.type === 'test') {
+            setActiveTool('console');
+            if (isGridView) {
+                setVisibleToolsInGrid(prev => new Set(prev).add('console'));
+            }
         }
-    }, [session.type]);
+    }, [session.activeRunId]); // Only trigger on NEW run ID
 
-    const { stopSession, rerunSession } = useTestSessions();
-    const { t } = useTranslation();
-    const { settings, systemCheckStatus } = useSettings();
-    const isMirrorDisabled = systemCheckStatus?.missingMirroring?.length > 0;
+    // Safety: Enforce valid tool for Toolbox mode
+    useEffect(() => {
+        if (session.type === 'toolbox' && activeTool === 'console') {
+            setActiveTool('logcat');
+        }
+    }, [session.type, activeTool]);
+
+    // Sync state for tab persistence
+    useEffect(() => {
+        setSessionActiveTool(session.runId, activeTool);
+    }, [activeTool, session.runId, setSessionActiveTool]);
+
+    // Cleanup or other hooks (removed duplicate destructuring)
     const [isRecording, setIsRecording] = useState(false);
     const [recordingTime, setRecordingTime] = useState(0);
 
@@ -199,7 +218,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
     }, [isGridView, visibleToolsInGrid.size, session.type]);
 
     return (
-        <div ref={containerRef} className="h-full flex flex-col space-y-4">
+        <div ref={containerRef} className="h-full flex flex-col space-y-4 pointer-events-auto relative z-10">
             {/* Tool Selection Header */}
             <div className="flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-800/50 p-1 rounded-lg border border-zinc-200 dark:border-zinc-800 w-fit">
@@ -321,7 +340,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
 
             {/* Tool Content */}
             {isGridView ? (
-                <div className="flex-1 min-h-0 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-4 pb-2 auto-rows-[minmax(min-content,1fr)]">
+                <div className="flex-1 min-h-0 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-4 pb-2 auto-rows-[minmax(300px,1fr)]">
                     {(() => {
                         const allTools: ToolTab[] = ['console', 'logcat', 'commands', 'performance'];
                         const visibleTools = allTools.filter(t =>
@@ -349,11 +368,13 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                                     minimizeLabel={t('common.minimize')}
                                 >
                                     {tool === 'console' && (
-                                        <div className="h-full flex flex-col">
-                                            <div className="p-2 border-b border-zinc-100 dark:border-zinc-800 text-xs text-zinc-500 font-mono">
+                                        <div className="h-full flex flex-col overflow-hidden">
+                                            <div className="p-2 border-b border-zinc-100 dark:border-zinc-800 text-xs text-zinc-500 font-mono shrink-0">
                                                 {session.testPath}
                                             </div>
-                                            <RunConsole logs={session.logs} isRunning={session.status === 'running'} />
+                                            <div className="flex-1 min-h-0">
+                                                <RunConsole logs={session.logs} isRunning={session.status === 'running'} />
+                                            </div>
                                         </div>
                                     )}
                                     {tool === 'logcat' && <LogcatSubTab key={session.deviceUdid} selectedDevice={session.deviceUdid} />}
@@ -366,11 +387,13 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                 </div>
             ) : (
                 <div className="flex-1 min-h-0 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden relative">
-                    <div className={clsx("h-full flex flex-col", activeTool === 'console' && session.type === 'test' ? "block" : "hidden")}>
-                        <div className="p-2 border-b border-zinc-100 dark:border-zinc-800 text-xs text-zinc-500 font-mono">
+                    <div className={clsx("h-full flex flex-col overflow-hidden", activeTool === 'console' && session.type === 'test' ? "block" : "hidden")}>
+                        <div className="p-2 border-b border-zinc-100 dark:border-zinc-800 text-xs text-zinc-500 font-mono shrink-0">
                             {session.testPath}
                         </div>
-                        <RunConsole logs={session.logs} isRunning={session.status === 'running'} />
+                        <div className="flex-1 min-h-0">
+                            <RunConsole logs={session.logs} isRunning={session.status === 'running'} />
+                        </div>
                     </div>
 
                     <div className={clsx("h-full", activeTool === 'logcat' ? "block" : "hidden")}>

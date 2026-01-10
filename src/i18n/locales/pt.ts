@@ -168,6 +168,8 @@ export const pt = {
             paths: "Caminhos",
             tools: "Ferramentas",
             general: "Geral",
+            recycle_device_views: "Reciclar Tela de Dispositivo",
+            recycle_device_views_desc: "Reutilizar abas existentes ao executar testes no mesmo dispositivo",
             language: "Idioma",
             appearance: {
                 title: "Aparência",

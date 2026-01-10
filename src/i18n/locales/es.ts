@@ -168,6 +168,8 @@ export const es = {
             paths: "Rutas",
             tools: "Herramientas",
             general: "General",
+            recycle_device_views: "Reciclar Pantalla del Dispositivo",
+            recycle_device_views_desc: "Reutilizar pestañas existentes al ejecutar pruebas en el mismo dispositivo",
             language: "Idioma",
             appearance: {
                 title: "Apariencia",

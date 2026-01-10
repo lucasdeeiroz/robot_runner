@@ -24,6 +24,7 @@ export interface AppSettings {
     primaryColor: string;
     customLogoLight?: string;
     customLogoDark?: string;
+    recycleDeviceViews: boolean; // New setting
 
     // Appium
     appiumHost: string;
@@ -55,6 +56,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     theme: 'dark',
     language: 'en_US',
     primaryColor: 'blue',
+    recycleDeviceViews: false, // Default to false
     appiumHost: '127.0.0.1',
     appiumPort: 4723,
     paths: {

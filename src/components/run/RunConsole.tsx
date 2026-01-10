@@ -59,11 +59,18 @@ export function RunConsole({ logs, isRunning }: RunConsoleProps) {
     const containerRef = useRef<HTMLDivElement>(null);
 
     // Auto-scroll on new logs
+    // Auto-scroll on new logs with stick-to-bottom logic
     useEffect(() => {
-        if (containerRef.current) {
-            containerRef.current.scrollTop = containerRef.current.scrollHeight;
+        const el = containerRef.current;
+        if (!el || el.clientHeight === 0) return;
+
+        // Tolerance for floating point sizes or small mismatches
+        const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 50;
+
+        if (isAtBottom || logs.length < 5) {
+            el.scrollTop = el.scrollHeight;
         }
-    }, [logs, isRunning]); // Added isRunning to ensure scroll on start/stop/update
+    }, [logs, isRunning]);
 
     // Parse logs into Tree
     const tree = useMemo(() => {
@@ -348,10 +355,11 @@ export function RunConsole({ logs, isRunning }: RunConsoleProps) {
 
             return (
                 <div key={node.id} className="mb-2 mt-1 border border-zinc-800 bg-zinc-900/30 rounded-lg overflow-hidden">
-                    <button
-                        onClick={() => toggleNode(node.id)}
+                    <div
+                        role="button"
+                        onClick={(e) => { e.stopPropagation(); toggleNode(node.id); }}
                         className={clsx(
-                            "w-full flex items-center justify-between px-3 py-1.5 hover:bg-zinc-800/50 transition-colors text-left",
+                            "w-full flex items-center justify-between px-3 py-1.5 hover:bg-zinc-800/50 transition-colors text-left relative z-10 cursor-pointer select-none",
                             isFailed ? "border-l-2 border-red-500" : "border-l-2 border-green-500"
                         )}
                     >
@@ -368,7 +376,7 @@ export function RunConsole({ logs, isRunning }: RunConsoleProps) {
                             {isFailed ? <XCircle size={12} /> : <CheckCircle2 size={12} />}
                             {node.status}
                         </div>
-                    </button>
+                    </div>
                     {isOpen && (
                         <div className="p-2 pl-6 bg-black/20 text-xs border-t border-zinc-800/50">
                             {node.documentation && (
@@ -391,9 +399,10 @@ export function RunConsole({ logs, isRunning }: RunConsoleProps) {
 
             return (
                 <div key={node.id} className="mb-3 mt-2 border-l-4 border-zinc-700/50 pl-2 ml-1">
-                    <button
-                        onClick={() => toggleNode(node.id)}
-                        className="flex items-center gap-2 text-sm font-bold text-zinc-300 hover:text-white mb-2 group w-full text-left"
+                    <div
+                        role="button"
+                        onClick={(e) => { e.stopPropagation(); toggleNode(node.id); }}
+                        className="flex items-center gap-2 text-sm font-bold text-zinc-300 hover:text-white mb-2 group w-full text-left relative z-10 cursor-pointer select-none"
                     >
                         {isOpen ? <ChevronDown size={16} className="text-zinc-500 group-hover:text-zinc-300 transition-colors" /> : <ChevronRight size={16} className="text-zinc-500 group-hover:text-zinc-300 transition-colors" />}
                         <Layers size={14} className="text-primary opacity-70" />
@@ -401,7 +410,7 @@ export function RunConsole({ logs, isRunning }: RunConsoleProps) {
                         <span className={clsx("text-[10px] ml-auto px-1.5 py-0.5 rounded border", isFailed ? "border-red-900/50 text-red-400" : "border-green-900/50 text-green-500 bg-green-900/10")}>
                             {node.summary}
                         </span>
-                    </button>
+                    </div>
 
                     {isOpen && (
                         <div className="pl-2 space-y-1">
@@ -420,12 +429,14 @@ export function RunConsole({ logs, isRunning }: RunConsoleProps) {
     };
 
     return (
-        <div ref={containerRef} className="h-full bg-black/90 rounded-lg p-4 font-mono text-sm overflow-auto border border-zinc-800 shadow-inner custom-scrollbar">
+        <div ref={containerRef} className="h-full bg-black/90 rounded-lg p-4 font-mono text-sm overflow-auto border border-zinc-800 shadow-inner custom-scrollbar pointer-events-auto relative z-0 isolate">
             {logs.length === 0 && (
                 <div className="text-zinc-500 italic opacity-50 select-none">{t('console.waiting')}</div>
             )}
 
-            {tree.map(renderNode)}
+            <div className="relative z-10 w-full">
+                {tree.map(renderNode)}
+            </div>
 
             {isRunning && logs.length > 0 && (
                 <div className="animate-pulse text-blue-500 mt-2 flex items-center gap-2 text-xs">

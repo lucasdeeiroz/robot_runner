@@ -7,6 +7,7 @@ import { feedback } from './feedback';
 
 export interface TestSession {
     runId: string;
+    activeRunId?: string; // New: For tracking recycled sessions
     type: 'test' | 'toolbox'; // New field
     deviceName: string;
     deviceUdid: string;
@@ -17,6 +18,7 @@ export interface TestSession {
     argumentsFile?: string | null;
     deviceModel?: string; // New
     androidVersion?: string; // New
+    lastActiveTool?: string; // Persist active tool across mounts
 }
 
 interface TestOutputPayload {
@@ -38,6 +40,7 @@ interface TestSessionContextType {
     clearSession: (runId: string) => void;
     activeSessionId: string | 'dashboard';
     setActiveSessionId: (id: string | 'dashboard') => void;
+    setSessionActiveTool: (runId: string, tool: string) => void;
 }
 
 const TestSessionContext = createContext<TestSessionContextType | undefined>(undefined);
@@ -51,7 +54,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
         const unlistenOutputPromise = listen<TestOutputPayload>('test-output', (event) => {
             const { run_id, message } = event.payload;
             setSessions(prev => prev.map(s => {
-                if (s.runId === run_id) {
+                if (s.runId === run_id || s.activeRunId === run_id) {
                     return { ...s, logs: [...s.logs, message] };
                 }
                 return s;
@@ -61,7 +64,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
         const unlistenFinishedPromise = listen<TestFinishedPayload>('test-finished', (event) => {
             const { run_id, status } = event.payload;
             setSessions(prev => prev.map(s => {
-                if (s.runId === run_id) {
+                if (s.runId === run_id || s.activeRunId === run_id) {
                     // Feedback
                     // Backend sends "Exit Code: 0" for success
                     if (status.includes('Exit Code: 0') || status.includes('exit code: 0')) {
@@ -87,31 +90,85 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
         };
     }, []);
 
+    const { settings } = useSettings();
+
     const addSession = useCallback((runId: string, deviceUdid: string, deviceName: string, testPath: string, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string) => {
-        setSessions(prev => [
-            ...prev,
-            {
-                runId,
-                type: 'test',
-                deviceUdid,
-                deviceName,
-                testPath,
-                logs: [`[System] Starting test session: ${runId}`, `[System] Device: ${deviceName}`, `[System] Suite: ${testPath}`, '----------------------------------------'],
-                status: 'running',
-                argumentsFile: argumentsFile,
-                deviceModel,
-                androidVersion
+        setSessions(prev => {
+            // Check for recycling
+            if (settings.recycleDeviceViews) {
+                // Determine UDID for local if needed, though runId usually has it? No, passed explicitly.
+                const targetUdid = deviceUdid;
+
+                // Find existing session for this device
+                const existingIndex = prev.findIndex(s => s.deviceUdid === targetUdid);
+                if (existingIndex !== -1) {
+                    // Update existing session
+                    const updatedSessions = [...prev];
+                    const existing = updatedSessions[existingIndex];
+
+                    updatedSessions[existingIndex] = {
+                        ...existing,
+                        activeRunId: runId, // Track the new test run ID
+                        type: 'test',       // Switch to test view/mode (handled by ToolBox if we update it, but here we just set type)
+                        // Ideally ToolBoxView should know if it's running a test to show console.
+                        // The types field helps `TestsPage` show status icons.
+                        testPath,
+                        // Reset logs for new test? Yes.
+                        logs: [`[System] Starting test session: ${runId}`, `[System] Device: ${deviceName}`, `[System] Suite: ${testPath}`, '----------------------------------------'],
+                        status: 'running',
+                        argumentsFile,
+                        deviceModel,
+                        androidVersion,
+                        exitCode: undefined // clear previous exit code
+                    };
+
+                    setTimeout(() => setActiveSessionId(existing.runId), 0); // Focus it
+                    return updatedSessions;
+                }
             }
-        ]);
-        setActiveSessionId(runId);
-        feedback.toast.info('feedback.test_started'); // New key needed or use raw? Let's use raw or add key. User asked for notifications. Toast is good for start.
-    }, []);
+
+            // Default behavior: Add new session
+            setTimeout(() => setActiveSessionId(runId), 0);
+            return [
+                ...prev,
+                {
+                    runId,
+                    type: 'test',
+                    deviceUdid,
+                    deviceName,
+                    testPath,
+                    logs: [`[System] Starting test session: ${runId}`, `[System] Device: ${deviceName}`, `[System] Suite: ${testPath}`, '----------------------------------------'],
+                    status: 'running',
+                    argumentsFile: argumentsFile,
+                    deviceModel,
+                    androidVersion
+                }
+            ];
+        });
+        feedback.toast.info('feedback.test_started');
+    }, [settings.recycleDeviceViews]);
 
     const addToolboxSession = useCallback((deviceUdid: string, deviceName: string) => {
         const runId = `toolbox-${deviceUdid}`;
-        // Prevent duplicates
+
         setSessions(prev => {
-            if (prev.find(s => s.runId === runId)) return prev;
+            // Check for recycling
+            if (settings.recycleDeviceViews) {
+                // Check if ANY session exists for this device (Test or Toolbox)
+                const existing = prev.find(s => s.deviceUdid === deviceUdid);
+                if (existing) {
+                    setTimeout(() => setActiveSessionId(existing.runId), 0);
+                    return prev;
+                }
+            }
+
+            // Normal check (Toolbox duplicate)
+            if (prev.find(s => s.runId === runId)) {
+                setTimeout(() => setActiveSessionId(runId), 0);
+                return prev;
+            }
+
+            setTimeout(() => setActiveSessionId(runId), 0);
             return [
                 ...prev,
                 {
@@ -121,14 +178,11 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     deviceName,
                     testPath: 'Toolbox',
                     logs: [],
-                    status: 'running' // Always "running" for toolbox
+                    status: 'running'
                 }
             ];
         });
-        setActiveSessionId(runId);
-    }, []);
-
-    const { settings } = useSettings();
+    }, [settings.recycleDeviceViews]);
 
     const stopSession = useCallback(async (runId: string) => {
         try {
@@ -141,7 +195,6 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
             }));
         } catch (e) {
             console.error("Failed to stop session", e);
-            // Still mark as stopped in UI if failed? Or error.
             setSessions(prev => prev.map(s => {
                 if (s.runId === runId) {
                     return { ...s, logs: [...s.logs, `\n[Error] Failed to stop: ${e}`] };
@@ -229,8 +282,17 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
         }
     }, [activeSessionId]);
 
+    const setSessionActiveTool = useCallback((runId: string, tool: string) => {
+        setSessions(prev => prev.map(s => {
+            if (s.runId === runId) {
+                return { ...s, lastActiveTool: tool };
+            }
+            return s;
+        }));
+    }, []);
+
     return (
-        <TestSessionContext.Provider value={{ sessions, addSession, addToolboxSession, stopSession, rerunSession, clearSession, activeSessionId, setActiveSessionId }}>
+        <TestSessionContext.Provider value={{ sessions, addSession, addToolboxSession, stopSession, rerunSession, clearSession, activeSessionId, setActiveSessionId, setSessionActiveTool }}>
             {children}
         </TestSessionContext.Provider>
     );
