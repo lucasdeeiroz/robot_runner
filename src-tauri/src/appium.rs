@@ -13,7 +13,17 @@ pub struct AppiumStatus {
 
 #[tauri::command]
 pub fn get_appium_status(state: State<'_, AppiumState>) -> AppiumStatus {
-    let mut child_guard = state.0.lock().unwrap();
+    let mut child_guard = match state.0.lock() {
+        Ok(guard) => guard,
+        Err(_) => {
+            // If poisoned, we assume it's not running or in bad state.
+            // Ideally we should log this.
+            return AppiumStatus {
+                running: false,
+                pid: None,
+            };
+        }
+    };
     if let Some(child) = &mut *child_guard {
         // limit: try_wait() returns Ok(Some(_)) if exited, Ok(None) if running
         match child.try_wait() {
@@ -56,7 +66,7 @@ pub fn start_appium_server(
     args: String, // Extra args string
     app_handle: tauri::AppHandle,
 ) -> Result<String, String> {
-    let mut child_guard = state.0.lock().unwrap();
+    let mut child_guard = state.0.lock().map_err(|e| e.to_string())?;
 
     // Check if already running
     if let Some(child) = &mut *child_guard {
@@ -138,7 +148,7 @@ pub fn start_appium_server(
 
 #[tauri::command]
 pub fn stop_appium_server(state: State<'_, AppiumState>) -> Result<String, String> {
-    let mut child_guard = state.0.lock().unwrap();
+    let mut child_guard = state.0.lock().map_err(|e| e.to_string())?;
     if let Some(mut child) = child_guard.take() {
         // Handle Windows Process Tree Killing
         #[cfg(target_os = "windows")]
