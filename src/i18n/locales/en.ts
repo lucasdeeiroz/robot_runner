@@ -455,7 +455,8 @@ export const en = {
             system_only: "Entire System",
             device_stats: "Device Performance",
             app_stats: "App Performance",
-            auto: "Auto"
+            auto: "Auto",
+            na: "N/A"
         },
         feedback: {
             success: "Success",
@@ -480,7 +481,8 @@ export const en = {
                 device: "Device: {{device}}",
                 path: "Path: {{path}}",
                 url: "URL: {{url}}"
-            }
+            },
+            saved_to_prefix: "File saved to:"
         },
         startup: {
             loading: "Initializing application...",

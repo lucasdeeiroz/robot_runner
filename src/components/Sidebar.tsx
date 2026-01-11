@@ -192,7 +192,14 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
             <div className="p-4 border-t border-zinc-200 dark:border-zinc-800">
                 {!collapsed && <div className="text-xs text-zinc-500 flex justify-between items-center">
                     <span>v{appVersion}</span>
-                    {updateAvailable && <span className="text-red-500 font-bold text-[10px] bg-red-100 dark:bg-red-900/30 px-1.5 py-0.5 rounded">UPDATE</span>}
+                    {updateAvailable && (
+                        <button
+                            onClick={() => onNavigate('about')}
+                            className="text-red-500 font-bold text-[10px] bg-red-100 dark:bg-red-900/30 px-1.5 py-0.5 rounded hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors animate-pulse cursor-pointer"
+                        >
+                            {t('about.update_badge')}
+                        </button>
+                    )}
                 </div>}
             </div>
         </div>

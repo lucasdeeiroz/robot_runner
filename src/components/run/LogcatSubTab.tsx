@@ -7,6 +7,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useSettings } from "@/lib/settings";
 import clsx from "clsx";
 import { feedback } from "@/lib/feedback";
+import { FileSavedFeedback } from "@/components/common/FileSavedFeedback";
 
 interface LogcatSubTabProps {
     selectedDevice: string;
@@ -168,6 +169,8 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
         return () => { isMounted.current = false; };
     }, []);
 
+    const [lastSavedFile, setLastSavedFile] = useState<string | null>(null);
+
     const stopLogcat = async () => {
         console.log("Stopping logcat for", selectedDevice);
         try {
@@ -175,8 +178,10 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
             if (!isMounted.current) return; // Prevent state update if unmounted
             setIsStreaming(false);
             if (currentDumpFile) {
-                setLogs(prev => [...prev, `Saved logcat to: ${currentDumpFile}`]);
+                // Keep the log in the text list as well? user might want it.
+                setLogs(prev => [...prev, `${t('feedback.saved_to_prefix')} ${currentDumpFile}`]);
                 feedback.toast.success('feedback.logcat_saved');
+                setLastSavedFile(currentDumpFile);
                 setCurrentDumpFile(null);
             }
         } catch (e) {
@@ -282,6 +287,11 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
                 </div>
             </div>
 
+            <FileSavedFeedback
+                path={lastSavedFile}
+                onClose={() => setLastSavedFile(null)}
+            />
+
             {/* Log Viewer */}
             {/* Log Viewer */}
             <div
@@ -297,10 +307,10 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
                         atBottomThreshold={50} // If user scrolls up, stop auto-scrolling
                         itemContent={(_, log) => (
                             <div className="whitespace-pre-wrap hover:bg-white/5 px-2 py-0.5 break-all">
-                                {log.startsWith('Saved logcat to: ') ? (
+                                {log.startsWith(t('feedback.saved_to_prefix')) ? (
                                     <span
                                         className="text-primary underline cursor-pointer hover:opacity-80"
-                                        onClick={() => invoke('open_path', { path: log.replace('Saved logcat to: ', '') })}
+                                        onClick={() => invoke('open_path', { path: log.replace(t('feedback.saved_to_prefix') + ' ', '') })}
                                         title={t('logcat.open_file', 'Click to open file')}
                                     >
                                         {log}

@@ -13,6 +13,7 @@ import { PerformanceSubTab } from "./PerformanceSubTab";
 import { RunConsole } from "./RunConsole";
 import { TestSession, useTestSessions } from "@/lib/testSessionStore";
 import { feedback } from "@/lib/feedback";
+import { FileSavedFeedback } from "@/components/common/FileSavedFeedback";
 
 interface ToolboxViewProps {
     session: TestSession;
@@ -93,6 +94,8 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
         return () => clearInterval(interval);
     }, [isRecording]);
 
+    const [lastSavedFile, setLastSavedFile] = useState<string | null>(null);
+
     const handleScreenshot = async () => {
         try {
             let filePath: string | null = null;
@@ -112,6 +115,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
             if (filePath) {
                 await invoke('save_screenshot', { device: session.deviceUdid, path: filePath });
                 console.log("Screenshot saved to:", filePath);
+                setLastSavedFile(filePath);
                 feedback.toast.success('feedback.screenshot_saved');
             }
         } catch (e) {
@@ -141,6 +145,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                 if (filePath) {
                     setIsRecording(false);
                     await invoke('stop_screen_recording', { device: session.deviceUdid, localPath: filePath });
+                    setLastSavedFile(filePath);
                     feedback.notify('feedback.recording_saved', 'feedback.details.path', { path: filePath });
                 }
             } catch (e) {
@@ -354,6 +359,12 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                 </div>
             </div>
 
+            {/* Feedback for Screenshot/Listening */}
+            <FileSavedFeedback
+                path={lastSavedFile}
+                onClose={() => setLastSavedFile(null)}
+            />
+
             {/* Tool Content */}
             {isGridView ? (
                 <div className="flex-1 min-h-0 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-4 pb-2 auto-rows-[minmax(300px,1fr)]">
@@ -390,14 +401,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                                     maximizeLabel={t('common.maximize')}
                                 >
                                     {tool === 'console' && (
-                                        <div className="h-full flex flex-col overflow-hidden">
-                                            <div className="p-2 border-b border-zinc-100 dark:border-zinc-800 text-xs text-zinc-500 font-mono shrink-0">
-                                                {session.testPath}
-                                            </div>
-                                            <div className="flex-1 min-h-0">
-                                                <RunConsole logs={session.logs} isRunning={session.status === 'running'} />
-                                            </div>
-                                        </div>
+                                        <RunConsole logs={session.logs} isRunning={session.status === 'running'} testPath={session.testPath} />
                                     )}
                                     {tool === 'logcat' && <LogcatSubTab key={session.deviceUdid} selectedDevice={session.deviceUdid} />}
                                     {tool === 'commands' && <CommandsSubTab selectedDevice={session.deviceUdid} />}
@@ -411,12 +415,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
             ) : (
                 <div className="flex-1 min-h-0 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden relative">
                     <div className={clsx("h-full flex flex-col overflow-hidden", activeTool === 'console' && session.type === 'test' ? "block" : "hidden")}>
-                        <div className="p-2 border-b border-zinc-100 dark:border-zinc-800 text-xs text-zinc-500 font-mono shrink-0">
-                            {session.testPath}
-                        </div>
-                        <div className="flex-1 min-h-0">
-                            <RunConsole logs={session.logs} isRunning={session.status === 'running'} />
-                        </div>
+                        <RunConsole logs={session.logs} isRunning={session.status === 'running'} testPath={session.testPath} />
                     </div>
 
                     <div className={clsx("h-full", activeTool === 'logcat' ? "block" : "hidden")}>
@@ -435,8 +434,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                         <AppsSubTab />
                     </div>
                 </div>
-            )
-            }
+            )}
         </div>
     );
 }

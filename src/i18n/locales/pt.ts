@@ -455,7 +455,8 @@ export const pt = {
             system_only: "Sistema Inteiro",
             device_stats: "Desempenho do Dispositivo",
             app_stats: "Desempenho do Aplicativo",
-            auto: "Auto"
+            auto: "Auto",
+            na: "N/D"
         },
         feedback: {
             success: "Sucesso",
@@ -480,7 +481,8 @@ export const pt = {
                 device: "Dispositivo: {{device}}",
                 path: "Caminho: {{path}}",
                 url: "URL: {{url}}"
-            }
+            },
+            saved_to_prefix: "Arquivo salvo em:"
         },
         startup: {
             loading: "Inicializando aplicação...",
