@@ -11,6 +11,7 @@ export const pt = {
             about: "Sobre",
             description_about: "Informações sobre o Robot Runner e seus criadores."
         },
+
         run_tab: {
             launcher: "Iniciador",
             connect: "Conectar",
@@ -21,7 +22,14 @@ export const pt = {
                 selected_count: "{{count}} Selecionados",
                 select: "Selecionar Dispositivos",
                 busy: "Ocupado",
-                refresh: "Atualizar"
+                refresh: "Atualizar Dispositivos"
+            },
+            console: {
+                running: "EXECUTANDO",
+                pass: "SUCESSO",
+                fail: "FALHA",
+                test_summary: "{{total}} TESTES: {{passed}} COM SUCESSO, {{failed}} COM FALHA",
+                waiting: "Aguardando logs..."
             }
         },
         common: {
@@ -34,7 +42,47 @@ export const pt = {
             search: "Buscar...",
             loading: "Carregando...",
             minimize: "Minimizar",
-            close: "Fechar"
+            close: "Fechar",
+            confirm: "Confirmar",
+            attention: "Atenção"
+        },
+        apps: {
+            actions: {
+                uninstall_title: "Desinstalar Pacote",
+                uninstall_confirm: "Tem certeza que deseja desinstalar {{pkg}}?",
+                disable_title: "Desativar App",
+                enable_title: "Ativar App",
+                disable_confirm: "Desativar {{pkg}}?",
+                enable_confirm: "Ativar {{pkg}}?",
+                clear_title: "Limpar Dados",
+                clear_confirm: "Limpar todos os dados de {{pkg}}?",
+                install: "Instalar APK",
+                uninstall: "Desinstalar",
+                disable: "Desativar",
+                enable: "Ativar",
+                clear: "Limpar Dados",
+                sort_by_name: "Ordenar por Nome",
+                sort_by_package: "Ordenar por Pacote",
+                refresh: "Atualizar Lista"
+            },
+            search_placeholder: "Buscar pacotes...",
+            toggle_system: "Exibir Apps do Sistema",
+            no_device: "Nenhum dispositivo selecionado",
+            no_packages: "Nenhum pacote encontrado",
+            status: {
+                installing: "Instalando APK...",
+                disabled_badge: "Desativado"
+            },
+            success: {
+                uninstalled: "Pacote {{pkg}} desinstalado com sucesso",
+                disabled: "Pacote {{pkg}} desativado",
+                enabled: "Pacote {{pkg}} ativado",
+                cleared: "Dados de {{pkg}} limpos",
+                installed: "APK instalado com sucesso"
+            },
+            error: {
+                install_failed: "Falha na instalação: {{error}}"
+            },
         },
         tests: {
             mode: {
@@ -51,7 +99,8 @@ export const pt = {
                 starting: "Iniciando Appium...",
                 launching: "Iniciando Testes...",
                 redirecting: "Redirecionando...",
-                failed: "Falha ao iniciar"
+                failed: "Falha ao iniciar",
+                waiting_server: "Aguardando Servidor..."
             },
             alerts: {
                 busy: "Os seguintes dispositivos estão ocupados:\n{{devices}}\n\nAguarde o término."
@@ -168,6 +217,8 @@ export const pt = {
             paths: "Caminhos",
             tools: "Ferramentas",
             general: "Geral",
+            recycle_device_views: "Reciclar Tela de Dispositivo",
+            recycle_device_views_desc: "Reutilizar abas existentes ao executar testes no mesmo dispositivo",
             language: "Idioma",
             appearance: {
                 title: "Aparência",
@@ -250,7 +301,8 @@ export const pt = {
                 logcat: "Logcat",
                 commands: "Comandos",
                 mirror: "Espelhamento",
-                performance: "Performance"
+                performance: "Performance",
+                apps: "Apps"
             },
             actions: {
                 screenshot: "Capturar Tela",
@@ -259,7 +311,8 @@ export const pt = {
                 stop_execution: "Parar Execução",
                 rerun: "Re-executar",
                 switch_to_grid: "Alternar para Grade",
-                switch_to_tabs: "Alternar para Abas"
+                switch_to_tabs: "Alternar para Abas",
+                force_stop: "Forçar Parada"
             }
         },
         file_explorer: {

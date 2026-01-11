@@ -6,6 +6,8 @@ mod ngrok;
 mod runner;
 mod system;
 
+use tauri::Manager;
+
 mod files;
 
 #[tauri::command]
@@ -75,8 +77,23 @@ pub fn run() {
             adb::media::stop_screen_recording,
             adb::network::get_device_ip,
             files::list_directory,
-            files::save_file
+            files::save_file,
+            // Packages
+            adb::packages::get_installed_packages,
+            adb::packages::uninstall_package,
+            adb::packages::enable_package,
+            adb::packages::disable_package,
+            adb::packages::clear_package,
+            adb::packages::install_package
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| match event {
+            tauri::RunEvent::ExitRequested { .. } => {}
+            tauri::RunEvent::Exit => {
+                let state = app_handle.state::<appium::AppiumState>();
+                appium::shutdown_appium(&state);
+            }
+            _ => {}
+        });
 }

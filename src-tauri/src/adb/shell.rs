@@ -102,13 +102,13 @@ pub fn start_adb_command(
         let _ = app_clone.emit(&format!("cmd-close-{}", id_clone), "Process finished");
     });
 
-    state.running_commands.lock().unwrap().insert(id, child);
+    state.running_commands.lock().map_err(|e| e.to_string())?.insert(id, child);
     Ok(())
 }
 
 #[command]
 pub fn stop_adb_command(state: State<'_, ShellState>, id: String) -> Result<(), String> {
-    let mut commands = state.running_commands.lock().unwrap();
+    let mut commands = state.running_commands.lock().map_err(|e| e.to_string())?;
     if let Some(mut child) = commands.remove(&id) {
         child.kill().map_err(|e| e.to_string())?;
         Ok(())

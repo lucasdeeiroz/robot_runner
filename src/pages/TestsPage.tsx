@@ -344,43 +344,8 @@ export function TestsPage() {
         );
     };
 
-    const GridItem = ({ title, children, onClose, onHide, className }: { title: React.ReactNode, children: React.ReactNode, onClose?: () => void, onHide?: () => void, className?: string }) => {
-        return (
-            <div className={clsx(
-                "flex flex-col border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900 overflow-hidden shadow-sm transition-all duration-300 min-h-0", // min-h-0 allows flex shrink/grow properly
-                className
-            )}>
-                <div className="flex items-center justify-between px-3 py-2 bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-100 dark:border-zinc-800 shrink-0">
-                    <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-200 flex items-center gap-2 max-w-[80%] truncate">
-                        {title}
-                    </span>
-                    <div className="flex items-center gap-1">
-                        {onHide && (
-                            <button
-                                onClick={onHide}
-                                className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded"
-                                title={t('common.minimize')} // Visually minimize implies hiding from grid per user req
-                            >
-                                <Minimize2 size={14} />
-                            </button>
-                        )}
-                        {onClose && (
-                            <button
-                                onClick={onClose}
-                                className="p-1 text-zinc-400 hover:text-red-500 rounded"
-                                title={t('common.close')}
-                            >
-                                <XCircle size={14} />
-                            </button>
-                        )}
-                    </div>
-                </div>
-                <div className="flex-1 min-h-0 relative">
-                    {children}
-                </div>
-            </div>
-        );
-    };
+    // Moved outside
+    // const GridItem = ...
 
     return (
         <div className="h-full flex flex-col space-y-4">
@@ -570,7 +535,7 @@ export function TestsPage() {
                             </div>
                         </div>
                     ) : activeSession ? (
-                        <ToolboxView session={activeSession} />
+                        <ToolboxView key={activeSession.runId} session={activeSession} />
                     ) : (
                         <div className="h-full flex items-center justify-center text-zinc-400">
                             {t('tests_page.session_not_found')}
@@ -580,5 +545,44 @@ export function TestsPage() {
             )
             }
         </div >
+    );
+}
+
+function GridItem({ title, children, onClose, onHide, className }: { title: React.ReactNode, children: React.ReactNode, onClose?: () => void, onHide?: () => void, className?: string }) {
+    const { t } = useTranslation();
+    return (
+        <div className={clsx(
+            "flex flex-col border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900 shadow-sm min-h-0 relative z-0",
+            className
+        )}>
+            <div className="flex items-center justify-between px-3 py-2 bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-100 dark:border-zinc-800 shrink-0">
+                <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-200 flex items-center gap-2 max-w-[80%] truncate">
+                    {title}
+                </span>
+                <div className="flex items-center gap-1">
+                    {onHide && (
+                        <button
+                            onClick={onHide}
+                            className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded"
+                            title={t('common.minimize')}
+                        >
+                            <Minimize2 size={14} />
+                        </button>
+                    )}
+                    {onClose && (
+                        <button
+                            onClick={onClose}
+                            className="p-1 text-zinc-400 hover:text-red-500 rounded"
+                            title={t('common.close')}
+                        >
+                            <XCircle size={14} />
+                        </button>
+                    )}
+                </div>
+            </div>
+            <div className="flex-1 min-h-0 relative">
+                {children}
+            </div>
+        </div>
     );
 }

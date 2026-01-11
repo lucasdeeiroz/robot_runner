@@ -17,11 +17,7 @@ export function AboutPage() {
         if (isChecking) return;
         setIsChecking(true);
         try {
-            console.log("[AboutPage] Calling checkForUpdates()...");
             const update = await checkForUpdates();
-            console.log("[AboutPage] Update result:", update);
-
-            console.log("[AboutPage] Update result:", update);
 
             if (update.available) {
                 setUpdateAvailable(true);
@@ -31,7 +27,6 @@ export function AboutPage() {
                 feedback.toast.info(t('about.update_not_available'));
             }
         } catch (error) {
-            console.error("[AboutPage] Error:", error);
             feedback.toast.error(t('about.update_error'));
         } finally {
             setIsChecking(false);

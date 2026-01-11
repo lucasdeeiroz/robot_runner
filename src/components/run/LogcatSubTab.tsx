@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { Play, Square, Eraser, AlignLeft, Package as PackageIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
@@ -17,7 +18,7 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
     const { t } = useTranslation();
     const [isStreaming, setIsStreaming] = useState(false);
     const [logs, setLogs] = useState<string[]>([]);
-    const listRef = useRef<HTMLDivElement>(null);
+    const virtuosoRef = useRef<VirtuosoHandle>(null);
     const { settings } = useSettings();
     const [currentDumpFile, setCurrentDumpFile] = useState<string | null>(null);
 
@@ -101,13 +102,6 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
             if (interval) clearInterval(interval);
         };
     }, [isStreaming, selectedDevice]);
-
-    // Auto-scroll
-    useEffect(() => {
-        if (listRef.current) {
-            listRef.current.scrollTop = listRef.current.scrollHeight;
-        }
-    }, [logs]);
 
     const [selectedPackage, setSelectedPackage] = useState("");
     const [logLevel, setLogLevel] = useState("E");
@@ -289,28 +283,35 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
             </div>
 
             {/* Log Viewer */}
+            {/* Log Viewer */}
             <div
-                ref={listRef}
-                className="flex-1 bg-zinc-900 font-mono text-xs text-zinc-300 p-2 overflow-y-auto rounded-lg border border-zinc-800"
+                className="flex-1 bg-zinc-900 font-mono text-xs text-zinc-300 rounded-lg border border-zinc-800 overflow-hidden"
             >
                 {logs.length === 0 ? (
                     <div className="h-full flex items-center justify-center text-zinc-700">{t('logcat.no_logs')}</div>
                 ) : (
-                    logs.map((log, i) => (
-                        <div key={i} className="whitespace-pre-wrap hover:bg-white/5 px-1 rounded break-all">
-                            {log.startsWith('Saved logcat to: ') ? (
-                                <span
-                                    className="text-primary underline cursor-pointer hover:opacity-80"
-                                    onClick={() => invoke('open_path', { path: log.replace('Saved logcat to: ', '') })}
-                                    title={t('logcat.open_file', 'Click to open file')}
-                                >
-                                    {log}
-                                </span>
-                            ) : (
-                                log
-                            )}
-                        </div>
-                    ))
+                    <Virtuoso
+                        ref={virtuosoRef}
+                        data={logs}
+                        followOutput="auto"
+                        atBottomThreshold={50} // If user scrolls up, stop auto-scrolling
+                        itemContent={(_, log) => (
+                            <div className="whitespace-pre-wrap hover:bg-white/5 px-2 py-0.5 break-all">
+                                {log.startsWith('Saved logcat to: ') ? (
+                                    <span
+                                        className="text-primary underline cursor-pointer hover:opacity-80"
+                                        onClick={() => invoke('open_path', { path: log.replace('Saved logcat to: ', '') })}
+                                        title={t('logcat.open_file', 'Click to open file')}
+                                    >
+                                        {log}
+                                    </span>
+                                ) : (
+                                    log
+                                )}
+                            </div>
+                        )}
+                        style={{ height: '100%' }}
+                    />
                 )}
             </div>
         </div>

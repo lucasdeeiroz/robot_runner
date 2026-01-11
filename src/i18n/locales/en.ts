@@ -11,6 +11,7 @@ export const en = {
             about: "About",
             description_about: "Information about Robot Runner and its creators."
         },
+
         run_tab: {
             launcher: "Launcher",
             connect: "Connect",
@@ -22,6 +23,13 @@ export const en = {
                 select: "Select Devices",
                 busy: "Busy",
                 refresh: "Refresh Devices"
+            },
+            console: {
+                running: "RUNNING",
+                pass: "PASS",
+                fail: "FAIL",
+                test_summary: "{{total}} TESTS: {{passed}} PASSED, {{failed}} FAILED",
+                waiting: "Waiting for logs..."
             }
         },
         tests: {
@@ -39,7 +47,8 @@ export const en = {
                 starting: "Starting Appium...",
                 launching: "Launching Tests...",
                 redirecting: "Redirecting...",
-                failed: "Launch failed"
+                failed: "Launch failed",
+                waiting_server: "Waiting for Server..."
             },
             alerts: {
                 busy: "The following devices are currently busy running a test:\n{{devices}}\n\nPlease wait for them to finish."
@@ -160,7 +169,47 @@ export const en = {
             search: "Search...",
             loading: "Loading...",
             minimize: "Minimize",
-            close: "Close"
+            close: "Close",
+            confirm: "Confirm",
+            attention: "Attention"
+        },
+        apps: {
+            actions: {
+                uninstall_title: "Uninstall Package",
+                uninstall_confirm: "Are you sure you want to uninstall {{pkg}}?",
+                disable_title: "Disable App",
+                enable_title: "Enable App",
+                disable_confirm: "Disable {{pkg}}?",
+                enable_confirm: "Enable {{pkg}}?",
+                clear_title: "Clear Data",
+                clear_confirm: "Clear all data for {{pkg}}?",
+                install: "Install APK",
+                uninstall: "Uninstall",
+                disable: "Disable",
+                enable: "Enable",
+                clear: "Clear Data",
+                sort_by_name: "Sort by Name",
+                sort_by_package: "Sort by Package",
+                refresh: "Refresh List"
+            },
+            search_placeholder: "Search packages...",
+            toggle_system: "Toggle System Apps",
+            no_device: "No device selected",
+            no_packages: "No packages found",
+            status: {
+                installing: "Installing APK...",
+                disabled_badge: "Disabled"
+            },
+            success: {
+                uninstalled: "Package {{pkg}} uninstalled successfully",
+                disabled: "Package {{pkg}} disabled",
+                enabled: "Package {{pkg}} enabled",
+                cleared: "Data cleared for {{pkg}}",
+                installed: "APK installed successfully"
+            },
+            error: {
+                install_failed: "Installation failed: {{error}}"
+            },
         },
         settings: {
             title: "Settings",
@@ -168,6 +217,8 @@ export const en = {
             paths: "Path Configuration",
             tools: "Tool Options",
             general: "General",
+            recycle_device_views: "Recycle Device Screen",
+            recycle_device_views_desc: "Reuse existing tabs when running tests on the same device",
             language: "Language",
             appearance: {
                 title: "Appearance",
@@ -250,7 +301,8 @@ export const en = {
                 logcat: "Logcat",
                 commands: "Commands",
                 mirror: "Mirror",
-                performance: "Performance"
+                performance: "Performance",
+                apps: "Apps"
             },
             actions: {
                 screenshot: "Take Screenshot",
@@ -259,7 +311,8 @@ export const en = {
                 stop_execution: "Stop Execution",
                 rerun: "Re-run",
                 switch_to_grid: "Switch to Grid View",
-                switch_to_tabs: "Switch to Tab View"
+                switch_to_tabs: "Switch to Tab View",
+                force_stop: "Force Stop"
             }
         },
         file_explorer: {

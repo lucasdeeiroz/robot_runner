@@ -13,7 +13,17 @@ pub struct AppiumStatus {
 
 #[tauri::command]
 pub fn get_appium_status(state: State<'_, AppiumState>) -> AppiumStatus {
-    let mut child_guard = state.0.lock().unwrap();
+    let mut child_guard = match state.0.lock() {
+        Ok(guard) => guard,
+        Err(_) => {
+            // If poisoned, we assume it's not running or in bad state.
+            // Ideally we should log this.
+            return AppiumStatus {
+                running: false,
+                pid: None,
+            };
+        }
+    };
     if let Some(child) = &mut *child_guard {
         // limit: try_wait() returns Ok(Some(_)) if exited, Ok(None) if running
         match child.try_wait() {
@@ -56,7 +66,7 @@ pub fn start_appium_server(
     args: String, // Extra args string
     app_handle: tauri::AppHandle,
 ) -> Result<String, String> {
-    let mut child_guard = state.0.lock().unwrap();
+    let mut child_guard = state.0.lock().map_err(|e| e.to_string())?;
 
     // Check if already running
     if let Some(child) = &mut *child_guard {
@@ -136,33 +146,27 @@ pub fn start_appium_server(
     }
 }
 
+pub fn shutdown_appium(state: &AppiumState) {
+    if let Ok(mut child_guard) = state.0.lock() {
+        if let Some(mut child) = child_guard.take() { // take() replaces with None immediately
+             // Handle Windows Process Tree Killing
+            #[cfg(target_os = "windows")]
+            {
+                use std::os::windows::process::CommandExt;
+                let pid = child.id();
+                let _ = Command::new("taskkill")
+                    .args(&["/F", "/T", "/PID", &pid.to_string()])
+                    .creation_flags(0x08000000) // CREATE_NO_WINDOW
+                    .output();
+            }
+            let _ = child.kill();
+            let _ = child.wait(); // prevent zombie
+        }
+    }
+}
+
 #[tauri::command]
 pub fn stop_appium_server(state: State<'_, AppiumState>) -> Result<String, String> {
-    let mut child_guard = state.0.lock().unwrap();
-    if let Some(mut child) = child_guard.take() {
-        // Handle Windows Process Tree Killing
-        #[cfg(target_os = "windows")]
-        {
-            use std::os::windows::process::CommandExt; // Import CommandExt here
-            let pid = child.id();
-            let _ = Command::new("taskkill")
-                .args(&["/F", "/T", "/PID", &pid.to_string()])
-                .creation_flags(0x08000000) // CREATE_NO_WINDOW
-                .output();
-
-            // We still call child.kill() / wait just to be sure Rust knows it's gone
-            let _ = child.kill();
-        }
-
-        #[cfg(not(target_os = "windows"))]
-        {
-            let _ = child.kill();
-        }
-
-        let _ = child.wait(); // Prevent zombie process
-
-        Ok("Appium stopped".to_string())
-    } else {
-        Ok("Appium was not running".to_string())
-    }
+    shutdown_appium(&state);
+    Ok("Appium server stopped".to_string())
 }

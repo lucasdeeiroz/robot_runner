@@ -145,7 +145,7 @@ pub fn get_test_history(
 }
 
 fn parse_log_entry(folder_path: &Path, xml_path: &Path) -> Option<TestLog> {
-    let content = fs::read_to_string(xml_path).ok()?;
+    let content = read_optimized_log(xml_path).ok()?;
     let abs_folder_path = folder_path
         .canonicalize()
         .unwrap_or(folder_path.to_path_buf());
@@ -261,32 +261,36 @@ fn parse_log_entry(folder_path: &Path, xml_path: &Path) -> Option<TestLog> {
     })
 }
 
+fn read_optimized_log(path: &Path) -> std::io::Result<String> {
+    use std::io::{Read, Seek, SeekFrom};
+    use std::fs::File;
+
+    let mut file = File::open(path)?;
+    let len = file.metadata()?.len();
+
+    if len < 20000 {
+        return fs::read_to_string(path);
+    }
+
+    // Read head
+    let mut head_buf = vec![0; 10000];
+    let _ = file.read(&mut head_buf);
+
+    // Read tail
+    let _ = file.seek(SeekFrom::End(-10000));
+    let mut tail_buf = vec![0; 10000];
+    let _ = file.read(&mut tail_buf);
+
+    let head = String::from_utf8_lossy(&head_buf);
+    let tail = String::from_utf8_lossy(&tail_buf);
+
+    Ok(format!("{}\n...skipped...\n{}", head, tail))
+}
+
+
 #[command]
 pub fn open_log_folder(path: String) -> Result<(), String> {
-    println!("Opening folder: {}", path);
-
-    #[cfg(target_os = "windows")]
-    {
-        Command::new("explorer")
-            .arg(path)
-            .spawn()
-            .map_err(|e| format!("Failed to open explorer: {}", e))?;
-    }
-    #[cfg(target_os = "macos")]
-    {
-        Command::new("open")
-            .arg(path)
-            .spawn()
-            .map_err(|e| format!("Failed to open finder: {}", e))?;
-    }
-    #[cfg(target_os = "linux")]
-    {
-        Command::new("xdg-open")
-            .arg(path)
-            .spawn()
-            .map_err(|e| format!("Failed to open xdg-open: {}", e))?;
-    }
-    Ok(())
+    open_path(path)
 }
 
 #[command]
