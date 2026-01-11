@@ -94,6 +94,18 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     await new Promise(r => setTimeout(r, 500));
                 }
 
+                // Check if Appium is ready
+                if (!isReady) {
+                    // Appium did not report as running within the timeout
+                    setLaunchStatus(t('tests.status.server_not_ready'));
+                    setWarningModal({
+                        isOpen: true,
+                        message: t('tests.alerts.server_not_ready'),
+                    });
+                    setIsLaunching(false);
+                    return;
+                }
+
                 // Stabilization delay to ensure port binding
                 if (isReady) {
                     await new Promise(r => setTimeout(r, 3000));

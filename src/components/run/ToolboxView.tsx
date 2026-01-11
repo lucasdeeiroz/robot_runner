@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { AlignLeft, Terminal, Cpu, Cast, FileText, StopCircle, RefreshCcw, Camera, Video, Square, LayoutGrid, Minimize2, Package } from "lucide-react";
+import { AlignLeft, Terminal, Cpu, Cast, FileText, StopCircle, RefreshCcw, Camera, Video, Square, LayoutGrid, Minimize2, Maximize2, Package } from "lucide-react";
 import clsx from "clsx";
 import { save } from '@tauri-apps/plugin-dialog';
 import { invoke } from "@tauri-apps/api/core";
@@ -33,7 +33,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
     );
     const [isGridView, setIsGridView] = useState(false);
     // Default visible tools in grid: Console and Logcat
-    const [visibleToolsInGrid, setVisibleToolsInGrid] = useState<Set<ToolTab>>(new Set(['console', 'logcat', 'commands', 'performance']));
+    const [visibleToolsInGrid, setVisibleToolsInGrid] = useState<Set<ToolTab>>(new Set(['console', 'logcat', 'performance']));
 
     // Responsive State
     const containerRef = useRef<HTMLDivElement>(null);
@@ -60,7 +60,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                 setVisibleToolsInGrid(prev => new Set(prev).add('console'));
             }
         }
-    }, [session.activeRunId]); // Only trigger on NEW run ID
+    }, [session.activeRunId, session.type]); // Trigger on Run ID or Type change
 
     // Safety: Enforce valid tool for Toolbox mode
     useEffect(() => {
@@ -221,7 +221,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
     return (
         <div ref={containerRef} className="h-full flex flex-col space-y-4 pointer-events-auto relative z-10">
             {/* Tool Selection Header */}
-            <div className="flex items-center justify-between shrink-0">
+            <div className="flex items-center justify-between flex-wrap gap-y-2 shrink-0">
                 <div className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-800/50 p-1 rounded-lg border border-zinc-200 dark:border-zinc-800 w-fit">
                     {session.type === 'test' && (
                         <ToolButton
@@ -240,17 +240,17 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                         showLabel={!isCompact && !isNarrow}
                     />
                     <ToolButton
-                        active={isGridView ? visibleToolsInGrid.has('commands') : activeTool === 'commands'}
-                        onClick={() => handleToolClick('commands')}
-                        icon={<Terminal size={16} />}
-                        label={t('toolbox.tabs.commands')}
-                        showLabel={!isCompact && !isNarrow}
-                    />
-                    <ToolButton
                         active={isGridView ? visibleToolsInGrid.has('performance') : activeTool === 'performance'}
                         onClick={() => handleToolClick('performance')}
                         icon={<Cpu size={16} />}
                         label={t('toolbox.tabs.performance')}
+                        showLabel={!isCompact && !isNarrow}
+                    />
+                    <ToolButton
+                        active={isGridView ? visibleToolsInGrid.has('commands') : activeTool === 'commands'}
+                        onClick={() => handleToolClick('commands')}
+                        icon={<Terminal size={16} />}
+                        label={t('toolbox.tabs.commands')}
                         showLabel={!isCompact && !isNarrow}
                     />
                     <ToolButton
@@ -264,7 +264,15 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                         <>
                             <div className="w-px h-4 bg-zinc-300 dark:bg-zinc-700 mx-1 self-center" />
                             <button
-                                onClick={() => setIsGridView(!isGridView)}
+                                onClick={() => {
+                                    if (!isGridView) {
+                                        // Reset grid tools to defaults + current active tool
+                                        // This prevents transient tools (Commands/Apps) from sticking around if they aren't active
+                                        const defaults: ToolTab[] = ['console', 'logcat', 'performance'];
+                                        setVisibleToolsInGrid(new Set([...defaults, activeTool]));
+                                    }
+                                    setIsGridView(!isGridView);
+                                }}
                                 className={clsx(
                                     "p-1.5 rounded-md transition-all flex items-center justify-center",
                                     isGridView
@@ -350,7 +358,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
             {isGridView ? (
                 <div className="flex-1 min-h-0 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-4 pb-2 auto-rows-[minmax(300px,1fr)]">
                     {(() => {
-                        const allTools: ToolTab[] = ['console', 'logcat', 'commands', 'performance', 'apps'];
+                        const allTools: ToolTab[] = ['console', 'logcat', 'performance', 'commands', 'apps'];
                         const visibleTools = allTools.filter(t =>
                             visibleToolsInGrid.has(t) && (t !== 'console' || session.type === 'test')
                         );
@@ -375,6 +383,11 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                                     className={clsx(isOddIn2Col && "md:col-span-2")}
                                     onHide={() => handleToolClick(tool)}
                                     minimizeLabel={t('common.minimize')}
+                                    onMaximize={() => {
+                                        setIsGridView(false);
+                                        setActiveTool(tool);
+                                    }}
+                                    maximizeLabel={t('common.maximize')}
                                 >
                                     {tool === 'console' && (
                                         <div className="h-full flex flex-col overflow-hidden">
@@ -446,7 +459,7 @@ function ToolButton({ active, onClick, icon, label, showLabel = true }: { active
     );
 }
 
-function GridToolItem({ title, children, className, onHide, minimizeLabel }: { id: string, title: React.ReactNode, children: React.ReactNode, className?: string, onHide?: () => void, minimizeLabel?: string }) {
+function GridToolItem({ title, children, className, onHide, minimizeLabel, onMaximize, maximizeLabel }: { id: string, title: React.ReactNode, children: React.ReactNode, className?: string, onHide?: () => void, minimizeLabel?: string, onMaximize?: () => void, maximizeLabel?: string }) {
     return (
         <div className={clsx(
             "flex flex-col border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900 overflow-hidden shadow-sm transition-all duration-300 min-h-0",
@@ -456,15 +469,26 @@ function GridToolItem({ title, children, className, onHide, minimizeLabel }: { i
                 <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-200 flex items-center gap-2">
                     {title}
                 </span>
-                {onHide && (
-                    <button
-                        onClick={onHide}
-                        className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded"
-                        title={minimizeLabel || "Minimize"}
-                    >
-                        <Minimize2 size={14} />
-                    </button>
-                )}
+                <div className="flex items-center gap-1">
+                    {onMaximize && (
+                        <button
+                            onClick={onMaximize}
+                            className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded"
+                            title={maximizeLabel || "Maximize"}
+                        >
+                            <Maximize2 size={14} />
+                        </button>
+                    )}
+                    {onHide && (
+                        <button
+                            onClick={onHide}
+                            className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded"
+                            title={minimizeLabel || "Minimize"}
+                        >
+                            <Minimize2 size={14} />
+                        </button>
+                    )}
+                </div>
             </div>
             <div className="flex-1 min-h-0 relative">
                 {children}
