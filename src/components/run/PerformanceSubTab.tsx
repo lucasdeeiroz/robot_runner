@@ -5,6 +5,7 @@ import { Activity, Cpu, Battery, CircuitBoard, RefreshCw, Play, Square, Package 
 import clsx from "clsx";
 import { useSettings } from "@/lib/settings";
 import { feedback } from "@/lib/feedback";
+import { FileSavedFeedback } from "@/components/common/FileSavedFeedback";
 
 interface PerformanceSubTabProps {
     selectedDevice: string;
@@ -127,10 +128,21 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
         }
     };
 
-    const formatBytes = (kb: number) => {
-        if (kb > 1024 * 1024) return `${(kb / (1024 * 1024)).toFixed(2)} GB`;
-        if (kb > 1024) return `${(kb / 1024).toFixed(2)} MB`;
-        return `${kb} KB`;
+    const formatBytes = (kb: number, showUnit: boolean = true) => {
+        if (!kb || kb === 0) return t('performance.na', 'N/A');
+        if (kb > 1024 * 1024) return <>{(kb / (1024 * 1024)).toFixed(2)} {showUnit && <span className="text-sm text-zinc-500 font-normal">GB</span>}</>;
+        if (kb > 1024) return <>{(kb / 1024).toFixed(2)} {showUnit && <span className="text-sm text-zinc-500 font-normal">MB</span>}</>;
+        return <>{kb} {showUnit && <span className="text-sm text-zinc-500 font-normal">KB</span>}</>;
+    };
+
+    const formatRate = (val: number, unit: string, additional?: string) => {
+        if (!val || val === 0) return t('performance.na', 'N/A');
+        return <>{val.toFixed(1)} <span className="text-sm text-zinc-500 font-normal">{unit} {additional}</span></>;
+    };
+
+    const formatFPS = (val: number) => {
+        if (!val || val === 0) return t('performance.na', 'N/A');
+        return <>{Math.round(val)} <span className="text-sm text-zinc-500 font-normal">fps</span></>;
     };
 
     const getBatteryColor = (level: number) => {
@@ -220,18 +232,11 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
                 </div>
             )}
 
-            {lastRecording && (
-                <div className="bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 p-3 rounded-md text-sm mb-4 border border-green-100 dark:border-green-900/50 flex items-center gap-2">
-                    <span>{t('performance.saved', 'Recorded saved to:')}</span>
-                    <span
-                        className="underline cursor-pointer hover:text-green-900 dark:hover:text-green-100 font-mono break-all"
-                        onClick={() => invoke('open_path', { path: lastRecording })}
-                        title={t('common.open_file', "Click to open file")}
-                    >
-                        {lastRecording}
-                    </span>
-                </div>
-            )}
+            {/* Recording Feedback */}
+            <FileSavedFeedback
+                path={lastRecording}
+                onClose={() => setLastRecording(null)}
+            />
 
             {!stats ? (
                 <div className="flex-1 flex flex-col items-center justify-center text-zinc-400 animate-pulse">
@@ -247,9 +252,8 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
                             <Card title={t('performance.cpu')} icon={<Cpu size={24} className="text-primary" />}>
                                 <div className="flex items-end gap-2 mt-2">
                                     <span className="text-4xl font-bold text-zinc-800 dark:text-zinc-100">
-                                        {stats.cpu_usage.toFixed(1)}%
+                                        {formatRate(stats.cpu_usage, '%', t('performance.load'))}
                                     </span>
-                                    <span className="text-sm text-zinc-500 mb-1">{t('performance.load')}</span>
                                 </div>
                                 <ProgressBar value={stats.cpu_usage} max={100} color="bg-blue-500" />
                             </Card>
@@ -258,7 +262,7 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
                             <Card title={t('performance.ram')} icon={<CircuitBoard size={24} className="text-purple-500" />}>
                                 <div className="flex items-end gap-2 mt-2">
                                     <span className="text-3xl font-bold text-zinc-800 dark:text-zinc-100">
-                                        {formatBytes(stats.ram_used)}
+                                        {formatBytes(stats.ram_used, false)}
                                     </span>
                                     <span className="text-xs text-zinc-500 mb-1">
                                         / {formatBytes(stats.ram_total)}
@@ -293,7 +297,7 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
                                 <Card title={`${t('performance.cpu')} (App)`} icon={<Cpu size={24} className="text-orange-500" />}>
                                     <div className="flex items-end gap-2 mt-2">
                                         <span className="text-4xl font-bold text-zinc-800 dark:text-zinc-100">
-                                            {stats.app_stats.cpu_usage.toFixed(1)}%
+                                            {formatRate(stats.app_stats.cpu_usage, '%')}
                                         </span>
                                     </div>
                                     <ProgressBar value={stats.app_stats.cpu_usage} max={100} color="bg-orange-500" />
@@ -314,9 +318,8 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
                                 <Card title="FPS" icon={<Eye size={24} className="text-green-500" />}>
                                     <div className="flex items-end gap-2 mt-2">
                                         <span className="text-4xl font-bold text-zinc-800 dark:text-zinc-100">
-                                            {stats.app_stats.fps}
+                                            {formatFPS(stats.app_stats.fps)}
                                         </span>
-                                        <span className="text-sm text-zinc-500 mb-1">fps</span>
                                     </div>
                                     <ProgressBar value={stats.app_stats.fps} max={120} color="bg-green-500" />
                                 </Card>

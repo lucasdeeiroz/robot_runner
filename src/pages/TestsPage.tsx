@@ -3,7 +3,7 @@ import { useTestSessions } from "@/lib/testSessionStore";
 import { useSettings } from "@/lib/settings";
 import { ToolboxView } from "../components/run/ToolboxView";
 import { HistoryCharts } from "../components/history/HistoryCharts";
-import { XCircle, FileText, Folder, Calendar, RefreshCw, ChevronDown, ChevronRight, CheckCircle, Clock, PieChart, LayoutGrid, Minimize2 } from 'lucide-react';
+import { XCircle, FileText, Folder, Calendar, RefreshCw, ChevronDown, ChevronRight, CheckCircle, Clock, PieChart, LayoutGrid, Minimize2, Maximize2 } from 'lucide-react';
 import clsx from 'clsx';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from "react-i18next";
@@ -453,6 +453,10 @@ export function TestsPage() {
                                 }
                                 onClose={() => clearSession(s.runId)}
                                 onHide={() => toggleGridSession(s.runId)}
+                                onMaximize={() => {
+                                    setIsGridView(false);
+                                    handleTabChange(s.runId);
+                                }}
                             >
                                 <ToolboxView session={s} isCompact={true} />
                             </GridItem>
@@ -535,7 +539,7 @@ export function TestsPage() {
                             </div>
                         </div>
                     ) : activeSession ? (
-                        <ToolboxView key={activeSession.runId} session={activeSession} />
+                        <ToolboxView key={activeSession.deviceUdid || activeSession.runId} session={activeSession} />
                     ) : (
                         <div className="h-full flex items-center justify-center text-zinc-400">
                             {t('tests_page.session_not_found')}
@@ -548,7 +552,7 @@ export function TestsPage() {
     );
 }
 
-function GridItem({ title, children, onClose, onHide, className }: { title: React.ReactNode, children: React.ReactNode, onClose?: () => void, onHide?: () => void, className?: string }) {
+function GridItem({ title, children, onClose, onHide, className, onMaximize }: { title: React.ReactNode, children: React.ReactNode, onClose?: () => void, onHide?: () => void, className?: string, onMaximize?: () => void }) {
     const { t } = useTranslation();
     return (
         <div className={clsx(
@@ -560,6 +564,15 @@ function GridItem({ title, children, onClose, onHide, className }: { title: Reac
                     {title}
                 </span>
                 <div className="flex items-center gap-1">
+                    {onMaximize && (
+                        <button
+                            onClick={onMaximize}
+                            className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded"
+                            title={t('common.maximize')}
+                        >
+                            <Maximize2 size={14} />
+                        </button>
+                    )}
                     {onHide && (
                         <button
                             onClick={onHide}

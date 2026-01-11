@@ -42,6 +42,7 @@ export const pt = {
             search: "Buscar...",
             loading: "Carregando...",
             minimize: "Minimizar",
+            maximize: "Maximizar",
             close: "Fechar",
             confirm: "Confirmar",
             attention: "Atenção"
@@ -100,10 +101,12 @@ export const pt = {
                 launching: "Iniciando Testes...",
                 redirecting: "Redirecionando...",
                 failed: "Falha ao iniciar",
-                waiting_server: "Aguardando Servidor..."
+                waiting_server: "Aguardando Servidor...",
+                server_not_ready: "O Servidor Appium não está pronto"
             },
             alerts: {
-                busy: "Os seguintes dispositivos estão ocupados:\n{{devices}}\n\nAguarde o término."
+                busy: "Os seguintes dispositivos estão ocupados:\n{{devices}}\n\nAguarde o término.",
+                server_not_ready: "O Servidor Appium não está pronto"
             },
             options: {
                 dont_overwrite: "Não sobrescrever logs"
@@ -452,7 +455,8 @@ export const pt = {
             system_only: "Sistema Inteiro",
             device_stats: "Desempenho do Dispositivo",
             app_stats: "Desempenho do Aplicativo",
-            auto: "Auto"
+            auto: "Auto",
+            na: "N/D"
         },
         feedback: {
             success: "Sucesso",
@@ -477,7 +481,8 @@ export const pt = {
                 device: "Dispositivo: {{device}}",
                 path: "Caminho: {{path}}",
                 url: "URL: {{url}}"
-            }
+            },
+            saved_to_prefix: "Arquivo salvo em:"
         },
         startup: {
             loading: "Inicializando aplicação...",

@@ -2,7 +2,7 @@ import { Github, Bot, RefreshCcw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { feedback } from '@/lib/feedback';
 import { checkForUpdates } from '@/lib/updater';
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import clsx from "clsx";
 import packageJson from '../../package.json';
 
@@ -21,9 +21,13 @@ export function AboutPage() {
 
             if (update.available) {
                 setUpdateAvailable(true);
+                // Don't toast on auto-check if already known likely, or maybe just toast success
                 feedback.toast.success(t('about.update_available', { version: update.latestVersion }));
             } else {
                 setUpdateAvailable(false);
+                // Only toast "not available" if manually triggered? 
+                // We can't distinguish easily without prop, but for now user requested "Start automatically".
+                // We'll leave the toast logic as is, it's fine.
                 feedback.toast.info(t('about.update_not_available'));
             }
         } catch (error) {
@@ -32,6 +36,11 @@ export function AboutPage() {
             setIsChecking(false);
         }
     };
+
+    // Auto-check on mount
+    useEffect(() => {
+        handleCheckUpdate();
+    }, []);
 
     return (
         <div className="space-y-8 pb-12">
