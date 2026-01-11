@@ -48,10 +48,12 @@ export const en = {
                 launching: "Launching Tests...",
                 redirecting: "Redirecting...",
                 failed: "Launch failed",
-                waiting_server: "Waiting for Server..."
+                waiting_server: "Waiting for Server...",
+                server_not_ready: "The Appium server is not ready"
             },
             alerts: {
-                busy: "The following devices are currently busy running a test:\n{{devices}}\n\nPlease wait for them to finish."
+                busy: "The following devices are currently busy running a test:\n{{devices}}\n\nPlease wait for them to finish.",
+                server_not_ready: "The Appium server is not ready"
             },
             options: {
                 dont_overwrite: "Don't Overwrite Logs"
@@ -169,6 +171,7 @@ export const en = {
             search: "Search...",
             loading: "Loading...",
             minimize: "Minimize",
+            maximize: "Maximize",
             close: "Close",
             confirm: "Confirm",
             attention: "Attention"

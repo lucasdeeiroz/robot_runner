@@ -232,8 +232,8 @@ export function RunConsole({ logs, isRunning }: RunConsoleProps) {
                     // Consume next line (summary) as well
                     if (i + 1 < newLogs.length) {
                         i++;
-                        linesProcessed++;
                     }
+                    linesProcessed++;
                 } else {
                     // Test End
                     if (activeFailGroupId) activeFailGroupId = null;

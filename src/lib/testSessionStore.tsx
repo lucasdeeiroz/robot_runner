@@ -188,14 +188,20 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
         const session = sessions.find(s => s.runId === runId);
         if (!session) return;
 
-        // If it's a pure toolbox session (no active test), just close it locally
-        if (session.type === 'toolbox' && !session.activeRunId) {
+        // If it's a toolbox session, just close/stop it locally.
+        // Even if activeRunId is set (stale from a previous run), if type is 'toolbox', we aren't running a test now.
+        if (session.type === 'toolbox') {
             setSessions(prev => prev.map(s => {
                 if (s.runId === runId) {
                     return { ...s, status: 'stopped', logs: [...s.logs, '\n[System] Toolbox session stopped.'] };
                 }
                 return s;
             }));
+            return;
+        }
+
+        // Validate that we are actually in a state that requires backend stopping
+        if (session.status !== 'running' && session.status !== 'stopping') {
             return;
         }
 
