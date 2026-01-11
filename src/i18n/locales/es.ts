@@ -471,6 +471,7 @@ export const es = {
             adb_connected: "ADB Inalámbrico Conectado",
             remote_connected: "Acceso Remoto Conectado",
             recording_saved: "Grabación de Pantalla Guardada",
+            recording_started: "Grabación Iniciada",
             inspector_updated: "Inspector Actualizado",
             logcat_saved: "Logcat Guardado",
             performance_saved: "Estadísticas de Rendimiento Guardadas",

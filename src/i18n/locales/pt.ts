@@ -471,6 +471,7 @@ export const pt = {
             adb_connected: "ADB Sem Fio Conectado",
             remote_connected: "Acesso Remoto Conectado",
             recording_saved: "Gravação de Tela Salva",
+            recording_started: "Gravação Iniciada",
             inspector_updated: "Inspetor Atualizado",
             logcat_saved: "Logcat Salvo",
             performance_saved: "Estatísticas de Desempenho Salvas",

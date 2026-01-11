@@ -1,11 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
+import { join } from "@tauri-apps/api/path";
+import { save } from "@tauri-apps/plugin-dialog";
 import { Activity, Cpu, Battery, CircuitBoard, RefreshCw, Play, Square, Package as PackageIcon, Eye } from "lucide-react";
 import clsx from "clsx";
 import { useSettings } from "@/lib/settings";
 import { feedback } from "@/lib/feedback";
 import { FileSavedFeedback } from "@/components/common/FileSavedFeedback";
+
 
 interface PerformanceSubTabProps {
     selectedDevice: string;
@@ -50,9 +53,12 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
     }, []);
 
     // Recording State
+    // Local feedback state for this specific streaming use-case
+    const [lastSaved, setLastSaved] = useState<string | null>(null);
+
+    // We keep isRecording state local
     const [isRecording, setIsRecording] = useState(false);
     const [recordingPath, setRecordingPath] = useState<string | null>(null);
-    const [lastRecording, setLastRecording] = useState<string | null>(null);
 
     useEffect(() => {
         let interval: NodeJS.Timeout;
@@ -63,7 +69,21 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
         return () => clearInterval(interval);
     }, [selectedDevice, autoRefresh, selectedPackage]);
 
-    // Recording Logic
+    const fetchStats = async () => {
+        try {
+            const data = await invoke<DeviceStats>('get_device_stats', {
+                device: selectedDevice,
+                package: selectedPackage || null
+            });
+            setStats(data);
+            setError(null);
+        } catch (e) {
+            console.error("Failed to fetch stats:", e);
+            setError(t('performance.error'));
+        }
+    };
+
+    // Recording Logic - Append Data
     useEffect(() => {
         if (isRecording && stats && recordingPath) {
             let line = `${new Date().toISOString()},${stats.cpu_usage.toFixed(2)},${stats.ram_used},${stats.battery_level}`;
@@ -81,49 +101,49 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
         }
     }, [stats, isRecording, recordingPath]);
 
-    const fetchStats = async () => {
-        try {
-            const data = await invoke<DeviceStats>('get_device_stats', {
-                device: selectedDevice,
-                package: selectedPackage || null
-            });
-            setStats(data);
-            setError(null);
-        } catch (e) {
-            console.error("Failed to fetch stats:", e);
-            setError(t('performance.error'));
-        }
-    };
 
     const toggleRecording = async () => {
         if (isRecording) {
             if (recordingPath) {
-                setLastRecording(recordingPath);
+                // Just notify stopped, file is already written incrementally
+                setLastSaved(recordingPath);
                 feedback.toast.success('feedback.performance_saved');
             }
             setIsRecording(false);
             setRecordingPath(null);
         } else {
-            setLastRecording(null);
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const safeDeviceName = selectedDevice.replace(/[^a-zA-Z0-9]/g, '_');
-            const filename = `performance_${safeDeviceName}_${timestamp}.csv`;
-            const dir = settings.paths.logs || ".";
-            const path = dir.endsWith('\\') || dir.endsWith('/') ? `${dir}${filename}` : `${dir}/${filename}`;
+            // Start Recording: Create File
+            const header = "Timestamp,System_CPU_%,System_RAM_KB,Battery_%" +
+                (selectedPackage ? ",App_CPU_%,App_RAM_KB,FPS" : "") + "\n";
 
             try {
-                // Header based on selection
-                let header = "Timestamp,System_CPU_%,System_RAM_KB,Battery_%";
-                if (selectedPackage) {
-                    header += `,App_CPU_%,App_RAM_KB,FPS`;
-                }
-                header += "\n";
+                let savePath = "";
+                const filename = `performance_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
 
-                await invoke('save_file', { path, content: header, append: false });
-                setRecordingPath(path);
-                setIsRecording(true);
+                if (settings.paths.logs) {
+                    savePath = await join(settings.paths.logs, filename);
+                } else {
+                    // Fallback if no log path configured: ask user or default to desktop?
+                    // User requested auto-save, implying log path exists. 
+                    // If now, we can throw or just fallback to save dialog?
+                    // Let's use save dialog as fallback if no log path.
+                    const selected = await save({
+                        filters: [{ name: 'CSV', extensions: ['csv'] }],
+                        defaultPath: filename
+                    });
+                    if (selected) savePath = selected;
+                }
+
+                if (savePath) {
+                    await invoke('save_file', { path: savePath, content: header, append: false });
+                    setRecordingPath(savePath);
+                    setIsRecording(true);
+                    setLastSaved(null);
+                    feedback.toast.success('feedback.recording_started');
+                }
             } catch (e) {
-                setError(t('performance.record_error') + ": " + e);
+                console.error("Failed to start recording:", e);
+                feedback.toast.error(String(e));
             }
         }
     };
@@ -234,8 +254,8 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
 
             {/* Recording Feedback */}
             <FileSavedFeedback
-                path={lastRecording}
-                onClose={() => setLastRecording(null)}
+                path={lastSaved}
+                onClose={() => setLastSaved(null)}
             />
 
             {!stats ? (

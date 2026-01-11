@@ -471,6 +471,7 @@ export const en = {
             adb_connected: "Wireless ADB Connected",
             remote_connected: "Remote Access Connected",
             recording_saved: "Screen Recording Saved",
+            recording_started: "Recording Started",
             inspector_updated: "Inspector Updated",
             logcat_saved: "Logcat Saved",
             performance_saved: "Performance Stats Saved",

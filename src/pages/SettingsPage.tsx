@@ -372,11 +372,11 @@ export function SettingsPage() {
                     {showAppiumLogs && (
                         <div
                             ref={logsContainerRef}
-                            className="mt-4 bg-zinc-900 border border-zinc-800 rounded-xl p-3 font-mono text-xs h-64 overflow-auto custom-scrollbar shadow-inner"
+                            className="mt-4 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 font-mono text-xs h-64 overflow-auto custom-scrollbar shadow-inner"
                         >
                             {appiumLogs.length === 0 && <span className="text-zinc-500 italic">{t('settings.appium.waiting')}</span>}
                             {appiumLogs.map((log, i) => (
-                                <div key={i} className="text-zinc-300 whitespace-pre-wrap border-b border-zinc-800/50 pb-0.5 mb-0.5">{log}</div>
+                                <div key={i} className="text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap border-b border-zinc-200 dark:border-zinc-800/50 pb-0.5 mb-0.5">{log}</div>
                             ))}
                         </div>
                     )}

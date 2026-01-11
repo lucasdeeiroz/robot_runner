@@ -1,9 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { AlignLeft, Terminal, Cpu, Cast, FileText, StopCircle, RefreshCcw, Camera, Video, Square, LayoutGrid, Minimize2, Maximize2, Package } from "lucide-react";
 import clsx from "clsx";
-import { save } from '@tauri-apps/plugin-dialog';
 import { invoke } from "@tauri-apps/api/core";
-import { join } from '@tauri-apps/api/path';
 import { useSettings } from "@/lib/settings";
 import { LogcatSubTab } from "./LogcatSubTab";
 import { AppsSubTab } from "./AppsSubTab";
@@ -14,6 +12,7 @@ import { RunConsole } from "./RunConsole";
 import { TestSession, useTestSessions } from "@/lib/testSessionStore";
 import { feedback } from "@/lib/feedback";
 import { FileSavedFeedback } from "@/components/common/FileSavedFeedback";
+import { useFileSave } from "@/hooks/useFileSave";
 
 interface ToolboxViewProps {
     session: TestSession;
@@ -79,10 +78,6 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
     const [isRecording, setIsRecording] = useState(false);
     const [recordingTime, setRecordingTime] = useState(0);
 
-    const getTimestampFilename = (prefix: string, ext: string) => {
-        return `${prefix}_${new Date().toISOString().replace(/[:.]/g, '-')}.${ext}`;
-    };
-
     // Timer for recording
     useEffect(() => {
         let interval: NodeJS.Timeout;
@@ -94,64 +89,62 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
         return () => clearInterval(interval);
     }, [isRecording]);
 
-    const [lastSavedFile, setLastSavedFile] = useState<string | null>(null);
+    // File Savers
+    const screenshotSaver = useFileSave({
+        fileType: 'Image',
+        extensions: ['png'],
+        defaultNamePrefix: 'screenshot',
+        settingPathKey: 'screenshots'
+    });
+
+    const recordingSaver = useFileSave({
+        fileType: 'Video',
+        extensions: ['mp4'],
+        defaultNamePrefix: 'recording',
+        settingPathKey: 'recordings'
+    });
 
     const handleScreenshot = async () => {
         try {
-            let filePath: string | null = null;
-            const filename = getTimestampFilename('screenshot', 'png');
-
-            if (settings.paths.screenshots && settings.paths.screenshots.trim() !== '') {
-                // Auto-save
-                filePath = await join(settings.paths.screenshots, filename);
-            } else {
-                // Dialog
-                filePath = await save({
-                    filters: [{ name: 'Image', extensions: ['png'] }],
-                    defaultPath: filename
-                });
-            }
-
-            if (filePath) {
-                await invoke('save_screenshot', { device: session.deviceUdid, path: filePath });
-                console.log("Screenshot saved to:", filePath);
-                setLastSavedFile(filePath);
-                feedback.toast.success('feedback.screenshot_saved');
-            }
+            await screenshotSaver.saveFile(async (path) => {
+                await invoke('save_screenshot', { device: session.deviceUdid, path });
+            }, 'feedback.screenshot_saved');
+            // Clear recording feedback so this one shows
+            recordingSaver.clearFeedback();
         } catch (e) {
             console.error("Screenshot failed:", e);
-            alert(`Screenshot failed: ${e}`);
         }
     };
 
     const handleToggleRecording = async () => {
         if (isRecording) {
-            // Stop
+            // Stop recording - Prompt for save path
             try {
-                let filePath: string | null = null;
-                const filename = getTimestampFilename('recording', 'mp4');
+                const path = await recordingSaver.saveFile(async (p) => {
+                    await invoke('stop_screen_recording', { device: session.deviceUdid, localPath: p });
+                }, 'feedback.recording_saved');
 
-                if (settings.paths.recordings && settings.paths.recordings.trim() !== '') {
-                    // Auto-save
-                    filePath = await join(settings.paths.recordings, filename);
-                } else {
-                    // Dialog
-                    filePath = await save({
-                        filters: [{ name: 'Video', extensions: ['mp4'] }],
-                        defaultPath: filename
-                    });
-                }
-
-                if (filePath) {
+                if (path) {
+                    // Clear screenshot feedback if any, though activeSavedPath priority usually handles the latest if we structure right.
+                    // But explicitly clearing ensures we see THIS feedback.
+                    screenshotSaver.clearFeedback();
                     setIsRecording(false);
-                    await invoke('stop_screen_recording', { device: session.deviceUdid, localPath: filePath });
-                    setLastSavedFile(filePath);
-                    feedback.notify('feedback.recording_saved', 'feedback.details.path', { path: filePath });
                 }
             } catch (e) {
                 console.error("Stop recording failed:", e);
-                alert(`Failed to save recording: ${e}`);
-                setIsRecording(false);
+                // Don't disable recording state if save failed? 
+                // Usually we want to stop anyway or retry?
+                // For now, if saveFile returns null (cancelled), we might want to keep recording?
+                // But the user clicked 'Stop'.
+                // If the user Cancels the dialog, we usually want to stop & discard or Keep recording?
+                // The standard `useFileSave` returns null if cancelled.
+                // If we want to allow "Stop & Discard", we probably need a different flow.
+                // But typically "Stop" implies "I'm done".
+                // If user cancels save, maybe we should just stop & discard (without invoke stop logic that saves)?
+                // `start_screen_recording` -> `stop_screen_recording(path)`.
+                // If we don't call stop, it keeps recording.
+                // If we call stop with path, it saves.
+                // If user cancels, we stay recording? Matches current UX.
             }
         } else {
             // Start
@@ -163,6 +156,13 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                 alert(`Failed to start recording: ${e}`);
             }
         }
+    };
+
+    // Combine feedback paths
+    const activeSavedPath = screenshotSaver.lastSavedPath || recordingSaver.lastSavedPath;
+    const clearAllFeedback = () => {
+        screenshotSaver.clearFeedback();
+        recordingSaver.clearFeedback();
     };
 
     const handleScrcpy = async () => {
@@ -361,8 +361,8 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
 
             {/* Feedback for Screenshot/Listening */}
             <FileSavedFeedback
-                path={lastSavedFile}
-                onClose={() => setLastSavedFile(null)}
+                path={activeSavedPath}
+                onClose={clearAllFeedback}
             />
 
             {/* Tool Content */}
