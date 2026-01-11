@@ -295,10 +295,10 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
             {/* Log Viewer */}
             {/* Log Viewer */}
             <div
-                className="flex-1 bg-zinc-900 font-mono text-xs text-zinc-300 rounded-lg border border-zinc-800 overflow-hidden"
+                className="flex-1 bg-white dark:bg-zinc-900 font-mono text-xs text-zinc-800 dark:text-zinc-300 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden"
             >
                 {logs.length === 0 ? (
-                    <div className="h-full flex items-center justify-center text-zinc-700">{t('logcat.no_logs')}</div>
+                    <div className="h-full flex items-center justify-center text-zinc-400 dark:text-zinc-600">{t('logcat.no_logs')}</div>
                 ) : (
                     <Virtuoso
                         ref={virtuosoRef}
@@ -306,7 +306,7 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
                         followOutput="auto"
                         atBottomThreshold={50} // If user scrolls up, stop auto-scrolling
                         itemContent={(_, log) => (
-                            <div className="whitespace-pre-wrap hover:bg-white/5 px-2 py-0.5 break-all">
+                            <div className="whitespace-pre-wrap hover:bg-zinc-100 dark:hover:bg-white/5 px-2 py-0.5 break-all">
                                 {log.startsWith(t('feedback.saved_to_prefix')) ? (
                                     <span
                                         className="text-primary underline cursor-pointer hover:opacity-80"

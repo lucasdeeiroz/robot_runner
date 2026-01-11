@@ -7,6 +7,17 @@ import clsx from "clsx";
 import packageJson from '../../package.json';
 
 
+const TOOLS = [
+    { key: 'tauri', url: 'https://tauri.app' },
+    { key: 'react', url: 'https://react.dev' },
+    { key: 'rust', url: 'https://www.rust-lang.org' },
+    { key: 'vite', url: 'https://vitejs.dev' },
+    { key: 'appium', url: 'https://appium.io' },
+    { key: 'robot', url: 'https://robotframework.org' },
+    { key: 'tailwind', url: 'https://tailwindcss.com' },
+    { key: 'lucide', url: 'https://lucide.dev' }
+];
+
 export function AboutPage() {
     const { t } = useTranslation();
     const appVersion = packageJson.version;
@@ -96,16 +107,7 @@ export function AboutPage() {
                             {t('about.tools_desc')}
                         </p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {[
-                                { key: 'tauri', url: 'https://tauri.app' },
-                                { key: 'react', url: 'https://react.dev' },
-                                { key: 'rust', url: 'https://www.rust-lang.org' },
-                                { key: 'vite', url: 'https://vitejs.dev' },
-                                { key: 'appium', url: 'https://appium.io' },
-                                { key: 'robot', url: 'https://robotframework.org' },
-                                { key: 'tailwind', url: 'https://tailwindcss.com' },
-                                { key: 'lucide', url: 'https://lucide.dev' }
-                            ].map(tool => (
+                            {TOOLS.map(tool => (
                                 <a
                                     key={tool.key}
                                     href={tool.url}

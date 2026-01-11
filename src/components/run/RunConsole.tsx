@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
-import { invoke } from "@tauri-apps/api/core";
 import { ChevronRight, ChevronDown, CheckCircle2, XCircle, Layers, Loader2, Star } from "lucide-react";
 
 interface RunConsoleProps {
@@ -54,6 +53,8 @@ interface SuiteNode {
 type LogNode = TextNode | SuiteStartNode | TestNode | SuiteNode | SuiteEndNode;
 type LinearNode = TextNode | SuiteStartNode | SuiteEndNode;
 
+
+import { LinkRenderer } from "./LinkRenderer";
 
 export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
     const { t } = useTranslation();
@@ -385,43 +386,7 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
         });
     };
 
-    const openLink = async (path: string) => {
-        try {
-            await invoke('open_log_folder', { path });
-        } catch (e) {
-            console.error("Failed to open link", e);
-        }
-    };
-
-    const LinkRenderer = ({ content }: { content: string }) => {
-        const linkMatch = content.match(/^(Output|Log|Report):\s+(.*)$/);
-        if (linkMatch) {
-            const label = linkMatch[1];
-            const path = linkMatch[2].trim();
-            return (
-                <div className="mb-0.5 pl-4">
-                    <span className="text-zinc-500">{label}: </span>
-                    <span
-                        onClick={() => openLink(path)}
-                        className="text-blue-400 hover:text-blue-300 cursor-pointer hover:underline"
-                        title="Open File"
-                    >
-                        {path}
-                    </span>
-                </div>
-            );
-        }
-        return (
-            <div className={clsx(
-                "whitespace-pre-wrap break-all leading-tight mb-0.5",
-                content.includes("[Error]") || content.includes("STDERR") ? "text-red-400" :
-                    content.includes("[System]") ? "text-blue-400 font-semibold" :
-                        "text-zinc-300"
-            )}>
-                {content}
-            </div>
-        );
-    };
+    // LinkRenderer was here... removed
 
     // Recursive Render
     const renderNode = (node: LogNode, parentName?: string) => {
@@ -445,18 +410,18 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
             const textColor = isRunning ? 'text-blue-400' : (isFailed ? 'text-red-400' : 'text-green-500');
 
             return (
-                <div key={node.id} className={clsx("mb-2 mt-1 border rounded-lg overflow-hidden border-zinc-800", isRunning && "animate-pulse-subtle")}>
+                <div key={node.id} className={clsx("mb-2 mt-1 border rounded-lg overflow-hidden border-zinc-200 dark:border-zinc-800", isRunning && "animate-pulse-subtle")}>
                     <div
                         role="button"
                         onClick={(e) => { e.stopPropagation(); toggleNode(node.id); }}
                         className={clsx(
-                            "w-full flex items-center justify-between px-3 py-1.5 hover:bg-zinc-800/50 transition-colors text-left relative z-10 cursor-pointer select-none",
+                            "w-full flex items-center justify-between px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors text-left relative z-10 cursor-pointer select-none",
                             `border-l-4 ${borderColor.replace('/50', '')}`
                         )}
                     >
                         <div className="flex items-center gap-2 max-w-[80%]">
                             {isOpen ? <ChevronDown size={14} className="text-zinc-500 shrink-0" /> : <ChevronRight size={14} className="text-zinc-500 shrink-0" />}
-                            <span className={clsx("font-semibold truncate", isFailed ? "text-red-300" : "text-zinc-200")}>
+                            <span className={clsx("font-semibold truncate", isFailed ? "text-red-600 dark:text-red-300" : "text-zinc-800 dark:text-zinc-200")}>
                                 {node.name}
                             </span>
                         </div>
@@ -469,7 +434,7 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
                         </div>
                     </div>
                     {isOpen && (
-                        <div className="p-2 pl-6 bg-black/20 text-xs border-t border-zinc-800/50">
+                        <div className="p-2 pl-6 bg-zinc-50 dark:bg-black/20 text-xs border-t border-zinc-200 dark:border-zinc-800/50 text-zinc-700 dark:text-zinc-300">
                             {node.documentation && (
                                 <div className="text-zinc-500 italic mb-2 border-b border-zinc-800 pb-1 text-xs">
                                     Documentation: {node.documentation}
@@ -494,8 +459,8 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
             const isToggled = collapsedIds.has(node.id);
             const isOpen = !isToggled; // Suites default Open
 
-            const borderColor = isRunning ? 'border-zinc-700' : (isFailed ? 'border-red-900/50' : 'border-green-900/50');
-            const summaryColor = isRunning ? 'text-zinc-400' : (isFailed ? 'text-red-400' : 'text-green-500');
+            const borderColor = isRunning ? 'border-zinc-300 dark:border-zinc-700' : (isFailed ? 'border-red-500/50 dark:border-red-900/50' : 'border-green-500/50 dark:border-green-900/50');
+            const summaryColor = isRunning ? 'text-zinc-500 dark:text-zinc-400' : (isFailed ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-500');
 
             return (
                 <div key={node.id} className="mb-3 mt-2 pl-2 ml-1">
@@ -503,7 +468,7 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
                         role="button"
                         onClick={(e) => { e.stopPropagation(); toggleNode(node.id); }}
                         className={clsx(
-                            "flex items-center gap-2 text-sm font-bold text-zinc-300 hover:text-white mb-2 group w-full text-left relative z-10 cursor-pointer select-none rounded p-1 hover:bg-white/5 transition-colors",
+                            "flex items-center gap-2 text-sm font-bold text-zinc-700 dark:text-zinc-300 hover:text-black dark:hover:text-white mb-2 group w-full text-left relative z-10 cursor-pointer select-none rounded p-1 hover:bg-black/5 dark:hover:bg-white/5 transition-colors",
                             `border-l-4 ${borderColor}`
                         )}
                     >
@@ -515,16 +480,16 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
                         </span>
 
                         {/* Status Badge for Suite */}
-                        <span className={clsx("text-[10px] ml-2 px-1.5 py-0.5 rounded border flex items-center gap-1", borderColor, summaryColor, isRunning && "bg-zinc-800")}>
+                        <span className={clsx("text-[10px] ml-2 px-1.5 py-0.5 rounded border flex items-center gap-1", borderColor, summaryColor, isRunning && "bg-zinc-100 dark:bg-zinc-800")}>
                             {isRunning && <Loader2 size={10} className="animate-spin" />}
                             {isRunning ? t('run_tab.console.running') : translateSummary(node.summary) || t(node.status === 'FAIL' ? 'run_tab.console.fail' : 'run_tab.console.pass')}
                         </span>
                     </div>
 
                     {isOpen && (
-                        <div className="pl-2 space-y-1 block border-l border-zinc-800/50 ml-2">
+                        <div className="pl-2 space-y-1 block border-l border-zinc-200 dark:border-zinc-800/50 ml-2">
                             {node.documentation && (
-                                <div className="text-zinc-500 italic px-2 py-1 text-xs border-b border-zinc-800/50 mb-1">
+                                <div className="text-zinc-500 italic px-2 py-1 text-xs border-b border-zinc-200 dark:border-zinc-800/50 mb-1">
                                     {node.documentation}
                                 </div>
                             )}
@@ -538,12 +503,12 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
     };
 
     return (
-        <div className="h-full flex flex-col bg-black/90 rounded-lg font-mono text-sm border border-zinc-800 shadow-inner pointer-events-auto relative z-0 isolate overflow-hidden">
-            <div className="flex items-center justify-between p-2 border-b border-zinc-800 bg-zinc-900/50 backdrop-blur shrink-0 z-20">
+        <div className="h-full flex flex-col bg-white dark:bg-black/90 rounded-lg font-mono text-sm border border-zinc-200 dark:border-zinc-800 shadow-inner pointer-events-auto relative z-0 isolate overflow-hidden">
+            <div className="flex items-center justify-between p-2 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/50 backdrop-blur shrink-0 z-20">
                 <span className="text-xs text-zinc-500 font-mono truncate px-2" title={testPath}>{testPath}</span>
                 <button
                     onClick={() => setIsRawMode(!isRawMode)}
-                    className="p-1 hover:bg-zinc-800 rounded transition-colors text-zinc-500 hover:text-yellow-400"
+                    className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-colors text-zinc-500 hover:text-yellow-500 dark:hover:text-yellow-400"
                     title={isRawMode ? "Enable Fancy Mode" : "Enable Raw Mode"}
                 >
                     <Star size={14} fill={!isRawMode ? "currentColor" : "none"} className={clsx(!isRawMode && "text-yellow-400")} />
@@ -556,7 +521,7 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
                 )}
 
                 {isRawMode ? (
-                    <div className="whitespace-pre-wrap font-mono text-xs text-zinc-300 leading-tight">
+                    <div className="whitespace-pre-wrap font-mono text-xs text-zinc-800 dark:text-zinc-300 leading-tight">
                         {logs.map((line, i) => (
                             <div key={i} className="min-h-[1.2em]">{line}</div>
                         ))}

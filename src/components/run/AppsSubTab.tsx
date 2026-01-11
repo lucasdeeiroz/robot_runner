@@ -172,9 +172,9 @@ export function AppsSubTab() {
 
 
     return (
-        <div className="h-full flex flex-col bg-zinc-900/50">
+        <div className="h-full flex flex-col bg-zinc-50 dark:bg-zinc-900/50">
             {/* Toolbar */}
-            <div className="p-2 border-b border-zinc-800 flex items-center gap-2">
+            <div className="p-2 border-b border-zinc-200 dark:border-zinc-800 flex items-center gap-2">
                 <div className="relative flex-1">
                     <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-500" />
                     <input
@@ -182,7 +182,7 @@ export function AppsSubTab() {
                         value={search}
                         onChange={e => setSearch(e.target.value)}
                         placeholder={t('apps.search_placeholder', "Search packages...")}
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded px-8 py-1.5 text-xs text-zinc-300 focus:outline-none focus:border-primary/50"
+                        className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded px-8 py-1.5 text-xs text-zinc-900 dark:text-zinc-300 focus:outline-none focus:border-primary/50"
                     />
                 </div>
 
@@ -190,7 +190,7 @@ export function AppsSubTab() {
                     onClick={() => setShowSystem(!showSystem)}
                     className={clsx(
                         "p-1.5 rounded border text-xs flex items-center gap-1.5 transition-colors",
-                        showSystem ? "bg-blue-500/10 border-blue-500/50 text-blue-400" : "bg-transparent border-zinc-800 text-zinc-400 hover:text-zinc-200"
+                        showSystem ? "bg-blue-500/10 border-blue-500/50 text-blue-600 dark:text-blue-400" : "bg-transparent border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
                     )}
                     title={t('apps.toggle_system', "Toggle System Apps")}
                 >
@@ -218,7 +218,7 @@ export function AppsSubTab() {
                 <button
                     onClick={fetchPackages}
                     disabled={loading}
-                    className="p-1.5 hover:bg-zinc-800 text-zinc-400 rounded transition-colors"
+                    className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-400 rounded transition-colors"
                     title={t('apps.actions.refresh')}
                 >
                     <RefreshCw size={14} className={clsx(loading && "animate-spin")} />
@@ -242,7 +242,7 @@ export function AppsSubTab() {
                         data={filtered}
                         className="custom-scrollbar"
                         itemContent={(_index, pkg) => (
-                            <div className="px-3 py-2 border-b border-zinc-800 hover:bg-zinc-800/30 group flex items-center gap-3">
+                            <div className="px-3 py-2 border-b border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800/30 group flex items-center gap-3">
                                 <div className={clsx(
                                     "p-2 rounded-lg shrink-0",
                                     pkg.is_system ? "bg-purple-500/10 text-purple-400" : "bg-blue-500/10 text-blue-400"
@@ -250,7 +250,7 @@ export function AppsSubTab() {
                                     <Package size={16} />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <div className="text-sm text-zinc-200 truncate font-medium flex items-center gap-2">
+                                    <div className="text-sm text-zinc-800 dark:text-zinc-200 truncate font-medium flex items-center gap-2">
                                         {friendlyNames[String(pkg.name)] || pkg.name}
                                         {pkg.is_disabled && (
                                             <span className="text-[10px] bg-red-500/20 text-red-400 px-1 rounded uppercase font-bold tracking-wider">
@@ -260,8 +260,8 @@ export function AppsSubTab() {
                                     </div>
                                     <div className="text-xs text-zinc-500 truncate font-mono opacity-70 flex items-center gap-2">
                                         <span>{pkg.name}</span>
-                                        <span className="text-zinc-700 dark:text-zinc-600 px-1">•</span>
-                                        <span title={String(pkg.path)} className="truncate max-w-[150px] cursor-help hover:text-zinc-300 transition-colors">
+                                        <span className="text-zinc-300 dark:text-zinc-600 px-1">•</span>
+                                        <span title={String(pkg.path)} className="truncate max-w-[150px] cursor-help hover:text-zinc-900 dark:hover:text-zinc-300 transition-colors">
                                             {pkg.path}
                                         </span>
                                     </div>

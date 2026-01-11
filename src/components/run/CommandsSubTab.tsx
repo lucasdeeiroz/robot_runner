@@ -177,10 +177,10 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
             </div>
 
             {/* Console Output */}
-            <div className="flex-1 bg-zinc-900 text-zinc-300 font-mono text-xs rounded-lg border border-zinc-800 p-4 overflow-y-auto whitespace-pre-wrap">
+            <div className="flex-1 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-300 font-mono text-xs rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 overflow-y-auto whitespace-pre-wrap">
                 {history.length === 0 && <span className="opacity-30">{t('commands.waiting')}</span>}
                 {history.map((line, i) => (
-                    <div key={i} className={line.startsWith('>') ? "text-primary font-bold mt-2" : "text-zinc-300"}>
+                    <div key={i} className={line.startsWith('>') ? "text-primary font-bold mt-2" : "text-zinc-800 dark:text-zinc-300"}>
                         {line}
                     </div>
                 ))}
