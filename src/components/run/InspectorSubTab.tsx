@@ -112,7 +112,6 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
 
         } catch (e) {
             console.error("Inspector error:", e);
-            // alert(`Inspector failed: ${ e } `); // Maybe too intrusive for auto-load
         } finally {
             setLoading(false);
         }

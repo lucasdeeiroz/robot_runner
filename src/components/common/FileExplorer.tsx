@@ -20,6 +20,7 @@ interface FileExplorerProps {
 }
 
 import { useTranslation } from "react-i18next";
+import { WarningModal } from "@/components/shared/WarningModal";
 
 export function FileExplorer({ initialPath = ".", onSelect, onCancel, selectionMode = 'file', title: _title, onSelectionChange, allowHideFooter = false }: FileExplorerProps) {
     const { t } = useTranslation();
@@ -28,6 +29,7 @@ export function FileExplorer({ initialPath = ".", onSelect, onCancel, selectionM
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [selectedEntry, setSelectedEntry] = useState<FileEntry | null>(null);
+    const [warningModal, setWarningModal] = useState<{ isOpen: boolean, message: string }>({ isOpen: false, message: '' });
 
     useEffect(() => {
         loadDirectory(currentPath);
@@ -104,7 +106,11 @@ export function FileExplorer({ initialPath = ".", onSelect, onCancel, selectionM
                 onSelect(selectedEntry.path);
             } else {
                 // Should not happen if filtered, but just in case
-                alert(t('file_explorer.select_folder'));
+                // Should not happen if filtered, but just in case
+                setWarningModal({
+                    isOpen: true,
+                    message: t('file_explorer.select_folder')
+                });
             }
         } else {
             // File mode
@@ -119,6 +125,12 @@ export function FileExplorer({ initialPath = ".", onSelect, onCancel, selectionM
 
     return (
         <div className="flex flex-col h-full">
+            <WarningModal
+                isOpen={warningModal.isOpen}
+                onClose={() => setWarningModal(prev => ({ ...prev, isOpen: false }))}
+                title={t('common.attention', "Attention")}
+                description={warningModal.message}
+            />
             {/* Header / Breadcrumb */}
             <div className="flex items-center gap-2 mb-2 p-2 bg-zinc-50 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 shrink-0">
                 <button

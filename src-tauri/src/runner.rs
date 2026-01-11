@@ -10,29 +10,30 @@ use tauri::{AppHandle, Emitter, Manager, State};
 pub struct TestState(pub Mutex<HashMap<String, Child>>);
 
 #[tauri::command]
-pub fn stop_robot_test(state: State<'_, TestState>, run_id: String) -> Result<String, String> {
+pub async fn stop_robot_test(state: State<'_, TestState>, run_id: String) -> Result<String, String> {
     let mut procs = state.0.lock().map_err(|e| e.to_string())?;
 
-    if let Some(mut child) = procs.remove(&run_id) {
-        // Handle Windows Process Tree Killing
+    if let Some(child) = procs.get_mut(&run_id) {
+        let pid = child.id();
+
         #[cfg(target_os = "windows")]
         {
             use std::os::windows::process::CommandExt;
-            let pid = child.id();
             let _ = Command::new("taskkill")
                 .args(&["/F", "/T", "/PID", &pid.to_string()])
-                .creation_flags(0x08000000) // CREATE_NO_WINDOW
+                .creation_flags(0x08000000)
                 .output();
-
-            let _ = child.kill();
         }
 
         #[cfg(not(target_os = "windows"))]
         {
-            let _ = child.kill();
+            let _ = Command::new("kill")
+                .args(&["-9", &pid.to_string()])
+                .output();
         }
-
-        let _ = child.wait();
+        
+        // Final fallback
+        let _ = child.kill(); 
         return Ok(format!("Test {} stopped", run_id));
     }
     Err(format!("Test {} not running", run_id))
@@ -130,11 +131,12 @@ pub fn run_robot_test(
         meta_version.replace("\\", "\\\\").replace("\"", "\\\"")
     );
 
-    // Create dir if not exists (Robot does it, but we do it before Robot)
+    // Create dir if not exists
     let _ = std::fs::create_dir_all(&abs_output_dir);
     let _ = std::fs::write(metadata_path, metadata_json);
 
-    let mut cmd = Command::new("robot"); // Keeping generic "robot" relies on PATH.
+    let mut cmd = Command::new("python");
+    cmd.arg("-m").arg("robot");
     cmd.args(&args);
 
     if let Some(wd) = working_dir {

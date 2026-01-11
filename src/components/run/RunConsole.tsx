@@ -62,6 +62,20 @@ const isArtifact = (line: string) => /^\s*(Output|Log|Report):/.test(line);
 export function RunConsole({ logs, isRunning }: RunConsoleProps) {
     const { t } = useTranslation();
 
+    const translateSummary = (summary: string) => {
+        if (!summary) return summary;
+        // Match "X tests, Y passed, Z failed"
+        const match = summary.match(/(\d+) tests?, (\d+) passed, (\d+) failed/);
+        if (match) {
+            return t('run_tab.console.test_summary', {
+                total: match[1],
+                passed: match[2],
+                failed: match[3]
+            });
+        }
+        return summary;
+    };
+
 
     // State for toggles (Set of IDs)
     const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
@@ -473,7 +487,7 @@ export function RunConsole({ logs, isRunning }: RunConsoleProps) {
                             isFailed ? "bg-red-500/10 text-red-400" : "bg-green-500/10 text-green-500"
                         )}>
                             {isFailed ? <XCircle size={12} /> : <CheckCircle2 size={12} />}
-                            {node.status}
+                            {t(isFailed ? 'run_tab.console.fail' : 'run_tab.console.pass')}
                         </div>
                     </div>
                     {isOpen && (
@@ -507,7 +521,7 @@ export function RunConsole({ logs, isRunning }: RunConsoleProps) {
                         <Layers size={14} className="text-primary opacity-70" />
                         <span className="truncate">{node.name}</span>
                         <span className={clsx("text-[10px] ml-auto px-1.5 py-0.5 rounded border", isFailed ? "border-red-900/50 text-red-400" : "border-green-900/50 text-green-500 bg-green-900/10")}>
-                            {node.summary}
+                            {translateSummary(node.summary)}
                         </span>
                     </div>
 
@@ -530,7 +544,7 @@ export function RunConsole({ logs, isRunning }: RunConsoleProps) {
     return (
         <div ref={containerRef} className="h-full bg-black/90 rounded-lg p-4 font-mono text-sm overflow-auto border border-zinc-800 shadow-inner custom-scrollbar pointer-events-auto relative z-0 isolate">
             {logs.length === 0 && (
-                <div className="text-zinc-500 italic opacity-50 select-none">{t('console.waiting')}</div>
+                <div className="text-zinc-500 italic opacity-50 select-none">{t('run_tab.console.waiting')}</div>
             )}
 
             <div className="relative z-10 w-full">
@@ -545,7 +559,7 @@ export function RunConsole({ logs, isRunning }: RunConsoleProps) {
                                 </span>
                             </div>
                             <div className="text-[10px] px-2 py-0.5 rounded font-bold uppercase flex items-center gap-1 shrink-0 bg-blue-500/10 text-blue-400">
-                                RUNNING
+                                {t('run_tab.console.running')}
                             </div>
                         </div>
                         {pendingLogs.length > 1 && (

@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from "react";
-import { AlignLeft, Terminal, Cpu, Cast, FileText, StopCircle, RefreshCcw, Camera, Video, Square, LayoutGrid, Minimize2 } from "lucide-react";
+import { AlignLeft, Terminal, Cpu, Cast, FileText, StopCircle, RefreshCcw, Camera, Video, Square, LayoutGrid, Minimize2, Package } from "lucide-react";
 import clsx from "clsx";
 import { save } from '@tauri-apps/plugin-dialog';
 import { invoke } from "@tauri-apps/api/core";
 import { join } from '@tauri-apps/api/path';
 import { useSettings } from "@/lib/settings";
 import { LogcatSubTab } from "./LogcatSubTab";
+import { AppsSubTab } from "./AppsSubTab";
 import { useTranslation } from "react-i18next";
 import { CommandsSubTab } from "./CommandsSubTab";
 import { PerformanceSubTab } from "./PerformanceSubTab";
@@ -18,7 +19,7 @@ interface ToolboxViewProps {
     isCompact?: boolean;
 }
 
-type ToolTab = 'console' | 'logcat' | 'performance' | 'commands';
+type ToolTab = 'console' | 'logcat' | 'performance' | 'commands' | 'apps';
 
 export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
     const { stopSession, rerunSession, setSessionActiveTool } = useTestSessions();
@@ -252,6 +253,13 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                         label={t('toolbox.tabs.performance')}
                         showLabel={!isCompact && !isNarrow}
                     />
+                    <ToolButton
+                        active={isGridView ? visibleToolsInGrid.has('apps') : activeTool === 'apps'}
+                        onClick={() => handleToolClick('apps')}
+                        icon={<Package size={16} />}
+                        label={t('toolbox.tabs.apps')}
+                        showLabel={!isCompact && !isNarrow}
+                    />
                     {!isCompact && (
                         <>
                             <div className="w-px h-4 bg-zinc-300 dark:bg-zinc-700 mx-1 self-center" />
@@ -316,7 +324,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                             {session.status === 'running' && (
                                 <button
                                     onClick={() => stopSession(session.runId)}
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-md text-sm font-medium hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+                                    className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50"
                                     title={t('toolbox.actions.stop_execution')}
                                 >
                                     <StopCircle size={16} />
@@ -342,7 +350,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
             {isGridView ? (
                 <div className="flex-1 min-h-0 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-4 pb-2 auto-rows-[minmax(300px,1fr)]">
                     {(() => {
-                        const allTools: ToolTab[] = ['console', 'logcat', 'commands', 'performance'];
+                        const allTools: ToolTab[] = ['console', 'logcat', 'commands', 'performance', 'apps'];
                         const visibleTools = allTools.filter(t =>
                             visibleToolsInGrid.has(t) && (t !== 'console' || session.type === 'test')
                         );
@@ -355,7 +363,8 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                                 'console': t('toolbox.tabs.console'),
                                 'logcat': t('toolbox.tabs.logcat'),
                                 'commands': t('toolbox.tabs.commands'),
-                                'performance': t('toolbox.tabs.performance')
+                                'performance': t('toolbox.tabs.performance'),
+                                'apps': t('toolbox.tabs.apps')
                             };
 
                             return (
@@ -380,6 +389,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                                     {tool === 'logcat' && <LogcatSubTab key={session.deviceUdid} selectedDevice={session.deviceUdid} />}
                                     {tool === 'commands' && <CommandsSubTab selectedDevice={session.deviceUdid} />}
                                     {tool === 'performance' && <PerformanceSubTab selectedDevice={session.deviceUdid} />}
+                                    {tool === 'apps' && <AppsSubTab />}
                                 </GridToolItem>
                             );
                         });
@@ -406,6 +416,10 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
 
                     <div className={clsx("h-full", activeTool === 'performance' ? "block" : "hidden")}>
                         <PerformanceSubTab selectedDevice={session.deviceUdid} />
+                    </div>
+
+                    <div className={clsx("h-full", activeTool === 'apps' ? "block" : "hidden")}>
+                        <AppsSubTab />
                     </div>
                 </div>
             )

@@ -8,6 +8,7 @@ import { FileExplorer } from "@/components/common/FileExplorer";
 import { v4 as uuidv4 } from 'uuid';
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
+import { WarningModal } from "@/components/shared/WarningModal";
 
 interface TestsSubTabProps {
     selectedDevices: string[];
@@ -30,6 +31,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
     const [launchStatus, setLaunchStatus] = useState<string>("");
     const [isLaunching, setIsLaunching] = useState(false);
     const [dontOverwrite, setDontOverwrite] = useState(false);
+    const [warningModal, setWarningModal] = useState<{ isOpen: boolean, message: string }>({ isOpen: false, message: '' });
 
     // Responsive State
     const containerRef = useRef<HTMLDivElement>(null);
@@ -58,7 +60,10 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
         const conflictingDevices = selectedDevices.filter(d => busyDeviceIds.includes(d));
 
         if (conflictingDevices.length > 0) {
-            alert(t('tests.alerts.busy', { devices: conflictingDevices.join('\n') }));
+            setWarningModal({
+                isOpen: true,
+                message: t('tests.alerts.busy', { devices: conflictingDevices.join('\n') })
+            });
             return;
         }
 
@@ -76,32 +81,22 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     args: settings.tools.appiumArgs
                 });
 
-                let basePath = "";
-                const argsLower = settings.tools.appiumArgs.toLowerCase();
-                const basePathMatch = argsLower.match(/--base-path[=\s]([^\s]+)/);
 
-                if (basePathMatch) {
-                    basePath = basePathMatch[1]; // e.g. /wd/hub
-                } else if (settings.tools.appiumArgs.includes("/wd/hub")) {
-                    // Fallback loose check if they just typed it without full arg (unlikely but safe)
-                    basePath = "/wd/hub";
+                // Allow process to initialize (Backend Check + Delay)
+                setLaunchStatus(t('tests.status.waiting_server'));
+                let isReady = false;
+                for (let i = 0; i < 20; i++) {
+                    const s = await invoke<{ running: boolean }>('get_appium_status');
+                    if (s.running) {
+                        isReady = true;
+                        break;
+                    }
+                    await new Promise(r => setTimeout(r, 500));
                 }
 
-                // Remove trailing slash if user added it
-                if (basePath.endsWith('/')) basePath = basePath.slice(0, -1);
-
-                const statusPath = `${basePath}/status`;
-                const baseUrl = `http://${settings.appiumHost}:${settings.appiumPort}${statusPath}`;
-
-                for (let i = 0; i < 20; i++) {
-                    try {
-                        const controller = new AbortController();
-                        const id = setTimeout(() => controller.abort(), 1000);
-                        const response = await fetch(baseUrl + `?t=${Date.now()}`, { signal: controller.signal, cache: 'no-store' });
-                        clearTimeout(id);
-                        if (response.ok || response.status === 304) break;
-                    } catch (e) { }
-                    await new Promise(r => setTimeout(r, 1000));
+                // Stabilization delay to ensure port binding
+                if (isReady) {
+                    await new Promise(r => setTimeout(r, 3000));
                 }
             }
 
@@ -207,6 +202,12 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
 
     return (
         <div ref={containerRef} className="h-full flex flex-col gap-4 p-4 w-full overflow-y-auto">
+            <WarningModal
+                isOpen={warningModal.isOpen}
+                onClose={() => setWarningModal(prev => ({ ...prev, isOpen: false }))}
+                title={t('common.attention', "Attention")}
+                description={warningModal.message}
+            />
             {/* Main Content Area: Explorer + Side Menu */}
             <div className="flex-1 min-h-0 flex gap-4">
                 {/* Embedded File Explorer */}

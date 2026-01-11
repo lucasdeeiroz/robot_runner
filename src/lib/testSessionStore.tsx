@@ -13,7 +13,7 @@ export interface TestSession {
     deviceUdid: string;
     testPath: string; // For toolbox, this might be "Toolbox" or empty
     logs: string[];
-    status: 'running' | 'finished' | 'stopped' | 'error';
+    status: 'running' | 'finished' | 'stopped' | 'error' | 'stopping';
     exitCode?: string;
     argumentsFile?: string | null;
     deviceModel?: string; // New
@@ -185,14 +185,32 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
     }, [settings.recycleDeviceViews]);
 
     const stopSession = useCallback(async (runId: string) => {
-        try {
-            await invoke('stop_robot_test', { runId });
+        const session = sessions.find(s => s.runId === runId);
+        if (!session) return;
+
+        // If it's a pure toolbox session (no active test), just close it locally
+        if (session.type === 'toolbox' && !session.activeRunId) {
             setSessions(prev => prev.map(s => {
                 if (s.runId === runId) {
-                    return { ...s, status: 'stopped', logs: [...s.logs, '\n[System] Stopped by user.'] };
+                    return { ...s, status: 'stopped', logs: [...s.logs, '\n[System] Toolbox session stopped.'] };
                 }
                 return s;
             }));
+            return;
+        }
+
+        // Use the active run ID (process ID) if available, otherwise the session ID
+        const targetBackendId = session.activeRunId || runId;
+
+        setSessions(prev => prev.map(s => {
+            if (s.runId === runId) {
+                return { ...s, logs: [...s.logs, '\n[System] Stopping...'] };
+            }
+            return s;
+        }));
+
+        try {
+            await invoke('stop_robot_test', { runId: targetBackendId });
         } catch (e) {
             console.error("Failed to stop session", e);
             setSessions(prev => prev.map(s => {
@@ -202,7 +220,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                 return s;
             }));
         }
-    }, []);
+    }, [sessions]);
 
     const rerunSession = useCallback(async (runId: string) => {
         const session = sessions.find(s => s.runId === runId);

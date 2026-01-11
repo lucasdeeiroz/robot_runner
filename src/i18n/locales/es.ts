@@ -11,6 +11,7 @@ export const es = {
             about: "Acerca de",
             description_about: "Información sobre Robot Runner y sus creadores."
         },
+
         run_tab: {
             launcher: "Lanzador",
             connect: "Conectar",
@@ -21,7 +22,14 @@ export const es = {
                 selected_count: "{{count}} Seleccionados",
                 select: "Seleccionar Dispositivos",
                 busy: "Ocupado",
-                refresh: "Actualizar"
+                refresh: "Actualizar Dispositivos"
+            },
+            console: {
+                running: "EJECUTANDO",
+                pass: "ÉXITO",
+                fail: "FALLO",
+                test_summary: "{{total}} PRUEBAS: {{passed}} ÉXITOS, {{failed}} FALLOS",
+                waiting: "Esperando registros..."
             }
         },
         tests: {
@@ -39,7 +47,8 @@ export const es = {
                 starting: "Iniciando Appium...",
                 launching: "Iniciando Pruebas...",
                 redirecting: "Redirigiendo...",
-                failed: "Fallo al iniciar"
+                failed: "Fallo al iniciar",
+                waiting_server: "Esperando al Servidor..."
             },
             alerts: {
                 busy: "Los siguientes dispositivos están ocupados:\n{{devices}}\n\nEspere a que terminen."
@@ -160,7 +169,47 @@ export const es = {
             search: "Buscar...",
             loading: "Cargando...",
             minimize: "Minimizar",
-            close: "Cerrar"
+            close: "Cerrar",
+            confirm: "Confirmar",
+            attention: "Atención"
+        },
+        apps: {
+            actions: {
+                uninstall_title: "Desinstalar Paquete",
+                uninstall_confirm: "¿Estás seguro de que quieres desinstalar {{pkg}}?",
+                disable_title: "Deshabilitar App",
+                enable_title: "Habilitar App",
+                disable_confirm: "¿Deshabilitar {{pkg}}?",
+                enable_confirm: "¿Habilitar {{pkg}}?",
+                clear_title: "Borrar Datos",
+                clear_confirm: "¿Borrar todos los datos de {{pkg}}?",
+                install: "Instalar APK",
+                uninstall: "Desinstalar",
+                disable: "Deshabilitar",
+                enable: "Habilitar",
+                clear: "Borrar Datos",
+                sort_by_name: "Ordenar por Nombre",
+                sort_by_package: "Ordenar por Paquete",
+                refresh: "Actualizar Lista"
+            },
+            search_placeholder: "Buscar paquetes...",
+            toggle_system: "Mostrar Apps del Sistema",
+            no_device: "Ningún dispositivo seleccionado",
+            no_packages: "Ningún paquete encontrado",
+            status: {
+                installing: "Instalando APK...",
+                disabled_badge: "Deshabilitado"
+            },
+            success: {
+                uninstalled: "{{pkg}} desinstalado con éxito",
+                disabled: "{{pkg}} deshabilitado",
+                enabled: "{{pkg}} habilitado",
+                cleared: "Datos borrados para {{pkg}}",
+                installed: "APK instalado con éxito"
+            },
+            error: {
+                install_failed: "Fallo en la instalación: {{error}}"
+            },
         },
         settings: {
             title: "Ajustes",
@@ -252,7 +301,8 @@ export const es = {
                 logcat: "Logcat",
                 commands: "Comandos",
                 mirror: "Espejo",
-                performance: "Rendimiento"
+                performance: "Rendimiento",
+                apps: "Apps"
             },
             actions: {
                 screenshot: "Capturar Pantalla",
@@ -261,7 +311,8 @@ export const es = {
                 stop_execution: "Detener Ejecución",
                 rerun: "Re-ejecutar",
                 switch_to_grid: "Cambiar a Cuadrícula",
-                switch_to_tabs: "Cambiar a Pestañas"
+                switch_to_tabs: "Cambiar a Pestañas",
+                force_stop: "Forzar Detención"
             }
         },
         file_explorer: {

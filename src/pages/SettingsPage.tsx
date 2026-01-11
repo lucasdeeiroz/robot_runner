@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next";
 import { feedback } from "@/lib/feedback";
 import { TOOL_LINKS } from "@/lib/tools";
 import { Modal } from "@/components/common/Modal";
+import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
 
 export function SettingsPage() {
     const { settings, updateSetting, loading, profiles, activeProfileId, createProfile, switchProfile, renameProfile, deleteProfile, systemVersions, checkSystemVersions, systemCheckStatus } = useSettings();
@@ -200,31 +201,14 @@ export function SettingsPage() {
     return (
         <div ref={containerRef} className="space-y-8 animate-in fade-in duration-500 pb-12">
             {/* Delete Confirmation Modal */}
-            <Modal
+            <ConfirmationModal
                 isOpen={!!showDeleteConfirm}
                 onClose={() => setShowDeleteConfirm(null)}
+                onConfirm={confirmDeleteInfo}
                 title={t('settings.profiles.delete')}
-            >
-                <div className="space-y-4">
-                    <p className="text-zinc-600 dark:text-zinc-400">
-                        {t('settings.profiles.confirm_delete')}
-                    </p>
-                    <div className="flex justify-end gap-2 mt-6">
-                        <button
-                            onClick={() => setShowDeleteConfirm(null)}
-                            className="px-4 py-2 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 font-medium"
-                        >
-                            {t('common.cancel')}
-                        </button>
-                        <button
-                            onClick={confirmDeleteInfo}
-                            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
-                        >
-                            {t('common.delete')}
-                        </button>
-                    </div>
-                </div>
-            </Modal>
+                description={t('settings.profiles.confirm_delete')}
+                confirmText={t('common.delete')}
+            />
 
             {/* Profile Manager Section */}
             <section className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
@@ -275,39 +259,38 @@ export function SettingsPage() {
             </section>
 
             {/* Modal for Create/Rename */}
-            {showProfileModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-                    <form onSubmit={handleProfileSubmit} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 w-full max-w-sm shadow-2xl">
-                        <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white tracking-tight">
-                            {isRenaming ? t('settings.profiles.rename') : t('settings.profiles.create')}
-                        </h3>
-                        <input
-                            autoFocus
-                            type="text"
-                            value={newProfileName}
-                            onChange={(e) => setNewProfileName(e.target.value)}
-                            placeholder={t('settings.profiles.name_placeholder')}
-                            className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 mb-4 outline-none focus:ring-2 focus:ring-primary/20 text-gray-900 dark:text-zinc-100"
-                        />
-                        <div className="flex justify-end gap-2">
-                            <button
-                                type="button"
-                                onClick={() => setShowProfileModal(false)}
-                                className="px-4 py-2 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
-                            >
-                                {t('common.cancel')}
-                            </button>
-                            <button
-                                type="submit"
-                                disabled={!newProfileName.trim()}
-                                className="px-4 py-2 bg-primary hover:opacity-90 text-white rounded-xl disabled:opacity-50 transition-all active:scale-95"
-                            >
-                                {t('common.save')}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            )}
+            <Modal
+                isOpen={showProfileModal}
+                onClose={() => setShowProfileModal(false)}
+                title={isRenaming ? t('settings.profiles.rename') : t('settings.profiles.create')}
+            >
+                <form onSubmit={handleProfileSubmit} className="space-y-4">
+                    <input
+                        autoFocus
+                        type="text"
+                        value={newProfileName}
+                        onChange={(e) => setNewProfileName(e.target.value)}
+                        placeholder={t('settings.profiles.name_placeholder')}
+                        className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 text-gray-900 dark:text-zinc-100"
+                    />
+                    <div className="flex justify-end gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setShowProfileModal(false)}
+                            className="px-4 py-2 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                        >
+                            {t('common.cancel')}
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={!newProfileName.trim()}
+                            className="px-4 py-2 bg-primary hover:opacity-90 text-white rounded-xl disabled:opacity-50 transition-all active:scale-95"
+                        >
+                            {t('common.save')}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
 
 
             <div className="grid gap-6">
