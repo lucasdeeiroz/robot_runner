@@ -113,7 +113,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                         // Ideally ToolBoxView should know if it's running a test to show console.
                         // The types field helps `TestsPage` show status icons.
                         testPath,
-                        // Reset logs for new test? Yes.
+                        // Reset logs for new test
                         logs: [`[System] Starting test session: ${runId}`, `[System] Device: ${deviceName}`, `[System] Suite: ${testPath}`, '----------------------------------------'],
                         status: 'running',
                         argumentsFile,

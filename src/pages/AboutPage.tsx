@@ -36,9 +36,6 @@ export function AboutPage() {
                 feedback.toast.success(t('about.update_available', { version: update.latestVersion }));
             } else {
                 setUpdateAvailable(false);
-                // Only toast "not available" if manually triggered? 
-                // We can't distinguish easily without prop, but for now user requested "Start automatically".
-                // We'll leave the toast logic as is, it's fine.
                 feedback.toast.info(t('about.update_not_available'));
             }
         } catch (error) {

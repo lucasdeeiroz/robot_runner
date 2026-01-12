@@ -113,6 +113,8 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
             recordingSaver.clearFeedback();
         } catch (e) {
             console.error("Screenshot failed:", e);
+            const message = e instanceof Error ? e.message : String(e);
+            feedback.toast.error(`Failed to take screenshot: ${message}`);
         }
     };
 
@@ -132,19 +134,11 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                 }
             } catch (e) {
                 console.error("Stop recording failed:", e);
-                // Don't disable recording state if save failed? 
-                // Usually we want to stop anyway or retry?
-                // For now, if saveFile returns null (cancelled), we might want to keep recording?
-                // But the user clicked 'Stop'.
-                // If the user Cancels the dialog, we usually want to stop & discard or Keep recording?
-                // The standard `useFileSave` returns null if cancelled.
-                // If we want to allow "Stop & Discard", we probably need a different flow.
-                // But typically "Stop" implies "I'm done".
-                // If user cancels save, maybe we should just stop & discard (without invoke stop logic that saves)?
-                // `start_screen_recording` -> `stop_screen_recording(path)`.
-                // If we don't call stop, it keeps recording.
-                // If we call stop with path, it saves.
-                // If user cancels, we stay recording? Matches current UX.
+                // If saving is cancelled or fails, we intentionally keep `isRecording` true
+                // so recording continues until the user successfully stops and saves/discards it.
+                alert(`Failed to stop recording: ${e}`);
+                // Ensure the UI does not remain stuck in the "recording" state after a failure.
+                setIsRecording(false);
             }
         } else {
             // Start

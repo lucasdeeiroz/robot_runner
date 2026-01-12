@@ -353,7 +353,6 @@ export function TestsPage() {
 
             {/* View Toggle (Grid/Tabs) */}
             <div className="absolute top-4 right-4 z-10 hidden md:block">
-                {/* Need to position this outside relative container? Actually place it in tabs row? */}
             </div>
 
             {/* Modified Tabs Row with Grid Toggle */}

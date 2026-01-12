@@ -26,7 +26,6 @@ pub fn get_installed_packages(device: String) -> Result<Vec<PackageInfo>, String
     for line in output_all.lines() {
         if let Some(record) = line.strip_prefix("package:") {
             // Format: /path/to/apk=com.package.name
-            // But sometimes just com.package.name if -f fails? No, -f should give path.
             if let Some((path, name)) = record.rsplit_once('=') {
                 let name = name.trim().to_string();
                 let path = path.trim().to_string();

@@ -18,7 +18,7 @@ export function SystemCheckOverlay({ status, onCriticalExit, onTestingRedirect, 
     // We can derive the current state to show based on priority
     // 1. Loading
     // 2. Critical Error (Node/ADB)
-    // 3. Testing Error (Python/Robot/Appium) - Only if not acknowledged ? Actually, if we redirect, we are "done" with the overlay.
+    // 3. Testing Error (Python/Robot/Appium)
     // 4. Mirroring Error (Scrcpy)
 
     if (status.loading || !status.complete) {
