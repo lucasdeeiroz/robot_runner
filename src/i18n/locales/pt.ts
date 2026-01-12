@@ -160,7 +160,11 @@ export const pt = {
                 disconnected_all: "Todos os dispositivos desconectados",
                 tunnel_stopped: "Túnel Ngrok Parado",
                 tunnel_stop_error: "Erro ao parar Ngrok",
-                tunnel_start_error: "Erro ao iniciar Ngrok"
+                tunnel_start_error: "Erro ao iniciar Ngrok",
+                payment_required_title: "Pagamento Ngrok Necessário",
+                payment_required_desc: "Contas gratuitas do ngrok exigem um cartão de crédito válido para usar túneis TCP. Você não será cobrado.",
+                add_card: "Adicionar Cartão",
+                cancel_card: "Cancelar"
             }
         },
         inspector: {

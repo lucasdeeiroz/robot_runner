@@ -107,7 +107,11 @@ export const es = {
                 disconnected_all: "Desconectados todos los dispositivos",
                 tunnel_stopped: "Túnel Ngrok Detenido",
                 tunnel_stop_error: "Error deteniendo Ngrok",
-                tunnel_start_error: "Error iniciando Ngrok"
+                tunnel_start_error: "Error iniciando Ngrok",
+                payment_required_title: "Pago de Ngrok Requerido",
+                payment_required_desc: "Las cuentas gratuitas de ngrok requieren una tarjeta de crédito válida para usar túneles TCP. No se te cobrará.",
+                add_card: "Añadir Tarjeta",
+                cancel_card: "Cancelar"
             }
         },
         inspector: {

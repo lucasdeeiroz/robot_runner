@@ -5,6 +5,8 @@ import clsx from "clsx";
 import { useSettings } from "@/lib/settings";
 import { useTranslation } from "react-i18next";
 import { feedback } from "@/lib/feedback";
+import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
+import { openUrl } from "@tauri-apps/plugin-opener";
 
 interface ConnectSubTabProps {
     onDeviceConnected: () => void;
@@ -80,8 +82,24 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
     const [ngrokLoading, setNgrokLoading] = useState(false);
     const [ngrokStatusMsg, setNgrokStatusMsg] = useState<{ text: string, type: 'success' | 'error' | 'info' } | null>(null);
 
+    const handleStopNgrok = async () => {
+        setNgrokStatusMsg(null);
+        try {
+            await invoke('stop_ngrok');
+            setNgrokUrl("");
+            setNgrokStatusMsg({ text: t('connect.status.tunnel_stopped'), type: 'info' });
+        } catch (e) {
+            setNgrokStatusMsg({ text: `${t('connect.status.tunnel_stop_error')}: ${e}`, type: 'error' });
+        }
+    };
+
+    // Payment Required Modal
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+
     const handleStartNgrok = async () => {
         setNgrokStatusMsg(null);
+        setShowPaymentModal(false);
+
         if (!selectedDevice) {
             setNgrokStatusMsg({ text: t('connect.status.select_device_first') || "Select a device to expose", type: 'error' });
             return;
@@ -112,20 +130,16 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
             feedback.notify('feedback.remote_connected', 'feedback.details.url', { url });
         } catch (e) {
             console.error(e);
+            const errStr = String(e);
+
+            // Check for Payment Required Error (ERR_NGROK_8013)
+            if (errStr.includes("ERR_NGROK_8013") || errStr.toLowerCase().includes("credit or debit card")) {
+                setShowPaymentModal(true);
+            }
+
             setNgrokStatusMsg({ text: `${t('connect.status.tunnel_start_error')}: ${e}`, type: 'error' });
         } finally {
             setNgrokLoading(false);
-        }
-    };
-
-    const handleStopNgrok = async () => {
-        setNgrokStatusMsg(null);
-        try {
-            await invoke('stop_ngrok');
-            setNgrokUrl("");
-            setNgrokStatusMsg({ text: t('connect.status.tunnel_stopped'), type: 'info' });
-        } catch (e) {
-            setNgrokStatusMsg({ text: `${t('connect.status.tunnel_stop_error')}: ${e}`, type: 'error' });
         }
     };
 
@@ -199,6 +213,20 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
 
     return (
         <div className="h-full space-y-6 overflow-auto">
+            <ConfirmationModal
+                isOpen={showPaymentModal}
+                onClose={() => setShowPaymentModal(false)}
+                onConfirm={async () => {
+                    await openUrl('https://dashboard.ngrok.com/settings#id-verification');
+                    setShowPaymentModal(false);
+                }}
+                title={t('connect.status.payment_required_title')}
+                description={t('connect.status.payment_required_desc')}
+                confirmText={t('connect.status.add_card')}
+                cancelText={t('connect.status.cancel_card')}
+                variant="warning"
+            />
+
             {/* Wireless Connection Card */}
             <div className="bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
                 <div className="flex items-center gap-3 mb-6">
@@ -293,7 +321,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                 {/* Status Message Area */}
                 {statusMsg && (
                     <div className={clsx(
-                        "mt-4 p-3 rounded-lg text-sm font-mono break-all animate-in slide-in-from-top-2",
+                        "mt-4 p-3 rounded-lg text-sm font-mono break-all whitespace-pre-wrap animate-in slide-in-from-top-2",
                         statusMsg.type === 'error' ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/50" :
                             statusMsg.type === 'success' ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-900/50" :
                                 "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50"
@@ -386,7 +414,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                 {/* Ngrok Status Message Area */}
                 {ngrokStatusMsg && (
                     <div className={clsx(
-                        "mt-4 p-3 rounded-lg text-sm font-mono break-all animate-in slide-in-from-top-2",
+                        "mt-4 p-3 rounded-lg text-sm font-mono break-all whitespace-pre-wrap animate-in slide-in-from-top-2",
                         ngrokStatusMsg.type === 'error' ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/50" :
                             ngrokStatusMsg.type === 'success' ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-900/50" :
                                 "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50"
