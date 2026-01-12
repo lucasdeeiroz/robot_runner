@@ -123,10 +123,7 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
                 if (settings.paths.logs) {
                     savePath = await join(settings.paths.logs, filename);
                 } else {
-                    // Fallback if no log path configured: ask user or default to desktop?
-                    // User requested auto-save, implying log path exists. 
-                    // If now, we can throw or just fallback to save dialog?
-                    // Let's use save dialog as fallback if no log path.
+                    // Fallback: use save dialog when no log path is configured.
                     const selected = await save({
                         filters: [{ name: 'CSV', extensions: ['csv'] }],
                         defaultPath: filename

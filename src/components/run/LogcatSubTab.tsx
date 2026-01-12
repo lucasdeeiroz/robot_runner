@@ -38,7 +38,6 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
         return () => observer.disconnect();
     }, []);
 
-    // Auto-stop when unmounting or changing device?
     useEffect(() => {
         return () => {
             if (isStreaming && selectedDevice) {
@@ -78,7 +77,6 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
                     const totalLen = result[1];
 
                     if (totalLen < pollingOffset) {
-                        // Buffer reset on device?
                         pollingOffset = 0;
                     } else {
                         if (newLines && newLines.length > 0) {
@@ -178,7 +176,6 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
             if (!isMounted.current) return; // Prevent state update if unmounted
             setIsStreaming(false);
             if (currentDumpFile) {
-                // Keep the log in the text list as well? user might want it.
                 setLogs(prev => [...prev, `${t('feedback.saved_to_prefix')} ${currentDumpFile}`]);
                 feedback.toast.success('feedback.logcat_saved');
                 setLastSavedFile(currentDumpFile);

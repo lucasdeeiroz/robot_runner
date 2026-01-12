@@ -151,7 +151,6 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
         if (interactionMode === 'swipe' && swipeStart) {
             const end = getCoords(e);
             if (end) {
-                // Determine duration based on distance? Or fixed.
                 sendAdbInput(`swipe ${swipeStart.x} ${swipeStart.y} ${end.x} ${end.y} 500`);
                 addSwipeAnimation(swipeStart.x, swipeStart.y, end.x, end.y);
             }

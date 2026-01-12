@@ -137,7 +137,7 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' && !isExecuting) { // Prevent enter if executing (or allow if we want parallel? usually 1 console at a time)
+        if (e.key === 'Enter' && !isExecuting) { // Prevent enter if executing
             handleSend();
         }
     };

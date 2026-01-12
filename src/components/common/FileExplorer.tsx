@@ -94,7 +94,6 @@ export function FileExplorer({ initialPath = ".", onSelect, onCancel, selectionM
 
     const handleConfirm = () => {
         if (!selectedEntry) {
-            // If mode is directory and nothing selected, maybe select current directory?
             if (selectionMode === 'directory') {
                 onSelect(currentPath);
             }
@@ -105,8 +104,6 @@ export function FileExplorer({ initialPath = ".", onSelect, onCancel, selectionM
             if (selectedEntry.is_dir) {
                 onSelect(selectedEntry.path);
             } else {
-                // Should not happen if filtered, but just in case
-                // Should not happen if filtered, but just in case
                 setWarningModal({
                     isOpen: true,
                     message: t('file_explorer.select_folder')
@@ -117,7 +114,6 @@ export function FileExplorer({ initialPath = ".", onSelect, onCancel, selectionM
             if (!selectedEntry.is_dir) {
                 onSelect(selectedEntry.path);
             } else {
-                // If user selected a dir in file mode, open it?
                 handleNavigate(selectedEntry.path);
             }
         }

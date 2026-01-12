@@ -126,7 +126,7 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
         const IS_SINGLE = (l: string) => /^-{10,}$/.test(l.trim());
         const IS_STATUS = (l: string) => / \|\s+(PASS|FAIL)\s+\|/.test(l); // Loose match for table status
         const IS_SUMMARY = (l: string) => /^\d+ tests?, \d+ passed, \d+ failed/.test(l.trim());
-        const IS_SYSTEM = (l: string) => l.trim().startsWith('[System]') || l.trim().startsWith('[Error]') || /^\s*(Output|Log|Report):/.test(l);
+        const IS_SYSTEM = (l: string) => l.trim().startsWith('[System]') || l.trim().startsWith('[Error]') || /^\s*(Output|Log|Report|STDERR|STDOUT):/.test(l);
 
         if (currentCount > processedCount) {
             const newLogs = logs.slice(processedCount);
@@ -182,7 +182,7 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
                                 if (match) {
                                     statusNodeIndex = linearNodes.length - 1 - k;
                                 }
-                                break; // Found or not (if looks like status but regex fails, stop?) -> actually IS_STATUS checks regex roughly
+                                break;
                             }
                         }
 
@@ -386,8 +386,6 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
         });
     };
 
-    // LinkRenderer was here... removed
-
     // Recursive Render
     const renderNode = (node: LogNode, parentName?: string) => {
         if (node.type === 'text') {
@@ -400,9 +398,6 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
             const isFailed = node.status === 'FAIL';
             const isUserToggled = collapsedIds.has(node.id); // If in set, it is TOGGLED (inverted)
 
-            // Running tests always open (unless toggled explicitly?)
-            // Failed tests default open.
-            // Passed tests default closed.
             const isOpen = isRunning ? !isUserToggled : (isFailed ? !isUserToggled : isUserToggled);
 
             const borderColor = isRunning ? 'border-blue-500/50' : (isFailed ? 'border-red-500' : 'border-green-500');

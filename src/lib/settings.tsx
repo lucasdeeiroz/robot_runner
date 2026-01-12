@@ -227,7 +227,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
     const createProfile = (name: string) => {
         const id = uuidv4();
-        // Clone current settings or default? Default is safer/cleaner.
         const newProfile: Profile = {
             id,
             name,
@@ -265,7 +264,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     };
 
     const deleteProfile = (id: string) => {
-        // Prevent deleting last profile or current?
         // If deleting current, switch to default first.
         const profiles = { ...storeData.profiles };
         if (Object.keys(profiles).length <= 1) {
@@ -302,7 +300,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     });
 
     const checkSystemVersions = async () => {
-        // If already loading, skip? No, forcing check might be needed.
         setSystemCheckStatus(prev => ({ ...prev, loading: true }));
         try {
             const versions = await invoke<SystemVersions>('get_system_versions');

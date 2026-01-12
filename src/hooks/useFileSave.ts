@@ -38,11 +38,14 @@ export function useFileSave({ fileType, extensions, defaultNamePrefix, settingPa
             let filePath: string | null = null;
 
             // 1. Check Auto-Save Path
-            if (settingPathKey && settings.paths[settingPathKey] && settings.paths[settingPathKey].trim() !== '') {
-                try {
-                    filePath = await join(settings.paths[settingPathKey], filename);
-                } catch (e) {
-                    console.warn("Failed to join auto-save path", e);
+            if (settingPathKey) {
+                const autoSaveBasePath = settings.paths?.[settingPathKey];
+                if (autoSaveBasePath && autoSaveBasePath.trim() !== '') {
+                    try {
+                        filePath = await join(autoSaveBasePath, filename);
+                    } catch (e) {
+                        console.warn("Failed to join auto-save path", e);
+                    }
                 }
             }
 
@@ -63,8 +66,8 @@ export function useFileSave({ fileType, extensions, defaultNamePrefix, settingPa
                 return filePath;
             }
         } catch (e) {
-            console.error(`Failed to save ${fileType}`, e);
-            feedback.toast.error(`${t('common.error_occurred')}: ${e}`);
+            const errorMessage = e instanceof Error ? e.message : String(e);
+            feedback.toast.error(`${t('common.error_occurred')}: ${errorMessage}`);
         } finally {
             setIsSaving(false);
         }

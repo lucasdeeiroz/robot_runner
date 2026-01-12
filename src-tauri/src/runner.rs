@@ -256,7 +256,6 @@ pub fn run_robot_test(
             if finished {
                 // Remove from map
                 procs.remove(&rid_monitor);
-                // Drop lock before emitting? No, try_wait is fast.
                 drop(procs);
 
                 let _ = app_handle_finish.emit(
