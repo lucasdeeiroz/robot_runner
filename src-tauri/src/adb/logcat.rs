@@ -26,18 +26,18 @@ pub fn start_logcat(
     level: Option<String>,
     output_file: Option<String>,
 ) -> Result<String, String> {
-    println!("Logcat: Received request for device: {}", device);
+    // println!("Logcat: Received request for device: {}", device);
 
     let mut procs = state.0.lock().map_err(|e| e.to_string())?;
 
     if procs.contains_key(&device) {
-        println!("Logcat: Already active for {}", device);
+        // println!("Logcat: Already active for {}", device);
         return Ok("Logcat already running".to_string());
     }
 
     let mut pid_filter = None;
     if let Some(pkg) = &filter {
-        println!("Logcat: Looking up PID for package: {}", pkg);
+        // println!("Logcat: Looking up PID for package: {}", pkg);
         // Try to find PID
         // adb -s <device> shell pidof -s <package>
         let mut pidof_cmd = Command::new("adb");
@@ -65,7 +65,7 @@ pub fn start_logcat(
                     if let Ok(score) = score_str.parse::<i32>() {
                         // 900 is CACHED_APP_MIN_ADJ. If it's cached, we treat as closed.
                         if score >= 900 {
-                            println!("Logcat: Process {} ({}) is cached (score {}), treating as stopped.", pkg, pid, score);
+                            // println!("Logcat: Process {} ({}) is cached (score {}), treating as stopped.", pkg, pid, score);
                             return Err(format!("APP_NOT_RUNNING:{}", pkg));
                         }
                     }
@@ -74,7 +74,7 @@ pub fn start_logcat(
                 pid_filter = Some(pid);
             }
             Err(e) => {
-                println!("Logcat: Failed to run pidof: {}", e);
+                // println!("Logcat: Failed to run pidof: {}", e);
                 return Err(format!("Failed to checking if app is running: {}", e));
             }
         }
@@ -98,7 +98,7 @@ pub fn start_logcat(
 
     args.push(&level_arg);
 
-    println!("Logcat: Exec params {:?}", args);
+    // println!("Logcat: Exec params {:?}", args);
     let cmd_trace = format!("Command: adb {}", args.join(" "));
 
     #[cfg(target_os = "windows")]
@@ -130,11 +130,11 @@ pub fn start_logcat(
     // Prepare file writer
     // Use ref path to avoid moving output_file
     let mut file_writer = if let Some(ref path) = output_file {
-        println!("Logcat: Writing to file '{}'", path);
+        // println!("Logcat: Writing to file '{}'", path);
         match OpenOptions::new().create(true).append(true).open(path) {
             Ok(f) => Some(f),
             Err(e) => {
-                println!("Logcat: Failed to open output file: {}", e);
+                // println!("Logcat: Failed to open output file: {}", e);
                 None
             }
         }
@@ -143,13 +143,13 @@ pub fn start_logcat(
     };
 
     let dev_id = device.clone();
-    println!("Logcat: Spawning stdout thread for device {}", dev_id);
+    // println!("Logcat: Spawning stdout thread for device {}", dev_id);
     thread::spawn(move || {
         let reader = BufReader::new(stdout);
         for line in reader.lines() {
             if let Ok(l) = line {
                 let preview: String = l.chars().take(100).collect();
-                println!("Logcat read: {}", preview);
+                // println!("Logcat read: {}", preview);
 
                 // Write to file
                 if let Some(ref mut file) = file_writer {
@@ -164,11 +164,11 @@ pub fn start_logcat(
                     }
                 }
             } else {
-                println!("Logcat: EOF or Error");
+                // println!("Logcat: EOF or Error");
                 break;
             }
         }
-        println!("Logcat thread finished for {}", dev_id);
+        // println!("Logcat thread finished for {}", dev_id);
     });
 
     procs.insert(device.clone(), LogcatProcess { child, buffer, output_file: output_file.clone() });
@@ -178,12 +178,12 @@ pub fn start_logcat(
 
 #[tauri::command]
 pub fn stop_logcat(state: State<'_, LogcatState>, device: String) -> Result<String, String> {
-    println!("Logcat: STOP request for {}", device);
+    // println!("Logcat: STOP request for {}", device);
     let mut procs = state.0.lock().map_err(|e| e.to_string())?;
 
     if let Some(mut process) = procs.remove(&device) {
         let _ = process.child.kill();
-        println!("Logcat: Killed process for {}", device);
+        // println!("Logcat: Killed process for {}", device);
         return Ok("Logcat stopped".to_string());
     }
 

@@ -51,6 +51,7 @@ pub fn run() {
             adb::wireless::adb_connect,
             adb::wireless::adb_pair,
             adb::wireless::adb_disconnect,
+            adb::wireless::adb_disconnect_all,
             system::get_system_versions,
             adb::shell::is_adb_server_running,
             adb::shell::kill_adb_server,

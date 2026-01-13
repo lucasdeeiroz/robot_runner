@@ -7,6 +7,7 @@ import { XCircle, FileText, Folder, Calendar, RefreshCw, ChevronDown, ChevronRig
 import clsx from 'clsx';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from "react-i18next";
+import { feedback } from '@/lib/feedback';
 
 interface TestLog {
     path: string;
@@ -173,7 +174,7 @@ export function TestsPage() {
             });
             setHistory(logs);
         } catch (e) {
-            console.error("Failed to load history", e);
+            feedback.toast.error("tests.history.load_error", e);
         } finally {
             setLoadingHistory(false);
         }
@@ -231,7 +232,7 @@ export function TestsPage() {
         try {
             await invoke('open_log_folder', { path });
         } catch (e) {
-            console.error("Failed to open file/folder", e);
+            feedback.toast.error("common.errors.open_file_failed", e);
         }
     };
 

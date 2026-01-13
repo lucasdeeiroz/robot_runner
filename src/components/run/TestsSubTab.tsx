@@ -9,6 +9,7 @@ import { v4 as uuidv4 } from 'uuid';
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
 import { WarningModal } from "@/components/shared/WarningModal";
+import { feedback } from "@/lib/feedback";
 
 interface TestsSubTabProps {
     selectedDevices: string[];
@@ -186,7 +187,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     timestampOutputs: dontOverwrite,
                     workingDir
                 }).catch(e => {
-                    console.error("Launch failed", e);
+                    feedback.toast.error("tests.launch_failed", e);
                 });
             }
 
@@ -199,7 +200,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
             }, 500);
 
         } catch (e: any) {
-            console.error(e);
+            feedback.toast.error("tests.launch_failed", e);
             let errStr = String(e);
             if (errStr.includes("Error:")) errStr = errStr.replace("Error:", "").trim();
             setLaunchStatus(`${t('tests.status.failed')}: ${errStr}`);

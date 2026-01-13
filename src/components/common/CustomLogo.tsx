@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { readFile } from '@tauri-apps/plugin-fs';
+import { feedback } from '@/lib/feedback';
 
 interface CustomLogoProps {
     path: string;
@@ -59,7 +60,7 @@ export function CustomLogo({ path, className }: CustomLogoProps) {
                 if (active) setSrc(`data:${mime};base64,${base64}`);
             } catch (e: any) {
                 const msg = e instanceof Error ? e.message : String(e);
-                console.error("Failed to load logo:", path, msg);
+                feedback.toast.error("components.logo.load_error", msg);
                 // Simplify error message for UI but include path hint
                 if (active) setError(`${msg} (${path})`);
             }

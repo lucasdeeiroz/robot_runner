@@ -13,6 +13,7 @@ import { TestSession, useTestSessions } from "@/lib/testSessionStore";
 import { feedback } from "@/lib/feedback";
 import { FileSavedFeedback } from "@/components/common/FileSavedFeedback";
 import { useFileSave } from "@/hooks/useFileSave";
+import { SplitButton } from "@/components/shared/SplitButton";
 
 interface ToolboxViewProps {
     session: TestSession;
@@ -112,9 +113,8 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
             // Clear recording feedback so this one shows
             recordingSaver.clearFeedback();
         } catch (e) {
-            console.error("Screenshot failed:", e);
             const message = e instanceof Error ? e.message : String(e);
-            feedback.toast.error(`Failed to take screenshot: ${message}`);
+            feedback.toast.error("toolbox.screenshot.error", message);
         }
     };
 
@@ -133,10 +133,8 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                     setIsRecording(false);
                 }
             } catch (e) {
-                console.error("Stop recording failed:", e);
-                // If saving is cancelled or fails, we intentionally keep `isRecording` true
-                // so recording continues until the user successfully stops and saves/discards it.
-                alert(`Failed to stop recording: ${e}`);
+                feedback.toast.error("toolbox.recording.stop_error", e);
+
                 // Ensure the UI does not remain stuck in the "recording" state after a failure.
                 setIsRecording(false);
             }
@@ -146,8 +144,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                 await invoke('start_screen_recording', { device: session.deviceUdid });
                 setIsRecording(true);
             } catch (e) {
-                console.error("Start recording failed:", e);
-                alert(`Failed to start recording: ${e}`);
+                feedback.toast.error("toolbox.recording.start_error", e);
             }
         }
     };
@@ -167,8 +164,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
             });
             feedback.toast.success('feedback.mirror_launched');
         } catch (e) {
-            console.error("Failed to open Scrcpy:", e);
-            alert(`${t('scrcpy.error')}: ${e}`);
+            feedback.toast.error("toolbox.scrcpy.open_error", e);
         }
     };
 
@@ -177,8 +173,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
         try {
             await rerunSession(session.runId);
         } catch (e) {
-            console.error("Rerun failed trigger:", e);
-            alert("Failed to initiate rerun");
+            feedback.toast.error("toolbox.rerun.init_error", e);
         }
     };
 
@@ -339,14 +334,36 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                                 </button>
                             )}
                             {session.status !== 'running' && (
-                                <button
-                                    onClick={handleRerun}
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-primary hover:opacity-90 text-white rounded-md text-sm font-medium transition-colors cursor-pointer"
-                                    title={t('toolbox.actions.rerun')}
-                                >
-                                    <RefreshCcw size={16} />
-                                    {!isCompact && !isNarrow && t('toolbox.actions.rerun')}
-                                </button>
+                                <div className="flex items-center">
+                                    <SplitButton
+                                        variant="primary"
+                                        primaryAction={{
+                                            label: !isCompact && !isNarrow ? t('toolbox.actions.rerun') : "",
+                                            onClick: handleRerun,
+                                            icon: <RefreshCcw size={16} />
+                                        }}
+                                        secondaryActions={[
+                                            {
+                                                label: t('connect.actions.rerun_failed'),
+                                                icon: <RefreshCcw size={14} className="text-red-500" />,
+                                                // Check if finished with error (exit code != 0) AND we can find Output xml in logs
+                                                disabled: !(session.status === 'finished' && session.exitCode && !session.exitCode.includes("Exit Code: 0")) ||
+                                                    !session.logs.some(l => l.includes("Output:  ") && l.endsWith(".xml")),
+                                                onClick: () => {
+                                                    // Find XML path
+                                                    const outputLine = session.logs.find(l => l.includes("Output:  ") && l.endsWith(".xml"));
+                                                    if (outputLine) {
+                                                        const match = outputLine.match(/Output:\s+(.*\.xml)/);
+                                                        if (match && match[1]) {
+                                                            const xmlPath = match[1].trim();
+                                                            rerunSession(session.runId, xmlPath);
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        ]}
+                                    />
+                                </div>
                             )}
                         </>
                     )}

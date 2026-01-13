@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { feedback } from "@/lib/feedback";
 import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { SplitButton } from "@/components/shared/SplitButton";
 
 interface ConnectSubTabProps {
     onDeviceConnected: () => void;
@@ -72,7 +73,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                 setStatusMsg({ text: t('connect.status.ip_not_found'), type: 'info' });
             }
         } catch (e) {
-            console.log("Failed to auto-detect IP:", e);
+            // console.log("Failed to auto-detect IP:", e);
             setStatusMsg({ text: t('connect.status.ip_not_found'), type: 'info' });
         }
     };
@@ -129,7 +130,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
             setNgrokStatusMsg({ text: t('connect.status.tunnel_active'), type: 'success' });
             feedback.notify('feedback.remote_connected', 'feedback.details.url', { url });
         } catch (e) {
-            console.error(e);
+            feedback.toast.error("connect.tunnel.start_error", e);
             const errStr = String(e);
 
             // Check for Payment Required Error (ERR_NGROK_8013)
@@ -143,10 +144,13 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
         }
     };
 
-    const handleAction = async (action: 'connect' | 'pair' | 'disconnect') => {
-        if (action !== 'disconnect' && (!ip || !port)) {
-            setStatusMsg({ text: t('connect.labels.ip') + " & " + t('connect.labels.port') + " required", type: 'error' });
-            return;
+    const handleAction = async (action: 'connect' | 'pair' | 'disconnect' | 'disconnect_all') => {
+        // Validation
+        if (action !== 'disconnect_all' && action !== 'disconnect') {
+            if (!ip || !port) {
+                setStatusMsg({ text: t('connect.labels.ip') + " & " + t('connect.labels.port') + " required", type: 'error' });
+                return;
+            }
         }
         if (action === 'pair' && !code) {
             setStatusMsg({ text: t('connect.labels.code') + " required", type: 'error' });
@@ -154,20 +158,33 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
         }
 
         setLoading(true);
-        setStatusMsg({ text: t(`connect.status.executing_${action}`), type: 'info' });
+        // Use generic "Disconnecting..." for both disconnect actions
+        const statusKey = action === 'disconnect_all' ? 'disconnect' : action;
+
+        setStatusMsg({ text: t(`connect.status.executing_${statusKey}`), type: 'info' });
 
         try {
             let cmd = '';
-            let args = { ip, port, code: code || undefined };
+            let args: any = {};
 
-            if (action === 'connect') cmd = 'adb_connect';
-            else if (action === 'pair') cmd = 'adb_pair';
-            else if (action === 'disconnect') cmd = 'adb_disconnect';
+            if (action === 'connect') {
+                cmd = 'adb_connect';
+                args = { ip, port };
+            } else if (action === 'pair') {
+                cmd = 'adb_pair';
+                args = { ip, port, code };
+            } else if (action === 'disconnect') {
+                cmd = 'adb_disconnect';
+                args = { ip, port };
+            } else if (action === 'disconnect_all') {
+                cmd = 'adb_disconnect_all';
+                args = {};
+            }
 
             // Execute command
-            await invoke<string>(cmd, args);
+            // const res = await invoke<string>(cmd, args);
 
-            // Construct success message using translated strings
+            // Construct success message
             const target = `${ip}:${port}`;
             let successMsg = "";
 
@@ -176,24 +193,21 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
             } else if (action === 'pair') {
                 successMsg = t('connect.status.pairing_success', { target });
             } else if (action === 'disconnect') {
-                if (!ip) {
-                    successMsg = t('connect.status.disconnected_all');
-                } else {
-                    successMsg = t('connect.status.disconnection_success', { target });
-                }
+                successMsg = t('connect.status.disconnection_success', { target });
+            } else if (action === 'disconnect_all') {
+                successMsg = t('connect.status.disconnected_all');
             }
 
             setStatusMsg({ text: successMsg || "Success", type: 'success' });
 
-            // Clear successful inputs if needed, or keep for reuse
+            // Clear successful inputs if needed
             if (action === 'pair') setCode("");
 
+            // Post-action side effects
             if (action === 'connect') {
-                // Wait a bit for device to appear in list
                 setTimeout(() => onDeviceConnected(), 2000);
                 feedback.notify('feedback.adb_connected', 'feedback.details.device', { device: ip });
-            } else if (action === 'disconnect') {
-                // Refresh list after disconnect
+            } else if (action === 'disconnect' || action === 'disconnect_all') {
                 setTimeout(() => onDeviceConnected(), 1000);
             }
 
@@ -295,27 +309,45 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                 </div>
 
                 <div className="flex flex-wrap gap-3">
-                    <button
-                        onClick={() => handleAction('connect')}
-                        disabled={loading || !ip || !port}
-                        className="px-6 py-2 bg-primary hover:opacity-90 text-white rounded-xl disabled:opacity-50 transition-all active:scale-95 flex items-center gap-2 font-medium shadow-lg shadow-primary/20 disabled:cursor-not-allowed"
-                    >
-                        <Link size={18} /> {t('connect.actions.connect')}
-                    </button>
-                    <button
-                        onClick={() => handleAction('pair')}
-                        disabled={loading || !ip || !port || !code}
-                        className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-900 dark:text-zinc-100 rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <Wifi size={18} /> {t('connect.actions.pair')}
-                    </button>
-                    <button
-                        onClick={() => handleAction('disconnect')}
-                        disabled={loading}
-                        className="px-4 py-2 bg-red-100 dark:bg-red-900/20 hover:bg-red-200 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 rounded-lg font-medium transition-colors flex items-center gap-2 ml-auto disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <Unplug size={18} /> {t('connect.actions.disconnect')}
-                    </button>
+                    <div className="flex gap-3 w-full">
+                        <SplitButton
+                            variant="primary"
+                            disabled={loading || !ip || !port}
+                            primaryAction={{
+                                label: t('connect.actions.connect'),
+                                onClick: () => handleAction('connect'),
+                                icon: loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Link size={16} />
+                            }}
+                            secondaryActions={[
+                                {
+                                    label: t('connect.actions.pair'),
+                                    onClick: () => handleAction('pair'),
+                                    icon: <Wifi size={14} />,
+                                    disabled: loading || !ip || !port || !code
+                                }
+                            ]}
+                            className=""
+                        />
+
+                        <SplitButton
+                            variant="danger"
+                            primaryAction={{
+                                label: t('connect.actions.disconnect'),
+                                onClick: () => handleAction('disconnect'),
+                                icon: loading ? <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin" /> : <Unplug size={16} />,
+                                disabled: loading || !ip || !port
+                            }}
+                            secondaryActions={[
+                                {
+                                    label: t('connect.actions.disconnect_all'),
+                                    onClick: () => handleAction('disconnect_all'),
+                                    icon: <Unplug size={14} />
+                                }
+                            ]}
+                            disabled={loading}
+                            className="ml-auto"
+                        />
+                    </div>
                 </div>
 
                 {/* Status Message Area */}

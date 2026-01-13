@@ -111,7 +111,7 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
             feedback.toast.success('feedback.inspector_updated');
 
         } catch (e) {
-            console.error("Inspector error:", e);
+            feedback.toast.error("inspector.update_error", e);
         } finally {
             setLoading(false);
         }
@@ -125,7 +125,7 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
             // Auto-refresh after input to show updated state
             setTimeout(refreshAll, 1500);
         } catch (e) {
-            console.error("Input failed", e);
+            feedback.toast.error("inspector.input_error", e);
         }
     };
 

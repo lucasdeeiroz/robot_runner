@@ -21,9 +21,9 @@ export async function checkForUpdates(): Promise<UpdateInfo> {
     let currentVersion = '0.0.0';
     try {
         currentVersion = await getVersion();
-        console.log("[Updater] Current version:", currentVersion);
+        // feedback.toast.info("updater.version_check", currentVersion);
     } catch (e) {
-        console.error("Failed to get app version:", e);
+        // feedback.toast.error("updater.version_check_error", e);
     }
 
     try {
@@ -41,10 +41,10 @@ export async function checkForUpdates(): Promise<UpdateInfo> {
 
         const data = await response.json() as GitHubRelease;
         const latestTag = data.tag_name.replace(/^v/, ''); // Remove 'v' prefix if present
-        console.log("[Updater] Latest tag from GitHub:", data.tag_name, "Parsed:", latestTag);
+        // console.log("[Updater] Latest tag from GitHub:", data.tag_name, "Parsed:", latestTag);
 
         const available = gt(latestTag, currentVersion);
-        console.log("[Updater] Update available?", available);
+        // console.log("[Updater] Update available?", available);
 
         return {
             available,
@@ -54,7 +54,7 @@ export async function checkForUpdates(): Promise<UpdateInfo> {
             notes: data.body
         };
     } catch (e) {
-        console.error("Failed to check updates:", e);
+        // console.error("Failed to check updates:", e);
         return {
             available: false,
             currentVersion, // Return the actual version even if update check fails

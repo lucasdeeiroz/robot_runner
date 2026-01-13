@@ -57,7 +57,7 @@ pub fn get_test_history(
                 }
             }
 
-            println!("Loading logs from cache: {:?}", cache_path);
+            // println!("Loading logs from cache: {:?}", cache_path);
             if let Ok(content) = fs::read_to_string(cache_path) {
                 if let Ok(cached_logs) = serde_json::from_str::<Vec<TestLog>>(&content) {
                     for log in cached_logs {
@@ -65,7 +65,7 @@ pub fn get_test_history(
                         cache_map.insert(log.xml_path.clone(), log);
                     }
                 } else {
-                    println!("Failed to parse cache, falling back to full scan.");
+                    // println!("Failed to parse cache, falling back to full scan.");
                 }
             }
         }
@@ -87,7 +87,7 @@ pub fn get_test_history(
         }
         seen_paths.insert(abs_path_str);
 
-        println!("Scanning logs in: {:?}", abs_base);
+        // println!("Scanning logs in: {:?}", abs_base);
 
         if base_path.exists() && base_path.is_dir() {
             // Walkdir manual recursive
@@ -137,7 +137,7 @@ pub fn get_test_history(
     if let Some(ref cache_path) = cache_file {
         if let Ok(json) = serde_json::to_string_pretty(&logs) {
             let _ = fs::write(cache_path, json);
-            println!("Saved logs cache to: {:?}", cache_path);
+            // println!("Saved logs cache to: {:?}", cache_path);
         }
     }
 
@@ -295,7 +295,7 @@ pub fn open_log_folder(path: String) -> Result<(), String> {
 
 #[command]
 pub fn open_path(path: String) -> Result<(), String> {
-    println!("Opening path: {}", path);
+    // println!("Opening path: {}", path);
 
     #[cfg(target_os = "windows")]
     {

@@ -92,7 +92,7 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
                         }
                     }
                 } catch (e) {
-                    console.error("Polling error:", e);
+                    feedback.toast.error("logcat.errors.fetch_failed", e);
                 }
             }, 200); // 200ms
         }
@@ -121,7 +121,7 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
     }, [settings.tools.appPackage]);
 
     const startLogcat = async () => {
-        console.log("Starting logcat for", selectedDevice);
+        // console.log("Starting logcat for", selectedDevice);
 
         let dumpFile = null;
         if (settings.paths.logcat) {
@@ -133,7 +133,7 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
         setCurrentDumpFile(dumpFile);
 
         const activeFilter = selectedPackage || null;
-        console.log("Package:", activeFilter, "Level:", logLevel);
+        // console.log("Package:", activeFilter, "Level:", logLevel);
 
         try {
             setLogs([]); // Clear previous logs for clarity
@@ -145,11 +145,11 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
             });
             setIsStreaming(true);
             if (dumpFile) {
-                console.log("Saving logs to:", dumpFile);
+                // console.log("Saving logs to:", dumpFile);
                 setLogs(prev => [...prev, `--- ${t('logcat.saving')} ${dumpFile} ---`]);
             }
         } catch (e) {
-            console.error("Failed to start logcat", e);
+            feedback.toast.error("logcat.errors.start_failed", e);
             const errStr = String(e);
             if (errStr.startsWith("APP_NOT_RUNNING:")) {
                 const pkg = errStr.split(":")[1];
@@ -170,7 +170,7 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
     const [lastSavedFile, setLastSavedFile] = useState<string | null>(null);
 
     const stopLogcat = async () => {
-        console.log("Stopping logcat for", selectedDevice);
+        // console.log("Stopping logcat for", selectedDevice);
         try {
             await invoke('stop_logcat', { device: selectedDevice });
             if (!isMounted.current) return; // Prevent state update if unmounted
@@ -182,7 +182,7 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
                 setCurrentDumpFile(null);
             }
         } catch (e) {
-            console.error("Failed to stop logcat", e);
+            feedback.toast.error("logcat.errors.stop_failed", e);
         }
     };
 

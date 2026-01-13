@@ -21,6 +21,7 @@ interface FileExplorerProps {
 
 import { useTranslation } from "react-i18next";
 import { WarningModal } from "@/components/shared/WarningModal";
+import { feedback } from "@/lib/feedback";
 
 export function FileExplorer({ initialPath = ".", onSelect, onCancel, selectionMode = 'file', title: _title, onSelectionChange, allowHideFooter = false }: FileExplorerProps) {
     const { t } = useTranslation();
@@ -50,7 +51,7 @@ export function FileExplorer({ initialPath = ".", onSelect, onCancel, selectionM
             const list = await invoke<FileEntry[]>('list_directory', { path });
             setEntries(list);
         } catch (e) {
-            console.error("Failed to list directory:", e);
+            feedback.toast.error("file_explorer.list_error", e);
             setError(typeof e === 'string' ? e : t('file_explorer.error'));
         } finally {
             setLoading(false);

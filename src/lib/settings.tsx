@@ -2,6 +2,7 @@ import { LazyStore } from '@tauri-apps/plugin-store';
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { invoke } from '@tauri-apps/api/core';
+import { feedback } from './feedback';
 
 export interface SystemVersions {
     adb: string;
@@ -187,7 +188,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                 }
             }
         } catch (e) {
-            console.error('Failed to load settings:', e);
+            feedback.toast.error("settings.load_error", e);
         } finally {
             setLoading(false);
         }
@@ -195,7 +196,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
     const saveStore = (data: SettingsStoreData) => {
         store.set('app_config', data).then(() => store.save()).catch(e => {
-            console.error('Failed to save settings:', e);
+            feedback.toast.error("settings.save_error", e);
         });
     };
 
@@ -203,10 +204,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         const activeId = storeData.activeProfileId;
         const currentProfile = storeData.profiles[activeId];
 
-        console.log(`[Settings] Updating ${key} to ${value} for profile ${activeId}`);
+        // console.log(`[Settings] Updating ${key} to ${value} for profile ${activeId}`);
 
         if (!currentProfile) {
-            console.error('[Settings] Active profile not found!');
+            feedback.toast.error("settings.profile_not_found");
             return;
         }
 
@@ -343,7 +344,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             });
 
         } catch (e) {
-            console.error("Failed to load system versions", e);
+            feedback.toast.error("settings.versions_load_error", e);
             setSystemCheckStatus(prev => ({ ...prev, loading: false }));
         }
     };
