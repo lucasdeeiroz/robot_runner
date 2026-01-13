@@ -1,53 +1,46 @@
 export const pt = {
     translation: {
-        sidebar: {
-            run: "Executar",
-            description_run: "Gerenciamento de dispositivos e execução de automação.",
-            tests: "Testes",
-            description_tests: "Histórico de execuções e análise de resultados.",
-            ai_assistant: "Assistente IA",
-            settings: "Configurações",
-            description_settings: "Configure preferências e integrações do aplicativo.",
-            about: "Sobre",
-            description_about: "Informações sobre o Robot Runner e seus criadores."
-        },
-
-        run_tab: {
-            launcher: "Iniciador",
-            connect: "Conectar",
-            inspector: "Inspetor",
-            commands: "Comandos",
-            device: {
-                no_device: "Nenhum Dispositivo",
-                selected_count: "{{count}} Selecionados",
-                select: "Selecionar Dispositivos",
-                busy: "Ocupado",
-                refresh: "Atualizar Dispositivos"
+        about: {
+            description: "Informações sobre o Robot Runner e seus criadores.",
+            long_description: "Uma interface gráfica moderna e multiplataforma para Robot Framework e Appium, projetada para simplificar fluxos de automação de testes.",
+            developed_by: "Desenvolvido por",
+            lead: "Desenvolvedor Principal",
+            collaborator: "Desenvolvedora Colaboradora",
+            powered_by: "Desenvolvido com",
+            tools_title: "Ferramentas Utilizadas",
+            tools_desc: "O Robot Runner é construído sobre gigantes de código aberto:",
+            tools_list: {
+                tauri: { name: "Tauri", desc: "Framework leve para construção de aplicativos desktop seguros usando tecnologias web." },
+                react: { name: "React", desc: "Biblioteca JavaScript para criar interfaces de usuário dinâmicas e responsivas." },
+                rust: { name: "Rust", desc: "Linguagem de sistemas que oferece performance crítica e segurança de memória para o backend." },
+                vite: { name: "Vite", desc: "Ferramenta de build de próxima geração que proporciona um ambiente de desenvolvimento ultrarrápido." },
+                appium: { name: "Appium", desc: "Plataforma de automação líder para testes nativos, híbridos e web móveis." },
+                robot: { name: "Robot Framework", desc: "Framework de automação genérico e keywords-driven para testes de aceitação." },
+                tailwind: { name: "TailwindCSS", desc: "Framework CSS utilitário para estilização rápida e consistente." },
+                lucide: { name: "Lucide", desc: "Biblioteca de ícones vetoriais bonita e consistente." }
             },
-            console: {
-                running: "EXECUTANDO",
-                pass: "SUCESSO",
-                fail: "FALHA",
-                test_summary: "{{total}} TESTES: {{passed}} COM SUCESSO, {{failed}} COM FALHA",
-                waiting: "Aguardando logs..."
-            }
+            legal_title: "Termos e Licença",
+            license: "Licença MIT",
+            license_desc: "A permissão é concedida, gratuitamente, a qualquer pessoa que obtenha uma cópia deste software e dos arquivos de documentação associados (o 'Software'), para lidar com o Software sem restrições, incluindo, sem limitação, os direitos de usar, copiar, modificar, mesclar, publicar, distribuir, sublicenciar e/ou vender cópias do Software, e permitir que as pessoas a quem o Software é fornecido o façam, sujeito às seguintes condições: O aviso de direitos autorais acima e este aviso de permissão devem ser incluídos em todas as cópias ou partes substanciais do Software.",
+            disclaimer: "O software é fornecido 'como está', sem garantia de qualquer tipo, expressa ou implícita.",
+            update_check: "Verificar Atualizações",
+            update_available: "Nova versão disponível: {{version}}",
+            update_not_available: "Você está atualizado",
+            update_error: "Falha ao verificar atualizações",
+            checking: "Verificando...",
+            update_badge: "ATUALIZAÇÃO"
         },
-        common: {
-            cancel: "Cancelar",
-            save: "Salvar",
-            error_occurred: "Ocorreu um erro: {{error}}",
-            delete: "Excluir",
-            edit: "Editar",
-            ok: "OK",
-            search: "Buscar...",
-            loading: "Carregando...",
-            minimize: "Minimizar",
-            maximize: "Maximizar",
-            close: "Fechar",
-            confirm: "Confirmar",
-            attention: "Atenção"
+        ai_page: {
+            title: "Assistente IA",
+            powered_by: "Desenvolvido com Google Gemini",
+            welcome: "Olá! Sou seu assistente de Robot Framework, acessível via Google Gemini. Como posso ajudar a escrever ou depurar seus testes hoje?",
+            placeholder: "Pergunte sobre Robot Framework ou seus resultados...",
+            thinking: "Pensando...",
+            error: "Desculpe, encontrei um erro ao conectar ao serviço de IA."
         },
         apps: {
+            fetch_error: "Falha ao buscar pacotes",
+            install_error: "Falha ao instalar APK",
             actions: {
                 uninstall_title: "Desinstalar Pacote",
                 uninstall_confirm: "Tem certeza que deseja desinstalar {{pkg}}?",
@@ -83,33 +76,53 @@ export const pt = {
             },
             error: {
                 install_failed: "Falha na instalação: {{error}}"
-            },
+            }
         },
-        tests: {
-            mode: {
-                file: "Arquivo de Teste",
-                folder: "Pasta de Testes",
-                args: "Arquivo de Args"
+        commands: {
+            parse_error: "Falha ao processar comandos salvos",
+            cancel_error: "Falha ao cancelar comando",
+            empty: "Selecione um dispositivo para executar comandos",
+            placeholder: "Digite comando ADB (ex: 'shell ls -la')",
+            waiting: "Aguardando comandos...",
+            clear: "Limpar Console",
+            quick: "Rápido",
+            saved: "Salvos",
+            actions: {
+                save: "Salvar",
+                send: "Enviar",
+                delete_confirm: "Excluir este comando salvo?"
             },
-            target: "Alvo",
-            no_selection: "Nenhuma seleção válida",
-            run_all: "Executar Todos",
-            run_selected: "Executar Selecionado",
-            status: {
-                checking: "Verificando Appium...",
-                starting: "Iniciando Appium...",
-                launching: "Iniciando Testes...",
-                redirecting: "Redirecionando...",
-                failed: "Falha ao iniciar",
-                waiting_server: "Aguardando Servidor...",
-                server_not_ready: "O Servidor Appium não está pronto"
-            },
-            alerts: {
-                busy: "Os seguintes dispositivos estão ocupados:\n{{devices}}\n\nAguarde o término.",
-                server_not_ready: "O Servidor Appium não está pronto"
-            },
-            options: {
-                dont_overwrite: "Não sobrescrever logs"
+            modal: {
+                title: "Salvar Comando Personalizado",
+                label: "Rótulo",
+                placeholder: "ex: Listar Arquivos",
+                command: "Comando",
+                cancel: "Cancelar",
+                save: "Salvar Comando"
+            }
+        },
+        common: {
+            cancel: "Cancelar",
+            save: "Salvar",
+            error_occurred: "Ocorreu um erro: {{error}}",
+            delete: "Excluir",
+            edit: "Editar",
+            ok: "OK",
+            search: "Buscar...",
+            loading: "Carregando...",
+            minimize: "Minimizar",
+            maximize: "Maximizar",
+            close: "Fechar",
+            confirm: "Confirmar",
+            attention: "Atenção",
+            errors: {
+                open_file_failed: "Falha ao abrir arquivo ou pasta",
+                open_link_failed: "Falha ao abrir link"
+            }
+        },
+        components: {
+            logo: {
+                load_error: "Falha ao carregar logo"
             }
         },
         connect: {
@@ -137,7 +150,9 @@ export const pt = {
                 start_tunnel: "Iniciar Túnel Público",
                 stop_tunnel: "Parar Túnel",
                 copy: "Copiado!",
-                paste_url: "Colar URL"
+                paste_url: "Colar URL",
+                disconnect_all: "Desconectar Todos",
+                rerun_failed: "Reexecutar Falhas"
             },
             status: {
                 tunnel_active: "Túnel Ativo",
@@ -160,10 +175,63 @@ export const pt = {
                 disconnected_all: "Todos os dispositivos desconectados",
                 tunnel_stopped: "Túnel Ngrok Parado",
                 tunnel_stop_error: "Erro ao parar Ngrok",
-                tunnel_start_error: "Erro ao iniciar Ngrok"
+                tunnel_start_error: "Erro ao iniciar Ngrok",
+                payment_required_title: "Pagamento Ngrok Necessário",
+                payment_required_desc: "Contas gratuitas do ngrok exigem um cartão de crédito válido para usar túneis TCP. Você não será cobrado.",
+                add_card: "Adicionar Cartão",
+                cancel_card: "Cancelar"
             }
         },
+        console: {
+            waiting: "Aguardando saída..."
+        },
+        devices: {
+            load_error: "Falha ao carregar dispositivos"
+        },
+        feedback: {
+            success: "Sucesso",
+            error: "Erro",
+            saved: "Salvo com sucesso",
+            test_started: "Execução de Teste Iniciada",
+            test_finished: "Execução de Teste Finalizada",
+            test_passed: "Suíte de Teste Aprovada",
+            test_failed: "Suíte de Teste Falhou",
+            appium_started: "Servidor Appium Iniciado",
+            appium_stopped: "Servidor Appium Parado",
+            adb_connected: "ADB Sem Fio Conectado",
+            remote_connected: "Acesso Remoto Conectado",
+            recording_saved: "Gravação de Tela Salva",
+            recording_started: "Gravação Iniciada",
+            inspector_updated: "Inspetor Atualizado",
+            logcat_saved: "Logcat Salvo",
+            performance_saved: "Estatísticas de Desempenho Salvas",
+            mirror_launched: "Espelhamento Iniciado",
+            screenshot_saved: "Captura de Tela Salva",
+            profile_changed: "Perfil de Configuração Alterado",
+            details: {
+                device: "Dispositivo: {{device}}",
+                path: "Caminho: {{path}}",
+                url: "URL: {{url}}"
+            },
+            saved_to_prefix: "Arquivo salvo em:"
+        },
+        file_explorer: {
+            list_error: "Falha ao listar diretório",
+            error: "Erro ao acessar diretório",
+            up: "Subir Nível",
+            loading: "Carregando...",
+            reset: "Resetar para Raiz",
+            empty: "Diretório vazio",
+            current: "Diretório atual",
+            no_selection: "Nenhuma seleção",
+            cancel: "Cancelar",
+            select_file: "Selecionar Arquivo",
+            select_folder: "Selecionar Pasta",
+            select_generic: "Selecionar"
+        },
         inspector: {
+            update_error: "Falha ao atualizar inspetor",
+            input_error: "Falha ao enviar input",
             empty: "Selecione um dispositivo para iniciar o Inspetor",
             refresh: "Atualizar Fonte",
             modes: {
@@ -193,31 +261,110 @@ export const pt = {
                 recents: "Recentes"
             }
         },
-        commands: {
-            empty: "Selecione um dispositivo para executar comandos",
-            placeholder: "Digite comando ADB (ex: 'shell ls -la')",
-            waiting: "Aguardando comandos...",
-            clear: "Limpar Console",
-            quick: "Rápido",
-            saved: "Salvos",
-            actions: {
-                save: "Salvar",
-                send: "Enviar",
-                delete_confirm: "Excluir este comando salvo?"
+        logcat: {
+            title: "Logcat",
+            errors: {
+                fetch_failed: "Falha ao buscar logcat",
+                start_failed: "Falha ao iniciar logcat",
+                stop_failed: "Falha ao parar logcat",
+                app_not_running: "App não está rodando: {{pkg}}"
             },
-            modal: {
-                title: "Salvar Comando Personalizado",
-                label: "Rótulo",
-                placeholder: "ex: Listar Arquivos",
-                command: "Comando",
-                cancel: "Cancelar",
-                save: "Salvar Comando"
+            saving: "Salvando logcat em",
+            start: "Iniciar",
+            stop: "Parar",
+            filter: "Filtrar App",
+            entire_system: "Sistema Inteiro",
+            no_packages: "Nenhum pacote configurado",
+            level: "Nível de Log",
+            clear: "Limpar Logs",
+            lines: "linhas",
+            no_logs: "Nenhum log capturado",
+            select_device: "Selecione um dispositivo para ver logs"
+        },
+        performance: {
+            fetch_error: "Falha ao buscar estatísticas",
+            save_error: "Falha ao salvar dados de performance",
+            record_error: "Falha ao iniciar gravação",
+            title: "Desempenho do Dispositivo",
+            auto_on: "Auto-Atualizar Ligado",
+            auto_off: "Auto-Atualizar Desligado",
+            refresh: "Atualizar Agora",
+            cpu: "Uso de CPU",
+            ram: "Uso de RAM",
+            battery: "Bateria",
+            load: "carga",
+            used: "usado",
+            loading: "Carregando estatísticas...",
+            error: "Falha ao buscar estatísticas do dispositivo",
+            start_record: "Iniciar Gravação",
+            stop_record: "Parar Gravação",
+            recording: "Gravando...",
+            select_device: "Selecione um dispositivo para ver estatísticas de desempenho.",
+            system_only: "Sistema Inteiro",
+            device_stats: "Desempenho do Dispositivo",
+            app_stats: "Desempenho do Aplicativo",
+            auto: "Auto",
+            na: "N/D"
+        },
+        run_tab: {
+            launcher: "Iniciador",
+            connect: "Conectar",
+            inspector: "Inspetor",
+            commands: "Comandos",
+            device: {
+                no_device: "Nenhum Dispositivo",
+                selected_count: "{{count}} Selecionados",
+                select: "Selecionar Dispositivos",
+                busy: "Ocupado",
+                refresh: "Atualizar Dispositivos"
+            },
+            console: {
+                running: "EXECUTANDO",
+                pass: "SUCESSO",
+                fail: "FALHA",
+                test_summary: "{{total}} TESTES: {{passed}} COM SUCESSO, {{failed}} COM FALHA",
+                waiting: "Aguardando logs..."
             }
         },
+        scrcpy: {
+            title: "Espelhamento de Tela",
+            description: "Inicie o Scrcpy para espelhar e controlar a tela deste dispositivo em uma janela separada.",
+            start: "Iniciar Espelhamento",
+            starting: "Iniciando...",
+            note: "Nota: O Scrcpy deve estar instalado no PATH do sistema. A janela de espelho roda independentemente.",
+            error: "Falha ao iniciar Scrcpy. Garanta que ele esteja instalado e no seu PATH."
+        },
+        session: {
+            stop_error: "Falha ao parar sessão",
+            rerun_error: "Falha ao reexecutar"
+        },
         settings: {
+            logo: {
+                read_error: "Falha ao ler arquivo de logo. Tente novamente.",
+                select_error: "Falha ao selecionar logo"
+            },
+            appium: {
+                status_error: "Falha ao obter status do Appium",
+                title: "Servidor Appium",
+                running: "Rodando (PID: {{pid}})",
+                stopped: "Parado",
+                start: "Iniciar Servidor",
+                stop: "Parar Servidor",
+                logs: "Ver Logs",
+                waiting: "Aguardando logs...",
+                host: "Host",
+                port: "Port"
+            },
+            paths: {
+                select_error: "Falha ao selecionar pasta",
+                title: "Caminhos"
+            },
+            load_error: "Falha ao carregar configurações",
+            save_error: "Falha ao salvar configurações",
+            profile_not_found: "Perfil ativo não encontrado!",
+            versions_load_error: "Falha ao carregar versões do sistema",
             title: "Configurações",
             description: "Configure preferências e integrações do aplicativo.",
-            paths: "Caminhos",
             tools: "Ferramentas",
             general: "Geral",
             recycle_device_views: "Reciclar Tela de Dispositivo",
@@ -234,17 +381,6 @@ export const pt = {
                 logo_dark: "Logo Modo Escuro",
                 use_default: "Padrão (Texto)",
                 logo_hint: "Recomendado: PNG, Altura 40px, Largura Máx 200px"
-            },
-            appium: {
-                title: "Servidor Appium",
-                running: "Rodando (PID: {{pid}})",
-                stopped: "Parado",
-                start: "Iniciar Servidor",
-                stop: "Parar Servidor",
-                logs: "Ver Logs",
-                waiting: "Aguardando logs...",
-                host: "Host",
-                port: "Porta"
             },
             tool_config: {
                 appium_args: "Argumentos Appium",
@@ -298,76 +434,64 @@ export const pt = {
                 automationRoot: "Raiz da Automação (Working Dir)"
             }
         },
-        toolbox: {
-            tabs: {
-                console: "Console de Teste",
-                logcat: "Logcat",
-                commands: "Comandos",
-                mirror: "Espelhamento",
-                performance: "Performance",
-                apps: "Apps"
+        sidebar: {
+            run: "Executar",
+            description_run: "Gerenciamento de dispositivos e execução de automação.",
+            tests: "Testes",
+            description_tests: "Histórico de execuções e análise de resultados.",
+            ai_assistant: "Assistente IA",
+            settings: "Configurações",
+            description_settings: "Configure preferências e integrações do aplicativo.",
+            about: "Sobre",
+            description_about: "Informações sobre o Robot Runner e seus criadores."
+        },
+        startup: {
+            loading: "Inicializando aplicação...",
+            checking: "Verificando ferramentas do sistema...",
+            critical: {
+                title: "Ferramentas Críticas Ausentes",
+                description: "As seguintes ferramentas são necessárias para executar esta aplicação:",
+                action: "Sair da Aplicação"
             },
-            actions: {
-                screenshot: "Capturar Tela",
-                start_recording: "Gravar Tela",
-                stop_recording: "Parar Gravação",
-                stop_execution: "Parar Execução",
-                rerun: "Re-executar",
-                switch_to_grid: "Alternar para Grade",
-                switch_to_tabs: "Alternar para Abas",
-                force_stop: "Forçar Parada"
+            testing: {
+                title: "Ferramentas de Teste Ausentes",
+                description: "Algumas ferramentas necessárias para automação estão faltando:",
+                note: "Você ainda pode usar outros recursos, mas a execução de testes será desativada.",
+                action: "Configurar"
+            },
+            mirroring: {
+                title: "Ferramenta de Espelhamento Ausente",
+                description: "O Scrcpy é necessário para o espelhamento de tela:",
+                note: "O espelhamento de tela será desativado.",
+                action: "Continuar"
             }
         },
-        file_explorer: {
-            up: "Subir Nível",
-            loading: "Carregando...",
-            error: "Falha ao carregar diretório",
-            reset: "Resetar para Raiz",
-            empty: "Diretório vazio",
-            current: "Diretório atual",
-            no_selection: "Nenhuma seleção",
-            cancel: "Cancelar",
-            select_file: "Selecionar Arquivo",
-            select_folder: "Selecionar Pasta",
-            select_generic: "Selecionar"
-        },
-        about: {
-            description: "Informações sobre o Robot Runner e seus criadores.",
-            long_description: "Uma interface gráfica moderna e multiplataforma para Robot Framework e Appium, projetada para simplificar fluxos de automação de testes.",
-            developed_by: "Desenvolvido por",
-            lead: "Desenvolvedor Principal",
-            collaborator: "Desenvolvedora Colaboradora",
-            powered_by: "Desenvolvido com",
-            tools_title: "Ferramentas Utilizadas",
-            tools_desc: "O Robot Runner é construído sobre gigantes de código aberto:",
-            tools_list: {
-                tauri: { name: "Tauri", desc: "Framework leve para construção de aplicativos desktop seguros usando tecnologias web." },
-                react: { name: "React", desc: "Biblioteca JavaScript para criar interfaces de usuário dinâmicas e responsivas." },
-                rust: { name: "Rust", desc: "Linguagem de sistemas que oferece performance crítica e segurança de memória para o backend." },
-                vite: { name: "Vite", desc: "Ferramenta de build de próxima geração que proporciona um ambiente de desenvolvimento ultrarrápido." },
-                appium: { name: "Appium", desc: "Plataforma de automação líder para testes nativos, híbridos e web móveis." },
-                robot: { name: "Robot Framework", desc: "Framework de automação genérico e keywords-driven para testes de aceitação." },
-                tailwind: { name: "TailwindCSS", desc: "Framework CSS utilitário para estilização rápida e consistente." },
-                lucide: { name: "Lucide", desc: "Biblioteca de ícones vetoriais bonita e consistente." }
+        tests: {
+            mode: {
+                file: "Arquivo de Teste",
+                folder: "Pasta de Testes",
+                args: "Arquivo de Args"
             },
-            legal_title: "Termos e Licença",
-            license: "Licença MIT",
-            license_desc: "A permissão é concedida, gratuitamente, a qualquer pessoa que obtenha uma cópia deste software e dos arquivos de documentação associados (o 'Software'), para lidar com o Software sem restrições, incluindo, sem limitação, os direitos de usar, copiar, modificar, mesclar, publicar, distribuir, sublicenciar e/ou vender cópias do Software, e permitir que as pessoas a quem o Software é fornecido o façam, sujeito às seguintes condições: O aviso de direitos autorais acima e este aviso de permissão devem ser incluídos em todas as cópias ou partes substanciais do Software.",
-            disclaimer: "O software é fornecido 'como está', sem garantia de qualquer tipo, expressa ou implícita.",
-            update_check: "Verificar Atualizações",
-            update_available: "Nova versão disponível: {{version}}",
-            update_not_available: "Você está atualizado",
-            update_error: "Falha ao verificar atualizações",
-            checking: "Verificando...",
-            update_badge: "ATUALIZAÇÃO"
-        },
-        ai_page: {
-            title: "Assistente IA",
-            powered_by: "Desenvolvido com Google Gemini",
-            welcome: "Olá! Sou seu assistente de Robot Framework, acessível via Google Gemini. Como posso ajudar a escrever ou depurar seus testes hoje?",
-            placeholder: "Pergunte sobre Robot Framework ou seus resultados...",
-            thinking: "Pensando...",
-            error: "Desculpe, encontrei um erro ao conectar ao serviço de IA."
+            target: "Alvo",
+            no_selection: "Nenhuma seleção válida",
+            run_all: "Executar Todos",
+            run_selected: "Executar Selecionado",
+            status: {
+                checking: "Verificando Appium...",
+                starting: "Iniciando Appium...",
+                launching: "Iniciando Testes...",
+                redirecting: "Redirecionando...",
+                failed: "Falha ao iniciar",
+                waiting_server: "Aguardando Servidor...",
+                server_not_ready: "O Servidor Appium não está pronto"
+            },
+            alerts: {
+                busy: "Os seguintes dispositivos estão ocupados:\n{{devices}}\n\nAguarde o término.",
+                server_not_ready: "O Servidor Appium não está pronto"
+            },
+            options: {
+                dont_overwrite: "Não sobrescrever logs"
+            }
         },
         tests_page: {
             monitoring: "Monitoramento de Testes",
@@ -408,103 +532,42 @@ export const pt = {
                 hide: "Ocultar Gráficos"
             }
         },
-        console: {
-            waiting: "Aguardando saída..."
-        },
-        logcat: {
-            start: "Iniciar",
-            stop: "Parar",
-            filter: "Filtrar App",
-            entire_system: "Sistema Inteiro",
-            no_packages: "Nenhum pacote configurado",
-            level: "Nível de Log",
-            clear: "Limpar Logs",
-            lines: "linhas",
-            no_logs: "Nenhum log capturado",
-            select_device: "Selecione um dispositivo para ver logs",
-            saving: "Salvando logs em:",
-            errors: {
-                app_not_running: "O aplicativo não está rodando: {{pkg}}"
+        toolbox: {
+            screenshot: {
+                error: "Falha ao capturar tela"
+            },
+            recording: {
+                start_error: "Falha ao iniciar gravação",
+                stop_error: "Falha ao parar gravação"
+            },
+            scrcpy: {
+                open_error: "Falha ao abrir Scrcpy"
+            },
+            rerun: {
+                init_error: "Falha ao iniciar reexecução"
+            },
+            tabs: {
+                console: "Console de Teste",
+                logcat: "Logcat",
+                commands: "Comandos",
+                mirror: "Espelhamento",
+                performance: "Performance",
+                apps: "Apps"
+            },
+            actions: {
+                screenshot: "Capturar Tela",
+                start_recording: "Gravar Tela",
+                stop_recording: "Parar Gravação",
+                stop_execution: "Parar Execução",
+                rerun: "Re-executar",
+                switch_to_grid: "Alternar para Grade",
+                switch_to_tabs: "Alternar para Abas",
+                force_stop: "Forçar Parada"
             }
         },
-        scrcpy: {
-            title: "Espelhamento de Tela",
-            description: "Inicie o Scrcpy para espelhar e controlar a tela deste dispositivo em uma janela separada.",
-            start: "Iniciar Espelhamento",
-            starting: "Iniciando...",
-            note: "Nota: O Scrcpy deve estar instalado no PATH do sistema. A janela de espelho roda independentemente.",
-            error: "Falha ao iniciar Scrcpy. Garanta que ele esteja instalado e no seu PATH."
-        },
-        performance: {
-            title: "Desempenho do Dispositivo",
-            auto_on: "Auto-Atualizar Ligado",
-            auto_off: "Auto-Atualizar Desligado",
-            refresh: "Atualizar Agora",
-            cpu: "Uso de CPU",
-            ram: "Uso de RAM",
-            battery: "Bateria",
-            load: "carga",
-            used: "usado",
-            loading: "Carregando estatísticas...",
-            error: "Falha ao buscar estatísticas do dispositivo",
-            start_record: "Iniciar Gravação",
-            stop_record: "Parar Gravação",
-            recording: "Gravando...",
-            record_error: "Falha ao gravar",
-            select_device: "Selecione um dispositivo para ver estatísticas de desempenho.",
-            system_only: "Sistema Inteiro",
-            device_stats: "Desempenho do Dispositivo",
-            app_stats: "Desempenho do Aplicativo",
-            auto: "Auto",
-            na: "N/D"
-        },
-        feedback: {
-            success: "Sucesso",
-            error: "Erro",
-            saved: "Salvo com sucesso",
-            test_started: "Execução de Teste Iniciada",
-            test_finished: "Execução de Teste Finalizada",
-            test_passed: "Suíte de Teste Aprovada",
-            test_failed: "Suíte de Teste Falhou",
-            appium_started: "Servidor Appium Iniciado",
-            appium_stopped: "Servidor Appium Parado",
-            adb_connected: "ADB Sem Fio Conectado",
-            remote_connected: "Acesso Remoto Conectado",
-            recording_saved: "Gravação de Tela Salva",
-            recording_started: "Gravação Iniciada",
-            inspector_updated: "Inspetor Atualizado",
-            logcat_saved: "Logcat Salvo",
-            performance_saved: "Estatísticas de Desempenho Salvas",
-            mirror_launched: "Espelhamento Iniciado",
-            screenshot_saved: "Captura de Tela Salva",
-            profile_changed: "Perfil de Configuração Alterado",
-            details: {
-                device: "Dispositivo: {{device}}",
-                path: "Caminho: {{path}}",
-                url: "URL: {{url}}"
-            },
-            saved_to_prefix: "Arquivo salvo em:"
-        },
-        startup: {
-            loading: "Inicializando aplicação...",
-            checking: "Verificando ferramentas do sistema...",
-            critical: {
-                title: "Ferramentas Críticas Ausentes",
-                description: "As seguintes ferramentas são necessárias para executar esta aplicação:",
-                action: "Sair da Aplicação"
-            },
-            testing: {
-                title: "Ferramentas de Teste Ausentes",
-                description: "Algumas ferramentas necessárias para automação estão faltando:",
-                note: "Você ainda pode usar outros recursos, mas a execução de testes será desativada.",
-                action: "Configurar"
-            },
-            mirroring: {
-                title: "Ferramenta de Espelhamento Ausente",
-                description: "O Scrcpy é necessário para o espelhamento de tela:",
-                note: "O espelhamento de tela será desativado.",
-                action: "Continuar"
-            }
+        updater: {
+            version_check_error: "Falha ao obter versão do app",
+            check_error: "Falha ao verificar atualizações"
         }
     }
-};
+}

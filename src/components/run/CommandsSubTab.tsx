@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useTranslation } from "react-i18next";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { Modal } from "@/components/common/Modal";
+import { feedback } from "@/lib/feedback";
 
 interface CommandsSubTabProps {
     selectedDevice: string;
@@ -45,7 +46,7 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
             try {
                 setSavedCommands(JSON.parse(saved));
             } catch (e) {
-                console.error("Failed to parse saved commands", e);
+                feedback.toast.error("commands.parse_error", e);
             }
         }
     }, []);
@@ -125,7 +126,7 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
                 await invoke('stop_adb_command', { id: currentCmdId });
                 setHistory(prev => [...prev, "^ Cancelled by user"]);
             } catch (e) {
-                console.error("Failed to cancel command", e);
+                feedback.toast.error("commands.cancel_error", e);
             }
         }
     };

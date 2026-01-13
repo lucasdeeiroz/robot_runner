@@ -10,6 +10,7 @@ import { useTestSessions } from "@/lib/testSessionStore";
 
 import { useSettings } from "@/lib/settings";
 import { Device } from "@/lib/types";
+import { feedback } from "@/lib/feedback";
 
 type TabType = 'tests' | 'connect' | 'inspector';
 
@@ -102,7 +103,7 @@ export function RunTab({ onNavigate, initialTab }: RunTabProps) {
             }
 
         } catch (e) {
-            console.error("Failed to load devices:", e);
+            feedback.toast.error("devices.load_error", e);
         } finally {
             setLoadingDevices(false);
         }

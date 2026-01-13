@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Virtuoso } from "react-virtuoso";
 
 import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
+import { feedback } from "@/lib/feedback";
 
 interface PackageInfo {
     name: String;
@@ -53,8 +54,7 @@ export function AppsSubTab() {
             const list = await invoke<PackageInfo[]>("get_installed_packages", { device: activeDevice });
             setPackages(list);
         } catch (e) {
-            console.error(e);
-            toast.error(String(e));
+            feedback.toast.error("apps.fetch_error", e);
         } finally {
             setLoading(false);
         }
@@ -154,8 +154,7 @@ export function AppsSubTab() {
                 fetchPackages();
             }
         } catch (e) {
-            console.error(e);
-            toast.error(t('apps.error.install_failed', { error: String(e), defaultValue: `Installation failed: ${String(e)}` }));
+            feedback.toast.error("apps.install_error", e);
         } finally {
             if (toastId !== null) {
                 toast.dismiss(toastId);

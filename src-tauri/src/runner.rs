@@ -64,6 +64,7 @@ pub fn run_robot_test(
     device_model: Option<String>,
     android_version: Option<String>,
     working_dir: Option<String>,
+    rerun_failed_from: Option<String>, // Added this
 ) -> Result<String, String> {
     // Resolve absolute path for output_dir to ensure clean logs
     let abs_output_dir = std::fs::canonicalize(&output_dir)
@@ -80,6 +81,15 @@ pub fn run_robot_test(
 
     let mut args = vec!["-d", &abs_output_dir, "--console", "verbose"];
 
+
+    // Rerunning logic: Must appear before any Datasource (which might come from -A)
+    if let Some(xml_path) = &rerun_failed_from {
+        if !xml_path.is_empty() {
+            args.push("--rerunfailed");
+            args.push(xml_path);
+        }
+    }
+
     if let Some(true) = timestamp_outputs {
         args.push("--timestampoutputs");
     }
@@ -95,6 +105,8 @@ pub fn run_robot_test(
         args.push("-A");
         args.push(arg_file);
     }
+
+
 
     // Only add test_path if it is provided
     if let Some(tp) = &test_path {
@@ -138,6 +150,7 @@ pub fn run_robot_test(
     let mut cmd = Command::new("python");
     cmd.arg("-m").arg("robot");
     cmd.args(&args);
+    // println!("Running command: {}", args.join(" "));
 
     if let Some(wd) = working_dir {
         if !wd.is_empty() {

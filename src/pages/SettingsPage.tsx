@@ -72,12 +72,11 @@ export function SettingsPage() {
 
                     updateSetting(key, dataUri);
                 } catch (readErr) {
-                    console.error("Failed to read logo file", readErr);
-                    feedback.toast.error("Failed to read logo file. Please try again.");
+                    feedback.toast.error("settings.logo.read_error");
                 }
             }
         } catch (e) {
-            console.error("Failed to select logo", e);
+            feedback.toast.error("settings.logo.select_error", e);
         }
     };
 
@@ -127,7 +126,7 @@ export function SettingsPage() {
             const status = await invoke<{ running: boolean, pid?: number }>('get_appium_status');
             setAppiumStatus(status);
         } catch (e) {
-            console.error(e);
+            feedback.toast.error("settings.appium.status_error", e);
         }
     };
 
@@ -147,7 +146,6 @@ export function SettingsPage() {
             }
             checkAppiumStatus();
         } catch (e: any) {
-            console.error('Failed to toggle appium:', e);
             let errStr = String(e).replace(/^Error:/, '').trim();
             feedback.toast.error('common.error_occurred', { error: errStr });
         }
@@ -164,7 +162,7 @@ export function SettingsPage() {
                 updateSetting('paths', { ...settings.paths, [key]: selected as string });
             }
         } catch (err) {
-            console.error("Failed to select folder", err);
+            feedback.toast.error("settings.paths.select_error", err);
         }
     };
 
@@ -385,7 +383,7 @@ export function SettingsPage() {
                 {/* Path Configuration */}
                 <section className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
                     <h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-white tracking-tight">
-                        <FolderOpen size={20} className="text-primary" /> {t('settings.paths')}
+                        <FolderOpen size={20} className="text-primary" /> {t('settings.paths.title')}
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {(['automationRoot', 'resources', 'tests', 'suites', 'logs', 'logcat', 'screenshots', 'recordings'] as Array<keyof typeof settings.paths>).map((key) => {

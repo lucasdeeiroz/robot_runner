@@ -78,7 +78,7 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
             setStats(data);
             setError(null);
         } catch (e) {
-            console.error("Failed to fetch stats:", e);
+            feedback.toast.error("performance.fetch_error", e);
             setError(t('performance.error'));
         }
     };
@@ -97,7 +97,7 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
             line += "\n";
 
             invoke('save_file', { path: recordingPath, content: line, append: true })
-                .catch(e => console.error("Failed to save perf data", e));
+                .catch(e => feedback.toast.error("performance.save_error", e));
         }
     }, [stats, isRecording, recordingPath]);
 
@@ -139,16 +139,15 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
                     feedback.toast.success('feedback.recording_started');
                 }
             } catch (e) {
-                console.error("Failed to start recording:", e);
-                feedback.toast.error(String(e));
+                feedback.toast.error("performance.record_error", e);
             }
         }
     };
 
     const formatBytes = (kb: number, showUnit: boolean = true) => {
         if (!kb || kb === 0) return t('performance.na', 'N/A');
-        if (kb > 1024 * 1024) return <>{(kb / (1024 * 1024)).toFixed(2)} {showUnit && <span className="text-sm text-zinc-500 font-normal">GB</span>}</>;
-        if (kb > 1024) return <>{(kb / 1024).toFixed(2)} {showUnit && <span className="text-sm text-zinc-500 font-normal">MB</span>}</>;
+        if (kb > 1024 * 1024) return <>{(kb / (1024 * 1024)).toFixed(1)} {showUnit && <span className="text-sm text-zinc-500 font-normal">GB</span>}</>;
+        if (kb > 1024) return <>{(kb / 1024).toFixed(1)} {showUnit && <span className="text-sm text-zinc-500 font-normal">MB</span>}</>;
         return <>{kb} {showUnit && <span className="text-sm text-zinc-500 font-normal">KB</span>}</>;
     };
 

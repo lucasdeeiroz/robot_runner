@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import clsx from "clsx";
+import { feedback } from "@/lib/feedback";
 
 interface LinkRendererProps {
     content: string;
@@ -10,7 +11,7 @@ export function LinkRenderer({ content }: LinkRendererProps) {
         try {
             await invoke('open_log_folder', { path });
         } catch (e) {
-            console.error("Failed to open link", e);
+            feedback.toast.error("common.errors.open_link_failed", e);
         }
     };
 

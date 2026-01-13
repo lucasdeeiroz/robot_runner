@@ -35,7 +35,7 @@ interface TestSessionContextType {
     sessions: TestSession[];
     addSession: (runId: string, deviceUdid: string, deviceName: string, testPath: string, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string) => void;
     addToolboxSession: (deviceUdid: string, deviceName: string) => void; // New action
-    rerunSession: (runId: string) => Promise<void>;
+    rerunSession: (runId: string, rerunFailedFrom?: string) => Promise<void>;
     stopSession: (runId: string) => Promise<void>;
     clearSession: (runId: string) => void;
     activeSessionId: string | 'dashboard';
@@ -218,7 +218,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
         try {
             await invoke('stop_robot_test', { runId: targetBackendId });
         } catch (e) {
-            console.error("Failed to stop session", e);
+            feedback.toast.error("session.stop_error", e);
             setSessions(prev => prev.map(s => {
                 if (s.runId === runId) {
                     return { ...s, logs: [...s.logs, `\n[Error] Failed to stop: ${e}`] };
@@ -228,7 +228,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
         }
     }, [sessions]);
 
-    const rerunSession = useCallback(async (runId: string) => {
+    const rerunSession = useCallback(async (runId: string, rerunFailedFrom?: string) => {
         const session = sessions.find(s => s.runId === runId);
         if (!session || session.type !== 'test') return;
 
@@ -270,13 +270,13 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                 await new Promise(r => setTimeout(r, 2000));
             }
 
-            // Run Test
-            console.log("Invoking run_robot_test for Re-run", {
-                runId: newRunId,
-                working_dir: settings.paths.automationRoot,
-                outputDir
-            });
+            // console.log("Invoking run_robot_test for Re-run", {
+            //     runId: newRunId,
+            //     working_dir: settings.paths.automationRoot,
+            //     outputDir
+            // });
 
+            // Run Test
             await invoke("run_robot_test", {
                 runId: newRunId,
                 testPath: session.testPath === session.argumentsFile ? null : session.testPath,
@@ -285,11 +285,12 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                 argumentsFile: session.argumentsFile,
                 deviceModel: session.deviceModel, // Pass deviceModel
                 androidVersion: session.androidVersion, // Pass androidVersion
-                workingDir: settings.paths.automationRoot // Pass configured automation root (camelCase for Tauri)
+                workingDir: settings.paths.automationRoot, // Pass configured automation root (camelCase for Tauri)
+                rerunFailedFrom: rerunFailedFrom
             });
 
         } catch (e) {
-            console.error("Rerun failed", e);
+            feedback.toast.error("session.rerun_error", e);
             setSessions(prev => prev.map(s => {
                 if (s.runId === newRunId) {
                     return { ...s, status: 'error', logs: [...s.logs, `\n[Error] Rerun failed: ${e}`] };

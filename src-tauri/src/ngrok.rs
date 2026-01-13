@@ -72,14 +72,23 @@ pub async fn start_ngrok(
     let reader = std::io::BufReader::new(stdout);
     use std::io::BufRead;
 
+    let mut output_buffer = Vec::new();
     let start = std::time::Instant::now();
+    
     for line in reader.lines() {
         if start.elapsed().as_secs() > 10 {
             let _ = child.kill();
-            return Err("Timed out waiting for ngrok URL".to_string());
+             let debug_log = output_buffer.join("\n");
+            return Err(format!("Timed out waiting for ngrok URL. Output:\n{}", debug_log));
         }
 
         if let Ok(l) = line {
+            output_buffer.push(l.clone());
+            // Keep buffer size reasonable
+            if output_buffer.len() > 20 {
+                output_buffer.remove(0);
+            }
+
             if let Some(idx) = l.find("url=") {
                 let url = l[idx+4..].split_whitespace().next().unwrap_or("").to_string();
                 if !url.is_empty() {
@@ -89,7 +98,8 @@ pub async fn start_ngrok(
         }
     }
 
-    Err("Ngrok started but no URL found".to_string())
+    let debug_log = output_buffer.join("\n");
+    Err(format!("Ngrok process finished without URL. Output:\n{}", debug_log))
 }
 
 #[command]
