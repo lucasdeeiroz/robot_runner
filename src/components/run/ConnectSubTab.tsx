@@ -182,7 +182,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
             }
 
             // Execute command
-            // const res = await invoke<string>(cmd, args);
+            await invoke<string>(cmd, args);
 
             // Construct success message
             const target = `${ip}:${port}`;
