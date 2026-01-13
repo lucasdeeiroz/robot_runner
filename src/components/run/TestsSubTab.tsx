@@ -200,7 +200,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
             }, 500);
 
         } catch (e: any) {
-            feedback.toast.error("tests.launch_failed", e);
+            feedback.toast.error("tests.status.failed", e);
             let errStr = String(e);
             if (errStr.includes("Error:")) errStr = errStr.replace("Error:", "").trim();
             setLaunchStatus(`${t('tests.status.failed')}: ${errStr}`);

@@ -130,7 +130,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
             setNgrokStatusMsg({ text: t('connect.status.tunnel_active'), type: 'success' });
             feedback.notify('feedback.remote_connected', 'feedback.details.url', { url });
         } catch (e) {
-            feedback.toast.error("connect.tunnel.start_error", e);
+            feedback.toast.error("connect.status.tunnel_start_error", e);
             const errStr = String(e);
 
             // Check for Payment Required Error (ERR_NGROK_8013)

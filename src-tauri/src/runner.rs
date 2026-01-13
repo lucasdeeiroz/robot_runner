@@ -87,6 +87,8 @@ pub fn run_robot_test(
         if !xml_path.is_empty() {
             args.push("--rerunfailed");
             args.push(xml_path);
+            args.push("--output");
+            args.push("output_rerun.xml");
         }
     }
 

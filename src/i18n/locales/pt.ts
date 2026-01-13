@@ -503,6 +503,7 @@ export const pt = {
             open_folder: "Abrir Pasta",
             session_not_found: "Sessão não encontrada.",
             close_tab: "Fechar Aba",
+            load_error: "Falha ao carregar histórico",
             filter: {
                 search: "Buscar logs...",
                 period: "Período",

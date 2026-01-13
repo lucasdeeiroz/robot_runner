@@ -503,6 +503,7 @@ export const es = {
             open_folder: "Abrir Carpeta",
             session_not_found: "Sesión no encontrada.",
             close_tab: "Cerrar Pestaña",
+            load_error: "Error al cargar historial",
             filter: {
                 search: "Buscar logs...",
                 period: "Período",
@@ -513,12 +514,12 @@ export const es = {
                 all_time: "Todo el tiempo",
                 today: "Hoy",
                 last_7_days: "Últimos 7 días",
-                last_30_days: "Últimos 30 dias",
+                last_30_days: "Últimos 30 días",
                 os_version: "Versión del SO"
             },
             actions: {
                 refresh: "Actualizar Lista",
-                clear: "Limpar",
+                clear: "Limpiar",
                 delete: "Eliminar Log",
                 open_launcher: "Abrir en Lanzador"
             },
