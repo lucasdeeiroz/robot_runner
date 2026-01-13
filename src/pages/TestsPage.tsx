@@ -174,7 +174,7 @@ export function TestsPage() {
             });
             setHistory(logs);
         } catch (e) {
-            feedback.toast.error("tests.history.load_error", e);
+            feedback.toast.error("tests_page.load_error", e);
         } finally {
             setLoadingHistory(false);
         }

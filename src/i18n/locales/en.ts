@@ -503,6 +503,7 @@ export const en = {
             open_folder: "Open Folder",
             session_not_found: "Session not found.",
             close_tab: "Close Tab",
+            load_error: "Failed to load history",
             filter: {
                 search: "Search logs...",
                 period: "Period",

@@ -67,45 +67,68 @@ export function SplitButton({ primaryAction, secondaryActions, className, disabl
         secondary: "border-l border-zinc-200 dark:border-zinc-700"
     };
 
+    // Promotion Logic
+    let effectivePrimary = primaryAction;
+    let effectiveSecondaries = secondaryActions;
+
+    // Only apply logic if the component itself is not globally disabled
+    if (!disabled) {
+        const allActions = [primaryAction, ...secondaryActions];
+        const enabledActions = allActions.filter(a => !a.disabled);
+
+        if (enabledActions.length > 0) {
+            // Promote first enabled action to primary
+            effectivePrimary = enabledActions[0];
+            effectiveSecondaries = enabledActions.slice(1);
+        } else {
+            // All specific actions are disabled, keep original structure but effectivePrimary will be disabled via its prop
+        }
+    }
+
+    const showDropdown = effectiveSecondaries.length > 0;
+
     return (
         <div ref={containerRef} className={clsx("relative inline-flex rounded-md shadow-sm h-9", className)}>
             <button
                 type="button"
-                onClick={primaryAction.onClick}
-                disabled={disabled || primaryAction.disabled}
+                onClick={effectivePrimary.onClick}
+                disabled={disabled || effectivePrimary.disabled}
                 className={clsx(
                     baseStyles,
                     variantStyles[variant],
-                    "px-3 rounded-l-md font-medium text-sm gap-2",
+                    "px-3 font-medium text-sm gap-2",
+                    showDropdown ? "rounded-l-md" : "rounded-md",
                     "disabled:cursor-not-allowed"
                 )}
             >
-                {primaryAction.icon}
-                {primaryAction.label}
+                {effectivePrimary.icon}
+                {effectivePrimary.label}
             </button>
-            <button
-                ref={buttonRef}
-                type="button"
-                className={clsx(
-                    baseStyles,
-                    variantStyles[variant],
-                    "px-1.5 rounded-r-md",
-                    separatorStyles[variant],
-                    "disabled:cursor-not-allowed"
-                )}
-                onClick={() => !disabled && setIsOpen(!isOpen)}
-                disabled={disabled}
-            >
-                <ChevronDown size={14} className={clsx("transition-transform", isOpen && "rotate-180")} />
-            </button>
+            {showDropdown && (
+                <button
+                    ref={buttonRef}
+                    type="button"
+                    className={clsx(
+                        baseStyles,
+                        variantStyles[variant],
+                        "px-1.5 rounded-r-md",
+                        separatorStyles[variant],
+                        "disabled:cursor-not-allowed"
+                    )}
+                    onClick={() => !disabled && setIsOpen(!isOpen)}
+                    disabled={disabled}
+                >
+                    <ChevronDown size={14} className={clsx("transition-transform", isOpen && "rotate-180")} />
+                </button>
+            )}
 
-            {isOpen && createPortal(
+            {isOpen && showDropdown && createPortal(
                 <div
                     ref={dropdownRef}
                     className="fixed z-50 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md shadow-lg py-1 min-w-[140px]"
                     style={dropdownStyle}
                 >
-                    {secondaryActions.map((action, idx) => (
+                    {effectiveSecondaries.map((action, idx) => (
                         <button
                             key={idx}
                             onClick={() => {
