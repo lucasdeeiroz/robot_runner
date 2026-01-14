@@ -39,6 +39,40 @@ pub async fn stop_robot_test(state: State<'_, TestState>, run_id: String) -> Res
     Err(format!("Test {} not running", run_id))
 }
 
+pub fn shutdown_all_tests(state: &State<'_, TestState>) {
+    let mut procs = match state.0.lock() {
+        Ok(g) => g,
+        Err(e) => {
+            eprintln!("Failed to lock TestState mutex: {}", e);
+            return;
+        }
+    };
+
+    for (run_id, child) in procs.iter_mut() {
+        let pid = child.id();
+        println!("Shutting down robot test {} (PID: {})", run_id, pid);
+
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            let _ = Command::new("taskkill")
+                .args(&["/F", "/T", "/PID", &pid.to_string()])
+                .creation_flags(0x08000000)
+                .output();
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = Command::new("kill")
+                .args(&["-9", &pid.to_string()])
+                .output();
+        }
+        
+        let _ = child.kill();
+    }
+    procs.clear();
+}
+
 #[derive(serde::Serialize, Clone)]
 struct TestOutput {
     run_id: String,
