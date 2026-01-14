@@ -17,7 +17,7 @@ import "./App.css";
 function App() {
   const { t } = useTranslation();
   const [activePage, setActivePage] = useState("run");
-  const { settings, checkSystemVersions, systemCheckStatus, loading: settings_loading } = useSettings();
+  const { settings, checkSystemVersions, systemCheckStatus, loading: settings_loading, checkForAppUpdate } = useSettings();
 
   // State to track if we should show the overlay or if it has been dismissed/handled
   const [initialCheckDismissed, setInitialCheckDismissed] = useState(false);
@@ -112,6 +112,7 @@ function App() {
   useEffect(() => {
     if (!settings_loading) {
       checkSystemVersions();
+      checkForAppUpdate(false); // Silent global check on startup
     }
   }, [settings_loading]);
 

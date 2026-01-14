@@ -3,6 +3,7 @@ import { useState, useEffect, createContext, useContext, ReactNode } from 'react
 import { v4 as uuidv4 } from 'uuid';
 import { invoke } from '@tauri-apps/api/core';
 import { feedback } from './feedback';
+import { checkForUpdates, UpdateInfo } from './updater';
 
 export interface SystemVersions {
     adb: string;
@@ -128,6 +129,8 @@ interface SettingsContextType {
     systemVersions: SystemVersions | null;
     checkSystemVersions: () => Promise<void>;
     systemCheckStatus: SystemCheckStatus;
+    updateInfo: UpdateInfo | null;
+    checkForAppUpdate: (manual?: boolean) => Promise<void>;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -349,6 +352,29 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         }
     };
 
+    // Update Logic
+    const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+
+    const checkForAppUpdate = async (manual: boolean = false) => {
+        // If we already have info and it's not a manual check, skip
+        if (updateInfo && !manual) return;
+
+        try {
+            const info = await checkForUpdates();
+            setUpdateInfo(info);
+
+            if (manual) {
+                if (info.available) {
+                    feedback.toast.success("about.update_available", { version: info.latestVersion });
+                } else {
+                    feedback.toast.info("about.update_not_available");
+                }
+            }
+        } catch (e) {
+            if (manual) feedback.toast.error("about.update_error");
+        }
+    };
+
     return (
         <SettingsContext.Provider value={{
             settings: activeProfile.settings,
@@ -362,7 +388,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             loading,
             systemVersions,
             checkSystemVersions,
-            systemCheckStatus
+            systemCheckStatus,
+            updateInfo,
+            checkForAppUpdate
         }}>
             {children}
         </SettingsContext.Provider>
