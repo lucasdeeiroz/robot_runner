@@ -142,7 +142,7 @@ pub async fn stop_ngrok(state: State<'_, NgrokState>) -> Result<(), String> {
 }
 
 pub fn shutdown_ngrok(state: &State<'_, NgrokState>) {
-    if let Ok(mut lock) = state.0.lock() {
+    if let Ok(lock) = state.0.lock() {
         if let Some(pid) = *lock {
             #[cfg(target_os = "windows")]
             {

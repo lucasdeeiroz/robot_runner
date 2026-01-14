@@ -254,7 +254,7 @@ export function RunTab({ onNavigate, initialTab }: RunTabProps) {
                 </div>
 
                 <div className={clsx("h-full", activeTab === 'inspector' ? "block" : "hidden")}>
-                    <InspectorSubTab selectedDevice={selectedDevices[0] || ""} />
+                    <InspectorSubTab selectedDevice={selectedDevices[0] || ""} isActive={activeTab === 'inspector'} />
                 </div>
             </div>
         </div>

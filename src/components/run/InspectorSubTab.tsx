@@ -10,9 +10,10 @@ import { feedback } from "@/lib/feedback";
 
 interface InspectorSubTabProps {
     selectedDevice: string;
+    isActive: boolean;
 }
 
-export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
+export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabProps) {
     const { t } = useTranslation();
     const [screenshot, setScreenshot] = useState<string | null>(null);
     const [rootNode, setRootNode] = useState<InspectorNode | null>(null);
@@ -77,17 +78,20 @@ export function InspectorSubTab({ selectedDevice }: InspectorSubTabProps) {
         setTimeout(() => setSwipes(prev => prev.filter(s => s.id !== id)), 600);
     };
 
+    // Main fetch logic
     useEffect(() => {
-        if (selectedDevice) {
-            refreshAll();
-        } else {
-            // Reset if no device
+        if (!selectedDevice) {
             setScreenshot(null);
-            // setXmlData(null); // Removed unused state
             setRootNode(null);
             setSelectedNode(null);
+            return;
         }
-    }, [selectedDevice]);
+
+        if (isActive) {
+            // Only fetch if active, or if never loaded and just became active
+            refreshAll();
+        }
+    }, [selectedDevice, isActive]);
 
     const refreshAll = async () => {
         if (!selectedDevice) return;
