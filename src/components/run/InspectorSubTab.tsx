@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { RefreshCw, Maximize, Check, Scan, MousePointerClick, Move, Home, ArrowLeft, Rows } from 'lucide-react';
+import { RefreshCw, Maximize, Check, Scan, MousePointerClick, Move, Home, ArrowLeft, Rows, X } from 'lucide-react';
 import { XMLParser } from 'fast-xml-parser';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
@@ -206,6 +206,34 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
                 c.bounds.h === best.bounds.h
             );
 
+            // Prioritization Logic
+            const getPriority = (node: InspectorNode): number => {
+                const attr = node.attributes || {};
+
+                // 1. Accessibility ID / Content Desc
+                if (attr['content-desc']) return 60;
+
+                // 2. Resource ID
+                if (attr['resource-id']) return 50;
+
+                // 3. Text
+                if (attr['text']) return 40;
+
+                // 4. Clickable
+                if (attr['clickable'] === 'true') return 30;
+
+                // 5. ScrollView (Check class or tag)
+                const isScrollView = (node.tagName && node.tagName.includes('ScrollView')) ||
+                    (attr['class'] && attr['class'].includes('ScrollView'));
+                if (isScrollView) return 20;
+
+                // 6. Others
+                return 10;
+            };
+
+            // Sort Descending (Higher priority first -> Left in tabs)
+            exactMatches.sort((a, b) => getPriority(b) - getPriority(a));
+
             setAvailableNodes(exactMatches);
             setSelectedNode(exactMatches[0]);
         }
@@ -380,9 +408,9 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
 
                 {/* Right: Properties Scroll View */}
                 <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl flex flex-col overflow-hidden shadow-sm dark:shadow-none h-full">
-                    <div className="flex flex-col border-b border-zinc-200 dark:border-zinc-800 shrink-0 bg-zinc-50 dark:bg-zinc-800/50">
+                    <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 shrink-0 bg-zinc-50 dark:bg-zinc-800/50 pr-2">
                         {availableNodes.length > 1 ? (
-                            <div className="flex overflow-x-auto custom-scrollbar">
+                            <div className="flex overflow-x-auto custom-scrollbar flex-1">
                                 {availableNodes.map((node) => (
                                     <button
                                         key={node.id}
@@ -400,9 +428,23 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
                                 ))}
                             </div>
                         ) : (
-                            <div className="px-4 py-3 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                            <div className="px-4 py-3 text-sm font-semibold text-zinc-700 dark:text-zinc-300 flex-1">
                                 {t('inspector.properties')}
                             </div>
+                        )}
+
+                        {/* Clear Selection Button */}
+                        {selectedNode && (
+                            <button
+                                onClick={() => {
+                                    setSelectedNode(null);
+                                    setAvailableNodes([]);
+                                }}
+                                className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors ml-2"
+                                title={t('inspector.clear_selection')}
+                            >
+                                <X size={16} />
+                            </button>
                         )}
                     </div>
 
@@ -430,6 +472,16 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
                                             value={generateXPath(selectedNode)}
                                             onCopy={(v) => copyToClipboard(v, 'xpath')}
                                             active={copied === 'xpath'}
+                                        />
+                                    </div>
+
+                                    {/* Breadcrumbs */}
+                                    <div className="mt-4">
+                                        <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">{t('inspector.attributes.hierarchy')}</h3>
+                                        <NodeBreadcrumbs
+                                            node={selectedNode}
+                                            onSelect={setSelectedNode}
+                                            onHover={setHoveredNode}
                                         />
                                     </div>
                                 </div>
@@ -462,6 +514,53 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
                     </div>
                 </div>
             </div>
+        </div>
+    );
+}
+
+// ... (Helper Component)
+function NodeBreadcrumbs({ node, onSelect, onHover }: { node: InspectorNode, onSelect: (n: InspectorNode) => void, onHover: (n: InspectorNode | null) => void }) {
+    if (!node) return null;
+
+    // 1. Build path from leaf to root
+    let path: InspectorNode[] = [];
+    let curr: InspectorNode | undefined = node;
+    while (curr) {
+        if (curr.tagName !== 'hierarchy' && curr.tagName !== 'node') {
+            path.unshift(curr);
+        }
+        curr = curr.parent;
+    }
+
+    // Filter out system nodes (up to android:id/content)
+    const contentIndex = path.findIndex(n => n.attributes['resource-id']?.endsWith(':id/content'));
+    if (contentIndex !== -1) {
+        path = path.slice(contentIndex + 1);
+    }
+
+    const cleanTag = (tag: string) => tag.replace('android.widget.', '').replace('android.view.', '');
+
+    return (
+        <div className="flex flex-wrap items-center gap-1 text-xs text-zinc-500 font-mono p-2 bg-zinc-50 dark:bg-black/20 rounded border border-zinc-100 dark:border-zinc-800/50">
+            {path.map((n, i) => (
+                <div key={n.id} className="flex items-center">
+                    {i > 0 && <span className="mx-1 text-zinc-300 dark:text-zinc-700">&gt;</span>}
+                    <button
+                        onClick={() => onSelect(n)}
+                        onMouseEnter={() => onHover(n)}
+                        onMouseLeave={() => onHover(null)}
+                        className={clsx(
+                            "hover:text-primary hover:underline transition-colors text-left",
+                            n === node ? "font-bold text-gray-900 dark:text-zinc-100" : ""
+                        )}
+                        title={generateXPath(n)}
+                    >
+                        {cleanTag(n.tagName)}
+                        {n.attributes['resource-id'] && <span className="ml-1 text-blue-600 dark:text-blue-400">resource-id="{n.attributes['resource-id'].split('/').pop()}"</span>}
+                        {!n.attributes['resource-id'] && n.attributes['content-desc'] && <span className="ml-1 text-green-600 dark:text-green-400">content-desc="{n.attributes['content-desc'].substring(0, 15)}..."</span>}
+                    </button>
+                </div>
+            ))}
         </div>
     );
 }
