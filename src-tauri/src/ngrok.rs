@@ -140,3 +140,39 @@ pub async fn stop_ngrok(state: State<'_, NgrokState>) -> Result<(), String> {
         
     Ok(())
 }
+
+pub fn shutdown_ngrok(state: &State<'_, NgrokState>) {
+    if let Ok(lock) = state.0.lock() {
+        if let Some(pid) = *lock {
+            #[cfg(target_os = "windows")]
+            {
+                let _ = Command::new("taskkill")
+                    .args(&["/F", "/PID", &pid.to_string()])
+                    .creation_flags(CREATE_NO_WINDOW)
+                    .output();
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                let _ = Command::new("kill")
+                    .arg(pid.to_string())
+                    .output();
+            }
+            // *lock = None; // Not strictly necessary on exit, but good practice
+        }
+    }
+
+    // Safety net: Kill by name
+    #[cfg(target_os = "windows")]
+    {
+        let _ = Command::new("taskkill")
+            .args(&["/F", "/IM", "ngrok.exe"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output();
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = Command::new("pkill")
+            .arg("ngrok")
+            .output();
+    }
+}

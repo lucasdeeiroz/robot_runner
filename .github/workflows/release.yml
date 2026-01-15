@@ -173,28 +173,24 @@ jobs:
             if ($manifestDir) {
                  Write-Host "Patching manifests in $($manifestDir.FullName)"
                  
-                 # 1. Inject ReleaseDate into installer manifest
+                 # 1. Inject Metadata into locale manifest
                  $date = Get-Date -Format "yyyy-MM-dd"
-                 $installerManifest = Get-ChildItem -Path $manifestDir.FullName -Filter "*installer.yaml"
-                 if ($installerManifest) {
-                    $content = Get-Content $installerManifest.FullName -Raw
-                    if (-not ($content -match "ReleaseDate:")) {
-                        $content = $content + "`nReleaseDate: $date"
-                        Set-Content -Path $installerManifest.FullName -Value $content
-                        Write-Host "Added ReleaseDate: $date to $($installerManifest.Name)"
-                    }
-                 }
-
-                 # 2. Inject ReleaseNotesUrl into locale manifest
                  $localeManifest = Get-ChildItem -Path $manifestDir.FullName -Filter "*locale.en-US.yaml"
                  if ($localeManifest) {
                     $content = Get-Content $localeManifest.FullName -Raw
+                    
                     if (-not ($content -match "ReleaseNotesUrl:")) {
                         $releaseNotesUrl = "https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
                         $content = $content + "`nReleaseNotesUrl: $releaseNotesUrl"
-                        Set-Content -Path $localeManifest.FullName -Value $content
                         Write-Host "Added ReleaseNotesUrl to $($localeManifest.Name)"
                     }
+
+                    if (-not ($content -match "ReleaseDate:")) {
+                        $content = $content + "`nReleaseDate: $date"
+                        Write-Host "Added ReleaseDate: $date to $($localeManifest.Name)"
+                    }
+
+                    Set-Content -Path $localeManifest.FullName -Value $content
                  }
 
                  Write-Host "Submitting manifest from $($manifestDir.FullName)"

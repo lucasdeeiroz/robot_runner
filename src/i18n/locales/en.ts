@@ -253,8 +253,10 @@ export const en = {
                 resource_id: "Resource ID",
                 access_id: "Access ID",
                 class: "Class",
-                identifiers: "Identifiers"
+                identifiers: "Identifiers",
+                hierarchy: "Hierarchy"
             },
+            clear_selection: "Clear Selection",
             nav: {
                 home: "Home",
                 back: "Back",

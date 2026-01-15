@@ -94,6 +94,10 @@ pub fn run() {
             tauri::RunEvent::Exit => {
                 let state = app_handle.state::<appium::AppiumState>();
                 appium::shutdown_appium(&state);
+                let ngrok_state = app_handle.state::<ngrok::NgrokState>();
+                ngrok::shutdown_ngrok(&ngrok_state);
+                let runner_state = app_handle.state::<runner::TestState>();
+                runner::shutdown_all_tests(&runner_state);
             }
             _ => {}
         });

@@ -1,10 +1,9 @@
 import { Github, Bot, RefreshCcw } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { feedback } from '@/lib/feedback';
-import { checkForUpdates } from '@/lib/updater';
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import clsx from "clsx";
 import packageJson from '../../package.json';
+import { useSettings } from "@/lib/settings";
 
 
 const TOOLS = [
@@ -21,34 +20,21 @@ const TOOLS = [
 export function AboutPage() {
     const { t } = useTranslation();
     const appVersion = packageJson.version;
+    const { checkForAppUpdate, updateInfo } = useSettings();
     const [isChecking, setIsChecking] = useState(false);
-    const [updateAvailable, setUpdateAvailable] = useState(false);
+
+    // Check global state
+    const updateAvailable = updateInfo?.available || false;
 
     const handleCheckUpdate = async () => {
         if (isChecking) return;
         setIsChecking(true);
         try {
-            const update = await checkForUpdates();
-
-            if (update.available) {
-                setUpdateAvailable(true);
-                // Don't toast on auto-check if already known likely, or maybe just toast success
-                feedback.toast.success(t('about.update_available', { version: update.latestVersion }));
-            } else {
-                setUpdateAvailable(false);
-                feedback.toast.info(t('about.update_not_available'));
-            }
-        } catch (error) {
-            feedback.toast.error(t('about.update_error'));
+            await checkForAppUpdate(true); // Manual check
         } finally {
             setIsChecking(false);
         }
     };
-
-    // Auto-check on mount
-    useEffect(() => {
-        handleCheckUpdate();
-    }, []);
 
     return (
         <div className="space-y-8 pb-12">

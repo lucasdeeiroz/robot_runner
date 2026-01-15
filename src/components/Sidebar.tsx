@@ -10,9 +10,7 @@ import { cn } from '@/lib/utils';
 import { useSettings } from "@/lib/settings";
 
 import { useTranslation } from "react-i18next";
-import { getVersion } from '@tauri-apps/api/app';
 import packageJson from '../../package.json';
-import { checkForUpdates } from '@/lib/updater';
 import { CustomLogo } from './common/CustomLogo';
 
 interface SidebarProps {
@@ -21,11 +19,12 @@ interface SidebarProps {
 }
 
 export function Sidebar({ activePage, onNavigate }: SidebarProps) {
-    const { settings } = useSettings();
+    const { settings, updateInfo } = useSettings();
     const [collapsed, setCollapsed] = useState(false);
     const { t } = useTranslation();
-    const [updateAvailable, setUpdateAvailable] = useState(false);
-    const [appVersion, setAppVersion] = useState("...");
+
+    const updateAvailable = updateInfo?.available || false;
+    const appVersion = updateInfo?.currentVersion || packageJson.version;
 
     useEffect(() => {
         let timeoutId: NodeJS.Timeout;
@@ -44,22 +43,6 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
 
         handleResize(); // Check on mount (immediate)
         window.addEventListener('resize', handleResize);
-
-        // Check for updates
-        checkForUpdates()
-            .then(info => {
-                setAppVersion(info.currentVersion);
-                if (info.available) {
-                    setUpdateAvailable(true);
-                }
-            })
-            .catch(async () => {
-                try {
-                    setAppVersion(await getVersion());
-                } catch {
-                    setAppVersion(packageJson.version); // Ultimate fallback (dynamic)
-                }
-            });
 
         return () => {
             window.removeEventListener('resize', handleResize);
