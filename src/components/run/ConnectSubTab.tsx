@@ -8,6 +8,7 @@ import { feedback } from "@/lib/feedback";
 import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { SplitButton } from "@/components/shared/SplitButton";
+import { Section } from "@/components/organisms/Section";
 
 interface ConnectSubTabProps {
     onDeviceConnected: () => void;
@@ -242,16 +243,11 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
             />
 
             {/* Wireless Connection Card */}
-            <div className="bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
-                <div className="flex items-center gap-3 mb-6">
-                    <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                        <Wifi size={24} className="text-primary mb-2" />
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">{t('connect.wireless.title')}</h2>
-                        <p className="text-sm text-zinc-500 dark:text-zinc-400">{t('connect.wireless.desc')}</p>
-                    </div>
-                </div>
+            <Section
+                title={t('connect.wireless.title')}
+                icon={Wifi}
+                description={t('connect.wireless.desc')}
+            >
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     <div>
@@ -361,29 +357,26 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                         {statusMsg.text}
                     </div>
                 )}
-            </div>
+            </Section>
 
             {/* Ngrok Integration Card */}
-            <div className={clsx(
-                "bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 transition-opacity",
-                systemCheckStatus?.missingTunnelling?.length > 0 ? "opacity-50 pointer-events-none grayscale" : ""
-            )}>
-                <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                            <Globe className="text-purple-600 dark:text-purple-400" size={24} />
-                        </div>
-                        <div>
-                            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">{t('connect.remote.title')}</h2>
-                            <p className="text-sm text-zinc-500 dark:text-zinc-400">{t('connect.remote.desc')}</p>
-                        </div>
-                    </div>
-                    {systemCheckStatus?.missingTunnelling?.length > 0 && (
+            <Section
+                title={t('connect.remote.title')}
+                icon={Globe}
+                description={t('connect.remote.desc')}
+                variant="card"
+                className={clsx(
+                    "transition-opacity",
+                    systemCheckStatus?.missingTunnelling?.length > 0 ? "opacity-50 pointer-events-none grayscale" : ""
+                )}
+                status={
+                    systemCheckStatus?.missingTunnelling?.length > 0 && (
                         <span className="text-xs font-bold text-red-500 bg-red-100 dark:bg-red-900/20 px-2 py-1 rounded">
                             Ngrok Not Found
                         </span>
-                    )}
-                </div>
+                    )
+                }
+            >
 
                 {!ngrokUrl && !ngrokLoading ? (
                     <div className="space-y-4">
@@ -454,7 +447,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                         {ngrokStatusMsg.text}
                     </div>
                 )}
-            </div>
+            </Section>
 
         </div>
     );

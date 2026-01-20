@@ -13,6 +13,11 @@ import { TOOL_LINKS } from "@/lib/tools";
 import { Modal } from "@/components/common/Modal";
 import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
 
+// Atoms
+import { Button } from "@/components/atoms/Button";
+import { Input } from "@/components/atoms/Input";
+import { Section } from "@/components/organisms/Section";
+
 export function SettingsPage() {
     const { settings, updateSetting, loading, profiles, activeProfileId, createProfile, switchProfile, renameProfile, deleteProfile, systemVersions, checkSystemVersions, systemCheckStatus } = useSettings();
     const { t, i18n } = useTranslation();
@@ -209,52 +214,53 @@ export function SettingsPage() {
             />
 
             {/* Profile Manager Section */}
-            <section className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
-                <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-semibold flex items-center gap-2 text-gray-900 dark:text-white tracking-tight">
-                        <Users size={20} className="text-primary" />
-                        {t('settings.profiles.title')}
-                    </h2>
-                    <div className="flex items-center gap-2">
-                        <select
-                            value={activeProfileId}
-                            onChange={(e) => { switchProfile(e.target.value); feedback.toast.success('feedback.profile_changed'); }}
-                            className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-1.5 text-sm min-w-[150px] outline-none focus:ring-2 focus:ring-primary/20 text-gray-900 dark:text-zinc-100"
-                        >
-                            {profiles.map(p => (
-                                <option key={p.id} value={p.id}>
-                                    {p.id === 'default' && p.name === 'Default' ? t('settings.profiles.default') : p.name}
-                                </option>
-                            ))}
-                        </select>
-                        <button
+            <Section
+                title={t('settings.profiles.title')}
+                icon={Users}
+                menus={
+                    <select
+                        value={activeProfileId}
+                        onChange={(e) => { switchProfile(e.target.value); feedback.toast.success('feedback.profile_changed'); }}
+                        className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-sm min-w-[150px] outline-none focus:ring-2 focus:ring-primary/20 text-gray-900 dark:text-zinc-100"
+                    >
+                        {profiles.map(p => (
+                            <option key={p.id} value={p.id}>
+                                {p.id === 'default' && p.name === 'Default' ? t('settings.profiles.default') : p.name}
+                            </option>
+                        ))}
+                    </select>
+                }
+                actions={
+                    <>
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => { setIsRenaming(false); setNewProfileName(""); setShowProfileModal(true); }}
-                            className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all active:scale-95 text-zinc-500 dark:text-zinc-400 hover:text-gray-900 dark:hover:text-white flex items-center gap-2"
-                            title={t('settings.profiles.create')}
+                            leftIcon={<Plus size={16} />}
                         >
-                            <Plus size={18} />
-                            {!isNarrow && <span className="text-sm font-medium">{t('settings.profiles.create')}</span>}
-                        </button>
-                        <button
+                            {!isNarrow && t('settings.profiles.create')}
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => { setIsRenaming(true); setNewProfileName(profiles.find(p => p.id === activeProfileId)?.name || ""); setShowProfileModal(true); }}
-                            className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all active:scale-95 text-zinc-500 dark:text-zinc-400 hover:text-gray-900 dark:hover:text-white flex items-center gap-2"
-                            title={t('settings.profiles.rename')}
+                            leftIcon={<Edit2 size={16} />}
                         >
-                            <Edit2 size={18} />
-                            {!isNarrow && <span className="text-sm font-medium">{t('settings.profiles.rename')}</span>}
-                        </button>
+                            {!isNarrow && t('settings.profiles.rename')}
+                        </Button>
                         {profiles.length > 1 && (
-                            <button
+                            <Button
+                                variant="ghost"
+                                size="icon"
                                 onClick={() => handleDeleteClick(activeProfileId)}
-                                className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                                title={t('settings.profiles.delete')}
+                                className="text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
                             >
                                 <Trash2 size={16} />
-                            </button>
+                            </Button>
                         )}
-                    </div>
-                </div>
-            </section>
+                    </>
+                }
+            />
 
             {/* Modal for Create/Rename */}
             <Modal
@@ -290,23 +296,22 @@ export function SettingsPage() {
                 </form>
             </Modal>
 
-
             <div className="grid gap-6">
                 {/* Appium Server Config & Control */}
-                <section className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
-                    <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-xl font-semibold flex items-center gap-2 text-gray-900 dark:text-white tracking-tight">
-                            <Server size={20} className="text-primary" /> {t('settings.appium.title')}
-                        </h2>
-                        <div className="flex items-center gap-2">
-                            <div className={clsx("flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold border",
-                                appiumStatus.running
-                                    ? "bg-green-50 text-green-600 border-green-200 dark:bg-green-500/10 dark:text-green-400 dark:border-green-500/20"
-                                    : "bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700")}>
-                                <div className={clsx("w-2 h-2 rounded-full", appiumStatus.running ? "bg-green-500" : "bg-zinc-400")} />
-                                {appiumStatus.running ? t('settings.appium.running', { pid: appiumStatus.pid }) : t('settings.appium.stopped')}
-                            </div>
-
+                <Section
+                    title={t('settings.appium.title')}
+                    icon={Server}
+                    status={
+                        <div className={clsx("flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold border",
+                            appiumStatus.running
+                                ? "bg-green-50 text-green-600 border-green-200 dark:bg-green-500/10 dark:text-green-400 dark:border-green-500/20"
+                                : "bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700")}>
+                            <div className={clsx("w-2 h-2 rounded-full", appiumStatus.running ? "bg-green-500" : "bg-zinc-400")} />
+                            {appiumStatus.running ? t('settings.appium.running', { pid: appiumStatus.pid }) : t('settings.appium.stopped')}
+                        </div>
+                    }
+                    actions={
+                        <>
                             <button
                                 onClick={() => setShowAppiumLogs(!showAppiumLogs)}
                                 className={clsx("p-2 rounded-xl transition-all active:scale-95", showAppiumLogs ? "bg-primary/10 text-primary" : "hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400")}
@@ -327,40 +332,38 @@ export function SettingsPage() {
                             >
                                 {appiumStatus.running ? <><Square size={16} fill="currentColor" /> {t('settings.appium.stop')}</> : <><Play size={16} fill="currentColor" /> {t('settings.appium.start')}</>}
                             </button>
-                        </div>
-                    </div>
+                        </>
+                    }
+                >
 
                     <div className="grid grid-cols-2 gap-4 mb-4">
                         <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
-                            <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">{t('settings.appium.host')}</label>
-                            <input
+                            <Input
+                                label={t('settings.appium.host')}
                                 type="text"
                                 value={settings.appiumHost}
                                 onChange={(e) => updateSetting('appiumHost', e.target.value)}
                                 disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
-                                className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-primary/20 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                             />
                         </div>
                         <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
-                            <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">{t('settings.appium.port')}</label>
-                            <input
+                            <Input
+                                label={t('settings.appium.port')}
                                 type="number"
                                 value={settings.appiumPort}
                                 onChange={(e) => updateSetting('appiumPort', Number(e.target.value))}
                                 disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
-                                className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-primary/20 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                             />
                         </div>
                     </div>
                     <div className="mb-4">
                         <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
-                            <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">{t('settings.tool_config.appium_args')}</label>
-                            <input
+                            <Input
+                                label={t('settings.tool_config.appium_args')}
                                 type="text"
                                 value={settings.tools.appiumArgs}
                                 onChange={(e) => updateSetting('tools', { ...settings.tools, appiumArgs: e.target.value })}
                                 disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
-                                className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-primary/20 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                                 placeholder="--allow-insecure chromedriver"
                             />
                         </div>
@@ -378,50 +381,46 @@ export function SettingsPage() {
                             ))}
                         </div>
                     )}
-                </section>
+                </Section>
 
                 {/* Path Configuration */}
-                <section className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
-                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-white tracking-tight">
-                        <FolderOpen size={20} className="text-primary" /> {t('settings.paths.title')}
-                    </h2>
+                <Section title={t('settings.paths.title')} icon={FolderOpen}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {(['automationRoot', 'resources', 'tests', 'suites', 'logs', 'logcat', 'screenshots', 'recordings'] as Array<keyof typeof settings.paths>).map((key) => {
                             const isTestingPath = ['automationRoot', 'resources', 'tests', 'suites'].includes(key);
                             const isDisabled = isTestingPath && systemCheckStatus?.missingTesting?.length > 0;
                             return (
                                 <div key={key}>
-                                    <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1 capitalize">{t(`settings.path_labels.${key}` as any)}</label>
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="text"
-                                            value={settings.paths[key]}
-                                            readOnly
-                                            className="flex-1 bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-gray-900 dark:text-zinc-300 font-mono text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                                            placeholder={t('settings.not_set')}
-                                            disabled={isDisabled}
-                                            title={isDisabled ? "Testing dependencies missing" : ""}
-                                        />
-                                        <button
+                                    <div className="flex gap-2 items-end">
+                                        <div className="flex-1">
+                                            <Input
+                                                label={t(`settings.path_labels.${key}` as any)}
+                                                value={settings.paths[key]}
+                                                readOnly
+                                                placeholder={t('settings.not_set')}
+                                                disabled={isDisabled}
+                                                title={isDisabled ? "Testing dependencies missing" : ""}
+                                                className="font-mono text-xs sm:text-sm"
+                                            />
+                                        </div>
+                                        <Button
                                             onClick={() => handleSelectFolder(key)}
-                                            className="px-3 py-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 rounded-xl text-zinc-600 dark:text-zinc-300 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                                            title={t('settings.folder_select')}
                                             disabled={isDisabled}
+                                            title={t('settings.folder_select')}
+                                            variant="secondary"
+                                            size="icon"
                                         >
                                             <FolderOpen size={16} />
-                                        </button>
+                                        </Button>
                                     </div>
                                 </div>
                             );
                         })}
                     </div>
-                </section>
+                </Section>
 
                 {/* Tool Options */}
-                <section className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
-                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-white tracking-tight">
-                        <Wrench size={20} className="text-primary" /> {t('settings.tools')}
-                    </h2>
+                <Section title={t('settings.tools')} icon={Wrench}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {['robotArgs', 'scrcpyArgs'].map((key) => {
                             let isDisabled = false;
@@ -494,16 +493,13 @@ export function SettingsPage() {
                             />
                         </div>
                     </div>
-                </section>
+                </Section>
 
                 {/* Appearance & General */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
 
-                    <section className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
-                        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-white tracking-tight">
-                            <Moon size={20} className="text-primary" /> {t('settings.appearance.title')}
-                        </h2>
+                    <Section title={t('settings.appearance.title')} icon={Moon}>
                         {/* Theme Toggle */}
                         <div className="flex items-center justify-between">
                             <span className="text-zinc-600 dark:text-zinc-300">{t('settings.appearance.theme')}</span>
@@ -618,12 +614,9 @@ export function SettingsPage() {
                                 </p>
                             </div>
                         </div>
-                    </section>
+                    </Section>
 
-                    <section className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
-                        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-white tracking-tight">
-                            <Globe size={20} className="text-primary" /> {t('settings.general')}
-                        </h2>
+                    <Section title={t('settings.general')} icon={Globe}>
                         <div>
                             <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">{t('settings.language')}</label>
                             <select
@@ -651,15 +644,14 @@ export function SettingsPage() {
                                 onCheckedChange={(c: boolean) => updateSetting('recycleDeviceViews', c)}
                             />
                         </div>
-                    </section>
+                    </Section>
                 </div>
 
                 {/* System Versions */}
-                <section className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
-                    <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-xl font-semibold flex items-center gap-2 text-gray-900 dark:text-white tracking-tight">
-                            <Monitor size={20} className="text-primary" /> {t('settings.system.title')}
-                        </h2>
+                <Section
+                    title={t('settings.system.title')}
+                    icon={Monitor}
+                    actions={
                         <button
                             onClick={checkSystemVersions}
                             disabled={systemCheckStatus.loading}
@@ -671,7 +663,8 @@ export function SettingsPage() {
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" /><path d="M16 16h5v5" /></svg>
                         </button>
-                    </div>
+                    }
+                >
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {systemVersions ? (
                             (['adb', 'node', 'appium', 'uiautomator2', 'python', 'robot', 'appium_lib', 'scrcpy', 'ngrok'] as Array<keyof typeof systemVersions>).map((key) => (
@@ -699,7 +692,7 @@ export function SettingsPage() {
                             <div className="text-zinc-400 italic col-span-full">{t('settings.system.checking')}</div>
                         )}
                     </div>
-                </section>
+                </Section>
             </div>
         </div >
     );

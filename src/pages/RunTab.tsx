@@ -12,6 +12,11 @@ import { useSettings } from "@/lib/settings";
 import { Device } from "@/lib/types";
 import { feedback } from "@/lib/feedback";
 
+// Atoms & Molecules
+import { Button } from "@/components/atoms/Button";
+import { Badge } from "@/components/atoms/Badge";
+import { Tabs, TabItem } from "@/components/molecules/Tabs";
+
 type TabType = 'tests' | 'connect' | 'inspector';
 
 interface RunTabProps {
@@ -60,7 +65,14 @@ export function RunTab({ onNavigate, initialTab }: RunTabProps) {
         }
     }, [initialTab]);
 
-    // ...
+    const isLauncherDisabled = systemCheckStatus?.missingTesting?.length > 0;
+
+    // Define Tabs
+    const tabs: TabItem[] = [
+        { id: 'tests', label: !isNarrow ? t('run_tab.launcher') : '', icon: Play },
+        { id: 'connect', label: !isNarrow ? t('run_tab.connect') : '', icon: Wifi },
+        { id: 'inspector', label: !isNarrow ? t('run_tab.inspector') : '', icon: ScanEye },
+    ];
 
     // State for devices (Restored)
     const [devices, setDevices] = useState<Device[]>([]);
@@ -72,7 +84,6 @@ export function RunTab({ onNavigate, initialTab }: RunTabProps) {
     // Only 'test' type sessions mark device as busy
     const busyDeviceIds = sessions.filter(s => s.status === 'running' && s.type === 'test').map(s => s.deviceUdid);
 
-    const isLauncherDisabled = systemCheckStatus?.missingTesting?.length > 0;
 
     useEffect(() => {
         loadDevices();
@@ -137,30 +148,18 @@ export function RunTab({ onNavigate, initialTab }: RunTabProps) {
         <div ref={containerRef} className="h-full flex flex-col space-y-4" onClick={() => isDeviceDropdownOpen && setIsDeviceDropdownOpen(false)}>
             {/* Header / Device Selection Bar */}
             <div className="flex items-center justify-between bg-white dark:bg-zinc-900/50 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm dark:shadow-none shrink-0 z-20 relative">
-                <div className="flex bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg">
-                    <TabButton
-                        active={activeTab === 'tests'}
-                        onClick={() => !isLauncherDisabled && setActiveTab('tests')}
-                        icon={<Play size={16} />}
-                        label={t('run_tab.launcher')}
-                        disabled={isLauncherDisabled}
-                        hideText={isNarrow}
-                    />
-                    <TabButton
-                        active={activeTab === 'connect'}
-                        onClick={() => setActiveTab('connect')}
-                        icon={<Wifi size={16} />}
-                        label={t('run_tab.connect')}
-                        hideText={isNarrow}
-                    />
-                    <TabButton
-                        active={activeTab === 'inspector'}
-                        onClick={() => setActiveTab('inspector')}
-                        icon={<ScanEye size={16} />}
-                        label={t('run_tab.inspector')}
-                        hideText={isNarrow}
-                    />
-                </div>
+
+                {/* Atomic Tabs */}
+                <Tabs
+                    tabs={tabs}
+                    activeId={activeTab}
+                    onChange={(id) => {
+                        if (id === 'tests' && isLauncherDisabled) return;
+                        setActiveTab(id as TabType);
+                    }}
+                    variant="pills"
+                    className="w-auto"
+                />
 
                 <div className="flex items-center gap-3 relative">
                     {/* Device Selector */}
@@ -208,22 +207,24 @@ export function RunTab({ onNavigate, initialTab }: RunTabProps) {
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200 truncate">{d.model}</span>
                                                     {busyDeviceIds.includes(d.udid) && (
-                                                        <span className="text-[10px] bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">
+                                                        <Badge variant="warning" size="sm" className="text-[10px] font-bold uppercase tracking-wide">
                                                             {t('run_tab.device.busy')}
-                                                        </span>
+                                                        </Badge>
                                                     )}
                                                 </div>
                                                 <span className="text-xs text-zinc-500 truncate" title={d.udid}>{d.udid}</span>
                                             </div>
                                         </div>
 
-                                        <button
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
                                             onClick={(e) => { e.stopPropagation(); handleOpenToolbox(d); setIsDeviceDropdownOpen(false); }}
-                                            className="p-1.5 text-zinc-400 hover:text-primary hover:bg-primary/10 dark:hover:bg-primary/20 rounded transition-colors"
+                                            className="text-zinc-400 hover:text-primary hover:bg-primary/10 dark:hover:bg-primary/20"
                                             title="Open Toolbox"
                                         >
                                             <Wrench size={16} />
-                                        </button>
+                                        </Button>
                                     </div>
                                 ))}
                                 {devices.length === 0 && (
@@ -233,13 +234,15 @@ export function RunTab({ onNavigate, initialTab }: RunTabProps) {
                         )}
                     </div>
 
-                    <button
+                    <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={(e) => { e.stopPropagation(); loadDevices(); }}
-                        className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-md transition-colors text-zinc-500"
                         title={t('run_tab.device.refresh')}
+                        isLoading={loadingDevices}
                     >
-                        <RefreshCw size={14} className={loadingDevices ? "animate-spin" : ""} />
-                    </button>
+                        {!loadingDevices && <RefreshCw size={14} />}
+                    </Button>
                 </div>
             </div>
 
@@ -258,26 +261,5 @@ export function RunTab({ onNavigate, initialTab }: RunTabProps) {
                 </div>
             </div>
         </div>
-    );
-}
-
-function TabButton({ active, onClick, icon, label, disabled, hideText }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string, disabled?: boolean, hideText?: boolean }) {
-    return (
-        <button
-            onClick={onClick}
-            disabled={disabled}
-            className={clsx(
-                "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200",
-                active
-                    ? "bg-white dark:bg-zinc-700 text-primary shadow-sm"
-                    : disabled
-                        ? "text-zinc-300 dark:text-zinc-600 cursor-not-allowed"
-                        : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-white/50 dark:hover:bg-zinc-700/50"
-            )}
-            title={label}
-        >
-            {icon}
-            {!hideText && <span>{label}</span>}
-        </button>
     );
 }

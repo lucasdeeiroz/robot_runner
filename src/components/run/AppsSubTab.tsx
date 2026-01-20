@@ -10,6 +10,7 @@ import { Virtuoso } from "react-virtuoso";
 
 import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
 import { feedback } from "@/lib/feedback";
+import { Section } from "@/components/organisms/Section";
 
 interface PackageInfo {
     name: String;
@@ -171,58 +172,68 @@ export function AppsSubTab() {
 
 
     return (
-        <div className="h-full flex flex-col bg-zinc-50 dark:bg-zinc-900/50">
+        <div className="h-full flex flex-col p-2 overflow-y-auto">
             {/* Toolbar */}
-            <div className="p-2 border-b border-zinc-200 dark:border-zinc-800 flex items-center gap-2">
-                <div className="relative flex-1">
-                    <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-500" />
-                    <input
-                        type="text"
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        placeholder={t('apps.search_placeholder', "Search packages...")}
-                        className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded px-8 py-1.5 text-xs text-zinc-900 dark:text-zinc-300 focus:outline-none focus:border-primary/50"
-                    />
-                </div>
-
-                <button
-                    onClick={() => setShowSystem(!showSystem)}
-                    className={clsx(
-                        "p-1.5 rounded border text-xs flex items-center gap-1.5 transition-colors",
-                        showSystem ? "bg-blue-500/10 border-blue-500/50 text-blue-600 dark:text-blue-400" : "bg-transparent border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
-                    )}
-                    title={t('apps.toggle_system', "Toggle System Apps")}
-                >
-                    <Smartphone size={14} />
-                    {/* <span className="hidden xl:inline">System</span> */}
-                </button>
-
-                <button
-                    onClick={handleInstall}
-                    className="p-1.5 bg-green-600/10 hover:bg-green-600/20 text-green-500 border border-green-600/20 rounded flex items-center gap-1.5 transition-colors"
-                    title={t('apps.actions.install')}
-                >
-                    <Upload size={14} />
-                    <span className="text-xs font-semibold hidden lg:inline">{t('apps.actions.install')}</span>
-                </button>
-
-                <button
-                    onClick={() => setSortBy(prev => prev === 'name' ? 'package' : 'name')}
-                    className="p-1.5 hover:bg-zinc-800 text-zinc-400 rounded transition-colors"
-                    title={sortBy === 'name' ? t('apps.actions.sort_by_package') : t('apps.actions.sort_by_name')}
-                >
-                    {sortBy === 'name' ? <ArrowDownAZ size={14} /> : <Package size={14} />}
-                </button>
-
-                <button
-                    onClick={fetchPackages}
-                    disabled={loading}
-                    className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-400 rounded transition-colors"
-                    title={t('apps.actions.refresh')}
-                >
-                    <RefreshCw size={14} className={clsx(loading && "animate-spin")} />
-                </button>
-            </div>
+            <Section
+                title={t('apps.title', 'Apps')}
+                icon={Package}
+                variant="transparent"
+                className="border-b border-zinc-200 dark:border-zinc-800 pb-2 mb-2 p-2"
+                status={
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={fetchPackages}
+                            disabled={loading}
+                            className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-400 rounded transition-colors"
+                            title={t('apps.actions.refresh')}
+                        >
+                            <RefreshCw size={14} className={clsx(loading && "animate-spin")} />
+                        </button>
+                        <button
+                            onClick={() => setSortBy(prev => prev === 'name' ? 'package' : 'name')}
+                            className="p-1.5 hover:bg-zinc-800 text-zinc-400 rounded transition-colors"
+                            title={sortBy === 'name' ? t('apps.actions.sort_by_package') : t('apps.actions.sort_by_name')}
+                        >
+                            {sortBy === 'name' ? <ArrowDownAZ size={14} /> : <Package size={14} />}
+                        </button>
+                        <button
+                            onClick={() => setShowSystem(!showSystem)}
+                            className={clsx(
+                                "p-1.5 rounded border text-xs flex items-center gap-1.5 transition-colors",
+                                showSystem ? "bg-blue-500/10 border-blue-500/50 text-blue-600 dark:text-blue-400" : "bg-transparent border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                            )}
+                            title={t('apps.toggle_system', "Toggle System Apps")}
+                        >
+                            <Smartphone size={14} />
+                            {/* <span className="hidden xl:inline">System</span> */}
+                        </button>
+                    </div>
+                }
+                menus={
+                    <div className="relative">
+                        <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-500" />
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            placeholder={t('apps.search_placeholder', "Search packages...")}
+                            className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded px-8 py-1.5 text-xs text-zinc-900 dark:text-zinc-300 focus:outline-none focus:border-primary/50 w-64 transition-all"
+                        />
+                    </div>
+                }
+                actions={
+                    <>
+                        <button
+                            onClick={handleInstall}
+                            className="p-1.5 bg-green-600/10 hover:bg-green-600/20 text-green-500 border border-green-600/20 rounded flex items-center gap-1.5 transition-colors"
+                            title={t('apps.actions.install')}
+                        >
+                            <Upload size={14} />
+                            <span className="text-xs font-semibold hidden lg:inline">{t('apps.actions.install')}</span>
+                        </button>
+                    </>
+                }
+            />
 
             {/* Content */}
             <div className="flex-1 overflow-hidden relative">

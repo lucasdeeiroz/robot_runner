@@ -1,9 +1,10 @@
-import { Github, Bot, RefreshCcw } from "lucide-react";
+import { Github, Bot, RefreshCcw, Cpu, Users } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import clsx from "clsx";
 import packageJson from '../../package.json';
 import { useSettings } from "@/lib/settings";
+import { Section } from "@/components/organisms/Section";
 
 
 const TOOLS = [
@@ -82,13 +83,11 @@ export function AboutPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
                     {/* Tools & Tech (Now Left/Top) */}
-                    <section className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
-                        <h3 className="text-lg font-semibold mb-2 flex items-center gap-2 text-gray-900 dark:text-white">
-                            {t('about.tools_title')}
-                        </h3>
-                        <p className="text-sm text-zinc-500 mb-4">
-                            {t('about.tools_desc')}
-                        </p>
+                    <Section
+                        title={t('about.tools_title')}
+                        icon={Cpu}
+                        description={t('about.tools_desc')}
+                    >
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             {TOOLS.map(tool => (
                                 <a
@@ -108,14 +107,14 @@ export function AboutPage() {
                                 </a>
                             ))}
                         </div>
-                    </section>
+                    </Section>
 
                     {/* Legal & License (Now Right/Top) */}
-                    <section className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm flex flex-col">
-                        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
-                            <Github size={20} className="text-primary" /> {t('about.legal_title')}
-                        </h3>
-
+                    <Section
+                        title={t('about.legal_title')}
+                        icon={Github}
+                        className="flex flex-col"
+                    >
                         <div className="space-y-4 flex-1">
                             <div className="p-4 bg-zinc-50 dark:bg-black/20 rounded-lg border border-zinc-100 dark:border-zinc-800/50">
                                 <div className="font-medium text-gray-900 dark:text-white mb-1 flex items-center gap-2">
@@ -137,13 +136,14 @@ export function AboutPage() {
                                 <Github size={16} /> Repository
                             </a>
                         </div>
-                    </section>
+                    </Section>
 
                     {/* Credits (Now Bottom Full Width) */}
-                    <section className="md:col-span-2 bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
-                        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
-                            {t('about.developed_by')}
-                        </h3>
+                    <Section
+                        title={t('about.developed_by')}
+                        icon={Users}
+                        className="md:col-span-2"
+                    >
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="flex items-center gap-4">
                                 <div className="w-12 h-12 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center text-xl">
@@ -164,7 +164,7 @@ export function AboutPage() {
                                 </div>
                             </div>
                         </div>
-                    </section>
+                    </Section>
                 </div>
             </div>
         </div >

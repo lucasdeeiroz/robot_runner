@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { Modal } from "@/components/common/Modal";
 import { feedback } from "@/lib/feedback";
+import { Section } from "@/components/organisms/Section";
 
 interface CommandsSubTabProps {
     selectedDevice: string;
@@ -160,13 +161,18 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
     }
 
     return (
-        <div className="h-full flex flex-col space-y-4">
-            <div className="flex items-center justify-between text-zinc-500">
-                <div className="flex items-center gap-2">
-                    <Terminal size={20} />
-                    <span className="font-medium">ADB Commands - {selectedDevice}</span>
-                </div>
-                <div className="flex gap-1">
+        <div className="h-full flex flex-col p-2 overflow-y-auto">
+            <Section
+                title={t('commands.title', 'ADB Commands')}
+                icon={Terminal}
+                variant="transparent"
+                className="pb-2 mb-2 p-2"
+                status={
+                    <div className="text-xs text-zinc-400">
+                        {selectedDevice}
+                    </div>
+                }
+                actions={
                     <button
                         onClick={() => setHistory([])}
                         className="p-1 hover:text-red-500 transition-colors"
@@ -174,8 +180,8 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
                     >
                         <Trash2 size={16} />
                     </button>
-                </div>
-            </div>
+                }
+            />
 
             {/* Console Output */}
             <div className="flex-1 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-300 font-mono text-xs rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 overflow-y-auto whitespace-pre-wrap">

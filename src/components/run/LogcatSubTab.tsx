@@ -8,6 +8,7 @@ import { useSettings } from "@/lib/settings";
 import clsx from "clsx";
 import { feedback } from "@/lib/feedback";
 import { FileSavedFeedback } from "@/components/common/FileSavedFeedback";
+import { Section } from "@/components/organisms/Section";
 
 interface LogcatSubTabProps {
     selectedDevice: string;
@@ -196,93 +197,97 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
     }
 
     return (
-        <div ref={containerRef} className="h-full flex flex-col space-y-4">
+        <div ref={containerRef} className="h-full flex flex-col p-2 overflow-y-auto">
             {/* Toolbar */}
-            <div className="flex items-center gap-2 p-2 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg border border-zinc-200 dark:border-zinc-700">
-                <button
-                    onClick={isStreaming ? stopLogcat : startLogcat}
-                    className={clsx(
-                        "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed",
-                        isStreaming
-                            ? "bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
-                            : "bg-primary text-white hover:opacity-90 shadow-sm"
-                    )}
-                >
-                    {isStreaming ? (
-                        <>
-                            <Square size={14} fill="currentColor" /> {!isNarrow && t('logcat.stop')}
-                        </>
-                    ) : (
-                        <>
-                            <Play size={14} fill="currentColor" /> {!isNarrow && t('logcat.start')}
-                        </>
-                    )}
-                </button>
+            <Section
+                title={t('logcat.title', 'Logcat')}
+                icon={AlignLeft}
+                variant="transparent"
+                className="pb-2 mb-2 p-2"
+                status={
+                    <div className="text-xs text-zinc-400">
+                        {logs.length} {t('logcat.lines')}
+                        <button
+                            className="p-1.5 ml-2 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-md text-zinc-600 dark:text-zinc-400"
+                            title={t('logcat.clear')}
+                            onClick={() => setLogs([])}
+                        >
+                            <Eraser size={16} />
+                        </button>
+                    </div>
+                }
+                menus={
+                    <div className="flex items-center gap-2">
+                        {/* Package Selector */}
+                        <div className="relative">
+                            <select
+                                value={selectedPackage}
+                                onChange={(e) => setSelectedPackage(e.target.value)}
+                                className={clsx(
+                                    "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 rounded-md py-1.5 text-xs focus:ring-2 focus:ring-primary/20 outline-none transition-all",
+                                    isNarrow ? "px-2" : "pl-8 pr-2",
+                                    "truncate",
+                                    isNarrow ? "w-48" : "w-40", // Fixed width for visibility
+                                    "disabled:opacity-50 disabled:cursor-not-allowed"
+                                )}
+                                disabled={isStreaming}
+                            >
+                                <option value="">{t('logcat.entire_system')}</option>
+                                {(settings.tools?.appPackage ? settings.tools.appPackage.split(',') : []).map((pkg) => {
+                                    const p = pkg.trim();
+                                    return p ? <option key={p} value={p}>{p}</option> : null;
+                                })}
+                            </select>
+                            <PackageIcon
+                                size={14}
+                                className={clsx(
+                                    "absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none",
+                                    isNarrow ? "hidden" : "block"
+                                )}
+                            />
+                        </div>
+                        <select
+                            value={logLevel}
+                            onChange={(e) => setLogLevel(e.target.value)}
+                            className="text-xs bg-zinc-200 dark:bg-zinc-700 border-none rounded-md px-2 py-1 text-zinc-700 dark:text-zinc-200 ml-2 focus:ring-1 focus:ring-primary outline-none"
+                            title={t('logcat.level')}
+                        >
+                            <option value="V">Verbose</option>
+                            <option value="D">Debug</option>
+                            <option value="I">Info</option>
+                            <option value="W">Warning</option>
+                            <option value="E">Error</option>
+                            <option value="F">Fatal</option>
+                            <option value="S">Silent</option>
+                        </select>
+                    </div>
+                }
+                actions={
+                    <>
 
-                <div className="h-6 w-px bg-zinc-300 dark:bg-zinc-700 mx-1" />
 
-                {/* Package Selector */}
-                <div className="relative">
-                    <select
-                        value={selectedPackage}
-                        onChange={(e) => setSelectedPackage(e.target.value)}
-                        className={clsx(
-                            "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 rounded-md py-1.5 text-xs focus:ring-2 focus:ring-primary/20 outline-none transition-all",
-                            isNarrow ? "px-2" : "pl-8 pr-2",
-                            "truncate",
-                            isNarrow ? "w-48" : "w-40", // Fixed width for visibility
-                            "disabled:opacity-50 disabled:cursor-not-allowed"
-                        )}
-                        disabled={isStreaming}
-                    >
-                        <option value="">{t('logcat.entire_system')}</option>
-                        {(settings.tools?.appPackage ? settings.tools.appPackage.split(',') : []).map((pkg) => {
-                            const p = pkg.trim();
-                            return p ? <option key={p} value={p}>{p}</option> : null;
-                        })}
-                    </select>
-                    <PackageIcon
-                        size={14}
-                        className={clsx(
-                            "absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none",
-                            isNarrow ? "hidden" : "block"
-                        )}
-                    />
-                </div>
-
-                <div className="h-6 w-px bg-zinc-300 dark:bg-zinc-700 mx-1" />
-
-                <select
-                    value={logLevel}
-                    onChange={(e) => setLogLevel(e.target.value)}
-                    className="text-xs bg-zinc-200 dark:bg-zinc-700 border-none rounded px-2 py-1 text-zinc-700 dark:text-zinc-200 focus:ring-1 focus:ring-primary outline-none"
-                    title={t('logcat.level')}
-                >
-                    <option value="V">Verbose</option>
-                    <option value="D">Debug</option>
-                    <option value="I">Info</option>
-                    <option value="W">Warning</option>
-                    <option value="E">Error</option>
-                    <option value="F">Fatal</option>
-                    <option value="S">Silent</option>
-                </select>
-
-                <div className="h-6 w-px bg-zinc-300 dark:bg-zinc-700 mx-1" />
-
-                <button
-                    className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-md text-zinc-600 dark:text-zinc-400"
-                    title={t('logcat.clear')}
-                    onClick={() => setLogs([])}
-                >
-                    <Eraser size={16} />
-                </button>
-
-                <div className="flex-1" />
-
-                <div className="text-xs text-zinc-400">
-                    {logs.length} {t('logcat.lines')}
-                </div>
-            </div>
+                        <button
+                            onClick={isStreaming ? stopLogcat : startLogcat}
+                            className={clsx(
+                                "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed",
+                                isStreaming
+                                    ? "bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
+                                    : "bg-primary text-white hover:opacity-90 shadow-sm"
+                            )}
+                        >
+                            {isStreaming ? (
+                                <>
+                                    <Square size={14} fill="currentColor" /> {!isNarrow && t('logcat.stop')}
+                                </>
+                            ) : (
+                                <>
+                                    <Play size={14} fill="currentColor" /> {!isNarrow && t('logcat.start')}
+                                </>
+                            )}
+                        </button>
+                    </>
+                }
+            />
 
             <FileSavedFeedback
                 path={lastSavedFile}
