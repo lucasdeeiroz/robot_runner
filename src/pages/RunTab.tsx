@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Play, Wifi, Smartphone, RefreshCw, Wrench, ScanEye, PlayCircle } from "lucide-react";
+import { Play, Wifi, Smartphone, RefreshCw, Wrench, ScanEye, PlayCircle, Bot } from "lucide-react";
 import { PageHeader } from "@/components/organisms/PageHeader";
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
@@ -218,6 +218,12 @@ export function RunTab({ onNavigate, initialTab }: RunTabProps) {
                                                         <Badge variant="warning" size="sm" className="text-[10px] font-bold uppercase tracking-wide">
                                                             {t('run_tab.device.busy')}
                                                         </Badge>
+                                                    )}
+                                                    {d.android_version && (
+                                                        <div className="flex items-center gap-1 text-[10px] text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded-full" title={`Android ${d.android_version}`}>
+                                                            <Bot size={12} className="text-zinc-400" />
+                                                            <span>{d.android_version}</span>
+                                                        </div>
                                                     )}
                                                 </div>
                                                 <span className="text-xs text-zinc-500 truncate" title={d.udid}>{d.udid}</span>
