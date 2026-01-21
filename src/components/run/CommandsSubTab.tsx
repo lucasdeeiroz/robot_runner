@@ -29,20 +29,7 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
     const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
     const [saveLabel, setSaveLabel] = useState("");
 
-    // Responsive State
-    const containerRef = useRef<HTMLDivElement>(null);
-    const [isNarrow, setIsNarrow] = useState(false);
 
-    useEffect(() => {
-        if (!containerRef.current) return;
-        const observer = new ResizeObserver((entries) => {
-            for (const entry of entries) {
-                setIsNarrow(entry.contentRect.width < 500);
-            }
-        });
-        observer.observe(containerRef.current);
-        return () => observer.disconnect();
-    }, []);
 
     // Listeners ref
     const listenersRef = useRef<UnlistenFn[]>([]);
@@ -176,7 +163,7 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
     }
 
     return (
-        <div ref={containerRef} className="h-full flex flex-col p-2 overflow-y-auto">
+        <div className="h-full flex flex-col p-2 overflow-y-auto">
             <Section
                 title={t('commands.title', 'ADB Commands')}
                 icon={Terminal}
@@ -187,8 +174,7 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
                         {selectedDevice}
                     </div>
                 }
-                menus={!isNarrow ? null : null} // Placeholder for future use or if I missed something. Actually better to just not pass it if null.
-                // Let's not add it if it doesn't exist.
+                // menus={!isNarrow ? null : null} // Placeholder removed
 
                 actions={
                     <button

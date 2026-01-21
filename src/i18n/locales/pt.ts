@@ -165,7 +165,7 @@ export const pt = {
                 pasted: "Colado da área de transferência",
                 clipboard_invalid: "Formato inválido na área de transferência",
                 clipboard_error: "Permissão da área de transferência negada",
-                auto_ip: "IP Auto-detectado: {{ip}}",
+                auto_ip: "IP Auto-detectado",
                 ip_not_found: "Não foi possível detectar o IP via ADB",
                 select_device_first: "Selecione um dispositivo para expor",
                 forwarding: "Encaminhando para localhost:5555 (ADB)",

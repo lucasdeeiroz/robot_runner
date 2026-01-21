@@ -171,6 +171,15 @@ export function RunTab({ onNavigate, initialTab }: RunTabProps) {
 
                 <div className="flex items-center gap-3 relative">
                     {/* Device Selector */}
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => { e.stopPropagation(); loadDevices(); }}
+                        title={t('run_tab.device.refresh')}
+                        isLoading={loadingDevices}
+                    >
+                        {!loadingDevices && <RefreshCw size={14} />}
+                    </Button>
                     <div
                         className="flex items-center gap-2 bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors select-none"
                         onClick={(e) => {
@@ -248,15 +257,6 @@ export function RunTab({ onNavigate, initialTab }: RunTabProps) {
                         )}
                     </div>
 
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => { e.stopPropagation(); loadDevices(); }}
-                        title={t('run_tab.device.refresh')}
-                        isLoading={loadingDevices}
-                    >
-                        {!loadingDevices && <RefreshCw size={14} />}
-                    </Button>
                 </div>
             </div>
 

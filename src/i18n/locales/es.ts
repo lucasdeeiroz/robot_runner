@@ -89,7 +89,7 @@ export const es = {
             quick: "Rápido",
             saved: "Guardados",
             actions: {
-                ip_address: "Endereço IP",
+                ip_address: "Dirección IP",
                 list_packages: "Listar Paquetes",
                 battery: "Bateria",
                 reboot: "Reiniciar",
@@ -165,7 +165,7 @@ export const es = {
                 pasted: "Pegado del portapapeles",
                 clipboard_invalid: "Formato inválido en portapapeles",
                 clipboard_error: "Permiso de portapapeles denegado",
-                auto_ip: "IP Auto-detectada: {{ip}}",
+                auto_ip: "IP Auto-detectada",
                 ip_not_found: "No se pudo detectar la IP del dispositivo vía ADB",
                 select_device_first: "Seleccione un dispositivo para exponer",
                 forwarding: "Redirigiendo a localhost:5555 (ADB)",

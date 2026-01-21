@@ -165,7 +165,7 @@ export const en = {
                 pasted: "Pasted from clipboard",
                 clipboard_invalid: "Invalid format in clipboard",
                 clipboard_error: "Clipboard permission denied",
-                auto_ip: "Auto-detected IP: {{ip}}",
+                auto_ip: "Auto-detected IP",
                 ip_not_found: "Could not detect Device IP via ADB",
                 select_device_first: "Select a device to expose",
                 forwarding: "Forwarding to localhost:5555 (ADB)",

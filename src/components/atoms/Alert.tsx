@@ -42,7 +42,7 @@ export function Alert({ className, variant, icon, title, children, ...props }: A
         <div role="alert" className={twMerge(alertVariants({ variant }), className)} {...props}>
             {Icon}
             <div className="flex flex-col gap-1">
-                {title && <h5 className="mb-1 font-medium leading-none tracking-tight">{title}</h5>}
+                {title && <h5 className="font-medium leading-none tracking-tight">{title}</h5>}
                 <div className="text-sm opacity-90 break-words whitespace-pre-wrap">{children}</div>
             </div>
         </div>

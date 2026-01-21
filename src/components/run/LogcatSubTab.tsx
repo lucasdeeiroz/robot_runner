@@ -225,9 +225,9 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
                                 onChange={(e) => setSelectedPackage(e.target.value)}
                                 className={clsx(
                                     "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 rounded-md py-1.5 text-xs focus:ring-2 focus:ring-primary/20 outline-none transition-all",
-                                    isNarrow ? "px-2" : "pl-8 pr-2",
+                                    "pl-8 pr-2",
                                     "truncate",
-                                    isNarrow ? "w-48" : "w-40", // Fixed width for visibility
+                                    "w-40", // Fixed width for visibility
                                     "disabled:opacity-50 disabled:cursor-not-allowed"
                                 )}
                                 disabled={isStreaming}
@@ -242,7 +242,7 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
                                 size={14}
                                 className={clsx(
                                     "absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none",
-                                    isNarrow ? "hidden" : "block"
+                                    "block"
                                 )}
                             />
                         </div>
@@ -261,7 +261,8 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
                             <option value="S">Silent</option>
                         </select>
                     </div>
-                ) : null}
+                ) : null
+                }
                 actions={
                     <>
 
@@ -289,7 +290,7 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
                 }
             />
 
-            <FileSavedFeedback
+            < FileSavedFeedback
                 path={lastSavedFile}
                 onClose={() => setLastSavedFile(null)}
             />
@@ -326,6 +327,6 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
                     />
                 )}
             </div>
-        </div>
+        </div >
     );
 }

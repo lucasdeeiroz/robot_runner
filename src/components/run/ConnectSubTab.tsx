@@ -70,7 +70,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
             if (foundIp) {
                 setIp(foundIp);
                 setPort("5555");
-                setStatusMsg({ text: t('connect.status.auto_ip', { ip: foundIp }), type: 'success' });
+                setStatusMsg({ text: t('connect.status.auto_ip'), type: 'success' });
             } else {
                 setStatusMsg({ text: t('connect.status.ip_not_found'), type: 'info' });
             }
@@ -249,7 +249,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                 icon={Wifi}
                 description={t('connect.wireless.desc')}
                 status={statusMsg && (
-                    <Alert variant={statusMsg.type === 'error' ? 'destructive' : statusMsg.type === 'success' ? 'success' : 'info'} className="animate-in slide-in-from-top-2">
+                    <Alert variant={statusMsg.type === 'error' ? 'destructive' : statusMsg.type === 'success' ? 'success' : 'info'} className="animate-in slide-in-from-top-2 animate-out slide-out-to-bottom-2">
                         {statusMsg.text}
                     </Alert>
                 )}

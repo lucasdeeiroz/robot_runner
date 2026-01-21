@@ -220,7 +220,7 @@ export function SettingsPage() {
                 title={t('settings.profiles.title')}
                 icon={Users}
                 menus={
-                    < Select
+                    <Select
                         options={profiles.map(p => ({
                             label: p.id === 'default' && p.name === 'Default' ? t('settings.profiles.default') : p.name,
                             value: p.id
@@ -606,11 +606,11 @@ export function SettingsPage() {
                 </div >
 
                 {/* System Versions */}
-                < Section
+                <Section
                     title={t('settings.system.title')}
                     icon={Monitor}
                     actions={
-                        < button
+                        <button
                             onClick={checkSystemVersions}
                             disabled={systemCheckStatus.loading}
                             className={
@@ -622,7 +622,7 @@ export function SettingsPage() {
                             title={t('common.loading')}
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" /><path d="M16 16h5v5" /></svg>
-                        </button >
+                        </button>
                     }
                 >
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -652,8 +652,8 @@ export function SettingsPage() {
                             <div className="text-zinc-400 italic col-span-full">{t('settings.system.checking')}</div>
                         )}
                     </div>
-                </Section >
-            </div >
-        </div >
+                </Section>
+            </div>
+        </div>
     );
 }
