@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { Input, InputProps } from '../atoms/Input';
 import { Button } from '../atoms/Button';
 import { FolderOpen } from 'lucide-react';
@@ -6,7 +6,7 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { feedback } from '@/lib/feedback';
 import { useTranslation } from 'react-i18next';
 
-interface PathInputProps extends Omit<InputProps, 'onChange'> {
+interface PathInputProps extends Omit<InputProps, 'onChange' | 'onSelect'> {
     value: string;
     onSelect: (path: string) => void;
     dialogTitle?: string;
