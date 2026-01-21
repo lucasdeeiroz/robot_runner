@@ -44,6 +44,18 @@ export function HistoryCharts({ logs, groupBy }: HistoryChartsProps) {
         ].filter(d => d.value > 0);
     }, [logs]);
 
+
+    // Helper to decode HTML entities (e.g., &amp; -> &)
+    const decodeHtml = (text: string) => {
+        try {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(text, 'text/html');
+            return doc.documentElement.textContent || text;
+        } catch (e) {
+            return text;
+        }
+    };
+
     const groupData = useMemo(() => {
         if (groupBy === 'none') return [];
 
@@ -60,6 +72,9 @@ export function HistoryCharts({ logs, groupBy }: HistoryChartsProps) {
             } else if (groupBy === 'status') {
                 key = log.status;
             }
+
+            // Decode entities in the key (especially for suite names)
+            key = decodeHtml(key);
 
             if (!groups[key]) groups[key] = { name: key, PASS: 0, FAIL: 0 };
             if (log.status === 'PASS') groups[key].PASS++;

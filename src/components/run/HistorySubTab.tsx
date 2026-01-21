@@ -37,6 +37,16 @@ const formatDate = (dateStr: string) => {
     }
 };
 
+const decodeHtml = (text: string) => {
+    try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(text, 'text/html');
+        return doc.documentElement.textContent || text;
+    } catch (e) {
+        return text;
+    }
+};
+
 export function HistorySubTab() {
     const { t } = useTranslation();
     const { settings } = useSettings();
@@ -93,7 +103,8 @@ export function HistorySubTab() {
     };
 
     const filteredHistory = history.filter(log => {
-        const matchesText = log.suite_name.toLowerCase().includes(filterText.toLowerCase());
+        const decodedName = decodeHtml(log.suite_name);
+        const matchesText = decodedName.toLowerCase().includes(filterText.toLowerCase());
         const matchesPeriod = isDateInPeriod(log.timestamp, filterPeriod);
         return matchesText && matchesPeriod;
     });
@@ -114,7 +125,7 @@ export function HistorySubTab() {
             });
         } else if (groupBy === 'suite') {
             filteredHistory.forEach(log => {
-                const suite = log.suite_name || 'Unknown';
+                const suite = decodeHtml(log.suite_name || 'Unknown');
                 if (!groups[suite]) groups[suite] = [];
                 groups[suite].push(log);
             });
@@ -180,8 +191,8 @@ export function HistorySubTab() {
                                     </div>
                                     <div className="min-w-0 flex-1">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <span className="font-semibold text-zinc-900 dark:text-zinc-100 truncate" title={log.suite_name}>
-                                                {log.suite_name}
+                                            <span className="font-semibold text-zinc-900 dark:text-zinc-100 truncate" title={decodeHtml(log.suite_name)}>
+                                                {decodeHtml(log.suite_name)}
                                             </span>
                                             <span className={clsx("text-xs font-bold px-1.5 py-0.5 rounded border",
                                                 log.status === 'PASS'
