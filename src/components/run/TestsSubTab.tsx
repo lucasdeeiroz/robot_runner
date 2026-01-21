@@ -267,19 +267,17 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     isNarrow ? "w-fit" : "w-[200px]"
                 )}>
                     {/* Atomic Vertical Tabs */}
-                    <div className="bg-zinc-100 dark:bg-zinc-800 p-1.5 rounded-xl shadow-sm">
-                        <Tabs
-                            orientation="vertical"
-                            variant="pills"
-                            tabs={[
-                                { id: 'file', label: !isNarrow ? t('tests.mode.file') : '', icon: FileCode },
-                                { id: 'folder', label: !isNarrow ? t('tests.mode.folder') : '', icon: FolderOpen },
-                                { id: 'args', label: !isNarrow ? t('tests.mode.args') : '', icon: FileText },
-                            ]}
-                            activeId={mode}
-                            onChange={(id) => { setMode(id as SelectionMode); setSelectedPath(""); }}
-                        />
-                    </div>
+                    <Tabs
+                        orientation="vertical"
+                        variant="pills"
+                        tabs={[
+                            { id: 'file', label: !isNarrow ? t('tests.mode.file') : '', icon: FileCode },
+                            { id: 'folder', label: !isNarrow ? t('tests.mode.folder') : '', icon: FolderOpen },
+                            { id: 'args', label: !isNarrow ? t('tests.mode.args') : '', icon: FileText },
+                        ]}
+                        activeId={mode}
+                        onChange={(id) => { setMode(id as SelectionMode); setSelectedPath(""); }}
+                    />
 
                     <div className="flex-1" /> {/* Spacer */}
 

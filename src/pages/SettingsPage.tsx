@@ -19,6 +19,12 @@ import { Input } from "@/components/atoms/Input";
 import { Section } from "@/components/organisms/Section";
 import { PageHeader } from "@/components/organisms/PageHeader";
 
+// New Components
+import { Select } from "@/components/atoms/Select";
+import { PathInput } from "@/components/molecules/PathInput";
+import { TagInput } from "@/components/molecules/TagInput";
+import { SegmentedControl } from "@/components/molecules/SegmentedControl";
+
 export function SettingsPage() {
     const { settings, updateSetting, loading, profiles, activeProfileId, createProfile, switchProfile, renameProfile, deleteProfile, systemVersions, checkSystemVersions, systemCheckStatus } = useSettings();
     const { t, i18n } = useTranslation();
@@ -157,20 +163,7 @@ export function SettingsPage() {
         }
     };
 
-    const handleSelectFolder = async (key: keyof typeof settings.paths) => {
-        try {
-            const selected = await open({
-                directory: true,
-                multiple: false,
-                defaultPath: settings.paths[key] || undefined
-            });
-            if (selected) {
-                updateSetting('paths', { ...settings.paths, [key]: selected as string });
-            }
-        } catch (err) {
-            feedback.toast.error("settings.paths.select_error", err);
-        }
-    };
+
 
     const handleProfileSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -227,17 +220,15 @@ export function SettingsPage() {
                 title={t('settings.profiles.title')}
                 icon={Users}
                 menus={
-                    <select
+                    < Select
+                        options={profiles.map(p => ({
+                            label: p.id === 'default' && p.name === 'Default' ? t('settings.profiles.default') : p.name,
+                            value: p.id
+                        }))}
                         value={activeProfileId}
                         onChange={(e) => { switchProfile(e.target.value); feedback.toast.success('feedback.profile_changed'); }}
-                        className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-sm min-w-[150px] outline-none focus:ring-2 focus:ring-primary/20 text-gray-900 dark:text-zinc-100"
-                    >
-                        {profiles.map(p => (
-                            <option key={p.id} value={p.id}>
-                                {p.id === 'default' && p.name === 'Default' ? t('settings.profiles.default') : p.name}
-                            </option>
-                        ))}
-                    </select>
+                        containerClassName="w-[180px]"
+                    />
                 }
                 actions={
                     <>
@@ -399,30 +390,15 @@ export function SettingsPage() {
                             const isTestingPath = ['automationRoot', 'resources', 'tests', 'suites'].includes(key);
                             const isDisabled = isTestingPath && systemCheckStatus?.missingTesting?.length > 0;
                             return (
-                                <div key={key}>
-                                    <div className="flex gap-2 items-end">
-                                        <div className="flex-1">
-                                            <Input
-                                                label={t(`settings.path_labels.${key}` as any)}
-                                                value={settings.paths[key]}
-                                                readOnly
-                                                placeholder={t('settings.not_set')}
-                                                disabled={isDisabled}
-                                                title={isDisabled ? "Testing dependencies missing" : ""}
-                                                className="font-mono text-xs sm:text-sm"
-                                            />
-                                        </div>
-                                        <Button
-                                            onClick={() => handleSelectFolder(key)}
-                                            disabled={isDisabled}
-                                            title={t('settings.folder_select')}
-                                            variant="secondary"
-                                            size="icon"
-                                        >
-                                            <FolderOpen size={16} />
-                                        </Button>
-                                    </div>
-                                </div>
+                                <PathInput
+                                    key={key}
+                                    label={t(`settings.path_labels.${key}` as any)}
+                                    value={settings.paths[key] || ''}
+                                    onSelect={(path) => updateSetting('paths', { ...settings.paths, [key]: path })}
+                                    disabled={isDisabled}
+                                    placeholder={t('settings.not_set')}
+                                    directory={true}
+                                />
                             );
                         })}
                     </div>
@@ -452,42 +428,21 @@ export function SettingsPage() {
                         })}
                         {/* App Packages List */}
                         <div className="col-span-1 md:col-span-2">
-                            <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">{t('settings.tool_config.app_packages')}</label>
-                            <div className="bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 min-h-[42px] flex flex-wrap gap-2 items-center">
-                                {settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean).map((pkg, idx) => (
-                                    <div key={idx} className="flex items-center gap-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2 py-1 rounded-lg text-sm text-zinc-700 dark:text-zinc-300">
-                                        <span>{pkg}</span>
-                                        <button
-                                            onClick={() => {
-                                                const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
-                                                const next = current.filter((_, i) => i !== idx).join(', ');
-                                                updateSetting('tools', { ...settings.tools, appPackage: next });
-                                            }}
-                                            className="hover:text-red-500 p-0.5 rounded-full transition-colors"
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
-                                        </button>
-                                    </div>
-                                ))}
-                                <input
-                                    type="text"
-                                    placeholder={t('settings.tool_config.add_package_placeholder')}
-                                    className="flex-1 min-w-[150px] bg-transparent outline-none text-gray-900 dark:text-zinc-300 text-sm"
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            const val = e.currentTarget.value.trim();
-                                            if (val) {
-                                                const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
-                                                if (!current.includes(val)) {
-                                                    const next = [...current, val].join(', ');
-                                                    updateSetting('tools', { ...settings.tools, appPackage: next });
-                                                }
-                                                e.currentTarget.value = '';
-                                            }
-                                        }
-                                    }}
-                                />
-                            </div>
+                            <TagInput
+                                label={t('settings.tool_config.app_packages')}
+                                tags={settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean)}
+                                onAdd={(tag) => {
+                                    const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
+                                    if (!current.includes(tag)) {
+                                        updateSetting('tools', { ...settings.tools, appPackage: [...current, tag].join(', ') });
+                                    }
+                                }}
+                                onRemove={(tag) => {
+                                    const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
+                                    updateSetting('tools', { ...settings.tools, appPackage: current.filter(t => t !== tag).join(', ') });
+                                }}
+                                placeholder={t('settings.tool_config.add_package_placeholder')}
+                            />
                         </div>
                         <div className="col-span-1 md:col-span-2">
                             <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">{t('settings.tool_config.ngrok_token')}</label>
@@ -512,21 +467,14 @@ export function SettingsPage() {
                         title={t('settings.appearance.title')}
                         icon={Moon}
                         menus={
-                            <div className="flex bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl">
-                                <button
-                                    onClick={() => updateSetting('theme', 'light')}
-                                    className={`p-2 rounded-lg transition-all active:scale-95 ${settings.theme === 'light' ? 'bg-white shadow text-primary' : 'text-zinc-400 hover:text-gray-900 dark:hover:text-white'}`}
-                                >
-                                    <Sun size={18} />
-                                </button>
-                                <button
-                                    onClick={() => updateSetting('theme', 'dark')}
-                                    className={`p-2 rounded-lg transition-all active:scale-95 ${settings.theme === 'dark' ? 'bg-zinc-700 text-white shadow' : 'text-zinc-400 hover:text-gray-900 dark:hover:text-white'}`}
-                                >
-                                    <Moon size={18} />
-                                </button>
-                            </div>
-
+                            <SegmentedControl
+                                options={[
+                                    { value: 'light', icon: <Sun size={18} /> },
+                                    { value: 'dark', icon: <Moon size={18} /> }
+                                ]}
+                                value={settings.theme}
+                                onChange={(val: any) => updateSetting('theme', val)}
+                            />
                         }
                     >
                         {/* Primary Color */}
@@ -628,16 +576,16 @@ export function SettingsPage() {
 
                     <Section title={t('settings.general')} icon={Globe}>
                         <div>
-                            <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">{t('settings.language')}</label>
-                            <select
+                            <Select
                                 value={settings.language}
                                 onChange={(e) => updateSetting('language', e.target.value)}
-                                className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-primary/20 outline-none"
-                            >
-                                <option value="en_US">English (US)</option>
-                                <option value="pt_BR">Português (Brasil)</option>
-                                <option value="es_ES">Español</option>
-                            </select>
+                                label={t('settings.language')}
+                                options={[
+                                    { value: "en_US", label: "English (US)" },
+                                    { value: "pt_BR", label: "Português (Brasil)" },
+                                    { value: "es_ES", label: "Español" }
+                                ]}
+                            />
                         </div>
 
                         <div className="flex items-center justify-between pt-4 border-t border-zinc-100 dark:border-zinc-800 mt-4">
@@ -655,24 +603,26 @@ export function SettingsPage() {
                             />
                         </div>
                     </Section>
-                </div>
+                </div >
 
                 {/* System Versions */}
-                <Section
+                < Section
                     title={t('settings.system.title')}
                     icon={Monitor}
                     actions={
-                        <button
+                        < button
                             onClick={checkSystemVersions}
                             disabled={systemCheckStatus.loading}
-                            className={clsx(
-                                "p-2 rounded-xl transition-all active:scale-95 hover:bg-zinc-100 dark:hover:bg-zinc-800",
-                                systemCheckStatus.loading ? "animate-spin text-primary" : "text-zinc-500 hover:text-primary dark:text-zinc-400"
-                            )}
+                            className={
+                                clsx(
+                                    "p-2 rounded-xl transition-all active:scale-95 hover:bg-zinc-100 dark:hover:bg-zinc-800",
+                                    systemCheckStatus.loading ? "animate-spin text-primary" : "text-zinc-500 hover:text-primary dark:text-zinc-400"
+                                )
+                            }
                             title={t('common.loading')}
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" /><path d="M16 16h5v5" /></svg>
-                        </button>
+                        </button >
                     }
                 >
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -702,8 +652,8 @@ export function SettingsPage() {
                             <div className="text-zinc-400 italic col-span-full">{t('settings.system.checking')}</div>
                         )}
                     </div>
-                </Section>
-            </div>
+                </Section >
+            </div >
         </div >
     );
 }

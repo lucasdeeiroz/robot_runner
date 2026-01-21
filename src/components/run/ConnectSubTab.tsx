@@ -9,6 +9,7 @@ import { ConfirmationModal } from "@/components/organisms/ConfirmationModal";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { SplitButton } from "@/components/molecules/SplitButton";
 import { Section } from "@/components/organisms/Section";
+import { Alert } from "@/components/atoms/Alert";
 
 interface ConnectSubTabProps {
     onDeviceConnected: () => void;
@@ -247,6 +248,11 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                 title={t('connect.wireless.title')}
                 icon={Wifi}
                 description={t('connect.wireless.desc')}
+                status={statusMsg && (
+                    <Alert variant={statusMsg.type === 'error' ? 'destructive' : statusMsg.type === 'success' ? 'success' : 'info'} className="animate-in slide-in-from-top-2">
+                        {statusMsg.text}
+                    </Alert>
+                )}
             >
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -304,7 +310,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                     </div>
                 </div>
 
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap gap-3 mt-4">
                     <div className="flex gap-3 w-full">
                         <SplitButton
                             variant="primary"
@@ -346,17 +352,6 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                     </div>
                 </div>
 
-                {/* Status Message Area */}
-                {statusMsg && (
-                    <div className={clsx(
-                        "mt-4 p-3 rounded-lg text-sm font-mono break-all whitespace-pre-wrap animate-in slide-in-from-top-2",
-                        statusMsg.type === 'error' ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/50" :
-                            statusMsg.type === 'success' ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-900/50" :
-                                "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50"
-                    )}>
-                        {statusMsg.text}
-                    </div>
-                )}
             </Section>
 
             {/* Ngrok Integration Card */}
@@ -376,6 +371,11 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                         </span>
                     )
                 }
+                menus={ngrokStatusMsg && (
+                    <Alert variant={ngrokStatusMsg.type === 'error' ? 'destructive' : ngrokStatusMsg.type === 'success' ? 'success' : 'info'} className="animate-in slide-in-from-top-2">
+                        {ngrokStatusMsg.text}
+                    </Alert>
+                )}
             >
 
                 {!ngrokUrl && !ngrokLoading ? (
@@ -436,19 +436,8 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                     </div>
                 )}
 
-                {/* Ngrok Status Message Area */}
-                {ngrokStatusMsg && (
-                    <div className={clsx(
-                        "mt-4 p-3 rounded-lg text-sm font-mono break-all whitespace-pre-wrap animate-in slide-in-from-top-2",
-                        ngrokStatusMsg.type === 'error' ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/50" :
-                            ngrokStatusMsg.type === 'success' ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-900/50" :
-                                "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50"
-                    )}>
-                        {ngrokStatusMsg.text}
-                    </div>
-                )}
             </Section>
 
-        </div>
+        </div >
     );
 }
