@@ -252,15 +252,17 @@ export function HistorySubTab() {
                 icon={Calendar}
                 variant="transparent"
                 className="p-0 pb-4 mb-4"
-                menus={
+                status={
+                    <button
+                        onClick={() => loadHistory(true)}
+                        className="p-1.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors"
+                        title={t('tests_page.actions.refresh')}
+                    >
+                        <RefreshCw size={16} className={loadingHistory ? "animate-spin" : ""} />
+                    </button>
+                }
+                menus={!isHistoryNarrow ? (
                     <div className="flex flex-wrap gap-2">
-                        <button
-                            onClick={() => loadHistory(true)}
-                            className="p-1.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors"
-                            title={t('tests_page.actions.refresh')}
-                        >
-                            <RefreshCw size={16} className={loadingHistory ? "animate-spin" : ""} />
-                        </button>
                         <input
                             type="text"
                             placeholder={t('tests_page.filter.search')}
@@ -289,19 +291,22 @@ export function HistorySubTab() {
                             <option value="suite">{t('tests_page.filter.suite')}</option>
                             <option value="os_version">{t('tests_page.filter.os_version') || "Versão do SO"}</option>
                         </select>
-                        <button
-                            onClick={() => setShowCharts(!showCharts)}
-                            className={clsx(
-                                "px-3 py-1.5 rounded-md flex items-center gap-2 text-sm font-medium transition-colors",
-                                showCharts
-                                    ? "bg-primary/10 text-primary"
-                                    : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
-                            )}
-                            title={showCharts ? t('tests_page.charts.hide') : t('tests_page.charts.show')}
-                        >
-                            <PieChart size={16} />
-                        </button>
                     </div>
+                ) : null
+                }
+                actions={
+                    <button
+                        onClick={() => setShowCharts(!showCharts)}
+                        className={clsx(
+                            "px-3 py-1.5 rounded-md flex items-center gap-2 text-sm font-medium transition-colors",
+                            showCharts
+                                ? "bg-primary/10 text-primary"
+                                : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                        )}
+                        title={showCharts ? t('tests_page.charts.hide') : t('tests_page.charts.show')}
+                    >
+                        <PieChart size={16} />
+                    </button>
                 }
             />
 

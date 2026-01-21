@@ -29,7 +29,7 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
         if (!containerRef.current) return;
         const observer = new ResizeObserver((entries) => {
             for (const entry of entries) {
-                setIsNarrow(entry.contentRect.width < 660);
+                setIsNarrow(entry.contentRect.width < 768);
             }
         });
         observer.observe(containerRef.current);

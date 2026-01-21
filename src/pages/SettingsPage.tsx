@@ -43,7 +43,7 @@ export function SettingsPage() {
         if (!containerRef.current) return;
         const observer = new ResizeObserver((entries) => {
             for (const entry of entries) {
-                setIsNarrow(entry.contentRect.width < 600);
+                setIsNarrow(entry.contentRect.width < 768);
             }
         });
         observer.observe(containerRef.current);
@@ -330,7 +330,7 @@ export function SettingsPage() {
                                 )}
                                 disabled={!appiumStatus.running && systemCheckStatus?.missingAppium?.length > 0}
                             >
-                                {appiumStatus.running ? <><Square size={16} fill="currentColor" /> {t('settings.appium.stop')}</> : <><Play size={16} fill="currentColor" /> {t('settings.appium.start')}</>}
+                                {appiumStatus.running ? <><Square size={16} fill="currentColor" /> {!isNarrow && t('settings.appium.stop')}</> : <><Play size={16} fill="currentColor" /> {!isNarrow && t('settings.appium.start')}</>}
                             </button>
                         </>
                     }
