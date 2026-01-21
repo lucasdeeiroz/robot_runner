@@ -79,6 +79,7 @@ export const en = {
             }
         },
         commands: {
+            title: "ADB Commands",
             parse_error: "Failed to parse saved commands",
             cancel_error: "Failed to cancel command",
             empty: "Select a device to execute commands",
@@ -88,6 +89,10 @@ export const en = {
             quick: "Quick",
             saved: "Saved",
             actions: {
+                ip_address: "IP Address",
+                list_packages: "List Packages",
+                battery: "Battery",
+                reboot: "Reboot",
                 save: "Save",
                 send: "Send",
                 delete_confirm: "Delete this saved command?"
@@ -230,6 +235,7 @@ export const en = {
             select_generic: "Select"
         },
         inspector: {
+            title: "Inspector",
             update_error: "Failed to update inspector",
             input_error: "Failed to send input",
             empty: "Select a device to start Inspector",

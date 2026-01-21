@@ -79,6 +79,7 @@ export const pt = {
             }
         },
         commands: {
+            title: "Comandos ADB",
             parse_error: "Falha ao processar comandos salvos",
             cancel_error: "Falha ao cancelar comando",
             empty: "Selecione um dispositivo para executar comandos",
@@ -88,6 +89,10 @@ export const pt = {
             quick: "Rápido",
             saved: "Salvos",
             actions: {
+                ip_address: "Endereço IP",
+                list_packages: "Listar Pacotes",
+                battery: "Bateria",
+                reboot: "Reiniciar",
                 save: "Salvar",
                 send: "Enviar",
                 delete_confirm: "Excluir este comando salvo?"
@@ -230,6 +235,7 @@ export const pt = {
             select_generic: "Selecionar"
         },
         inspector: {
+            title: "Inspetor",
             update_error: "Falha ao atualizar inspetor",
             input_error: "Falha ao enviar input",
             empty: "Selecione um dispositivo para iniciar o Inspetor",

@@ -1,6 +1,4 @@
 import { useState, useEffect } from "react";
-import { useTranslation } from "react-i18next";
-import { PlayCircle, FileText, Settings, Info, Box } from "lucide-react";
 import { Layout } from "./components/Layout";
 import { RunTab } from "./pages/RunTab";
 import { TestsPage } from "./pages/TestsPage";
@@ -15,7 +13,6 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import "./App.css";
 
 function App() {
-  const { t } = useTranslation();
   const [activePage, setActivePage] = useState("run");
   const { settings, checkSystemVersions, systemCheckStatus, loading: settings_loading, checkForAppUpdate } = useSettings();
 
@@ -37,23 +34,6 @@ function App() {
   const handleCriticalExit = async () => {
     await getCurrentWindow().close();
   };
-
-  const getHeaderInfo = () => {
-    switch (activePage) {
-      case 'run':
-        return { title: t('sidebar.run'), description: t('sidebar.description_run'), Icon: PlayCircle };
-      case 'tests':
-        return { title: t('sidebar.tests'), description: t('sidebar.description_tests'), Icon: FileText };
-      case 'settings':
-        return { title: t('sidebar.settings'), description: t('sidebar.description_settings'), Icon: Settings };
-      case 'about':
-        return { title: t('sidebar.about'), description: t('sidebar.description_about'), Icon: Info };
-      default:
-        return { title: 'Robot Runner', description: 'Test Automation & Device Management', Icon: Box };
-    }
-  };
-
-  const { title, description, Icon } = getHeaderInfo();
 
   const handleTestingRedirect = () => {
     setActivePage('settings');
@@ -135,21 +115,6 @@ function App() {
       )}
       <Layout activePage={activePage} onNavigate={setActivePage}>
         <div className="max-w-7xl mx-auto h-full flex flex-col">
-          {/* App Title Header */}
-          <div className="flex items-center gap-4 px-8 py-6 shrink-0 z-50">
-            <div className="h-[52px] w-[52px] flex items-center justify-center rounded-2xl bg-primary/10">
-              <Icon size={32} className="text-[var(--color-primary)]" />
-            </div>
-            <div className="flex flex-col">
-              <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                {title}
-                {/* <span className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full font-medium tracking-wider uppercase">Beta</span> */}
-              </h1>
-              <p className="text-sm text-zinc-500 font-medium">{description}</p>
-            </div>
-          </div>
-
-
           <div className="flex-1 min-h-0 relative">
             <div className={clsx("absolute inset-0 flex flex-col", activePage === 'run' ? "z-10" : "z-0 hidden")}>
               <RunTab onNavigate={setActivePage} initialTab={initialSubTab} />

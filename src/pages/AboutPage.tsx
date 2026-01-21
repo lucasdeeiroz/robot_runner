@@ -1,4 +1,5 @@
-import { Github, Bot, RefreshCcw, Cpu, Users } from "lucide-react";
+import { Github, Bot, RefreshCcw, Cpu, Users, Info } from "lucide-react";
+import { PageHeader } from "@/components/organisms/PageHeader";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import clsx from "clsx";
@@ -38,8 +39,15 @@ export function AboutPage() {
     };
 
     return (
-        <div className="space-y-8 pb-12">
+        <div className="space-y-4 pb-12">
 
+
+            <PageHeader
+                title={t('sidebar.about')}
+                description={t('sidebar.description_about')}
+                icon={Info}
+                iconSize="xl"
+            />
 
             <div className="grid gap-6">
                 {/* Main Info Card */}

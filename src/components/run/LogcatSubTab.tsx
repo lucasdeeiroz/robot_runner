@@ -216,7 +216,7 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
                         </button>
                     </div>
                 }
-                menus={
+                menus={!isNarrow ? (
                     <div className="flex items-center gap-2">
                         {/* Package Selector */}
                         <div className="relative">
@@ -261,7 +261,7 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
                             <option value="S">Silent</option>
                         </select>
                     </div>
-                }
+                ) : null}
                 actions={
                     <>
 

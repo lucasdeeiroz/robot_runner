@@ -25,8 +25,8 @@ export const Heading = ({
     };
 
     const variants = {
-        default: 'text-zinc-900 dark:text-zinc-50',
-        muted: 'text-zinc-500 dark:text-zinc-400',
+        default: 'text-zinc-700 dark:text-zinc-300',
+        muted: 'text-zinc-550 dark:text-zinc-450',
         gradient: 'bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent',
     };
 
@@ -73,7 +73,7 @@ export const Text = ({
 
     const variants = {
         default: 'text-zinc-700 dark:text-zinc-300',
-        muted: 'text-zinc-500 dark:text-zinc-400',
+        muted: 'text-zinc-550 dark:text-zinc-450',
         success: 'text-green-600 dark:text-green-400',
         error: 'text-red-600 dark:text-red-400',
         warning: 'text-amber-600 dark:text-amber-400',

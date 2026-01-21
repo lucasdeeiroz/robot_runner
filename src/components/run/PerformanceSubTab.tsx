@@ -203,7 +203,7 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
                         </button>
                     </div>
                 }
-                menus={
+                menus={!isNarrow ? (
                     <div className="relative">
                         <select
                             value={selectedPackage}
@@ -220,7 +220,7 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
                         </select>
                         <PackageIcon size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
                     </div>
-                }
+                ) : null}
                 actions={
                     <>
                         <button

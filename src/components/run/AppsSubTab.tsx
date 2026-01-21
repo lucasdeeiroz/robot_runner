@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useTranslation } from "react-i18next";
 import { Search, RefreshCw, Smartphone, Package, Trash2, Snowflake, PlayCircle, Eraser, Upload, ArrowDownAZ } from "lucide-react";
@@ -30,6 +30,21 @@ export function AppsSubTab() {
     const [search, setSearch] = useState("");
     const [showSystem, setShowSystem] = useState(false);
     const [sortBy, setSortBy] = useState<'name' | 'package'>('name');
+
+    // Responsive State
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [isNarrow, setIsNarrow] = useState(false);
+
+    useEffect(() => {
+        if (!containerRef.current) return;
+        const observer = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                setIsNarrow(entry.contentRect.width < 500);
+            }
+        });
+        observer.observe(containerRef.current);
+        return () => observer.disconnect();
+    }, []);
 
     // Modal State
     const [modalConfig, setModalConfig] = useState<{
@@ -172,7 +187,7 @@ export function AppsSubTab() {
 
 
     return (
-        <div className="h-full flex flex-col p-2 overflow-y-auto">
+        <div ref={containerRef} className="h-full flex flex-col p-2 overflow-y-auto">
             {/* Toolbar */}
             <Section
                 title={t('apps.title', 'Apps')}
@@ -209,7 +224,7 @@ export function AppsSubTab() {
                         </button>
                     </div>
                 }
-                menus={
+                menus={!isNarrow ? (
                     <div className="relative">
                         <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-500" />
                         <input
@@ -220,7 +235,7 @@ export function AppsSubTab() {
                             className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded px-8 py-1.5 text-xs text-zinc-900 dark:text-zinc-300 focus:outline-none focus:border-primary/50 w-64 transition-all"
                         />
                     </div>
-                }
+                ) : null}
                 actions={
                     <>
                         <button

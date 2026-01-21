@@ -29,8 +29,8 @@
   --bg-surface-hover: #f4f4f5;
   /* zinc-100 */
 
-  --text-app: #18181b;
-  /* zinc-900 */
+  --text-app: #3f3f46;
+  /* zinc-700 */
   --text-muted: #71717a;
   /* zinc-500 */
   --text-disabled: #a1a1aa;
@@ -66,7 +66,7 @@ html.dark {
   --bg-surface-hover: #27272a;
   /* zinc-800 */
 
-  --text-app: #ffffff;
+  --text-app: #e4e4e7;
   --text-muted: #a1a1aa;
   /* zinc-400 */
   --text-disabled: #52525b;

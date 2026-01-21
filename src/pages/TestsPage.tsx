@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useTestSessions } from "@/lib/testSessionStore";
 import { ToolboxView } from "../components/run/ToolboxView";
 import { HistorySubTab } from "../components/run/HistorySubTab";
-import { XCircle, LayoutGrid, Minimize2, Maximize2 } from 'lucide-react';
+import { XCircle, LayoutGrid, Minimize2, Maximize2, FileText } from 'lucide-react';
+import { PageHeader } from "@/components/organisms/PageHeader";
 import clsx from 'clsx';
 import { useTranslation } from "react-i18next";
 
@@ -119,6 +120,12 @@ export function TestsPage() {
 
     return (
         <div className="h-full flex flex-col space-y-4">
+            <PageHeader
+                title={t('sidebar.tests')}
+                description={t('sidebar.description_tests')}
+                icon={FileText}
+                iconSize="xl"
+            />
 
 
             {/* View Toggle (Grid/Tabs) */}

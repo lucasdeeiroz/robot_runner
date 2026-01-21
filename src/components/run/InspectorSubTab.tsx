@@ -339,7 +339,7 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
             {/* Main Content: Split View */}
             <div className="flex-1 grid grid-cols-[auto_1fr] gap-4 min-h-0 overflow-hidden">
                 {/* Left: Device Screen (Adaptive) */}
-                <div className="bg-zinc-100 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 flex items-center justify-center overflow-hidden relative">
+                <div className="flex items-center justify-center overflow-hidden relative">
                     {screenshot ? (
                         <div className="relative h-full w-full flex items-center justify-center">
                             <img

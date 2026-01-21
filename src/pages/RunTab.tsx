@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Play, Wifi, Smartphone, RefreshCw, Wrench, ScanEye } from "lucide-react";
+import { Play, Wifi, Smartphone, RefreshCw, Wrench, ScanEye, PlayCircle } from "lucide-react";
+import { PageHeader } from "@/components/organisms/PageHeader";
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
 import { TestsSubTab } from "../components/run/TestsSubTab";
@@ -146,6 +147,13 @@ export function RunTab({ onNavigate, initialTab }: RunTabProps) {
 
     return (
         <div ref={containerRef} className="h-full flex flex-col space-y-4" onClick={() => isDeviceDropdownOpen && setIsDeviceDropdownOpen(false)}>
+            <PageHeader
+                title={t('sidebar.run')}
+                description={t('sidebar.description_run')}
+                icon={PlayCircle}
+                iconSize="xl"
+            />
+
             {/* Header / Device Selection Bar */}
             <div className="flex items-center justify-between bg-white dark:bg-zinc-900/50 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm dark:shadow-none shrink-0 z-20 relative">
 

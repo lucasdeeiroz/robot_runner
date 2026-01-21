@@ -29,6 +29,21 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
     const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
     const [saveLabel, setSaveLabel] = useState("");
 
+    // Responsive State
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [isNarrow, setIsNarrow] = useState(false);
+
+    useEffect(() => {
+        if (!containerRef.current) return;
+        const observer = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                setIsNarrow(entry.contentRect.width < 500);
+            }
+        });
+        observer.observe(containerRef.current);
+        return () => observer.disconnect();
+    }, []);
+
     // Listeners ref
     const listenersRef = useRef<UnlistenFn[]>([]);
 
@@ -145,10 +160,10 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
     };
 
     const quickActions = [
-        { label: "IP Address", icon: <Wifi size={14} />, cmd: "shell ip addr show wlan0 | grep inet" },
-        { label: "List Packages", icon: <Smartphone size={14} />, cmd: "shell pm list packages -3" },
-        { label: "Battery", icon: <Battery size={14} />, cmd: "shell dumpsys battery" },
-        { label: "Reboot", icon: <Power size={14} />, cmd: "reboot" },
+        { label: t('commands.actions.ip_address'), icon: <Wifi size={14} />, cmd: "shell ip addr show wlan0 | grep inet" },
+        { label: t('commands.actions.list_packages'), icon: <Smartphone size={14} />, cmd: "shell pm list packages -3" },
+        { label: t('commands.actions.battery'), icon: <Battery size={14} />, cmd: "shell dumpsys battery" },
+        { label: t('commands.actions.reboot'), icon: <Power size={14} />, cmd: "reboot" },
     ];
 
     if (!selectedDevice) {
@@ -161,7 +176,7 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
     }
 
     return (
-        <div className="h-full flex flex-col p-2 overflow-y-auto">
+        <div ref={containerRef} className="h-full flex flex-col p-2 overflow-y-auto">
             <Section
                 title={t('commands.title', 'ADB Commands')}
                 icon={Terminal}
@@ -172,6 +187,9 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
                         {selectedDevice}
                     </div>
                 }
+                menus={!isNarrow ? null : null} // Placeholder for future use or if I missed something. Actually better to just not pass it if null.
+                // Let's not add it if it doesn't exist.
+
                 actions={
                     <button
                         onClick={() => setHistory([])}
@@ -194,7 +212,7 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
             </div>
 
             {/* Actions Area */}
-            <div className="space-y-2">
+            <div className="space-y-2 p-2">
                 {/* Quick Actions */}
                 <div className="flex gap-2 flex-wrap">
                     <span className="text-xs font-semibold text-zinc-400 self-center mr-2">{t('commands.quick')}:</span>

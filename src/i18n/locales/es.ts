@@ -79,6 +79,7 @@ export const es = {
             }
         },
         commands: {
+            title: "Comandos ADB",
             parse_error: "Error al procesar comandos guardados",
             cancel_error: "Error al cancelar comando",
             empty: "Seleccione un dispositivo para ejecutar comandos",
@@ -88,6 +89,10 @@ export const es = {
             quick: "Rápido",
             saved: "Guardados",
             actions: {
+                ip_address: "Endereço IP",
+                list_packages: "Listar Paquetes",
+                battery: "Bateria",
+                reboot: "Reiniciar",
                 save: "Guardar",
                 send: "Enviar",
                 delete_confirm: "¿Eliminar este comando guardado?"
@@ -230,6 +235,7 @@ export const es = {
             select_generic: "Seleccionar"
         },
         inspector: {
+            title: "Inspector",
             update_error: "Error al actualizar inspector",
             input_error: "Error al enviar entrada",
             empty: "Seleccione un dispositivo para iniciar el Inspector",

@@ -3,7 +3,7 @@ import { twMerge } from 'tailwind-merge';
 
 interface IconBoxProps {
     icon: LucideIcon;
-    size?: 'sm' | 'md' | 'lg';
+    size?: 'sm' | 'md' | 'lg' | 'xl';
     variant?: 'primary' | 'success' | 'warning' | 'error' | 'neutral' | 'transparent';
     className?: string;
 }
@@ -13,12 +13,14 @@ export const IconBox = ({ icon: Icon, size = 'md', variant = 'primary', classNam
         sm: 'w-6 h-6 p-1',
         md: 'w-8 h-8 p-1.5',
         lg: 'w-10 h-10 p-2',
+        xl: 'w-[52px] h-[52px] p-2.5 rounded-2xl',
     };
 
     const iconSizes = {
         sm: 14,
         md: 18,
         lg: 20,
+        xl: 32,
     };
 
     const variants = {

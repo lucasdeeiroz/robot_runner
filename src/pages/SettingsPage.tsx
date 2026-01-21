@@ -1,5 +1,5 @@
 import { useSettings } from "@/lib/settings";
-import { Moon, Sun, Globe, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2, ExternalLink } from "lucide-react";
+import { Moon, Sun, Globe, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2, ExternalLink, Settings as SettingsIcon } from "lucide-react";
 import { Switch } from "@/components/common/Switch";
 import { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -17,6 +17,7 @@ import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
 import { Button } from "@/components/atoms/Button";
 import { Input } from "@/components/atoms/Input";
 import { Section } from "@/components/organisms/Section";
+import { PageHeader } from "@/components/organisms/PageHeader";
 
 export function SettingsPage() {
     const { settings, updateSetting, loading, profiles, activeProfileId, createProfile, switchProfile, renameProfile, deleteProfile, systemVersions, checkSystemVersions, systemCheckStatus } = useSettings();
@@ -202,7 +203,7 @@ export function SettingsPage() {
     };
 
     return (
-        <div ref={containerRef} className="space-y-8 animate-in fade-in duration-500 pb-12">
+        <div ref={containerRef} className="space-y-4 animate-in fade-in duration-500 pb-12">
             {/* Delete Confirmation Modal */}
             <ConfirmationModal
                 isOpen={!!showDeleteConfirm}
@@ -211,6 +212,14 @@ export function SettingsPage() {
                 title={t('settings.profiles.delete')}
                 description={t('settings.profiles.confirm_delete')}
                 confirmText={t('common.delete')}
+            />
+
+            {/* Page Header */}
+            <PageHeader
+                title={t('sidebar.settings')}
+                description={t('sidebar.description_settings')}
+                icon={SettingsIcon}
+                iconSize="xl"
             />
 
             {/* Profile Manager Section */}
@@ -499,10 +508,10 @@ export function SettingsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
 
-                    <Section title={t('settings.appearance.title')} icon={Moon}>
-                        {/* Theme Toggle */}
-                        <div className="flex items-center justify-between">
-                            <span className="text-zinc-600 dark:text-zinc-300">{t('settings.appearance.theme')}</span>
+                    <Section
+                        title={t('settings.appearance.title')}
+                        icon={Moon}
+                        menus={
                             <div className="flex bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl">
                                 <button
                                     onClick={() => updateSetting('theme', 'light')}
@@ -517,8 +526,9 @@ export function SettingsPage() {
                                     <Moon size={18} />
                                 </button>
                             </div>
-                        </div>
 
+                        }
+                    >
                         {/* Primary Color */}
                         <div className="mt-6">
                             <h3 className="text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-3">{t('settings.appearance.primary_color')}</h3>
