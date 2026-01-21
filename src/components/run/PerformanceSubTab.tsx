@@ -7,7 +7,7 @@ import { Activity, Cpu, Battery, CircuitBoard, RefreshCw, Play, Square, Package 
 import clsx from "clsx";
 import { useSettings } from "@/lib/settings";
 import { feedback } from "@/lib/feedback";
-import { FileSavedFeedback } from "@/components/common/FileSavedFeedback";
+import { FileSavedFeedback } from "@/components/molecules/FileSavedFeedback";
 import { Section } from "@/components/organisms/Section";
 
 

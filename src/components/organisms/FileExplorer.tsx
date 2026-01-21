@@ -20,7 +20,7 @@ interface FileExplorerProps {
 }
 
 import { useTranslation } from "react-i18next";
-import { WarningModal } from "@/components/shared/WarningModal";
+import { WarningModal } from "@/components/organisms/WarningModal";
 import { feedback } from "@/lib/feedback";
 
 export function FileExplorer({ initialPath = ".", onSelect, onCancel, selectionMode = 'file', title: _title, onSelectionChange, allowHideFooter = false }: FileExplorerProps) {

@@ -4,12 +4,12 @@ import { Play, FolderOpen, FileText, FileCode, History } from "lucide-react";
 import { useSettings } from "@/lib/settings";
 import { useTestSessions } from "@/lib/testSessionStore";
 import { Device } from "@/lib/types";
-import { FileExplorer } from "@/components/common/FileExplorer";
+import { FileExplorer } from "@/components/organisms/FileExplorer";
 import { v4 as uuidv4 } from 'uuid';
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
 import { Tabs } from "@/components/molecules/Tabs";
-import { WarningModal } from "@/components/shared/WarningModal";
+import { WarningModal } from "@/components/organisms/WarningModal";
 import { feedback } from "@/lib/feedback";
 
 interface TestsSubTabProps {

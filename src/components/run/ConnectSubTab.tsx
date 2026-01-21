@@ -5,9 +5,9 @@ import clsx from "clsx";
 import { useSettings } from "@/lib/settings";
 import { useTranslation } from "react-i18next";
 import { feedback } from "@/lib/feedback";
-import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
+import { ConfirmationModal } from "@/components/organisms/ConfirmationModal";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { SplitButton } from "@/components/shared/SplitButton";
+import { SplitButton } from "@/components/molecules/SplitButton";
 import { Section } from "@/components/organisms/Section";
 
 interface ConnectSubTabProps {

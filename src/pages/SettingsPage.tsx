@@ -1,6 +1,6 @@
 import { useSettings } from "@/lib/settings";
 import { Moon, Sun, Globe, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2, ExternalLink, Settings as SettingsIcon } from "lucide-react";
-import { Switch } from "@/components/common/Switch";
+import { Switch } from "@/components/atoms/Switch";
 import { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -10,8 +10,8 @@ import clsx from "clsx";
 import { useTranslation } from "react-i18next";
 import { feedback } from "@/lib/feedback";
 import { TOOL_LINKS } from "@/lib/tools";
-import { Modal } from "@/components/common/Modal";
-import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
+import { Modal } from "@/components/organisms/Modal";
+import { ConfirmationModal } from "@/components/organisms/ConfirmationModal";
 
 // Atoms
 import { Button } from "@/components/atoms/Button";

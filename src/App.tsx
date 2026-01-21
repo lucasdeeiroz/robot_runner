@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Layout } from "./components/Layout";
+import { Layout } from "./components/templates/Layout";
 import { RunTab } from "./pages/RunTab";
 import { TestsPage } from "./pages/TestsPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -8,7 +8,7 @@ import clsx from "clsx";
 import { TestSessionProvider } from "./lib/testSessionStore";
 import { Toaster } from "sonner";
 import { useSettings } from "./lib/settings";
-import { SystemCheckOverlay } from "./components/startup/SystemCheckOverlay";
+import { SystemCheckOverlay } from "./components/organisms/SystemCheckOverlay";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import "./App.css";
 

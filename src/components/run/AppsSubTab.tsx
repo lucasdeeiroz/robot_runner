@@ -8,7 +8,7 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { toast } from "sonner";
 import { Virtuoso } from "react-virtuoso";
 
-import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
+import { ConfirmationModal } from "@/components/organisms/ConfirmationModal";
 import { feedback } from "@/lib/feedback";
 import { Section } from "@/components/organisms/Section";
 

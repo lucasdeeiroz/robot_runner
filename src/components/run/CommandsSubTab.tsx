@@ -3,7 +3,7 @@ import { Terminal, Send, Trash2, Power, Wifi, Smartphone, Battery, Save, Star, X
 import { invoke } from "@tauri-apps/api/core";
 import { useTranslation } from "react-i18next";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
-import { Modal } from "@/components/common/Modal";
+import { Modal } from "@/components/organisms/Modal";
 import { feedback } from "@/lib/feedback";
 import { Section } from "@/components/organisms/Section";
 

@@ -7,7 +7,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useSettings } from "@/lib/settings";
 import clsx from "clsx";
 import { feedback } from "@/lib/feedback";
-import { FileSavedFeedback } from "@/components/common/FileSavedFeedback";
+import { FileSavedFeedback } from "@/components/molecules/FileSavedFeedback";
 import { Section } from "@/components/organisms/Section";
 
 interface LogcatSubTabProps {

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSettings } from "@/lib/settings";
-import { HistoryCharts } from "../history/HistoryCharts";
+import { HistoryCharts } from "../organisms/HistoryCharts";
 import { XCircle, FileText, Folder, Calendar, RefreshCw, ChevronDown, ChevronRight, CheckCircle, Clock, PieChart } from 'lucide-react';
 import clsx from 'clsx';
 import { invoke } from '@tauri-apps/api/core';
