@@ -8,12 +8,12 @@ import { AppsSubTab } from "./AppsSubTab";
 import { useTranslation } from "react-i18next";
 import { CommandsSubTab } from "./CommandsSubTab";
 import { PerformanceSubTab } from "./PerformanceSubTab";
-import { RunConsole } from "./RunConsole";
+import { RunConsole } from "@/components/organisms/RunConsole";
 import { TestSession, useTestSessions } from "@/lib/testSessionStore";
 import { feedback } from "@/lib/feedback";
-import { FileSavedFeedback } from "@/components/common/FileSavedFeedback";
+import { FileSavedFeedback } from "@/components/molecules/FileSavedFeedback";
 import { useFileSave } from "@/hooks/useFileSave";
-import { SplitButton } from "@/components/shared/SplitButton";
+import { SplitButton } from "@/components/molecules/SplitButton";
 
 interface ToolboxViewProps {
     session: TestSession;

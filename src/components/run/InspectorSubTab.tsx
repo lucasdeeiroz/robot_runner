@@ -7,6 +7,7 @@ import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { InspectorNode, transformXmlToTree, findNodesAtCoords, generateXPath } from '@/lib/inspectorUtils';
 import { feedback } from "@/lib/feedback";
+import { Section } from "@/components/organisms/Section";
 
 interface InspectorSubTabProps {
     selectedDevice: string;
@@ -28,7 +29,7 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
         if (!containerRef.current) return;
         const observer = new ResizeObserver((entries) => {
             for (const entry of entries) {
-                setIsNarrow(entry.contentRect.width < 660);
+                setIsNarrow(entry.contentRect.width < 768);
             }
         });
         observer.observe(containerRef.current);
@@ -274,19 +275,25 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
     return (
         <div ref={containerRef} className="h-full flex flex-col space-y-4">
             {/* Toolbar - Now at the Top */}
-            <div className="bg-zinc-50 dark:bg-black/20 p-2 rounded-lg border border-zinc-200 dark:border-zinc-800 flex items-center justify-between shrink-0">
-                <div className="flex gap-2">
-                    <button
-                        onClick={refreshAll}
-                        disabled={loading}
-                        className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-700 text-sm font-medium transition-colors disabled:opacity-50"
-                        title={t('inspector.refresh')}
-                    >
-                        <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-                        {!isNarrow && t('inspector.refresh')}
-                    </button>
-                    <div className="h-6 w-px bg-zinc-300 dark:bg-zinc-700 mx-2 self-center" />
-
+            <Section
+                title={t('inspector.title', 'Inspector')}
+                icon={Scan}
+                variant="transparent"
+                className="p-0"
+                status={
+                    <div className="flex items-center gap-2">
+                        <div className="text-xs text-zinc-400">
+                            {loading ? t('inspector.status.fetching') : t('inspector.status.ready')}
+                        </div>
+                        <div className="h-4 w-px bg-zinc-300 dark:bg-zinc-700 mx-1" />
+                        <div className="flex gap-1">
+                            <button onClick={() => sendAdbInput('keyevent 4')} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-zinc-500" title={t('inspector.nav.back')}><ArrowLeft size={16} /></button>
+                            <button onClick={() => sendAdbInput('keyevent 3')} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-zinc-500" title={t('inspector.nav.home')}><Home size={16} /></button>
+                            <button onClick={() => sendAdbInput('keyevent 187')} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-zinc-500" title={t('inspector.nav.recents')}><Rows size={16} /></button>
+                        </div>
+                    </div>
+                }
+                menus={
                     <div className="flex bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-md">
                         <button
                             onClick={() => setInteractionMode('inspect')}
@@ -310,22 +317,29 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
                             <Move size={16} />
                         </button>
                     </div>
-
-                    <div className="flex gap-1 ml-2">
-                        <button onClick={() => sendAdbInput('keyevent 3')} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-zinc-500" title={t('inspector.nav.home')}><Home size={16} /></button>
-                        <button onClick={() => sendAdbInput('keyevent 4')} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-zinc-500" title={t('inspector.nav.back')}><ArrowLeft size={16} /></button>
-                        <button onClick={() => sendAdbInput('keyevent 187')} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-zinc-500" title={t('inspector.nav.recents')}><Rows size={16} /></button>
-                    </div>
-                </div>
-                <div className="text-xs text-zinc-400">
-                    {loading ? t('inspector.status.fetching') : t('inspector.status.ready')}
-                </div>
-            </div>
+                }
+                actions={
+                    <>
+                        <button
+                            onClick={refreshAll}
+                            disabled={loading}
+                            className={clsx(
+                                "flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-700 text-sm font-medium transition-colors disabled:opacity-50",
+                                loading && "cursor-wait"
+                            )}
+                            title={t('inspector.refresh')}
+                        >
+                            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+                            {!isNarrow && t('inspector.refresh')}
+                        </button>
+                    </>
+                }
+            />
 
             {/* Main Content: Split View */}
             <div className="flex-1 grid grid-cols-[auto_1fr] gap-4 min-h-0 overflow-hidden">
                 {/* Left: Device Screen (Adaptive) */}
-                <div className="bg-zinc-100 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 flex items-center justify-center overflow-hidden relative">
+                <div className="flex items-center justify-center overflow-hidden relative">
                     {screenshot ? (
                         <div className="relative h-full w-full flex items-center justify-center">
                             <img

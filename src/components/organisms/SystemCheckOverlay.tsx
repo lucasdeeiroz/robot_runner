@@ -1,7 +1,7 @@
 import { SystemCheckStatus } from "@/lib/settings";
 import { Loader2, AlertTriangle, XCircle, MonitorX } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { Modal } from "@/components/common/Modal";
+import { Modal } from "@/components/organisms/Modal";
 import { TOOL_LINKS } from "@/lib/tools";
 
 interface SystemCheckOverlayProps {

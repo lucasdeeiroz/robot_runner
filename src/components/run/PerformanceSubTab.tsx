@@ -7,7 +7,8 @@ import { Activity, Cpu, Battery, CircuitBoard, RefreshCw, Play, Square, Package 
 import clsx from "clsx";
 import { useSettings } from "@/lib/settings";
 import { feedback } from "@/lib/feedback";
-import { FileSavedFeedback } from "@/components/common/FileSavedFeedback";
+import { FileSavedFeedback } from "@/components/molecules/FileSavedFeedback";
+import { Section } from "@/components/organisms/Section";
 
 
 interface PerformanceSubTabProps {
@@ -178,32 +179,31 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
 
     return (
         <div ref={containerRef} className="h-full flex flex-col p-4 overflow-y-auto">
-            <div className="flex flex-wrap items-center justify-between mb-6 gap-4">
-                <div className="flex items-center gap-4">
-                    <h2 className="text-lg font-medium flex items-center gap-2">
-                        <Activity size={20} className="text-primary" />
-                        {t('performance.title')}
-                    </h2>
-
-
-                </div>
-
-                <div className="flex items-center gap-2">
-                    <button
-                        onClick={toggleRecording}
-                        className={clsx(
-                            "flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-medium transition-all duration-200 active:scale-95 border",
-                            isRecording
-                                ? "bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800 shadow-sm"
-                                : "bg-white text-zinc-600 hover:bg-zinc-50 dark:bg-zinc-800 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 shadow-sm"
-                        )}
-                        title={isRecording ? t('performance.stop_record') : t('performance.start_record')}
-                    >
-                        {isRecording ? <Square size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
-                        {!isNarrow && (isRecording ? t('performance.recording') : "REC")}
-                    </button>
-
-                    {/* Package Selector */}
+            <Section
+                title={t('performance.title')}
+                icon={Activity}
+                variant="transparent"
+                status={
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={fetchStats}
+                            className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all active:scale-95"
+                            title={t('performance.refresh')}
+                        >
+                            <RefreshCw size={16} className="text-zinc-500" />
+                        </button>
+                        <button
+                            onClick={() => setAutoRefresh(!autoRefresh)}
+                            className={clsx(
+                                "text-xs px-2 py-1 rounded-lg border transition-all active:scale-95",
+                                autoRefresh ? "bg-primary/10 text-primary border-primary/20 dark:text-primary dark:border-primary/50" : "bg-zinc-50 text-zinc-500 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700"
+                            )}
+                        >
+                            {t('performance.auto', "Auto")}
+                        </button>
+                    </div>
+                }
+                menus={!isNarrow ? (
                     <div className="relative">
                         <select
                             value={selectedPackage}
@@ -220,130 +220,129 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
                         </select>
                         <PackageIcon size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
                     </div>
+                ) : null}
+                actions={
+                    <>
+                        <button
+                            onClick={toggleRecording}
+                            className={clsx(
+                                "flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-medium transition-all duration-200 active:scale-95 border",
+                                isRecording
+                                    ? "bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800 shadow-sm"
+                                    : "bg-white text-zinc-600 hover:bg-zinc-50 dark:bg-zinc-800 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 shadow-sm"
+                            )}
+                            title={isRecording ? t('performance.stop_record') : t('performance.start_record')}
+                        >
+                            {isRecording ? <Square size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
+                            {!isNarrow && (isRecording ? t('performance.recording') : "REC")}
+                        </button>
+                    </>
+                }
+            >
 
-                    <div className="h-4 w-px bg-zinc-300 dark:bg-zinc-700 mx-1" />
-
-                    <button
-                        onClick={() => setAutoRefresh(!autoRefresh)}
-                        className={clsx(
-                            "text-xs px-2 py-1 rounded-lg border transition-all active:scale-95",
-                            autoRefresh ? "bg-primary/10 text-primary border-primary/20 dark:text-primary dark:border-primary/50" : "bg-zinc-50 text-zinc-500 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700"
-                        )}
-                    >
-                        {t('performance.auto', "Auto")}
-                    </button>
-                    <button
-                        onClick={fetchStats}
-                        className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all active:scale-95"
-                        title={t('performance.refresh')}
-                    >
-                        <RefreshCw size={16} className="text-zinc-500" />
-                    </button>
-                </div>
-            </div>
-
-            {error && (
-                <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-3 rounded-md text-sm mb-4 border border-red-100 dark:border-red-900/50">
-                    {error}
-                </div>
-            )}
-
-            {/* Recording Feedback */}
-            <FileSavedFeedback
-                path={lastSaved}
-                onClose={() => setLastSaved(null)}
-            />
-
-            {!stats ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-zinc-400 animate-pulse">
-                    <p>{t('performance.loading')}</p>
-                </div>
-            ) : (
-                <div className="space-y-6">
-                    {/* System Stats Section */}
-                    <div>
-                        <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3 ml-1">{t('performance.device_stats', 'Device Performance')}</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {/* CPU Card */}
-                            <Card title={t('performance.cpu')} icon={<Cpu size={24} className="text-primary" />}>
-                                <div className="flex items-end gap-2 mt-2">
-                                    <span className="text-4xl font-bold text-zinc-800 dark:text-zinc-100">
-                                        {formatRate(stats.cpu_usage, '%', t('performance.load'))}
-                                    </span>
-                                </div>
-                                <ProgressBar value={stats.cpu_usage} max={100} color="bg-blue-500" />
-                            </Card>
-
-                            {/* RAM Card */}
-                            <Card title={t('performance.ram')} icon={<CircuitBoard size={24} className="text-purple-500" />}>
-                                <div className="flex items-end gap-2 mt-2">
-                                    <span className="text-3xl font-bold text-zinc-800 dark:text-zinc-100">
-                                        {formatBytes(stats.ram_used, false)}
-                                    </span>
-                                    <span className="text-xs text-zinc-500 mb-1">
-                                        / {formatBytes(stats.ram_total)}
-                                    </span>
-                                </div>
-                                <ProgressBar value={stats.ram_used} max={stats.ram_total} color="bg-purple-500" />
-                                <div className="text-xs text-right mt-1 text-zinc-400">
-                                    {((stats.ram_used / stats.ram_total) * 100).toFixed(1)}% {t('performance.used')}
-                                </div>
-                            </Card>
-
-                            {/* Battery Card */}
-                            <Card title={t('performance.battery')} icon={<Battery size={24} className={getBatteryColor(stats.battery_level)} />}>
-                                <div className="flex items-end gap-2 mt-2">
-                                    <span className={clsx("text-4xl font-bold", getBatteryColor(stats.battery_level))}>
-                                        {stats.battery_level}%
-                                    </span>
-                                </div>
-                                <ProgressBar value={stats.battery_level} max={100} color={getBatteryColor(stats.battery_level).replace("text-", "bg-")} />
-                            </Card>
-                        </div>
+                {error && (
+                    <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-3 rounded-md text-sm mb-4 border border-red-100 dark:border-red-900/50">
+                        {error}
                     </div>
+                )}
 
-                    {/* Check if app stats are available (only if package selected and backend returned it) */}
-                    {selectedPackage && stats.app_stats && (
-                        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                            <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3 ml-1 flex items-center gap-2">
-                                {t('performance.app_stats', 'App Performance')}: <span className="normal-case text-primary dark:text-blue-400 font-mono">{selectedPackage}</span>
-                            </h3>
+                {/* Recording Feedback */}
+                <FileSavedFeedback
+                    path={lastSaved}
+                    onClose={() => setLastSaved(null)}
+                />
+
+                {!stats ? (
+                    <div className="flex-1 flex flex-col items-center justify-center text-zinc-400 animate-pulse">
+                        <p>{t('performance.loading')}</p>
+                    </div>
+                ) : (
+                    <div className="space-y-6">
+                        {/* System Stats Section */}
+                        <div>
+                            <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3 ml-1">{t('performance.device_stats', 'Device Performance')}</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {/* App CPU */}
-                                <Card title={`${t('performance.cpu')} (App)`} icon={<Cpu size={24} className="text-orange-500" />}>
+                                {/* CPU Card */}
+                                <Card title={t('performance.cpu')} icon={<Cpu size={24} className="text-primary" />}>
                                     <div className="flex items-end gap-2 mt-2">
                                         <span className="text-4xl font-bold text-zinc-800 dark:text-zinc-100">
-                                            {formatRate(stats.app_stats.cpu_usage, '%')}
+                                            {formatRate(stats.cpu_usage, '%', t('performance.load'))}
                                         </span>
                                     </div>
-                                    <ProgressBar value={stats.app_stats.cpu_usage} max={100} color="bg-orange-500" />
+                                    <ProgressBar value={stats.cpu_usage} max={100} color="bg-blue-500" />
                                 </Card>
 
-                                {/* App RAM */}
-                                <Card title={`${t('performance.ram')} (App)`} icon={<CircuitBoard size={24} className="text-pink-500" />}>
+                                {/* RAM Card */}
+                                <Card title={t('performance.ram')} icon={<CircuitBoard size={24} className="text-purple-500" />}>
                                     <div className="flex items-end gap-2 mt-2">
                                         <span className="text-3xl font-bold text-zinc-800 dark:text-zinc-100">
-                                            {formatBytes(stats.app_stats.ram_used)}
+                                            {formatBytes(stats.ram_used, false)}
+                                        </span>
+                                        <span className="text-xs text-zinc-500 mb-1">
+                                            / {formatBytes(stats.ram_total)}
                                         </span>
                                     </div>
-                                    {/* Using Device Total RAM as baseline for bar */}
-                                    <ProgressBar value={stats.app_stats.ram_used} max={stats.ram_total} color="bg-pink-500" />
+                                    <ProgressBar value={stats.ram_used} max={stats.ram_total} color="bg-purple-500" />
+                                    <div className="text-xs text-right mt-1 text-zinc-400">
+                                        {((stats.ram_used / stats.ram_total) * 100).toFixed(1)}% {t('performance.used')}
+                                    </div>
                                 </Card>
 
-                                {/* App FPS */}
-                                <Card title="FPS" icon={<Eye size={24} className="text-green-500" />}>
+                                {/* Battery Card */}
+                                <Card title={t('performance.battery')} icon={<Battery size={24} className={getBatteryColor(stats.battery_level)} />}>
                                     <div className="flex items-end gap-2 mt-2">
-                                        <span className="text-4xl font-bold text-zinc-800 dark:text-zinc-100">
-                                            {formatFPS(stats.app_stats.fps)}
+                                        <span className={clsx("text-4xl font-bold", getBatteryColor(stats.battery_level))}>
+                                            {stats.battery_level}%
                                         </span>
                                     </div>
-                                    <ProgressBar value={stats.app_stats.fps} max={120} color="bg-green-500" />
+                                    <ProgressBar value={stats.battery_level} max={100} color={getBatteryColor(stats.battery_level).replace("text-", "bg-")} />
                                 </Card>
                             </div>
                         </div>
-                    )}
-                </div>
-            )}
+
+                        {/* Check if app stats are available (only if package selected and backend returned it) */}
+                        {selectedPackage && stats.app_stats && (
+                            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3 ml-1 flex items-center gap-2">
+                                    {t('performance.app_stats', 'App Performance')}: <span className="normal-case text-primary dark:text-blue-400 font-mono">{selectedPackage}</span>
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {/* App CPU */}
+                                    <Card title={`${t('performance.cpu')} (App)`} icon={<Cpu size={24} className="text-orange-500" />}>
+                                        <div className="flex items-end gap-2 mt-2">
+                                            <span className="text-4xl font-bold text-zinc-800 dark:text-zinc-100">
+                                                {formatRate(stats.app_stats.cpu_usage, '%')}
+                                            </span>
+                                        </div>
+                                        <ProgressBar value={stats.app_stats.cpu_usage} max={100} color="bg-orange-500" />
+                                    </Card>
+
+                                    {/* App RAM */}
+                                    <Card title={`${t('performance.ram')} (App)`} icon={<CircuitBoard size={24} className="text-pink-500" />}>
+                                        <div className="flex items-end gap-2 mt-2">
+                                            <span className="text-3xl font-bold text-zinc-800 dark:text-zinc-100">
+                                                {formatBytes(stats.app_stats.ram_used)}
+                                            </span>
+                                        </div>
+                                        {/* Using Device Total RAM as baseline for bar */}
+                                        <ProgressBar value={stats.app_stats.ram_used} max={stats.ram_total} color="bg-pink-500" />
+                                    </Card>
+
+                                    {/* App FPS */}
+                                    <Card title="FPS" icon={<Eye size={24} className="text-green-500" />}>
+                                        <div className="flex items-end gap-2 mt-2">
+                                            <span className="text-4xl font-bold text-zinc-800 dark:text-zinc-100">
+                                                {formatFPS(stats.app_stats.fps)}
+                                            </span>
+                                        </div>
+                                        <ProgressBar value={stats.app_stats.fps} max={120} color="bg-green-500" />
+                                    </Card>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </Section>
         </div>
     );
 }

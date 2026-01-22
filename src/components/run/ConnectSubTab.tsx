@@ -5,9 +5,11 @@ import clsx from "clsx";
 import { useSettings } from "@/lib/settings";
 import { useTranslation } from "react-i18next";
 import { feedback } from "@/lib/feedback";
-import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
+import { ConfirmationModal } from "@/components/organisms/ConfirmationModal";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { SplitButton } from "@/components/shared/SplitButton";
+import { SplitButton } from "@/components/molecules/SplitButton";
+import { Section } from "@/components/organisms/Section";
+import { Alert } from "@/components/atoms/Alert";
 
 interface ConnectSubTabProps {
     onDeviceConnected: () => void;
@@ -68,7 +70,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
             if (foundIp) {
                 setIp(foundIp);
                 setPort("5555");
-                setStatusMsg({ text: t('connect.status.auto_ip', { ip: foundIp }), type: 'success' });
+                setStatusMsg({ text: t('connect.status.auto_ip'), type: 'success' });
             } else {
                 setStatusMsg({ text: t('connect.status.ip_not_found'), type: 'info' });
             }
@@ -242,16 +244,16 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
             />
 
             {/* Wireless Connection Card */}
-            <div className="bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
-                <div className="flex items-center gap-3 mb-6">
-                    <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                        <Wifi size={24} className="text-primary mb-2" />
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">{t('connect.wireless.title')}</h2>
-                        <p className="text-sm text-zinc-500 dark:text-zinc-400">{t('connect.wireless.desc')}</p>
-                    </div>
-                </div>
+            <Section
+                title={t('connect.wireless.title')}
+                icon={Wifi}
+                description={t('connect.wireless.desc')}
+                status={statusMsg && (
+                    <Alert variant={statusMsg.type === 'error' ? 'destructive' : statusMsg.type === 'success' ? 'success' : 'info'} className="animate-in slide-in-from-top-2 animate-out slide-out-to-bottom-2">
+                        {statusMsg.text}
+                    </Alert>
+                )}
+            >
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     <div>
@@ -308,7 +310,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                     </div>
                 </div>
 
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap gap-3 mt-4">
                     <div className="flex gap-3 w-full">
                         <SplitButton
                             variant="primary"
@@ -350,40 +352,31 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                     </div>
                 </div>
 
-                {/* Status Message Area */}
-                {statusMsg && (
-                    <div className={clsx(
-                        "mt-4 p-3 rounded-lg text-sm font-mono break-all whitespace-pre-wrap animate-in slide-in-from-top-2",
-                        statusMsg.type === 'error' ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/50" :
-                            statusMsg.type === 'success' ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-900/50" :
-                                "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50"
-                    )}>
-                        {statusMsg.text}
-                    </div>
-                )}
-            </div>
+            </Section>
 
             {/* Ngrok Integration Card */}
-            <div className={clsx(
-                "bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 transition-opacity",
-                systemCheckStatus?.missingTunnelling?.length > 0 ? "opacity-50 pointer-events-none grayscale" : ""
-            )}>
-                <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                            <Globe className="text-purple-600 dark:text-purple-400" size={24} />
-                        </div>
-                        <div>
-                            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">{t('connect.remote.title')}</h2>
-                            <p className="text-sm text-zinc-500 dark:text-zinc-400">{t('connect.remote.desc')}</p>
-                        </div>
-                    </div>
-                    {systemCheckStatus?.missingTunnelling?.length > 0 && (
+            <Section
+                title={t('connect.remote.title')}
+                icon={Globe}
+                description={t('connect.remote.desc')}
+                variant="card"
+                className={clsx(
+                    "transition-opacity",
+                    systemCheckStatus?.missingTunnelling?.length > 0 ? "opacity-50 pointer-events-none grayscale" : ""
+                )}
+                status={
+                    systemCheckStatus?.missingTunnelling?.length > 0 && (
                         <span className="text-xs font-bold text-red-500 bg-red-100 dark:bg-red-900/20 px-2 py-1 rounded">
                             Ngrok Not Found
                         </span>
-                    )}
-                </div>
+                    )
+                }
+                menus={ngrokStatusMsg && (
+                    <Alert variant={ngrokStatusMsg.type === 'error' ? 'destructive' : ngrokStatusMsg.type === 'success' ? 'success' : 'info'} className="animate-in slide-in-from-top-2">
+                        {ngrokStatusMsg.text}
+                    </Alert>
+                )}
+            >
 
                 {!ngrokUrl && !ngrokLoading ? (
                     <div className="space-y-4">
@@ -443,19 +436,8 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                     </div>
                 )}
 
-                {/* Ngrok Status Message Area */}
-                {ngrokStatusMsg && (
-                    <div className={clsx(
-                        "mt-4 p-3 rounded-lg text-sm font-mono break-all whitespace-pre-wrap animate-in slide-in-from-top-2",
-                        ngrokStatusMsg.type === 'error' ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/50" :
-                            ngrokStatusMsg.type === 'success' ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-900/50" :
-                                "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50"
-                    )}>
-                        {ngrokStatusMsg.text}
-                    </div>
-                )}
-            </div>
+            </Section>
 
-        </div>
+        </div >
     );
 }

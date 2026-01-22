@@ -54,7 +54,7 @@ type LogNode = TextNode | SuiteStartNode | TestNode | SuiteNode | SuiteEndNode;
 type LinearNode = TextNode | SuiteStartNode | SuiteEndNode;
 
 
-import { LinkRenderer } from "./LinkRenderer";
+import { LinkRenderer } from "../molecules/LinkRenderer";
 
 export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
     const { t } = useTranslation();

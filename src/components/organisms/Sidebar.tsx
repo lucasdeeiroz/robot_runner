@@ -10,8 +10,8 @@ import { cn } from '@/lib/utils';
 import { useSettings } from "@/lib/settings";
 
 import { useTranslation } from "react-i18next";
-import packageJson from '../../package.json';
-import { CustomLogo } from './common/CustomLogo';
+import packageJson from '../../../package.json';
+import { CustomLogo } from '../molecules/CustomLogo';
 
 interface SidebarProps {
     activePage: string;

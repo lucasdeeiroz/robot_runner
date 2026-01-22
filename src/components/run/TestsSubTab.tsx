@@ -4,11 +4,12 @@ import { Play, FolderOpen, FileText, FileCode, History } from "lucide-react";
 import { useSettings } from "@/lib/settings";
 import { useTestSessions } from "@/lib/testSessionStore";
 import { Device } from "@/lib/types";
-import { FileExplorer } from "@/components/common/FileExplorer";
+import { FileExplorer } from "@/components/organisms/FileExplorer";
 import { v4 as uuidv4 } from 'uuid';
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
-import { WarningModal } from "@/components/shared/WarningModal";
+import { Tabs } from "@/components/molecules/Tabs";
+import { WarningModal } from "@/components/organisms/WarningModal";
 import { feedback } from "@/lib/feedback";
 
 interface TestsSubTabProps {
@@ -42,7 +43,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
         if (!containerRef.current) return;
         const observer = new ResizeObserver((entries) => {
             for (const entry of entries) {
-                setIsNarrow(entry.contentRect.width < 660);
+                setIsNarrow(entry.contentRect.width < 768);
             }
         });
         observer.observe(containerRef.current);
@@ -265,12 +266,18 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     "flex flex-col gap-6 shrink-0 h-full transition-all duration-300",
                     isNarrow ? "w-fit" : "w-[200px]"
                 )}>
-                    {/* Mode Selection */}
-                    <div className="flex flex-col gap-2 bg-zinc-100 dark:bg-zinc-800 p-1.5 rounded-xl shadow-sm">
-                        <ModeButton active={mode === 'file'} onClick={() => { setMode('file'); setSelectedPath(""); }} icon={<FileCode size={18} />} label={t('tests.mode.file')} hideText={isNarrow} />
-                        <ModeButton active={mode === 'folder'} onClick={() => { setMode('folder'); setSelectedPath(""); }} icon={<FolderOpen size={18} />} label={t('tests.mode.folder')} hideText={isNarrow} />
-                        <ModeButton active={mode === 'args'} onClick={() => { setMode('args'); setSelectedPath(""); }} icon={<FileText size={18} />} label={t('tests.mode.args')} hideText={isNarrow} />
-                    </div>
+                    {/* Atomic Vertical Tabs */}
+                    <Tabs
+                        orientation="vertical"
+                        variant="pills"
+                        tabs={[
+                            { id: 'file', label: !isNarrow ? t('tests.mode.file') : '', icon: FileCode },
+                            { id: 'folder', label: !isNarrow ? t('tests.mode.folder') : '', icon: FolderOpen },
+                            { id: 'args', label: !isNarrow ? t('tests.mode.args') : '', icon: FileText },
+                        ]}
+                        activeId={mode}
+                        onChange={(id) => { setMode(id as SelectionMode); setSelectedPath(""); }}
+                    />
 
                     <div className="flex-1" /> {/* Spacer */}
 
@@ -304,7 +311,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                             {isLaunching ? (
                                 <>
                                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    {launchStatus}
+                                    {!isNarrow && launchStatus}
                                 </>
                             ) : (
                                 <>
@@ -326,20 +333,4 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
     );
 }
 
-function ModeButton({ active, onClick, icon, label, hideText }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string, hideText?: boolean }) {
-    return (
-        <button
-            onClick={onClick}
-            className={clsx(
-                "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200",
-                active
-                    ? "bg-white dark:bg-zinc-700 text-primary shadow-sm"
-                    : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
-            )}
-            title={label}
-        >
-            {icon}
-            {!hideText && <span>{label}</span>}
-        </button>
-    );
-}
+
