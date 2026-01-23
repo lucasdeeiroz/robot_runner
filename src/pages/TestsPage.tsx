@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTestSessions } from "@/lib/testSessionStore";
-import { ToolboxView } from "../components/run/ToolboxView";
-import { HistorySubTab } from "../components/run/HistorySubTab";
+import { ToolboxView } from "../components/tabs/ToolboxView";
+import { HistorySubTab } from "../components/tabs/HistorySubTab";
+import { AndroidVersionPill } from "@/components/atoms/AndroidVersionPill";
 import { XCircle, LayoutGrid, Minimize2, Maximize2, FileText } from 'lucide-react';
 import { PageHeader } from "@/components/organisms/PageHeader";
 import clsx from 'clsx';
@@ -178,6 +179,7 @@ export function TestsPage() {
                                     {s.type === 'test' && isFailed && <span className="w-2.5 h-2.5 rounded-full bg-red-500" />}
                                     {s.type === 'test' && s.status === 'error' && <span className="w-2.5 h-2.5 rounded-full bg-red-500" />}
                                     <span>{s.deviceName}</span>
+                                    {s.androidVersion && <AndroidVersionPill version={s.androidVersion} />}
                                 </div>
                                 <button
                                     onClick={(e) => { e.stopPropagation(); clearSession(s.runId); }}
@@ -225,6 +227,7 @@ export function TestsPage() {
                                         {s.type === 'test' && s.status === 'running' && <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />}
                                         {s.type === 'test' && s.status === 'finished' && <span className={clsx("w-2 h-2 rounded-full", (s.exitCode?.includes("0") || s.exitCode === "0") ? "bg-green-500" : "bg-red-500")} />}
                                         <span>{s.deviceName}</span>
+                                        {s.androidVersion && <AndroidVersionPill version={s.androidVersion} className="bg-zinc-100 dark:bg-zinc-800" />}
                                     </div>
                                 }
                                 onClose={() => clearSession(s.runId)}

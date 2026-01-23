@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Play, Wifi, Smartphone, RefreshCw, Wrench, ScanEye, PlayCircle, Bot } from "lucide-react";
+import { Play, Wifi, Smartphone, RefreshCw, Wrench, ScanEye, PlayCircle } from "lucide-react";
 import { PageHeader } from "@/components/organisms/PageHeader";
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
-import { TestsSubTab } from "../components/run/TestsSubTab";
-import { ConnectSubTab } from "../components/run/ConnectSubTab";
-import { InspectorSubTab } from "../components/run/InspectorSubTab";
+import { TestsSubTab } from "../components/tabs/TestsSubTab";
+import { ConnectSubTab } from "../components/tabs/ConnectSubTab";
+import { InspectorSubTab } from "../components/tabs/InspectorSubTab";
 import { useTestSessions } from "@/lib/testSessionStore";
 
 import { useSettings } from "@/lib/settings";
@@ -17,15 +17,16 @@ import { feedback } from "@/lib/feedback";
 import { Button } from "@/components/atoms/Button";
 import { Badge } from "@/components/atoms/Badge";
 import { Tabs, TabItem } from "@/components/molecules/Tabs";
+import { AndroidVersionPill } from "@/components/atoms/AndroidVersionPill";
 
 type TabType = 'tests' | 'connect' | 'inspector';
 
-interface RunTabProps {
+interface RunPageProps {
     onNavigate?: (page: string) => void;
     initialTab?: TabType;
 }
 
-export function RunTab({ onNavigate, initialTab }: RunTabProps) {
+export function RunPage({ onNavigate, initialTab }: RunPageProps) {
     const { t } = useTranslation();
     const { systemCheckStatus } = useSettings();
     const containerRef = useRef<HTMLDivElement>(null);
@@ -137,9 +138,10 @@ export function RunTab({ onNavigate, initialTab }: RunTabProps) {
     };
 
     const handleOpenToolbox = (device: Device) => {
-        const ver = device.android_version ? `Android ${device.android_version}` : device.udid;
-        const name = `${device.model} (${ver})`;
-        addToolboxSession(device.udid, name);
+        // const ver = device.android_version ? `Android ${device.android_version}` : device.udid;
+        // const name = `${device.model} (${ver})`;
+        const name = device.model; // Clean name without version
+        addToolboxSession(device.udid, name, device.model, device.android_version || undefined);
         if (onNavigate) {
             onNavigate('tests');
         }
@@ -229,10 +231,7 @@ export function RunTab({ onNavigate, initialTab }: RunTabProps) {
                                                         </Badge>
                                                     )}
                                                     {d.android_version && (
-                                                        <div className="flex items-center gap-1 text-[10px] text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded-full" title={`Android ${d.android_version}`}>
-                                                            <Bot size={12} className="text-zinc-400" />
-                                                            <span>{d.android_version}</span>
-                                                        </div>
+                                                        <AndroidVersionPill version={d.android_version} />
                                                     )}
                                                 </div>
                                                 <span className="text-xs text-zinc-500 truncate" title={d.udid}>{d.udid}</span>

@@ -7,6 +7,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from "react-i18next";
 import { feedback } from '@/lib/feedback';
 import { Section } from "@/components/organisms/Section";
+import { AndroidVersionPill } from "@/components/atoms/AndroidVersionPill";
 
 interface TestLog {
     path: string;
@@ -212,7 +213,7 @@ export function HistorySubTab() {
                                             </div>
                                             {(log.device_model || log.device_udid) && (
                                                 <div className="flex items-center gap-1 text-zinc-400">
-                                                    {log.android_version ? `Android ${log.android_version} • ` : ''}
+                                                    {log.android_version && <AndroidVersionPill version={log.android_version} className="bg-zinc-100 dark:bg-zinc-700/50" />}
                                                     {log.device_model || t('tests_page.unknown_model')}
                                                     {log.device_udid ? ` (${log.device_udid})` : ''}
                                                 </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Layout } from "./components/templates/Layout";
-import { RunTab } from "./pages/RunTab";
+import { RunPage } from "./pages/RunPage";
 import { TestsPage } from "./pages/TestsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { AboutPage } from "./pages/AboutPage";
@@ -117,7 +117,7 @@ function App() {
         <div className="max-w-7xl mx-auto h-full flex flex-col">
           <div className="flex-1 min-h-0 relative">
             <div className={clsx("absolute inset-0 flex flex-col", activePage === 'run' ? "z-10" : "z-0 hidden")}>
-              <RunTab onNavigate={setActivePage} initialTab={initialSubTab} />
+              <RunPage onNavigate={setActivePage} initialTab={initialSubTab} />
             </div>
             {activePage === 'tests' && <TestsPage />}
             {activePage === 'settings' && <SettingsPage />}
