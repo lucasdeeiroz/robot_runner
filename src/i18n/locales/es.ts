@@ -393,10 +393,14 @@ export const es = {
                 dark: "Oscuro",
                 primary_color: "Color Primario",
                 sidebar_logo: "Logo de la Barra Lateral",
-                logo_light: "Logo Modo Claro",
-                logo_dark: "Logo Modo Oscuro",
+                logo_light: "Modo Claro",
+                logo_dark: "Modo Oscuro",
                 use_default: "Predeterminado (Texto)",
-                logo_hint: "Recomendado: PNG, Altura 40px, Ancho Máx 200px"
+                logo_hint: "Recomendado: PNG, Altura 40px, Ancho Máx 200px",
+                logo_set: "Logo establecido",
+                no_logo: "Ningún logo",
+                upload_logo: "Subir Logo",
+                remove_logo: "Eliminar Logo"
             },
             tool_config: {
                 appium_args: "Argumentos Appium",

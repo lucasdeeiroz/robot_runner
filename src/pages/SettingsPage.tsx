@@ -25,6 +25,7 @@ import { PathInput } from "@/components/molecules/PathInput";
 import { TagInput } from "@/components/molecules/TagInput";
 import { SegmentedControl } from "@/components/molecules/SegmentedControl";
 import { InfoCard } from "@/components/molecules/InfoCard";
+import { LogoInput } from "@/components/molecules/LogoInput";
 
 export function SettingsPage() {
     const { settings, updateSetting, loading, profiles, activeProfileId, createProfile, switchProfile, renameProfile, deleteProfile, systemVersions, checkSystemVersions, systemCheckStatus, isNgrokEnabled } = useSettings();
@@ -516,66 +517,25 @@ export function SettingsPage() {
                         {/* Sidebar Logo */}
                         <div className="mt-6 pt-6 border-t border-zinc-100 dark:border-zinc-800">
                             <h3 className="text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-3">{t('settings.appearance.sidebar_logo')}</h3>
-                            <div className="space-y-4">
-                                {/* Light Mode Logo */}
-                                <div>
-                                    <label className="block text-xs text-zinc-500 mb-1">{t('settings.appearance.logo_light')}</label>
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="text"
-                                            value={settings.customLogoLight || ''}
-                                            readOnly
-                                            placeholder={t('settings.appearance.use_default')}
-                                            className="flex-1 bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-zinc-100"
-                                        />
-                                        <button
-                                            onClick={() => handleLogoUpload('customLogoLight')}
-                                            className="px-3 py-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 rounded-xl transition-all"
-                                        >
-                                            <FolderOpen size={16} />
-                                        </button>
-                                        {settings.customLogoLight && (
-                                            <button
-                                                onClick={() => updateSetting('customLogoLight', undefined)}
-                                                className="px-3 py-2 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 text-red-500 rounded-xl transition-all"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Dark Mode Logo */}
-                                <div>
-                                    <label className="block text-xs text-zinc-500 mb-1">{t('settings.appearance.logo_dark')}</label>
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="text"
-                                            value={settings.customLogoDark || ''}
-                                            readOnly
-                                            placeholder={t('settings.appearance.use_default')}
-                                            className="flex-1 bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-zinc-100"
-                                        />
-                                        <button
-                                            onClick={() => handleLogoUpload('customLogoDark')}
-                                            className="px-3 py-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 rounded-xl transition-all"
-                                        >
-                                            <FolderOpen size={16} />
-                                        </button>
-                                        {settings.customLogoDark && (
-                                            <button
-                                                onClick={() => updateSetting('customLogoDark', undefined)}
-                                                className="px-3 py-2 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 text-red-500 rounded-xl transition-all"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                                <p className="text-[10px] text-zinc-400">
-                                    {t('settings.appearance.logo_hint')}
-                                </p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <LogoInput
+                                    label={t('settings.appearance.logo_light')}
+                                    value={settings.customLogoLight}
+                                    onUpload={() => handleLogoUpload('customLogoLight')}
+                                    onDelete={() => updateSetting('customLogoLight', undefined)}
+                                    placeholder={t('settings.appearance.use_default')}
+                                />
+                                <LogoInput
+                                    label={t('settings.appearance.logo_dark')}
+                                    value={settings.customLogoDark}
+                                    onUpload={() => handleLogoUpload('customLogoDark')}
+                                    onDelete={() => updateSetting('customLogoDark', undefined)}
+                                    placeholder={t('settings.appearance.use_default')}
+                                />
                             </div>
+                            <p className="text-[10px] text-zinc-400 mt-2">
+                                {t('settings.appearance.logo_hint')}
+                            </p>
                         </div>
                     </Section>
 
