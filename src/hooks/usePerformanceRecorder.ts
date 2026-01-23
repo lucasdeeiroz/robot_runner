@@ -17,6 +17,7 @@ export interface DeviceStats {
     ram_used: number;
     ram_total: number;
     battery_level: number;
+    temperature: number;
     app_stats?: AppStats;
 }
 
@@ -63,7 +64,7 @@ export function usePerformanceRecorder(selectedDevice: string, isActive: boolean
     // Recording Logic - Append Data
     useEffect(() => {
         if (isRecording && stats && recordingPath) {
-            let line = `${new Date().toISOString()},${stats.cpu_usage.toFixed(2)},${stats.ram_used},${stats.battery_level}`;
+            let line = `${new Date().toISOString()},${stats.cpu_usage.toFixed(2)},${stats.ram_used},${stats.battery_level},${stats.temperature.toFixed(1)}`;
 
             // Add App stats if present
             if (stats.app_stats) {
@@ -89,7 +90,7 @@ export function usePerformanceRecorder(selectedDevice: string, isActive: boolean
             setRecordingPath(null);
         } else {
             // Start Recording: Create File
-            const header = "Timestamp,System_CPU_%,System_RAM_KB,Battery_%" +
+            const header = "Timestamp,System_CPU_%,System_RAM_KB,Battery_%,Battery_Temp_C" +
                 (selectedPackage ? ",App_CPU_%,App_RAM_KB,FPS" : "") + "\n";
 
             try {

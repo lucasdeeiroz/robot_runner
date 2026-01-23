@@ -14,6 +14,7 @@ pub struct DeviceStats {
     pub ram_used: u64,
     pub ram_total: u64,
     pub battery_level: u8,
+    pub temperature: f32, // Celsius
     pub app_stats: Option<AppStats>,
 }
 
@@ -22,9 +23,9 @@ pub async fn get_device_stats(
     device: String,
     package: Option<String>,
 ) -> Result<DeviceStats, String> {
-    // 1. Get Battery Level
+    // 1. Get Battery Level & Temperature
     let bat_output = run_adb_shell(&device, "dumpsys battery");
-    let battery_level = parse_battery_level(&bat_output).unwrap_or(0);
+    let (battery_level, temperature) = parse_battery_info(&bat_output).unwrap_or((0, 0.0));
 
     // 2. Get System RAM Info
     let mem_output = run_adb_shell(&device, "cat /proc/meminfo");
@@ -55,6 +56,7 @@ pub async fn get_device_stats(
         ram_used,
         ram_total,
         battery_level,
+        temperature,
         app_stats,
     })
 }
@@ -83,27 +85,41 @@ fn run_adb_shell(device: &str, command: &str) -> String {
     }
 }
 
-fn parse_battery_level(output: &str) -> Option<u8> {
+fn parse_battery_info(output: &str) -> Option<(u8, f32)> {
     // output example:
-    // AC powered: false
-    // USB powered: true
-    // Wireless powered: false
-    // Max charging current: 0
-    // Max charging voltage: 0
-    // Charge counter: 0
-    // status: 2
-    // health: 2
-    // present: true
+    // ...
     // level: 100
-    // scale: 100
+    // temperature: 300  (= 30.0 C)
+    // ...
 
-    output
-        .lines()
-        .find(|line| line.trim().starts_with("level:"))
-        .and_then(|line| {
-            let parts: Vec<&str> = line.split(':').collect();
-            parts.get(1).and_then(|val| val.trim().parse::<u8>().ok())
-        })
+    let mut level = 0;
+    let mut temp = 0.0;
+    let mut found_level = false;
+
+    for line in output.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("level:") {
+            if let Some(val_str) = trimmed.split(':').nth(1) {
+                if let Ok(val) = val_str.trim().parse::<u8>() {
+                    level = val;
+                    found_level = true;
+                }
+            }
+        } else if trimmed.starts_with("temperature:") {
+             if let Some(val_str) = trimmed.split(':').nth(1) {
+                if let Ok(val) = val_str.trim().parse::<f32>() {
+                    // Convert tenths to celsius
+                    temp = val / 10.0;
+                }
+            }
+        }
+    }
+
+    if found_level {
+        Some((level, temp))
+    } else {
+        None
+    }
 }
 
 fn parse_mem_info(output: &str) -> Option<(u64, u64)> {

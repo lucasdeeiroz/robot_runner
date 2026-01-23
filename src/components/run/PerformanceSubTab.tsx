@@ -208,6 +208,9 @@ export function PerformanceSubTab({
                                         <span className={clsx("text-4xl font-bold", getBatteryColor(stats.battery_level))}>
                                             {stats.battery_level}%
                                         </span>
+                                        <span className="text-sm text-zinc-500 mb-1 font-medium">
+                                            {stats.temperature.toFixed(1)}°C
+                                        </span>
                                     </div>
                                     <ProgressBar value={stats.battery_level} max={100} color={getBatteryColor(stats.battery_level).replace("text-", "bg-")} />
                                 </Card>
