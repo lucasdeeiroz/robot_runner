@@ -6,6 +6,7 @@ import clsx from "clsx";
 import packageJson from '../../package.json';
 import { useSettings } from "@/lib/settings";
 import { Section } from "@/components/organisms/Section";
+import { InfoCard } from "@/components/molecules/InfoCard";
 
 
 const TOOLS = [
@@ -98,21 +99,14 @@ export function AboutPage() {
                     >
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             {TOOLS.map(tool => (
-                                <a
+                                <InfoCard
                                     key={tool.key}
+                                    title={t(`about.tools_list.${tool.key}.name` as any)}
                                     href={tool.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="block p-3 bg-zinc-50 dark:bg-black/20 rounded-lg border border-zinc-100 dark:border-zinc-800 hover:border-primary/30 transition-all hover:scale-[1.02] cursor-pointer"
+                                    headerRight={<span className="text-zinc-300 dark:text-zinc-600">↗</span>}
                                 >
-                                    <div className="font-semibold text-sm text-gray-900 dark:text-zinc-200 mb-1 flex items-center justify-between">
-                                        {t(`about.tools_list.${tool.key}.name` as any)}
-                                        <span className="text-zinc-300 dark:text-zinc-600">↗</span>
-                                    </div>
-                                    <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-snug">
-                                        {t(`about.tools_list.${tool.key}.desc` as any)}
-                                    </p>
-                                </a>
+                                    {t(`about.tools_list.${tool.key}.desc` as any)}
+                                </InfoCard>
                             ))}
                         </div>
                     </Section>

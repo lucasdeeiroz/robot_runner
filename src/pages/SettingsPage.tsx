@@ -1,5 +1,5 @@
 import { useSettings } from "@/lib/settings";
-import { Moon, Sun, Globe, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2, ExternalLink, Settings as SettingsIcon } from "lucide-react";
+import { Moon, Sun, Globe, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2, Settings as SettingsIcon } from "lucide-react";
 import { Switch } from "@/components/atoms/Switch";
 import { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -24,6 +24,7 @@ import { Select } from "@/components/atoms/Select";
 import { PathInput } from "@/components/molecules/PathInput";
 import { TagInput } from "@/components/molecules/TagInput";
 import { SegmentedControl } from "@/components/molecules/SegmentedControl";
+import { InfoCard } from "@/components/molecules/InfoCard";
 
 export function SettingsPage() {
     const { settings, updateSetting, loading, profiles, activeProfileId, createProfile, switchProfile, renameProfile, deleteProfile, systemVersions, checkSystemVersions, systemCheckStatus, isNgrokEnabled } = useSettings();
@@ -634,25 +635,17 @@ export function SettingsPage() {
                             (['adb', 'node', 'appium', 'uiautomator2', 'python', 'robot', 'appium_lib', 'scrcpy', 'ngrok'] as Array<keyof typeof systemVersions>)
                                 .filter(key => key !== 'ngrok' || isNgrokEnabled)
                                 .map((key) => (
-                                    <div key={key} className="bg-zinc-50 dark:bg-black/20 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800/50 flex flex-col justify-between group h-20 transition-all hover:bg-zinc-100 dark:hover:bg-zinc-800/50">
-                                        <div className="flex items-center justify-between">
-                                            <span className="block text-xs uppercase text-zinc-500 font-bold">
-                                                {t(`settings.system.tools.${key}` as any) || key}
-                                            </span>
-                                            <a
-                                                href={TOOL_LINKS[key as keyof typeof TOOL_LINKS]}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-zinc-400 hover:text-primary transition-colors opacity-0 group-hover:opacity-100"
-                                                title="View Documentation/Download"
-                                            >
-                                                <ExternalLink size={14} />
-                                            </a>
-                                        </div>
+                                    <InfoCard
+                                        key={key}
+                                        title={t(`settings.system.tools.${key}` as any) || key}
+                                        href={TOOL_LINKS[key as keyof typeof TOOL_LINKS]}
+                                        headerRight={<span className="text-zinc-300 dark:text-zinc-600">↗</span>}
+                                        className="h-20"
+                                    >
                                         <span className="text-sm font-mono text-gray-900 dark:text-zinc-300 truncate block mt-1" title={systemVersions[key]}>
                                             {systemVersions[key]}
                                         </span>
-                                    </div>
+                                    </InfoCard>
                                 ))
                         ) : (
                             <div className="text-zinc-400 italic col-span-full">{t('settings.system.checking')}</div>
