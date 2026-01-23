@@ -297,91 +297,150 @@ export function SettingsPage() {
             </Modal>
 
             <div className="grid gap-6">
-                {/* Appium Server Config & Control */}
-                <Section
-                    title={t('settings.appium.title')}
-                    icon={Server}
-                    status={
-                        <div className={clsx("flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold border",
-                            appiumStatus.running
-                                ? "bg-green-50 text-green-600 border-green-200 dark:bg-green-500/10 dark:text-green-400 dark:border-green-500/20"
-                                : "bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700")}>
-                            <div className={clsx("w-2 h-2 rounded-full", appiumStatus.running ? "bg-green-500" : "bg-zinc-400")} />
-                            {appiumStatus.running ? t('settings.appium.running', { pid: appiumStatus.pid }) : t('settings.appium.stopped')}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Appium Server Config & Control */}
+                    <Section
+                        title={t('settings.appium.title')}
+                        icon={Server}
+                        status={
+                            <div className={clsx("flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold border",
+                                appiumStatus.running
+                                    ? "bg-green-50 text-green-600 border-green-200 dark:bg-green-500/10 dark:text-green-400 dark:border-green-500/20"
+                                    : "bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700")}>
+                                <div className={clsx("w-2 h-2 rounded-full", appiumStatus.running ? "bg-green-500" : "bg-zinc-400")} />
+                                {appiumStatus.running ? t('settings.appium.running', { pid: appiumStatus.pid }) : t('settings.appium.stopped')}
+                            </div>
+                        }
+                        actions={
+                            <>
+                                <button
+                                    onClick={() => setShowAppiumLogs(!showAppiumLogs)}
+                                    className={clsx("p-2 rounded-xl transition-all active:scale-95", showAppiumLogs ? "bg-primary/10 text-primary" : "hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400")}
+                                    title={t('settings.appium.logs')}
+                                    disabled={!appiumStatus.running && systemCheckStatus?.missingAppium?.length > 0}
+                                >
+                                    <Terminal size={18} />
+                                </button>
+
+                                <button
+                                    onClick={toggleAppium}
+                                    className={clsx("flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all text-sm text-white shadow-lg active:scale-95",
+                                        appiumStatus.running
+                                            ? "bg-red-500 hover:bg-red-600 shadow-red-500/20"
+                                            : "bg-green-600 hover:bg-green-700 shadow-green-500/20"
+                                    )}
+                                    disabled={!appiumStatus.running && systemCheckStatus?.missingAppium?.length > 0}
+                                >
+                                    {appiumStatus.running ? <><Square size={16} fill="currentColor" /> {!isNarrow && t('settings.appium.stop')}</> : <><Play size={16} fill="currentColor" /> {!isNarrow && t('settings.appium.start')}</>}
+                                </button>
+                            </>
+                        }
+                    >
+
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
+                                <Input
+                                    label={t('settings.appium.host')}
+                                    type="text"
+                                    value={settings.appiumHost}
+                                    onChange={(e) => updateSetting('appiumHost', e.target.value)}
+                                    disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
+                                />
+                            </div>
+                            <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
+                                <Input
+                                    label={t('settings.appium.port')}
+                                    type="number"
+                                    value={settings.appiumPort}
+                                    onChange={(e) => updateSetting('appiumPort', Number(e.target.value))}
+                                    disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
+                                />
+                            </div>
                         </div>
-                    }
-                    actions={
-                        <>
-                            <button
-                                onClick={() => setShowAppiumLogs(!showAppiumLogs)}
-                                className={clsx("p-2 rounded-xl transition-all active:scale-95", showAppiumLogs ? "bg-primary/10 text-primary" : "hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400")}
-                                title={t('settings.appium.logs')}
-                                disabled={!appiumStatus.running && systemCheckStatus?.missingAppium?.length > 0}
+                        <div className="mb-4">
+                            <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
+                                <Input
+                                    label={t('settings.tool_config.appium_args')}
+                                    type="text"
+                                    value={settings.tools.appiumArgs}
+                                    onChange={(e) => updateSetting('tools', { ...settings.tools, appiumArgs: e.target.value })}
+                                    disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
+                                    placeholder="--allow-insecure chromedriver"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Logs Output */}
+                        {showAppiumLogs && (
+                            <div
+                                ref={logsContainerRef}
+                                className="mt-4 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 font-mono text-xs h-64 overflow-auto custom-scrollbar shadow-inner"
                             >
-                                <Terminal size={18} />
-                            </button>
+                                {appiumLogs.length === 0 && <span className="text-zinc-500 italic">{t('settings.appium.waiting')}</span>}
+                                {appiumLogs.map((log, i) => (
+                                    <div key={i} className="text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap border-b border-zinc-200 dark:border-zinc-800/50 pb-0.5 mb-0.5">{log}</div>
+                                ))}
+                            </div>
+                        )}
+                    </Section>
 
-                            <button
-                                onClick={toggleAppium}
-                                className={clsx("flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all text-sm text-white shadow-lg active:scale-95",
-                                    appiumStatus.running
-                                        ? "bg-red-500 hover:bg-red-600 shadow-red-500/20"
-                                        : "bg-green-600 hover:bg-green-700 shadow-green-500/20"
-                                )}
-                                disabled={!appiumStatus.running && systemCheckStatus?.missingAppium?.length > 0}
-                            >
-                                {appiumStatus.running ? <><Square size={16} fill="currentColor" /> {!isNarrow && t('settings.appium.stop')}</> : <><Play size={16} fill="currentColor" /> {!isNarrow && t('settings.appium.start')}</>}
-                            </button>
-                        </>
-                    }
-                >
+                    {/* Tool Options */}
+                    <Section title={t('settings.tools')} icon={Wrench}>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {['robotArgs', 'scrcpyArgs'].map((key) => {
+                                let isDisabled = false;
+                                if (key === 'robotArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
+                                if (key === 'scrcpyArgs' && systemCheckStatus?.missingMirroring?.length > 0) isDisabled = true;
 
-                    <div className="grid grid-cols-2 gap-4 mb-4">
-                        <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
-                            <Input
-                                label={t('settings.appium.host')}
-                                type="text"
-                                value={settings.appiumHost}
-                                onChange={(e) => updateSetting('appiumHost', e.target.value)}
-                                disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
-                            />
+                                return (
+                                    <div key={key}>
+                                        <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">{t(`settings.tool_config.${key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)}` as any)}</label>
+                                        <input
+                                            type="text"
+                                            value={(settings.tools as any)[key]}
+                                            onChange={(e) => updateSetting('tools', { ...settings.tools, [key]: e.target.value })}
+                                            className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-primary/20 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                                            disabled={isDisabled}
+                                            title={isDisabled ? "Dependency missing" : ""}
+                                        />
+                                    </div>
+                                );
+                            })}
+                            {/* App Packages List */}
+                            <div className="col-span-1 md:col-span-2">
+                                <TagInput
+                                    label={t('settings.tool_config.app_packages')}
+                                    tags={settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean)}
+                                    onAdd={(tag) => {
+                                        const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
+                                        if (!current.includes(tag)) {
+                                            updateSetting('tools', { ...settings.tools, appPackage: [...current, tag].join(', ') });
+                                        }
+                                    }}
+                                    onRemove={(tag) => {
+                                        const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
+                                        updateSetting('tools', { ...settings.tools, appPackage: current.filter(t => t !== tag).join(', ') });
+                                    }}
+                                    placeholder={t('settings.tool_config.add_package_placeholder')}
+                                />
+                            </div>
+                            {isNgrokEnabled && (
+                                <div className="col-span-1 md:col-span-2">
+                                    <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">{t('settings.tool_config.ngrok_token')}</label>
+                                    <input
+                                        type="password"
+                                        value={settings.tools.ngrokToken || ''}
+                                        onChange={(e) => updateSetting('tools', { ...settings.tools, ngrokToken: e.target.value })}
+                                        className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-primary/20 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                                        placeholder="Authorization Token"
+                                        disabled={systemCheckStatus?.missingTunnelling?.length > 0}
+                                        title={systemCheckStatus?.missingTunnelling?.length > 0 ? "Ngrok not found" : ""}
+                                    />
+                                </div>
+                            )}
                         </div>
-                        <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
-                            <Input
-                                label={t('settings.appium.port')}
-                                type="number"
-                                value={settings.appiumPort}
-                                onChange={(e) => updateSetting('appiumPort', Number(e.target.value))}
-                                disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
-                            />
-                        </div>
-                    </div>
-                    <div className="mb-4">
-                        <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
-                            <Input
-                                label={t('settings.tool_config.appium_args')}
-                                type="text"
-                                value={settings.tools.appiumArgs}
-                                onChange={(e) => updateSetting('tools', { ...settings.tools, appiumArgs: e.target.value })}
-                                disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
-                                placeholder="--allow-insecure chromedriver"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Logs Output */}
-                    {showAppiumLogs && (
-                        <div
-                            ref={logsContainerRef}
-                            className="mt-4 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 font-mono text-xs h-64 overflow-auto custom-scrollbar shadow-inner"
-                        >
-                            {appiumLogs.length === 0 && <span className="text-zinc-500 italic">{t('settings.appium.waiting')}</span>}
-                            {appiumLogs.map((log, i) => (
-                                <div key={i} className="text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap border-b border-zinc-200 dark:border-zinc-800/50 pb-0.5 mb-0.5">{log}</div>
-                            ))}
-                        </div>
-                    )}
-                </Section>
+                    </Section>
+                </div>
 
                 {/* Path Configuration */}
                 <Section title={t('settings.paths.title')} icon={FolderOpen}>
@@ -401,61 +460,6 @@ export function SettingsPage() {
                                 />
                             );
                         })}
-                    </div>
-                </Section>
-
-                {/* Tool Options */}
-                <Section title={t('settings.tools')} icon={Wrench}>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {['robotArgs', 'scrcpyArgs'].map((key) => {
-                            let isDisabled = false;
-                            if (key === 'robotArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
-                            if (key === 'scrcpyArgs' && systemCheckStatus?.missingMirroring?.length > 0) isDisabled = true;
-
-                            return (
-                                <div key={key}>
-                                    <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">{t(`settings.tool_config.${key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)}` as any)}</label>
-                                    <input
-                                        type="text"
-                                        value={(settings.tools as any)[key]}
-                                        onChange={(e) => updateSetting('tools', { ...settings.tools, [key]: e.target.value })}
-                                        className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-primary/20 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                                        disabled={isDisabled}
-                                        title={isDisabled ? "Dependency missing" : ""}
-                                    />
-                                </div>
-                            );
-                        })}
-                        {/* App Packages List */}
-                        <div className="col-span-1 md:col-span-2">
-                            <TagInput
-                                label={t('settings.tool_config.app_packages')}
-                                tags={settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean)}
-                                onAdd={(tag) => {
-                                    const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
-                                    if (!current.includes(tag)) {
-                                        updateSetting('tools', { ...settings.tools, appPackage: [...current, tag].join(', ') });
-                                    }
-                                }}
-                                onRemove={(tag) => {
-                                    const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
-                                    updateSetting('tools', { ...settings.tools, appPackage: current.filter(t => t !== tag).join(', ') });
-                                }}
-                                placeholder={t('settings.tool_config.add_package_placeholder')}
-                            />
-                        </div>
-                        <div className="col-span-1 md:col-span-2">
-                            <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">{t('settings.tool_config.ngrok_token')}</label>
-                            <input
-                                type="password"
-                                value={settings.tools.ngrokToken || ''}
-                                onChange={(e) => updateSetting('tools', { ...settings.tools, ngrokToken: e.target.value })}
-                                className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-primary/20 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                                placeholder="Authorization Token"
-                                disabled={systemCheckStatus?.missingTunnelling?.length > 0}
-                                title={systemCheckStatus?.missingTunnelling?.length > 0 ? "Ngrok not found" : ""}
-                            />
-                        </div>
                     </div>
                 </Section>
 
