@@ -22,19 +22,20 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
     const [hoveredNode, setHoveredNode] = useState<InspectorNode | null>(null);
 
     // Responsive State
-    const containerRef = useRef<HTMLDivElement>(null);
+    const [containerRef, setContainerRef] = useState<HTMLDivElement | null>(null);
     const [isNarrow, setIsNarrow] = useState(false);
 
     useEffect(() => {
-        if (!containerRef.current) return;
+        if (!containerRef) return;
         const observer = new ResizeObserver((entries) => {
             for (const entry of entries) {
-                setIsNarrow(entry.contentRect.width < 768);
+                // Increased threshold to 900px to ensure it collapses earlier
+                setIsNarrow(entry.contentRect.width < 900);
             }
         });
-        observer.observe(containerRef.current);
+        observer.observe(containerRef);
         return () => observer.disconnect();
-    }, []);
+    }, [containerRef]);
 
     const [loading, setLoading] = useState(false);
     // const [viewMode, setViewMode] = useState<'properties' | 'xml'>('properties');
@@ -273,7 +274,7 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
     }
 
     return (
-        <div ref={containerRef} className="h-full flex flex-col space-y-4">
+        <div ref={setContainerRef} className="h-full w-full flex flex-col space-y-4">
             {/* Toolbar - Now at the Top */}
             <Section
                 title={t('inspector.title', 'Inspector')}
@@ -330,7 +331,7 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
                             title={t('inspector.refresh')}
                         >
                             <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-                            {!isNarrow && t('inspector.refresh')}
+                            <span className={clsx(isNarrow && "hidden")}>{t('inspector.refresh')}</span>
                         </button>
                     </>
                 }

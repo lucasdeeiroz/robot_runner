@@ -150,14 +150,15 @@ export const en = {
             },
             actions: {
                 connect: "Connect",
-                pair: "Pair",
-                disconnect: "Disconnect",
-                start_tunnel: "Start Public Tunnel",
-                stop_tunnel: "Stop Tunnel",
                 copy: "Copied!",
-                paste_url: "Paste URL",
+                disconnect: "Disconnect",
                 disconnect_all: "Disconnect All",
-                rerun_failed: "Re-run Failed Tests"
+                enable_remote: "Enable Remote Connection",
+                pair: "Pair",
+                paste_url: "Paste URL",
+                rerun_failed: "Re-run Failed Tests",
+                start_tunnel: "Start Public Tunnel",
+                stop_tunnel: "Stop Tunnel"
             },
             status: {
                 tunnel_active: "Tunnel Active",
@@ -191,9 +192,6 @@ export const en = {
                 message: "Enabling remote connection (Ngrok) will expose your local device to the internet.\n\nEnsure this complies with your organization's Information Security policies before proceeding.",
                 cancel: "Cancel",
                 confirm: "Enable Ngrok"
-            },
-            action: {
-                enable_remote: "Enable Remote Connection"
             }
         },
         console: {
@@ -333,7 +331,8 @@ export const en = {
                 selected_count: "{{count}} Devices Selected",
                 select: "Select Devices",
                 busy: "Busy",
-                refresh: "Refresh Devices"
+                refresh: "Refresh Devices",
+                open_toolbox: "Open Toolbox"
             },
             console: {
                 running: "RUNNING",

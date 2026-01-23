@@ -150,14 +150,15 @@ export const pt = {
             },
             actions: {
                 connect: "Conectar",
-                pair: "Parear",
-                disconnect: "Desconectar",
-                start_tunnel: "Iniciar Túnel Público",
-                stop_tunnel: "Parar Túnel",
                 copy: "Copiado!",
-                paste_url: "Colar URL",
+                disconnect: "Desconectar",
                 disconnect_all: "Desconectar Todos",
-                rerun_failed: "Reexecutar Falhas"
+                enable_remote: "Habilitar Conexão Remota",
+                pair: "Parear",
+                paste_url: "Colar URL",
+                rerun_failed: "Reexecutar Falhas",
+                start_tunnel: "Iniciar Túnel Público",
+                stop_tunnel: "Parar Túnel"
             },
             status: {
                 tunnel_active: "Túnel Ativo",
@@ -191,9 +192,6 @@ export const pt = {
                 message: "Habilitar a conexão remota (Ngrok) exporá seu dispositivo local à internet.\n\nCertifique-se de que isso esteja em conformidade com as políticas de Segurança da Informação da sua organização antes de prosseguir.",
                 cancel: "Cancelar",
                 confirm: "Habilitar Ngrok"
-            },
-            action: {
-                enable_remote: "Habilitar Conexão Remota"
             }
         },
         console: {
@@ -333,7 +331,8 @@ export const pt = {
                 selected_count: "{{count}} Selecionados",
                 select: "Selecionar Dispositivos",
                 busy: "Ocupado",
-                refresh: "Atualizar Dispositivos"
+                refresh: "Atualizar Dispositivos",
+                open_toolbox: "Abrir Caixa de Ferramentas"
             },
             console: {
                 running: "EXECUTANDO",

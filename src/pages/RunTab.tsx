@@ -172,7 +172,7 @@ export function RunTab({ onNavigate, initialTab }: RunTabProps) {
                 <div className="flex items-center gap-3 relative">
                     {/* Device Selector */}
                     <div
-                        className="flex items-center gap-2 bg-white dark:bg-zinc-900/50 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm dark:shadow-none px-3 py-2 cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors select-none"
+                        className="flex items-center gap-2 bg-white dark:bg-zinc-900/50 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm dark:shadow-none px-3 py-1 cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors select-none"
                         onClick={(e) => {
                             e.stopPropagation();
                             setIsDeviceDropdownOpen(!isDeviceDropdownOpen);
@@ -244,7 +244,7 @@ export function RunTab({ onNavigate, initialTab }: RunTabProps) {
                                             size="icon"
                                             onClick={(e) => { e.stopPropagation(); handleOpenToolbox(d); setIsDeviceDropdownOpen(false); }}
                                             className="text-zinc-400 hover:text-primary hover:bg-primary/10 dark:hover:bg-primary/20"
-                                            title="Open Toolbox"
+                                            title={t('run_tab.device.open_toolbox')}
                                         >
                                             <Wrench size={16} />
                                         </Button>

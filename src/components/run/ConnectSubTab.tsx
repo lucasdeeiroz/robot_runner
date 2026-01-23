@@ -484,11 +484,15 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                         <button
                             onClick={() => setShowSecurityModal(true)}
                             className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-xl shadow-lg font-bold transition-all hover:scale-105 active:scale-95 flex items-center gap-2"
+                            aria-describedby="enable-remote-description"
                         >
                             <Globe size={20} />
-                            {t('connect.action.enable_remote')}
+                            {t('connect.actions.enable_remote')}
                         </button>
-                        <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400 font-medium max-w-xs text-center">
+                        <p
+                            id="enable-remote-description"
+                            className="mt-3 text-sm text-zinc-600 dark:text-zinc-400 font-medium max-w-xs text-center"
+                        >
                             {t('connect.remote.desc')}
                         </p>
                     </div>
