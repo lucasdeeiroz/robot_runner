@@ -26,7 +26,7 @@ import { TagInput } from "@/components/molecules/TagInput";
 import { SegmentedControl } from "@/components/molecules/SegmentedControl";
 
 export function SettingsPage() {
-    const { settings, updateSetting, loading, profiles, activeProfileId, createProfile, switchProfile, renameProfile, deleteProfile, systemVersions, checkSystemVersions, systemCheckStatus } = useSettings();
+    const { settings, updateSetting, loading, profiles, activeProfileId, createProfile, switchProfile, renameProfile, deleteProfile, systemVersions, checkSystemVersions, systemCheckStatus, isNgrokEnabled } = useSettings();
     const { t, i18n } = useTranslation();
 
     // Profile Management Details
@@ -627,27 +627,29 @@ export function SettingsPage() {
                 >
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {systemVersions ? (
-                            (['adb', 'node', 'appium', 'uiautomator2', 'python', 'robot', 'appium_lib', 'scrcpy', 'ngrok'] as Array<keyof typeof systemVersions>).map((key) => (
-                                <div key={key} className="bg-zinc-50 dark:bg-black/20 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800/50 flex flex-col justify-between group h-20 transition-all hover:bg-zinc-100 dark:hover:bg-zinc-800/50">
-                                    <div className="flex items-center justify-between">
-                                        <span className="block text-xs uppercase text-zinc-500 font-bold">
-                                            {t(`settings.system.tools.${key}` as any) || key}
+                            (['adb', 'node', 'appium', 'uiautomator2', 'python', 'robot', 'appium_lib', 'scrcpy', 'ngrok'] as Array<keyof typeof systemVersions>)
+                                .filter(key => key !== 'ngrok' || isNgrokEnabled)
+                                .map((key) => (
+                                    <div key={key} className="bg-zinc-50 dark:bg-black/20 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800/50 flex flex-col justify-between group h-20 transition-all hover:bg-zinc-100 dark:hover:bg-zinc-800/50">
+                                        <div className="flex items-center justify-between">
+                                            <span className="block text-xs uppercase text-zinc-500 font-bold">
+                                                {t(`settings.system.tools.${key}` as any) || key}
+                                            </span>
+                                            <a
+                                                href={TOOL_LINKS[key as keyof typeof TOOL_LINKS]}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-zinc-400 hover:text-primary transition-colors opacity-0 group-hover:opacity-100"
+                                                title="View Documentation/Download"
+                                            >
+                                                <ExternalLink size={14} />
+                                            </a>
+                                        </div>
+                                        <span className="text-sm font-mono text-gray-900 dark:text-zinc-300 truncate block mt-1" title={systemVersions[key]}>
+                                            {systemVersions[key]}
                                         </span>
-                                        <a
-                                            href={TOOL_LINKS[key as keyof typeof TOOL_LINKS]}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-zinc-400 hover:text-primary transition-colors opacity-0 group-hover:opacity-100"
-                                            title="View Documentation/Download"
-                                        >
-                                            <ExternalLink size={14} />
-                                        </a>
                                     </div>
-                                    <span className="text-sm font-mono text-gray-900 dark:text-zinc-300 truncate block mt-1" title={systemVersions[key]}>
-                                        {systemVersions[key]}
-                                    </span>
-                                </div>
-                            ))
+                                ))
                         ) : (
                             <div className="text-zinc-400 italic col-span-full">{t('settings.system.checking')}</div>
                         )}

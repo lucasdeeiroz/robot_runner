@@ -185,6 +185,15 @@ export const en = {
                 payment_required_desc: "Free ngrok accounts require a valid credit card to use TCP tunnels. You won't be charged.",
                 add_card: "Add Card",
                 cancel_card: "Cancel"
+            },
+            security_warning: {
+                title: "Security Warning",
+                message: "Enabling remote connection (Ngrok) will expose your local device to the internet.\n\nEnsure this complies with your organization's Information Security policies before proceeding.",
+                cancel: "Cancel",
+                confirm: "Enable Ngrok"
+            },
+            action: {
+                enable_remote: "Enable Remote Connection"
             }
         },
         console: {

@@ -185,6 +185,15 @@ export const es = {
                 payment_required_desc: "Las cuentas gratuitas de ngrok requieren una tarjeta de crédito válida para usar túneles TCP. No se te cobrará.",
                 add_card: "Añadir Tarjeta",
                 cancel_card: "Cancelar"
+            },
+            security_warning: {
+                title: "Advertencia de Seguridad",
+                message: "Habilitar la conexión remota (Ngrok) expondrá su dispositivo local a Internet.\n\nAsegúrese de que esto cumpla con las políticas de Seguridad de la Información de su organización antes de continuar.",
+                cancel: "Cancelar",
+                confirm: "Habilitar Ngrok"
+            },
+            action: {
+                enable_remote: "Habilitar Conexión Remota"
             }
         },
         console: {

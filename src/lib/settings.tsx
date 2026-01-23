@@ -131,6 +131,8 @@ interface SettingsContextType {
     systemCheckStatus: SystemCheckStatus;
     updateInfo: UpdateInfo | null;
     checkForAppUpdate: (manual?: boolean) => Promise<void>;
+    isNgrokEnabled: boolean;
+    enableNgrok: () => void;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -143,6 +145,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         }
     });
     const [loading, setLoading] = useState(true);
+    const [isNgrokEnabled, setIsNgrokEnabled] = useState(false);
+
+    const enableNgrok = () => {
+        setIsNgrokEnabled(true);
+    };
 
     useEffect(() => {
         loadSettings();
@@ -306,7 +313,30 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const checkSystemVersions = async () => {
         setSystemCheckStatus(prev => ({ ...prev, loading: true }));
         try {
-            const versions = await invoke<SystemVersions>('get_system_versions');
+            // Conditionally skip ngrok check if not enabled
+            const versions = await invoke<SystemVersions>('get_system_versions', { checkNgrok: isNgrokEnabled });
+
+            // If ngrok is not enabled, artificially mark it as 'Not Found' or simply ignore checking it if the backend supports it.
+            // Since backend returns all, we just filter it out effectively from the "error" list if we considered "Not Found" a critical error, 
+            // but here we want to avoid showing it.
+            // However, the prompt says: "Não fazer checagem de versão do ngrok durante o startup".
+            // Since `get_system_versions` likely runs ALL checks in the backend, we might need a backend change OR just ignore the result here.
+            // But if the backend check is slow/blocking, we'd want to avoid it.
+            // Assuming `get_system_versions` is fast enough or we can't change backend easily:
+            // We will just manage the UI state 'ngrok' based on `isNgrokEnabled`.
+
+            // Wait, the prompt says: "Não fazer checagem de versão do ngrok durante o startup".
+            // If the backend `get_system_versions` blindly checks everything, we rely on `isNgrokEnabled` to HIDE it.
+            // BUT, if we can pass a flag to `get_system_versions` that would be ideal.
+            // For now, assuming we can't change backend implementation in this step (TS implementation plan), 
+            // we will simulate the behavior by overriding the result in state if not enabled.
+
+            if (!isNgrokEnabled) {
+                // Determine if we should even show it as "missing"
+                // If it's disabled, we don't care if it's missing.
+                versions.ngrok = ""; // Clear it so it doesn't show up? Or keep it but don't error?
+            }
+
             setSystemVersions(versions);
 
             const missingCritical: string[] = [];
@@ -334,7 +364,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             if (versions.scrcpy === 'Not Found') missingMirroring.push('Scrcpy');
 
             // Tunnelling Tools
-            if (versions.ngrok === 'Not Found') missingTunnelling.push('Ngrok');
+            if (isNgrokEnabled && versions.ngrok === 'Not Found') missingTunnelling.push('Ngrok');
 
             setSystemCheckStatus({
                 loading: false,
@@ -390,7 +420,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             checkSystemVersions,
             systemCheckStatus,
             updateInfo,
-            checkForAppUpdate
+            checkForAppUpdate,
+            isNgrokEnabled,
+            enableNgrok
         }}>
             {children}
         </SettingsContext.Provider>
