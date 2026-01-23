@@ -14,6 +14,7 @@ import { feedback } from "@/lib/feedback";
 import { FileSavedFeedback } from "@/components/molecules/FileSavedFeedback";
 import { useFileSave } from "@/hooks/useFileSave";
 import { SplitButton } from "@/components/molecules/SplitButton";
+import { usePerformanceRecorder } from "@/hooks/usePerformanceRecorder";
 
 interface ToolboxViewProps {
     session: TestSession;
@@ -149,12 +150,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
         }
     };
 
-    // Combine feedback paths
-    const activeSavedPath = screenshotSaver.lastSavedPath || recordingSaver.lastSavedPath;
-    const clearAllFeedback = () => {
-        screenshotSaver.clearFeedback();
-        recordingSaver.clearFeedback();
-    };
+
 
     const handleScrcpy = async () => {
         try {
@@ -211,6 +207,22 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
             setVisibleToolsInGrid(new Set(['console', 'logcat', 'commands', 'performance']));
         }
     }, [isGridView, visibleToolsInGrid.size, session.type]);
+
+    // Performance Hook
+    // Determine active state for performance hook:
+    // It is active if it's the active tool OR if we are in grid view and it's visible.
+    const isPerformanceActive = activeTool === 'performance' || (isGridView && visibleToolsInGrid.has('performance'));
+
+    const performanceState = usePerformanceRecorder(session.deviceUdid, isPerformanceActive);
+
+    // Combine feedback paths (add performance saved path)
+    const activeSavedPath = screenshotSaver.lastSavedPath || recordingSaver.lastSavedPath;
+
+    // Clear all feedback
+    const clearAllFeedback = () => {
+        screenshotSaver.clearFeedback();
+        recordingSaver.clearFeedback();
+    };
 
     return (
         <div ref={containerRef} className="h-full flex flex-col space-y-4 pointer-events-auto relative z-10">
@@ -416,7 +428,13 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                                     )}
                                     {tool === 'logcat' && <LogcatSubTab key={session.deviceUdid} selectedDevice={session.deviceUdid} />}
                                     {tool === 'commands' && <CommandsSubTab selectedDevice={session.deviceUdid} />}
-                                    {tool === 'performance' && <PerformanceSubTab selectedDevice={session.deviceUdid} />}
+                                    {tool === 'performance' && (
+                                        <PerformanceSubTab
+                                            selectedDevice={session.deviceUdid}
+                                            {...performanceState}
+                                            onRefresh={performanceState.fetchStats}
+                                        />
+                                    )}
                                     {tool === 'apps' && <AppsSubTab />}
                                 </GridToolItem>
                             );
@@ -438,7 +456,11 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                     </div>
 
                     <div className={clsx("h-full", activeTool === 'performance' ? "block" : "hidden")}>
-                        <PerformanceSubTab selectedDevice={session.deviceUdid} />
+                        <PerformanceSubTab
+                            selectedDevice={session.deviceUdid}
+                            {...performanceState}
+                            onRefresh={performanceState.fetchStats}
+                        />
                     </div>
 
                     <div className={clsx("h-full", activeTool === 'apps' ? "block" : "hidden")}>

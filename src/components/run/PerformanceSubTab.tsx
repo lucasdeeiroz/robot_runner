@@ -1,42 +1,46 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { invoke } from "@tauri-apps/api/core";
-import { join } from "@tauri-apps/api/path";
-import { save } from "@tauri-apps/plugin-dialog";
 import { Activity, Cpu, Battery, CircuitBoard, RefreshCw, Play, Square, Package as PackageIcon, Eye } from "lucide-react";
 import clsx from "clsx";
 import { useSettings } from "@/lib/settings";
-import { feedback } from "@/lib/feedback";
+
 import { FileSavedFeedback } from "@/components/molecules/FileSavedFeedback";
 import { Section } from "@/components/organisms/Section";
-
+import { DeviceStats } from "@/hooks/usePerformanceRecorder";
 
 interface PerformanceSubTabProps {
     selectedDevice: string;
+    stats: DeviceStats | null;
+    error: string | null;
+    autoRefresh: boolean;
+    setAutoRefresh: (val: boolean) => void;
+    selectedPackage: string;
+    setSelectedPackage: (val: string) => void;
+    isRecording: boolean;
+    toggleRecording: () => void;
+    lastSaved: string | null;
+    setLastSaved: (val: string | null) => void;
+
+    onRefresh: () => void;
 }
 
-interface AppStats {
-    cpu_usage: number;
-    ram_used: number;
-    fps: number;
-}
+export function PerformanceSubTab({
+    selectedDevice,
+    stats,
+    error,
+    autoRefresh,
+    setAutoRefresh,
+    selectedPackage,
+    setSelectedPackage,
+    isRecording,
+    toggleRecording,
+    lastSaved,
+    setLastSaved,
 
-interface DeviceStats {
-    cpu_usage: number;
-    ram_used: number;
-    ram_total: number;
-    battery_level: number;
-    app_stats?: AppStats;
-}
-
-export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
+    onRefresh
+}: PerformanceSubTabProps) {
     const { t } = useTranslation();
     const { settings } = useSettings();
-    const [stats, setStats] = useState<DeviceStats | null>(null);
-    // const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [autoRefresh, setAutoRefresh] = useState(true);
-    const [selectedPackage, setSelectedPackage] = useState<string>("");
 
     // Responsive State
     const containerRef = useRef<HTMLDivElement>(null);
@@ -52,98 +56,6 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
         observer.observe(containerRef.current);
         return () => observer.disconnect();
     }, []);
-
-    // Recording State
-    // Local feedback state for this specific streaming use-case
-    const [lastSaved, setLastSaved] = useState<string | null>(null);
-
-    // We keep isRecording state local
-    const [isRecording, setIsRecording] = useState(false);
-    const [recordingPath, setRecordingPath] = useState<string | null>(null);
-
-    useEffect(() => {
-        let interval: NodeJS.Timeout;
-        if (selectedDevice && autoRefresh) {
-            fetchStats();
-            interval = setInterval(fetchStats, 2000); // Poll every 2s
-        }
-        return () => clearInterval(interval);
-    }, [selectedDevice, autoRefresh, selectedPackage]);
-
-    const fetchStats = async () => {
-        try {
-            const data = await invoke<DeviceStats>('get_device_stats', {
-                device: selectedDevice,
-                package: selectedPackage || null
-            });
-            setStats(data);
-            setError(null);
-        } catch (e) {
-            feedback.toast.error("performance.fetch_error", e);
-            setError(t('performance.error'));
-        }
-    };
-
-    // Recording Logic - Append Data
-    useEffect(() => {
-        if (isRecording && stats && recordingPath) {
-            let line = `${new Date().toISOString()},${stats.cpu_usage.toFixed(2)},${stats.ram_used},${stats.battery_level}`;
-
-            // Add App stats if present
-            if (stats.app_stats) {
-                line += `,${stats.app_stats.cpu_usage.toFixed(2)},${stats.app_stats.ram_used},${stats.app_stats.fps}`;
-            } else {
-                line += ",,,"; // Empty placeholders
-            }
-            line += "\n";
-
-            invoke('save_file', { path: recordingPath, content: line, append: true })
-                .catch(e => feedback.toast.error("performance.save_error", e));
-        }
-    }, [stats, isRecording, recordingPath]);
-
-
-    const toggleRecording = async () => {
-        if (isRecording) {
-            if (recordingPath) {
-                // Just notify stopped, file is already written incrementally
-                setLastSaved(recordingPath);
-                feedback.toast.success('feedback.performance_saved');
-            }
-            setIsRecording(false);
-            setRecordingPath(null);
-        } else {
-            // Start Recording: Create File
-            const header = "Timestamp,System_CPU_%,System_RAM_KB,Battery_%" +
-                (selectedPackage ? ",App_CPU_%,App_RAM_KB,FPS" : "") + "\n";
-
-            try {
-                let savePath = "";
-                const filename = `performance_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
-
-                if (settings.paths.logs) {
-                    savePath = await join(settings.paths.logs, filename);
-                } else {
-                    // Fallback: use save dialog when no log path is configured.
-                    const selected = await save({
-                        filters: [{ name: 'CSV', extensions: ['csv'] }],
-                        defaultPath: filename
-                    });
-                    if (selected) savePath = selected;
-                }
-
-                if (savePath) {
-                    await invoke('save_file', { path: savePath, content: header, append: false });
-                    setRecordingPath(savePath);
-                    setIsRecording(true);
-                    setLastSaved(null);
-                    feedback.toast.success('feedback.recording_started');
-                }
-            } catch (e) {
-                feedback.toast.error("performance.record_error", e);
-            }
-        }
-    };
 
     const formatBytes = (kb: number, showUnit: boolean = true) => {
         if (!kb || kb === 0) return t('performance.na', 'N/A');
@@ -186,7 +98,7 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
                 status={
                     <div className="flex items-center gap-2">
                         <button
-                            onClick={fetchStats}
+                            onClick={onRefresh}
                             className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all active:scale-95"
                             title={t('performance.refresh')}
                         >
@@ -245,6 +157,8 @@ export function PerformanceSubTab({ selectedDevice }: PerformanceSubTabProps) {
                         {error}
                     </div>
                 )}
+
+
 
                 {/* Recording Feedback */}
                 <FileSavedFeedback
