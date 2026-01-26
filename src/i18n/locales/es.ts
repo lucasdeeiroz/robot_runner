@@ -83,7 +83,7 @@ export const es = {
             parse_error: "Error al procesar comandos guardados",
             cancel_error: "Error al cancelar comando",
             empty: "Seleccione un dispositivo para ejecutar comandos",
-            placeholder: "Ingrese comando ADB (ej: 'shell ls -la')",
+            input_placeholder: "Ingrese comando ADB (ej: 'shell ls -la')",
             waiting: "Esperando comandos...",
             clear: "Limpiar Consola",
             quick: "Rápido",
@@ -284,6 +284,10 @@ export const es = {
                 start_failed: "Error al iniciar logcat",
                 stop_failed: "Error al detener logcat",
                 app_not_running: "Aplicación no se está ejecutando: {{pkg}}"
+            },
+            status: {
+                waiting: "Esperando logs...",
+                empty: "No se capturaron logs"
             },
             saving: "Guardando logcat en",
             start: "Iniciar",

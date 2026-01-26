@@ -83,7 +83,7 @@ export const pt = {
             parse_error: "Falha ao processar comandos salvos",
             cancel_error: "Falha ao cancelar comando",
             empty: "Selecione um dispositivo para executar comandos",
-            placeholder: "Digite comando ADB (ex: 'shell ls -la')",
+            input_placeholder: "Digite comando ADB (ex: 'shell ls -la')",
             waiting: "Aguardando comandos...",
             clear: "Limpar Console",
             quick: "Rápido",
@@ -284,6 +284,10 @@ export const pt = {
                 start_failed: "Falha ao iniciar logcat",
                 stop_failed: "Falha ao parar logcat",
                 app_not_running: "App não está rodando: {{pkg}}"
+            },
+            status: {
+                waiting: "Aguardando logs...",
+                empty: "Nenhum log capturado"
             },
             saving: "Salvando logcat em",
             start: "Iniciar",

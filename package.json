@@ -36,7 +36,6 @@
     "recharts": "^3.6.0",
     "semver": "^7.7.3",
     "sonner": "^2.0.7",
-    "tailwind-material-colors": "^3.2.3",
     "tailwind-merge": "^3.4.0",
     "uuid": "^13.0.0"
   },

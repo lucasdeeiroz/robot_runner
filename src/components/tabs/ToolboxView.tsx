@@ -299,7 +299,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                                     "p-1.5 rounded-md transition-all",
                                     isMirrorDisabled
                                         ? "text-on-surface/80 cursor-not-allowed"
-                                        : "text-on-surface/80 hover:text-on-surface/80 hover:bg-on-primary"
+                                        : "text-on-surface/80 hover:text-primary hover:bg-primary/10"
                                 )}
                                 title={isMirrorDisabled ? t('startup.mirroring.description') : t('scrcpy.title')}
                             >
@@ -310,7 +310,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                                 variant="ghost"
                                 size="icon"
                                 onClick={handleScreenshot}
-                                className="text-on-surface/80 hover:text-on-surface/80 hover:bg-on-primary transition-all h-8 w-8"
+                                className="text-on-surface/80 hover:text-primary hover:bg-primary/10 transition-all h-8 w-8"
                                 title={t('toolbox.actions.screenshot')}
                             >
                                 <Camera size={18} />
@@ -322,7 +322,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                                     "rounded-md transition-all flex items-center gap-2 h-8 px-2",
                                     isRecording
                                         ? "bg-error-container text-on-error-container animate-pulse hover:bg-error-container/80"
-                                        : "text-on-surface/80 hover:text-on-surface/80 hover:bg-on-primary"
+                                        : "text-on-surface/80 hover:text-primary hover:bg-primary/10"
                                 )}
                                 title={isRecording ? t('toolbox.actions.stop_recording') : t('toolbox.actions.start_recording')}
                             >

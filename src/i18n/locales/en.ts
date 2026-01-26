@@ -83,7 +83,7 @@ export const en = {
             parse_error: "Failed to parse saved commands",
             cancel_error: "Failed to cancel command",
             empty: "Select a device to execute commands",
-            placeholder: "Enter ADB command (e.g. 'shell ls -la')",
+            input_placeholder: "Enter ADB command (e.g. 'shell ls -la')",
             waiting: "Waiting for commands...",
             clear: "Clear Console",
             quick: "Quick",
@@ -284,6 +284,10 @@ export const en = {
                 start_failed: "Failed to start logcat",
                 stop_failed: "Failed to stop logcat",
                 app_not_running: "App not running: {{pkg}}"
+            },
+            status: {
+                waiting: "Waiting for logs...",
+                empty: "No logs captured"
             },
             saving: "Saving logcat to",
             start: "Start",
