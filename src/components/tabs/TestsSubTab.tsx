@@ -222,7 +222,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
     ];
 
     return (
-        <div ref={containerRef} className="h-full flex flex-col w-full overflow-hidden p-4">
+        <div ref={containerRef} className="h-full flex flex-col w-full overflow-hidden">
             <WarningModal
                 isOpen={warningModal.isOpen}
                 onClose={() => setWarningModal(prev => ({ ...prev, isOpen: false }))}

@@ -227,7 +227,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
     };
 
     return (
-        <div ref={containerRef} className="h-full flex flex-col space-y-4 pointer-events-auto relative z-10">
+        <div ref={containerRef} className="h-full flex flex-col space-y-4 pointer-events-auto relative z-10 bg-surface rounded-xl p-4 border border-outline-variant/30">
             {/* Tool Selection Header */}
             <TabBar
                 tabs={[
