@@ -22,10 +22,10 @@ export function LinkRenderer({ content }: LinkRendererProps) {
         const path = linkMatch[2].trim();
         return (
             <div className="mb-0.5 pl-4">
-                <span className="text-zinc-500">{label}: </span>
+                <span className="text-on-surface-variant/80">{label}: </span>
                 <span
                     onClick={() => openLink(path)}
-                    className="text-blue-400 hover:text-blue-300 cursor-pointer hover:underline"
+                    className="text-primary hover:underline cursor-pointer"
                     title="Open File"
                 >
                     {path}
@@ -36,10 +36,10 @@ export function LinkRenderer({ content }: LinkRendererProps) {
 
     return (
         <div className={clsx(
-            "whitespace-pre-wrap break-all leading-tight mb-0.5",
-            content.includes("[Error]") || content.includes("STDERR") ? "text-red-400" :
-                content.includes("[System]") ? "text-blue-400 font-semibold" :
-                    "text-zinc-600 dark:text-zinc-300"
+            "on-primaryspace-pre-wrap break-all leading-tight mb-0.5",
+            content.includes("[Error]") || content.includes("STDERR") ? "text-error" :
+                content.includes("[System]") ? "text-primary font-semibold" :
+                    "text-on-surface/80"
         )}>
             {content}
         </div>

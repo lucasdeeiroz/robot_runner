@@ -7,6 +7,7 @@ import { XCircle, LayoutGrid, Minimize2, Maximize2, FileText } from 'lucide-reac
 import { PageHeader } from "@/components/organisms/PageHeader";
 import clsx from 'clsx';
 import { useTranslation } from "react-i18next";
+import { TabBar } from "@/components/organisms/TabBar";
 
 export function TestsPage() {
     const { t } = useTranslation();
@@ -134,79 +135,69 @@ export function TestsPage() {
             </div>
 
             {/* Modified Tabs Row with Grid Toggle */}
-            <div className="flex items-center gap-2">
-                <div className="flex-1 flex bg-zinc-100 dark:bg-zinc-800/50 p-1 rounded-lg overflow-x-auto no-scrollbar gap-1 border border-zinc-200 dark:border-zinc-800 shrink-0">
-                    <button
-                        onClick={() => {
-                            if (isGridView) setIsGridView(false);
-                            handleTabChange('history');
-                        }}
-                        className={clsx(
-                            "px-4 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap",
-                            !isGridView && subTab === 'history'
-                                ? "bg-white dark:bg-zinc-700 text-primary shadow-sm"
-                                : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-white/50 dark:hover:bg-zinc-700/50"
-                        )}
-                    >
-                        {t('tests_page.history')}
-                    </button>
-
-                    {sessions.map(s => {
+            <TabBar
+                tabs={[
+                    {
+                        id: 'history',
+                        label: t('tests_page.history'),
+                        selected: subTab === 'history' && !isGridView
+                    },
+                    ...sessions.map(s => {
                         const isSuccess = s.exitCode && (s.exitCode.includes("exit code: 0") || s.exitCode === "0");
                         const isFailed = s.status === 'finished' && !isSuccess;
-                        const isSelected = isGridView ? visibleGridSessions.has(s.runId) : subTab === s.runId;
 
-                        return (
-                            <div key={s.runId} className={clsx(
-                                "group flex items-center gap-2 pl-3 pr-2 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap border border-transparent cursor-pointer", // Added cursor-pointer
-                                isSelected
-                                    ? "bg-white dark:bg-zinc-700 text-primary shadow-sm border-zinc-200 dark:border-zinc-600"
-                                    : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-white/50 dark:hover:bg-zinc-700/50"
-                            )}
-                                onClick={() => {
-                                    if (isGridView) {
-                                        toggleGridSession(s.runId);
-                                    } else {
-                                        handleTabChange(s.runId);
-                                    }
-                                }}
-                            >
+                        return {
+                            id: s.runId,
+                            label: (
                                 <div className="flex items-center gap-2">
-                                    {/* Removed nested button to avoid click conflict, handled by parent div */}
-                                    {s.type === 'toolbox' && <span className="w-2.5 h-2.5 rounded-full bg-zinc-400" />}
+                                    {/* Status Dot */}
+                                    {s.type === 'toolbox' && <span className="w-2.5 h-2.5 rounded-full bg-on-surface/10" />}
                                     {s.type === 'test' && s.status === 'running' && <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse" />}
-                                    {s.type === 'test' && s.status === 'finished' && isSuccess && <span className="w-2.5 h-2.5 rounded-full bg-green-500" />}
-                                    {s.type === 'test' && isFailed && <span className="w-2.5 h-2.5 rounded-full bg-red-500" />}
-                                    {s.type === 'test' && s.status === 'error' && <span className="w-2.5 h-2.5 rounded-full bg-red-500" />}
-                                    <span>{s.deviceName}</span>
-                                    {s.androidVersion && <AndroidVersionPill version={s.androidVersion} />}
+                                    {s.type === 'test' && s.status === 'finished' && isSuccess && <span className="w-2.5 h-2.5 rounded-full bg-success" />}
+                                    {s.type === 'test' && isFailed && <span className="w-2.5 h-2.5 rounded-full bg-error" />}
+                                    {s.type === 'test' && s.status === 'error' && <span className="w-2.5 h-2.5 rounded-full bg-error" />}
+
+                                    <span>{s.deviceModel || s.deviceName}</span>
+                                    <AndroidVersionPill version={s.androidVersion} />
                                 </div>
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); clearSession(s.runId); }}
-                                    className="opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity p-0.5 rounded"
-                                    title={t('tests_page.close_tab')}
-                                >
-                                    <XCircle size={14} />
-                                </button>
-                            </div>
-                        );
-                    })}
-                </div>
-                {sessions.length >= 2 && (
-                    <button
-                        onClick={() => setIsGridView(!isGridView)}
-                        className={clsx(
-                            "p-2 rounded-lg border transition-all shrink-0",
-                            isGridView
-                                ? "bg-primary/10 border-primary text-primary"
-                                : "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
-                        )}
-                        title={isGridView ? t('toolbox.actions.switch_to_tabs') : t('toolbox.actions.switch_to_grid')}
-                    >
-                        <LayoutGrid size={20} />
-                    </button>
-                )}
-            </div>
+                            ),
+                            onClose: () => clearSession(s.runId),
+                            selected: isGridView ? visibleGridSessions.has(s.runId) : subTab === s.runId
+                        };
+                    })
+                ]}
+                activeId={subTab}
+                onChange={(id) => {
+                    if (isGridView) {
+                        if (id === 'history') {
+                            setIsGridView(false);
+                            handleTabChange('history');
+                        } else {
+                            toggleGridSession(id);
+                        }
+                    } else {
+                        handleTabChange(id);
+                    }
+                }}
+                variant="pills"
+                className="z-10 shrink-0"
+                actions={
+                    sessions.length >= 2 ? (
+                        <button
+                            onClick={() => setIsGridView(!isGridView)}
+                            className={clsx(
+                                "p-2 rounded-lg border transition-all shrink-0",
+                                isGridView
+                                    ? "bg-primary/10 border-none text-primary"
+                                    : "bg-transparent border-none text-on-surface-variant/80 hover:text-on-surface-variant/80 hover:bg-surface-variant/30"
+                            )}
+                            title={isGridView ? t('toolbox.actions.switch_to_tabs') : t('toolbox.actions.switch_to_grid')}
+                        >
+                            <LayoutGrid size={20} />
+                        </button>
+                    ) : undefined
+                }
+            />
 
             {/* Content */}
             {isGridView ? (
@@ -223,11 +214,11 @@ export function TestsPage() {
                                 className="min-w-0 h-full"
                                 title={
                                     <div className="flex items-center gap-2">
-                                        {s.type === 'toolbox' && <span className="w-2 h-2 rounded-full bg-zinc-400" />}
+                                        {s.type === 'toolbox' && <span className="w-2 h-2 rounded-full bg-on-surface/10" />}
                                         {s.type === 'test' && s.status === 'running' && <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />}
-                                        {s.type === 'test' && s.status === 'finished' && <span className={clsx("w-2 h-2 rounded-full", (s.exitCode?.includes("0") || s.exitCode === "0") ? "bg-green-500" : "bg-red-500")} />}
-                                        <span>{s.deviceName}</span>
-                                        {s.androidVersion && <AndroidVersionPill version={s.androidVersion} className="bg-zinc-100 dark:bg-zinc-800" />}
+                                        {s.type === 'test' && s.status === 'finished' && <span className={clsx("w-2 h-2 rounded-full", (s.exitCode?.includes("0") || s.exitCode === "0") ? "bg-success" : "bg-error")} />}
+                                        <span>{s.deviceModel || s.deviceName}</span>
+                                        <AndroidVersionPill version={s.androidVersion} className="bg-surface-variant/30" />
                                     </div>
                                 }
                                 onClose={() => clearSession(s.runId)}
@@ -249,7 +240,7 @@ export function TestsPage() {
                     ) : activeSession ? (
                         <ToolboxView key={activeSession.deviceUdid || activeSession.runId} session={activeSession} />
                     ) : (
-                        <div className="h-full flex items-center justify-center text-zinc-400">
+                        <div className="h-full flex items-center justify-center text-on-surface/80">
                             {t('tests_page.session_not_found')}
                         </div>
                     )}
@@ -264,18 +255,18 @@ function GridItem({ title, children, onClose, onHide, className, onMaximize }: {
     const { t } = useTranslation();
     return (
         <div className={clsx(
-            "flex flex-col border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900 shadow-sm min-h-0 relative z-0",
+            "flex flex-col border border-outline-variant/30 rounded-xl shadow-sm min-h-0 relative z-0",
             className
         )}>
-            <div className="flex items-center justify-between px-3 py-2 bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-100 dark:border-zinc-800 shrink-0">
-                <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-200 flex items-center gap-2 max-w-[80%] truncate">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-outline-variant/30 shrink-0">
+                <span className="text-sm font-semibold text-on-surface-variant/80 flex items-center gap-2 max-w-[80%] truncate">
                     {title}
                 </span>
                 <div className="flex items-center gap-1">
                     {onMaximize && (
                         <button
                             onClick={onMaximize}
-                            className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded"
+                            className="p-1 text-on-surface/80 hover:text-on-surface-variant/80 rounded"
                             title={t('common.maximize')}
                         >
                             <Maximize2 size={14} />
@@ -284,7 +275,7 @@ function GridItem({ title, children, onClose, onHide, className, onMaximize }: {
                     {onHide && (
                         <button
                             onClick={onHide}
-                            className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded"
+                            className="p-1 text-on-surface/80 hover:text-on-surface-variant/80 rounded"
                             title={t('common.minimize')}
                         >
                             <Minimize2 size={14} />
@@ -293,7 +284,7 @@ function GridItem({ title, children, onClose, onHide, className, onMaximize }: {
                     {onClose && (
                         <button
                             onClick={onClose}
-                            className="p-1 text-zinc-400 hover:text-red-500 rounded"
+                            className="p-1 text-on-surface/80 hover:text-error rounded"
                             title={t('common.close')}
                         >
                             <XCircle size={14} />

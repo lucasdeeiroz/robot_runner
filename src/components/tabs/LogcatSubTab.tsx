@@ -5,10 +5,11 @@ import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 
 import { useSettings } from "@/lib/settings";
-import clsx from "clsx";
 import { feedback } from "@/lib/feedback";
 import { FileSavedFeedback } from "@/components/molecules/FileSavedFeedback";
 import { Section } from "@/components/organisms/Section";
+import { Button } from "@/components/atoms/Button";
+import { Select } from "@/components/atoms/Select";
 
 interface LogcatSubTabProps {
     selectedDevice: string;
@@ -189,7 +190,7 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
 
     if (!selectedDevice) {
         return (
-            <div className="h-full flex flex-col items-center justify-center text-zinc-400">
+            <div className="h-full flex flex-col items-center justify-center text-on-surface/80">
                 <AlignLeft size={48} className="mb-4 opacity-20" />
                 <p>{t('logcat.select_device')}</p>
             </div>
@@ -205,88 +206,62 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
                 variant="transparent"
                 className="pb-2 mb-2 p-2"
                 status={
-                    <div className="text-xs text-zinc-400">
+                    <div className="text-xs text-on-surface/80">
                         {logs.length} {t('logcat.lines')}
                         <button
-                            className="p-1.5 ml-2 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-md text-zinc-600 dark:text-zinc-400"
+                            onClick={() => { setLogs([]); }}
+                            className="px-3 py-1.5 ml-2 rounded-md text-xs font-medium items-center justify-center gap-2 bg-surface text-on-surface/80 border border-outline-variant/30 hover:bg-surface-variant/50 transition-colors"
                             title={t('logcat.clear')}
-                            onClick={() => setLogs([])}
                         >
-                            <Eraser size={16} />
+                            <Eraser size={14} />
                         </button>
                     </div>
                 }
                 menus={!isNarrow ? (
                     <div className="flex items-center gap-2">
                         {/* Package Selector */}
-                        <div className="relative">
-                            <select
+                        <div className="w-40">
+                            <Select
+                                options={[
+                                    { label: t('logcat.entire_system'), value: "" },
+                                    ...(settings.tools?.appPackage ? settings.tools.appPackage.split(',') : []).map(p => ({ label: p.trim(), value: p.trim() })).filter(o => o.value)
+                                ]}
                                 value={selectedPackage}
                                 onChange={(e) => setSelectedPackage(e.target.value)}
-                                className={clsx(
-                                    "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 rounded-md py-1.5 text-xs focus:ring-2 focus:ring-primary/20 outline-none transition-all",
-                                    "pl-8 pr-2",
-                                    "truncate",
-                                    "w-40", // Fixed width for visibility
-                                    "disabled:opacity-50 disabled:cursor-not-allowed"
-                                )}
+                                leftIcon={<PackageIcon size={14} />}
                                 disabled={isStreaming}
-                            >
-                                <option value="">{t('logcat.entire_system')}</option>
-                                {(settings.tools?.appPackage ? settings.tools.appPackage.split(',') : []).map((pkg) => {
-                                    const p = pkg.trim();
-                                    return p ? <option key={p} value={p}>{p}</option> : null;
-                                })}
-                            </select>
-                            <PackageIcon
-                                size={14}
-                                className={clsx(
-                                    "absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none",
-                                    "block"
-                                )}
+                                containerClassName="w-full"
                             />
                         </div>
-                        <select
-                            value={logLevel}
-                            onChange={(e) => setLogLevel(e.target.value)}
-                            className="text-xs bg-zinc-200 dark:bg-zinc-700 border-none rounded-md px-2 py-1 text-zinc-700 dark:text-zinc-200 ml-2 focus:ring-1 focus:ring-primary outline-none"
-                            title={t('logcat.level')}
-                        >
-                            <option value="V">Verbose</option>
-                            <option value="D">Debug</option>
-                            <option value="I">Info</option>
-                            <option value="W">Warning</option>
-                            <option value="E">Error</option>
-                            <option value="F">Fatal</option>
-                            <option value="S">Silent</option>
-                        </select>
+                        <div className="w-28">
+                            <Select
+                                options={[
+                                    { label: "Verbose", value: "V" },
+                                    { label: "Debug", value: "D" },
+                                    { label: "Info", value: "I" },
+                                    { label: "Warning", value: "W" },
+                                    { label: "Error", value: "E" },
+                                    { label: "Fatal", value: "F" },
+                                    { label: "Silent", value: "S" },
+                                ]}
+                                value={logLevel}
+                                onChange={(e) => setLogLevel(e.target.value)}
+                            />
+                        </div>
                     </div>
                 ) : null
                 }
                 actions={
-                    <>
-
-
-                        <button
+                    <div className="flex gap-2">
+                        <Button
                             onClick={isStreaming ? stopLogcat : startLogcat}
-                            className={clsx(
-                                "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed",
-                                isStreaming
-                                    ? "bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
-                                    : "bg-primary text-white hover:opacity-90 shadow-sm"
-                            )}
+                            variant={isStreaming ? "danger" : "primary"}
+                            size="sm"
+                            leftIcon={isStreaming ? <Square size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
                         >
-                            {isStreaming ? (
-                                <>
-                                    <Square size={14} fill="currentColor" /> {!isNarrow && t('logcat.stop')}
-                                </>
-                            ) : (
-                                <>
-                                    <Play size={14} fill="currentColor" /> {!isNarrow && t('logcat.start')}
-                                </>
-                            )}
-                        </button>
-                    </>
+                            {!isNarrow && t(isStreaming ? 'logcat.stop' : 'logcat.start')}
+                        </Button>
+                    </div>
                 }
             />
 
@@ -296,20 +271,22 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
             />
 
             {/* Log Viewer */}
-            {/* Log Viewer */}
-            <div
-                className="flex-1 bg-white dark:bg-zinc-900 font-mono text-xs text-zinc-800 dark:text-zinc-300 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden"
-            >
+            {/* Log Area */}
+            <div className="flex-1 min-h-0 bg-surface text-on-surface/80 font-mono text-xs relative border border-outline-variant/30 rounded-lg">
                 {logs.length === 0 ? (
-                    <div className="h-full flex items-center justify-center text-zinc-400 dark:text-zinc-600">{t('logcat.no_logs')}</div>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-on-surface-variant/80 gap-2 pointer-events-none">
+                        <AlignLeft size={32} className="opacity-20" />
+                        <span className="opacity-50">{isStreaming ? t('logcat.status.waiting') : t('logcat.status.empty')}</span>
+                    </div>
                 ) : (
                     <Virtuoso
                         ref={virtuosoRef}
                         data={logs}
+                        className="custom-scrollbar"
                         followOutput="auto"
                         atBottomThreshold={50} // If user scrolls up, stop auto-scrolling
                         itemContent={(_, log) => (
-                            <div className="whitespace-pre-wrap hover:bg-zinc-100 dark:hover:bg-white/5 px-2 py-0.5 break-all">
+                            <div className="on-primaryspace-pre-wrap hover:bg-surface-variant/30 px-2 py-0.5 break-all transition-colors">
                                 {log.startsWith(t('feedback.saved_to_prefix')) ? (
                                     <span
                                         className="text-primary underline cursor-pointer hover:opacity-80"

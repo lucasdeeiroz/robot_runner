@@ -261,6 +261,7 @@ export const pt = {
             properties: "Propriedades do Nó",
             select_element: "Selecione um elemento na tela",
             attributes: {
+                copied: "Copiado!",
                 all: "Todos Atributos",
                 xpath: "XPath",
                 resource_id: "Resource ID",
@@ -328,6 +329,7 @@ export const pt = {
             commands: "Comandos",
             device: {
                 no_device: "Nenhum Dispositivo",
+                no_devices_found: "Nenhum dispositivo encontrado",
                 selected_count: "{{count}} Selecionados",
                 select: "Selecionar Dispositivos",
                 busy: "Ocupado",
@@ -510,7 +512,7 @@ export const pt = {
                 server_not_ready: "O Servidor Appium não está pronto"
             },
             options: {
-                dont_overwrite: "Não sobrescrever logs"
+                dont_overwrite: "Salvar Logs"
             }
         },
         tests_page: {

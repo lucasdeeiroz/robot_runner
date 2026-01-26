@@ -10,14 +10,14 @@ export function AndroidVersionPill({ version, className }: AndroidVersionPillPro
     if (!version) return null;
 
     return (
-        <div 
+        <div
             className={clsx(
-                "flex items-center gap-1 text-[10px] text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded-full",
+                "flex items-center gap-1 text-[10px] text-on-surface/80 bg-surface-variant/50 px-1.5 py-0.5 rounded-full",
                 className
-            )} 
+            )}
             title={`Android ${version}`}
         >
-            <Bot size={12} className="text-zinc-400" />
+            <Bot size={12} className="text-on-surface/80" />
             <span>{version}</span>
         </div>
     );

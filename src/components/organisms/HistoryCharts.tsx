@@ -20,8 +20,8 @@ interface HistoryChartsProps {
 }
 
 const COLORS = {
-    PASS: '#22c55e', // green-500
-    FAIL: '#ef4444', // red-500
+    PASS: '#22c55e', // success
+    FAIL: '#ef4444', // error
     // Additional colors for groups if needed
     blue: '#3b82f6',
     orange: '#f97316',
@@ -89,8 +89,8 @@ export function HistoryCharts({ logs, groupBy }: HistoryChartsProps) {
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6 animate-in fade-in slide-in-from-top-4 duration-500">
             {/* Status Distribution (Pie) */}
-            <div className="bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-700/50 rounded-lg p-4 flex flex-col">
-                <div className="flex items-center gap-2 mb-4 text-zinc-600 dark:text-zinc-400 font-medium text-sm border-b border-zinc-200 dark:border-zinc-700 pb-2">
+            <div className="bg-surface/50 border border-outline-variant/30 rounded-lg p-4 flex flex-col">
+                <div className="flex items-center gap-2 mb-4 text-on-surface-variant/80 font-medium text-sm border-b border-outline-variant/30 pb-2">
                     <PieIcon size={16} />
                     {t('tests_page.charts.status_distribution')}
                 </div>
@@ -122,8 +122,8 @@ export function HistoryCharts({ logs, groupBy }: HistoryChartsProps) {
 
             {/* Group Performance (Bar) */}
             {groupBy !== 'none' && groupBy !== 'status' && (
-                <div className="bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-700/50 rounded-lg p-4 flex flex-col">
-                    <div className="flex items-center gap-2 mb-4 text-zinc-600 dark:text-zinc-400 font-medium text-sm border-b border-zinc-200 dark:border-zinc-700 pb-2">
+                <div className="bg-surface/50 border border-outline-variant/30 rounded-lg p-4 flex flex-col">
+                    <div className="flex items-center gap-2 mb-4 text-on-surface-variant/80 font-medium text-sm border-b border-outline-variant/30 pb-2">
                         <BarIcon size={16} />
                         {t('tests_page.charts.group_performance', { group: t(`tests_page.filter.${groupBy}`) })}
                     </div>
@@ -157,7 +157,7 @@ export function HistoryCharts({ logs, groupBy }: HistoryChartsProps) {
 
             {/* Placeholder if no grouping selected */}
             {groupBy === 'none' && (
-                <div className="bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-700/50 rounded-lg p-4 flex flex-col items-center justify-center text-zinc-400 text-sm">
+                <div className="bg-surface/50 border border-outline-variant/30 rounded-lg p-4 flex flex-col items-center justify-center text-on-surface/80 text-sm">
                     <BarIcon size={32} className="mb-2 opacity-50" />
                     <p>{t('tests_page.charts.select_group')}</p>
                 </div>

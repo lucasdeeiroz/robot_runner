@@ -11,7 +11,7 @@ export function Layout({ children, activePage, onNavigate }: LayoutProps) {
     return (
         <div
             className="flex h-screen overflow-hidden transition-colors duration-300"
-            style={{ backgroundColor: 'var(--bg-app)', color: 'var(--text-app)' }}
+            style={{ backgroundColor: 'var(--bg-app-variant)', color: 'var(--text-app-variant)' }}
         >
             <Sidebar activePage={activePage} onNavigate={onNavigate} />
             <main

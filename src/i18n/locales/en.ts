@@ -261,6 +261,7 @@ export const en = {
             properties: "Node Properties",
             select_element: "Select an element on the screenshot",
             attributes: {
+                copied: "Copied!",
                 all: "All Attributes",
                 xpath: "XPath",
                 resource_id: "Resource ID",
@@ -328,6 +329,7 @@ export const en = {
             commands: "Commands",
             device: {
                 no_device: "No Device Selected",
+                no_devices_found: "No devices found",
                 selected_count: "{{count}} Devices Selected",
                 select: "Select Devices",
                 busy: "Busy",
@@ -510,7 +512,7 @@ export const en = {
                 server_not_ready: "The Appium server is not ready"
             },
             options: {
-                dont_overwrite: "Don't Overwrite Logs"
+                dont_overwrite: "Save Logs"
             }
         },
         tests_page: {

@@ -25,11 +25,11 @@ export const IconBox = ({ icon: Icon, size = 'md', variant = 'primary', classNam
 
     const variants = {
         primary: 'bg-primary/10 text-primary',
-        success: 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400',
-        warning: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400',
-        error: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400',
-        neutral: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400',
-        transparent: 'bg-transparent text-zinc-500 dark:text-zinc-400',
+        success: 'bg-success/10 text-success',
+        warning: 'bg-warning/10 text-warning',
+        error: 'bg-error/10 text-error',
+        neutral: 'bg-surface-variant/10 text-on-surface/80',
+        transparent: 'bg-transparent text-on-surface-variant/80',
     };
 
     return (

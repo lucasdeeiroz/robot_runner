@@ -29,7 +29,7 @@ export const Section = ({
 }: SectionProps) => {
 
     const containerStyles = {
-        card: 'bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm',
+        card: 'bg-surface border border-outline-variant/30 rounded-xl p-6 shadow-sm',
         transparent: 'bg-transparent',
     };
 
@@ -44,7 +44,7 @@ export const Section = ({
                     <div>
                         <Heading level={4} className={!icon ? "ml-1" : ""}>{title}</Heading>
                         {description && (
-                            <p className="text-sm text-zinc-500 font-normal mt-0.5">{description}</p>
+                            <p className="text-sm text-on-surface/80 font-normal mt-0.5">{description}</p>
                         )}
                     </div>
                 </div>
@@ -55,14 +55,14 @@ export const Section = ({
                         {status && (
                             <>
                                 <div className="flex items-center gap-2">{status}</div>
-                                {(menus || actions) && <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-700 mx-1" />}
+                                {(menus || actions) && <div className="h-4 w-px bg-outline-variant mx-1" />}
                             </>
                         )}
 
                         {menus && (
                             <>
                                 <div className="flex items-center gap-2">{menus}</div>
-                                {actions && <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-700 mx-1" />}
+                                {actions && <div className="h-4 w-px bg-outline-variant mx-1" />}
                             </>
                         )}
 
