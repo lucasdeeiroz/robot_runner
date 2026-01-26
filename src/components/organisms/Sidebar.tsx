@@ -63,7 +63,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
             collapsed ? "w-16" : "w-64"
         )}>
             {/* Header */}
-            <div className="p-4 flex items-center justify-between border-b border-outline-variant/30 h-[65px]">
+            <div className="p-4 flex items-center justify-between h-[65px]">
                 {!collapsed && (
                     settings.theme === 'light' && settings.customLogoLight ? (
                         <CustomLogo key={settings.customLogoLight} path={settings.customLogoLight} className="h-8 object-contain" />
