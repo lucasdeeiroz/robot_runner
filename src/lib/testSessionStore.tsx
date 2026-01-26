@@ -34,7 +34,7 @@ interface TestFinishedPayload {
 interface TestSessionContextType {
     sessions: TestSession[];
     addSession: (runId: string, deviceUdid: string, deviceName: string, testPath: string, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string) => void;
-    addToolboxSession: (deviceUdid: string, deviceName: string) => void; // New action
+    addToolboxSession: (deviceUdid: string, deviceName: string, deviceModel?: string, androidVersion?: string) => void; // New action
     rerunSession: (runId: string, rerunFailedFrom?: string) => Promise<void>;
     stopSession: (runId: string) => Promise<void>;
     clearSession: (runId: string) => void;
@@ -148,7 +148,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
         feedback.toast.info('feedback.test_started');
     }, [settings.recycleDeviceViews]);
 
-    const addToolboxSession = useCallback((deviceUdid: string, deviceName: string) => {
+    const addToolboxSession = useCallback((deviceUdid: string, deviceName: string, deviceModel?: string, androidVersion?: string) => {
         const runId = `toolbox-${deviceUdid}`;
 
         setSessions(prev => {
@@ -178,7 +178,9 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     deviceName,
                     testPath: 'Toolbox',
                     logs: [],
-                    status: 'running'
+                    status: 'running',
+                    deviceModel,
+                    androidVersion
                 }
             ];
         });

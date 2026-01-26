@@ -59,23 +59,23 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
 
     return (
         <div className={cn(
-            "h-screen bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md border-r border-zinc-200 dark:border-zinc-800 transition-all duration-300 flex flex-col",
+            "h-screen bg-surface backdrop-blur-md border-r border-outline-variant/30 transition-all duration-300 flex flex-col",
             collapsed ? "w-16" : "w-64"
         )}>
             {/* Header */}
-            <div className="p-4 flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 h-[65px]">
+            <div className="p-4 flex items-center justify-between border-b border-outline-variant/30 h-[65px]">
                 {!collapsed && (
                     settings.theme === 'light' && settings.customLogoLight ? (
                         <CustomLogo key={settings.customLogoLight} path={settings.customLogoLight} className="h-8 object-contain" />
                     ) : settings.theme === 'dark' && settings.customLogoDark ? (
                         <CustomLogo key={settings.customLogoDark} path={settings.customLogoDark} className="h-8 object-contain" />
                     ) : (
-                        <span className="font-bold text-lg text-gray-900 dark:text-white tracking-tight">Robot Runner</span>
+                        <span className="font-bold text-lg text-on-surface/80 tracking-tight">Robot Runner</span>
                     )
                 )}
                 <button
                     onClick={() => setCollapsed(!collapsed)}
-                    className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 dark:text-zinc-400 hover:text-gray-900 dark:hover:text-white transition-transform active:scale-95"
+                    className="p-1 hover:bg-surface-variant/50 rounded-lg text-on-surface-variant/80 hover:text-on-surface/80 transition-transform active:scale-95"
                 >
                     <Menu size={20} />
                 </button>
@@ -90,8 +90,8 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                         className={cn(
                             "w-full flex items-center p-2 rounded-xl transition-all duration-200 active:scale-95 relative",
                             activePage === item.id
-                                ? "bg-primary text-white shadow-md shadow-primary/20"
-                                : "text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-white",
+                                ? "bg-primary/10 text-primary shadow-primary/20"
+                                : "text-on-surface-variant/80/80 hover:bg-surface-variant/50 hover:text-on-surface/80",
                             collapsed ? "justify-center" : "gap-3"
                         )}
                         title={collapsed ? item.label : undefined}
@@ -105,19 +105,19 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
             </nav>
 
             {/* Footer */}
-            <div className="p-4 border-t border-zinc-200 dark:border-zinc-800">
-                {!collapsed && <div className="text-xs text-zinc-500 flex justify-between items-center">
+            <div className="p-4 border-t border-outline-variant">
+                {!collapsed && <div className="text-xs text-on-surface-variant/80 flex justify-between items-center">
                     <span>v{appVersion}</span>
                     {updateAvailable && (
                         <button
                             onClick={() => onNavigate('about')}
-                            className="text-red-500 font-bold text-[10px] bg-red-100 dark:bg-red-900/30 px-1.5 py-0.5 rounded hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors animate-pulse cursor-pointer"
+                            className="text-error font-bold text-[10px] bg-error-container px-1.5 py-0.5 rounded hover:bg-error-container/80 transition-colors animate-pulse cursor-pointer"
                         >
                             {t('about.update_badge')}
                         </button>
                     )}
                 </div>}
             </div>
-        </div>
+        </div >
     );
 }

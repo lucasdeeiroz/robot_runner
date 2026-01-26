@@ -186,8 +186,13 @@ jobs:
                     }
 
                     if (-not ($content -match "ReleaseDate:")) {
-                        $content = $content + "`nReleaseDate: $date"
-                        Write-Host "Added ReleaseDate: $date to $($localeManifest.Name)"
+                        if ($content -match "ReleaseNotesUrl:") {
+                            $content = $content -replace "(ReleaseNotesUrl: .+)", "`$1`nReleaseDate: $date"
+                            Write-Host "Inserted ReleaseDate after ReleaseNotesUrl in $($localeManifest.Name)"
+                        } else {
+                            $content = $content + "`nReleaseDate: $date"
+                            Write-Host "Added ReleaseDate: $date to $($localeManifest.Name)"
+                        }
                     }
 
                     Set-Content -Path $localeManifest.FullName -Value $content

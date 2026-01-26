@@ -83,7 +83,7 @@ export const es = {
             parse_error: "Error al procesar comandos guardados",
             cancel_error: "Error al cancelar comando",
             empty: "Seleccione un dispositivo para ejecutar comandos",
-            placeholder: "Ingrese comando ADB (ej: 'shell ls -la')",
+            input_placeholder: "Ingrese comando ADB (ej: 'shell ls -la')",
             waiting: "Esperando comandos...",
             clear: "Limpiar Consola",
             quick: "Rápido",
@@ -150,14 +150,15 @@ export const es = {
             },
             actions: {
                 connect: "Conectar",
-                pair: "Emparejar",
-                disconnect: "Desconectar",
-                start_tunnel: "Iniciar Túnel Público",
-                stop_tunnel: "Detener Túnel",
                 copy: "¡Copiado!",
-                paste_url: "Pegar URL",
+                disconnect: "Desconectar",
                 disconnect_all: "Desconectar Todos",
-                rerun_failed: "Reejecutar Fallos"
+                enable_remote: "Habilitar Conexión Remota",
+                pair: "Emparejar",
+                paste_url: "Pegar URL",
+                rerun_failed: "Reejecutar Fallos",
+                start_tunnel: "Iniciar Túnel Público",
+                stop_tunnel: "Detener Túnel"
             },
             status: {
                 tunnel_active: "Túnel Activo",
@@ -185,6 +186,12 @@ export const es = {
                 payment_required_desc: "Las cuentas gratuitas de ngrok requieren una tarjeta de crédito válida para usar túneles TCP. No se te cobrará.",
                 add_card: "Añadir Tarjeta",
                 cancel_card: "Cancelar"
+            },
+            security_warning: {
+                title: "Advertencia de Seguridad",
+                message: "Habilitar la conexión remota (Ngrok) expondrá su dispositivo local a Internet.\n\nAsegúrese de que esto cumpla con las políticas de Seguridad de la Información de su organización antes de continuar.",
+                cancel: "Cancelar",
+                confirm: "Habilitar Ngrok"
             }
         },
         console: {
@@ -254,6 +261,7 @@ export const es = {
             properties: "Propiedades del Nodo",
             select_element: "Seleccione un elemento en la pantalla",
             attributes: {
+                copied: "¡Copiado!",
                 all: "Todos los Atributos",
                 xpath: "XPath",
                 resource_id: "Resource ID",
@@ -276,6 +284,10 @@ export const es = {
                 start_failed: "Error al iniciar logcat",
                 stop_failed: "Error al detener logcat",
                 app_not_running: "Aplicación no se está ejecutando: {{pkg}}"
+            },
+            status: {
+                waiting: "Esperando logs...",
+                empty: "No se capturaron logs"
             },
             saving: "Guardando logcat en",
             start: "Iniciar",
@@ -321,10 +333,12 @@ export const es = {
             commands: "Comandos",
             device: {
                 no_device: "Ningún Dispositivo",
+                no_devices_found: "No se encontraron dispositivos",
                 selected_count: "{{count}} Seleccionados",
                 select: "Seleccionar Dispositivos",
                 busy: "Ocupado",
-                refresh: "Actualizar Dispositivos"
+                refresh: "Actualizar Dispositivos",
+                open_toolbox: "Abrir Caja de Herramientas"
             },
             console: {
                 running: "EJECUTANDO",
@@ -385,10 +399,14 @@ export const es = {
                 dark: "Oscuro",
                 primary_color: "Color Primario",
                 sidebar_logo: "Logo de la Barra Lateral",
-                logo_light: "Logo Modo Claro",
-                logo_dark: "Logo Modo Oscuro",
+                logo_light: "Modo Claro",
+                logo_dark: "Modo Oscuro",
                 use_default: "Predeterminado (Texto)",
-                logo_hint: "Recomendado: PNG, Altura 40px, Ancho Máx 200px"
+                logo_hint: "Recomendado: PNG, Altura 40px, Ancho Máx 200px",
+                logo_set: "Logo establecido",
+                no_logo: "Ningún logo",
+                upload_logo: "Subir Logo",
+                remove_logo: "Eliminar Logo"
             },
             tool_config: {
                 appium_args: "Argumentos Appium",
@@ -498,7 +516,7 @@ export const es = {
                 server_not_ready: "El servidor Appium no está listo"
             },
             options: {
-                dont_overwrite: "No sobrescribir logs"
+                dont_overwrite: "Guardar Logs"
             }
         },
         tests_page: {

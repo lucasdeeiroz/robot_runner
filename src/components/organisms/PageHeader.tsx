@@ -19,7 +19,7 @@ export const PageHeader = ({ title, description, icon, iconSize = 'lg', rightEle
                     <IconBox icon={icon} size={iconSize} variant="primary" />
                 )}
                 <div>
-                    <Heading level={2} className="text-zinc-700 dark:text-zinc-200">{title}</Heading>
+                    <Heading level={2} className="text-on-surface/80">{title}</Heading>
                     {description && (
                         <Text variant="muted" size="sm">
                             {description}

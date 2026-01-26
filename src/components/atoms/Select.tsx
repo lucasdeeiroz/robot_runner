@@ -12,6 +12,7 @@ export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
     options: SelectOption[];
     error?: string;
     containerClassName?: string;
+    leftIcon?: React.ReactNode;
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(({
@@ -21,6 +22,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(({
     error,
     id,
     containerClassName,
+    leftIcon,
     ...props
 }, ref) => {
     const selectId = id || React.useId();
@@ -30,22 +32,27 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(({
             {label && (
                 <label
                     htmlFor={selectId}
-                    className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+                    className="block text-sm font-medium text-on-surface-variant/80"
                 >
                     {label}
                 </label>
             )}
             <div className="relative">
+                {leftIcon && (
+                    <div className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant/80">
+                        {leftIcon}
+                    </div>
+                )}
                 <select
                     ref={ref}
                     id={selectId}
                     className={twMerge(
-                        "w-full appearance-none rounded-lg border border-zinc-200 bg-white px-3 py-2 pr-10 text-sm text-zinc-900",
-                        "focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500",
-                        "dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100",
+                        "w-full appearance-none rounded-lg border border-outline-variant/30 bg-surface px-3 py-2 pr-10 text-sm text-on-surface/80",
+                        "focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/80",
                         "disabled:cursor-not-allowed disabled:opacity-50",
                         "transition-all duration-200",
-                        error && "border-red-500 focus:border-red-500 focus:ring-red-500/20",
+                        leftIcon && "pl-9",
+                        error && "border-error focus:border-error focus:ring-error/20",
                         className
                     )}
                     {...props}
@@ -56,12 +63,12 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(({
                         </option>
                     ))}
                 </select>
-                <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500">
+                <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant/80">
                     <ChevronDown size={16} />
                 </div>
             </div>
             {error && (
-                <p className="text-xs text-red-500 animate-in slide-in-from-top-1 fade-in">
+                <p className="text-xs text-error animate-in slide-in-from-top-1 fade-in">
                     {error}
                 </p>
             )}

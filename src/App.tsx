@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Layout } from "./components/templates/Layout";
-import { RunTab } from "./pages/RunTab";
+import { RunPage } from "./pages/RunPage";
 import { TestsPage } from "./pages/TestsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { AboutPage } from "./pages/AboutPage";
@@ -11,6 +11,7 @@ import { useSettings } from "./lib/settings";
 import { SystemCheckOverlay } from "./components/organisms/SystemCheckOverlay";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import "./App.css";
+import { argbFromHex, themeFromSourceColor, TonalPalette } from "@material/material-color-utilities";
 
 function App() {
   const [activePage, setActivePage] = useState("run");
@@ -66,7 +67,8 @@ function App() {
     if (typeof window === 'undefined') return;
 
     // Theme logic
-    if (settings.theme === 'dark') {
+    const isDark = settings.theme === 'dark';
+    if (isDark) {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
@@ -83,8 +85,64 @@ function App() {
       pink: '#db2777',
     };
 
-    const color = colors[settings.primaryColor] || colors.blue;
-    document.documentElement.style.setProperty('--color-primary', color);
+    const colorHex = colors[settings.primaryColor] || colors.blue;
+
+    // Generate and apply Material 3 theme
+    // Generate and apply Material 3 theme manually to match Tailwind's expected RGB format
+    try {
+      const theme = themeFromSourceColor(argbFromHex(colorHex));
+      const scheme = isDark ? theme.schemes.dark : theme.schemes.light;
+
+      // Helper to convert decimal ARGB to RGB space-separated string
+      const toRgb = (argb: number) => {
+        const r = (argb >> 16) & 0xFF;
+        const g = (argb >> 8) & 0xFF;
+        const b = argb & 0xFF;
+        return `${r} ${g} ${b}`;
+      };
+
+      // Apply all colors from the scheme
+      const jsonScheme = scheme.toJSON();
+      for (const [key, value] of Object.entries(jsonScheme)) {
+        // Convert camelCase to kebab-case (e.g. onPrimary -> on-primary)
+        const token = key.replace(/([A-Z])/g, "-$1").toLowerCase();
+        const colorValue = toRgb(value);
+        document.documentElement.style.setProperty(`--md-sys-color-${token}`, colorValue);
+      }
+
+      // Generate Custom Colors (Success, Warning, Info)
+      // We use TonalPalette to generate the correct tones for Light/Dark modes
+      // Mapping:
+      // Light: Color=40, On=100, Container=90, OnContainer=10
+      // Dark:  Color=80, On=20,  Container=30, OnContainer=90
+      const customColors = {
+        success: '#22c55e', // success
+        warning: '#eab308', // warning
+        info: '#0ea5e9',    // sky-500
+      };
+
+      for (const [name, hex] of Object.entries(customColors)) {
+        const palette = TonalPalette.fromInt(argbFromHex(hex));
+        const setVar = (role: string, tone: number) => {
+          document.documentElement.style.setProperty(`--md-sys-color-${name}${role}`, toRgb(palette.tone(tone)));
+        };
+
+        if (isDark) {
+          setVar('', 80);            // color-success
+          setVar('-on', 20);         // color-on-success
+          setVar('-container', 30);  // color-success-container
+          setVar('-on-container', 90); // color-on-success-container
+        } else {
+          setVar('', 40);            // color-success
+          setVar('-on', 100);        // color-on-success
+          setVar('-container', 90);  // color-success-container
+          setVar('-on-container', 10); // color-on-success-container
+        }
+      }
+
+    } catch (e) {
+      console.error("Failed to apply Material theme:", e);
+    }
 
   }, [settings.theme, settings.primaryColor]);
 
@@ -117,7 +175,7 @@ function App() {
         <div className="max-w-7xl mx-auto h-full flex flex-col">
           <div className="flex-1 min-h-0 relative">
             <div className={clsx("absolute inset-0 flex flex-col", activePage === 'run' ? "z-10" : "z-0 hidden")}>
-              <RunTab onNavigate={setActivePage} initialTab={initialSubTab} />
+              <RunPage onNavigate={setActivePage} initialTab={initialSubTab} />
             </div>
             {activePage === 'tests' && <TestsPage />}
             {activePage === 'settings' && <SettingsPage />}
@@ -125,8 +183,8 @@ function App() {
 
             {/* Placeholder for other pages */}
             {activePage !== 'run' && activePage !== 'tests' && activePage !== 'settings' && activePage !== 'about' && (
-              <div className="p-12 text-center border-2 border-dashed border-zinc-800 rounded-lg">
-                <p className="text-zinc-500">Module {activePage} coming soon...</p>
+              <div className="p-12 text-center border-2 border-dashed border-outline-variant/30 rounded-lg">
+                <p className="text-on-surface-variant/80">Module {activePage} coming soon...</p>
               </div>
             )}
           </div>

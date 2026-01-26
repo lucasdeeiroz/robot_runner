@@ -6,6 +6,7 @@ import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { Modal } from "@/components/organisms/Modal";
 import { feedback } from "@/lib/feedback";
 import { Section } from "@/components/organisms/Section";
+import { Button } from "@/components/atoms/Button";
 
 interface CommandsSubTabProps {
     selectedDevice: string;
@@ -155,7 +156,7 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
 
     if (!selectedDevice) {
         return (
-            <div className="h-full flex flex-col items-center justify-center text-zinc-400">
+            <div className="h-full flex flex-col items-center justify-center text-on-surface/80">
                 <Terminal size={48} className="mb-4 opacity-20" />
                 <p>{t('commands.empty')}</p>
             </div>
@@ -170,7 +171,7 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
                 variant="transparent"
                 className="pb-2 mb-2 p-2"
                 status={
-                    <div className="text-xs text-zinc-400">
+                    <div className="text-xs text-on-surface/80">
                         {selectedDevice}
                     </div>
                 }
@@ -179,7 +180,7 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
                 actions={
                     <button
                         onClick={() => setHistory([])}
-                        className="p-1 hover:text-red-500 transition-colors"
+                        className="p-1 hover:text-error transition-colors"
                         title={t('commands.clear')}
                     >
                         <Trash2 size={16} />
@@ -188,11 +189,11 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
             />
 
             {/* Console Output */}
-            <div className="flex-1 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-300 font-mono text-xs rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 overflow-y-auto whitespace-pre-wrap">
+            <div className="flex-1 bg-surface text-on-surface/50 font-mono text-xs rounded-lg border border-outline-variant/30 p-4 overflow-y-auto on-primaryspace-pre-wrap">
                 {history.length === 0 && <span className="opacity-30">{t('commands.waiting')}</span>}
                 {history.map((line, i) => (
-                    <div key={i} className={line.startsWith('>') ? "text-primary font-bold mt-2" : "text-zinc-800 dark:text-zinc-300"}>
-                        {line}
+                    <div key={i} className="text-on-surface/80 on-primaryspace-pre-wrap break-all">
+                        {line.startsWith('>') ? <span className="text-primary font-bold">{line}</span> : line}
                     </div>
                 ))}
             </div>
@@ -201,13 +202,13 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
             <div className="space-y-2 p-2">
                 {/* Quick Actions */}
                 <div className="flex gap-2 flex-wrap">
-                    <span className="text-xs font-semibold text-zinc-400 self-center mr-2">{t('commands.quick')}:</span>
+                    <span className="text-xs font-semibold text-on-surface/80 self-center mr-2">{t('commands.quick')}:</span>
                     {quickActions.map(action => (
                         <button
                             key={action.label}
                             onClick={() => executeCommand(action.cmd, action.label)}
                             disabled={isExecuting}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-md text-xs font-medium transition-colors border border-zinc-200 dark:border-zinc-700 disabled:opacity-50"
+                            className="flex items-center gap-2 px-3 py-1.5 bg-surface-variant/30 hover:bg-outline-variant rounded-md text-xs font-medium transition-colors border border-outline-variant/30 disabled:opacity-50"
                         >
                             {action.icon}
                             {action.label}
@@ -218,24 +219,23 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
                 {/* Saved Commands */}
                 {savedCommands.length > 0 && (
                     <div className="flex gap-2 flex-wrap">
-                        <span className="text-xs font-semibold text-amber-500/80 self-center mr-2">{t('commands.saved')}:</span>
+                        <span className="text-xs font-semibold text-warning/80 self-center mr-2">{t('commands.saved')}:</span>
                         {savedCommands.map(saved => (
                             <div
                                 key={saved.id}
-                                className="group flex items-center gap-1 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30 rounded-md px-1 pr-2 overflow-hidden"
+                                className="group flex items-center gap-1 bg-warning-container/50 border border-warning/20 rounded-md px-1 pr-2 overflow-hidden"
                             >
                                 <button
                                     onClick={() => setCommand(saved.cmd)} // Fill input
-                                    className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-200 transition-colors"
+                                    className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-on-warning-container hover:text-on-warning-container/50 transition-colors"
                                     title={saved.cmd}
                                 >
-                                    <Star size={12} className="fill-amber-400 text-amber-500" />
+                                    <Star size={12} className="fill-warning/40 text-warning-container/60" />
                                     {saved.label}
                                 </button>
-                                <div className="h-3 w-px bg-amber-200 dark:bg-amber-800" />
                                 <button
                                     onClick={(e) => deleteSavedCommand(saved.id, e)}
-                                    className="p-1 text-amber-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                                    className="p-1 text-warning/80 hover:text-error transition-colors opacity-0 group-hover:opacity-100"
                                 >
                                     <X size={12} />
                                 </button>
@@ -248,41 +248,45 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
 
             {/* Input Line */}
             <div className="flex gap-2">
-                <input
-                    type="text"
-                    value={command}
-                    onChange={(e) => setCommand(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder={t('commands.placeholder')}
-                    className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg px-4 py-2 font-mono text-sm"
-                    disabled={isExecuting}
-                />
+                <div className="flex-1 flex items-center gap-2 bg-surface p-2 border-t border-outline-variant/30 rounded-lg">
+                    <Terminal size={18} className="text-on-surface-variant/80" />
+                    <input
+                        type="text"
+                        value={command}
+                        onChange={e => setCommand(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder={t('commands.input_placeholder', "Enter command...")}
+                        className="flex-1 bg-transparent border-none outline-none text-sm text-on-surface/80 font-mono placeholder:text-on-surface-variant/80/50"
+                        autoComplete="off"
+                        disabled={isExecuting}
+                    />
+                </div>
 
                 <button
                     onClick={openSaveModal}
                     disabled={!command.trim() || isExecuting}
-                    className="px-3 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-400 rounded-lg transition-colors border border-zinc-200 dark:border-zinc-700 disabled:opacity-50"
+                    className="px-3 bg-surface-variant/30 hover:bg-outline-variant text-on-surface-variant/80 rounded-lg transition-colors border border-outline-variant/30 disabled:opacity-50"
                     title={t('commands.actions.save')}
                 >
                     <Save size={18} />
                 </button>
 
                 {isExecuting ? (
-                    <button
+                    <Button
                         onClick={handleCancel}
-                        className="px-4 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors flex items-center gap-2"
+                        variant="danger"
                         title="Cancel Command"
                     >
                         <Square size={18} fill="currentColor" />
-                    </button>
+                    </Button>
                 ) : (
-                    <button
+                    <Button
                         onClick={handleSend}
                         disabled={!command.trim()}
-                        className="px-4 bg-primary hover:opacity-90 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        variant="primary"
                     >
                         <Send size={18} />
-                    </button>
+                    </Button>
                 )}
             </div>
 
@@ -294,7 +298,7 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
             >
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                        <label className="block text-sm font-medium text-on-surface-variant/80 mb-1">
                             {t('commands.modal.label')}
                         </label>
                         <input
@@ -302,29 +306,29 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
                             value={saveLabel}
                             onChange={(e) => setSaveLabel(e.target.value)}
                             placeholder={t('commands.modal.placeholder')}
-                            className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                            className="w-full px-3 py-2 bg-on-primary border border-outline-variant/30 rounded-lg focus:ring-2 focus:ring-primary outline-none"
                             autoFocus
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                        <label className="block text-sm font-medium text-on-surface-variant/80 mb-1">
                             {t('commands.modal.command')}
                         </label>
-                        <div className="px-3 py-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg font-mono text-sm text-zinc-600 dark:text-zinc-400 break-all border border-zinc-200 dark:border-zinc-700">
+                        <div className="px-3 py-2 bg-surface-variant/30 rounded-lg font-mono text-sm text-on-surface-variant/80 break-all border border-outline-variant">
                             {command}
                         </div>
                     </div>
                     <div className="flex justify-end gap-3 pt-4">
                         <button
                             onClick={() => setIsSaveModalOpen(false)}
-                            className="px-4 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+                            className="px-4 py-2 text-sm font-medium text-on-surface-variant/80 hover:bg-surface-variant/30 rounded-lg transition-colors"
                         >
                             {t('commands.modal.cancel')}
                         </button>
                         <button
                             onClick={confirmSaveCommand}
                             disabled={!saveLabel.trim()}
-                            className="px-4 py-2 text-sm font-medium bg-primary text-white hover:opacity-90 rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="px-4 py-2 text-sm font-medium bg-primary text-on-primary hover:opacity-90 rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {t('commands.modal.save')}
                         </button>

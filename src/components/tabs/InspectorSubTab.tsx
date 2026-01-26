@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { InspectorNode, transformXmlToTree, findNodesAtCoords, generateXPath } from '@/lib/inspectorUtils';
 import { feedback } from "@/lib/feedback";
 import { Section } from "@/components/organisms/Section";
+import { t } from 'i18next';
 
 interface InspectorSubTabProps {
     selectedDevice: string;
@@ -22,19 +23,20 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
     const [hoveredNode, setHoveredNode] = useState<InspectorNode | null>(null);
 
     // Responsive State
-    const containerRef = useRef<HTMLDivElement>(null);
+    const [containerRef, setContainerRef] = useState<HTMLDivElement | null>(null);
     const [isNarrow, setIsNarrow] = useState(false);
 
     useEffect(() => {
-        if (!containerRef.current) return;
+        if (!containerRef) return;
         const observer = new ResizeObserver((entries) => {
             for (const entry of entries) {
-                setIsNarrow(entry.contentRect.width < 768);
+                // Increased threshold to 900px to ensure it collapses earlier
+                setIsNarrow(entry.contentRect.width < 900);
             }
         });
-        observer.observe(containerRef.current);
+        observer.observe(containerRef);
         return () => observer.disconnect();
-    }, []);
+    }, [containerRef]);
 
     const [loading, setLoading] = useState(false);
     // const [viewMode, setViewMode] = useState<'properties' | 'xml'>('properties');
@@ -265,7 +267,7 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
 
     if (!selectedDevice) {
         return (
-            <div className="h-full flex flex-col items-center justify-center text-zinc-400">
+            <div className="h-full flex flex-col items-center justify-center text-on-surface/80">
                 <Scan size={48} className="mb-4 opacity-20" />
                 <p>{t('inspector.empty')}</p>
             </div>
@@ -273,7 +275,7 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
     }
 
     return (
-        <div ref={containerRef} className="h-full flex flex-col space-y-4">
+        <div ref={setContainerRef} className="h-full w-full flex flex-col space-y-4">
             {/* Toolbar - Now at the Top */}
             <Section
                 title={t('inspector.title', 'Inspector')}
@@ -282,36 +284,36 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
                 className="p-0"
                 status={
                     <div className="flex items-center gap-2">
-                        <div className="text-xs text-zinc-400">
+                        <div className="text-xs text-on-surface/80">
                             {loading ? t('inspector.status.fetching') : t('inspector.status.ready')}
                         </div>
-                        <div className="h-4 w-px bg-zinc-300 dark:bg-zinc-700 mx-1" />
+                        <div className="h-4 w-px bg-surface/80 mx-1" />
                         <div className="flex gap-1">
-                            <button onClick={() => sendAdbInput('keyevent 4')} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-zinc-500" title={t('inspector.nav.back')}><ArrowLeft size={16} /></button>
-                            <button onClick={() => sendAdbInput('keyevent 3')} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-zinc-500" title={t('inspector.nav.home')}><Home size={16} /></button>
-                            <button onClick={() => sendAdbInput('keyevent 187')} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-zinc-500" title={t('inspector.nav.recents')}><Rows size={16} /></button>
+                            <button onClick={() => sendAdbInput('keyevent 4')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" title={t('inspector.nav.back')}><ArrowLeft size={16} /></button>
+                            <button onClick={() => sendAdbInput('keyevent 3')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" title={t('inspector.nav.home')}><Home size={16} /></button>
+                            <button onClick={() => sendAdbInput('keyevent 187')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" title={t('inspector.nav.recents')}><Rows size={16} /></button>
                         </div>
                     </div>
                 }
                 menus={
-                    <div className="flex bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-md">
+                    <div className="flex bg-surface-variant/30 p-0.5 rounded-md">
                         <button
                             onClick={() => setInteractionMode('inspect')}
-                            className={clsx("p-1.5 rounded-sm transition-all", interactionMode === 'inspect' ? "bg-white dark:bg-zinc-600 shadow-sm text-primary" : "text-zinc-400 hover:text-zinc-600")}
+                            className={clsx("p-1.5 rounded-sm transition-all", interactionMode === 'inspect' ? "bg-primary/10 shadow-sm text-primary" : "text-on-surface/80 hover:text-on-surface-variant/80")}
                             title={t('inspector.modes.inspect')}
                         >
                             <Scan size={16} />
                         </button>
                         <button
                             onClick={() => setInteractionMode('tap')}
-                            className={clsx("p-1.5 rounded-sm transition-all", interactionMode === 'tap' ? "bg-white dark:bg-zinc-600 shadow-sm text-primary" : "text-zinc-400 hover:text-zinc-600")}
+                            className={clsx("p-1.5 rounded-sm transition-all", interactionMode === 'tap' ? "bg-primary/10 shadow-sm text-primary" : "text-on-surface/80 hover:text-on-surface-variant/80")}
                             title={t('inspector.modes.tap')}
                         >
                             <MousePointerClick size={16} />
                         </button>
                         <button
                             onClick={() => setInteractionMode('swipe')}
-                            className={clsx("p-1.5 rounded-sm transition-all", interactionMode === 'swipe' ? "bg-white dark:bg-zinc-600 shadow-sm text-primary" : "text-zinc-400 hover:text-zinc-600")}
+                            className={clsx("p-1.5 rounded-sm transition-all", interactionMode === 'swipe' ? "bg-primary/10 shadow-sm text-primary" : "text-on-surface/80 hover:text-on-surface-variant/80")}
                             title={t('inspector.modes.swipe')}
                         >
                             <Move size={16} />
@@ -324,13 +326,13 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
                             onClick={refreshAll}
                             disabled={loading}
                             className={clsx(
-                                "flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-700 text-sm font-medium transition-colors disabled:opacity-50",
+                                "flex items-center gap-2 px-3 py-1.5 bg-surface-variant/30 border border-outline-variant/30 rounded-md hover:bg-surface/50 text-sm font-medium transition-colors disabled:opacity-50",
                                 loading && "cursor-wait"
                             )}
                             title={t('inspector.refresh')}
                         >
                             <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-                            {!isNarrow && t('inspector.refresh')}
+                            <span className={clsx(isNarrow && "hidden")}>{t('inspector.refresh')}</span>
                         </button>
                     </>
                 }
@@ -357,7 +359,7 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
                             {taps.map(tap => (
                                 <div
                                     key={tap.id}
-                                    className="absolute rounded-full bg-white/50 border-2 border-white animate-ping pointer-events-none"
+                                    className="absolute rounded-full bg-surface border-2 border-on-primary animate-ping pointer-events-none"
                                     style={{
                                         left: tap.x - 20,
                                         top: tap.y - 20,
@@ -404,16 +406,16 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
                                 </div>
                             )}
                             <div
-                                className="absolute border-2 border-blue-400 pointer-events-none transition-all duration-75 z-10"
+                                className="absolute border-2 border-info-container/80 pointer-events-none transition-all duration-75 z-10"
                                 style={{ ...getHighlighterStyle(hoveredNode, '#60a5fa'), display: hoveredNode?.bounds ? 'block' : 'none' }}
                             />
                             <div
-                                className="absolute border-2 border-red-500 pointer-events-none z-20"
+                                className="absolute border-2 border-error pointer-events-none z-20"
                                 style={{ ...getHighlighterStyle(selectedNode, '#ef4444'), display: selectedNode?.bounds ? 'block' : 'none' }}
                             />
                         </div>
                     ) : (
-                        <div className="text-zinc-400 flex flex-col items-center">
+                        <div className="text-on-surface/80 flex flex-col items-center">
                             {loading ? <RefreshCw className="animate-spin mb-2 opacity-50" size={32} /> : <Maximize size={32} className="mb-2 opacity-50" />}
                             <p>{loading ? t('inspector.status.loading') : t('inspector.status.no_screenshot')}</p>
                         </div>
@@ -421,8 +423,8 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
                 </div>
 
                 {/* Right: Properties Scroll View */}
-                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl flex flex-col overflow-hidden shadow-sm dark:shadow-none h-full">
-                    <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 shrink-0 bg-zinc-50 dark:bg-zinc-800/50 pr-2">
+                <div className="bg-surface border border-outline-variant/30 rounded-xl flex flex-col overflow-hidden shadow-sm h-full">
+                    <div className="flex items-center justify-between border-b border-outline-variant/30 shrink-0 bg-surface/50 pr-2">
                         {availableNodes.length > 1 ? (
                             <div className="flex overflow-x-auto custom-scrollbar flex-1">
                                 {availableNodes.map((node) => (
@@ -430,10 +432,10 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
                                         key={node.id}
                                         onClick={() => setSelectedNode(node)}
                                         className={clsx(
-                                            "px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
+                                            "px-4 py-3 text-sm font-medium border-b-2 transition-colors space-nowrap",
                                             selectedNode === node
-                                                ? "border-primary text-primary bg-white dark:bg-zinc-900"
-                                                : "border-transparent text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                                                ? "border-primary text-primary bg-surface-variant/30"
+                                                : "border-transparent text-on-surface-variant/80 hover:text-on-surface-variant/80 hover:bg-surface-variant/30"
                                         )}
                                     >
                                         {node.tagName}
@@ -442,7 +444,7 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
                                 ))}
                             </div>
                         ) : (
-                            <div className="px-4 py-3 text-sm font-semibold text-zinc-700 dark:text-zinc-300 flex-1">
+                            <div className="px-4 py-3 text-sm font-semibold text-on-surface-variant/80 flex-1">
                                 {t('inspector.properties')}
                             </div>
                         )}
@@ -454,7 +456,7 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
                                     setSelectedNode(null);
                                     setAvailableNodes([]);
                                 }}
-                                className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors ml-2"
+                                className="p-1.5 text-on-surface/80 hover:text-error hover:bg-error-container/10 rounded-md transition-colors ml-2"
                                 title={t('inspector.clear_selection')}
                             >
                                 <X size={16} />
@@ -467,7 +469,7 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
                             <div className="p-4 space-y-6">
                                 {/* Quick Copy Actions */}
                                 <div className="space-y-4">
-                                    <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">{t('inspector.attributes.identifiers')}</h3>
+                                    <h3 className="text-xs font-semibold text-on-surface-variant/80 uppercase tracking-wider">{t('inspector.attributes.identifiers')}</h3>
                                     <div className="grid grid-cols-1 gap-2">
                                         <CopyButton
                                             label={t('inspector.attributes.access_id')}
@@ -491,7 +493,7 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
 
                                     {/* Breadcrumbs */}
                                     <div className="mt-4">
-                                        <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">{t('inspector.attributes.hierarchy')}</h3>
+                                        <h3 className="text-xs font-semibold text-on-surface-variant/80 uppercase tracking-wider mb-2">{t('inspector.attributes.hierarchy')}</h3>
                                         <NodeBreadcrumbs
                                             node={selectedNode}
                                             onSelect={setSelectedNode}
@@ -502,16 +504,16 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
 
                                 {/* All Attributes */}
                                 <div>
-                                    <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">{t('inspector.attributes.all')}</h3>
-                                    <div className="border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden text-sm">
+                                    <h3 className="text-xs font-semibold text-on-surface-variant/80 uppercase tracking-wider mb-2">{t('inspector.attributes.all')}</h3>
+                                    <div className="border border-outline-variant/30 rounded-lg overflow-hidden text-sm">
                                         {Object.entries(selectedNode.attributes)
                                             .sort(([a], [b]) => a.localeCompare(b))
                                             .map(([key, value]) => (
-                                                <div key={key} className="flex flex-col border-b border-zinc-100 dark:border-zinc-800 last:border-0">
-                                                    <div className="bg-zinc-50 dark:bg-zinc-800/50 px-3 py-1.5 text-xs text-zinc-500 font-medium break-all">
+                                                <div key={key} className="flex flex-col border-b border-outline-variant/30 last:border-0">
+                                                    <div className="bg-surface-variant/80 px-3 py-1.5 text-xs text-on-surface-variant/80 font-medium break-all">
                                                         {key}
                                                     </div>
-                                                    <div className="bg-white dark:bg-zinc-900 px-3 py-2 font-mono text-zinc-700 dark:text-zinc-300 break-all">
+                                                    <div className="bg-surface px-3 py-2 font-mono text-on-surface-variant/80 break-all">
                                                         {String(value)}
                                                     </div>
                                                 </div>
@@ -520,7 +522,7 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
                                 </div>
                             </div>
                         ) : (
-                            <div className="flex flex-col items-center justify-center h-full text-zinc-400 p-8 text-center">
+                            <div className="flex flex-col items-center justify-center h-full text-on-surface/80 p-8 text-center">
                                 <Scan size={48} className="mb-4 opacity-20" />
                                 <p className="text-sm">{t('inspector.select_element')}</p>
                             </div>
@@ -555,23 +557,23 @@ function NodeBreadcrumbs({ node, onSelect, onHover }: { node: InspectorNode, onS
     const cleanTag = (tag: string) => tag.replace('android.widget.', '').replace('android.view.', '');
 
     return (
-        <div className="flex flex-wrap items-center gap-1 text-xs text-zinc-500 font-mono p-2 bg-zinc-50 dark:bg-black/20 rounded border border-zinc-100 dark:border-zinc-800/50">
+        <div className="flex flex-wrap items-center gap-1 text-xs text-on-surface-variant/80 font-mono p-2 bg-surface/50 rounded border border-outline-variant/30">
             {path.map((n, i) => (
                 <div key={n.id} className="flex items-center">
-                    {i > 0 && <span className="mx-1 text-zinc-300 dark:text-zinc-700">&gt;</span>}
+                    {i > 0 && <span className="mx-1 text-on-surface/80">&gt;</span>}
                     <button
                         onClick={() => onSelect(n)}
                         onMouseEnter={() => onHover(n)}
                         onMouseLeave={() => onHover(null)}
                         className={clsx(
                             "hover:text-primary hover:underline transition-colors text-left",
-                            n === node ? "font-bold text-gray-900 dark:text-zinc-100" : ""
+                            n === node ? "font-bold text-on-surface/80" : ""
                         )}
                         title={generateXPath(n)}
                     >
                         {cleanTag(n.tagName)}
-                        {n.attributes['resource-id'] && <span className="ml-1 text-blue-600 dark:text-blue-400">resource-id="{n.attributes['resource-id'].split('/').pop()}"</span>}
-                        {!n.attributes['resource-id'] && n.attributes['content-desc'] && <span className="ml-1 text-green-600 dark:text-green-400">content-desc="{n.attributes['content-desc'].substring(0, 15)}..."</span>}
+                        {n.attributes['resource-id'] && <span className="ml-1 text-primary">resource-id="{n.attributes['resource-id'].split('/').pop()}"</span>}
+                        {!n.attributes['resource-id'] && n.attributes['content-desc'] && <span className="ml-1 text-on-success-container/10">content-desc="{n.attributes['content-desc'].substring(0, 15)}..."</span>}
                     </button>
                 </div>
             ))}
@@ -587,13 +589,17 @@ function CopyButton({ label, value, onCopy, active }: { label: string, value: st
             className={clsx(
                 "flex flex-col items-start p-2 rounded-lg border transition-all text-left",
                 active
-                    ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300"
-                    : "bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 hover:border-blue-300 dark:hover:border-blue-700"
+                    ? "bg-success-container/10 border-success-container/20 text-on-success-container"
+                    : "bg-surface/50 border-outline-variant/30 hover:border-info-container/50"
             )}
         >
-            <span className="text-[10px] font-semibold uppercase tracking-wider opacity-70 mb-0.5 flex w-full justify-between">
-                {label}
-                {active && <Check size={12} />}
+            <span className="text-[10px] tracking-wider opacity-70 mb-0.5 flex w-full justify-between">
+                <div className="font-semibold uppercase">
+                    {label}
+                </div>
+                <div className="text-success">
+                    {active && <div className="flex items-center gap-1"><Check size={12} />{t("inspector.attributes.copied")}</div>}
+                </div>
             </span>
             <span className="text-xs font-mono truncate w-full" title={value}>{value}</span>
         </button>

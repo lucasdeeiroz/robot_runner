@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
 import clsx from "clsx";
 import { createPortal } from "react-dom";
+import { Button } from "../atoms/Button";
 
 interface SplitButtonAction {
     label: string;
@@ -53,18 +54,13 @@ export function SplitButton({ primaryAction, secondaryActions, className, disabl
         };
     }, [isOpen]);
 
-    const baseStyles = "flex items-center justify-center transition-colors h-full";
-    const variantStyles = {
-        primary: "bg-primary text-white hover:bg-primary/90 disabled:bg-primary/50",
-        danger: "bg-red-100 text-red-600 hover:bg-red-200 disabled:bg-red-50 disabled:text-red-300 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50",
-        secondary: "bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700"
-    };
+    // Border color logic for separator
 
     // Border color logic for separator
     const separatorStyles = {
-        primary: "border-l border-white/20",
-        danger: "border-l border-red-200 dark:border-red-800/50",
-        secondary: "border-l border-zinc-200 dark:border-zinc-700"
+        primary: "border-l border-on-primary/20",
+        danger: "border-l border-on-error-container/20",
+        secondary: "border-l border-outline"
     };
 
     // Promotion Logic
@@ -89,43 +85,41 @@ export function SplitButton({ primaryAction, secondaryActions, className, disabl
 
     return (
         <div ref={containerRef} className={clsx("relative inline-flex rounded-md shadow-sm h-9", className)}>
-            <button
+            <Button
                 type="button"
                 onClick={effectivePrimary.onClick}
                 disabled={disabled || effectivePrimary.disabled}
+                variant={variant}
                 className={clsx(
-                    baseStyles,
-                    variantStyles[variant],
-                    "px-3 font-medium text-sm gap-2",
+                    "rounded-none h-9", // Override rounded to handle group
                     showDropdown ? "rounded-l-md" : "rounded-md",
-                    "disabled:cursor-not-allowed"
+                    "border-r-0"
                 )}
+                leftIcon={effectivePrimary.icon}
             >
-                {effectivePrimary.icon}
                 {effectivePrimary.label}
-            </button>
+            </Button>
             {showDropdown && (
-                <button
+                <Button
                     ref={buttonRef}
                     type="button"
+                    variant={variant}
                     className={clsx(
-                        baseStyles,
-                        variantStyles[variant],
-                        "px-1.5 rounded-r-md",
-                        separatorStyles[variant],
-                        "disabled:cursor-not-allowed"
+                        "rounded-none h-9 px-1.5",
+                        "rounded-r-md",
+                        separatorStyles[variant]
                     )}
                     onClick={() => !disabled && setIsOpen(!isOpen)}
                     disabled={disabled}
                 >
                     <ChevronDown size={14} className={clsx("transition-transform", isOpen && "rotate-180")} />
-                </button>
+                </Button>
             )}
 
             {isOpen && showDropdown && createPortal(
                 <div
                     ref={dropdownRef}
-                    className="fixed z-50 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md shadow-lg py-1 min-w-[140px]"
+                    className="fixed z-50 bg-surface border border-outline-variant/30 rounded-md shadow-lg py-1 min-w-[140px]"
                     style={dropdownStyle}
                 >
                     {effectiveSecondaries.map((action, idx) => (
@@ -136,9 +130,9 @@ export function SplitButton({ primaryAction, secondaryActions, className, disabl
                                 setIsOpen(false);
                             }}
                             disabled={action.disabled}
-                            className="w-full text-left px-3 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700/50 flex items-center gap-2 group transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                            className="w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-surface-variant/50 flex items-center gap-2 group transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                         >
-                            {action.icon && <span className="text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300">{action.icon}</span>}
+                            {action.icon && <span className="text-on-surface-variant/80 group-hover:text-on-surface/80">{action.icon}</span>}
                             {action.label}
                         </button>
                     ))}

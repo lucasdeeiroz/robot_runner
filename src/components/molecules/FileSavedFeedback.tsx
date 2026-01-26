@@ -14,10 +14,10 @@ export function FileSavedFeedback({ path, onClose, className = "" }: FileSavedFe
     if (!path) return null;
 
     return (
-        <div className={`bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 p-3 rounded-md text-sm mb-4 border border-green-100 dark:border-green-900/50 flex items-center gap-2 animate-in fade-in slide-in-from-top-2 ${className}`}>
+        <div className={`bg-success-container/20 text-on-success-container p-3 rounded-md text-sm mb-4 border border-success/20 flex items-center gap-2 animate-in fade-in slide-in-from-top-2 ${className}`}>
             <span>{t('feedback.saved_to_prefix', 'File saved to:')}</span>
             <span
-                className="underline cursor-pointer hover:text-green-900 dark:hover:text-green-100 font-mono break-all flex-1"
+                className="underline cursor-pointer hover:opacity-80 font-mono break-all flex-1"
                 onClick={() => invoke('open_path', { path })}
                 title={t('common.open_file', "Click to open file")}
             >
@@ -26,7 +26,7 @@ export function FileSavedFeedback({ path, onClose, className = "" }: FileSavedFe
             {onClose && (
                 <button
                     onClick={onClose}
-                    className="ml-2 hover:bg-green-100 dark:hover:bg-green-800 rounded p-1 transition-colors"
+                    className="ml-2 hover:bg-success/10 rounded p-1 transition-colors"
                 >
                     <X size={14} />
                 </button>

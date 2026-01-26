@@ -23,7 +23,7 @@ pub struct SystemVersions {
 }
 
 #[command]
-pub async fn get_system_versions() -> SystemVersions {
+pub async fn get_system_versions(check_ngrok: bool) -> SystemVersions {
     let adb_raw = get_version("adb", &["--version"]);
     let adb = extract_version(&adb_raw, r"Android Debug Bridge version ([\d\.]+)");
 
@@ -69,8 +69,12 @@ pub async fn get_system_versions() -> SystemVersions {
     let scrcpy_raw = get_version("scrcpy", &["--version"]);
     let scrcpy = extract_version(&scrcpy_raw, r"scrcpy ([\d\.]+)");
 
-    let ngrok_raw = get_version("ngrok", &["--version"]);
-    let ngrok = extract_version(&ngrok_raw, r"ngrok version ([\d\.]+)");
+    let ngrok = if check_ngrok {
+        let ngrok_raw = get_version("ngrok", &["--version"]);
+        extract_version(&ngrok_raw, r"ngrok version ([\d\.]+)").to_string()
+    } else {
+        "Not Checked".to_string()
+    };
 
     SystemVersions {
         adb,

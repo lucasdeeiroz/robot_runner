@@ -1,5 +1,5 @@
 import { useSettings } from "@/lib/settings";
-import { Moon, Sun, Globe, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2, ExternalLink, Settings as SettingsIcon } from "lucide-react";
+import { Moon, Sun, Globe, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2, Settings as SettingsIcon } from "lucide-react";
 import { Switch } from "@/components/atoms/Switch";
 import { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -24,9 +24,11 @@ import { Select } from "@/components/atoms/Select";
 import { PathInput } from "@/components/molecules/PathInput";
 import { TagInput } from "@/components/molecules/TagInput";
 import { SegmentedControl } from "@/components/molecules/SegmentedControl";
+import { InfoCard } from "@/components/molecules/InfoCard";
+import { LogoInput } from "@/components/molecules/LogoInput";
 
 export function SettingsPage() {
-    const { settings, updateSetting, loading, profiles, activeProfileId, createProfile, switchProfile, renameProfile, deleteProfile, systemVersions, checkSystemVersions, systemCheckStatus } = useSettings();
+    const { settings, updateSetting, loading, profiles, activeProfileId, createProfile, switchProfile, renameProfile, deleteProfile, systemVersions, checkSystemVersions, systemCheckStatus, isNgrokEnabled } = useSettings();
     const { t, i18n } = useTranslation();
 
     // Profile Management Details
@@ -180,7 +182,7 @@ export function SettingsPage() {
     };
 
     if (loading) {
-        return <div className="p-8 text-center text-zinc-500">Loading settings...</div>;
+        return <div className="p-8 text-center text-on-surface-variant/80">Loading settings...</div>;
     }
 
     const handleDeleteClick = (profileId: string) => {
@@ -220,26 +222,30 @@ export function SettingsPage() {
                 title={t('settings.profiles.title')}
                 icon={Users}
                 menus={
-                    <Select
-                        options={profiles.map(p => ({
-                            label: p.id === 'default' && p.name === 'Default' ? t('settings.profiles.default') : p.name,
-                            value: p.id
-                        }))}
-                        value={activeProfileId}
-                        onChange={(e) => { switchProfile(e.target.value); feedback.toast.success('feedback.profile_changed'); }}
-                        containerClassName="w-[180px]"
-                    />
+                    <>
+                        {profiles.length > 1 && (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDeleteClick(activeProfileId)}
+                                className="text-on-surface/80 hover:text-error hover:bg-error-container/10"
+                            >
+                                <Trash2 size={16} />
+                            </Button>
+                        )}
+                        <Select
+                            options={profiles.map(p => ({
+                                label: p.id === 'default' && p.name === 'Default' ? t('settings.profiles.default') : p.name,
+                                value: p.id
+                            }))}
+                            value={activeProfileId}
+                            onChange={(e) => { switchProfile(e.target.value); feedback.toast.success('feedback.profile_changed'); }}
+                            containerClassName="w-[180px]"
+                        />
+                    </>
                 }
                 actions={
                     <>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => { setIsRenaming(false); setNewProfileName(""); setShowProfileModal(true); }}
-                            leftIcon={<Plus size={16} />}
-                        >
-                            {!isNarrow && t('settings.profiles.create')}
-                        </Button>
                         <Button
                             variant="ghost"
                             size="sm"
@@ -248,16 +254,14 @@ export function SettingsPage() {
                         >
                             {!isNarrow && t('settings.profiles.rename')}
                         </Button>
-                        {profiles.length > 1 && (
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDeleteClick(activeProfileId)}
-                                className="text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
-                            >
-                                <Trash2 size={16} />
-                            </Button>
-                        )}
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => { setIsRenaming(false); setNewProfileName(""); setShowProfileModal(true); }}
+                            leftIcon={<Plus size={16} />}
+                        >
+                            {!isNarrow && t('settings.profiles.create')}
+                        </Button>
                     </>
                 }
             />
@@ -275,20 +279,20 @@ export function SettingsPage() {
                         value={newProfileName}
                         onChange={(e) => setNewProfileName(e.target.value)}
                         placeholder={t('settings.profiles.name_placeholder')}
-                        className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 text-gray-900 dark:text-zinc-100"
+                        className="w-full bg-surface/50 border border-outline-variant/30 rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 text-on-surface/80"
                     />
                     <div className="flex justify-end gap-2">
                         <button
                             type="button"
                             onClick={() => setShowProfileModal(false)}
-                            className="px-4 py-2 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                            className="px-4 py-2 text-on-surface-variant/80 hover:text-on-surface-variant/80"
                         >
                             {t('common.cancel')}
                         </button>
                         <button
                             type="submit"
                             disabled={!newProfileName.trim()}
-                            className="px-4 py-2 bg-primary hover:opacity-90 text-white rounded-xl disabled:opacity-50 transition-all active:scale-95"
+                            className="px-4 py-2 bg-primary hover:opacity-90 text-on-primary rounded-xl disabled:opacity-50 transition-all active:scale-95"
                         >
                             {t('common.save')}
                         </button>
@@ -297,91 +301,148 @@ export function SettingsPage() {
             </Modal>
 
             <div className="grid gap-6">
-                {/* Appium Server Config & Control */}
-                <Section
-                    title={t('settings.appium.title')}
-                    icon={Server}
-                    status={
-                        <div className={clsx("flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold border",
-                            appiumStatus.running
-                                ? "bg-green-50 text-green-600 border-green-200 dark:bg-green-500/10 dark:text-green-400 dark:border-green-500/20"
-                                : "bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700")}>
-                            <div className={clsx("w-2 h-2 rounded-full", appiumStatus.running ? "bg-green-500" : "bg-zinc-400")} />
-                            {appiumStatus.running ? t('settings.appium.running', { pid: appiumStatus.pid }) : t('settings.appium.stopped')}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Appium Server Config & Control */}
+                    <Section
+                        title={t('settings.appium.title')}
+                        icon={Server}
+                        status={
+                            <div className={clsx("flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold border",
+                                appiumStatus.running
+                                    ? "bg-success-container/10 text-on-success-container/10 border-success-container/20"
+                                    : "bg-surface-variant/30 text-on-surface-variant/80 border-outline-variant")}>
+                                <div className={clsx("w-2 h-2 rounded-full", appiumStatus.running ? "bg-success" : "bg-on-surface/10")} />
+                                {appiumStatus.running ? t('settings.appium.running', { pid: appiumStatus.pid }) : t('settings.appium.stopped')}
+                            </div>
+                        }
+                        actions={
+                            <>
+                                <Button
+                                    onClick={() => setShowAppiumLogs(!showAppiumLogs)}
+                                    size="icon"
+                                    variant="ghost"
+                                    className={clsx(showAppiumLogs ? "bg-primary/10 text-primary" : "text-on-surface/80")}
+                                    title={t('settings.appium.logs')}
+                                    disabled={!appiumStatus.running && systemCheckStatus?.missingAppium?.length > 0}
+                                >
+                                    <Terminal size={18} />
+                                </Button>
+
+                                <Button
+                                    onClick={toggleAppium}
+                                    variant={appiumStatus.running ? "danger" : "primary"}
+                                    className="shadow-lg hover:shadow-xl transition-all"
+                                    disabled={!appiumStatus.running && systemCheckStatus?.missingAppium?.length > 0}
+                                    leftIcon={appiumStatus.running ? <Square size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
+                                >
+                                    {!isNarrow && (appiumStatus.running ? t('settings.appium.stop') : t('settings.appium.start'))}
+                                </Button>
+                            </>
+                        }
+                    >
+
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
+                                <Input
+                                    label={t('settings.appium.host')}
+                                    type="text"
+                                    value={settings.appiumHost}
+                                    onChange={(e) => updateSetting('appiumHost', e.target.value)}
+                                    disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
+                                />
+                            </div>
+                            <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
+                                <Input
+                                    label={t('settings.appium.port')}
+                                    type="number"
+                                    value={settings.appiumPort}
+                                    onChange={(e) => updateSetting('appiumPort', Number(e.target.value))}
+                                    disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
+                                />
+                            </div>
                         </div>
-                    }
-                    actions={
-                        <>
-                            <button
-                                onClick={() => setShowAppiumLogs(!showAppiumLogs)}
-                                className={clsx("p-2 rounded-xl transition-all active:scale-95", showAppiumLogs ? "bg-primary/10 text-primary" : "hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400")}
-                                title={t('settings.appium.logs')}
-                                disabled={!appiumStatus.running && systemCheckStatus?.missingAppium?.length > 0}
+                        <div className="mb-4">
+                            <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
+                                <Input
+                                    label={t('settings.tool_config.appium_args')}
+                                    type="text"
+                                    value={settings.tools.appiumArgs}
+                                    onChange={(e) => updateSetting('tools', { ...settings.tools, appiumArgs: e.target.value })}
+                                    disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
+                                    placeholder="--allow-insecure chromedriver"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Logs Output */}
+                        {showAppiumLogs && (
+                            <div
+                                ref={logsContainerRef}
+                                className="mt-4 bg-surface/50 border border-outline-variant/30 rounded-xl p-3 font-mono text-xs h-64 overflow-auto custom-scrollbar shadow-inner"
                             >
-                                <Terminal size={18} />
-                            </button>
+                                {appiumLogs.length === 0 && <span className="text-on-surface-variant/80 italic">{t('settings.appium.waiting')}</span>}
+                                {appiumLogs.map((log, i) => (
+                                    <div key={i} className="text-on-surface-variant/80 on-primaryspace-pre-wrap border-b border-outline-variant/30 pb-0.5 mb-0.5">{log}</div>
+                                ))}
+                            </div>
+                        )}
+                    </Section>
 
-                            <button
-                                onClick={toggleAppium}
-                                className={clsx("flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all text-sm text-white shadow-lg active:scale-95",
-                                    appiumStatus.running
-                                        ? "bg-red-500 hover:bg-red-600 shadow-red-500/20"
-                                        : "bg-green-600 hover:bg-green-700 shadow-green-500/20"
-                                )}
-                                disabled={!appiumStatus.running && systemCheckStatus?.missingAppium?.length > 0}
-                            >
-                                {appiumStatus.running ? <><Square size={16} fill="currentColor" /> {!isNarrow && t('settings.appium.stop')}</> : <><Play size={16} fill="currentColor" /> {!isNarrow && t('settings.appium.start')}</>}
-                            </button>
-                        </>
-                    }
-                >
+                    {/* Tool Options */}
+                    <Section title={t('settings.tools')} icon={Wrench}>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {['robotArgs', 'scrcpyArgs'].map((key) => {
+                                let isDisabled = false;
+                                if (key === 'robotArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
+                                if (key === 'scrcpyArgs' && systemCheckStatus?.missingMirroring?.length > 0) isDisabled = true;
 
-                    <div className="grid grid-cols-2 gap-4 mb-4">
-                        <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
-                            <Input
-                                label={t('settings.appium.host')}
-                                type="text"
-                                value={settings.appiumHost}
-                                onChange={(e) => updateSetting('appiumHost', e.target.value)}
-                                disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
-                            />
+                                return (
+                                    <div key={key}>
+                                        <Input
+                                            label={t(`settings.tool_config.${key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)}` as any)}
+                                            type="text"
+                                            value={(settings.tools as any)[key]}
+                                            onChange={(e) => updateSetting('tools', { ...settings.tools, [key]: e.target.value })}
+                                            disabled={isDisabled}
+                                            title={isDisabled ? "Dependency missing" : ""}
+                                        />
+                                    </div>
+                                );
+                            })}
+                            {/* App Packages List */}
+                            <div className="col-span-1 md:col-span-2">
+                                <TagInput
+                                    label={t('settings.tool_config.app_packages')}
+                                    tags={settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean)}
+                                    onAdd={(tag) => {
+                                        const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
+                                        if (!current.includes(tag)) {
+                                            updateSetting('tools', { ...settings.tools, appPackage: [...current, tag].join(', ') });
+                                        }
+                                    }}
+                                    onRemove={(tag) => {
+                                        const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
+                                        updateSetting('tools', { ...settings.tools, appPackage: current.filter(t => t !== tag).join(', ') });
+                                    }}
+                                    placeholder={t('settings.tool_config.add_package_placeholder')}
+                                />
+                            </div>
+                            {isNgrokEnabled && (
+                                <div className="col-span-1 md:col-span-2">
+                                    <Input
+                                        label={t('settings.tool_config.ngrok_token')}
+                                        type="password"
+                                        value={settings.tools.ngrokToken || ''}
+                                        onChange={(e) => updateSetting('tools', { ...settings.tools, ngrokToken: e.target.value })}
+                                        placeholder="Authorization Token"
+                                        disabled={systemCheckStatus?.missingTunnelling?.length > 0}
+                                        title={systemCheckStatus?.missingTunnelling?.length > 0 ? "Ngrok not found" : ""}
+                                    />
+                                </div>
+                            )}
                         </div>
-                        <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
-                            <Input
-                                label={t('settings.appium.port')}
-                                type="number"
-                                value={settings.appiumPort}
-                                onChange={(e) => updateSetting('appiumPort', Number(e.target.value))}
-                                disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
-                            />
-                        </div>
-                    </div>
-                    <div className="mb-4">
-                        <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
-                            <Input
-                                label={t('settings.tool_config.appium_args')}
-                                type="text"
-                                value={settings.tools.appiumArgs}
-                                onChange={(e) => updateSetting('tools', { ...settings.tools, appiumArgs: e.target.value })}
-                                disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
-                                placeholder="--allow-insecure chromedriver"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Logs Output */}
-                    {showAppiumLogs && (
-                        <div
-                            ref={logsContainerRef}
-                            className="mt-4 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 font-mono text-xs h-64 overflow-auto custom-scrollbar shadow-inner"
-                        >
-                            {appiumLogs.length === 0 && <span className="text-zinc-500 italic">{t('settings.appium.waiting')}</span>}
-                            {appiumLogs.map((log, i) => (
-                                <div key={i} className="text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap border-b border-zinc-200 dark:border-zinc-800/50 pb-0.5 mb-0.5">{log}</div>
-                            ))}
-                        </div>
-                    )}
-                </Section>
+                    </Section>
+                </div>
 
                 {/* Path Configuration */}
                 <Section title={t('settings.paths.title')} icon={FolderOpen}>
@@ -401,61 +462,6 @@ export function SettingsPage() {
                                 />
                             );
                         })}
-                    </div>
-                </Section>
-
-                {/* Tool Options */}
-                <Section title={t('settings.tools')} icon={Wrench}>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {['robotArgs', 'scrcpyArgs'].map((key) => {
-                            let isDisabled = false;
-                            if (key === 'robotArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
-                            if (key === 'scrcpyArgs' && systemCheckStatus?.missingMirroring?.length > 0) isDisabled = true;
-
-                            return (
-                                <div key={key}>
-                                    <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">{t(`settings.tool_config.${key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)}` as any)}</label>
-                                    <input
-                                        type="text"
-                                        value={(settings.tools as any)[key]}
-                                        onChange={(e) => updateSetting('tools', { ...settings.tools, [key]: e.target.value })}
-                                        className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-primary/20 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                                        disabled={isDisabled}
-                                        title={isDisabled ? "Dependency missing" : ""}
-                                    />
-                                </div>
-                            );
-                        })}
-                        {/* App Packages List */}
-                        <div className="col-span-1 md:col-span-2">
-                            <TagInput
-                                label={t('settings.tool_config.app_packages')}
-                                tags={settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean)}
-                                onAdd={(tag) => {
-                                    const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
-                                    if (!current.includes(tag)) {
-                                        updateSetting('tools', { ...settings.tools, appPackage: [...current, tag].join(', ') });
-                                    }
-                                }}
-                                onRemove={(tag) => {
-                                    const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
-                                    updateSetting('tools', { ...settings.tools, appPackage: current.filter(t => t !== tag).join(', ') });
-                                }}
-                                placeholder={t('settings.tool_config.add_package_placeholder')}
-                            />
-                        </div>
-                        <div className="col-span-1 md:col-span-2">
-                            <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">{t('settings.tool_config.ngrok_token')}</label>
-                            <input
-                                type="password"
-                                value={settings.tools.ngrokToken || ''}
-                                onChange={(e) => updateSetting('tools', { ...settings.tools, ngrokToken: e.target.value })}
-                                className="w-full bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-gray-900 dark:text-zinc-300 focus:ring-2 focus:ring-primary/20 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                                placeholder="Authorization Token"
-                                disabled={systemCheckStatus?.missingTunnelling?.length > 0}
-                                title={systemCheckStatus?.missingTunnelling?.length > 0 ? "Ngrok not found" : ""}
-                            />
-                        </div>
                     </div>
                 </Section>
 
@@ -479,7 +485,7 @@ export function SettingsPage() {
                     >
                         {/* Primary Color */}
                         <div className="mt-6">
-                            <h3 className="text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-3">{t('settings.appearance.primary_color')}</h3>
+                            <h3 className="text-sm font-medium text-on-surface-variant/80 mb-3">{t('settings.appearance.primary_color')}</h3>
                             <div className="flex flex-wrap gap-3">
                                 {[
                                     { id: 'blue', hex: '#2563eb' },
@@ -494,14 +500,14 @@ export function SettingsPage() {
                                         key={color.id}
                                         onClick={() => updateSetting('primaryColor', color.id)}
                                         className={clsx(
-                                            "w-8 h-8 rounded-full transition-all active:scale-95 ring-offset-2 ring-offset-white dark:ring-offset-zinc-900 flex items-center justify-center",
+                                            "w-8 h-8 rounded-full transition-all active:scale-95 ring-offset-2 ring-offset-on-primary flex items-center justify-center",
                                             settings.primaryColor === color.id ? "ring-2 scale-110" : "hover:scale-105"
                                         )}
                                         style={{ backgroundColor: color.hex, borderColor: color.hex, '--tw-ring-color': color.hex } as any}
                                         title={color.id.charAt(0).toUpperCase() + color.id.slice(1)}
                                     >
                                         {settings.primaryColor === color.id && (
-                                            <div className="w-2.5 h-2.5 bg-white rounded-full shadow-sm" />
+                                            <div className="w-2.5 h-2.5 bg-on-primary rounded-full shadow-sm" />
                                         )}
                                     </button>
                                 ))}
@@ -509,71 +515,31 @@ export function SettingsPage() {
                         </div>
 
                         {/* Sidebar Logo */}
-                        <div className="mt-6 pt-6 border-t border-zinc-100 dark:border-zinc-800">
-                            <h3 className="text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-3">{t('settings.appearance.sidebar_logo')}</h3>
-                            <div className="space-y-4">
-                                {/* Light Mode Logo */}
-                                <div>
-                                    <label className="block text-xs text-zinc-500 mb-1">{t('settings.appearance.logo_light')}</label>
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="text"
-                                            value={settings.customLogoLight || ''}
-                                            readOnly
-                                            placeholder={t('settings.appearance.use_default')}
-                                            className="flex-1 bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-zinc-100"
-                                        />
-                                        <button
-                                            onClick={() => handleLogoUpload('customLogoLight')}
-                                            className="px-3 py-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 rounded-xl transition-all"
-                                        >
-                                            <FolderOpen size={16} />
-                                        </button>
-                                        {settings.customLogoLight && (
-                                            <button
-                                                onClick={() => updateSetting('customLogoLight', undefined)}
-                                                className="px-3 py-2 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 text-red-500 rounded-xl transition-all"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Dark Mode Logo */}
-                                <div>
-                                    <label className="block text-xs text-zinc-500 mb-1">{t('settings.appearance.logo_dark')}</label>
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="text"
-                                            value={settings.customLogoDark || ''}
-                                            readOnly
-                                            placeholder={t('settings.appearance.use_default')}
-                                            className="flex-1 bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-zinc-100"
-                                        />
-                                        <button
-                                            onClick={() => handleLogoUpload('customLogoDark')}
-                                            className="px-3 py-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 rounded-xl transition-all"
-                                        >
-                                            <FolderOpen size={16} />
-                                        </button>
-                                        {settings.customLogoDark && (
-                                            <button
-                                                onClick={() => updateSetting('customLogoDark', undefined)}
-                                                className="px-3 py-2 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 text-red-500 rounded-xl transition-all"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                                <p className="text-[10px] text-zinc-400">
-                                    {t('settings.appearance.logo_hint')}
-                                </p>
+                        <div className="mt-6 pt-6 border-t border-outline-variant/30">
+                            <h3 className="text-sm font-medium text-on-surface-variant/80 mb-3">{t('settings.appearance.sidebar_logo')}</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <LogoInput
+                                    label={t('settings.appearance.logo_light')}
+                                    value={settings.customLogoLight}
+                                    onUpload={() => handleLogoUpload('customLogoLight')}
+                                    onDelete={() => updateSetting('customLogoLight', undefined)}
+                                    placeholder={t('settings.appearance.use_default')}
+                                />
+                                <LogoInput
+                                    label={t('settings.appearance.logo_dark')}
+                                    value={settings.customLogoDark}
+                                    onUpload={() => handleLogoUpload('customLogoDark')}
+                                    onDelete={() => updateSetting('customLogoDark', undefined)}
+                                    placeholder={t('settings.appearance.use_default')}
+                                />
                             </div>
+                            <p className="text-[10px] text-on-surface-variant/80 mt-2">
+                                {t('settings.appearance.logo_hint')}
+                            </p>
                         </div>
                     </Section>
 
+                    {/* General Settings */}
                     <Section title={t('settings.general')} icon={Globe}>
                         <div>
                             <Select
@@ -588,12 +554,12 @@ export function SettingsPage() {
                             />
                         </div>
 
-                        <div className="flex items-center justify-between pt-4 border-t border-zinc-100 dark:border-zinc-800 mt-4">
+                        <div className="flex items-center justify-between pt-4 border-t border-outline-variant/30 mt-4">
                             <div>
-                                <label className="block text-sm text-zinc-700 dark:text-zinc-300 font-medium mb-1">
+                                <label className="block text-sm text-on-surface-variant/80 font-medium mb-1">
                                     {t('settings.recycle_device_views')}
                                 </label>
-                                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                                <p className="text-xs text-on-surface-variant/80">
                                     {t('settings.recycle_device_views_desc', { defaultValue: "Reuse existing tabs when running tests on the same device" })}
                                 </p>
                             </div>
@@ -615,8 +581,8 @@ export function SettingsPage() {
                             disabled={systemCheckStatus.loading}
                             className={
                                 clsx(
-                                    "p-2 rounded-xl transition-all active:scale-95 hover:bg-zinc-100 dark:hover:bg-zinc-800",
-                                    systemCheckStatus.loading ? "animate-spin text-primary" : "text-zinc-500 hover:text-primary dark:text-zinc-400"
+                                    "p-2 rounded-xl transition-all active:scale-95 hover:bg-surface-variant/30",
+                                    systemCheckStatus.loading ? "animate-spin text-primary" : "text-on-surface-variant/80 hover:text-primary"
                                 )
                             }
                             title={t('common.loading')}
@@ -627,29 +593,23 @@ export function SettingsPage() {
                 >
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {systemVersions ? (
-                            (['adb', 'node', 'appium', 'uiautomator2', 'python', 'robot', 'appium_lib', 'scrcpy', 'ngrok'] as Array<keyof typeof systemVersions>).map((key) => (
-                                <div key={key} className="bg-zinc-50 dark:bg-black/20 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800/50 flex flex-col justify-between group h-20 transition-all hover:bg-zinc-100 dark:hover:bg-zinc-800/50">
-                                    <div className="flex items-center justify-between">
-                                        <span className="block text-xs uppercase text-zinc-500 font-bold">
-                                            {t(`settings.system.tools.${key}` as any) || key}
+                            (['adb', 'node', 'appium', 'uiautomator2', 'python', 'robot', 'appium_lib', 'scrcpy', 'ngrok'] as Array<keyof typeof systemVersions>)
+                                .filter(key => key !== 'ngrok' || isNgrokEnabled)
+                                .map((key) => (
+                                    <InfoCard
+                                        key={key}
+                                        title={t(`settings.system.tools.${key}` as any) || key}
+                                        href={TOOL_LINKS[key as keyof typeof TOOL_LINKS]}
+                                        headerRight={<span className="text-on-surface-variant/80">↗</span>}
+                                        className="h-20"
+                                    >
+                                        <span className="text-sm font-mono text-on-surface/80 truncate block mt-1" title={systemVersions[key]}>
+                                            {systemVersions[key]}
                                         </span>
-                                        <a
-                                            href={TOOL_LINKS[key as keyof typeof TOOL_LINKS]}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-zinc-400 hover:text-primary transition-colors opacity-0 group-hover:opacity-100"
-                                            title="View Documentation/Download"
-                                        >
-                                            <ExternalLink size={14} />
-                                        </a>
-                                    </div>
-                                    <span className="text-sm font-mono text-gray-900 dark:text-zinc-300 truncate block mt-1" title={systemVersions[key]}>
-                                        {systemVersions[key]}
-                                    </span>
-                                </div>
-                            ))
+                                    </InfoCard>
+                                ))
                         ) : (
-                            <div className="text-zinc-400 italic col-span-full">{t('settings.system.checking')}</div>
+                            <div className="text-on-surface/80 italic col-span-full">{t('settings.system.checking')}</div>
                         )}
                     </div>
                 </Section>

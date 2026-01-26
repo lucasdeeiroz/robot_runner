@@ -14,6 +14,9 @@ import { feedback } from "@/lib/feedback";
 import { FileSavedFeedback } from "@/components/molecules/FileSavedFeedback";
 import { useFileSave } from "@/hooks/useFileSave";
 import { SplitButton } from "@/components/molecules/SplitButton";
+import { usePerformanceRecorder } from "@/hooks/usePerformanceRecorder";
+import { Button } from "@/components/atoms/Button";
+import { TabBar } from "@/components/organisms/TabBar";
 
 interface ToolboxViewProps {
     session: TestSession;
@@ -149,12 +152,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
         }
     };
 
-    // Combine feedback paths
-    const activeSavedPath = screenshotSaver.lastSavedPath || recordingSaver.lastSavedPath;
-    const clearAllFeedback = () => {
-        screenshotSaver.clearFeedback();
-        recordingSaver.clearFeedback();
-    };
+
 
     const handleScrcpy = async () => {
         try {
@@ -212,163 +210,177 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
         }
     }, [isGridView, visibleToolsInGrid.size, session.type]);
 
+    // Performance Hook
+    // Determine active state for performance hook:
+    // It is active if it's the active tool OR if we are in grid view and it's visible.
+    const isPerformanceActive = activeTool === 'performance' || (isGridView && visibleToolsInGrid.has('performance'));
+
+    const performanceState = usePerformanceRecorder(session.deviceUdid, isPerformanceActive);
+
+    // Combine feedback paths (add performance saved path)
+    const activeSavedPath = screenshotSaver.lastSavedPath || recordingSaver.lastSavedPath;
+
+    // Clear all feedback
+    const clearAllFeedback = () => {
+        screenshotSaver.clearFeedback();
+        recordingSaver.clearFeedback();
+    };
+
     return (
         <div ref={containerRef} className="h-full flex flex-col space-y-4 pointer-events-auto relative z-10">
             {/* Tool Selection Header */}
-            <div className="flex items-center justify-between flex-wrap gap-y-2 shrink-0">
-                <div className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-800/50 p-1 rounded-lg border border-zinc-200 dark:border-zinc-800 w-fit">
-                    {session.type === 'test' && (
-                        <ToolButton
-                            active={isGridView ? visibleToolsInGrid.has('console') : activeTool === 'console'}
-                            onClick={() => handleToolClick('console')}
-                            icon={<FileText size={16} />}
-                            label={t('toolbox.tabs.console')}
-                            showLabel={!isCompact && !isNarrow}
-                        />
-                    )}
-                    <ToolButton
-                        active={isGridView ? visibleToolsInGrid.has('logcat') : activeTool === 'logcat'}
-                        onClick={() => handleToolClick('logcat')}
-                        icon={<AlignLeft size={16} />}
-                        label={t('toolbox.tabs.logcat')}
-                        showLabel={!isCompact && !isNarrow}
-                    />
-                    <ToolButton
-                        active={isGridView ? visibleToolsInGrid.has('performance') : activeTool === 'performance'}
-                        onClick={() => handleToolClick('performance')}
-                        icon={<Cpu size={16} />}
-                        label={t('toolbox.tabs.performance')}
-                        showLabel={!isCompact && !isNarrow}
-                    />
-                    <ToolButton
-                        active={isGridView ? visibleToolsInGrid.has('commands') : activeTool === 'commands'}
-                        onClick={() => handleToolClick('commands')}
-                        icon={<Terminal size={16} />}
-                        label={t('toolbox.tabs.commands')}
-                        showLabel={!isCompact && !isNarrow}
-                    />
-                    <ToolButton
-                        active={isGridView ? visibleToolsInGrid.has('apps') : activeTool === 'apps'}
-                        onClick={() => handleToolClick('apps')}
-                        icon={<Package size={16} />}
-                        label={t('toolbox.tabs.apps')}
-                        showLabel={!isCompact && !isNarrow}
-                    />
-                    {!isCompact && (
-                        <>
-                            <div className="w-px h-4 bg-zinc-300 dark:bg-zinc-700 mx-1 self-center" />
+            <TabBar
+                tabs={[
+                    ...(session.type === 'test' ? [{
+                        id: 'console',
+                        label: (!isCompact && !isNarrow) ? t('toolbox.tabs.console') : "",
+                        icon: FileText,
+                        selected: isGridView ? visibleToolsInGrid.has('console') : activeTool === 'console'
+                    }] : []),
+                    {
+                        id: 'logcat',
+                        label: (!isCompact && !isNarrow) ? t('toolbox.tabs.logcat') : "",
+                        icon: AlignLeft,
+                        selected: isGridView ? visibleToolsInGrid.has('logcat') : activeTool === 'logcat'
+                    },
+                    {
+                        id: 'performance',
+                        label: (!isCompact && !isNarrow) ? t('toolbox.tabs.performance') : "",
+                        icon: Cpu,
+                        selected: isGridView ? visibleToolsInGrid.has('performance') : activeTool === 'performance'
+                    },
+                    {
+                        id: 'commands',
+                        label: (!isCompact && !isNarrow) ? t('toolbox.tabs.commands') : "",
+                        icon: Terminal,
+                        selected: isGridView ? visibleToolsInGrid.has('commands') : activeTool === 'commands'
+                    },
+                    {
+                        id: 'apps',
+                        label: (!isCompact && !isNarrow) ? t('toolbox.tabs.apps') : "",
+                        icon: Package,
+                        selected: isGridView ? visibleToolsInGrid.has('apps') : activeTool === 'apps'
+                    }
+                ]}
+                activeId={activeTool}
+                onChange={(id) => handleToolClick(id as ToolTab)}
+                variant="pills"
+                className="z-10 shrink-0"
+                menus={
+                    !isCompact && (
+                        <button
+                            onClick={() => {
+                                if (!isGridView) {
+                                    const defaults: ToolTab[] = ['console', 'logcat', 'performance'];
+                                    setVisibleToolsInGrid(new Set([...defaults, activeTool]));
+                                }
+                                setIsGridView(!isGridView);
+                            }}
+                            className={clsx(
+                                "p-1.5 rounded-md transition-all flex items-center justify-center border border-transparent",
+                                isGridView
+                                    ? "bg-primary/10 text-primary border-none"
+                                    : "text-on-surface/80 hover:text-on-surface/80 hover:bg-surface-variant/30"
+                            )}
+                            title={isGridView ? t('toolbox.actions.switch_to_tabs') : t('toolbox.actions.switch_to_grid')}
+                        >
+                            <LayoutGrid size={18} />
+                        </button>
+                    )
+                }
+                actions={
+                    <div className="flex items-center gap-2">
+                        {/* Session Controls */}
+                        <div className="flex bg-surface p-1 rounded-lg border border-outline-variant/30">
                             <button
-                                onClick={() => {
-                                    if (!isGridView) {
-                                        // Reset grid tools to defaults + current active tool
-                                        // This prevents transient tools (Commands/Apps) from sticking around if they aren't active
-                                        const defaults: ToolTab[] = ['console', 'logcat', 'performance'];
-                                        setVisibleToolsInGrid(new Set([...defaults, activeTool]));
-                                    }
-                                    setIsGridView(!isGridView);
-                                }}
+                                onClick={handleScrcpy}
+                                disabled={isMirrorDisabled}
                                 className={clsx(
-                                    "p-1.5 rounded-md transition-all flex items-center justify-center",
-                                    isGridView
-                                        ? "bg-primary/10 text-primary"
-                                        : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                                    "p-1.5 rounded-md transition-all",
+                                    isMirrorDisabled
+                                        ? "text-on-surface/80 cursor-not-allowed"
+                                        : "text-on-surface/80 hover:text-primary hover:bg-primary/10"
                                 )}
-                                title={isGridView ? t('toolbox.actions.switch_to_tabs') : t('toolbox.actions.switch_to_grid')}
+                                title={isMirrorDisabled ? t('startup.mirroring.description') : t('scrcpy.title')}
                             >
-                                <LayoutGrid size={18} />
+                                <Cast size={18} />
                             </button>
-                        </>
-                    )}
-                </div>
+                            <div className="w-px h-4 bg-surface/80 mx-1 self-center" />
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={handleScreenshot}
+                                className="text-on-surface/80 hover:text-primary hover:bg-primary/10 transition-all h-8 w-8"
+                                title={t('toolbox.actions.screenshot')}
+                            >
+                                <Camera size={18} />
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                onClick={handleToggleRecording}
+                                className={clsx(
+                                    "rounded-md transition-all flex items-center gap-2 h-8 px-2",
+                                    isRecording
+                                        ? "bg-error-container text-on-error-container animate-pulse hover:bg-error-container/80"
+                                        : "text-on-surface/80 hover:text-primary hover:bg-primary/10"
+                                )}
+                                title={isRecording ? t('toolbox.actions.stop_recording') : t('toolbox.actions.start_recording')}
+                            >
+                                {isRecording ? <Square size={18} fill="currentColor" /> : <Video size={18} />}
+                                {isRecording && <span className="text-xs font-mono font-bold">{new Date(recordingTime * 1000).toISOString().substr(14, 5)}</span>}
+                            </Button>
+                        </div>
 
-                {/* Session Controls */}
-                <div className="flex items-center gap-2">
-                    {/* Media & Tools Controls - Always Visible */}
-                    <div className="flex bg-zinc-100 dark:bg-zinc-800/50 p-1 rounded-lg border border-zinc-200 dark:border-zinc-800 mr-2">
-                        <button
-                            onClick={handleScrcpy}
-                            disabled={isMirrorDisabled}
-                            className={clsx(
-                                "p-1.5 rounded-md transition-all",
-                                isMirrorDisabled
-                                    ? "text-zinc-300 dark:text-zinc-600 cursor-not-allowed"
-                                    : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-white dark:hover:bg-zinc-700"
-                            )}
-                            title={isMirrorDisabled ? t('startup.mirroring.description') : t('scrcpy.title')}
-                        >
-                            <Cast size={18} />
-                        </button>
-                        <div className="w-px h-4 bg-zinc-300 dark:bg-zinc-700 mx-1 self-center" />
-                        <button
-                            onClick={handleScreenshot}
-                            className="p-1.5 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-white dark:hover:bg-zinc-700 rounded-md transition-all"
-                            title={t('toolbox.actions.screenshot')}
-                        >
-                            <Camera size={18} />
-                        </button>
-                        <button
-                            onClick={handleToggleRecording}
-                            className={clsx(
-                                "p-1.5 rounded-md transition-all flex items-center gap-2",
-                                isRecording
-                                    ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 animate-pulse"
-                                    : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-white dark:hover:bg-zinc-700"
-                            )}
-                            title={isRecording ? t('toolbox.actions.stop_recording') : t('toolbox.actions.start_recording')}
-                        >
-                            {isRecording ? <Square size={18} fill="currentColor" /> : <Video size={18} />}
-                            {isRecording && <span className="text-xs font-mono font-bold">{new Date(recordingTime * 1000).toISOString().substr(14, 5)}</span>}
-                        </button>
-                    </div>
-
-                    {session.type === 'test' && (
-                        <>
-                            {session.status === 'running' && (
-                                <button
-                                    onClick={() => stopSession(session.runId)}
-                                    className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50"
-                                    title={t('toolbox.actions.stop_execution')}
-                                >
-                                    <StopCircle size={16} />
-                                    {!isCompact && !isNarrow && t('toolbox.actions.stop_execution')}
-                                </button>
-                            )}
-                            {session.status !== 'running' && (
-                                <div className="flex items-center">
-                                    <SplitButton
-                                        variant="primary"
-                                        primaryAction={{
-                                            label: !isCompact && !isNarrow ? t('toolbox.actions.rerun') : "",
-                                            onClick: handleRerun,
-                                            icon: <RefreshCcw size={16} />
-                                        }}
-                                        secondaryActions={[
-                                            {
-                                                label: t('connect.actions.rerun_failed'),
-                                                icon: <RefreshCcw size={14} className="text-red-500" />,
-                                                // Check if finished with error (exit code != 0) AND we can find Output xml in logs
-                                                disabled: !(session.status === 'finished' && session.exitCode && !session.exitCode.includes("Exit Code: 0")) ||
-                                                    !session.logs.some(l => l.includes("Output:  ") && l.endsWith(".xml")),
-                                                onClick: () => {
-                                                    // Find XML path
-                                                    const outputLine = session.logs.find(l => l.includes("Output:  ") && l.endsWith(".xml"));
-                                                    if (outputLine) {
-                                                        const match = outputLine.match(/Output:\s+(.*\.xml)/);
-                                                        if (match && match[1]) {
-                                                            const xmlPath = match[1].trim();
-                                                            rerunSession(session.runId, xmlPath);
+                        {session.type === 'test' && (
+                            <>
+                                {session.status === 'running' && (
+                                    <Button
+                                        onClick={() => stopSession(session.runId)}
+                                        variant="danger"
+                                        size="sm"
+                                        leftIcon={<StopCircle size={16} />}
+                                        title={t('toolbox.actions.stop_execution')}
+                                    >
+                                        {!isCompact && !isNarrow && t('toolbox.actions.stop_execution')}
+                                    </Button>
+                                )}
+                                {session.status !== 'running' && (
+                                    <div className="flex items-center">
+                                        <SplitButton
+                                            variant="primary"
+                                            primaryAction={{
+                                                label: !isCompact && !isNarrow ? t('toolbox.actions.rerun') : "",
+                                                onClick: handleRerun,
+                                                icon: <RefreshCcw size={16} />
+                                            }}
+                                            secondaryActions={[
+                                                {
+                                                    label: t('connect.actions.rerun_failed'),
+                                                    icon: <RefreshCcw size={14} className="text-error" />,
+                                                    // Check if finished with error (exit code != 0) AND we can find Output xml in logs
+                                                    disabled: !(session.status === 'finished' && session.exitCode && !session.exitCode.includes("Exit Code: 0")) ||
+                                                        !session.logs.some(l => l.includes("Output:  ") && l.endsWith(".xml")),
+                                                    onClick: () => {
+                                                        // Find XML path
+                                                        const outputLine = session.logs.find(l => l.includes("Output:  ") && l.endsWith(".xml"));
+                                                        if (outputLine) {
+                                                            const match = outputLine.match(/Output:\s+(.*\.xml)/);
+                                                            if (match && match[1]) {
+                                                                const xmlPath = match[1].trim();
+                                                                rerunSession(session.runId, xmlPath);
+                                                            }
                                                         }
                                                     }
                                                 }
-                                            }
-                                        ]}
-                                    />
-                                </div>
-                            )}
-                        </>
-                    )}
-                </div>
-            </div>
+                                            ]}
+                                        />
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
+                }
+            />
 
             {/* Feedback for Screenshot/Listening */}
             <FileSavedFeedback
@@ -416,7 +428,13 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                                     )}
                                     {tool === 'logcat' && <LogcatSubTab key={session.deviceUdid} selectedDevice={session.deviceUdid} />}
                                     {tool === 'commands' && <CommandsSubTab selectedDevice={session.deviceUdid} />}
-                                    {tool === 'performance' && <PerformanceSubTab selectedDevice={session.deviceUdid} />}
+                                    {tool === 'performance' && (
+                                        <PerformanceSubTab
+                                            selectedDevice={session.deviceUdid}
+                                            {...performanceState}
+                                            onRefresh={performanceState.fetchStats}
+                                        />
+                                    )}
                                     {tool === 'apps' && <AppsSubTab />}
                                 </GridToolItem>
                             );
@@ -424,7 +442,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                     })()}
                 </div>
             ) : (
-                <div className="flex-1 min-h-0 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden relative">
+                <div className="flex-1 min-h-0 bg-surface border border-outline-variant/30 rounded-xl overflow-hidden relative">
                     <div className={clsx("h-full flex flex-col overflow-hidden", activeTool === 'console' && session.type === 'test' ? "block" : "hidden")}>
                         <RunConsole logs={session.logs} isRunning={session.status === 'running'} testPath={session.testPath} />
                     </div>
@@ -438,7 +456,11 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                     </div>
 
                     <div className={clsx("h-full", activeTool === 'performance' ? "block" : "hidden")}>
-                        <PerformanceSubTab selectedDevice={session.deviceUdid} />
+                        <PerformanceSubTab
+                            selectedDevice={session.deviceUdid}
+                            {...performanceState}
+                            onRefresh={performanceState.fetchStats}
+                        />
                     </div>
 
                     <div className={clsx("h-full", activeTool === 'apps' ? "block" : "hidden")}>
@@ -450,39 +472,23 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
     );
 }
 
-function ToolButton({ active, onClick, icon, label, showLabel = true }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string, showLabel?: boolean }) {
-    return (
-        <button
-            onClick={onClick}
-            className={clsx(
-                "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200",
-                active
-                    ? "bg-white dark:bg-zinc-700 text-primary shadow-sm"
-                    : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-white/50 dark:hover:bg-zinc-700/50"
-            )}
-            title={label}
-        >
-            {icon}
-            {showLabel && <span>{label}</span>}
-        </button>
-    );
-}
+
 
 function GridToolItem({ title, children, className, onHide, minimizeLabel, onMaximize, maximizeLabel }: { id: string, title: React.ReactNode, children: React.ReactNode, className?: string, onHide?: () => void, minimizeLabel?: string, onMaximize?: () => void, maximizeLabel?: string }) {
     return (
         <div className={clsx(
-            "flex flex-col border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900 overflow-hidden shadow-sm transition-all duration-300 min-h-0",
+            "flex flex-col border border-outline-variant/30 rounded-xl bg-surface overflow-hidden shadow-sm transition-all duration-300 min-h-0",
             className
         )}>
-            <div className="flex items-center justify-between px-3 py-2 bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-100 dark:border-zinc-800 shrink-0">
-                <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-200 flex items-center gap-2">
+            <div className="flex items-center justify-between px-3 py-2 bg-surface/50 border-b border-outline-variant/30 shrink-0">
+                <span className="text-sm font-semibold text-on-surface-variant/80 flex items-center gap-2">
                     {title}
                 </span>
                 <div className="flex items-center gap-1">
                     {onMaximize && (
                         <button
                             onClick={onMaximize}
-                            className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded"
+                            className="p-1 text-on-surface/80 hover:text-on-surface-variant/80 rounded"
                             title={maximizeLabel || "Maximize"}
                         >
                             <Maximize2 size={14} />
@@ -491,7 +497,7 @@ function GridToolItem({ title, children, className, onHide, minimizeLabel, onMax
                     {onHide && (
                         <button
                             onClick={onHide}
-                            className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded"
+                            className="p-1 text-on-surface/80 hover:text-on-surface-variant/80 rounded"
                             title={minimizeLabel || "Minimize"}
                         >
                             <Minimize2 size={14} />

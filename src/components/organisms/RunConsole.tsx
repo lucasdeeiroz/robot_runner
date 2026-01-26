@@ -330,8 +330,30 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
                 } else {
                     const isSys = IS_SYSTEM(line);
                     if (isSys) {
-                        if (currentTest) currentTest.logs.push(line);
-                        else addToCurrentContext({ type: 'text', content: line, id: nodeId });
+                        if (currentTest) {
+                            currentTest.logs.push(line);
+
+                            // Heuristic: If system says we stopped/finished, identify if we need to force-fail the current test/suite
+                            if (line.includes('[System] Finished:') || line.includes('[System] Stopping...') || line.includes('[System] Toolbox session stopped')) {
+                                if (currentTest.status === 'RUNNING') {
+                                    currentTest.status = 'FAIL';
+                                }
+                                currentTest = null;
+
+                                // Also fail all open suites since they won't get a proper closure
+                                suiteStack.forEach(s => {
+                                    if (s.status === 'RUNNING') s.status = 'FAIL';
+                                });
+                            }
+                        } else {
+                            addToCurrentContext({ type: 'text', content: line, id: nodeId });
+                            // Also check for suites if we are at root level (e.g. suite setup failure or global stop)
+                            if (line.includes('[System] Finished:') || line.includes('[System] Stopping...') || line.includes('[System] Toolbox session stopped')) {
+                                suiteStack.forEach(s => {
+                                    if (s.status === 'RUNNING') s.status = 'FAIL';
+                                });
+                            }
+                        }
                     } else {
                         if (currentTest) {
                             currentTest.logs.push(line);
@@ -400,23 +422,23 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
 
             const isOpen = isRunning ? !isUserToggled : (isFailed ? !isUserToggled : isUserToggled);
 
-            const borderColor = isRunning ? 'border-blue-500/50' : (isFailed ? 'border-red-500' : 'border-green-500');
-            const bgColor = isRunning ? 'bg-blue-500/5' : (isFailed ? 'bg-red-500/10' : 'bg-green-500/10');
-            const textColor = isRunning ? 'text-blue-400' : (isFailed ? 'text-red-400' : 'text-green-500');
+            const borderColor = isRunning ? 'border-primary/50' : (isFailed ? 'border-error' : 'border-success');
+            const bgColor = isRunning ? 'bg-primary/5' : (isFailed ? 'bg-error/10' : 'bg-success/10');
+            const textColor = isRunning ? 'text-info-container/80' : (isFailed ? 'text-red-400' : 'text-success');
 
             return (
-                <div key={node.id} className={clsx("mb-2 mt-1 border rounded-lg overflow-hidden border-zinc-200 dark:border-zinc-800", isRunning && "animate-pulse-subtle")}>
+                <div key={node.id} className={clsx("mb-2 mt-1 border rounded-lg overflow-hidden border-outline-variant", isRunning && "animate-pulse-subtle")}>
                     <div
                         role="button"
                         onClick={(e) => { e.stopPropagation(); toggleNode(node.id); }}
                         className={clsx(
-                            "w-full flex items-center justify-between px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors text-left relative z-10 cursor-pointer select-none",
+                            "w-full flex items-center justify-between px-3 py-1.5 hover:bg-surface-variant/30 transition-colors text-left relative z-10 cursor-pointer select-none",
                             `border-l-4 ${borderColor.replace('/50', '')}`
                         )}
                     >
                         <div className="flex items-center gap-2 max-w-[80%]">
-                            {isOpen ? <ChevronDown size={14} className="text-zinc-500 shrink-0" /> : <ChevronRight size={14} className="text-zinc-500 shrink-0" />}
-                            <span className={clsx("font-semibold truncate", isFailed ? "text-red-600 dark:text-red-300" : "text-zinc-800 dark:text-zinc-200")}>
+                            {isOpen ? <ChevronDown size={14} className="text-on-surface-variant/80 shrink-0" /> : <ChevronRight size={14} className="text-on-surface-variant/80 shrink-0" />}
+                            <span className={clsx("font-semibold truncate", isRunning ? "text-primary" : (isFailed ? "text-error" : "text-success"))}>
                                 {node.name}
                             </span>
                         </div>
@@ -429,16 +451,16 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
                         </div>
                     </div>
                     {isOpen && (
-                        <div className="p-2 pl-6 bg-zinc-50 dark:bg-black/20 text-xs border-t border-zinc-200 dark:border-zinc-800/50 text-zinc-700 dark:text-zinc-300">
+                        <div className="p-2 pl-6 bg-surface/50 text-xs border-t border-outline-variant/30 text-on-surface-variant/80">
                             {node.documentation && (
-                                <div className="text-zinc-500 italic mb-2 border-b border-zinc-800 pb-1 text-xs">
+                                <div className="text-on-surface-variant/80 italic mb-2 border-b border-outline-variant/30 pb-1 text-xs">
                                     Documentation: {node.documentation}
                                 </div>
                             )}
                             {node.logs.map((line, i) => <LinkRenderer key={i} content={line} />)}
                             {isRunning && (
-                                <div className="text-blue-500 mt-2 flex items-center gap-2 text-xs italic opacity-70">
-                                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
+                                <div className="text-primary mt-2 flex items-center gap-2 text-xs italic opacity-70">
+                                    <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
                                     Processing...
                                 </div>
                             )}
@@ -454,8 +476,9 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
             const isToggled = collapsedIds.has(node.id);
             const isOpen = !isToggled; // Suites default Open
 
-            const borderColor = isRunning ? 'border-zinc-300 dark:border-zinc-700' : (isFailed ? 'border-red-500/50 dark:border-red-900/50' : 'border-green-500/50 dark:border-green-900/50');
-            const summaryColor = isRunning ? 'text-zinc-500 dark:text-zinc-400' : (isFailed ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-500');
+            const borderColor = isRunning ? 'border-outline-variant/30' : (isFailed ? 'border-error/50' : 'border-success/50');
+            const summaryColor = isRunning ? 'text-on-surface-variant/80' : (isFailed ? 'text-error' : 'text-success');
+            const badgeBg = isRunning ? 'bg-surface-variant/30' : (isFailed ? 'bg-error/10' : 'bg-success/10');
 
             return (
                 <div key={node.id} className="mb-3 mt-2 pl-2 ml-1">
@@ -463,11 +486,11 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
                         role="button"
                         onClick={(e) => { e.stopPropagation(); toggleNode(node.id); }}
                         className={clsx(
-                            "flex items-center gap-2 text-sm font-bold text-zinc-700 dark:text-zinc-300 hover:text-black dark:hover:text-white mb-2 group w-full text-left relative z-10 cursor-pointer select-none rounded p-1 hover:bg-black/5 dark:hover:bg-white/5 transition-colors",
+                            "flex items-center gap-2 text-sm font-bold text-on-surface-variant/80 hover:text-black mb-2 group w-full text-left relative z-10 cursor-pointer select-none rounded p-1 hover:bg-black/5 transition-colors",
                             `border-l-4 ${borderColor}`
                         )}
                     >
-                        {isOpen ? <ChevronDown size={16} className="text-zinc-500 transition-colors" /> : <ChevronRight size={16} className="text-zinc-500 transition-colors" />}
+                        {isOpen ? <ChevronDown size={16} className="text-on-surface-variant/80 transition-colors" /> : <ChevronRight size={16} className="text-on-surface-variant/80 transition-colors" />}
                         <Layers size={14} className={clsx("opacity-70", isRunning && "animate-pulse")} />
 
                         <span className="truncate flex-1">
@@ -475,16 +498,16 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
                         </span>
 
                         {/* Status Badge for Suite */}
-                        <span className={clsx("text-[10px] ml-2 px-1.5 py-0.5 rounded border flex items-center gap-1", borderColor, summaryColor, isRunning && "bg-zinc-100 dark:bg-zinc-800")}>
+                        <span className={clsx("text-[10px] ml-2 px-1.5 py-0.5 rounded border flex items-center gap-1", borderColor, summaryColor, badgeBg)}>
                             {isRunning && <Loader2 size={10} className="animate-spin" />}
                             {isRunning ? t('run_tab.console.running') : translateSummary(node.summary) || t(node.status === 'FAIL' ? 'run_tab.console.fail' : 'run_tab.console.pass')}
                         </span>
                     </div>
 
                     {isOpen && (
-                        <div className="pl-2 space-y-1 block border-l border-zinc-200 dark:border-zinc-800/50 ml-2">
+                        <div className="pl-2 space-y-1 block border-l border-outline-variant/30 ml-2">
                             {node.documentation && (
-                                <div className="text-zinc-500 italic px-2 py-1 text-xs border-b border-zinc-200 dark:border-zinc-800/50 mb-1">
+                                <div className="text-on-surface-variant/80 italic px-2 py-1 text-xs border-b border-outline-variant/30 mb-1">
                                     {node.documentation}
                                 </div>
                             )}
@@ -498,25 +521,25 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
     };
 
     return (
-        <div className="h-full flex flex-col bg-white dark:bg-black/90 rounded-lg font-mono text-sm border border-zinc-200 dark:border-zinc-800 shadow-inner pointer-events-auto relative z-0 isolate overflow-hidden">
-            <div className="flex items-center justify-between p-2 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/50 backdrop-blur shrink-0 z-20">
-                <span className="text-xs text-zinc-500 font-mono truncate px-2" title={testPath}>{testPath}</span>
+        <div className="h-full flex flex-col bg-surface rounded-lg font-mono text-sm border border-outline-variant/30 shadow-inner pointer-events-auto relative z-0 isolate overflow-hidden">
+            <div className="flex items-center justify-between p-2 border-b border-outline-variant/30 bg-surface/80 backdrop-blur shrink-0 z-20">
+                <span className="text-xs text-on-surface-variant/80 font-mono truncate px-2" title={testPath}>{testPath}</span>
                 <button
                     onClick={() => setIsRawMode(!isRawMode)}
-                    className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-colors text-zinc-500 hover:text-yellow-500 dark:hover:text-yellow-400"
+                    className="p-1 hover:bg-surface-variant/30 rounded transition-colors text-on-surface-variant/80 hover:text-warning"
                     title={isRawMode ? "Enable Fancy Mode" : "Enable Raw Mode"}
                 >
-                    <Star size={14} fill={!isRawMode ? "currentColor" : "none"} className={clsx(!isRawMode && "text-yellow-400")} />
+                    <Star size={14} fill={!isRawMode ? "currentColor" : "none"} className={clsx(!isRawMode && "text-warning-container/40")} />
                 </button>
             </div>
 
             <div ref={containerRef} className="flex-1 overflow-auto p-4 custom-scrollbar relative z-0">
                 {logs.length === 0 && (
-                    <div className="text-zinc-500 italic opacity-50 select-none pb-4">{t('run_tab.console.waiting')}</div>
+                    <div className="text-on-surface-variant/80 italic opacity-50 select-none pb-4">{t('run_tab.console.waiting')}</div>
                 )}
 
                 {isRawMode ? (
-                    <div className="whitespace-pre-wrap font-mono text-xs text-zinc-800 dark:text-zinc-300 leading-tight">
+                    <div className="on-primary space-pre-wrap font-mono text-xs text-on-surface/50 leading-tight">
                         {logs.map((line, i) => (
                             <div key={i} className="min-h-[1.2em]">{line}</div>
                         ))}

@@ -83,7 +83,7 @@ export const en = {
             parse_error: "Failed to parse saved commands",
             cancel_error: "Failed to cancel command",
             empty: "Select a device to execute commands",
-            placeholder: "Enter ADB command (e.g. 'shell ls -la')",
+            input_placeholder: "Enter ADB command (e.g. 'shell ls -la')",
             waiting: "Waiting for commands...",
             clear: "Clear Console",
             quick: "Quick",
@@ -150,14 +150,15 @@ export const en = {
             },
             actions: {
                 connect: "Connect",
-                pair: "Pair",
-                disconnect: "Disconnect",
-                start_tunnel: "Start Public Tunnel",
-                stop_tunnel: "Stop Tunnel",
                 copy: "Copied!",
-                paste_url: "Paste URL",
+                disconnect: "Disconnect",
                 disconnect_all: "Disconnect All",
-                rerun_failed: "Re-run Failed Tests"
+                enable_remote: "Enable Remote Connection",
+                pair: "Pair",
+                paste_url: "Paste URL",
+                rerun_failed: "Re-run Failed Tests",
+                start_tunnel: "Start Public Tunnel",
+                stop_tunnel: "Stop Tunnel"
             },
             status: {
                 tunnel_active: "Tunnel Active",
@@ -185,6 +186,12 @@ export const en = {
                 payment_required_desc: "Free ngrok accounts require a valid credit card to use TCP tunnels. You won't be charged.",
                 add_card: "Add Card",
                 cancel_card: "Cancel"
+            },
+            security_warning: {
+                title: "Security Warning",
+                message: "Enabling remote connection (Ngrok) will expose your local device to the internet.\n\nEnsure this complies with your organization's Information Security policies before proceeding.",
+                cancel: "Cancel",
+                confirm: "Enable Ngrok"
             }
         },
         console: {
@@ -254,6 +261,7 @@ export const en = {
             properties: "Node Properties",
             select_element: "Select an element on the screenshot",
             attributes: {
+                copied: "Copied!",
                 all: "All Attributes",
                 xpath: "XPath",
                 resource_id: "Resource ID",
@@ -276,6 +284,10 @@ export const en = {
                 start_failed: "Failed to start logcat",
                 stop_failed: "Failed to stop logcat",
                 app_not_running: "App not running: {{pkg}}"
+            },
+            status: {
+                waiting: "Waiting for logs...",
+                empty: "No logs captured"
             },
             saving: "Saving logcat to",
             start: "Start",
@@ -321,10 +333,12 @@ export const en = {
             commands: "Commands",
             device: {
                 no_device: "No Device Selected",
+                no_devices_found: "No devices found",
                 selected_count: "{{count}} Devices Selected",
                 select: "Select Devices",
                 busy: "Busy",
-                refresh: "Refresh Devices"
+                refresh: "Refresh Devices",
+                open_toolbox: "Open Toolbox"
             },
             console: {
                 running: "RUNNING",
@@ -385,10 +399,14 @@ export const en = {
                 dark: "Dark",
                 primary_color: "Primary Color",
                 sidebar_logo: "Sidebar Logo",
-                logo_light: "Light Mode Logo",
-                logo_dark: "Dark Mode Logo",
+                logo_light: "Light Mode",
+                logo_dark: "Dark Mode",
                 use_default: "Default (Text)",
-                logo_hint: "Recommended: PNG, Height 40px, Max Width 200px"
+                logo_hint: "Recommended: PNG, Height 40px, Max Width 200px",
+                logo_set: "Custom logo set",
+                no_logo: "No logo selected",
+                upload_logo: "Upload Logo",
+                remove_logo: "Remove Logo"
             },
             tool_config: {
                 appium_args: "Appium Arguments",
@@ -498,7 +516,7 @@ export const en = {
                 server_not_ready: "The Appium server is not ready"
             },
             options: {
-                dont_overwrite: "Don't Overwrite Logs"
+                dont_overwrite: "Save Logs"
             }
         },
         tests_page: {

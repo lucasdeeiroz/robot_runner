@@ -131,6 +131,8 @@ interface SettingsContextType {
     systemCheckStatus: SystemCheckStatus;
     updateInfo: UpdateInfo | null;
     checkForAppUpdate: (manual?: boolean) => Promise<void>;
+    isNgrokEnabled: boolean;
+    enableNgrok: () => void;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -143,6 +145,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         }
     });
     const [loading, setLoading] = useState(true);
+    const [isNgrokEnabled, setIsNgrokEnabled] = useState(false);
+
+    const enableNgrok = () => {
+        setIsNgrokEnabled(true);
+    };
 
     useEffect(() => {
         loadSettings();
@@ -306,7 +313,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const checkSystemVersions = async () => {
         setSystemCheckStatus(prev => ({ ...prev, loading: true }));
         try {
-            const versions = await invoke<SystemVersions>('get_system_versions');
+            // Conditionally skip ngrok check if not enabled
+            const versions = await invoke<SystemVersions>('get_system_versions', { checkNgrok: isNgrokEnabled });
+
             setSystemVersions(versions);
 
             const missingCritical: string[] = [];
@@ -334,7 +343,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             if (versions.scrcpy === 'Not Found') missingMirroring.push('Scrcpy');
 
             // Tunnelling Tools
-            if (versions.ngrok === 'Not Found') missingTunnelling.push('Ngrok');
+            if (isNgrokEnabled && versions.ngrok === 'Not Found') missingTunnelling.push('Ngrok');
 
             setSystemCheckStatus({
                 loading: false,
@@ -390,7 +399,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             checkSystemVersions,
             systemCheckStatus,
             updateInfo,
-            checkForAppUpdate
+            checkForAppUpdate,
+            isNgrokEnabled,
+            enableNgrok
         }}>
             {children}
         </SettingsContext.Provider>

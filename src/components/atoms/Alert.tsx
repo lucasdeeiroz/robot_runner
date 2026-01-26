@@ -7,11 +7,11 @@ const alertVariants = cva(
     {
         variants: {
             variant: {
-                default: "bg-zinc-100 text-zinc-900 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-100 dark:border-zinc-700",
-                destructive: "border-red-500/50 text-red-700 dark:border-red-500 [&>svg]:text-red-600 dark:bg-red-900/10 dark:text-red-400",
-                success: "border-green-500/50 text-green-700 dark:border-green-500 [&>svg]:text-green-600 dark:bg-green-900/10 dark:text-green-400",
-                warning: "border-yellow-500/50 text-yellow-700 dark:border-yellow-500 [&>svg]:text-yellow-600 dark:bg-yellow-900/10 dark:text-yellow-400",
-                info: "border-blue-500/50 text-blue-700 dark:border-blue-500 [&>svg]:text-blue-600 dark:bg-blue-900/10 dark:text-blue-400",
+                default: "bg-surface-variant/30 text-on-surface/80 border-outline-variant",
+                destructive: "border-error/30 text-error/80 bg-error-container/30 [&>svg]:text-error/80",
+                success: "border-success/30 text-success/80 bg-transparent [&>svg]:text-success/80",
+                warning: "border-warning/30 text-on-warning-container/80 bg-warning-container/30 [&>svg]:text-on-warning-container/80",
+                info: "border-info/30 text-info/80 bg-info-container/30 [&>svg]:text-info/80",
             },
         },
         defaultVariants: {
@@ -43,7 +43,7 @@ export function Alert({ className, variant, icon, title, children, ...props }: A
             {Icon}
             <div className="flex flex-col gap-1">
                 {title && <h5 className="font-medium leading-none tracking-tight">{title}</h5>}
-                <div className="text-sm opacity-90 break-words whitespace-pre-wrap">{children}</div>
+                <div className="text-sm opacity-90 break-words on-primaryspace-pre-wrap">{children}</div>
             </div>
         </div>
     );

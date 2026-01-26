@@ -1,12 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSettings } from "@/lib/settings";
 import { HistoryCharts } from "../organisms/HistoryCharts";
-import { XCircle, FileText, Folder, Calendar, RefreshCw, ChevronDown, ChevronRight, CheckCircle, Clock, PieChart } from 'lucide-react';
+import { XCircle, FileText, Folder, Calendar, RefreshCw, ChevronDown, ChevronRight, CheckCircle, Clock, PieChart, Search } from 'lucide-react';
 import clsx from 'clsx';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from "react-i18next";
 import { feedback } from '@/lib/feedback';
 import { Section } from "@/components/organisms/Section";
+import { AndroidVersionPill } from "@/components/atoms/AndroidVersionPill";
+import { Input } from "@/components/atoms/Input";
+import { Select } from "@/components/atoms/Select";
 
 interface TestLog {
     path: string;
@@ -163,14 +166,14 @@ export function HistorySubTab() {
                 {groupBy !== 'none' && (
                     <button
                         onClick={() => toggleGroup(group)}
-                        className="flex items-center gap-2 w-full text-left bg-zinc-100 dark:bg-zinc-800/80 px-3 py-2 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors sticky top-0 backdrop-blur-sm z-10"
+                        className="flex items-center gap-2 w-full text-left bg-surface-variant/30 px-3 py-2 rounded-lg hover:bg-outline-variant transition-colors sticky top-0 backdrop-blur-sm z-10"
                     >
                         {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                        <span className="font-semibold text-sm text-zinc-700 dark:text-zinc-300">
-                            {group === 'PASS' ? <span className="text-green-600 dark:text-green-400">{group}</span> :
-                                group === 'FAIL' ? <span className="text-red-600 dark:text-red-400">{group}</span> : group}
+                        <span className="font-semibold text-sm text-on-surface-variant/80">
+                            {group === 'PASS' ? <span className="text-on-success-container/10">{group}</span> :
+                                group === 'FAIL' ? <span className="text-error-container/80">{group}</span> : group}
                         </span>
-                        <span className="text-xs text-zinc-500 bg-zinc-200 dark:bg-zinc-700 px-1.5 py-0.5 rounded-full">
+                        <span className="text-xs text-on-surface-variant/80 bg-outline-variant px-1.5 py-0.5 rounded-full">
                             {logs.length}
                         </span>
                     </button>
@@ -179,31 +182,31 @@ export function HistorySubTab() {
                 {isExpanded && (
                     <div className="space-y-3 pl-1">
                         {logs.map((log, i) => (
-                            <div key={i} className="flex flex-row items-center gap-4 p-4 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-700/50 rounded-lg hover:border-blue-200 dark:hover:border-blue-700 transition-colors shadow-sm">
+                            <div key={i} className="flex flex-row items-center gap-4 p-4 bg-surface/50 border border-outline-variant/30 rounded-lg hover:border-primary/20 transition-colors shadow-sm">
                                 <div className="flex gap-4 items-start min-w-0 flex-1">
                                     <div className={clsx(
                                         "w-10 h-10 rounded-full flex items-center justify-center shrink-0 mt-1",
                                         log.status === 'PASS'
-                                            ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
-                                            : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
+                                            ? "bg-success-container text-on-success-container"
+                                            : "bg-error-container text-on-error-container"
                                     )}>
                                         {log.status === 'PASS' ? <CheckCircle size={20} /> : <XCircle size={20} />}
                                     </div>
                                     <div className="min-w-0 flex-1">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <span className="font-semibold text-zinc-900 dark:text-zinc-100 truncate" title={decodeHtml(log.suite_name)}>
+                                            <span className="font-semibold text-on-surface/80 truncate" title={decodeHtml(log.suite_name)}>
                                                 {decodeHtml(log.suite_name)}
                                             </span>
                                             <span className={clsx("text-xs font-bold px-1.5 py-0.5 rounded border",
                                                 log.status === 'PASS'
-                                                    ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800"
-                                                    : "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800"
+                                                    ? "bg-success-container text-on-success-container border-success-container/20"
+                                                    : "bg-error-container text-on-error-container border-error-container/20"
                                             )}>
                                                 {log.status}
                                             </span>
                                         </div>
 
-                                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-500">
+                                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-on-surface-variant/80">
                                             <div className="flex items-center gap-1">
                                                 <Calendar size={12} /> {formatDate(log.timestamp)}
                                             </div>
@@ -211,8 +214,8 @@ export function HistorySubTab() {
                                                 <Clock size={12} /> {log.duration}
                                             </div>
                                             {(log.device_model || log.device_udid) && (
-                                                <div className="flex items-center gap-1 text-zinc-400">
-                                                    {log.android_version ? `Android ${log.android_version} • ` : ''}
+                                                <div className="flex items-center gap-1 text-on-surface/80">
+                                                    {log.android_version && <AndroidVersionPill version={log.android_version} className="bg-surface-variant/50" />}
                                                     {log.device_model || t('tests_page.unknown_model')}
                                                     {log.device_udid ? ` (${log.device_udid})` : ''}
                                                 </div>
@@ -221,17 +224,17 @@ export function HistorySubTab() {
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-2 shrink-0 border-l border-zinc-100 dark:border-zinc-700 pl-3">
+                                <div className="flex items-center gap-2 shrink-0 border-l border-outline-variant/30 pl-3">
                                     <button
                                         onClick={() => openLog(log.log_html_path)}
-                                        className="flex items-center gap-2 px-3 py-1.5 bg-zinc-100 hover:bg-primary/10 text-zinc-600 hover:text-primary dark:bg-zinc-800 dark:hover:bg-blue-900/20 dark:text-zinc-400 dark:hover:text-blue-400 rounded-md text-xs font-medium transition-colors"
+                                        className="flex items-center gap-2 px-3 py-1.5 bg-surface-variant/30 hover:bg-primary/10 text-on-surface-variant/80 hover:text-primary rounded-md text-xs font-medium transition-colors"
                                         title={isHistoryNarrow ? t('tests_page.report') : log.log_html_path}
                                     >
                                         <FileText size={14} /> {!isHistoryNarrow && t('tests_page.report')}
                                     </button>
                                     <button
                                         onClick={() => openLog(log.path)}
-                                        className="flex items-center justify-center p-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-400 rounded-md transition-colors"
+                                        className="flex items-center justify-center p-1.5 bg-surface-variant/30 hover:bg-outline-variant text-on-surface-variant/80 rounded-md transition-colors"
                                         title={t('tests_page.open_folder')}
                                     >
                                         <Folder size={14} />
@@ -246,7 +249,7 @@ export function HistorySubTab() {
     };
 
     return (
-        <div ref={historyContainerRef} className="flex-1 min-h-0 bg-white dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 overflow-hidden relative flex flex-col">
+        <div ref={historyContainerRef} className="flex-1 min-h-0 bg-surface border border-outline-variant/30 rounded-xl p-4 overflow-hidden relative flex flex-col">
             <Section
                 title={t('tests_page.history')}
                 icon={Calendar}
@@ -255,7 +258,7 @@ export function HistorySubTab() {
                 status={
                     <button
                         onClick={() => loadHistory(true)}
-                        className="p-1.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors"
+                        className="p-1.5 text-on-surface-variant/80 hover:bg-surface-variant/30 rounded-md transition-colors"
                         title={t('tests_page.actions.refresh')}
                     >
                         <RefreshCw size={16} className={loadingHistory ? "animate-spin" : ""} />
@@ -263,34 +266,40 @@ export function HistorySubTab() {
                 }
                 menus={!isHistoryNarrow ? (
                     <div className="flex flex-wrap gap-2">
-                        <input
-                            type="text"
-                            placeholder={t('tests_page.filter.search')}
-                            value={filterText}
-                            onChange={(e) => setFilterText(e.target.value)}
-                            className="flex-1 min-w-[200px] bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-primary/50"
-                        />
-                        <select
+                        <div className="flex-1 min-w-[200px]">
+                            <Input
+                                placeholder={t('tests_page.filter.search')}
+                                value={filterText}
+                                onChange={(e) => setFilterText(e.target.value)}
+                                leftIcon={<Search size={16} />}
+                                className="bg-surface/50"
+                            />
+                        </div>
+                        <Select
                             value={filterPeriod}
                             onChange={(e) => setFilterPeriod(e.target.value)}
-                            className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-primary/50"
-                        >
-                            <option value="all_time">{t('tests_page.filter.all_time')}</option>
-                            <option value="today">{t('tests_page.filter.today')}</option>
-                            <option value="last_7_days">{t('tests_page.filter.last_7_days')}</option>
-                            <option value="last_30_days">{t('tests_page.filter.last_30_days')}</option>
-                        </select>
-                        <select
+                            options={[
+                                { value: "all_time", label: t('tests_page.filter.all_time') },
+                                { value: "today", label: t('tests_page.filter.today') },
+                                { value: "last_7_days", label: t('tests_page.filter.last_7_days') },
+                                { value: "last_30_days", label: t('tests_page.filter.last_30_days') }
+                            ]}
+                            className="bg-surface/50"
+                            containerClassName="w-auto min-w-[150px]"
+                        />
+                        <Select
                             value={groupBy}
                             onChange={(e) => setGroupBy(e.target.value)}
-                            className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-primary/50"
-                        >
-                            <option value="none">{t('tests_page.filter.group_by')}: {t('tests_page.filter.all_time').replace('Todo o período', 'Nenhum')}</option>
-                            <option value="status">{t('tests_page.filter.status')}</option>
-                            <option value="device">{t('tests_page.filter.device')}</option>
-                            <option value="suite">{t('tests_page.filter.suite')}</option>
-                            <option value="os_version">{t('tests_page.filter.os_version') || "Versão do SO"}</option>
-                        </select>
+                            options={[
+                                { value: "none", label: `${t('tests_page.filter.group_by')}: ${t('tests_page.filter.all_time').replace('Todo o período', 'Nenhum')}` },
+                                { value: "status", label: t('tests_page.filter.status') },
+                                { value: "device", label: t('tests_page.filter.device') },
+                                { value: "suite", label: t('tests_page.filter.suite') },
+                                { value: "os_version", label: t('tests_page.filter.os_version') || "Versão do SO" }
+                            ]}
+                            className="bg-surface/50"
+                            containerClassName="w-auto min-w-[200px]"
+                        />
                     </div>
                 ) : null
                 }
@@ -301,7 +310,7 @@ export function HistorySubTab() {
                             "px-3 py-1.5 rounded-md flex items-center gap-2 text-sm font-medium transition-colors",
                             showCharts
                                 ? "bg-primary/10 text-primary"
-                                : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                                : "bg-surface-variant/30 text-on-surface-variant/80 hover:bg-outline-variant"
                         )}
                         title={showCharts ? t('tests_page.charts.hide') : t('tests_page.charts.show')}
                     >
@@ -315,10 +324,10 @@ export function HistorySubTab() {
                     <HistoryCharts logs={filteredHistory} groupBy={groupBy} />
                 )}
 
-                {loadingHistory && <div className="text-center p-4 text-zinc-500">{t('tests_page.loading')}</div>}
+                {loadingHistory && <div className="text-center p-4 text-on-surface-variant/80">{t('tests_page.loading')}</div>}
 
                 {!loadingHistory && filteredHistory.length === 0 && (
-                    <div className="h-full flex flex-col items-center justify-center text-zinc-400">
+                    <div className="h-full flex flex-col items-center justify-center text-on-surface/80">
                         <p>{t('tests_page.no_logs')}</p>
                     </div>
                 )}

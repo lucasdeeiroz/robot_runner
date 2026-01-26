@@ -1,4 +1,4 @@
-import { Github, Bot, RefreshCcw, Cpu, Users, Info } from "lucide-react";
+import { Github, Bot, RefreshCcw, Cpu, Users, Info, User } from "lucide-react";
 import { PageHeader } from "@/components/organisms/PageHeader";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
@@ -6,6 +6,7 @@ import clsx from "clsx";
 import packageJson from '../../package.json';
 import { useSettings } from "@/lib/settings";
 import { Section } from "@/components/organisms/Section";
+import { InfoCard } from "@/components/molecules/InfoCard";
 
 
 const TOOLS = [
@@ -51,12 +52,12 @@ export function AboutPage() {
 
             <div className="grid gap-6">
                 {/* Main Info Card */}
-                <div className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-8 flex flex-col items-center text-center shadow-sm">
-                    <div className="w-20 h-20 bg-primary rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-primary/20 dark:shadow-blue-900/20">
-                        <Bot size={40} className="text-white" />
+                <div className="bg-surface border border-outline-variant/30 rounded-xl p-8 flex flex-col items-center text-center shadow-sm">
+                    <div className="w-20 h-20 bg-primary/10 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-primary/10">
+                        <Bot size={40} className="text-primary" />
                     </div>
 
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                    <h2 className="text-2xl font-bold text-on-surface/80 mb-2">
                         Robot Runner
                     </h2>
                     <div className="inline-flex items-center gap-2 pl-3 pr-1.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium">
@@ -76,13 +77,13 @@ export function AboutPage() {
                                 href="https://github.com/lucasdeeiroz/robot_runner/releases/latest"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="ml-2 text-[10px] bg-primary text-white px-2 py-0.5 rounded-full font-bold hover:bg-primary/90 transition-colors animate-pulse no-underline"
+                                className="ml-2 text-[10px] bg-primary text-on-primary px-2 py-0.5 rounded-full font-bold hover:bg-primary/90 transition-colors animate-pulse no-underline"
                             >
                                 {t('about.update_badge')}
                             </a>
                         )}
                     </div>
-                    <p className="mt-6 text-zinc-500 dark:text-zinc-400 max-w-lg mx-auto leading-relaxed">
+                    <p className="mt-6 text-on-surface-variant/80 max-w-lg mx-auto leading-relaxed">
                         {t('about.long_description')}
                     </p>
                 </div>
@@ -98,21 +99,14 @@ export function AboutPage() {
                     >
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             {TOOLS.map(tool => (
-                                <a
+                                <InfoCard
                                     key={tool.key}
+                                    title={t(`about.tools_list.${tool.key}.name` as any)}
                                     href={tool.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="block p-3 bg-zinc-50 dark:bg-black/20 rounded-lg border border-zinc-100 dark:border-zinc-800 hover:border-primary/30 transition-all hover:scale-[1.02] cursor-pointer"
+                                    headerRight={<span className="text-on-surface/80">↗</span>}
                                 >
-                                    <div className="font-semibold text-sm text-gray-900 dark:text-zinc-200 mb-1 flex items-center justify-between">
-                                        {t(`about.tools_list.${tool.key}.name` as any)}
-                                        <span className="text-zinc-300 dark:text-zinc-600">↗</span>
-                                    </div>
-                                    <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-snug">
-                                        {t(`about.tools_list.${tool.key}.desc` as any)}
-                                    </p>
-                                </a>
+                                    {t(`about.tools_list.${tool.key}.desc` as any)}
+                                </InfoCard>
                             ))}
                         </div>
                     </Section>
@@ -124,22 +118,22 @@ export function AboutPage() {
                         className="flex flex-col"
                     >
                         <div className="space-y-4 flex-1">
-                            <div className="p-4 bg-zinc-50 dark:bg-black/20 rounded-lg border border-zinc-100 dark:border-zinc-800/50">
-                                <div className="font-medium text-gray-900 dark:text-white mb-1 flex items-center gap-2">
+                            <div className="p-4 bg-surface/50 rounded-lg border border-outline-variant/30">
+                                <div className="font-medium text-on-surface/80 mb-1 flex items-center gap-2">
                                     {t('about.license')}
-                                    <span className="text-[10px] uppercase font-bold bg-green-100 text-green-700 px-1.5 py-0.5 rounded border border-green-200">Open Source</span>
+                                    <span className="text-[10px] uppercase font-bold bg-success-container text-on-success-container px-1.5 py-0.5 rounded border border-success-container/20">Open Source</span>
                                 </div>
-                                <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                                <p className="text-sm text-on-surface-variant/80 leading-relaxed">
                                     {t('about.license_desc')}
                                 </p>
                             </div>
 
-                            <p className="text-xs text-zinc-400 text-center italic mt-4">
+                            <p className="text-xs text-on-surface-variant/80 text-center italic mt-4">
                                 {t('about.disclaimer')}
                             </p>
                         </div>
 
-                        <div className="flex justify-center pt-6 text-zinc-500 text-sm gap-6 mt-auto">
+                        <div className="flex justify-center pt-6 text-on-surface-variant/80 text-sm gap-6 mt-auto">
                             <a href="https://github.com/lucasdeeiroz/robot_runner" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors flex items-center gap-2">
                                 <Github size={16} /> Repository
                             </a>
@@ -153,24 +147,30 @@ export function AboutPage() {
                         className="md:col-span-2"
                     >
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center text-xl">
-                                    👨‍💻
-                                </div>
-                                <div>
-                                    <div className="font-medium text-gray-900 dark:text-white">Lucas de Eiroz Rodrigues</div>
-                                    <div className="text-sm text-zinc-500">{t('about.lead')}</div>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center text-xl">
-                                    👩‍💻
-                                </div>
-                                <div>
-                                    <div className="font-medium text-gray-900 dark:text-white">Alessandra Gomes de Almeida</div>
-                                    <div className="text-sm text-zinc-500">{t('about.collaborator')}</div>
-                                </div>
-                            </div>
+                            <InfoCard
+                                title="Lucas de Eiroz Rodrigues"
+                                href="https://github.com/lucasdeeiroz"
+                                headerRight={<span>↗</span>}
+                                icon={
+                                    <div className="w-12 h-12 bg-surface-variant/30 rounded-full flex items-center justify-center text-on-surface-variant/80">
+                                        <User size={24} />
+                                    </div>
+                                }
+                            >
+                                {t('about.lead')}
+                            </InfoCard>
+                            <InfoCard
+                                title="Alessandra Gomes de Almeida"
+                                href="https://github.com/alealmeida31"
+                                headerRight={<span>↗</span>}
+                                icon={
+                                    <div className="w-12 h-12 bg-surface-variant/30 rounded-full flex items-center justify-center text-on-surface-variant/80">
+                                        <User size={24} />
+                                    </div>
+                                }
+                            >
+                                {t('about.collaborator')}
+                            </InfoCard>
                         </div>
                     </Section>
                 </div>

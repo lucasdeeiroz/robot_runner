@@ -83,7 +83,7 @@ export const pt = {
             parse_error: "Falha ao processar comandos salvos",
             cancel_error: "Falha ao cancelar comando",
             empty: "Selecione um dispositivo para executar comandos",
-            placeholder: "Digite comando ADB (ex: 'shell ls -la')",
+            input_placeholder: "Digite comando ADB (ex: 'shell ls -la')",
             waiting: "Aguardando comandos...",
             clear: "Limpar Console",
             quick: "Rápido",
@@ -150,14 +150,15 @@ export const pt = {
             },
             actions: {
                 connect: "Conectar",
-                pair: "Parear",
-                disconnect: "Desconectar",
-                start_tunnel: "Iniciar Túnel Público",
-                stop_tunnel: "Parar Túnel",
                 copy: "Copiado!",
-                paste_url: "Colar URL",
+                disconnect: "Desconectar",
                 disconnect_all: "Desconectar Todos",
-                rerun_failed: "Reexecutar Falhas"
+                enable_remote: "Habilitar Conexão Remota",
+                pair: "Parear",
+                paste_url: "Colar URL",
+                rerun_failed: "Reexecutar Falhas",
+                start_tunnel: "Iniciar Túnel Público",
+                stop_tunnel: "Parar Túnel"
             },
             status: {
                 tunnel_active: "Túnel Ativo",
@@ -185,6 +186,12 @@ export const pt = {
                 payment_required_desc: "Contas gratuitas do ngrok exigem um cartão de crédito válido para usar túneis TCP. Você não será cobrado.",
                 add_card: "Adicionar Cartão",
                 cancel_card: "Cancelar"
+            },
+            security_warning: {
+                title: "Aviso de Segurança",
+                message: "Habilitar a conexão remota (Ngrok) exporá seu dispositivo local à internet.\n\nCertifique-se de que isso esteja em conformidade com as políticas de Segurança da Informação da sua organização antes de prosseguir.",
+                cancel: "Cancelar",
+                confirm: "Habilitar Ngrok"
             }
         },
         console: {
@@ -254,6 +261,7 @@ export const pt = {
             properties: "Propriedades do Nó",
             select_element: "Selecione um elemento na tela",
             attributes: {
+                copied: "Copiado!",
                 all: "Todos Atributos",
                 xpath: "XPath",
                 resource_id: "Resource ID",
@@ -276,6 +284,10 @@ export const pt = {
                 start_failed: "Falha ao iniciar logcat",
                 stop_failed: "Falha ao parar logcat",
                 app_not_running: "App não está rodando: {{pkg}}"
+            },
+            status: {
+                waiting: "Aguardando logs...",
+                empty: "Nenhum log capturado"
             },
             saving: "Salvando logcat em",
             start: "Iniciar",
@@ -321,10 +333,12 @@ export const pt = {
             commands: "Comandos",
             device: {
                 no_device: "Nenhum Dispositivo",
+                no_devices_found: "Nenhum dispositivo encontrado",
                 selected_count: "{{count}} Selecionados",
                 select: "Selecionar Dispositivos",
                 busy: "Ocupado",
-                refresh: "Atualizar Dispositivos"
+                refresh: "Atualizar Dispositivos",
+                open_toolbox: "Abrir Caixa de Ferramentas"
             },
             console: {
                 running: "EXECUTANDO",
@@ -385,10 +399,14 @@ export const pt = {
                 dark: "Escuro",
                 primary_color: "Cor Primária",
                 sidebar_logo: "Logo da Barra Lateral",
-                logo_light: "Logo Modo Claro",
-                logo_dark: "Logo Modo Escuro",
+                logo_light: "Modo Claro",
+                logo_dark: "Modo Escuro",
                 use_default: "Padrão (Texto)",
-                logo_hint: "Recomendado: PNG, Altura 40px, Largura Máx 200px"
+                logo_hint: "Recomendado: PNG, Altura 40px, Largura Máx 200px",
+                logo_set: "Logo definida",
+                no_logo: "Nenhuma logo",
+                upload_logo: "Carregar Logo",
+                remove_logo: "Remover Logo"
             },
             tool_config: {
                 appium_args: "Argumentos Appium",
@@ -498,7 +516,7 @@ export const pt = {
                 server_not_ready: "O Servidor Appium não está pronto"
             },
             options: {
-                dont_overwrite: "Não sobrescrever logs"
+                dont_overwrite: "Salvar Logs"
             }
         },
         tests_page: {

@@ -1,9 +1,69 @@
 @import "tailwindcss";
 
-/* Define theme variable mapping to CSS variable */
 @theme {
-  --color-primary: var(--color-primary);
+  /* Primary */
+  --color-primary: rgb(var(--md-sys-color-primary));
+  --color-on-primary: rgb(var(--md-sys-color-on-primary));
+  --color-primary-container: rgb(var(--md-sys-color-primary-container));
+  --color-on-primary-container: rgb(var(--md-sys-color-on-primary-container));
+
+  /* Secondary */
+  --color-secondary: rgb(var(--md-sys-color-secondary));
+  --color-on-secondary: rgb(var(--md-sys-color-on-secondary));
+  --color-secondary-container: rgb(var(--md-sys-color-secondary-container));
+  --color-on-secondary-container: rgb(var(--md-sys-color-on-secondary-container));
+
+  /* Tertiary */
+  --color-tertiary: rgb(var(--md-sys-color-tertiary));
+  --color-on-tertiary: rgb(var(--md-sys-color-on-tertiary));
+  --color-tertiary-container: rgb(var(--md-sys-color-tertiary-container));
+  --color-on-tertiary-container: rgb(var(--md-sys-color-on-tertiary-container));
+
+  /* Error (Danger) */
+  --color-error: rgb(var(--md-sys-color-error));
+  --color-on-error: rgb(var(--md-sys-color-on-error));
+  --color-error-container: rgb(var(--md-sys-color-error-container));
+  --color-on-error-container: rgb(var(--md-sys-color-on-error-container));
+
+  /* Success */
+  --color-success: rgb(var(--md-sys-color-success));
+  --color-on-success: rgb(var(--md-sys-color-on-success));
+  --color-success-container: rgb(var(--md-sys-color-success-container));
+  --color-on-success-container: rgb(var(--md-sys-color-on-success-container));
+
+  /* Warning */
+  --color-warning: rgb(var(--md-sys-color-warning));
+  --color-on-warning: rgb(var(--md-sys-color-on-warning));
+  --color-warning-container: rgb(var(--md-sys-color-warning-container));
+  --color-on-warning-container: rgb(var(--md-sys-color-on-warning-container));
+
+  /* Info */
+  --color-info: rgb(var(--md-sys-color-info));
+  --color-on-info: rgb(var(--md-sys-color-on-info));
+  --color-info-container: rgb(var(--md-sys-color-info-container));
+  --color-on-info-container: rgb(var(--md-sys-color-on-info-container));
+
+  /* Surface & Background */
+  --color-background: rgb(var(--md-sys-color-background));
+  --color-on-background: rgb(var(--md-sys-color-on-background));
+  --color-surface: rgb(var(--md-sys-color-surface));
+  --color-on-surface: rgb(var(--md-sys-color-on-surface));
+  --color-surface-variant: rgb(var(--md-sys-color-surface-variant));
+  --color-on-surface-variant: rgb(var(--md-sys-color-on-surface-variant));
+  --color-inverse-surface: rgb(var(--md-sys-color-inverse-surface));
+  --color-inverse-on-surface: rgb(var(--md-sys-color-inverse-on-surface));
+  --color-inverse-primary: rgb(var(--md-sys-color-inverse-primary));
+
+  /* Outline */
+  --color-outline: rgb(var(--md-sys-color-outline));
+  --color-outline-variant: rgb(var(--md-sys-color-outline-variant));
+
+  /* Scrim/Shadow */
+  --color-scrim: rgb(var(--md-sys-color-scrim));
+  --color-shadow: rgb(var(--md-sys-color-shadow));
 }
+
+
 
 /* Custom dark variant for class strategy */
 @custom-variant dark (&:where(.dark, .dark *));
@@ -18,74 +78,15 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
 
-/* Global Theme Variables (Bypass Tailwind dark mode issues) */
-:root {
-  /* Initial values based on zinc-50/zinc-900 */
-  --bg-app: #fafafa;
-  /* zinc-50 */
-  --bg-surface: #ffffff;
-  --bg-surface-hover: #f4f4f5;
-  /* zinc-100 */
+  /* Initial Primary Color Fallback (Blue 600 - 37 99 235) */
+  --md-sys-color-primary: 37 99 235;
 
-  --text-app: #3f3f46;
-  /* zinc-700 */
-  --text-muted: #71717a;
-  /* zinc-500 */
-  --text-disabled: #a1a1aa;
-  /* zinc-400 */
-
-  --border-default: #e4e4e7;
-  /* zinc-200 */
-  --border-card: #f4f4f5;
-  /* zinc-100 */
-
-  --color-primary: #2563eb;
-  /* blue-600 */
-
-  --status-success-bg: #dcfce7;
-  /* green-100 */
-  --status-success-text: #15803d;
-  /* green-700 */
-  --status-error-bg: #fee2e2;
-  /* red-100 */
-  --status-error-text: #b91c1c;
-  /* red-700 */
-  --status-warning-bg: #fef3c7;
-  /* amber-100 */
-  --status-warning-text: #b45309;
-  /* amber-700 */
-}
-
-html.dark {
-  --bg-app: #09090b;
-  /* zinc-950 */
-  --bg-surface: #18181b;
-  /* zinc-900 */
-  --bg-surface-hover: #27272a;
-  /* zinc-800 */
-
-  --text-app: #e4e4e7;
-  --text-muted: #a1a1aa;
-  /* zinc-400 */
-  --text-disabled: #52525b;
-  /* zinc-600 */
-
-  --border-default: #27272a;
-  /* zinc-800 */
-  --border-card: #27272a;
-  /* zinc-800 */
-
-  --status-success-bg: rgba(22, 163, 74, 0.3);
-  --status-success-text: #4ade80;
-  /* green-400 */
-  --status-error-bg: rgba(185, 28, 28, 0.3);
-  --status-error-text: #f87171;
-  /* red-400 */
-  --status-warning-bg: rgba(180, 83, 9, 0.3);
-  --status-warning-text: #fbbf24;
-  /* amber-400 */
+  /* App Background variables */
+  --bg-app: rgb(var(--md-sys-color-surface) / 0.1);
+  --bg-app-variant: rgb(var(--md-sys-color-surface-variant) / 0.1);
+  --text-app: rgb(var(--md-sys-color-on-surface));
+  --text-app-variant: rgb(var(--md-sys-color-on-surface-variant));
 }
 
 body {
@@ -93,9 +94,10 @@ body {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  /* Apply variables to body */
-  background-color: var(--bg-app);
-  color: var(--text-app);
+  /* Apply Material 3 dynamic variables */
+  background-color: rgb(var(--md-sys-color-surface));
+  color: rgb(var(--md-sys-color-on-surface));
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 #root {
@@ -111,7 +113,6 @@ h4,
 h5,
 h6 {
   letter-spacing: -0.025em;
-  /* tracking-tight */
 }
 
 /* Tabular nums */
@@ -119,7 +120,7 @@ h6 {
   font-variant-numeric: tabular-nums;
 }
 
-/* Custom Scrollbar */
+/* Custom Scrollbar - Adapted to use MD3 vars where possible or neutral colors */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -130,35 +131,16 @@ h6 {
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: #d4d4d8;
-  /* zinc-300 */
+  background-color: rgb(var(--color-outline-variant));
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background-color: #a1a1aa;
-  /* zinc-400 */
-}
-
-/* Dark mode scrollbar */
-:where(.dark) ::-webkit-scrollbar-thumb {
-  background-color: #3f3f46;
-  /* zinc-700 */
-}
-
-:where(.dark) ::-webkit-scrollbar-thumb:hover {
-  background-color: #52525b;
-  /* zinc-600 */
+  background-color: rgb(var(--color-outline));
 }
 
 /* Global Focus Ring */
 :focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3), 0 0 0 3px #ffffff;
-  /* ring-blue-500/30 offset-white */
-}
-
-:where(.dark) :focus-visible {
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3), 0 0 0 3px #09090b;
-  /* ring-blue-500/30 offset-zinc-950 */
+  box-shadow: 0 0 0 2px rgb(var(--color-primary-container)), 0 0 0 3px rgb(var(--color-on-primary-container));
 }

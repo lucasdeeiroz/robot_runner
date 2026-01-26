@@ -71,7 +71,7 @@ export function CustomLogo({ path, className }: CustomLogoProps) {
         return () => { active = false; };
     }, [path]);
 
-    if (error) return <span className="text-[10px] text-red-500 font-mono break-all px-2" title={error}>{error}</span>;
-    if (!src) return <span className="text-xs text-zinc-500 animate-pulse px-2">Loading...</span>;
+    if (error) return <span className="text-[10px] text-error font-mono break-all px-2" title={error}>{error}</span>;
+    if (!src) return <span className="text-xs text-on-surface-variant/80 animate-pulse px-2">Loading...</span>;
     return <img src={src} alt="Logo" className={className || "h-8 object-contain"} />;
 }

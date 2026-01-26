@@ -23,11 +23,11 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
     ...props
 }, ref) => {
     const variants = {
-        primary: 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm border border-transparent',
-        secondary: 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/50 shadow-sm',
-        outline: 'bg-transparent border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800',
-        ghost: 'bg-transparent text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100',
-        danger: 'bg-red-600 hover:bg-red-700 text-white shadow-sm border border-transparent',
+        primary: 'bg-primary/10 hover:bg-primary-container/80 text-primary shadow-sm border border-transparent',
+        secondary: 'bg-surface text-on-surface/80 border border-outline-variant/30 hover:bg-surface-variant/50 shadow-sm',
+        outline: 'bg-transparent border border-outline-variant/30 text-on-surface/80 hover:bg-surface-variant/30',
+        ghost: 'bg-transparent text-on-surface-variant/80 hover:bg-surface-variant/30 hover:text-on-surface/80',
+        danger: 'bg-error hover:bg-error/90 text-on-error shadow-sm border border-transparent',
     };
 
     const sizes = {
@@ -41,7 +41,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
         <button
             ref={ref}
             className={twMerge(
-                'inline-flex items-center justify-center rounded-lg font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:pointer-events-none disabled:opacity-50 select-none',
+                'inline-flex items-center justify-center rounded-lg font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50 select-none',
                 variants[variant],
                 sizes[size],
                 className

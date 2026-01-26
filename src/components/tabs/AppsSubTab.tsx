@@ -11,6 +11,7 @@ import { Virtuoso } from "react-virtuoso";
 import { ConfirmationModal } from "@/components/organisms/ConfirmationModal";
 import { feedback } from "@/lib/feedback";
 import { Section } from "@/components/organisms/Section";
+import { Button } from "@/components/atoms/Button";
 
 interface PackageInfo {
     name: String;
@@ -193,20 +194,20 @@ export function AppsSubTab() {
                 title={t('apps.title', 'Apps')}
                 icon={Package}
                 variant="transparent"
-                className="border-b border-zinc-200 dark:border-zinc-800 pb-2 mb-2 p-2"
+                className="border-b border-outline-variant/30 pb-2 mb-2 p-2"
                 status={
                     <div className="flex items-center gap-2">
                         <button
                             onClick={fetchPackages}
                             disabled={loading}
-                            className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-400 rounded transition-colors"
+                            className="p-1.5 hover:bg-surface-variant/50 text-on-surface-variant/80 rounded transition-colors"
                             title={t('apps.actions.refresh')}
                         >
                             <RefreshCw size={14} className={clsx(loading && "animate-spin")} />
                         </button>
                         <button
                             onClick={() => setSortBy(prev => prev === 'name' ? 'package' : 'name')}
-                            className="p-1.5 hover:bg-zinc-800 text-zinc-400 rounded transition-colors"
+                            className="p-1.5 hover:bg-surface-variant/50 text-on-surface-variant/80 rounded transition-colors"
                             title={sortBy === 'name' ? t('apps.actions.sort_by_package') : t('apps.actions.sort_by_name')}
                         >
                             {sortBy === 'name' ? <ArrowDownAZ size={14} /> : <Package size={14} />}
@@ -215,7 +216,7 @@ export function AppsSubTab() {
                             onClick={() => setShowSystem(!showSystem)}
                             className={clsx(
                                 "p-1.5 rounded border text-xs flex items-center gap-1.5 transition-colors",
-                                showSystem ? "bg-blue-500/10 border-blue-500/50 text-blue-600 dark:text-blue-400" : "bg-transparent border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                                showSystem ? "bg-primary-container border-primary-container text-on-primary-container" : "bg-transparent border-outline-variant/30 text-on-surface-variant/80 hover:text-on-surface/80"
                             )}
                             title={t('apps.toggle_system', "Toggle System Apps")}
                         >
@@ -226,26 +227,28 @@ export function AppsSubTab() {
                 }
                 menus={!isNarrow ? (
                     <div className="relative">
-                        <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-500" />
+                        <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-on-surface-variant/80" />
                         <input
                             type="text"
                             value={search}
                             onChange={e => setSearch(e.target.value)}
                             placeholder={t('apps.search_placeholder', "Search packages...")}
-                            className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded px-8 py-1.5 text-xs text-zinc-900 dark:text-zinc-300 focus:outline-none focus:border-primary/50 w-64 transition-all"
+                            className="bg-surface border border-outline-variant/30 rounded px-8 py-1.5 text-xs text-on-surface/80 focus:outline-none focus:border-primary/50 w-64 transition-all"
                         />
                     </div>
                 ) : null}
                 actions={
                     <>
-                        <button
+                        <Button
                             onClick={handleInstall}
-                            className="p-1.5 bg-green-600/10 hover:bg-green-600/20 text-green-500 border border-green-600/20 rounded flex items-center gap-1.5 transition-colors"
+                            variant="ghost"
+                            size="sm"
+                            className="bg-on-success-container/10/10 hover:bg-on-success-container/10/20 text-success border border-on-success-container/10/20"
                             title={t('apps.actions.install')}
+                            leftIcon={<Upload size={14} />}
                         >
-                            <Upload size={14} />
                             <span className="text-xs font-semibold hidden lg:inline">{t('apps.actions.install')}</span>
-                        </button>
+                        </Button>
                     </>
                 }
             />
@@ -253,12 +256,12 @@ export function AppsSubTab() {
             {/* Content */}
             <div className="flex-1 overflow-hidden relative">
                 {!activeDevice ? (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-500 gap-2">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-on-surface-variant/80 gap-2">
                         <Smartphone size={32} className="opacity-20" />
                         <span className="text-sm">{t('apps.no_device', "No device selected")}</span>
                     </div>
                 ) : filtered.length === 0 ? (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-500 gap-2">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-on-surface-variant/80 gap-2">
                         <Package size={32} className="opacity-20" />
                         <span className="text-sm">{loading ? t('common.loading', "Loading...") : t('apps.no_packages', "No packages found")}</span>
                     </div>
@@ -267,26 +270,26 @@ export function AppsSubTab() {
                         data={filtered}
                         className="custom-scrollbar"
                         itemContent={(_index, pkg) => (
-                            <div className="px-3 py-2 border-b border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800/30 group flex items-center gap-3">
+                            <div className="px-3 py-2 border-b border-outline-variant/30 hover:bg-surface-variant/20 group flex items-center gap-3">
                                 <div className={clsx(
                                     "p-2 rounded-lg shrink-0",
-                                    pkg.is_system ? "bg-purple-500/10 text-purple-400" : "bg-blue-500/10 text-blue-400"
+                                    pkg.is_system ? "bg-tertiary-container text-on-tertiary-container" : "bg-primary-container text-on-primary-container"
                                 )}>
                                     <Package size={16} />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <div className="text-sm text-zinc-800 dark:text-zinc-200 truncate font-medium flex items-center gap-2">
+                                    <div className="text-sm text-on-surface/80 truncate font-medium flex items-center gap-2">
                                         {friendlyNames[String(pkg.name)] || pkg.name}
                                         {pkg.is_disabled && (
-                                            <span className="text-[10px] bg-red-500/20 text-red-400 px-1 rounded uppercase font-bold tracking-wider">
+                                            <span className="text-[10px] bg-error-container text-on-error-container px-1 rounded uppercase font-bold tracking-wider">
                                                 {t('apps.status.disabled_badge', "Disabled")}
                                             </span>
                                         )}
                                     </div>
-                                    <div className="text-xs text-zinc-500 truncate font-mono opacity-70 flex items-center gap-2">
+                                    <div className="text-xs text-on-surface-variant/80 truncate font-mono opacity-70 flex items-center gap-2">
                                         <span>{pkg.name}</span>
-                                        <span className="text-zinc-300 dark:text-zinc-600 px-1">•</span>
-                                        <span title={String(pkg.path)} className="truncate max-w-[150px] cursor-help hover:text-zinc-900 dark:hover:text-zinc-300 transition-colors">
+                                        <span className="text-outline-variant px-1">•</span>
+                                        <span title={String(pkg.path)} className="truncate max-w-[150px] cursor-help hover:text-on-surface/80 transition-colors">
                                             {pkg.path}
                                         </span>
                                     </div>
@@ -294,22 +297,22 @@ export function AppsSubTab() {
 
                                 <div className="flex items-center gap-1 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
                                     {pkg.is_disabled ? (
-                                        <button onClick={() => confirmFreeze(String(pkg.name), false)} className="p-1.5 hover:bg-blue-500/10 text-blue-400 rounded" title={t('apps.actions.enable', "Enable")}>
+                                        <Button size="icon" variant="ghost" onClick={() => confirmFreeze(String(pkg.name), false)} className="h-7 w-7 hover:bg-primary/10 text-info-container/80 rounded" title={t('apps.actions.enable', "Enable")}>
                                             <PlayCircle size={14} />
-                                        </button>
+                                        </Button>
                                     ) : (
-                                        <button onClick={() => confirmFreeze(String(pkg.name), true)} className="p-1.5 hover:bg-sky-500/10 text-sky-400 rounded" title={t('apps.actions.disable', "Freeze")}>
+                                        <Button size="icon" variant="ghost" onClick={() => confirmFreeze(String(pkg.name), true)} className="h-7 w-7 hover:bg-sky-500/10 text-sky-400 rounded" title={t('apps.actions.disable', "Freeze")}>
                                             <Snowflake size={14} />
-                                        </button>
+                                        </Button>
                                     )}
 
-                                    <button onClick={() => confirmClear(String(pkg.name))} className="p-1.5 hover:bg-yellow-500/10 text-yellow-400 rounded" title={t('apps.actions.clear', "Clear Data")}>
+                                    <Button size="icon" variant="ghost" onClick={() => confirmClear(String(pkg.name))} className="h-7 w-7 hover:bg-warning/10 text-warning-container/40 rounded" title={t('apps.actions.clear', "Clear Data")}>
                                         <Eraser size={14} />
-                                    </button>
+                                    </Button>
 
-                                    <button onClick={() => confirmUninstall(String(pkg.name))} className="p-1.5 hover:bg-red-500/10 text-red-400 rounded" title={t('apps.actions.uninstall', "Uninstall")}>
+                                    <Button size="icon" variant="ghost" onClick={() => confirmUninstall(String(pkg.name))} className="h-7 w-7 hover:bg-error/10 text-error-container/60 rounded" title={t('apps.actions.uninstall', "Uninstall")}>
                                         <Trash2 size={14} />
-                                    </button>
+                                    </Button>
                                 </div>
                             </div>
                         )}
