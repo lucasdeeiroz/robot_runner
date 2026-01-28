@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { RefreshCw, Maximize, Check, Scan, MousePointerClick, Move, Home, ArrowLeft, Rows, X } from 'lucide-react';
+import { Maximize, Check, Scan, MousePointerClick, Move, Home, ArrowLeft, Rows, X, RefreshCw } from 'lucide-react';
 import { XMLParser } from 'fast-xml-parser';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
@@ -9,6 +9,7 @@ import { InspectorNode, transformXmlToTree, findNodesAtCoords, generateXPath } f
 import { feedback } from "@/lib/feedback";
 import { Section } from "@/components/organisms/Section";
 import { t } from 'i18next';
+import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 
 interface InspectorSubTabProps {
     selectedDevice: string;
@@ -331,7 +332,7 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
                             )}
                             title={t('inspector.refresh')}
                         >
-                            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+                            {loading ? <ExpressiveLoading size="xsm" variant="circular" /> : <RefreshCw size={16} />}
                             <span className={clsx(isNarrow && "hidden")}>{t('inspector.refresh')}</span>
                         </button>
                     </>
@@ -416,7 +417,7 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
                         </div>
                     ) : (
                         <div className="text-on-surface/80 flex flex-col items-center">
-                            {loading ? <RefreshCw className="animate-spin mb-2 opacity-50" size={32} /> : <Maximize size={32} className="mb-2 opacity-50" />}
+                            {loading ? <ExpressiveLoading size="lg" variant="circular" className="mb-2" /> : <Maximize size={32} className="mb-2 opacity-50" />}
                             <p>{loading ? t('inspector.status.loading') : t('inspector.status.no_screenshot')}</p>
                         </div>
                     )}

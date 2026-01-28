@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { Activity, Cpu, Battery, CircuitBoard, RefreshCw, Play, Square, Package as PackageIcon, Eye } from "lucide-react";
+import { Activity, Cpu, Battery, CircuitBoard, Play, Square, Package as PackageIcon, Eye, RefreshCw } from "lucide-react";
 import clsx from "clsx";
 import { useSettings } from "@/lib/settings";
 
@@ -9,6 +9,7 @@ import { Section } from "@/components/organisms/Section";
 import { DeviceStats } from "@/hooks/usePerformanceRecorder";
 import { Button } from "@/components/atoms/Button";
 import { Select } from "@/components/atoms/Select";
+import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 
 interface PerformanceSubTabProps {
     selectedDevice: string;
@@ -24,6 +25,7 @@ interface PerformanceSubTabProps {
     setLastSaved: (val: string | null) => void;
 
     onRefresh: () => void;
+    isLoading?: boolean;
 }
 
 export function PerformanceSubTab({
@@ -39,7 +41,8 @@ export function PerformanceSubTab({
     lastSaved,
     setLastSaved,
 
-    onRefresh
+    onRefresh,
+    isLoading = false
 }: PerformanceSubTabProps) {
     const { t } = useTranslation();
     const { settings } = useSettings();
@@ -104,7 +107,11 @@ export function PerformanceSubTab({
                             className="p-1.5 hover:bg-surface-variant/30 rounded transition-all active:scale-95"
                             title={t('performance.refresh')}
                         >
-                            <RefreshCw size={16} className="text-on-surface-variant/80" />
+                            {isLoading ? (
+                                <ExpressiveLoading size="xsm" variant="circular" className="text-on-surface-variant/80" />
+                            ) : (
+                                <RefreshCw size={16} className="text-on-surface-variant/80" />
+                            )}
                         </button>
                         <button
                             onClick={() => setAutoRefresh(!autoRefresh)}
@@ -164,7 +171,8 @@ export function PerformanceSubTab({
                 />
 
                 {!stats ? (
-                    <div className="flex-1 flex flex-col items-center justify-center text-on-surface/80 animate-pulse">
+                    <div className="flex-1 flex flex-col items-center justify-center text-on-surface/80">
+                        <ExpressiveLoading size="lg" variant="circular" className="mb-2" />
                         <p>{t('performance.loading')}</p>
                     </div>
                 ) : (

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Folder, File, ChevronRight, CornerLeftUp, Loader2 } from "lucide-react";
+import { Folder, File, ChevronRight, CornerLeftUp } from "lucide-react";
+import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 import clsx from "clsx";
 
 interface FileEntry {
@@ -146,7 +147,7 @@ export function FileExplorer({ initialPath = ".", onSelect, onCancel, selectionM
             <div className="flex-1 overflow-y-auto border border-outline-variant/30 rounded-2xl bg-transparent backdrop-blur-md p-1 min-h-0">
                 {loading && (
                     <div className="flex flex-col items-center justify-center h-full text-on-surface/80">
-                        <Loader2 size={32} className="animate-spin mb-2" />
+                        <ExpressiveLoading size="md" variant="circular" className="mb-2" />
                         <span className="text-xs">{t('file_explorer.loading')}</span>
                     </div>
                 )}

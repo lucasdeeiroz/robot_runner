@@ -26,6 +26,7 @@ import { TagInput } from "@/components/molecules/TagInput";
 import { SegmentedControl } from "@/components/molecules/SegmentedControl";
 import { InfoCard } from "@/components/molecules/InfoCard";
 import { LogoInput } from "@/components/molecules/LogoInput";
+import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 
 export function SettingsPage() {
     const { settings, updateSetting, loading, profiles, activeProfileId, createProfile, switchProfile, renameProfile, deleteProfile, systemVersions, checkSystemVersions, systemCheckStatus, isNgrokEnabled } = useSettings();
@@ -582,12 +583,16 @@ export function SettingsPage() {
                             className={
                                 clsx(
                                     "p-2 rounded-2xl transition-all active:scale-95 hover:bg-surface-variant/30",
-                                    systemCheckStatus.loading ? "animate-spin text-primary" : "text-on-surface-variant/80 hover:text-primary"
+                                    systemCheckStatus.loading ? "text-primary" : "text-on-surface-variant/80 hover:text-primary"
                                 )
                             }
                             title={t('common.loading')}
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" /><path d="M16 16h5v5" /></svg>
+                            {systemCheckStatus.loading ? (
+                                <ExpressiveLoading size="xsm" variant="circular" />
+                            ) : (
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" /><path d="M16 16h5v5" /></svg>
+                            )}
                         </button>
                     }
                 >

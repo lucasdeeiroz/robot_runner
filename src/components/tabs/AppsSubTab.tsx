@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useTranslation } from "react-i18next";
-import { Search, RefreshCw, Smartphone, Package, Trash2, Snowflake, PlayCircle, Eraser, Upload, ArrowDownAZ } from "lucide-react";
+import { Search, Smartphone, Package, Trash2, Snowflake, PlayCircle, Eraser, Upload, ArrowDownAZ, RefreshCw } from "lucide-react";
 import clsx from "clsx";
 import { useTestSessions } from "@/lib/testSessionStore";
 import { open } from '@tauri-apps/plugin-dialog';
@@ -12,6 +12,7 @@ import { ConfirmationModal } from "@/components/organisms/ConfirmationModal";
 import { feedback } from "@/lib/feedback";
 import { Section } from "@/components/organisms/Section";
 import { Button } from "@/components/atoms/Button";
+import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 
 interface PackageInfo {
     name: String;
@@ -203,7 +204,7 @@ export function AppsSubTab() {
                             className="p-1.5 hover:bg-surface-variant/50 text-on-surface-variant/80 rounded transition-colors"
                             title={t('apps.actions.refresh')}
                         >
-                            <RefreshCw size={14} className={clsx(loading && "animate-spin")} />
+                            {loading ? <ExpressiveLoading size="xsm" variant="circular" /> : <RefreshCw size={14} />}
                         </button>
                         <button
                             onClick={() => setSortBy(prev => prev === 'name' ? 'package' : 'name')}
@@ -262,7 +263,7 @@ export function AppsSubTab() {
                     </div>
                 ) : filtered.length === 0 ? (
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-on-surface-variant/80 gap-2">
-                        <Package size={32} className="opacity-20" />
+                        {loading ? <ExpressiveLoading size="lg" variant="circular" /> : <Package size={32} className="opacity-20" />}
                         <span className="text-sm">{loading ? t('common.loading', "Loading...") : t('apps.no_packages', "No packages found")}</span>
                     </div>
                 ) : (

@@ -10,6 +10,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { SplitButton } from "@/components/molecules/SplitButton";
 import { Section } from "@/components/organisms/Section";
 import { Alert } from "@/components/atoms/Alert";
+import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 
 interface ConnectSubTabProps {
     onDeviceConnected: () => void;
@@ -340,7 +341,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                             primaryAction={{
                                 label: t('connect.actions.connect'),
                                 onClick: () => handleAction('connect'),
-                                icon: loading ? <div className="w-4 h-4 border-2 border-on-primary border-t-transparent rounded-2xl animate-spin" /> : <Link size={16} />
+                                icon: loading ? <ExpressiveLoading size="sm" variant="circular" /> : <Link size={16} />
                             }}
                             secondaryActions={[
                                 {
@@ -358,7 +359,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                             primaryAction={{
                                 label: t('connect.actions.disconnect'),
                                 onClick: () => handleAction('disconnect'),
-                                icon: loading ? <div className="w-4 h-4 border-2 border-error border-t-transparent rounded-2xl animate-spin" /> : <Unplug size={16} />,
+                                icon: loading ? <ExpressiveLoading size="sm" variant="circular" /> : <Unplug size={16} />,
                                 disabled: loading || !ip || !port
                             }}
                             secondaryActions={[
@@ -445,7 +446,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                             <div className="space-y-4">
                                 {ngrokLoading ? (
                                     <div className="flex flex-col items-center justify-center p-8 space-y-3">
-                                        <div className="w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-2xl animate-spin" />
+                                        <ExpressiveLoading size="md" variant="circular" className="text-purple-500" />
                                         <span className="text-sm text-on-surface-variant/80">{t('connect.status.starting_ngrok')}</span>
                                     </div>
                                 ) : (

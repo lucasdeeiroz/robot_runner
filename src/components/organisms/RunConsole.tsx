@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
-import { ChevronRight, ChevronDown, CheckCircle2, XCircle, Layers, Loader2, Star } from "lucide-react";
+import { ChevronRight, ChevronDown, CheckCircle2, XCircle, Layers, Star } from "lucide-react";
 
 interface RunConsoleProps {
     logs: string[];
@@ -55,6 +55,7 @@ type LinearNode = TextNode | SuiteStartNode | SuiteEndNode;
 
 
 import { LinkRenderer } from "../molecules/LinkRenderer";
+import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 
 export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
     const { t } = useTranslation();
@@ -446,7 +447,7 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
                             "text-[10px] px-2 py-0.5 rounded font-bold uppercase flex items-center gap-1 shrink-0",
                             bgColor, textColor
                         )}>
-                            {isRunning ? <Loader2 size={12} className="animate-spin" /> : (isFailed ? <XCircle size={12} /> : <CheckCircle2 size={12} />)}
+                            {isRunning ? <ExpressiveLoading size="xsm" variant="circular" /> : (isFailed ? <XCircle size={12} /> : <CheckCircle2 size={12} />)}
                             {t(isRunning ? 'run_tab.console.running' : (isFailed ? 'run_tab.console.fail' : 'run_tab.console.pass'))}
                         </div>
                     </div>
@@ -499,7 +500,7 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
 
                         {/* Status Badge for Suite */}
                         <span className={clsx("text-[10px] ml-2 px-1.5 py-0.5 rounded border flex items-center gap-1", borderColor, summaryColor, badgeBg)}>
-                            {isRunning && <Loader2 size={10} className="animate-spin" />}
+                            {isRunning && <ExpressiveLoading size="xsm" variant="circular" />}
                             {isRunning ? t('run_tab.console.running') : translateSummary(node.summary) || t(node.status === 'FAIL' ? 'run_tab.console.fail' : 'run_tab.console.pass')}
                         </span>
                     </div>

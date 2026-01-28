@@ -21,6 +21,7 @@ import { Badge } from "@/components/atoms/Badge";
 import { TabItem } from "@/components/molecules/Tabs";
 import { TabBar } from "@/components/organisms/TabBar";
 import { AndroidVersionPill } from "@/components/atoms/AndroidVersionPill";
+import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 
 type TabType = 'tests' | 'connect' | 'inspector';
 
@@ -194,9 +195,8 @@ export function RunPage({ onNavigate, initialTab }: RunPageProps) {
                                 size="icon"
                                 onClick={(e) => { e.stopPropagation(); loadDevices(); }}
                                 title={t('run_tab.device.refresh')}
-                                isLoading={loadingDevices}
                             >
-                                {!loadingDevices && <RefreshCw size={14} />}
+                                {!loadingDevices ? <RefreshCw size={14} /> : <ExpressiveLoading size="sm" variant="circular" />}
                             </Button>
                             {/* Dropdown Panel */}
                             <AnimatePresence>

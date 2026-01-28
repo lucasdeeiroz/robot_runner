@@ -28,6 +28,7 @@ export function usePerformanceRecorder(selectedDevice: string, isActive: boolean
     const [error, setError] = useState<string | null>(null);
     const [autoRefresh, setAutoRefresh] = useState(true);
     const [selectedPackage, setSelectedPackage] = useState<string>("");
+    const [isLoading, setIsLoading] = useState(false);
 
     // Recording State
     const [lastSaved, setLastSaved] = useState<string | null>(null);
@@ -48,6 +49,7 @@ export function usePerformanceRecorder(selectedDevice: string, isActive: boolean
     }, [selectedDevice, autoRefresh, selectedPackage, isActive, isRecording]);
 
     const fetchStats = async () => {
+        setIsLoading(true);
         try {
             const data = await invoke<DeviceStats>('get_device_stats', {
                 device: selectedDevice,
@@ -58,6 +60,8 @@ export function usePerformanceRecorder(selectedDevice: string, isActive: boolean
         } catch (e) {
             feedback.toast.error("performance.fetch_error", e);
             setError(t('performance.error'));
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -132,6 +136,7 @@ export function usePerformanceRecorder(selectedDevice: string, isActive: boolean
         toggleRecording,
         lastSaved,
         setLastSaved,
-        fetchStats
+        fetchStats,
+        isLoading
     };
 }

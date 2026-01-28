@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { useSettings } from "@/lib/settings";
 import { HistoryCharts } from "../organisms/HistoryCharts";
-import { XCircle, FileText, Folder, Calendar, RefreshCw, ChevronDown, ChevronRight, CheckCircle, Clock, PieChart, Search } from 'lucide-react';
+import { XCircle, FileText, Folder, Calendar, ChevronDown, ChevronRight, CheckCircle, Clock, PieChart, Search, RefreshCw } from 'lucide-react';
 import clsx from 'clsx';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from "react-i18next";
@@ -11,6 +11,7 @@ import { Section } from "@/components/organisms/Section";
 import { AndroidVersionPill } from "@/components/atoms/AndroidVersionPill";
 import { Input } from "@/components/atoms/Input";
 import { Select } from "@/components/atoms/Select";
+import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 
 interface TestLog {
     path: string;
@@ -266,7 +267,7 @@ export function HistorySubTab() {
                         className="p-1.5 text-on-surface-variant/80 hover:bg-surface-variant/30 rounded-2xl transition-colors"
                         title={t('tests_page.actions.refresh')}
                     >
-                        <RefreshCw size={16} className={loadingHistory ? "animate-spin" : ""} />
+                        {loadingHistory ? <ExpressiveLoading size="xsm" variant="circular" /> : <RefreshCw size={16} />}
                     </button>
                 }
                 menus={!isHistoryNarrow ? (
@@ -331,7 +332,11 @@ export function HistorySubTab() {
                     )}
                 </AnimatePresence>
 
-                {loadingHistory && <div className="text-center p-4 text-on-surface-variant/80">{t('tests_page.loading')}</div>}
+                {loadingHistory && (
+                    <div className="flex justify-center p-4">
+                        <ExpressiveLoading size="md" variant="circular" />
+                    </div>
+                )}
 
                 {!loadingHistory && filteredHistory.length === 0 && (
                     <div className="h-full flex flex-col items-center justify-center text-on-surface/80">

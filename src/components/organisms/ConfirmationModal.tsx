@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
 import { AnimatePresence, motion } from "framer-motion";
+import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 
 interface ConfirmationModalProps {
     isOpen: boolean;
@@ -89,7 +90,7 @@ export function ConfirmationModal({
                                             : "bg-warning-container hover:bg-warning-container/80 text-on-surface/80"
                                     )}
                                 >
-                                    {isLoading && <div className="w-3 h-3 border-2 border-on-primary/30 border-t-on-primary rounded-2xl animate-spin" />}
+                                    {isLoading && <ExpressiveLoading size="xsm" variant="circular" className="text-on-primary" />}
                                     {confirmText || t('common.confirm')}
                                 </button>
                             </div>

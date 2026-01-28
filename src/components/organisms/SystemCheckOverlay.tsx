@@ -1,9 +1,10 @@
 import { SystemCheckStatus } from "@/lib/settings";
-import { Loader2, AlertTriangle, XCircle, MonitorX } from "lucide-react";
+import { AlertTriangle, XCircle, MonitorX } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Modal } from "@/components/organisms/Modal";
 import { TOOL_LINKS } from "@/lib/tools";
 import { motion } from "framer-motion";
+import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 
 interface SystemCheckOverlayProps {
     status: SystemCheckStatus;
@@ -31,7 +32,7 @@ export function SystemCheckOverlay({ status, onCriticalExit, onTestingRedirect, 
                 exit={{ opacity: 0 }}
                 className="fixed inset-0 z-[100] bg-surface flex flex-col items-center justify-center space-y-4"
             >
-                <Loader2 className="w-12 h-12 text-primary animate-spin" />
+                <ExpressiveLoading size="lg" className="text-primary" variant="circular" />
                 <div className="flex flex-col items-center gap-2">
                     <h2 className="text-xl font-semibold text-on-surface/80">{t('startup.loading')}</h2>
                     <p className="text-sm text-on-surface-variant/80">{t('startup.checking')}</p>

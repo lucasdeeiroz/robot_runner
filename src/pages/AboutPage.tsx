@@ -2,11 +2,11 @@ import { Github, Bot, RefreshCcw, Cpu, Users, Info, User } from "lucide-react";
 import { PageHeader } from "@/components/organisms/PageHeader";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
-import clsx from "clsx";
 import packageJson from '../../package.json';
 import { useSettings } from "@/lib/settings";
 import { Section } from "@/components/organisms/Section";
 import { InfoCard } from "@/components/molecules/InfoCard";
+import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 
 
 const TOOLS = [
@@ -69,7 +69,11 @@ export function AboutPage() {
                             title={isChecking ? t('about.checking') : t('about.update_check')}
                             className="p-1 rounded-2xl hover:bg-primary/10 text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            <RefreshCcw size={13} className={clsx({ "animate-spin": isChecking })} />
+                            {isChecking ? (
+                                <ExpressiveLoading size="xsm" variant="circular" />
+                            ) : (
+                                <RefreshCcw size={13} />
+                            )}
                         </button>
 
                         {updateAvailable && (

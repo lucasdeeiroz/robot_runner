@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
 import clsx from "clsx";
 import { createPortal } from "react-dom";
-import { Button } from "../atoms/Button";
+
+import { AnimatePresence, motion } from "framer-motion";
 
 interface SplitButtonAction {
     label: string;
@@ -45,7 +46,7 @@ export function SplitButton({ primaryAction, secondaryActions, className, disabl
                 setDropdownStyle({
                     top: rect.bottom + 4,
                     right: window.innerWidth - rect.right,
-                    minWidth: 'max-content'
+                    minWidth: Math.max(containerRef.current?.offsetWidth || 0, 140)
                 });
             }
         }
@@ -54,13 +55,11 @@ export function SplitButton({ primaryAction, secondaryActions, className, disabl
         };
     }, [isOpen]);
 
-    // Border color logic for separator
-
-    // Border color logic for separator
+    // Separator line color logic - lighter and more subtle
     const separatorStyles = {
-        primary: "border-l border-on-primary/20",
-        danger: "border-l border-on-error-container/20",
-        secondary: "border-l border-outline"
+        primary: "bg-on-primary/20",
+        danger: "bg-on-error/20",
+        secondary: "bg-outline-variant"
     };
 
     // Promotion Logic
@@ -76,67 +75,84 @@ export function SplitButton({ primaryAction, secondaryActions, className, disabl
             // Promote first enabled action to primary
             effectivePrimary = enabledActions[0];
             effectiveSecondaries = enabledActions.slice(1);
-        } else {
-            // All specific actions are disabled, keep original structure but effectivePrimary will be disabled via its prop
         }
     }
 
     const showDropdown = effectiveSecondaries.length > 0;
 
     return (
-        <div ref={containerRef} className={clsx("relative inline-flex rounded-2xl shadow-sm h-9", className)}>
-            <Button
-                type="button"
-                onClick={effectivePrimary.onClick}
-                disabled={disabled || effectivePrimary.disabled}
-                variant={variant}
-                className={clsx(
-                    "rounded-none h-9", // Override rounded to handle group
-                    showDropdown ? "rounded-l-2xl" : "rounded-2xl",
-                    "border-r-0"
-                )}
-                leftIcon={effectivePrimary.icon}
-            >
-                {effectivePrimary.label}
-            </Button>
-            {showDropdown && (
-                <Button
-                    ref={buttonRef}
+        <div ref={containerRef} className={clsx("relative inline-flex h-9", className)}>
+            <div className={clsx(
+                "flex items-center rounded-2xl shadow-sm transition-all duration-200",
+                "group focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-1",
+                variant === 'primary' && "bg-primary text-on-primary hover:shadow-md",
+                variant === 'danger' && "bg-error text-on-error hover:shadow-md",
+                variant === 'secondary' && "bg-surface-variant/50 text-on-surface hover:bg-surface-variant border border-outline-variant/30"
+            )}>
+                <button
                     type="button"
-                    variant={variant}
+                    onClick={effectivePrimary.onClick}
+                    disabled={disabled || effectivePrimary.disabled}
                     className={clsx(
-                        "rounded-none h-9 px-1.5",
-                        "rounded-r-2xl",
-                        separatorStyles[variant]
+                        "h-full px-4 text-sm font-medium flex items-center gap-2 rounded-l-2xl outline-none",
+                        showDropdown ? "pr-2" : "rounded-r-2xl pr-4",
+                        disabled && "opacity-50 cursor-not-allowed"
                     )}
-                    onClick={() => !disabled && setIsOpen(!isOpen)}
-                    disabled={disabled}
                 >
-                    <ChevronDown size={14} className={clsx("transition-transform", isOpen && "rotate-180")} />
-                </Button>
-            )}
+                    {effectivePrimary.icon && <span>{effectivePrimary.icon}</span>}
+                    {effectivePrimary.label}
+                </button>
 
-            {isOpen && showDropdown && createPortal(
-                <div
-                    ref={dropdownRef}
-                    className="fixed z-50 bg-surface border border-outline-variant/30 rounded-2xl shadow-lg py-1 min-w-[140px]"
-                    style={dropdownStyle}
-                >
-                    {effectiveSecondaries.map((action, idx) => (
+                {showDropdown && (
+                    <>
+                        {/* Separator Line */}
+                        <div className={clsx("w-[1px] h-5 self-center", separatorStyles[variant], disabled && "opacity-30")} />
+
                         <button
-                            key={idx}
-                            onClick={() => {
-                                action.onClick();
-                                setIsOpen(false);
-                            }}
-                            disabled={action.disabled}
-                            className="w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-surface-variant/50 flex items-center gap-2 group transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                            ref={buttonRef}
+                            type="button"
+                            onClick={() => !disabled && setIsOpen(!isOpen)}
+                            disabled={disabled}
+                            className={clsx(
+                                "h-full pl-1.5 pr-2 rounded-r-2xl flex items-center justify-center outline-none",
+                                disabled && "opacity-50 cursor-not-allowed"
+                            )}
                         >
-                            {action.icon && <span className="text-on-surface-variant/80 group-hover:text-on-surface/80">{action.icon}</span>}
-                            {action.label}
+                            <ChevronDown size={16} className={clsx("transition-transform duration-300", isOpen && "rotate-180")} />
                         </button>
-                    ))}
-                </div>
+                    </>
+                )}
+            </div>
+
+            {showDropdown && createPortal(
+                <AnimatePresence>
+                    {isOpen && (
+                        <motion.div
+                            ref={dropdownRef}
+                            initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                            transition={{ duration: 0.15, ease: "easeOut" }}
+                            className="fixed z-50 bg-surface border border-outline-variant/30 rounded-2xl shadow-lg py-1.5 overflow-hidden"
+                            style={dropdownStyle}
+                        >
+                            {effectiveSecondaries.map((action, idx) => (
+                                <button
+                                    key={idx}
+                                    onClick={() => {
+                                        action.onClick();
+                                        setIsOpen(false);
+                                    }}
+                                    disabled={action.disabled}
+                                    className="w-full text-left px-4 py-2 text-sm text-on-surface/90 hover:bg-primary/5 active:bg-primary/10 flex items-center gap-2.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {action.icon && <span className="text-on-surface-variant">{action.icon}</span>}
+                                    {action.label}
+                                </button>
+                            ))}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
                 , document.body)}
         </div>
     );
