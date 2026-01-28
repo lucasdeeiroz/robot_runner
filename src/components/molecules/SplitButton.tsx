@@ -84,7 +84,7 @@ export function SplitButton({ primaryAction, secondaryActions, className, disabl
     const showDropdown = effectiveSecondaries.length > 0;
 
     return (
-        <div ref={containerRef} className={clsx("relative inline-flex rounded-md shadow-sm h-9", className)}>
+        <div ref={containerRef} className={clsx("relative inline-flex rounded-2xl shadow-sm h-9", className)}>
             <Button
                 type="button"
                 onClick={effectivePrimary.onClick}
@@ -92,7 +92,7 @@ export function SplitButton({ primaryAction, secondaryActions, className, disabl
                 variant={variant}
                 className={clsx(
                     "rounded-none h-9", // Override rounded to handle group
-                    showDropdown ? "rounded-l-md" : "rounded-md",
+                    showDropdown ? "rounded-l-2xl" : "rounded-2xl",
                     "border-r-0"
                 )}
                 leftIcon={effectivePrimary.icon}
@@ -106,7 +106,7 @@ export function SplitButton({ primaryAction, secondaryActions, className, disabl
                     variant={variant}
                     className={clsx(
                         "rounded-none h-9 px-1.5",
-                        "rounded-r-md",
+                        "rounded-r-2xl",
                         separatorStyles[variant]
                     )}
                     onClick={() => !disabled && setIsOpen(!isOpen)}
@@ -119,7 +119,7 @@ export function SplitButton({ primaryAction, secondaryActions, className, disabl
             {isOpen && showDropdown && createPortal(
                 <div
                     ref={dropdownRef}
-                    className="fixed z-50 bg-surface border border-outline-variant/30 rounded-md shadow-lg py-1 min-w-[140px]"
+                    className="fixed z-50 bg-surface border border-outline-variant/30 rounded-2xl shadow-lg py-1 min-w-[140px]"
                     style={dropdownStyle}
                 >
                     {effectiveSecondaries.map((action, idx) => (

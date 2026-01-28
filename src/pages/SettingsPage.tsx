@@ -279,7 +279,7 @@ export function SettingsPage() {
                         value={newProfileName}
                         onChange={(e) => setNewProfileName(e.target.value)}
                         placeholder={t('settings.profiles.name_placeholder')}
-                        className="w-full bg-surface/50 border border-outline-variant/30 rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 text-on-surface/80"
+                        className="w-full bg-surface/50 border border-outline-variant/30 rounded-2xl px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 text-on-surface/80"
                     />
                     <div className="flex justify-end gap-2">
                         <button
@@ -292,7 +292,7 @@ export function SettingsPage() {
                         <button
                             type="submit"
                             disabled={!newProfileName.trim()}
-                            className="px-4 py-2 bg-primary hover:opacity-90 text-on-primary rounded-xl disabled:opacity-50 transition-all active:scale-95"
+                            className="px-4 py-2 bg-primary hover:opacity-90 text-on-primary rounded-2xl disabled:opacity-50 transition-all active:scale-95"
                         >
                             {t('common.save')}
                         </button>
@@ -307,11 +307,11 @@ export function SettingsPage() {
                         title={t('settings.appium.title')}
                         icon={Server}
                         status={
-                            <div className={clsx("flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold border",
+                            <div className={clsx("flex items-center gap-2 px-3 py-1 rounded-2xl text-xs font-semibold border",
                                 appiumStatus.running
                                     ? "bg-success-container/10 text-on-success-container/10 border-success-container/20"
                                     : "bg-surface-variant/30 text-on-surface-variant/80 border-outline-variant")}>
-                                <div className={clsx("w-2 h-2 rounded-full", appiumStatus.running ? "bg-success" : "bg-on-surface/10")} />
+                                <div className={clsx("w-2 h-2 rounded-2xl", appiumStatus.running ? "bg-success" : "bg-on-surface/10")} />
                                 {appiumStatus.running ? t('settings.appium.running', { pid: appiumStatus.pid }) : t('settings.appium.stopped')}
                             </div>
                         }
@@ -378,7 +378,7 @@ export function SettingsPage() {
                         {showAppiumLogs && (
                             <div
                                 ref={logsContainerRef}
-                                className="mt-4 bg-surface/50 border border-outline-variant/30 rounded-xl p-3 font-mono text-xs h-64 overflow-auto custom-scrollbar shadow-inner"
+                                className="mt-4 bg-surface/50 border border-outline-variant/30 rounded-2xl p-3 font-mono text-xs h-64 overflow-auto custom-scrollbar shadow-inner"
                             >
                                 {appiumLogs.length === 0 && <span className="text-on-surface-variant/80 italic">{t('settings.appium.waiting')}</span>}
                                 {appiumLogs.map((log, i) => (
@@ -500,14 +500,14 @@ export function SettingsPage() {
                                         key={color.id}
                                         onClick={() => updateSetting('primaryColor', color.id)}
                                         className={clsx(
-                                            "w-8 h-8 rounded-full transition-all active:scale-95 ring-offset-2 ring-offset-on-primary flex items-center justify-center",
+                                            "w-8 h-8 rounded-2xl transition-all active:scale-95 ring-offset-2 ring-offset-on-primary flex items-center justify-center",
                                             settings.primaryColor === color.id ? "ring-2 scale-110" : "hover:scale-105"
                                         )}
                                         style={{ backgroundColor: color.hex, borderColor: color.hex, '--tw-ring-color': color.hex } as any}
                                         title={color.id.charAt(0).toUpperCase() + color.id.slice(1)}
                                     >
                                         {settings.primaryColor === color.id && (
-                                            <div className="w-2.5 h-2.5 bg-on-primary rounded-full shadow-sm" />
+                                            <div className="w-2.5 h-2.5 bg-on-primary rounded-2xl shadow-sm" />
                                         )}
                                     </button>
                                 ))}
@@ -581,7 +581,7 @@ export function SettingsPage() {
                             disabled={systemCheckStatus.loading}
                             className={
                                 clsx(
-                                    "p-2 rounded-xl transition-all active:scale-95 hover:bg-surface-variant/30",
+                                    "p-2 rounded-2xl transition-all active:scale-95 hover:bg-surface-variant/30",
                                     systemCheckStatus.loading ? "animate-spin text-primary" : "text-on-surface-variant/80 hover:text-primary"
                                 )
                             }

@@ -296,24 +296,24 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
                     </div>
                 }
                 menus={
-                    <div className="flex bg-surface-variant/30 p-0.5 rounded-md">
+                    <div className="flex bg-surface-variant/30 p-0.5 rounded-2xl">
                         <button
                             onClick={() => setInteractionMode('inspect')}
-                            className={clsx("p-1.5 rounded-sm transition-all", interactionMode === 'inspect' ? "bg-primary/10 shadow-sm text-primary" : "text-on-surface/80 hover:text-on-surface-variant/80")}
+                            className={clsx("p-1.5 rounded-2xl transition-all", interactionMode === 'inspect' ? "bg-primary/10 shadow-sm text-primary" : "text-on-surface/80 hover:text-on-surface-variant/80")}
                             title={t('inspector.modes.inspect')}
                         >
                             <Scan size={16} />
                         </button>
                         <button
                             onClick={() => setInteractionMode('tap')}
-                            className={clsx("p-1.5 rounded-sm transition-all", interactionMode === 'tap' ? "bg-primary/10 shadow-sm text-primary" : "text-on-surface/80 hover:text-on-surface-variant/80")}
+                            className={clsx("p-1.5 rounded-2xl transition-all", interactionMode === 'tap' ? "bg-primary/10 shadow-sm text-primary" : "text-on-surface/80 hover:text-on-surface-variant/80")}
                             title={t('inspector.modes.tap')}
                         >
                             <MousePointerClick size={16} />
                         </button>
                         <button
                             onClick={() => setInteractionMode('swipe')}
-                            className={clsx("p-1.5 rounded-sm transition-all", interactionMode === 'swipe' ? "bg-primary/10 shadow-sm text-primary" : "text-on-surface/80 hover:text-on-surface-variant/80")}
+                            className={clsx("p-1.5 rounded-2xl transition-all", interactionMode === 'swipe' ? "bg-primary/10 shadow-sm text-primary" : "text-on-surface/80 hover:text-on-surface-variant/80")}
                             title={t('inspector.modes.swipe')}
                         >
                             <Move size={16} />
@@ -326,7 +326,7 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
                             onClick={refreshAll}
                             disabled={loading}
                             className={clsx(
-                                "flex items-center gap-2 px-3 py-1.5 bg-surface-variant/30 border border-outline-variant/30 rounded-md hover:bg-surface/50 text-sm font-medium transition-colors disabled:opacity-50",
+                                "flex items-center gap-2 px-3 py-1.5 bg-surface-variant/30 border border-outline-variant/30 rounded-2xl hover:bg-surface/50 text-sm font-medium transition-colors disabled:opacity-50",
                                 loading && "cursor-wait"
                             )}
                             title={t('inspector.refresh')}
@@ -348,7 +348,7 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
                                 ref={imgRef}
                                 src={`data: image / png; base64, ${screenshot} `}
                                 alt="Device Screenshot"
-                                className="h-full w-auto object-contain shadow-lg rounded-md select-none max-w-full"
+                                className="h-full w-auto object-contain shadow-lg rounded-2xl select-none max-w-full"
                                 onMouseMove={handleImageMouseMove}
                                 onClick={handleImageClick}
                                 onMouseDown={handleImageMouseDown}
@@ -359,7 +359,7 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
                             {taps.map(tap => (
                                 <div
                                     key={tap.id}
-                                    className="absolute rounded-full bg-surface border-2 border-on-primary animate-ping pointer-events-none"
+                                    className="absolute rounded-2xl bg-surface border-2 border-on-primary animate-ping pointer-events-none"
                                     style={{
                                         left: tap.x - 20,
                                         top: tap.y - 20,
@@ -400,7 +400,7 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
                             {interactionMode === 'swipe' && swipeStart && (
                                 <div className="absolute w-full h-full top-0 left-0 pointer-events-none z-30">
                                     <div
-                                        className="absolute w-4 h-4 bg-orange-500 rounded-full -ml-2 -mt-2 opacity-50"
+                                        className="absolute w-4 h-4 bg-orange-500 rounded-2xl -ml-2 -mt-2 opacity-50"
                                         style={{ left: swipeStart.x, top: swipeStart.y }}
                                     />
                                 </div>
@@ -423,7 +423,7 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
                 </div>
 
                 {/* Right: Properties Scroll View */}
-                <div className="bg-surface border border-outline-variant/30 rounded-xl flex flex-col overflow-hidden shadow-sm h-full">
+                <div className="bg-surface border border-outline-variant/30 rounded-2xl flex flex-col overflow-hidden shadow-sm h-full">
                     <div className="flex items-center justify-between border-b border-outline-variant/30 shrink-0 bg-surface/50 pr-2">
                         {availableNodes.length > 1 ? (
                             <div className="flex overflow-x-auto custom-scrollbar flex-1">
@@ -456,7 +456,7 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
                                     setSelectedNode(null);
                                     setAvailableNodes([]);
                                 }}
-                                className="p-1.5 text-on-surface/80 hover:text-error hover:bg-error-container/10 rounded-md transition-colors ml-2"
+                                className="p-1.5 text-on-surface/80 hover:text-error hover:bg-error-container/10 rounded-2xl transition-colors ml-2"
                                 title={t('inspector.clear_selection')}
                             >
                                 <X size={16} />
@@ -505,7 +505,7 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
                                 {/* All Attributes */}
                                 <div>
                                     <h3 className="text-xs font-semibold text-on-surface-variant/80 uppercase tracking-wider mb-2">{t('inspector.attributes.all')}</h3>
-                                    <div className="border border-outline-variant/30 rounded-lg overflow-hidden text-sm">
+                                    <div className="border border-outline-variant/30 rounded-2xl overflow-hidden text-sm">
                                         {Object.entries(selectedNode.attributes)
                                             .sort(([a], [b]) => a.localeCompare(b))
                                             .map(([key, value]) => (
@@ -587,7 +587,7 @@ function CopyButton({ label, value, onCopy, active }: { label: string, value: st
         <button
             onClick={() => onCopy(value)}
             className={clsx(
-                "flex flex-col items-start p-2 rounded-lg border transition-all text-left",
+                "flex flex-col items-start p-2 rounded-2xl border transition-all text-left",
                 active
                     ? "bg-success-container/10 border-success-container/20 text-on-success-container"
                     : "bg-surface/50 border-outline-variant/30 hover:border-info-container/50"

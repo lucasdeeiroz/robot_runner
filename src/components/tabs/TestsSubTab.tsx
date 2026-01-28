@@ -271,6 +271,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                 </div>
 
                 <TabBar
+                    layoutId="tests-sub-tab"
                     tabs={tabs}
                     activeId={mode}
                     onChange={(id) => { setMode(id as SelectionMode); setSelectedPath(""); }}

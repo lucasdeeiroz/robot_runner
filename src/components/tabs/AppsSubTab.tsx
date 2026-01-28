@@ -233,7 +233,7 @@ export function AppsSubTab() {
                             value={search}
                             onChange={e => setSearch(e.target.value)}
                             placeholder={t('apps.search_placeholder', "Search packages...")}
-                            className="bg-surface border border-outline-variant/30 rounded px-8 py-1.5 text-xs text-on-surface/80 focus:outline-none focus:border-primary/50 w-64 transition-all"
+                            className="bg-surface border border-outline-variant/30 rounded-2xl px-8 py-1.5 text-xs text-on-surface/80 focus:outline-none focus:border-primary/50 w-64 transition-all"
                         />
                     </div>
                 ) : null}
@@ -272,7 +272,7 @@ export function AppsSubTab() {
                         itemContent={(_index, pkg) => (
                             <div className="px-3 py-2 border-b border-outline-variant/30 hover:bg-surface-variant/20 group flex items-center gap-3">
                                 <div className={clsx(
-                                    "p-2 rounded-lg shrink-0",
+                                    "p-2 rounded-2xl shrink-0",
                                     pkg.is_system ? "bg-tertiary-container text-on-tertiary-container" : "bg-primary-container text-on-primary-container"
                                 )}>
                                     <Package size={16} />

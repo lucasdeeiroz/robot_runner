@@ -52,7 +52,7 @@ export function AboutPage() {
 
             <div className="grid gap-6">
                 {/* Main Info Card */}
-                <div className="bg-surface border border-outline-variant/30 rounded-xl p-8 flex flex-col items-center text-center shadow-sm">
+                <div className="bg-surface border border-outline-variant/30 rounded-2xl p-8 flex flex-col items-center text-center shadow-sm">
                     <div className="w-20 h-20 bg-primary/10 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-primary/10">
                         <Bot size={40} className="text-primary" />
                     </div>
@@ -60,14 +60,14 @@ export function AboutPage() {
                     <h2 className="text-2xl font-bold text-on-surface/80 mb-2">
                         Robot Runner
                     </h2>
-                    <div className="inline-flex items-center gap-2 pl-3 pr-1.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium">
+                    <div className="inline-flex items-center gap-2 pl-3 pr-1.5 py-1 rounded-2xl bg-primary/10 border border-primary/20 text-primary text-sm font-medium">
                         <span>v{appVersion}</span>
                         <div className="w-px h-3 bg-primary/20 mx-0.5" />
                         <button
                             onClick={handleCheckUpdate}
                             disabled={isChecking}
                             title={isChecking ? t('about.checking') : t('about.update_check')}
-                            className="p-1 rounded-full hover:bg-primary/10 text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="p-1 rounded-2xl hover:bg-primary/10 text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <RefreshCcw size={13} className={clsx({ "animate-spin": isChecking })} />
                         </button>
@@ -77,7 +77,7 @@ export function AboutPage() {
                                 href="https://github.com/lucasdeeiroz/robot_runner/releases/latest"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="ml-2 text-[10px] bg-primary text-on-primary px-2 py-0.5 rounded-full font-bold hover:bg-primary/90 transition-colors animate-pulse no-underline"
+                                className="ml-2 text-[10px] bg-primary text-on-primary px-2 py-0.5 rounded-2xl font-bold hover:bg-primary/90 transition-colors animate-pulse no-underline"
                             >
                                 {t('about.update_badge')}
                             </a>
@@ -118,7 +118,7 @@ export function AboutPage() {
                         className="flex flex-col"
                     >
                         <div className="space-y-4 flex-1">
-                            <div className="p-4 bg-surface/50 rounded-lg border border-outline-variant/30">
+                            <div className="p-4 bg-surface/50 rounded-2xl border border-outline-variant/30">
                                 <div className="font-medium text-on-surface/80 mb-1 flex items-center gap-2">
                                     {t('about.license')}
                                     <span className="text-[10px] uppercase font-bold bg-success-container text-on-success-container px-1.5 py-0.5 rounded border border-success-container/20">Open Source</span>
@@ -152,7 +152,7 @@ export function AboutPage() {
                                 href="https://github.com/lucasdeeiroz"
                                 headerRight={<span>↗</span>}
                                 icon={
-                                    <div className="w-12 h-12 bg-surface-variant/30 rounded-full flex items-center justify-center text-on-surface-variant/80">
+                                    <div className="w-12 h-12 bg-surface-variant/30 rounded-2xl flex items-center justify-center text-on-surface-variant/80">
                                         <User size={24} />
                                     </div>
                                 }
@@ -164,7 +164,7 @@ export function AboutPage() {
                                 href="https://github.com/alealmeida31"
                                 headerRight={<span>↗</span>}
                                 icon={
-                                    <div className="w-12 h-12 bg-surface-variant/30 rounded-full flex items-center justify-center text-on-surface-variant/80">
+                                    <div className="w-12 h-12 bg-surface-variant/30 rounded-2xl flex items-center justify-center text-on-surface-variant/80">
                                         <User size={24} />
                                     </div>
                                 }

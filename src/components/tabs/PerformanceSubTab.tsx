@@ -150,7 +150,7 @@ export function PerformanceSubTab({
             >
 
                 {error && (
-                    <div className="bg-error-container/10 text-error-container/80 p-3 rounded-md text-sm mb-4 border border-error-container">
+                    <div className="bg-error-container/10 text-error-container/80 p-3 rounded-2xl text-sm mb-4 border border-error-container">
                         {error}
                     </div>
                 )}
@@ -263,7 +263,7 @@ export function PerformanceSubTab({
 
 function Card({ title, icon, children }: { title: string, icon: React.ReactNode, children: React.ReactNode }) {
     return (
-        <div className="bg-surface/50 border border-outline-variant/30 rounded-xl p-5 shadow-sm">
+        <div className="bg-surface/50 border border-outline-variant/30 rounded-2xl p-5 shadow-sm">
             <div className="flex items-center justify-between mb-4 opacity-80">
                 <span className="font-medium text-on-surface-variant/80">{title}</span>
                 {icon}
@@ -276,9 +276,9 @@ function Card({ title, icon, children }: { title: string, icon: React.ReactNode,
 function ProgressBar({ value, max, color }: { value: number, max: number, color: string }) {
     const percentage = Math.min(100, Math.max(0, (value / max) * 100));
     return (
-        <div className="w-full bg-outline-variant rounded-full h-2.5 mt-4 overflow-hidden">
+        <div className="w-full bg-outline-variant rounded-2xl h-2.5 mt-4 overflow-hidden">
             <div
-                className={clsx("h-2.5 rounded-full transition-all duration-500 ease-out", color)}
+                className={clsx("h-2.5 rounded-2xl transition-all duration-500 ease-out", color)}
                 style={{ width: `${percentage}%` }}
             ></div>
         </div>

@@ -307,7 +307,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                             placeholder="0.tcp.ngrok.io"
                             value={ip}
                             onChange={e => setIp(e.target.value)}
-                            className="w-full bg-surface border border-outline-variant/30 rounded-lg px-3 py-2 text-on-surface/80 outline-none focus:ring-2 focus:ring-primary transition-all font-mono"
+                            className="w-full bg-surface border border-outline-variant/30 rounded-2xl px-3 py-2 text-on-surface/80 outline-none focus:ring-2 focus:ring-primary transition-all font-mono"
                         />
                     </div>
                     <div>
@@ -317,7 +317,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                             placeholder="5555"
                             value={port}
                             onChange={e => setPort(e.target.value)}
-                            className="w-full bg-surface border border-outline-variant/30 rounded-lg px-3 py-2 text-on-surface/80 outline-none focus:ring-2 focus:ring-primary transition-all font-mono"
+                            className="w-full bg-surface border border-outline-variant/30 rounded-2xl px-3 py-2 text-on-surface/80 outline-none focus:ring-2 focus:ring-primary transition-all font-mono"
                         />
                     </div>
                     <div>
@@ -327,7 +327,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                             placeholder="123456"
                             value={code}
                             onChange={e => setCode(e.target.value)}
-                            className="w-full bg-surface border border-outline-variant/30 rounded-lg px-3 py-2 text-on-surface/80 outline-none focus:ring-2 focus:ring-primary transition-all font-mono"
+                            className="w-full bg-surface border border-outline-variant/30 rounded-2xl px-3 py-2 text-on-surface/80 outline-none focus:ring-2 focus:ring-primary transition-all font-mono"
                         />
                     </div>
                 </div>
@@ -340,7 +340,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                             primaryAction={{
                                 label: t('connect.actions.connect'),
                                 onClick: () => handleAction('connect'),
-                                icon: loading ? <div className="w-4 h-4 border-2 border-on-primary border-t-transparent rounded-full animate-spin" /> : <Link size={16} />
+                                icon: loading ? <div className="w-4 h-4 border-2 border-on-primary border-t-transparent rounded-2xl animate-spin" /> : <Link size={16} />
                             }}
                             secondaryActions={[
                                 {
@@ -358,7 +358,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                             primaryAction={{
                                 label: t('connect.actions.disconnect'),
                                 onClick: () => handleAction('disconnect'),
-                                icon: loading ? <div className="w-4 h-4 border-2 border-error border-t-transparent rounded-full animate-spin" /> : <Unplug size={16} />,
+                                icon: loading ? <div className="w-4 h-4 border-2 border-error border-t-transparent rounded-2xl animate-spin" /> : <Unplug size={16} />,
                                 disabled: loading || !ip || !port
                             }}
                             secondaryActions={[
@@ -405,7 +405,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                             {/* Dummy Content to show underneath blurred overlay */}
                             <div className="flex flex-col gap-2">
                                 <label className="text-xs font-medium text-on-surface-variant/80 ml-1">{t('connect.labels.config')}</label>
-                                <div className="flex items-center gap-2 p-3 bg-surface border border-outline-variant/30 rounded-lg">
+                                <div className="flex items-center gap-2 p-3 bg-surface border border-outline-variant/30 rounded-2xl">
                                     <span className="text-sm text-on-surface-variant/80">{t('connect.labels.expose_port')}:</span>
                                     <span className="font-mono text-sm font-bold text-on-surface/80">5555</span>
                                     <span className="text-outline-variant mx-2">|</span>
@@ -413,7 +413,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                                     <span className="font-mono text-sm text-on-surface/80">••••••••</span>
                                 </div>
                             </div>
-                            <button className="w-full py-2 bg-purple-600 text-on-primary rounded-lg font-medium flex items-center justify-center gap-2">
+                            <button className="w-full py-2 bg-purple-600 text-on-primary rounded-2xl font-medium flex items-center justify-center gap-2">
                                 <Link size={18} /> {t('connect.actions.start_tunnel')}
                             </button>
                         </div>
@@ -422,7 +422,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                             <div className="space-y-4">
                                 <div className="flex flex-col gap-2">
                                     <label className="text-xs font-medium text-on-surface-variant/80 ml-1">{t('connect.labels.config')}</label>
-                                    <div className="flex items-center gap-2 p-3 bg-surface border border-outline-variant/30 rounded-lg">
+                                    <div className="flex items-center gap-2 p-3 bg-surface border border-outline-variant/30 rounded-2xl">
                                         <span className="text-sm text-on-surface-variant/80">{t('connect.labels.expose_port')}:</span>
                                         <span className="font-mono text-sm font-bold text-on-surface/80">5555</span>
                                         <span className="text-outline-variant mx-2">|</span>
@@ -436,7 +436,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                                 <button
                                     onClick={handleStartNgrok}
                                     disabled={!settings.tools.ngrokToken}
-                                    className="w-full py-2 bg-purple-600 hover:bg-purple-500 text-on-primary rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="w-full py-2 bg-purple-600 hover:bg-purple-500 text-on-primary rounded-2xl font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <Link size={18} /> {t('connect.actions.start_tunnel')}
                                 </button>
@@ -445,14 +445,14 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                             <div className="space-y-4">
                                 {ngrokLoading ? (
                                     <div className="flex flex-col items-center justify-center p-8 space-y-3">
-                                        <div className="w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                                        <div className="w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-2xl animate-spin" />
                                         <span className="text-sm text-on-surface-variant/80">{t('connect.status.starting_ngrok')}</span>
                                     </div>
                                 ) : (
                                     <div className="space-y-4 animate-in fade-in">
-                                        <div className="bg-success-container/10 border border-success-container/20 rounded-lg p-4 flex flex-col items-center text-center space-y-2">
+                                        <div className="bg-success-container/10 border border-success-container/20 rounded-2xl p-4 flex flex-col items-center text-center space-y-2">
                                             <span className="text-xs font-bold text-on-success-container/10 uppercase tracking-wider">{t('connect.status.tunnel_active')}</span>
-                                            <div className="flex items-center gap-2 bg-on-primary px-3 py-1.5 rounded-md border border-success-container/20">
+                                            <div className="flex items-center gap-2 bg-on-primary px-3 py-1.5 rounded-2xl border border-success-container/20">
                                                 <span className="font-mono text-lg text-on-surface/50 select-all">{ngrokUrl}</span>
                                                 <button
                                                     onClick={() => { navigator.clipboard.writeText(ngrokUrl); setNgrokStatusMsg({ text: t('connect.actions.copy'), type: 'success' }); }}
@@ -467,7 +467,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
 
                                         <button
                                             onClick={handleStopNgrok}
-                                            className="w-full py-2 bg-error-container hover:bg-error-container/20 text-error-container/80 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                                            className="w-full py-2 bg-error-container hover:bg-error-container/20 text-error-container/80 rounded-2xl font-medium transition-colors flex items-center justify-center gap-2"
                                         >
                                             <Unplug size={18} /> {t('connect.actions.stop_tunnel')}
                                         </button>
@@ -480,10 +480,10 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
 
                 {/* Full-section Overlay for First-time Enable */}
                 {!isNgrokEnabled && (
-                    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-surface/60 backdrop-blur-[3px] rounded-xl transition-all animate-in fade-in duration-300">
+                    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-surface/60 backdrop-blur-[3px] rounded-2xl transition-all animate-in fade-in duration-300">
                         <button
                             onClick={() => setShowSecurityModal(true)}
-                            className="bg-error-container/80 hover:bg-error-container/60 text-on-surface/80 px-6 py-3 rounded-xl shadow-lg font-bold transition-all hover:scale-105 active:scale-95 flex items-center gap-2"
+                            className="bg-error-container/80 hover:bg-error-container/60 text-on-surface/80 px-6 py-3 rounded-2xl shadow-lg font-bold transition-all hover:scale-105 active:scale-95 flex items-center gap-2"
                             aria-describedby="enable-remote-description"
                         >
                             <Globe size={20} />

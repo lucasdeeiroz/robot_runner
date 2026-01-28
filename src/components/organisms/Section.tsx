@@ -29,7 +29,7 @@ export const Section = ({
 }: SectionProps) => {
 
     const containerStyles = {
-        card: 'bg-surface border border-outline-variant/30 rounded-xl p-6 shadow-sm',
+        card: 'bg-surface border border-outline-variant/30 rounded-2xl p-6 shadow-sm',
         transparent: 'bg-transparent',
     };
 

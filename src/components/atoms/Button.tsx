@@ -1,14 +1,18 @@
-import React, { ButtonHTMLAttributes, forwardRef } from 'react';
+import React, { forwardRef } from 'react';
+import { motion } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 import clsx from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
-export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+import { HTMLMotionProps } from 'framer-motion';
+
+export interface ButtonProps extends HTMLMotionProps<"button"> {
     variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
     size?: 'sm' | 'md' | 'lg' | 'icon';
     isLoading?: boolean;
     leftIcon?: React.ReactNode;
     rightIcon?: React.ReactNode;
+    children?: React.ReactNode;
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
@@ -38,10 +42,13 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
     };
 
     return (
-        <button
+        <motion.button
             ref={ref}
+            whileHover={{ scale: 1.02, filter: "brightness(1.05)" }}
+            whileTap={{ scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 400, damping: 17 }}
             className={twMerge(
-                'inline-flex items-center justify-center rounded-lg font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50 select-none',
+                'inline-flex items-center justify-center rounded-2xl font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50 select-none cursor-pointer',
                 variants[variant],
                 sizes[size],
                 className
@@ -53,7 +60,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
             {!isLoading && leftIcon && <span className={clsx("mr-2", size === 'icon' && "mr-0")}>{leftIcon}</span>}
             {children}
             {!isLoading && rightIcon && <span className="ml-2">{rightIcon}</span>}
-        </button>
+        </motion.button>
     );
 });
 

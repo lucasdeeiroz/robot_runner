@@ -3,6 +3,7 @@ import { Loader2, AlertTriangle, XCircle, MonitorX } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Modal } from "@/components/organisms/Modal";
 import { TOOL_LINKS } from "@/lib/tools";
+import { motion } from "framer-motion";
 
 interface SystemCheckOverlayProps {
     status: SystemCheckStatus;
@@ -23,13 +24,19 @@ export function SystemCheckOverlay({ status, onCriticalExit, onTestingRedirect, 
 
     if (status.loading || !status.complete) {
         return (
-            <div className="fixed inset-0 z-[100] bg-surface flex flex-col items-center justify-center space-y-4 animate-in fade-in duration-300">
+            <motion.div
+                key="loading"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-[100] bg-surface flex flex-col items-center justify-center space-y-4"
+            >
                 <Loader2 className="w-12 h-12 text-primary animate-spin" />
                 <div className="flex flex-col items-center gap-2">
                     <h2 className="text-xl font-semibold text-on-surface/80">{t('startup.loading')}</h2>
                     <p className="text-sm text-on-surface-variant/80">{t('startup.checking')}</p>
                 </div>
-            </div>
+            </motion.div>
         );
     }
 
@@ -38,17 +45,28 @@ export function SystemCheckOverlay({ status, onCriticalExit, onTestingRedirect, 
         const isAdbMissing = status.missingCritical.some(t => t.toLowerCase().includes('adb'));
 
         return (
-            <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-                <div className="bg-surface rounded-xl max-w-md w-full p-6 border border-outline-variant/30 shadow-2xl space-y-6">
+            <motion.div
+                key="critical"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+            >
+                <motion.div
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.9, opacity: 0 }}
+                    className="bg-surface rounded-2xl max-w-md w-full p-6 border border-outline-variant/30 shadow-2xl space-y-6"
+                >
                     <div className="flex flex-col items-center text-center space-y-2">
-                        <div className="p-3 bg-error-container rounded-full text-on-error-container">
+                        <div className="p-3 bg-error-container rounded-2xl text-on-error-container">
                             <XCircle size={32} />
                         </div>
                         <h2 className="text-lg font-bold text-on-surface/80">{t('startup.critical.title')}</h2>
                         <p className="text-sm text-on-surface-variant/80">{t('startup.critical.description')}</p>
                     </div>
 
-                    <div className="bg-surface-variant/50 rounded-lg p-3">
+                    <div className="bg-surface-variant/50 rounded-2xl p-3">
                         <ul className="list-disc list-inside text-sm text-on-surface/80 space-y-1">
                             {status.missingCritical.map(tool => (
                                 <li key={tool} className="font-medium">{tool}</li>
@@ -70,12 +88,12 @@ export function SystemCheckOverlay({ status, onCriticalExit, onTestingRedirect, 
 
                     <button
                         onClick={onCriticalExit}
-                        className="w-full py-2.5 bg-error hover:bg-error/90 text-on-error rounded-lg font-medium transition-colors"
+                        className="w-full py-2.5 bg-error hover:bg-error/90 text-on-error rounded-2xl font-medium transition-colors"
                     >
                         {t('startup.critical.action')}
                     </button>
-                </div>
-            </div>
+                </motion.div>
+            </motion.div>
         );
     }
 
@@ -90,13 +108,13 @@ export function SystemCheckOverlay({ status, onCriticalExit, onTestingRedirect, 
             >
                 <div className="space-y-6">
                     <div className="flex flex-col items-center text-center space-y-2">
-                        <div className="p-3 bg-warning-container rounded-full text-warning-container/80">
+                        <div className="p-3 bg-warning-container rounded-2xl text-warning-container/80">
                             <AlertTriangle size={32} />
                         </div>
                         <p className="text-sm text-on-surface-variant/80">{t('startup.testing.description')}</p>
                     </div>
 
-                    <div className="bg-surface/50 rounded-lg p-3 border border-outline-variant/30">
+                    <div className="bg-surface/50 rounded-2xl p-3 border border-outline-variant/30">
                         <ul className="list-disc list-inside text-sm text-on-surface-variant/80 space-y-1">
                             {status.missingTesting.map(tool => (
                                 <li key={tool} className="font-medium">{tool}</li>
@@ -108,7 +126,7 @@ export function SystemCheckOverlay({ status, onCriticalExit, onTestingRedirect, 
 
                     <button
                         onClick={onTestingRedirect}
-                        className="w-full py-2.5 bg-on-surface text-on-primary rounded-lg font-medium transition-opacity hover:opacity-90"
+                        className="w-full py-2.5 bg-on-surface text-on-primary rounded-2xl font-medium transition-opacity hover:opacity-90"
                     >
                         {t('startup.testing.action')}
                     </button>
@@ -129,13 +147,13 @@ export function SystemCheckOverlay({ status, onCriticalExit, onTestingRedirect, 
             >
                 <div className="space-y-6">
                     <div className="flex flex-col items-center text-center space-y-2">
-                        <div className="p-3 bg-info-container rounded-full text-primary">
+                        <div className="p-3 bg-info-container rounded-2xl text-primary">
                             <MonitorX size={32} />
                         </div>
                         <p className="text-sm text-on-surface-variant/80">{t('startup.mirroring.description')}</p>
                     </div>
 
-                    <div className="bg-surface/50 rounded-lg p-3 border border-outline-variant/30">
+                    <div className="bg-surface/50 rounded-2xl p-3 border border-outline-variant/30">
                         <ul className="list-disc list-inside text-sm text-on-surface-variant/80 space-y-1">
                             {status.missingMirroring.map(tool => (
                                 <li key={tool} className="font-medium">{tool}</li>
@@ -146,7 +164,7 @@ export function SystemCheckOverlay({ status, onCriticalExit, onTestingRedirect, 
 
                     <button
                         onClick={onMirroringContinue}
-                        className="w-full py-2.5 bg-on-surface text-on-primary rounded-lg font-medium transition-opacity hover:opacity-90"
+                        className="w-full py-2.5 bg-on-surface text-on-primary rounded-2xl font-medium transition-opacity hover:opacity-90"
                     >
                         {t('startup.mirroring.action')}
                     </button>

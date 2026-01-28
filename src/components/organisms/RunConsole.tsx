@@ -427,7 +427,7 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
             const textColor = isRunning ? 'text-info-container/80' : (isFailed ? 'text-red-400' : 'text-success');
 
             return (
-                <div key={node.id} className={clsx("mb-2 mt-1 border rounded-lg overflow-hidden border-outline-variant", isRunning && "animate-pulse-subtle")}>
+                <div key={node.id} className={clsx("mb-2 mt-1 border rounded-2xl overflow-hidden border-outline-variant", isRunning && "animate-pulse-subtle")}>
                     <div
                         role="button"
                         onClick={(e) => { e.stopPropagation(); toggleNode(node.id); }}
@@ -460,7 +460,7 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
                             {node.logs.map((line, i) => <LinkRenderer key={i} content={line} />)}
                             {isRunning && (
                                 <div className="text-primary mt-2 flex items-center gap-2 text-xs italic opacity-70">
-                                    <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
+                                    <div className="w-1.5 h-1.5 bg-primary rounded-2xl animate-pulse" />
                                     Processing...
                                 </div>
                             )}
@@ -521,7 +521,7 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
     };
 
     return (
-        <div className="h-full flex flex-col bg-surface rounded-lg font-mono text-sm border border-outline-variant/30 shadow-inner pointer-events-auto relative z-0 isolate overflow-hidden">
+        <div className="h-full flex flex-col bg-surface rounded-2xl font-mono text-sm border border-outline-variant/30 shadow-inner pointer-events-auto relative z-0 isolate overflow-hidden">
             <div className="flex items-center justify-between p-2 border-b border-outline-variant/30 bg-surface/80 backdrop-blur shrink-0 z-20">
                 <span className="text-xs text-on-surface-variant/80 font-mono truncate px-2" title={testPath}>{testPath}</span>
                 <button

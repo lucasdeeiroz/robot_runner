@@ -4,13 +4,13 @@ import { RunPage } from "./pages/RunPage";
 import { TestsPage } from "./pages/TestsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { AboutPage } from "./pages/AboutPage";
-import clsx from "clsx";
 import { TestSessionProvider } from "./lib/testSessionStore";
 import { Toaster } from "sonner";
 import { useSettings } from "./lib/settings";
 import { SystemCheckOverlay } from "./components/organisms/SystemCheckOverlay";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import "./App.css";
+import { motion, AnimatePresence } from "framer-motion";
 import { argbFromHex, themeFromSourceColor, TonalPalette } from "@material/material-color-utilities";
 
 function App() {
@@ -162,32 +162,58 @@ function App() {
   return (
     <TestSessionProvider>
       <Toaster richColors position="bottom-right" theme={settings.theme === 'dark' ? 'dark' : 'light'} />
-      {showOverlay && (
-        <SystemCheckOverlay
-          status={systemCheckStatus}
-          onCriticalExit={handleCriticalExit}
-          onTestingRedirect={handleTestingRedirect}
-          onMirroringContinue={handleMirroringContinue}
-          onDismiss={handleDismiss}
-        />
-      )}
+      <AnimatePresence>
+        {showOverlay && (
+          <SystemCheckOverlay
+            status={systemCheckStatus}
+            onCriticalExit={handleCriticalExit}
+            onTestingRedirect={handleTestingRedirect}
+            onMirroringContinue={handleMirroringContinue}
+            onDismiss={handleDismiss}
+          />
+        )}
+      </AnimatePresence>
       <Layout activePage={activePage} onNavigate={setActivePage}>
-        <div className="max-w-7xl mx-auto h-full flex flex-col">
-          <div className="flex-1 min-h-0 relative">
-            <div className={clsx("absolute inset-0 flex flex-col", activePage === 'run' ? "z-10" : "z-0 hidden")}>
-              <RunPage onNavigate={setActivePage} initialTab={initialSubTab} />
-            </div>
-            {activePage === 'tests' && <TestsPage />}
-            {activePage === 'settings' && <SettingsPage />}
-            {activePage === 'about' && <AboutPage />}
+        <div className="max-w-7xl mx-auto h-full flex flex-col relative overflow-hidden">
+          {/* RunPage - Kept mounted to preserve state */}
+          <motion.div
+            className="absolute inset-0 flex flex-col"
+            initial={false}
+            animate={{
+              opacity: activePage === 'run' ? 1 : 0,
+              zIndex: activePage === 'run' ? 10 : 0,
+              pointerEvents: activePage === 'run' ? 'auto' : 'none',
+              scale: activePage === 'run' ? 1 : 0.98
+            }}
+            transition={{ duration: 0.3 }}
+          >
+            <RunPage onNavigate={setActivePage} initialTab={initialSubTab} />
+          </motion.div>
 
-            {/* Placeholder for other pages */}
-            {activePage !== 'run' && activePage !== 'tests' && activePage !== 'settings' && activePage !== 'about' && (
-              <div className="p-12 text-center border-2 border-dashed border-outline-variant/30 rounded-lg">
-                <p className="text-on-surface-variant/80">Module {activePage} coming soon...</p>
-              </div>
+          {/* Other Pages - Transitions using AnimatePresence */}
+          <AnimatePresence mode="wait">
+            {activePage !== 'run' && (
+              <motion.div
+                key={activePage}
+                className="absolute inset-0 flex flex-col z-20 overflow-y-auto overflow-x-hidden custom-scrollbar"
+                initial={{ opacity: 0, scale: 0.98, x: 20 }}
+                animate={{ opacity: 1, scale: 1, x: 0 }}
+                exit={{ opacity: 0, scale: 0.98, x: -20 }}
+                transition={{ duration: 0.3, ease: [0.2, 0, 0, 1] }}
+              >
+                {activePage === 'tests' && <TestsPage />}
+                {activePage === 'settings' && <SettingsPage />}
+                {activePage === 'about' && <AboutPage />}
+
+                {/* Placeholder for other pages */}
+                {activePage !== 'tests' && activePage !== 'settings' && activePage !== 'about' && (
+                  <div className="p-12 text-center border-2 border-dashed border-outline-variant/30 rounded-2xl m-4">
+                    <p className="text-on-surface-variant/80">Module {activePage} coming soon...</p>
+                  </div>
+                )}
+              </motion.div>
             )}
-          </div>
+          </AnimatePresence>
         </div>
       </Layout>
     </TestSessionProvider>

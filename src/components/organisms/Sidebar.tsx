@@ -75,7 +75,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                 )}
                 <button
                     onClick={() => setCollapsed(!collapsed)}
-                    className="p-1 hover:bg-surface-variant/50 rounded-lg text-on-surface-variant/80 hover:text-on-surface/80 transition-transform active:scale-95"
+                    className="p-1 hover:bg-surface-variant/50 rounded-2xl text-on-surface-variant/80 hover:text-on-surface/80 transition-transform active:scale-95"
                 >
                     <Menu size={20} />
                 </button>
@@ -88,7 +88,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                         key={item.id}
                         onClick={() => onNavigate(item.id)}
                         className={cn(
-                            "w-full flex items-center p-2 rounded-xl transition-all duration-200 active:scale-95 relative",
+                            "w-full flex items-center p-2 rounded-2xl transition-all duration-200 active:scale-95 relative",
                             activePage === item.id
                                 ? "bg-primary/10 text-primary shadow-primary/20"
                                 : "text-on-surface-variant/80/80 hover:bg-surface-variant/50 hover:text-on-surface/80",
@@ -107,18 +107,18 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
             {/* Footer */}
             <div className="p-4 mb-2.5">
                 {!collapsed && <div className="text-[10px] flex justify-between items-center">
-                    <span className="text-on-surface-variant/80 bg-surface-variant/20 px-1.5 py-0.5 rounded-full">v{appVersion}</span>
+                    <span className="text-on-surface-variant/80 bg-surface-variant/20 px-1.5 py-0.5 rounded-2xl">v{appVersion}</span>
                     {updateAvailable && (
                         <button
                             onClick={() => onNavigate('about')}
-                            className="text-error font-bold bg-error-container px-1.5 py-0.5 rounded-full hover:bg-error-container/80 transition-colors animate-pulse cursor-pointer"
+                            className="text-error font-bold bg-error-container px-1.5 py-0.5 rounded-2xl hover:bg-error-container/80 transition-colors animate-pulse cursor-pointer"
                         >
                             {t('about.update_badge')}
                         </button>
                     )}
                 </div>}
                 {collapsed && <div className="text-[10px] flex justify-center items-center">
-                    <span className="text-on-surface-variant/80 bg-surface-variant/20 px-1.5 py-0.5 rounded-full">v{appVersion}</span>
+                    <span className="text-on-surface-variant/80 bg-surface-variant/20 px-1.5 py-0.5 rounded-2xl">v{appVersion}</span>
                 </div>}
             </div>
         </div >

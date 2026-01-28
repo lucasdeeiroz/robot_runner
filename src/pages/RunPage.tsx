@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { AnimatePresence } from "framer-motion";
+import { StaggerContainer, StaggerItem } from "@/components/motion/MotionPrimitives";
 import { Play, Wifi, Smartphone, RefreshCw, Wrench, ScanEye, PlayCircle } from "lucide-react";
 import { PageHeader } from "@/components/organisms/PageHeader";
 import clsx from "clsx";
@@ -159,6 +161,7 @@ export function RunPage({ onNavigate, initialTab }: RunPageProps) {
 
             {/* Header / Device Selection Bar */}
             <TabBar
+                layoutId="run-page-tabs"
                 tabs={tabs}
                 activeId={activeTab}
                 onChange={(id) => {
@@ -171,7 +174,7 @@ export function RunPage({ onNavigate, initialTab }: RunPageProps) {
                     <div className="flex items-center gap-3 relative">
                         {/* Device Selector */}
                         <div
-                            className="flex items-center gap-2 bg-surface rounded-xl border border-outline-variant/30 shadow-sm px-3 py-1 cursor-pointer hover:bg-surface-variant/30 transition-colors select-none"
+                            className="flex items-center gap-2 bg-surface rounded-2xl border border-outline-variant/30 shadow-sm px-3 py-1 cursor-pointer hover:bg-surface-variant/30 transition-colors select-none"
                             onClick={(e) => {
                                 e.stopPropagation();
                                 setIsDeviceDropdownOpen(!isDeviceDropdownOpen);
@@ -196,68 +199,70 @@ export function RunPage({ onNavigate, initialTab }: RunPageProps) {
                                 {!loadingDevices && <RefreshCw size={14} />}
                             </Button>
                             {/* Dropdown Panel */}
-                            {isDeviceDropdownOpen && (
-                                <div
-                                    className="absolute top-full right-0 mt-2 w-72 bg-surface backdrop-blur-md border border-outline-variant/30 rounded-lg shadow-xl p-2 z-50 flex flex-col gap-1"
-                                    onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside
-                                >
-                                    <div className="text-xs font-semibold px-2 py-1 uppercase tracking-wider">{t('run_tab.device.select')}</div>
-                                    {devices.map(d => (
-                                        <div
-                                            key={d.udid}
-                                            className="flex items-center justify-between px-2 py-2 hover:bg-surface-variant/30 rounded-md group"
-                                        >
-                                            <div
-                                                className="flex items-center gap-3 cursor-pointer flex-1 min-w-0"
-                                                onClick={() => toggleDevice(d.udid)}
+                            <AnimatePresence>
+                                {isDeviceDropdownOpen && (
+                                    <StaggerContainer
+                                        className="absolute top-full right-0 mt-2 w-72 bg-surface backdrop-blur-md border border-outline-variant/30 rounded-2xl shadow-xl p-2 z-50 flex flex-col gap-1"
+                                        onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside
+                                    >
+                                        <div className="text-xs font-semibold px-2 py-1 uppercase tracking-wider">{t('run_tab.device.select')}</div>
+                                        {devices.map(d => (
+                                            <StaggerItem
+                                                key={d.udid}
+                                                className="flex items-center justify-between px-2 py-2 hover:bg-surface-variant/30 rounded-2xl group"
                                             >
-                                                <div className={clsx(
-                                                    "w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0",
-                                                    selectedDevices.includes(d.udid)
-                                                        ? "bg-primary border-primary text-on-primary"
-                                                        : "border-outline-variant/30"
-                                                )}>
-                                                    {selectedDevices.includes(d.udid) && <div className="w-2 h-2 bg-on-primary rounded-full" />}
-                                                </div>
-                                                <div className="flex flex-col overflow-hidden">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-sm font-medium text-on-surface/80 truncate">{d.model}</span>
-                                                        {busyDeviceIds.includes(d.udid) && (
-                                                            <Badge variant="warning" size="sm" className="text-[10px] font-bold uppercase tracking-wide">
-                                                                {t('run_tab.device.busy')}
-                                                            </Badge>
-                                                        )}
-                                                        {d.android_version && (
-                                                            <AndroidVersionPill version={d.android_version} />
-                                                        )}
+                                                <div
+                                                    className="flex items-center gap-3 cursor-pointer flex-1 min-w-0"
+                                                    onClick={() => toggleDevice(d.udid)}
+                                                >
+                                                    <div className={clsx(
+                                                        "w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0",
+                                                        selectedDevices.includes(d.udid)
+                                                            ? "bg-primary border-primary text-on-primary"
+                                                            : "border-outline-variant/30"
+                                                    )}>
+                                                        {selectedDevices.includes(d.udid) && <div className="w-2 h-2 bg-on-primary rounded-2xl" />}
                                                     </div>
-                                                    <span className="text-xs text-on-surface-variant/80 truncate" title={d.udid}>{d.udid}</span>
+                                                    <div className="flex flex-col overflow-hidden">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-sm font-medium text-on-surface/80 truncate">{d.model}</span>
+                                                            {busyDeviceIds.includes(d.udid) && (
+                                                                <Badge variant="warning" size="sm" className="text-[10px] font-bold uppercase tracking-wide">
+                                                                    {t('run_tab.device.busy')}
+                                                                </Badge>
+                                                            )}
+                                                            {d.android_version && (
+                                                                <AndroidVersionPill version={d.android_version} />
+                                                            )}
+                                                        </div>
+                                                        <span className="text-xs text-on-surface-variant/80 truncate" title={d.udid}>{d.udid}</span>
+                                                    </div>
                                                 </div>
-                                            </div>
 
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={(e) => { e.stopPropagation(); handleOpenToolbox(d); setIsDeviceDropdownOpen(false); }}
-                                                className="text-on-surface/80 hover:text-primary hover:bg-primary/10"
-                                                title={t('run_tab.device.open_toolbox')}
-                                            >
-                                                <Wrench size={16} />
-                                            </Button>
-                                        </div>
-                                    ))}
-                                    {devices.length === 0 && (
-                                        <div className="text-sm text-on-surface/80 px-2 py-2 text-center">{t('run_tab.device.no_devices_found')}</div>
-                                    )}
-                                </div>
-                            )}
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={(e) => { e.stopPropagation(); handleOpenToolbox(d); setIsDeviceDropdownOpen(false); }}
+                                                    className="text-on-surface/80 hover:text-primary hover:bg-primary/10"
+                                                    title={t('run_tab.device.open_toolbox')}
+                                                >
+                                                    <Wrench size={16} />
+                                                </Button>
+                                            </StaggerItem>
+                                        ))}
+                                        {devices.length === 0 && (
+                                            <div className="text-sm text-on-surface/80 px-2 py-2 text-center">{t('run_tab.device.no_devices_found')}</div>
+                                        )}
+                                    </StaggerContainer>
+                                )}
+                            </AnimatePresence>
                         </div>
                     </div>
                 }
             />
 
             {/* Main Content Area */}
-            <div className="flex-1 min-h-0 bg-surface border border-outline-variant/30 rounded-xl p-4 overflow-hidden relative z-10">
+            <div className="flex-1 min-h-0 bg-surface p-4 overflow-hidden relative z-10 rounded-2xl border border-outline-variant/30">
                 <div className={clsx("h-full", activeTab === 'tests' ? "block" : "hidden")}>
                     <TestsSubTab selectedDevices={selectedDevices} devices={devices} onNavigate={onNavigate} />
                 </div>

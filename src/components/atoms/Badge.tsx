@@ -25,7 +25,7 @@ export const Badge = ({ children, variant = 'neutral', size = 'md', className }:
 
     return (
         <span className={twMerge(
-            'inline-flex items-center justify-center rounded-full font-medium border',
+            'inline-flex items-center justify-center rounded-2xl font-medium border',
             variants[variant],
             sizes[size],
             className
