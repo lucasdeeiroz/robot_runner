@@ -63,7 +63,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
             collapsed ? "w-16" : "w-64"
         )}>
             {/* Header */}
-            <div className="p-4 flex items-center justify-between border-b border-outline-variant/30 h-[65px]">
+            <div className="p-4 flex items-center justify-between h-[65px]">
                 {!collapsed && (
                     settings.theme === 'light' && settings.customLogoLight ? (
                         <CustomLogo key={settings.customLogoLight} path={settings.customLogoLight} className="h-8 object-contain" />
@@ -105,17 +105,20 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
             </nav>
 
             {/* Footer */}
-            <div className="p-4 border-t border-outline-variant">
-                {!collapsed && <div className="text-xs text-on-surface-variant/80 flex justify-between items-center">
-                    <span>v{appVersion}</span>
+            <div className="p-4 mb-2.5">
+                {!collapsed && <div className="text-[10px] flex justify-between items-center">
+                    <span className="text-on-surface-variant/80 bg-surface-variant/20 px-1.5 py-0.5 rounded rounded-full">v{appVersion}</span>
                     {updateAvailable && (
                         <button
                             onClick={() => onNavigate('about')}
-                            className="text-error font-bold text-[10px] bg-error-container px-1.5 py-0.5 rounded hover:bg-error-container/80 transition-colors animate-pulse cursor-pointer"
+                            className="text-error font-bold bg-error-container px-1.5 py-0.5 rounded rounded-full hover:bg-error-container/80 transition-colors animate-pulse cursor-pointer"
                         >
                             {t('about.update_badge')}
                         </button>
                     )}
+                </div>}
+                {collapsed && <div className="text-[10px] flex justify-center items-center">
+                    <span className="text-on-surface-variant/80 bg-surface-variant/20 px-1.5 py-0.5 rounded rounded-full">v{appVersion}</span>
                 </div>}
             </div>
         </div >

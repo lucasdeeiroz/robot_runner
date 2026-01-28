@@ -222,7 +222,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
     ];
 
     return (
-        <div ref={containerRef} className="h-full flex flex-col w-full overflow-hidden p-4">
+        <div ref={containerRef} className="h-full flex flex-col w-full overflow-hidden">
             <WarningModal
                 isOpen={warningModal.isOpen}
                 onClose={() => setWarningModal(prev => ({ ...prev, isOpen: false }))}
@@ -232,7 +232,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
 
             <div className="flex-1 min-h-0 flex gap-4">
                 {/* Embedded File Explorer */}
-                <div className="flex-1 overflow-hidden bg-transparent relative rounded-xl border border-outline-variant/30">
+                <div className="flex-1 overflow-hidden bg-transparent relative">
                     <div className="absolute inset-0">
                         <FileExplorer
                             initialPath={getInitialPath()}
