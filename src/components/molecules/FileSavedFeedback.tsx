@@ -14,7 +14,7 @@ export function FileSavedFeedback({ path, onClose, className = "" }: FileSavedFe
     if (!path) return null;
 
     return (
-        <div className={`bg-success-container/20 text-on-success-container p-3 rounded-md text-sm mb-4 border border-success/20 flex items-center gap-2 animate-in fade-in slide-in-from-top-2 ${className}`}>
+        <div className={`bg-success-container/20 text-on-success-container p-3 rounded-2xl text-sm mb-4 border border-success/20 flex items-center gap-2 animate-in fade-in slide-in-from-top-2 ${className}`}>
             <span>{t('feedback.saved_to_prefix', 'File saved to:')}</span>
             <span
                 className="underline cursor-pointer hover:opacity-80 font-mono break-all flex-1"

@@ -34,7 +34,7 @@ export function InfoCard({
             target={href ? "_blank" : undefined}
             rel={href ? "noopener noreferrer" : undefined}
             className={clsx(
-                "block bg-surface rounded-xl border border-outline-variant/30 p-3",
+                "block bg-surface rounded-2xl border border-outline-variant/30 p-3",
                 "h-full transition-all group",
                 interactable && "hover:bg-surface-variant/30 hover:scale-[1.02] cursor-pointer hover:border-primary/50",
                 className

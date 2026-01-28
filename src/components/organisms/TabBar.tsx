@@ -11,17 +11,18 @@ interface TabBarProps {
     className?: string;
     orientation?: 'horizontal' | 'vertical';
     variant?: 'underline' | 'pills' | 'cards';
+    layoutId?: string;
 }
 
-export const TabBar = ({ tabs, activeId, onChange, menus, actions, className, orientation = 'horizontal', variant = 'underline' }: TabBarProps) => {
+export const TabBar = ({ tabs, activeId, onChange, menus, actions, className, orientation = 'horizontal', variant = 'underline', layoutId }: TabBarProps) => {
     return (
         <div className={twMerge(
             'z-10 flex',
             // Default styling matches the "pills" container look
-            'bg-surface-variant/30 border border-outline-variant/30 rounded-lg p-1',
+            'bg-surface-variant/30 border border-outline-variant/30 rounded-2xl p-1',
             orientation === 'horizontal'
-                ? 'items-center justify-between'
-                : 'flex-col h-full gap-4 justify-between',
+                ? 'items-center justify-between pl-2'
+                : 'flex-col h-full gap-4 justify-between pt-2',
             className
         )}>
             <Tabs
@@ -32,6 +33,7 @@ export const TabBar = ({ tabs, activeId, onChange, menus, actions, className, or
                 variant={variant}
                 transparent={true} // Tabs is transparent because TabBar handles the container
                 className={variant === 'underline' && orientation === 'horizontal' ? "border-b-0" : ""}
+                layoutId={layoutId} // Pass implementation
             />
 
             {(menus || actions) && (
@@ -50,7 +52,7 @@ export const TabBar = ({ tabs, activeId, onChange, menus, actions, className, or
                     {actions && (
                         <div className={twMerge(
                             "flex",
-                            orientation === 'horizontal' ? "items-center gap-2" : "flex-col w-full gap-2",
+                            orientation === 'horizontal' ? "items-center gap-2 pr-2" : "flex-col w-full gap-2 pb-1",
                         )}>
                             {actions}
                         </div>

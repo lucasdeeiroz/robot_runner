@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Folder, File, ChevronRight, CornerLeftUp, Loader2 } from "lucide-react";
+import { Folder, File, ChevronRight, CornerLeftUp } from "lucide-react";
+import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 import clsx from "clsx";
 
 interface FileEntry {
@@ -129,7 +130,7 @@ export function FileExplorer({ initialPath = ".", onSelect, onCancel, selectionM
                 description={warningModal.message}
             />
             {/* Header / Breadcrumb */}
-            <div className="flex items-center gap-2 mb-2 p-2 bg-transparent backdrop-blur-md rounded-lg border border-outline-variant/30 shrink-0">
+            <div className="flex items-center gap-2 mb-2 p-2 bg-transparent backdrop-blur-md rounded-2xl border border-outline-variant/30 shrink-0">
                 <button
                     onClick={handleUp}
                     className="p-1 hover:bg-surface-variant/50 rounded transition-colors text-on-surface-variant/80"
@@ -143,10 +144,10 @@ export function FileExplorer({ initialPath = ".", onSelect, onCancel, selectionM
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto border border-outline-variant/30 rounded-lg bg-transparent backdrop-blur-md p-1 min-h-0">
+            <div className="flex-1 overflow-y-auto border border-outline-variant/30 rounded-2xl bg-transparent backdrop-blur-md p-1 min-h-0">
                 {loading && (
                     <div className="flex flex-col items-center justify-center h-full text-on-surface/80">
-                        <Loader2 size={32} className="animate-spin mb-2" />
+                        <ExpressiveLoading size="md" variant="circular" className="mb-2" />
                         <span className="text-xs">{t('file_explorer.loading')}</span>
                     </div>
                 )}
@@ -170,7 +171,7 @@ export function FileExplorer({ initialPath = ".", onSelect, onCancel, selectionM
                                     onClick={() => handleEntryClick(entry)}
                                     onDoubleClick={() => entry.is_dir ? handleNavigate(entry.path) : onSelect(entry.path)}
                                     className={clsx(
-                                        "flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer text-sm select-none transition-colors",
+                                        "flex items-center gap-3 px-3 py-2 rounded-2xl cursor-pointer text-sm select-none transition-colors",
                                         isSelected
                                             ? "bg-secondary-container text-on-secondary-container ring-1 ring-secondary/20"
                                             : "hover:bg-surface-variant/30 text-on-surface/80"
@@ -203,14 +204,14 @@ export function FileExplorer({ initialPath = ".", onSelect, onCancel, selectionM
                     </div>
                     <button
                         onClick={onCancel}
-                        className="px-4 py-2 rounded-lg text-sm font-medium text-on-surface-variant/80 hover:bg-surface-variant/30 transition-colors"
+                        className="px-4 py-2 rounded-2xl text-sm font-medium text-on-surface-variant/80 hover:bg-surface-variant/30 transition-colors"
                     >
                         {t('file_explorer.cancel')}
                     </button>
                     <button
                         onClick={handleConfirm}
                         disabled={!selectedEntry && selectionMode === 'file'}
-                        className="px-4 py-2 rounded-lg text-sm font-medium bg-primary text-on-primary hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-4 py-2 rounded-2xl text-sm font-medium bg-primary text-on-primary hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {selectionMode === 'directory' ? t('file_explorer.select_folder') : t('file_explorer.select_file')}
                     </button>

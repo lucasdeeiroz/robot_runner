@@ -50,20 +50,20 @@ export function TagInput({
                 </label>
             )}
             <div className={twMerge(
-                "w-full rounded-lg border border-outline-variant/30 bg-surface p-2 min-h-[42px] flex flex-wrap gap-2 items-center transition-all",
+                "w-full rounded-2xl border border-outline-variant/30 bg-surface p-2 min-h-[42px] flex flex-wrap gap-2 items-center transition-all",
                 "focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary"
             )}>
                 {tags.map((tag) => (
                     <div
                         key={tag}
-                        className="flex items-center gap-1 bg-surface-variant border border-outline-variant/30 px-2 py-1 rounded-md text-sm text-on-surface-variant/80 animate-in zoom-in-95 duration-200"
+                        className="flex items-center gap-1 bg-surface-variant border border-outline-variant/30 px-2 py-1 rounded-2xl text-sm text-on-surface-variant/80 animate-in zoom-in-95 duration-200"
                     >
                         <span>{tag}</span>
                         {!disabled && (
                             <button
                                 type="button"
                                 onClick={() => onRemove(tag)}
-                                className="hover:text-error p-0.5 rounded-full transition-colors"
+                                className="hover:text-error p-0.5 rounded-2xl transition-colors"
                             >
                                 <X size={12} />
                             </button>

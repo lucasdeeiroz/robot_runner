@@ -29,7 +29,7 @@ export function SegmentedControl<T extends string | number>({
                     {label}
                 </label>
             )}
-            <div className="flex bg-surface-variant/30 p-1 rounded-lg">
+            <div className="flex bg-surface-variant/30 p-1 rounded-2xl">
                 {options.map((option) => {
                     const isSelected = option.value === value;
                     return (
@@ -38,7 +38,7 @@ export function SegmentedControl<T extends string | number>({
                             type="button"
                             onClick={() => onChange(option.value)}
                             className={twMerge(
-                                "flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200",
+                                "flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-2xl text-sm font-medium transition-all duration-200",
                                 isSelected
                                     ? "bg-on-primary text-primary shadow-sm"
                                     : "text-on-surface-variant/80 hover:text-on-surface/80 hover:bg-outline-variant/50"

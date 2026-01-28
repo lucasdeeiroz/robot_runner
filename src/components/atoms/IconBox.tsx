@@ -34,7 +34,7 @@ export const IconBox = ({ icon: Icon, size = 'md', variant = 'primary', classNam
 
     return (
         <div className={twMerge(
-            'rounded-lg flex items-center justify-center shrink-0',
+            'rounded-2xl flex items-center justify-center shrink-0',
             sizes[size],
             variants[variant],
             className

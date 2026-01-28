@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
-import { ChevronRight, ChevronDown, CheckCircle2, XCircle, Layers, Loader2, Star } from "lucide-react";
+import { ChevronRight, ChevronDown, CheckCircle2, XCircle, Layers, Star } from "lucide-react";
 
 interface RunConsoleProps {
     logs: string[];
@@ -55,6 +55,7 @@ type LinearNode = TextNode | SuiteStartNode | SuiteEndNode;
 
 
 import { LinkRenderer } from "../molecules/LinkRenderer";
+import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 
 export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
     const { t } = useTranslation();
@@ -427,7 +428,7 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
             const textColor = isRunning ? 'text-info-container/80' : (isFailed ? 'text-red-400' : 'text-success');
 
             return (
-                <div key={node.id} className={clsx("mb-2 mt-1 border rounded-lg overflow-hidden border-outline-variant", isRunning && "animate-pulse-subtle")}>
+                <div key={node.id} className={clsx("mb-2 mt-1 border rounded-2xl overflow-hidden border-outline-variant", isRunning && "animate-pulse-subtle")}>
                     <div
                         role="button"
                         onClick={(e) => { e.stopPropagation(); toggleNode(node.id); }}
@@ -446,7 +447,7 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
                             "text-[10px] px-2 py-0.5 rounded font-bold uppercase flex items-center gap-1 shrink-0",
                             bgColor, textColor
                         )}>
-                            {isRunning ? <Loader2 size={12} className="animate-spin" /> : (isFailed ? <XCircle size={12} /> : <CheckCircle2 size={12} />)}
+                            {isRunning ? <ExpressiveLoading size="xsm" variant="circular" /> : (isFailed ? <XCircle size={12} /> : <CheckCircle2 size={12} />)}
                             {t(isRunning ? 'run_tab.console.running' : (isFailed ? 'run_tab.console.fail' : 'run_tab.console.pass'))}
                         </div>
                     </div>
@@ -460,7 +461,7 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
                             {node.logs.map((line, i) => <LinkRenderer key={i} content={line} />)}
                             {isRunning && (
                                 <div className="text-primary mt-2 flex items-center gap-2 text-xs italic opacity-70">
-                                    <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
+                                    <div className="w-1.5 h-1.5 bg-primary rounded-2xl animate-pulse" />
                                     Processing...
                                 </div>
                             )}
@@ -499,7 +500,7 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
 
                         {/* Status Badge for Suite */}
                         <span className={clsx("text-[10px] ml-2 px-1.5 py-0.5 rounded border flex items-center gap-1", borderColor, summaryColor, badgeBg)}>
-                            {isRunning && <Loader2 size={10} className="animate-spin" />}
+                            {isRunning && <ExpressiveLoading size="xsm" variant="circular" />}
                             {isRunning ? t('run_tab.console.running') : translateSummary(node.summary) || t(node.status === 'FAIL' ? 'run_tab.console.fail' : 'run_tab.console.pass')}
                         </span>
                     </div>
@@ -521,7 +522,7 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
     };
 
     return (
-        <div className="h-full flex flex-col bg-surface rounded-lg font-mono text-sm border border-outline-variant/30 shadow-inner pointer-events-auto relative z-0 isolate overflow-hidden">
+        <div className="h-full flex flex-col bg-surface rounded-2xl font-mono text-sm border border-outline-variant/30 shadow-inner pointer-events-auto relative z-0 isolate overflow-hidden">
             <div className="flex items-center justify-between p-2 border-b border-outline-variant/30 bg-surface/80 backdrop-blur shrink-0 z-20">
                 <span className="text-xs text-on-surface-variant/80 font-mono truncate px-2" title={testPath}>{testPath}</span>
                 <button

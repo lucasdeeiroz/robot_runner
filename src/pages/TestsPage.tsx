@@ -106,6 +106,8 @@ export function TestsPage() {
     useEffect(() => {
         if (activeSessionId !== 'dashboard') {
             setSubTab(activeSessionId);
+        } else {
+            setSubTab('history');
         }
     }, [activeSessionId]);
 
@@ -140,7 +142,7 @@ export function TestsPage() {
                     {
                         id: 'history',
                         label: t('tests_page.history'),
-                        selected: subTab === 'history' && !isGridView
+                        selected: isGridView ? false : undefined
                     },
                     ...sessions.map(s => {
                         const isSuccess = s.exitCode && (s.exitCode.includes("exit code: 0") || s.exitCode === "0");
@@ -151,18 +153,18 @@ export function TestsPage() {
                             label: (
                                 <div className="flex items-center gap-2">
                                     {/* Status Dot */}
-                                    {s.type === 'toolbox' && <span className="w-2.5 h-2.5 rounded-full bg-on-surface/10" />}
-                                    {s.type === 'test' && s.status === 'running' && <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse" />}
-                                    {s.type === 'test' && s.status === 'finished' && isSuccess && <span className="w-2.5 h-2.5 rounded-full bg-success" />}
-                                    {s.type === 'test' && isFailed && <span className="w-2.5 h-2.5 rounded-full bg-error" />}
-                                    {s.type === 'test' && s.status === 'error' && <span className="w-2.5 h-2.5 rounded-full bg-error" />}
+                                    {s.type === 'toolbox' && <span className="w-2.5 h-2.5 rounded-2xl bg-on-surface/10" />}
+                                    {s.type === 'test' && s.status === 'running' && <span className="w-2.5 h-2.5 rounded-2xl bg-orange-500 animate-pulse" />}
+                                    {s.type === 'test' && s.status === 'finished' && isSuccess && <span className="w-2.5 h-2.5 rounded-2xl bg-success" />}
+                                    {s.type === 'test' && isFailed && <span className="w-2.5 h-2.5 rounded-2xl bg-error" />}
+                                    {s.type === 'test' && s.status === 'error' && <span className="w-2.5 h-2.5 rounded-2xl bg-error" />}
 
                                     <span>{s.deviceModel || s.deviceName}</span>
                                     <AndroidVersionPill version={s.androidVersion} />
                                 </div>
                             ),
                             onClose: () => clearSession(s.runId),
-                            selected: isGridView ? visibleGridSessions.has(s.runId) : subTab === s.runId
+                            selected: isGridView ? visibleGridSessions.has(s.runId) : undefined
                         };
                     })
                 ]}
@@ -181,12 +183,13 @@ export function TestsPage() {
                 }}
                 variant="pills"
                 className="z-10 shrink-0"
+                layoutId="tests-page-tabs"
                 actions={
                     sessions.length >= 2 ? (
                         <button
                             onClick={() => setIsGridView(!isGridView)}
                             className={clsx(
-                                "p-2 rounded-lg border transition-all shrink-0",
+                                "p-2 rounded-2xl border transition-all shrink-0",
                                 isGridView
                                     ? "bg-primary/10 border-none text-primary"
                                     : "bg-transparent border-none text-on-surface-variant/80 hover:text-on-surface-variant/80 hover:bg-surface-variant/30"
@@ -214,9 +217,9 @@ export function TestsPage() {
                                 className="min-w-0 h-full"
                                 title={
                                     <div className="flex items-center gap-2">
-                                        {s.type === 'toolbox' && <span className="w-2 h-2 rounded-full bg-on-surface/10" />}
-                                        {s.type === 'test' && s.status === 'running' && <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />}
-                                        {s.type === 'test' && s.status === 'finished' && <span className={clsx("w-2 h-2 rounded-full", (s.exitCode?.includes("0") || s.exitCode === "0") ? "bg-success" : "bg-error")} />}
+                                        {s.type === 'toolbox' && <span className="w-2 h-2 rounded-2xl bg-on-surface/10" />}
+                                        {s.type === 'test' && s.status === 'running' && <span className="w-2 h-2 rounded-2xl bg-orange-500 animate-pulse" />}
+                                        {s.type === 'test' && s.status === 'finished' && <span className={clsx("w-2 h-2 rounded-2xl", (s.exitCode?.includes("0") || s.exitCode === "0") ? "bg-success" : "bg-error")} />}
                                         <span>{s.deviceModel || s.deviceName}</span>
                                         <AndroidVersionPill version={s.androidVersion} className="bg-surface-variant/30" />
                                     </div>
@@ -255,7 +258,7 @@ function GridItem({ title, children, onClose, onHide, className, onMaximize }: {
     const { t } = useTranslation();
     return (
         <div className={clsx(
-            "flex flex-col border border-outline-variant/30 rounded-xl shadow-sm min-h-0 relative z-0",
+            "flex flex-col border border-outline-variant/30 rounded-2xl shadow-sm min-h-0 relative z-0",
             className
         )}>
             <div className="flex items-center justify-between px-3 py-2 border-b border-outline-variant/30 shrink-0">

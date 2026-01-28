@@ -227,9 +227,14 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
     };
 
     return (
-        <div ref={containerRef} className="h-full flex flex-col space-y-4 pointer-events-auto relative z-10 bg-surface rounded-xl p-4 border border-outline-variant/30">
+        <div ref={containerRef} className={clsx(
+            "h-full flex flex-col space-y-4 pointer-events-auto relative z-10 bg-surface",
+            !isCompact && "rounded-2xl p-4 border border-outline-variant/30",
+            isCompact && "p-2"
+        )}>
             {/* Tool Selection Header */}
             <TabBar
+                layoutId={`toolbox-view-tabs-${session.runId}`}
                 tabs={[
                     ...(session.type === 'test' ? [{
                         id: 'console',
@@ -277,7 +282,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                                 setIsGridView(!isGridView);
                             }}
                             className={clsx(
-                                "p-1.5 rounded-md transition-all flex items-center justify-center border border-transparent",
+                                "p-1.5 rounded-2xl transition-all flex items-center justify-center border border-transparent",
                                 isGridView
                                     ? "bg-primary/10 text-primary border-none"
                                     : "text-on-surface/80 hover:text-on-surface/80 hover:bg-surface-variant/30"
@@ -291,12 +296,12 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                 actions={
                     <div className="flex items-center gap-2">
                         {/* Session Controls */}
-                        <div className="flex bg-surface p-1 rounded-lg border border-outline-variant/30">
+                        <div className="flex bg-surface p-1 rounded-2xl border border-outline-variant/30">
                             <button
                                 onClick={handleScrcpy}
                                 disabled={isMirrorDisabled}
                                 className={clsx(
-                                    "p-1.5 rounded-md transition-all",
+                                    "p-1.5 rounded-2xl transition-all",
                                     isMirrorDisabled
                                         ? "text-on-surface/80 cursor-not-allowed"
                                         : "text-on-surface/80 hover:text-primary hover:bg-primary/10"
@@ -319,7 +324,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                                 variant="ghost"
                                 onClick={handleToggleRecording}
                                 className={clsx(
-                                    "rounded-md transition-all flex items-center gap-2 h-8 px-2",
+                                    "rounded-2xl transition-all flex items-center gap-2 h-8 px-2",
                                     isRecording
                                         ? "bg-error-container text-on-error-container animate-pulse hover:bg-error-container/80"
                                         : "text-on-surface/80 hover:text-primary hover:bg-primary/10"
@@ -442,7 +447,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                     })()}
                 </div>
             ) : (
-                <div className="flex-1 min-h-0 bg-surface border border-outline-variant/30 rounded-xl overflow-hidden relative">
+                <div className="flex-1 min-h-0 bg-surface border border-outline-variant/30 rounded-2xl overflow-hidden relative">
                     <div className={clsx("h-full flex flex-col overflow-hidden", activeTool === 'console' && session.type === 'test' ? "block" : "hidden")}>
                         <RunConsole logs={session.logs} isRunning={session.status === 'running'} testPath={session.testPath} />
                     </div>
@@ -477,7 +482,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
 function GridToolItem({ title, children, className, onHide, minimizeLabel, onMaximize, maximizeLabel }: { id: string, title: React.ReactNode, children: React.ReactNode, className?: string, onHide?: () => void, minimizeLabel?: string, onMaximize?: () => void, maximizeLabel?: string }) {
     return (
         <div className={clsx(
-            "flex flex-col border border-outline-variant/30 rounded-xl bg-surface overflow-hidden shadow-sm transition-all duration-300 min-h-0",
+            "flex flex-col border border-outline-variant/30 rounded-2xl bg-surface overflow-hidden shadow-sm transition-all duration-300 min-h-0",
             className
         )}>
             <div className="flex items-center justify-between px-3 py-2 bg-surface/50 border-b border-outline-variant/30 shrink-0">

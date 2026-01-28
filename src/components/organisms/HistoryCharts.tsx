@@ -2,7 +2,9 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { PieChart as PieIcon, BarChart as BarIcon } from 'lucide-react';
+import { motion } from 'framer-motion';
 
+// ... existing interfaces ...
 interface TestLog {
     path: string;
     suite_name: string;
@@ -87,9 +89,15 @@ export function HistoryCharts({ logs, groupBy }: HistoryChartsProps) {
     if (logs.length === 0) return null;
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6 animate-in fade-in slide-in-from-top-4 duration-500">
+        <motion.div
+            initial={{ opacity: 0, height: 0, scale: 0.95, marginBottom: 0 }}
+            animate={{ opacity: 1, height: 'auto', scale: 1, marginBottom: 24 }}
+            exit={{ opacity: 0, height: 0, scale: 0.95, marginBottom: 0 }}
+            transition={{ duration: 0.4, ease: [0.2, 0, 0, 1] }}
+            className="grid grid-cols-1 lg:grid-cols-2 gap-4 overflow-hidden"
+        >
             {/* Status Distribution (Pie) */}
-            <div className="bg-surface/50 border border-outline-variant/30 rounded-lg p-4 flex flex-col">
+            <div className="bg-surface/50 border border-outline-variant/30 rounded-2xl p-4 flex flex-col">
                 <div className="flex items-center gap-2 mb-4 text-on-surface-variant/80 font-medium text-sm border-b border-outline-variant/30 pb-2">
                     <PieIcon size={16} />
                     {t('tests_page.charts.status_distribution')}
@@ -122,7 +130,7 @@ export function HistoryCharts({ logs, groupBy }: HistoryChartsProps) {
 
             {/* Group Performance (Bar) */}
             {groupBy !== 'none' && groupBy !== 'status' && (
-                <div className="bg-surface/50 border border-outline-variant/30 rounded-lg p-4 flex flex-col">
+                <div className="bg-surface/50 border border-outline-variant/30 rounded-2xl p-4 flex flex-col">
                     <div className="flex items-center gap-2 mb-4 text-on-surface-variant/80 font-medium text-sm border-b border-outline-variant/30 pb-2">
                         <BarIcon size={16} />
                         {t('tests_page.charts.group_performance', { group: t(`tests_page.filter.${groupBy}`) })}
@@ -157,11 +165,11 @@ export function HistoryCharts({ logs, groupBy }: HistoryChartsProps) {
 
             {/* Placeholder if no grouping selected */}
             {groupBy === 'none' && (
-                <div className="bg-surface/50 border border-outline-variant/30 rounded-lg p-4 flex flex-col items-center justify-center text-on-surface/80 text-sm">
+                <div className="bg-surface/50 border border-outline-variant/30 rounded-2xl p-4 flex flex-col items-center justify-center text-on-surface/80 text-sm">
                     <BarIcon size={32} className="mb-2 opacity-50" />
                     <p>{t('tests_page.charts.select_group')}</p>
                 </div>
             )}
-        </div>
+        </motion.div>
     );
 }

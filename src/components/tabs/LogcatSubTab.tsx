@@ -210,7 +210,7 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
                         {logs.length} {t('logcat.lines')}
                         <button
                             onClick={() => { setLogs([]); }}
-                            className="px-3 py-1.5 ml-2 rounded-md text-xs font-medium items-center justify-center gap-2 bg-surface text-on-surface/80 border border-outline-variant/30 hover:bg-surface-variant/50 transition-colors"
+                            className="px-3 py-1.5 ml-2 rounded-2xl text-xs font-medium items-center justify-center gap-2 bg-surface text-on-surface/80 border border-outline-variant/30 hover:bg-surface-variant/50 transition-colors"
                             title={t('logcat.clear')}
                         >
                             <Eraser size={14} />
@@ -272,7 +272,7 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
 
             {/* Log Viewer */}
             {/* Log Area */}
-            <div className="flex-1 min-h-0 bg-surface text-on-surface/80 font-mono text-xs relative border border-outline-variant/30 rounded-lg">
+            <div className="flex-1 min-h-0 bg-surface text-on-surface/80 font-mono text-xs relative border border-outline-variant/30 rounded-2xl">
                 {logs.length === 0 ? (
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-on-surface-variant/80 gap-2 pointer-events-none">
                         <AlignLeft size={32} className="opacity-20" />

@@ -12,7 +12,7 @@ export function AndroidVersionPill({ version, className }: AndroidVersionPillPro
     return (
         <div
             className={clsx(
-                "flex items-center gap-1 text-[10px] text-on-surface/80 bg-surface-variant/50 px-1.5 py-0.5 rounded-full",
+                "flex items-center gap-1 text-[10px] text-on-surface/80 bg-surface-variant/50 px-1.5 py-0.5 rounded-2xl",
                 className
             )}
             title={`Android ${version}`}

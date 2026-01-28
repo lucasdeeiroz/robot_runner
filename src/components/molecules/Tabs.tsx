@@ -1,5 +1,6 @@
 import { twMerge } from 'tailwind-merge';
 import { LucideIcon, X } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 export interface TabItem {
     id: string;
@@ -18,6 +19,7 @@ interface TabsProps {
     variant?: 'underline' | 'pills' | 'cards';
     className?: string;
     transparent?: boolean;
+    layoutId?: string;
 }
 
 export const Tabs = ({
@@ -27,7 +29,8 @@ export const Tabs = ({
     orientation = 'horizontal',
     variant = 'underline',
     className,
-    transparent = false
+    transparent = false,
+    layoutId // New Prop
 }: TabsProps) => {
 
     // styles based on variant
@@ -35,21 +38,17 @@ export const Tabs = ({
         ? 'flex items-center gap-1 border-b border-outline-variant'
         : 'flex flex-col gap-1';
 
-    const pillContainer = 'flex p-1 bg-surface-variant/30 rounded-lg border border-outline-variant/30';
+    const pillContainer = 'flex p-1 bg-surface-variant/30 rounded-2xl border border-outline-variant/30';
 
-    const itemBase = 'relative flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md cursor-pointer select-none group whitespace-nowrap';
+    const itemBase = 'relative flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-2xl cursor-pointer select-none group whitespace-nowrap';
 
-    const activeStyles = {
-        underline: 'text-primary border-b-2 border-primary rounded-none',
-        pills: 'bg-surface text-primary shadow-sm border border-outline-variant/30',
-        cards: 'bg-surface text-primary border-outline',
-    };
+    // Revised active/inactive styles to rely on motion div for background
+    const activeText = 'text-primary';
+    const inactiveText = 'text-on-surface-variant/80 hover:text-on-surface/80';
 
-    const inactiveStyles = {
-        underline: 'text-on-surface-variant/80 hover:text-on-surface/80 border-b-2 border-transparent hover:border-outline-variant/30 rounded-none',
-        pills: 'text-on-surface-variant/80 hover:text-on-surface/80 hover:bg-surface-variant/50',
-        cards: 'text-on-surface-variant/80 hover:text-on-surface/80',
-    };
+    // Unique IDs for this instance
+    const activeTabId = layoutId ? `${layoutId}-activeTab` : "activeTab";
+    const activeUnderlineId = layoutId ? `${layoutId}-activeUnderline` : "activeUnderline";
 
     return (
         <div className={twMerge(
@@ -69,19 +68,34 @@ export const Tabs = ({
                             itemBase,
                             // Only apply flex-1 for horizontal pills to spread them
                             variant === 'pills' && orientation === 'horizontal' && "flex-1 justify-center",
-                            isActive ? activeStyles[variant] : inactiveStyles[variant],
+                            isActive ? activeText : inactiveText,
                             // Vertical adjustments
                             orientation === 'vertical' && "justify-start w-full text-left",
                             // Remove rounded corners for underline vertical
                             variant === 'underline' && orientation === 'vertical' && "border-b-0 border-l-2 -ml-[1px]",
                         )}
                     >
+                        {isActive && variant === 'pills' && (
+                            <motion.div
+                                layoutId={tab.selected !== undefined ? `${activeTabId}-${tab.id}` : activeTabId}
+                                className="absolute inset-0 bg-surface rounded-2xl shadow-sm border border-outline-variant/30"
+                                transition={{ type: "spring", duration: 0.5 }}
+                            />
+                        )}
+                        {isActive && variant === 'underline' && (
+                            <motion.div
+                                layoutId={activeUnderlineId}
+                                className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary"
+                                transition={{ type: "spring", duration: 0.5 }}
+                            />
+                        )}
+
                         <span className="relative z-10 flex items-center gap-2">
                             {tab.icon && <tab.icon size={16} />}
                             {tab.label}
                             {tab.count !== undefined && (
                                 <span className={twMerge(
-                                    "ml-auto text-xs px-1.5 py-0.5 rounded-full",
+                                    "ml-auto text-xs px-1.5 py-0.5 rounded-2xl",
                                     isActive
                                         ? (variant === 'pills' ? "bg-surface-variant text-on-surface-variant/80" : "bg-primary-container text-on-primary-container")
                                         : "bg-surface-variant/50 text-on-surface-variant/80"
@@ -98,7 +112,7 @@ export const Tabs = ({
                                     tab.onClose?.();
                                 }}
                                 className={twMerge(
-                                    "ml-1 p-0.5 rounded-full transition-opacity hover:bg-surface-variant/50",
+                                    "ml-1 p-0.5 rounded-2xl z-10 transition-opacity hover:bg-surface-variant/50",
                                     isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                                 )}
                             >
