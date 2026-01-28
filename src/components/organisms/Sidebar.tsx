@@ -107,18 +107,18 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
             {/* Footer */}
             <div className="p-4 mb-2.5">
                 {!collapsed && <div className="text-[10px] flex justify-between items-center">
-                    <span className="text-on-surface-variant/80 bg-surface-variant/20 px-1.5 py-0.5 rounded rounded-full">v{appVersion}</span>
+                    <span className="text-on-surface-variant/80 bg-surface-variant/20 px-1.5 py-0.5 rounded-full">v{appVersion}</span>
                     {updateAvailable && (
                         <button
                             onClick={() => onNavigate('about')}
-                            className="text-error font-bold bg-error-container px-1.5 py-0.5 rounded rounded-full hover:bg-error-container/80 transition-colors animate-pulse cursor-pointer"
+                            className="text-error font-bold bg-error-container px-1.5 py-0.5 rounded-full hover:bg-error-container/80 transition-colors animate-pulse cursor-pointer"
                         >
                             {t('about.update_badge')}
                         </button>
                     )}
                 </div>}
                 {collapsed && <div className="text-[10px] flex justify-center items-center">
-                    <span className="text-on-surface-variant/80 bg-surface-variant/20 px-1.5 py-0.5 rounded rounded-full">v{appVersion}</span>
+                    <span className="text-on-surface-variant/80 bg-surface-variant/20 px-1.5 py-0.5 rounded-full">v{appVersion}</span>
                 </div>}
             </div>
         </div >
