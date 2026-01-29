@@ -38,12 +38,11 @@ export function usePerformanceRecorder(selectedDevice: string, isActive: boolean
     // Fetch Stats Loop
     useEffect(() => {
         let interval: NodeJS.Timeout;
-        // Update if active AND auto-refresh is on, OR if recording (regardless of visibility)
-        const shouldUpdate = selectedDevice && ((autoRefresh && isActive) || isRecording);
+        // Update if active AND auto-refresh is on AND test is NOT running, OR if recording
+        const shouldUpdate = selectedDevice && ((autoRefresh && isActive && !isTestRunning) || isRecording);
 
-        // If a test is running, throttle to 5s to prevent ADB congestion/Appium crashes. 
-        // Otherwise use 2s for responsiveness.
-        const pollInterval = isTestRunning ? 5000 : 2000;
+        // If a test is running, we strictly pause auto-polling.
+        const pollInterval = 2000;
 
         if (shouldUpdate) {
             fetchStats();
@@ -51,6 +50,13 @@ export function usePerformanceRecorder(selectedDevice: string, isActive: boolean
         }
         return () => clearInterval(interval);
     }, [selectedDevice, autoRefresh, selectedPackage, isActive, isRecording, isTestRunning]);
+
+    // Clear stats when test starts to show "Paused" state
+    useEffect(() => {
+        if (isTestRunning) {
+            setStats(null);
+        }
+    }, [isTestRunning]);
 
     const fetchStats = async () => {
         if (isLoading) return; // Prevent stacking requests

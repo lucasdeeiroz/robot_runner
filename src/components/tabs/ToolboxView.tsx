@@ -216,8 +216,9 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
     const isPerformanceActive = activeTool === 'performance' || (isGridView && visibleToolsInGrid.has('performance'));
     const isTestRunning = session.status === 'running';
 
-    // Disable auto-refresh by default if in 'test' mode to save resources
-    const initialAutoRefresh = session.type !== 'test';
+    // Always enable auto-refresh by default.
+    // The hook handles pausing it during active tests efficiently.
+    const initialAutoRefresh = true;
 
     const performanceState = usePerformanceRecorder(session.deviceUdid, isPerformanceActive, isTestRunning, initialAutoRefresh);
 
@@ -435,16 +436,17 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                                     {tool === 'console' && (
                                         <RunConsole logs={session.logs} isRunning={session.status === 'running'} testPath={session.testPath} />
                                     )}
-                                    {tool === 'logcat' && <LogcatSubTab key={session.deviceUdid} selectedDevice={session.deviceUdid} />}
-                                    {tool === 'commands' && <CommandsSubTab selectedDevice={session.deviceUdid} />}
+                                    {tool === 'logcat' && <LogcatSubTab key={session.deviceUdid} selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} />}
+                                    {tool === 'commands' && <CommandsSubTab selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} />}
                                     {tool === 'performance' && (
                                         <PerformanceSubTab
                                             selectedDevice={session.deviceUdid}
                                             {...performanceState}
                                             onRefresh={performanceState.fetchStats}
+                                            isTestRunning={isTestRunning}
                                         />
                                     )}
-                                    {tool === 'apps' && <AppsSubTab />}
+                                    {tool === 'apps' && <AppsSubTab isTestRunning={isTestRunning} />}
                                 </GridToolItem>
                             );
                         });
@@ -457,11 +459,11 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                     </div>
 
                     <div className={clsx("h-full", activeTool === 'logcat' ? "block" : "hidden")}>
-                        <LogcatSubTab key={session.deviceUdid} selectedDevice={session.deviceUdid} />
+                        <LogcatSubTab key={session.deviceUdid} selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} />
                     </div>
 
                     <div className={clsx("h-full", activeTool === 'commands' ? "block" : "hidden")}>
-                        <CommandsSubTab selectedDevice={session.deviceUdid} />
+                        <CommandsSubTab selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} />
                     </div>
 
                     <div className={clsx("h-full", activeTool === 'performance' ? "block" : "hidden")}>
@@ -469,11 +471,12 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                             selectedDevice={session.deviceUdid}
                             {...performanceState}
                             onRefresh={performanceState.fetchStats}
+                            isTestRunning={isTestRunning}
                         />
                     </div>
 
                     <div className={clsx("h-full", activeTool === 'apps' ? "block" : "hidden")}>
-                        <AppsSubTab />
+                        <AppsSubTab isTestRunning={isTestRunning} />
                     </div>
                 </div>
             )}

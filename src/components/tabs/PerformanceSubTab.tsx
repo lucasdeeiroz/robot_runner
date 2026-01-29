@@ -23,6 +23,7 @@ interface PerformanceSubTabProps {
     toggleRecording: () => void;
     lastSaved: string | null;
     setLastSaved: (val: string | null) => void;
+    isTestRunning?: boolean;
 
     onRefresh: () => void;
     isLoading?: boolean;
@@ -40,6 +41,7 @@ export function PerformanceSubTab({
     toggleRecording,
     lastSaved,
     setLastSaved,
+    isTestRunning = false,
 
     onRefresh,
     isLoading = false
@@ -147,6 +149,7 @@ export function PerformanceSubTab({
                             onClick={toggleRecording}
                             variant={isRecording ? "danger" : "secondary"}
                             size="sm"
+                            disabled={isTestRunning}
                             leftIcon={isRecording ? <Square size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
                             title={isRecording ? t('performance.stop_record') : t('performance.start_record')}
                         >
@@ -170,7 +173,12 @@ export function PerformanceSubTab({
                     onClose={() => setLastSaved(null)}
                 />
 
-                {!stats ? (
+                {(isTestRunning && !stats) ? (
+                    <div className="absolute inset-0 flex-1 flex flex-col items-center justify-center text-on-surface-variant/80 text-sm">
+                        <Activity size={32} className="opacity-20 mb-2" />
+                        <p>{t('performance.status.paused_test', "Performance monitoring paused during test")}</p>
+                    </div>
+                ) : !stats ? (
                     <div className="flex-1 flex flex-col items-center justify-center text-on-surface/80">
                         <ExpressiveLoading size="lg" variant="circular" className="mb-2" />
                         <p>{t('performance.loading')}</p>

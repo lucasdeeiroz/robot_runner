@@ -13,11 +13,10 @@ import { Select } from "@/components/atoms/Select";
 
 interface LogcatSubTabProps {
     selectedDevice: string;
+    isTestRunning?: boolean;
 }
 
-
-
-export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
+export function LogcatSubTab({ selectedDevice, isTestRunning = false }: LogcatSubTabProps) {
     const { t } = useTranslation();
     const [isStreaming, setIsStreaming] = useState(false);
     const [logs, setLogs] = useState<string[]>([]);
@@ -67,7 +66,7 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
         let interval: NodeJS.Timeout;
         let pollingOffset = 0; // Local offset for this session
 
-        if (isStreaming && selectedDevice) {
+        if (isStreaming && selectedDevice && !isTestRunning) { // Pause polling during active tests
 
             interval = setInterval(async () => {
                 try {
@@ -102,7 +101,7 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
         return () => {
             if (interval) clearInterval(interval);
         };
-    }, [isStreaming, selectedDevice]);
+    }, [isStreaming, selectedDevice, isTestRunning]);
 
     const [selectedPackage, setSelectedPackage] = useState("");
     const [logLevel, setLogLevel] = useState("E");
@@ -257,6 +256,7 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
                             onClick={isStreaming ? stopLogcat : startLogcat}
                             variant={isStreaming ? "danger" : "primary"}
                             size="sm"
+                            disabled={isTestRunning}
                             leftIcon={isStreaming ? <Square size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
                         >
                             {!isNarrow && t(isStreaming ? 'logcat.stop' : 'logcat.start')}
@@ -274,9 +274,12 @@ export function LogcatSubTab({ selectedDevice }: LogcatSubTabProps) {
             {/* Log Area */}
             <div className="flex-1 min-h-0 bg-surface text-on-surface/80 font-mono text-xs relative border border-outline-variant/30 rounded-2xl">
                 {logs.length === 0 ? (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-on-surface-variant/80 gap-2 pointer-events-none">
-                        <AlignLeft size={32} className="opacity-20" />
-                        <span className="opacity-50">{isStreaming ? t('logcat.status.waiting') : t('logcat.status.empty')}</span>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-on-surface-variant/80 font-sans text-sm">
+                        <AlignLeft size={32} className="opacity-20 mb-2" />
+                        <p>
+                            {isTestRunning ? t('logcat.status.paused_test', "Logcat paused during test") :
+                                isStreaming ? t('logcat.status.waiting') : t('logcat.status.empty')}
+                        </p>
                     </div>
                 ) : (
                     <Virtuoso

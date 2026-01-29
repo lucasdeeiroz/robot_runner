@@ -65,7 +65,8 @@ export const es = {
             no_packages: "Ningún paquete encontrado",
             status: {
                 installing: "Instalando APK...",
-                disabled_badge: "Deshabilitado"
+                disabled_badge: "Deshabilitado",
+                paused_test: "Actualización de apps pausada por prueba"
             },
             success: {
                 uninstalled: "{{pkg}} desinstalado con éxito",
@@ -85,6 +86,9 @@ export const es = {
             empty: "Seleccione un dispositivo para ejecutar comandos",
             input_placeholder: "Ingrese comando ADB (ej: 'shell ls -la')",
             waiting: "Esperando comandos...",
+            status: {
+                test_running: "Ejecución de prueba en curso"
+            },
             clear: "Limpiar Consola",
             quick: "Rápido",
             saved: "Guardados",
@@ -286,6 +290,7 @@ export const es = {
                 app_not_running: "Aplicación no se está ejecutando: {{pkg}}"
             },
             status: {
+                paused_test: "Logcat pausado durante la prueba",
                 waiting: "Esperando logs...",
                 empty: "No se capturaron logs"
             },

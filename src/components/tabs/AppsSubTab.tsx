@@ -21,7 +21,11 @@ interface PackageInfo {
     is_disabled: boolean;
 }
 
-export function AppsSubTab() {
+interface AppsSubTabProps {
+    isTestRunning?: boolean;
+}
+
+export function AppsSubTab({ isTestRunning = false }: AppsSubTabProps) {
     const { t } = useTranslation();
     const { sessions, activeSessionId } = useTestSessions();
     const activeSession = sessions.find(s => s.runId === activeSessionId);
@@ -32,6 +36,8 @@ export function AppsSubTab() {
     const [search, setSearch] = useState("");
     const [showSystem, setShowSystem] = useState(false);
     const [sortBy, setSortBy] = useState<'name' | 'package'>('name');
+
+    // ... (rest of state)
 
     // Responsive State
     const containerRef = useRef<HTMLDivElement>(null);
@@ -48,7 +54,7 @@ export function AppsSubTab() {
         return () => observer.disconnect();
     }, []);
 
-    // Modal State
+    // ... (Modal State)
     const [modalConfig, setModalConfig] = useState<{
         isOpen: boolean;
         type: 'uninstall' | 'disable' | 'enable' | 'clear' | null;
@@ -79,8 +85,10 @@ export function AppsSubTab() {
     };
 
     useEffect(() => {
-        fetchPackages();
-    }, [activeDevice]);
+        if (!isTestRunning) {
+            fetchPackages();
+        }
+    }, [activeDevice, isTestRunning]); // Don't auto-fetch if test running, but let user manually refresh if they really want via button
 
     const friendlyNames = useMemo(() => calculateUniqueLabels(packages), [packages]);
 
@@ -244,6 +252,7 @@ export function AppsSubTab() {
                             onClick={handleInstall}
                             variant="ghost"
                             size="sm"
+                            disabled={isTestRunning}
                             className="bg-on-success-container/10/10 hover:bg-on-success-container/10/20 text-success border border-on-success-container/10/20"
                             title={t('apps.actions.install')}
                             leftIcon={<Upload size={14} />}
@@ -262,9 +271,20 @@ export function AppsSubTab() {
                         <span className="text-sm">{t('apps.no_device', "No device selected")}</span>
                     </div>
                 ) : filtered.length === 0 ? (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-on-surface-variant/80 gap-2">
-                        {loading ? <ExpressiveLoading size="lg" variant="circular" /> : <Package size={32} className="opacity-20" />}
-                        <span className="text-sm">{loading ? t('common.loading', "Loading...") : t('apps.no_packages', "No packages found")}</span>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-on-surface-variant/80 text-sm">
+                        {loading ? (
+                            <ExpressiveLoading size="lg" variant="circular" className="mb-2" />
+                        ) : (
+                            <Package size={32} className="opacity-20 mb-2" />
+                        )}
+                        <p>
+                            {loading
+                                ? t('common.loading', "Loading...")
+                                : isTestRunning
+                                    ? t('apps.status.paused_test', "Apps refresh paused during test")
+                                    : t('apps.no_packages', "No packages found")
+                            }
+                        </p>
                     </div>
                 ) : (
                     <Virtuoso

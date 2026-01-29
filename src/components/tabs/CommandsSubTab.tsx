@@ -10,6 +10,7 @@ import { Button } from "@/components/atoms/Button";
 
 interface CommandsSubTabProps {
     selectedDevice: string;
+    isTestRunning?: boolean;
 }
 
 interface SavedCommand {
@@ -18,7 +19,7 @@ interface SavedCommand {
     cmd: string;
 }
 
-export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
+export function CommandsSubTab({ selectedDevice, isTestRunning = false }: CommandsSubTabProps) {
     const { t } = useTranslation();
     const [command, setCommand] = useState("");
     const [history, setHistory] = useState<string[]>([]);
@@ -189,8 +190,13 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
             />
 
             {/* Console Output */}
-            <div className="flex-1 bg-surface text-on-surface/50 font-mono text-xs rounded-2xl border border-outline-variant/30 p-4 overflow-y-auto on-primaryspace-pre-wrap">
-                {history.length === 0 && <span className="opacity-30">{t('commands.waiting')}</span>}
+            <div className="relative flex-1 bg-surface text-on-surface/50 font-mono text-xs rounded-2xl border border-outline-variant/30 p-4 overflow-y-auto on-primaryspace-pre-wrap">
+                {history.length === 0 && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-on-surface-variant/80 font-sans text-sm">
+                        <Terminal size={32} className="opacity-20 mb-2" />
+                        <p>{isTestRunning ? t('commands.status.test_running', "Test execution in progress") : t('commands.waiting')}</p>
+                    </div>
+                )}
                 {history.map((line, i) => (
                     <div key={i} className="text-on-surface/80 on-primaryspace-pre-wrap break-all">
                         {line.startsWith('>') ? <span className="text-primary font-bold">{line}</span> : line}
@@ -207,7 +213,7 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
                         <button
                             key={action.label}
                             onClick={() => executeCommand(action.cmd, action.label)}
-                            disabled={isExecuting}
+                            disabled={isExecuting || isTestRunning}
                             className="flex items-center gap-2 px-3 py-1.5 bg-surface-variant/30 hover:bg-outline-variant rounded-2xl text-xs font-medium transition-colors border border-outline-variant/30 disabled:opacity-50"
                         >
                             {action.icon}
@@ -227,7 +233,8 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
                             >
                                 <button
                                     onClick={() => setCommand(saved.cmd)} // Fill input
-                                    className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-on-warning-container hover:text-on-warning-container/50 transition-colors"
+                                    disabled={isTestRunning}
+                                    className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-on-warning-container hover:text-on-warning-container/50 transition-colors disabled:opacity-50"
                                     title={saved.cmd}
                                 >
                                     <Star size={12} className="fill-warning/40 text-warning-container/60" />
@@ -282,7 +289,7 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
                 ) : (
                     <Button
                         onClick={handleSend}
-                        disabled={!command.trim()}
+                        disabled={!command.trim() || isTestRunning}
                         variant="primary"
                     >
                         <Send size={18} />
