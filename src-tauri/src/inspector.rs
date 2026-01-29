@@ -33,34 +33,60 @@ pub async fn get_screenshot(device_id: String) -> Result<String, String> {
 
 #[command]
 pub async fn get_xml_dump(device_id: String) -> Result<String, String> {
-    // 1. Run uiautomator dump
-    // We strictly use /data/local/tmp to avoid permission issues
-    let mut cmd = Command::new("adb");
-    cmd.args(&[
-        "-s",
-        &device_id,
-        "shell",
-        "uiautomator",
-        "dump",
-        "/data/local/tmp/window_dump.xml",
-    ]);
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000);
-    }
-    let dump_cmd = cmd
-        .output()
-        .map_err(|e| format!("Failed to execute uiautomator dump: {}", e))?;
+    // 1. Run uiautomator dump (with retries)
+    let mut attempts = 0;
+    let max_attempts = 4; // Increased to 4 to allow comprehensive cleanup
+    
+    loop {
+        attempts += 1;
+        
+        let mut cmd = Command::new("adb");
+        cmd.args(&[
+            "-s",
+            &device_id,
+            "shell",
+            "uiautomator",
+            "dump",
+            "/data/local/tmp/window_dump.xml",
+        ]);
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(0x08000000);
+        }
+        
+        match cmd.output() {
+            Ok(output) => {
+                if output.status.success() {
+                    break;
+                } else {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    let stdout = String::from_utf8_lossy(&output.stdout);
+                    // eprintln!("uiautomator dump failed (attempt {}/{}). Stderr: '{}', Stdout: '{}'", attempts, max_attempts, stderr.trim(), stdout.trim());
+                    
+                    if attempts >= max_attempts {
+                        return Err(format!("uiautomator dump failed: {} {}", stderr, stdout));
+                    }
 
-    if !dump_cmd.status.success() {
-        // Some devices print "UI hierchary dumped to..." in stdout even on success,
-        // but if exit code is non-zero, it's a real error.
-        // NOTE: uiautomator dump sometimes is flaky or screen is busy.
-        return Err(format!(
-            "uiautomator dump failed: {}",
-            String::from_utf8_lossy(&dump_cmd.stderr)
-        ));
+                    // cleanup before retry
+                    let _ = Command::new("adb").args(&["-s", &device_id, "shell", "rm", "/data/local/tmp/window_dump.xml"]).output();
+                    let _ = Command::new("adb").args(&["-s", &device_id, "shell", "pkill", "uiautomator"]).output();
+                    
+                    // Also try to stop appium server if it's hanging
+                    let _ = Command::new("adb").args(&["-s", &device_id, "shell", "am", "force-stop", "io.appium.uiautomator2.server"]).output();
+                    let _ = Command::new("adb").args(&["-s", &device_id, "shell", "am", "force-stop", "io.appium.uiautomator2.server.test"]).output();
+                }
+            }
+            Err(e) => {
+                eprintln!("Failed to execute adb command (attempt {}/{}): {}", attempts, max_attempts, e);
+                if attempts >= max_attempts {
+                    return Err(format!("Failed to execute uiautomator dump command: {}", e));
+                }
+            }
+        }
+        
+        // Wait a bit before retry
+        std::thread::sleep(std::time::Duration::from_millis(1500));
     }
 
     // 2. Cat the file

@@ -14,14 +14,17 @@ import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 interface InspectorSubTabProps {
     selectedDevice: string;
     isActive: boolean;
+    isTestRunning?: boolean;
 }
 
-export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabProps) {
+export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = false }: InspectorSubTabProps) {
     const { t } = useTranslation();
     const [screenshot, setScreenshot] = useState<string | null>(null);
     const [rootNode, setRootNode] = useState<InspectorNode | null>(null);
     const [selectedNode, setSelectedNode] = useState<InspectorNode | null>(null);
     const [hoveredNode, setHoveredNode] = useState<InspectorNode | null>(null);
+
+    const prevTestRunning = useRef(isTestRunning);
 
     // Responsive State
     const [containerRef, setContainerRef] = useState<HTMLDivElement | null>(null);
@@ -88,14 +91,25 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
             setScreenshot(null);
             setRootNode(null);
             setSelectedNode(null);
+            prevTestRunning.current = isTestRunning;
             return;
         }
 
-        if (isActive) {
-            // Only fetch if active, or if never loaded and just became active
-            refreshAll();
+        const wasTestRunning = prevTestRunning.current;
+        prevTestRunning.current = isTestRunning;
+
+        if (isActive && !isTestRunning) {
+            if (wasTestRunning) {
+                // Device just finished test, give it a moment to recover (release resources/uiautomator)
+                // before trying to dump XML, otherwise it fails often.
+                const timer = setTimeout(refreshAll, 1500); // 1.5s delay
+                return () => clearTimeout(timer);
+            } else {
+                // Only fetch if active, or if never loaded and just became active
+                refreshAll();
+            }
         }
-    }, [selectedDevice, isActive]);
+    }, [selectedDevice, isActive, isTestRunning]);
 
     const refreshAll = async () => {
         if (!selectedDevice) return;
@@ -126,7 +140,7 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
     };
 
     const sendAdbInput = async (cmd: string) => {
-        if (!selectedDevice) return;
+        if (!selectedDevice || isTestRunning) return;
         const args = ['shell', 'input', ...cmd.split(' ')];
         try {
             await invoke('run_adb_command', { device: selectedDevice, args });
@@ -271,6 +285,15 @@ export function InspectorSubTab({ selectedDevice, isActive }: InspectorSubTabPro
             <div className="h-full flex flex-col items-center justify-center text-on-surface/80">
                 <Scan size={48} className="mb-4 opacity-20" />
                 <p>{t('inspector.empty')}</p>
+            </div>
+        );
+    }
+
+    if (isTestRunning) {
+        return (
+            <div className="h-full flex flex-col items-center justify-center text-on-surface-variant/80 text-sm">
+                <Scan size={32} className="opacity-20 mb-2" />
+                <p>{t('inspector.status.paused_test', 'Inspector disabled during test')}</p>
             </div>
         );
     }

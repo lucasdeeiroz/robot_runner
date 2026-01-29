@@ -260,7 +260,8 @@ export const pt = {
                 fetching: "Buscando estado...",
                 ready: "Pronto",
                 loading: "Carregando...",
-                no_screenshot: "Sem captura de tela"
+                no_screenshot: "Sem captura de tela",
+                paused_test: "Inspector desabilitado durante o teste"
             },
             properties: "Propriedades do Nó",
             select_element: "Selecione um elemento na tela",

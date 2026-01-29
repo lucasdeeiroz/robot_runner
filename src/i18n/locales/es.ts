@@ -260,7 +260,8 @@ export const es = {
                 fetching: "Buscando estado...",
                 ready: "Listo",
                 loading: "Cargando...",
-                no_screenshot: "Sin captura de pantalla"
+                no_screenshot: "Sin captura de pantalla",
+                paused_test: "Inspector deshabilitado durante la prueba"
             },
             properties: "Propiedades del Nodo",
             select_element: "Seleccione un elemento en la pantalla",

@@ -257,7 +257,8 @@ export const en = {
                 fetching: "Fetching device state...",
                 ready: "Ready",
                 loading: "Loading...",
-                no_screenshot: "No screenshot"
+                no_screenshot: "No screenshot",
+                paused_test: "Inspector disabled during test"
             },
             properties: "Node Properties",
             select_element: "Select an element on the screenshot",

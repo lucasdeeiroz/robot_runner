@@ -272,7 +272,11 @@ export function RunPage({ onNavigate, initialTab }: RunPageProps) {
                 </div>
 
                 <div className={clsx("h-full", activeTab === 'inspector' ? "block" : "hidden")}>
-                    <InspectorSubTab selectedDevice={selectedDevices[0] || ""} isActive={activeTab === 'inspector'} />
+                    <InspectorSubTab
+                        selectedDevice={selectedDevices[0] || ""}
+                        isActive={activeTab === 'inspector'}
+                        isTestRunning={selectedDevices[0] ? busyDeviceIds.includes(selectedDevices[0]) : false}
+                    />
                 </div>
             </div>
         </div>
