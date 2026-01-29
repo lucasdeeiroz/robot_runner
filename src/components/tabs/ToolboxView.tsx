@@ -214,8 +214,12 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
     // Determine active state for performance hook:
     // It is active if it's the active tool OR if we are in grid view and it's visible.
     const isPerformanceActive = activeTool === 'performance' || (isGridView && visibleToolsInGrid.has('performance'));
+    const isTestRunning = session.status === 'running';
 
-    const performanceState = usePerformanceRecorder(session.deviceUdid, isPerformanceActive);
+    // Disable auto-refresh by default if in 'test' mode to save resources
+    const initialAutoRefresh = session.type !== 'test';
+
+    const performanceState = usePerformanceRecorder(session.deviceUdid, isPerformanceActive, isTestRunning, initialAutoRefresh);
 
     // Combine feedback paths (add performance saved path)
     const activeSavedPath = screenshotSaver.lastSavedPath || recordingSaver.lastSavedPath;
