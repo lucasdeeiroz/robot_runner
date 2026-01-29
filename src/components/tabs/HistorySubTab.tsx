@@ -193,8 +193,8 @@ export function HistorySubTab() {
                                     <div className={clsx(
                                         "w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 mt-1",
                                         log.status === 'PASS'
-                                            ? "bg-success-container text-on-success-container"
-                                            : "bg-error-container text-on-error-container"
+                                            ? "bg-success/10 text-on-success-container"
+                                            : "bg-error/10 text-on-error-container"
                                     )}>
                                         {log.status === 'PASS' ? <CheckCircle size={20} /> : <XCircle size={20} />}
                                     </div>
@@ -202,13 +202,6 @@ export function HistorySubTab() {
                                         <div className="flex items-center gap-2 mb-1">
                                             <span className="font-semibold text-on-surface/80 truncate" title={decodeHtml(log.suite_name)}>
                                                 {decodeHtml(log.suite_name)}
-                                            </span>
-                                            <span className={clsx("text-xs font-bold px-1.5 py-0.5 rounded border",
-                                                log.status === 'PASS'
-                                                    ? "bg-success-container text-on-success-container border-success-container/20"
-                                                    : "bg-error-container text-on-error-container border-error-container/20"
-                                            )}>
-                                                {log.status}
                                             </span>
                                         </div>
 
@@ -230,7 +223,16 @@ export function HistorySubTab() {
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-2 shrink-0 border-l border-outline-variant/30 pl-3">
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <span className={clsx("text-xs font-bold px-1.5 py-0.5 rounded border",
+                                        log.status === 'PASS'
+                                            ? "bg-success/10 text-on-success-container border-success/20"
+                                            : "bg-error/10 text-on-error-container border-error/20"
+                                    )}>
+                                        {log.status}
+                                    </span>
+                                    <div className="border border-outline-variant/30 py-2">
+                                    </div>
                                     <button
                                         onClick={() => openLog(log.log_html_path)}
                                         className="flex items-center gap-2 px-3 py-1.5 bg-surface-variant/30 hover:bg-primary/10 text-on-surface-variant/80 hover:text-primary rounded-2xl text-xs font-medium transition-colors"
