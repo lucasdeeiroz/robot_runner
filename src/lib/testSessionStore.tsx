@@ -178,7 +178,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     deviceName,
                     testPath: 'Toolbox',
                     logs: [],
-                    status: 'running',
+                    status: 'stopped',
                     deviceModel,
                     androidVersion
                 }
