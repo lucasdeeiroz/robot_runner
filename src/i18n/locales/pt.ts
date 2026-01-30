@@ -65,7 +65,8 @@ export const pt = {
             no_packages: "Nenhum pacote encontrado",
             status: {
                 installing: "Instalando APK...",
-                disabled_badge: "Desativado"
+                disabled_badge: "Desativado",
+                paused_test: "Atualização pausada durante o teste"
             },
             success: {
                 uninstalled: "Pacote {{pkg}} desinstalado com sucesso",
@@ -85,6 +86,9 @@ export const pt = {
             empty: "Selecione um dispositivo para executar comandos",
             input_placeholder: "Digite comando ADB (ex: 'shell ls -la')",
             waiting: "Aguardando comandos...",
+            status: {
+                test_running: "Execução de teste em andamento"
+            },
             clear: "Limpar Console",
             quick: "Rápido",
             saved: "Salvos",
@@ -256,7 +260,8 @@ export const pt = {
                 fetching: "Buscando estado...",
                 ready: "Pronto",
                 loading: "Carregando...",
-                no_screenshot: "Sem captura de tela"
+                no_screenshot: "Sem captura de tela",
+                paused_test: "Inspector desabilitado durante o teste"
             },
             properties: "Propriedades do Nó",
             select_element: "Selecione um elemento na tela",
@@ -286,6 +291,7 @@ export const pt = {
                 app_not_running: "App não está rodando: {{pkg}}"
             },
             status: {
+                paused_test: "Logcat pausado durante o teste",
                 waiting: "Aguardando logs...",
                 empty: "Nenhum log capturado"
             },
@@ -324,7 +330,10 @@ export const pt = {
             device_stats: "Desempenho do Dispositivo",
             app_stats: "Desempenho do Aplicativo",
             auto: "Auto",
-            na: "N/D"
+            na: "N/D",
+            status: {
+                paused_test: "Monitoramento de performance pausado durante o teste"
+            }
         },
         run_tab: {
             launcher: "Iniciador",

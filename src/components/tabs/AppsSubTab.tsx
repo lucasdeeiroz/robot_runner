@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useTranslation } from "react-i18next";
-import { Search, RefreshCw, Smartphone, Package, Trash2, Snowflake, PlayCircle, Eraser, Upload, ArrowDownAZ } from "lucide-react";
+import { Search, Smartphone, Package, Trash2, Snowflake, PlayCircle, Eraser, Upload, ArrowDownAZ, RefreshCw } from "lucide-react";
 import clsx from "clsx";
 import { useTestSessions } from "@/lib/testSessionStore";
 import { open } from '@tauri-apps/plugin-dialog';
@@ -12,6 +12,7 @@ import { ConfirmationModal } from "@/components/organisms/ConfirmationModal";
 import { feedback } from "@/lib/feedback";
 import { Section } from "@/components/organisms/Section";
 import { Button } from "@/components/atoms/Button";
+import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 
 interface PackageInfo {
     name: String;
@@ -20,7 +21,11 @@ interface PackageInfo {
     is_disabled: boolean;
 }
 
-export function AppsSubTab() {
+interface AppsSubTabProps {
+    isTestRunning?: boolean;
+}
+
+export function AppsSubTab({ isTestRunning = false }: AppsSubTabProps) {
     const { t } = useTranslation();
     const { sessions, activeSessionId } = useTestSessions();
     const activeSession = sessions.find(s => s.runId === activeSessionId);
@@ -31,6 +36,8 @@ export function AppsSubTab() {
     const [search, setSearch] = useState("");
     const [showSystem, setShowSystem] = useState(false);
     const [sortBy, setSortBy] = useState<'name' | 'package'>('name');
+
+    // ... (rest of state)
 
     // Responsive State
     const containerRef = useRef<HTMLDivElement>(null);
@@ -47,7 +54,7 @@ export function AppsSubTab() {
         return () => observer.disconnect();
     }, []);
 
-    // Modal State
+    // ... (Modal State)
     const [modalConfig, setModalConfig] = useState<{
         isOpen: boolean;
         type: 'uninstall' | 'disable' | 'enable' | 'clear' | null;
@@ -78,8 +85,10 @@ export function AppsSubTab() {
     };
 
     useEffect(() => {
-        fetchPackages();
-    }, [activeDevice]);
+        if (!isTestRunning) {
+            fetchPackages();
+        }
+    }, [activeDevice, isTestRunning]); // Don't auto-fetch if test running, but let user manually refresh if they really want via button
 
     const friendlyNames = useMemo(() => calculateUniqueLabels(packages), [packages]);
 
@@ -203,7 +212,7 @@ export function AppsSubTab() {
                             className="p-1.5 hover:bg-surface-variant/50 text-on-surface-variant/80 rounded transition-colors"
                             title={t('apps.actions.refresh')}
                         >
-                            <RefreshCw size={14} className={clsx(loading && "animate-spin")} />
+                            {loading ? <ExpressiveLoading size="xsm" variant="circular" /> : <RefreshCw size={14} />}
                         </button>
                         <button
                             onClick={() => setSortBy(prev => prev === 'name' ? 'package' : 'name')}
@@ -233,7 +242,7 @@ export function AppsSubTab() {
                             value={search}
                             onChange={e => setSearch(e.target.value)}
                             placeholder={t('apps.search_placeholder', "Search packages...")}
-                            className="bg-surface border border-outline-variant/30 rounded px-8 py-1.5 text-xs text-on-surface/80 focus:outline-none focus:border-primary/50 w-64 transition-all"
+                            className="bg-surface border border-outline-variant/30 rounded-2xl px-8 py-1.5 text-xs text-on-surface/80 focus:outline-none focus:border-primary/50 w-64 transition-all"
                         />
                     </div>
                 ) : null}
@@ -243,6 +252,7 @@ export function AppsSubTab() {
                             onClick={handleInstall}
                             variant="ghost"
                             size="sm"
+                            disabled={isTestRunning}
                             className="bg-on-success-container/10/10 hover:bg-on-success-container/10/20 text-success border border-on-success-container/10/20"
                             title={t('apps.actions.install')}
                             leftIcon={<Upload size={14} />}
@@ -261,9 +271,20 @@ export function AppsSubTab() {
                         <span className="text-sm">{t('apps.no_device', "No device selected")}</span>
                     </div>
                 ) : filtered.length === 0 ? (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-on-surface-variant/80 gap-2">
-                        <Package size={32} className="opacity-20" />
-                        <span className="text-sm">{loading ? t('common.loading', "Loading...") : t('apps.no_packages', "No packages found")}</span>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-on-surface-variant/80 text-sm">
+                        {loading ? (
+                            <ExpressiveLoading size="lg" variant="circular" className="mb-2" />
+                        ) : (
+                            <Package size={32} className="opacity-20 mb-2" />
+                        )}
+                        <p>
+                            {loading
+                                ? t('common.loading', "Loading...")
+                                : isTestRunning
+                                    ? t('apps.status.paused_test', "Apps refresh paused during test")
+                                    : t('apps.no_packages', "No packages found")
+                            }
+                        </p>
                     </div>
                 ) : (
                     <Virtuoso
@@ -272,7 +293,7 @@ export function AppsSubTab() {
                         itemContent={(_index, pkg) => (
                             <div className="px-3 py-2 border-b border-outline-variant/30 hover:bg-surface-variant/20 group flex items-center gap-3">
                                 <div className={clsx(
-                                    "p-2 rounded-lg shrink-0",
+                                    "p-2 rounded-2xl shrink-0",
                                     pkg.is_system ? "bg-tertiary-container text-on-tertiary-container" : "bg-primary-container text-on-primary-container"
                                 )}>
                                     <Package size={16} />

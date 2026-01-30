@@ -12,6 +12,7 @@ import { TabBar } from "@/components/organisms/TabBar";
 import { WarningModal } from "@/components/organisms/WarningModal";
 import { feedback } from "@/lib/feedback";
 import { Button } from "@/components/atoms/Button";
+import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 
 interface TestsSubTabProps {
     selectedDevices: string[];
@@ -271,6 +272,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                 </div>
 
                 <TabBar
+                    layoutId="tests-sub-tab"
                     tabs={tabs}
                     activeId={mode}
                     onChange={(id) => { setMode(id as SelectionMode); setSelectedPath(""); }}
@@ -301,10 +303,9 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                                 variant="primary"
                                 onClick={() => handleRun()}
                                 disabled={!selectedPath || isLaunching}
-                                isLoading={isLaunching}
                                 title={mode === 'folder' ? t('tests.run_all') : t('tests.run_selected')}
                                 className="w-full py-6 font-bold shadow-primary/20"
-                                leftIcon={!isLaunching ? <Play size={18} fill="currentColor" /> : undefined}
+                                leftIcon={!isLaunching ? <Play size={18} fill="currentColor" /> : <ExpressiveLoading size="sm" variant="circular" />}
                             >
                                 {!isNarrow && (
                                     <span>

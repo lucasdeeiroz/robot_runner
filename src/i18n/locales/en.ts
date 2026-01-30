@@ -65,7 +65,8 @@ export const en = {
             no_packages: "No packages found",
             status: {
                 installing: "Installing APK...",
-                disabled_badge: "Disabled"
+                disabled_badge: "Disabled",
+                paused_test: "App list refresh paused during test"
             },
             success: {
                 uninstalled: "Package {{pkg}} uninstalled successfully",
@@ -256,7 +257,8 @@ export const en = {
                 fetching: "Fetching device state...",
                 ready: "Ready",
                 loading: "Loading...",
-                no_screenshot: "No screenshot"
+                no_screenshot: "No screenshot",
+                paused_test: "Inspector disabled during test"
             },
             properties: "Node Properties",
             select_element: "Select an element on the screenshot",
@@ -286,6 +288,7 @@ export const en = {
                 app_not_running: "App not running: {{pkg}}"
             },
             status: {
+                paused_test: "Logcat paused during test",
                 waiting: "Waiting for logs...",
                 empty: "No logs captured"
             },
@@ -324,7 +327,10 @@ export const en = {
             device_stats: "Device Performance",
             app_stats: "App Performance",
             auto: "Auto",
-            na: "N/A"
+            na: "N/A",
+            status: {
+                paused_test: "Performance monitoring paused during test"
+            }
         },
         run_tab: {
             launcher: "Launcher",

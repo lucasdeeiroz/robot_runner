@@ -10,6 +10,7 @@ import { Button } from "@/components/atoms/Button";
 
 interface CommandsSubTabProps {
     selectedDevice: string;
+    isTestRunning?: boolean;
 }
 
 interface SavedCommand {
@@ -18,7 +19,7 @@ interface SavedCommand {
     cmd: string;
 }
 
-export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
+export function CommandsSubTab({ selectedDevice, isTestRunning = false }: CommandsSubTabProps) {
     const { t } = useTranslation();
     const [command, setCommand] = useState("");
     const [history, setHistory] = useState<string[]>([]);
@@ -189,8 +190,13 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
             />
 
             {/* Console Output */}
-            <div className="flex-1 bg-surface text-on-surface/50 font-mono text-xs rounded-lg border border-outline-variant/30 p-4 overflow-y-auto on-primaryspace-pre-wrap">
-                {history.length === 0 && <span className="opacity-30">{t('commands.waiting')}</span>}
+            <div className="relative flex-1 bg-surface text-on-surface/50 font-mono text-xs rounded-2xl border border-outline-variant/30 p-4 overflow-y-auto on-primaryspace-pre-wrap">
+                {history.length === 0 && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-on-surface-variant/80 font-sans text-sm">
+                        <Terminal size={32} className="opacity-20 mb-2" />
+                        <p>{isTestRunning ? t('commands.status.test_running', "Test execution in progress") : t('commands.waiting')}</p>
+                    </div>
+                )}
                 {history.map((line, i) => (
                     <div key={i} className="text-on-surface/80 on-primaryspace-pre-wrap break-all">
                         {line.startsWith('>') ? <span className="text-primary font-bold">{line}</span> : line}
@@ -207,8 +213,8 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
                         <button
                             key={action.label}
                             onClick={() => executeCommand(action.cmd, action.label)}
-                            disabled={isExecuting}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-surface-variant/30 hover:bg-outline-variant rounded-md text-xs font-medium transition-colors border border-outline-variant/30 disabled:opacity-50"
+                            disabled={isExecuting || isTestRunning}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-surface-variant/30 hover:bg-outline-variant rounded-2xl text-xs font-medium transition-colors border border-outline-variant/30 disabled:opacity-50"
                         >
                             {action.icon}
                             {action.label}
@@ -223,11 +229,12 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
                         {savedCommands.map(saved => (
                             <div
                                 key={saved.id}
-                                className="group flex items-center gap-1 bg-warning-container/50 border border-warning/20 rounded-md px-1 pr-2 overflow-hidden"
+                                className="group flex items-center gap-1 bg-warning-container/50 border border-warning/20 rounded-2xl px-1 pr-2 overflow-hidden"
                             >
                                 <button
                                     onClick={() => setCommand(saved.cmd)} // Fill input
-                                    className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-on-warning-container hover:text-on-warning-container/50 transition-colors"
+                                    disabled={isTestRunning}
+                                    className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-on-warning-container hover:text-on-warning-container/50 transition-colors disabled:opacity-50"
                                     title={saved.cmd}
                                 >
                                     <Star size={12} className="fill-warning/40 text-warning-container/60" />
@@ -248,7 +255,7 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
 
             {/* Input Line */}
             <div className="flex gap-2">
-                <div className="flex-1 flex items-center gap-2 bg-surface p-2 border-t border-outline-variant/30 rounded-lg">
+                <div className="flex-1 flex items-center gap-2 bg-surface p-2 border-t border-outline-variant/30 rounded-2xl">
                     <Terminal size={18} className="text-on-surface-variant/80" />
                     <input
                         type="text"
@@ -265,7 +272,7 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
                 <button
                     onClick={openSaveModal}
                     disabled={!command.trim() || isExecuting}
-                    className="px-3 bg-surface-variant/30 hover:bg-outline-variant text-on-surface-variant/80 rounded-lg transition-colors border border-outline-variant/30 disabled:opacity-50"
+                    className="px-3 bg-surface-variant/30 hover:bg-outline-variant text-on-surface-variant/80 rounded-2xl transition-colors border border-outline-variant/30 disabled:opacity-50"
                     title={t('commands.actions.save')}
                 >
                     <Save size={18} />
@@ -282,7 +289,7 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
                 ) : (
                     <Button
                         onClick={handleSend}
-                        disabled={!command.trim()}
+                        disabled={!command.trim() || isTestRunning}
                         variant="primary"
                     >
                         <Send size={18} />
@@ -306,7 +313,7 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
                             value={saveLabel}
                             onChange={(e) => setSaveLabel(e.target.value)}
                             placeholder={t('commands.modal.placeholder')}
-                            className="w-full px-3 py-2 bg-on-primary border border-outline-variant/30 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                            className="w-full px-3 py-2 bg-on-primary border border-outline-variant/30 rounded-2xl focus:ring-2 focus:ring-primary outline-none"
                             autoFocus
                         />
                     </div>
@@ -314,21 +321,21 @@ export function CommandsSubTab({ selectedDevice }: CommandsSubTabProps) {
                         <label className="block text-sm font-medium text-on-surface-variant/80 mb-1">
                             {t('commands.modal.command')}
                         </label>
-                        <div className="px-3 py-2 bg-surface-variant/30 rounded-lg font-mono text-sm text-on-surface-variant/80 break-all border border-outline-variant">
+                        <div className="px-3 py-2 bg-surface-variant/30 rounded-2xl font-mono text-sm text-on-surface-variant/80 break-all border border-outline-variant">
                             {command}
                         </div>
                     </div>
                     <div className="flex justify-end gap-3 pt-4">
                         <button
                             onClick={() => setIsSaveModalOpen(false)}
-                            className="px-4 py-2 text-sm font-medium text-on-surface-variant/80 hover:bg-surface-variant/30 rounded-lg transition-colors"
+                            className="px-4 py-2 text-sm font-medium text-on-surface-variant/80 hover:bg-surface-variant/30 rounded-2xl transition-colors"
                         >
                             {t('commands.modal.cancel')}
                         </button>
                         <button
                             onClick={confirmSaveCommand}
                             disabled={!saveLabel.trim()}
-                            className="px-4 py-2 text-sm font-medium bg-primary text-on-primary hover:opacity-90 rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="px-4 py-2 text-sm font-medium bg-primary text-on-primary hover:opacity-90 rounded-2xl shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {t('commands.modal.save')}
                         </button>

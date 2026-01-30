@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { useSettings } from "@/lib/settings";
 import { HistoryCharts } from "../organisms/HistoryCharts";
-import { XCircle, FileText, Folder, Calendar, RefreshCw, ChevronDown, ChevronRight, CheckCircle, Clock, PieChart, Search } from 'lucide-react';
+import { XCircle, FileText, Folder, Calendar, ChevronDown, ChevronRight, CheckCircle, Clock, PieChart, Search, RefreshCw } from 'lucide-react';
 import clsx from 'clsx';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from "react-i18next";
@@ -10,6 +11,7 @@ import { Section } from "@/components/organisms/Section";
 import { AndroidVersionPill } from "@/components/atoms/AndroidVersionPill";
 import { Input } from "@/components/atoms/Input";
 import { Select } from "@/components/atoms/Select";
+import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 
 interface TestLog {
     path: string;
@@ -76,7 +78,11 @@ export function HistorySubTab() {
     }, []);
 
     useEffect(() => {
-        loadHistory();
+        // Delay initial load slightly to allow tab transition animation to finish
+        const timer = setTimeout(() => {
+            loadHistory();
+        }, 350);
+        return () => clearTimeout(timer);
     }, [settings.paths.logs]);
 
     const loadHistory = async (refresh: boolean = false) => {
@@ -166,14 +172,14 @@ export function HistorySubTab() {
                 {groupBy !== 'none' && (
                     <button
                         onClick={() => toggleGroup(group)}
-                        className="flex items-center gap-2 w-full text-left bg-surface-variant/30 px-3 py-2 rounded-lg hover:bg-outline-variant transition-colors sticky top-0 backdrop-blur-sm z-10"
+                        className="flex items-center gap-2 w-full text-left bg-surface-variant/30 px-3 py-2 rounded-2xl hover:bg-outline-variant transition-colors sticky top-0 backdrop-blur-sm z-10"
                     >
                         {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                         <span className="font-semibold text-sm text-on-surface-variant/80">
                             {group === 'PASS' ? <span className="text-on-success-container/10">{group}</span> :
                                 group === 'FAIL' ? <span className="text-error-container/80">{group}</span> : group}
                         </span>
-                        <span className="text-xs text-on-surface-variant/80 bg-outline-variant px-1.5 py-0.5 rounded-full">
+                        <span className="text-xs text-on-surface-variant/80 bg-outline-variant px-1.5 py-0.5 rounded-2xl">
                             {logs.length}
                         </span>
                     </button>
@@ -182,13 +188,13 @@ export function HistorySubTab() {
                 {isExpanded && (
                     <div className="space-y-3 pl-1">
                         {logs.map((log, i) => (
-                            <div key={i} className="flex flex-row items-center gap-4 p-4 bg-surface/50 border border-outline-variant/30 rounded-lg hover:border-primary/20 transition-colors shadow-sm">
+                            <div key={i} className="flex flex-row items-center gap-4 p-4 bg-surface/50 border border-outline-variant/30 rounded-2xl hover:border-primary/20 transition-colors shadow-sm">
                                 <div className="flex gap-4 items-start min-w-0 flex-1">
                                     <div className={clsx(
-                                        "w-10 h-10 rounded-full flex items-center justify-center shrink-0 mt-1",
+                                        "w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 mt-1",
                                         log.status === 'PASS'
-                                            ? "bg-success-container text-on-success-container"
-                                            : "bg-error-container text-on-error-container"
+                                            ? "bg-success/10 text-on-success-container"
+                                            : "bg-error/10 text-on-error-container"
                                     )}>
                                         {log.status === 'PASS' ? <CheckCircle size={20} /> : <XCircle size={20} />}
                                     </div>
@@ -196,13 +202,6 @@ export function HistorySubTab() {
                                         <div className="flex items-center gap-2 mb-1">
                                             <span className="font-semibold text-on-surface/80 truncate" title={decodeHtml(log.suite_name)}>
                                                 {decodeHtml(log.suite_name)}
-                                            </span>
-                                            <span className={clsx("text-xs font-bold px-1.5 py-0.5 rounded border",
-                                                log.status === 'PASS'
-                                                    ? "bg-success-container text-on-success-container border-success-container/20"
-                                                    : "bg-error-container text-on-error-container border-error-container/20"
-                                            )}>
-                                                {log.status}
                                             </span>
                                         </div>
 
@@ -224,17 +223,26 @@ export function HistorySubTab() {
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-2 shrink-0 border-l border-outline-variant/30 pl-3">
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <span className={clsx("text-xs font-bold px-1.5 py-0.5 rounded border",
+                                        log.status === 'PASS'
+                                            ? "bg-success/10 text-on-success-container border-success/20"
+                                            : "bg-error/10 text-on-error-container border-error/20"
+                                    )}>
+                                        {log.status}
+                                    </span>
+                                    <div className="border border-outline-variant/30 py-2">
+                                    </div>
                                     <button
                                         onClick={() => openLog(log.log_html_path)}
-                                        className="flex items-center gap-2 px-3 py-1.5 bg-surface-variant/30 hover:bg-primary/10 text-on-surface-variant/80 hover:text-primary rounded-md text-xs font-medium transition-colors"
+                                        className="flex items-center gap-2 px-3 py-1.5 bg-surface-variant/30 hover:bg-primary/10 text-on-surface-variant/80 hover:text-primary rounded-2xl text-xs font-medium transition-colors"
                                         title={isHistoryNarrow ? t('tests_page.report') : log.log_html_path}
                                     >
                                         <FileText size={14} /> {!isHistoryNarrow && t('tests_page.report')}
                                     </button>
                                     <button
                                         onClick={() => openLog(log.path)}
-                                        className="flex items-center justify-center p-1.5 bg-surface-variant/30 hover:bg-outline-variant text-on-surface-variant/80 rounded-md transition-colors"
+                                        className="flex items-center justify-center p-1.5 bg-surface-variant/30 hover:bg-outline-variant text-on-surface-variant/80 rounded-2xl transition-colors"
                                         title={t('tests_page.open_folder')}
                                     >
                                         <Folder size={14} />
@@ -249,7 +257,7 @@ export function HistorySubTab() {
     };
 
     return (
-        <div ref={historyContainerRef} className="flex-1 min-h-0 bg-surface border border-outline-variant/30 rounded-xl p-4 overflow-hidden relative flex flex-col">
+        <div ref={historyContainerRef} className="flex-1 min-h-0 bg-surface border border-outline-variant/30 rounded-2xl p-4 overflow-hidden relative flex flex-col">
             <Section
                 title={t('tests_page.history')}
                 icon={Calendar}
@@ -258,10 +266,10 @@ export function HistorySubTab() {
                 status={
                     <button
                         onClick={() => loadHistory(true)}
-                        className="p-1.5 text-on-surface-variant/80 hover:bg-surface-variant/30 rounded-md transition-colors"
+                        className="p-1.5 text-on-surface-variant/80 hover:bg-surface-variant/30 rounded-2xl transition-colors"
                         title={t('tests_page.actions.refresh')}
                     >
-                        <RefreshCw size={16} className={loadingHistory ? "animate-spin" : ""} />
+                        {loadingHistory ? <ExpressiveLoading size="xsm" variant="circular" /> : <RefreshCw size={16} />}
                     </button>
                 }
                 menus={!isHistoryNarrow ? (
@@ -307,7 +315,7 @@ export function HistorySubTab() {
                     <button
                         onClick={() => setShowCharts(!showCharts)}
                         className={clsx(
-                            "px-3 py-1.5 rounded-md flex items-center gap-2 text-sm font-medium transition-colors",
+                            "px-3 py-1.5 rounded-2xl flex items-center gap-2 text-sm font-medium transition-colors",
                             showCharts
                                 ? "bg-primary/10 text-primary"
                                 : "bg-surface-variant/30 text-on-surface-variant/80 hover:bg-outline-variant"
@@ -320,11 +328,17 @@ export function HistorySubTab() {
             />
 
             <div className="flex-1 overflow-y-auto pr-2">
-                {showCharts && (
-                    <HistoryCharts logs={filteredHistory} groupBy={groupBy} />
-                )}
+                <AnimatePresence>
+                    {showCharts && (
+                        <HistoryCharts logs={filteredHistory} groupBy={groupBy} />
+                    )}
+                </AnimatePresence>
 
-                {loadingHistory && <div className="text-center p-4 text-on-surface-variant/80">{t('tests_page.loading')}</div>}
+                {loadingHistory && (
+                    <div className="flex justify-center p-4">
+                        <ExpressiveLoading size="md" variant="circular" />
+                    </div>
+                )}
 
                 {!loadingHistory && filteredHistory.length === 0 && (
                     <div className="h-full flex flex-col items-center justify-center text-on-surface/80">

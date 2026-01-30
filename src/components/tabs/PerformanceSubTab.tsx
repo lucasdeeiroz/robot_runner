@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { Activity, Cpu, Battery, CircuitBoard, RefreshCw, Play, Square, Package as PackageIcon, Eye } from "lucide-react";
+import { Activity, Cpu, Battery, CircuitBoard, Play, Square, Package as PackageIcon, Eye, RefreshCw } from "lucide-react";
 import clsx from "clsx";
 import { useSettings } from "@/lib/settings";
 
@@ -9,6 +9,7 @@ import { Section } from "@/components/organisms/Section";
 import { DeviceStats } from "@/hooks/usePerformanceRecorder";
 import { Button } from "@/components/atoms/Button";
 import { Select } from "@/components/atoms/Select";
+import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 
 interface PerformanceSubTabProps {
     selectedDevice: string;
@@ -22,8 +23,10 @@ interface PerformanceSubTabProps {
     toggleRecording: () => void;
     lastSaved: string | null;
     setLastSaved: (val: string | null) => void;
+    isTestRunning?: boolean;
 
     onRefresh: () => void;
+    isLoading?: boolean;
 }
 
 export function PerformanceSubTab({
@@ -38,8 +41,10 @@ export function PerformanceSubTab({
     toggleRecording,
     lastSaved,
     setLastSaved,
+    isTestRunning = false,
 
-    onRefresh
+    onRefresh,
+    isLoading = false
 }: PerformanceSubTabProps) {
     const { t } = useTranslation();
     const { settings } = useSettings();
@@ -104,7 +109,11 @@ export function PerformanceSubTab({
                             className="p-1.5 hover:bg-surface-variant/30 rounded transition-all active:scale-95"
                             title={t('performance.refresh')}
                         >
-                            <RefreshCw size={16} className="text-on-surface-variant/80" />
+                            {isLoading ? (
+                                <ExpressiveLoading size="xsm" variant="circular" className="text-on-surface-variant/80" />
+                            ) : (
+                                <RefreshCw size={16} className="text-on-surface-variant/80" />
+                            )}
                         </button>
                         <button
                             onClick={() => setAutoRefresh(!autoRefresh)}
@@ -140,6 +149,7 @@ export function PerformanceSubTab({
                             onClick={toggleRecording}
                             variant={isRecording ? "danger" : "secondary"}
                             size="sm"
+                            disabled={isTestRunning}
                             leftIcon={isRecording ? <Square size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
                             title={isRecording ? t('performance.stop_record') : t('performance.start_record')}
                         >
@@ -150,7 +160,7 @@ export function PerformanceSubTab({
             >
 
                 {error && (
-                    <div className="bg-error-container/10 text-error-container/80 p-3 rounded-md text-sm mb-4 border border-error-container">
+                    <div className="bg-error-container/10 text-error-container/80 p-3 rounded-2xl text-sm mb-4 border border-error-container">
                         {error}
                     </div>
                 )}
@@ -163,8 +173,14 @@ export function PerformanceSubTab({
                     onClose={() => setLastSaved(null)}
                 />
 
-                {!stats ? (
-                    <div className="flex-1 flex flex-col items-center justify-center text-on-surface/80 animate-pulse">
+                {(isTestRunning && !stats) ? (
+                    <div className="absolute inset-0 flex-1 flex flex-col items-center justify-center text-on-surface-variant/80 text-sm">
+                        <Activity size={32} className="opacity-20 mb-2" />
+                        <p>{t('performance.status.paused_test', "Performance monitoring paused during test")}</p>
+                    </div>
+                ) : !stats ? (
+                    <div className="flex-1 flex flex-col items-center justify-center text-on-surface/80">
+                        <ExpressiveLoading size="lg" variant="circular" className="mb-2" />
                         <p>{t('performance.loading')}</p>
                     </div>
                 ) : (
@@ -263,7 +279,7 @@ export function PerformanceSubTab({
 
 function Card({ title, icon, children }: { title: string, icon: React.ReactNode, children: React.ReactNode }) {
     return (
-        <div className="bg-surface/50 border border-outline-variant/30 rounded-xl p-5 shadow-sm">
+        <div className="bg-surface/50 border border-outline-variant/30 rounded-2xl p-5 shadow-sm">
             <div className="flex items-center justify-between mb-4 opacity-80">
                 <span className="font-medium text-on-surface-variant/80">{title}</span>
                 {icon}
@@ -276,9 +292,9 @@ function Card({ title, icon, children }: { title: string, icon: React.ReactNode,
 function ProgressBar({ value, max, color }: { value: number, max: number, color: string }) {
     const percentage = Math.min(100, Math.max(0, (value / max) * 100));
     return (
-        <div className="w-full bg-outline-variant rounded-full h-2.5 mt-4 overflow-hidden">
+        <div className="w-full bg-outline-variant rounded-2xl h-2.5 mt-4 overflow-hidden">
             <div
-                className={clsx("h-2.5 rounded-full transition-all duration-500 ease-out", color)}
+                className={clsx("h-2.5 rounded-2xl transition-all duration-500 ease-out", color)}
                 style={{ width: `${percentage}%` }}
             ></div>
         </div>

@@ -21,13 +21,14 @@ export interface DeviceStats {
     app_stats?: AppStats;
 }
 
-export function usePerformanceRecorder(selectedDevice: string, isActive: boolean) {
+export function usePerformanceRecorder(selectedDevice: string, isActive: boolean, isTestRunning: boolean = false, initialAutoRefresh: boolean = true) {
     const { t } = useTranslation();
     const { settings } = useSettings();
     const [stats, setStats] = useState<DeviceStats | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [autoRefresh, setAutoRefresh] = useState(true);
+    const [autoRefresh, setAutoRefresh] = useState(initialAutoRefresh);
     const [selectedPackage, setSelectedPackage] = useState<string>("");
+    const [isLoading, setIsLoading] = useState(false);
 
     // Recording State
     const [lastSaved, setLastSaved] = useState<string | null>(null);
@@ -37,17 +38,30 @@ export function usePerformanceRecorder(selectedDevice: string, isActive: boolean
     // Fetch Stats Loop
     useEffect(() => {
         let interval: NodeJS.Timeout;
-        // Update if active AND auto-refresh is on, OR if recording (regardless of visibility)
-        const shouldUpdate = selectedDevice && ((autoRefresh && isActive) || isRecording);
+        // Update if active AND auto-refresh is on AND test is NOT running, OR if recording
+        const shouldUpdate = selectedDevice && ((autoRefresh && isActive && !isTestRunning) || isRecording);
+
+        // If a test is running, we strictly pause auto-polling.
+        const pollInterval = 2000;
 
         if (shouldUpdate) {
             fetchStats();
-            interval = setInterval(fetchStats, 2000); // Poll every 2s
+            interval = setInterval(fetchStats, pollInterval);
         }
         return () => clearInterval(interval);
-    }, [selectedDevice, autoRefresh, selectedPackage, isActive, isRecording]);
+    }, [selectedDevice, autoRefresh, selectedPackage, isActive, isRecording, isTestRunning]);
+
+    // Clear stats when test starts to show "Paused" state
+    useEffect(() => {
+        if (isTestRunning) {
+            setStats(null);
+        }
+    }, [isTestRunning]);
 
     const fetchStats = async () => {
+        if (isLoading) return; // Prevent stacking requests
+
+        setIsLoading(true);
         try {
             const data = await invoke<DeviceStats>('get_device_stats', {
                 device: selectedDevice,
@@ -56,8 +70,12 @@ export function usePerformanceRecorder(selectedDevice: string, isActive: boolean
             setStats(data);
             setError(null);
         } catch (e) {
-            feedback.toast.error("performance.fetch_error", e);
+            if (!isTestRunning) { // Suppress errors during tests to avoid spamming the UI if ADB is busy
+                feedback.toast.error("performance.fetch_error", e);
+            }
             setError(t('performance.error'));
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -132,6 +150,7 @@ export function usePerformanceRecorder(selectedDevice: string, isActive: boolean
         toggleRecording,
         lastSaved,
         setLastSaved,
-        fetchStats
+        fetchStats,
+        isLoading
     };
 }

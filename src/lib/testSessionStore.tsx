@@ -178,7 +178,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     deviceName,
                     testPath: 'Toolbox',
                     logs: [],
-                    status: 'running',
+                    status: 'stopped',
                     deviceModel,
                     androidVersion
                 }
@@ -303,10 +303,26 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
     }, [sessions, settings, addSession]);
 
     const clearSession = useCallback((runId: string) => {
-        setSessions(prev => prev.filter(s => s.runId !== runId));
-        if (activeSessionId === runId) {
-            setActiveSessionId('dashboard');
-        }
+        setSessions(prev => {
+            // Find session-to-be-removed index
+            const index = prev.findIndex(s => s.runId === runId);
+            const newSessions = prev.filter(s => s.runId !== runId);
+
+            // If we are closing the ACTIVE session, switch to the left one
+            if (activeSessionId === runId) {
+                if (index > 0) {
+                    // Switch to the session "to the left"
+                    const prevSession = prev[index - 1];
+                    // We must use setTimeout to avoid state update collision/warning if strictly necessary, 
+                    // but usually safe. To be safe with the activeSessionId dependency:
+                    setTimeout(() => setActiveSessionId(prevSession.runId), 0);
+                } else {
+                    // No left session? Switch to Dashboard (History)
+                    setTimeout(() => setActiveSessionId('dashboard'), 0);
+                }
+            }
+            return newSessions;
+        });
     }, [activeSessionId]);
 
     const setSessionActiveTool = useCallback((runId: string, tool: string) => {
