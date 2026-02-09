@@ -1,6 +1,7 @@
 import ttkbootstrap as ttk
 from ttkbootstrap.scrolled import ScrolledText
 from ttkbootstrap.constants import BOTH, END, YES, WORD, DISABLED, LEFT, X, W
+from ttkbootstrap.constants import BOTH, END, YES, WORD, DISABLED, LEFT, X, W
 from ttkbootstrap.tooltip import ToolTip
 
 from src.locales.i18n import gettext as translate
@@ -17,6 +18,7 @@ class AboutTabPage(ttk.Frame):
     def _setup_widgets(self):
         about_frame = ttk.Frame(self)
         about_frame.pack(fill=BOTH, expand=YES, padx=10, pady=5)
+        about_frame.pack(fill=BOTH, expand=YES, padx=10, pady=5)
 
         title_label = ttk.Label(about_frame, text=f"{translate("about_title")} v{__version__}", font="-size 24 -weight bold")
         title_label.pack(pady=(0, 10))
@@ -32,7 +34,9 @@ class AboutTabPage(ttk.Frame):
         ttk.Label(about_frame, text=translate("colaborators_text"), justify=LEFT).pack(anchor=W, fill=X)
 
         ttk.Label(about_frame, text=translate("license"), font="-weight bold").pack(anchor=W, pady=(20, 5))
+        ttk.Label(about_frame, text=translate("license"), font="-weight bold").pack(anchor=W, pady=(20, 5))
         license_frame = ttk.Frame(about_frame, padding=0, borderwidth=0)
+        license_frame.pack(fill=BOTH, expand=YES)
         license_frame.pack(fill=BOTH, expand=YES)
         
         license_text_widget = ScrolledText(license_frame, wrap=WORD, autohide=False)

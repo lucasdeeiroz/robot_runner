@@ -6,6 +6,7 @@ import platform
 from tkinter import messagebox
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import BOTH, YES, WORD, DISABLED, RIGHT, BOTTOM, X, W
+from ttkbootstrap.constants import BOTH, YES, WORD, DISABLED, RIGHT, BOTTOM, X, W
 from ttkbootstrap.scrolled import ScrolledText
 from ttkbootstrap.tooltip import ToolTip
 
