@@ -127,6 +127,7 @@ class DeviceTab(ttk.Frame):
     def _setup_widgets(self):
         """Sets up the 3-pane widget layout for the window."""
         self.main_paned_window = ttk.Panedwindow(self, orient=HORIZONTAL)
+        self.main_paned_window = ttk.Panedwindow(self, orient=HORIZONTAL)
         self.main_paned_window.pack(fill=BOTH, expand=YES)
 
         # --- Status Bar ---
@@ -137,6 +138,7 @@ class DeviceTab(ttk.Frame):
         self.status_label.pack(side=LEFT, fill=X, expand=YES)
         # --- 1. Left Pane (Outputs) ---
         self.left_pane_container = ttk.Frame(self.main_paned_window, padding=5)
+        self.output_paned_window = ttk.Panedwindow(self.left_pane_container, orient=VERTICAL)
         self.output_paned_window = ttk.Panedwindow(self.left_pane_container, orient=VERTICAL)
         self.placeholder_frame = ttk.Frame(self.left_pane_container)
         placeholder_label = ttk.Label(self.placeholder_frame, text=translate("select_output_placeholder"), justify=CENTER, anchor=CENTER, wraplength=300)
@@ -835,6 +837,27 @@ class DeviceTab(ttk.Frame):
 
                 if fallback_needed:
                     self.package_log_output_queue.put(f"--- {translate('logcat_fallback_info', method='--app')} ---\n")
+                fallback_needed = False
+                
+                # Monitor output for errors or valid logs
+                while not self.stop_package_log_event.is_set():
+                    line = process.stdout.readline()
+                    if not line:
+                        if process.poll() is not None: break
+                        continue
+                    
+                    # Check for immediate failure indicating unsupported flag
+                    if "unrecognized option" in line.lower() or "unknown option" in line.lower():
+                        fallback_needed = True
+                        break
+                    
+                    self.package_log_output_queue.put(line)
+
+                # Clean up if we stopped reading (either fallback or user stop)
+                if process.poll() is None: process.terminate()
+
+                if fallback_needed:
+                    self.package_log_output_queue.put(f"--- {translate('logcat_fallback_info', method='--app')} ---\n")
                     
                     # 2. Fallback to the classic PID-based method.
                     pid_cmd = ["adb", "-s", self.udid, "shell", "pidof", "-s", package_name]
@@ -854,6 +877,12 @@ class DeviceTab(ttk.Frame):
                             self.package_log_output_queue.put(line)
                             
                         if process.poll() is None: process.terminate()
+
+                    else:
+                        # 3. If PID also fails, stop the operation.
+                        self.package_log_output_queue.put(f"--- {translate('logcat_pid_error', package_name=package_name)} ---\n")
+                        self.after(0, self._stop_package_logging)
+                        return
 
                     else:
                         # 3. If PID also fails, stop the operation.

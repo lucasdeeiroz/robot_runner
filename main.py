@@ -849,7 +849,6 @@ class RobotRunnerApp:
         thread = threading.Thread(target=self._appium_server_handler, args=(silent,))
         thread.daemon = True
         thread.start()
-
     def _appium_server_handler(self, silent: bool):
         """
         The core handler for running the Appium server process and piping its output.

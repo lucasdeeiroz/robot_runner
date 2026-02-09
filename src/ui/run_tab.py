@@ -43,30 +43,6 @@ class RunTabPage(ttk.Frame):
         # Ensure the common_adb_commands attribute exists on the app object to prevent AttributeError
         if not hasattr(self.app, 'common_adb_commands'):
             self.app.common_adb_commands = []
-            
-        self.parent_app = self.app # Alias for compatibility with existing code
-
-        # --- Inspector Attributes ---
-        self.udid = None # Current device UDID for inspector
-        self.aspect_ratio = None
-        self.is_inspecting = False
-        self.inspector_is_visible = False
-        self.elements_data_map = {}
-        self.is_inspection_running = False
-        self.current_selected_element_data = None
-        self.auto_refresh_thread = None
-        self.inspector_auto_refresh_var = ttk.BooleanVar(value=False)
-        self.stop_auto_refresh_event = threading.Event()
-        self.last_ui_dump_hash = None
-        self.all_elements_list: List[Dict] = []
-        self.current_dump_path: Optional[Path] = None
-        self.xpath_search_var = ttk.StringVar()
-        
-        self.filter_by_resource_id_var = ttk.BooleanVar(value=True)
-        self.filter_by_text_var = ttk.BooleanVar(value=True)
-        self.filter_by_content_desc_var = ttk.BooleanVar(value=True)
-        self.filter_by_scrollview_var = ttk.BooleanVar(value=True)
-        self.filter_by_other_class_var = ttk.BooleanVar(value=False)
 
         self.remote_conn_mode_var = tk.StringVar(value="host")
         self.scrcpy_output_queue = queue.Queue() # Initialize the queue
