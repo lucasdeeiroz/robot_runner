@@ -32,7 +32,10 @@ export const TabBar = ({ tabs, activeId, onChange, menus, actions, className, or
                 onChange={onChange}
                 variant={variant}
                 transparent={true} // Tabs is transparent because TabBar handles the container
-                className={variant === 'underline' && orientation === 'horizontal' ? "border-b-0" : ""}
+                className={twMerge(
+                    variant === 'underline' && orientation === 'horizontal' ? "border-b-0" : "",
+                    orientation === 'horizontal' ? "flex-1 min-w-0 overflow-x-auto no-scrollbar" : ""
+                )}
                 layoutId={layoutId} // Pass implementation
             />
 

@@ -153,11 +153,11 @@ export function TestsPage() {
                             label: (
                                 <div className="flex items-center gap-2">
                                     {/* Status Dot */}
-                                    {s.type === 'toolbox' && <span className="w-2.5 h-2.5 rounded-2xl bg-on-surface/10" />}
-                                    {s.type === 'test' && s.status === 'running' && <span className="w-2.5 h-2.5 rounded-2xl bg-orange-500 animate-pulse" />}
-                                    {s.type === 'test' && s.status === 'finished' && isSuccess && <span className="w-2.5 h-2.5 rounded-2xl bg-success" />}
-                                    {s.type === 'test' && isFailed && <span className="w-2.5 h-2.5 rounded-2xl bg-error" />}
-                                    {s.type === 'test' && s.status === 'error' && <span className="w-2.5 h-2.5 rounded-2xl bg-error" />}
+                                    {s.type === 'toolbox' && <span className="w-2.5 h-2.5 rounded-full bg-on-surface/10" />}
+                                    {s.type === 'test' && s.status === 'running' && <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse" />}
+                                    {s.type === 'test' && s.status === 'finished' && isSuccess && <span className="w-2.5 h-2.5 rounded-full bg-success" />}
+                                    {s.type === 'test' && isFailed && <span className="w-2.5 h-2.5 rounded-full bg-error" />}
+                                    {s.type === 'test' && s.status === 'error' && <span className="w-2.5 h-2.5 rounded-full bg-error" />}
 
                                     <span>{s.deviceModel || s.deviceName}</span>
                                     <AndroidVersionPill version={s.androidVersion} />

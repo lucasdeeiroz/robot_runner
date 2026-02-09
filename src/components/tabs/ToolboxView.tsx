@@ -41,19 +41,23 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
 
     // Responsive State
     const containerRef = useRef<HTMLDivElement>(null);
-    const [isNarrow, setIsNarrow] = useState(false);
+    const [containerWidth, setContainerWidth] = useState(1000);
 
     useEffect(() => {
         if (!containerRef.current) return;
         const observer = new ResizeObserver((entries) => {
             for (const entry of entries) {
-                // If container width < 600px, hide labels
-                setIsNarrow(entry.contentRect.width < 600);
+                setContainerWidth(entry.contentRect.width);
             }
         });
         observer.observe(containerRef.current);
         return () => observer.disconnect();
     }, []);
+
+    // Calculate isNarrow based on container width AND session type
+    // If running a test, we have big "Stop" / "Rerun" buttons, so we need more space (higher threshold)
+    const narrowThreshold = session.type === 'test' ? 1000 : 700;
+    const isNarrow = containerWidth < narrowThreshold;
 
     // If session type/run changes (recycling), switch to console
     // If session run changes (new test via recycling), switch to console

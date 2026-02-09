@@ -66,8 +66,9 @@ export const Tabs = ({
                         onClick={() => onChange(tab.id)}
                         className={twMerge(
                             itemBase,
-                            // Only apply flex-1 for horizontal pills to spread them
-                            variant === 'pills' && orientation === 'horizontal' && "flex-1 justify-center",
+                            // Only apply flex-1 for horizontal pills to spread them (Removed per user request for left-alignment)
+                            // variant === 'pills' && orientation === 'horizontal' && "flex-1 justify-center", // OLD
+                            variant === 'pills' && orientation === 'horizontal' && "justify-center",
                             isActive ? activeText : inactiveText,
                             // Vertical adjustments
                             orientation === 'vertical' && "justify-start w-full text-left",
