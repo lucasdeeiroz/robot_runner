@@ -7,6 +7,7 @@ import { ScenarioInput } from '@/components/tabs/dashboard/ScenarioInput';
 import { ScenarioEditor } from '@/components/tabs/dashboard/ScenarioEditor';
 import { ImageEditor } from '@/components/tabs/dashboard/ImageEditor';
 import { HistoryPanel } from '@/components/tabs/dashboard/HistoryPanel';
+import { MapperSubTab } from '@/components/tabs/dashboard/MapperSubTab';
 import { generateTestCases } from '@/lib/dashboard/generator';
 import clsx from 'clsx';
 import { TabItem } from '@/components/molecules/Tabs';
@@ -15,7 +16,11 @@ import { useSettings } from '@/lib/settings';
 import { generateRefinedTestCases } from '@/lib/dashboard/gemini';
 import { feedback } from '@/lib/feedback';
 
-export function DashboardPage() {
+interface DashboardPageProps {
+    onNavigate?: (page: string) => void;
+}
+
+export function DashboardPage({ onNavigate }: DashboardPageProps) {
     const { t } = useTranslation();
     const [activeTab, setActiveTab] = useState('scenarios');
     const [generatedContent, setGeneratedContent] = useState('');
@@ -52,7 +57,8 @@ export function DashboardPage() {
     const tabs: TabItem[] = [
         { id: 'scenarios', label: t('dashboard.tabs.scenarios', "Scenario Generator") },
         { id: 'images', label: t('dashboard.tabs.images', "Image Editor") },
-        { id: 'history', label: t('dashboard.tabs.history', "History") }
+        { id: 'history', label: t('dashboard.tabs.history', "History") },
+        { id: 'mapper', label: t('dashboard.tabs.mapper', "Mapper") }
     ];
 
     return (
@@ -99,6 +105,11 @@ export function DashboardPage() {
                 {/* HISTORY TAB */}
                 <div className={clsx("h-full", activeTab === 'history' ? "block" : "hidden")}>
                     <HistoryPanel />
+                </div>
+
+                {/* MAPPER TAB */}
+                <div className={clsx("h-full", activeTab === 'mapper' ? "block" : "hidden")}>
+                    <MapperSubTab isActive={activeTab === 'mapper'} onNavigate={onNavigate} />
                 </div>
             </div>
         </div>

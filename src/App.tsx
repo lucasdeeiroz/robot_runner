@@ -205,7 +205,7 @@ function App() {
                 transition={{ duration: 0.3, ease: [0.2, 0, 0, 1] }}
               >
                 {activePage === 'tests' && <TestsPage />}
-                {activePage === 'dashboard' && <DashboardPage />}
+                {activePage === 'dashboard' && <DashboardPage onNavigate={setActivePage} />}
                 {activePage === 'settings' && <SettingsPage />}
                 {activePage === 'about' && <AboutPage />}
 

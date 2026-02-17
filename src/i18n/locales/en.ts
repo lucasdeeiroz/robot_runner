@@ -210,7 +210,8 @@ export const en = {
             tabs: {
                 scenarios: "Scenario Generator",
                 images: "Image Editor",
-                history: "History"
+                history: "History",
+                mapper: "Mapper"
             },
             input: {
                 title: "Requirements",
@@ -358,6 +359,109 @@ export const en = {
             lines: "lines",
             no_logs: "No logs captured",
             select_device: "Select a device to view logs"
+        },
+        mapper: {
+            title: "Mapper",
+            empty: "Select a device to start mapping",
+            refresh: "Refresh Source",
+            properties: "Element Properties",
+            clear_selection: "Clear Selection",
+            section_title: "Screen Mapper",
+            screen_mapper: "Screen Mapper",
+            screen_settings: "Screen Settings",
+            saved_screens: "Saved Screens",
+            no_saved_maps: "No saved maps found",
+            items: "items",
+            elements_mapped_count: "{{count}} elements mapped",
+            elements_mapped: "elements mapped",
+            select_element: "Select an element on the screenshot",
+            types: {
+                button: "Button",
+                input: "Input",
+                text: "Text",
+                link: "Link",
+                toggle: "Toggle",
+                checkbox: "Checkbox",
+                image: "Image",
+                menu: "Menu",
+                scroll_view: "Scroll View",
+                tab: "Tab"
+            },
+            screen_types: {
+                screen: "Screen",
+                modal: "Modal",
+                tab: "Tab",
+                drawer: "Drawer"
+            },
+            modes: {
+                inspect: "Inspect Mode",
+                tap: "Tap Mode",
+                swipe: "Swipe Mode"
+            },
+            status: {
+                fetching: "Fetching device state...",
+                ready: "Ready",
+                loading: "Loading...",
+                no_screenshot: "No screenshot",
+                paused_test: "Mapper disabled during test"
+            },
+            nav: {
+                home: "Home",
+                back: "Back",
+                recents: "Recents"
+            },
+            attributes: {
+                copied: "Copied!",
+                xpath: "XPath",
+                resource_id: "Resource ID",
+                access_id: "Access ID",
+                identifiers: "Identifiers",
+                hierarchy: "Hierarchy"
+            },
+            input: {
+                element_type: "Element Type",
+                element_name: "Element Name",
+                navigates_to: "Navigates To (Optional)",
+                menu_options: "Menu Options (Comma separated)",
+                parent_screen: "Parent Screen"
+            },
+            placeholder: {
+                element_name: "e.g. Login Button",
+                navigates_to: "Screen Name",
+                menu_options: "Option 1, Option 2...",
+                parent_screen: "Parent Screen Name",
+                screen_name: "Screen Name (Unique)"
+            },
+            action: {
+                add: "Add Mapping",
+                update: "Update",
+                remove: "Remove",
+                save_screen: "Save Screen",
+                load: "Load",
+                new: "New",
+                discard: "Discard",
+                discard_desc: "Discard Screen",
+                delete: "Delete"
+            },
+            feedback: {
+                mapped: "Element mapped!",
+                updated: "Mapper Updated",
+                removed: "Element mapping removed",
+                empty_map: "No elements mapped yet",
+                saved: "Screen mapped successfully!",
+                loaded: "Screen map loaded",
+                new_screen: "Ready for new screen",
+                deleted: "Map deleted"
+            },
+            error: {
+                missing_name: "Please provide a name for the element",
+                missing_screen_name: "Please provide a Screen Name",
+                save_failed: "Failed to save screen map"
+            },
+            confirm: {
+                delete: "Are you sure you want to delete this map?",
+                discard: "Discard current changes?"
+            }
         },
         performance: {
             fetch_error: "Failed to fetch stats",

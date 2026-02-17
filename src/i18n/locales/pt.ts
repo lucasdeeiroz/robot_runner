@@ -213,7 +213,8 @@ export const pt = {
             tabs: {
                 scenarios: "Gerador de Cenários",
                 images: "Editor de Imagens",
-                history: "Histórico"
+                history: "Histórico",
+                mapper: "Mapeador"
             },
             input: {
                 title: "Requisitos",
@@ -361,6 +362,109 @@ export const pt = {
             lines: "linhas",
             no_logs: "Nenhum log capturado",
             select_device: "Selecione um dispositivo para ver logs"
+        },
+        mapper: {
+            title: "Mapeador",
+            empty: "Selecione um dispositivo para iniciar o mapeamento",
+            refresh: "Atualizar Fonte",
+            properties: "Propriedades do Elemento",
+            clear_selection: "Limpar Seleção",
+            section_title: "Mapeador de Tela",
+            screen_mapper: "Mapeador de Tela",
+            screen_settings: "Configurações da Tela",
+            saved_screens: "Telas Salvas",
+            no_saved_maps: "Nenhum mapa salvo encontrado",
+            items: "itens",
+            elements_mapped_count: "{{count}} elementos mapeados",
+            elements_mapped: "elementos mapeados",
+            select_element: "Selecione um elemento na captura de tela",
+            types: {
+                button: "Botão",
+                input: "Entrada",
+                text: "Texto",
+                link: "Link",
+                toggle: "Alternador",
+                checkbox: "Caixa de Seleção",
+                image: "Imagem",
+                menu: "Menu",
+                scroll_view: "Rolagem",
+                tab: "Aba"
+            },
+            screen_types: {
+                screen: "Tela",
+                modal: "Modal",
+                tab: "Aba",
+                drawer: "Gaveta"
+            },
+            modes: {
+                inspect: "Modo Inspeção",
+                tap: "Modo Toque",
+                swipe: "Modo Deslize"
+            },
+            status: {
+                fetching: "Buscando estado do dispositivo...",
+                ready: "Pronto",
+                loading: "Carregando...",
+                no_screenshot: "Sem captura de tela",
+                paused_test: "Mapeador desativado durante o teste"
+            },
+            nav: {
+                home: "Início",
+                back: "Voltar",
+                recents: "Recentes"
+            },
+            attributes: {
+                copied: "Copiado!",
+                xpath: "XPath",
+                resource_id: "ID de Recurso",
+                access_id: "ID de Acesso",
+                identifiers: "Identificadores",
+                hierarchy: "Hierarquia"
+            },
+            input: {
+                element_type: "Tipo de Elemento",
+                element_name: "Nome do Elemento",
+                navigates_to: "Navega Para (Opcional)",
+                menu_options: "Opções de Menu (Separadas por vírgula)",
+                parent_screen: "Tela Pai"
+            },
+            placeholder: {
+                element_name: "ex: Botão de Login",
+                navigates_to: "Nome da Tela",
+                menu_options: "Opção 1, Opção 2...",
+                parent_screen: "Nome da Tela Pai",
+                screen_name: "Nome da Tela (Único)"
+            },
+            action: {
+                add: "Adicionar Mapeamento",
+                update: "Atualizar",
+                remove: "Remover",
+                save_screen: "Salvar Tela",
+                load: "Carregar",
+                new: "Novo",
+                discard: "Descartar",
+                discard_desc: "Descartar Tela",
+                delete: "Excluir"
+            },
+            feedback: {
+                mapped: "Elemento mapeado!",
+                updated: "Mapeador Atualizado",
+                removed: "Mapeamento removido",
+                empty_map: "Nenhum elemento mapeado ainda",
+                saved: "Tela mapeada com sucesso!",
+                loaded: "Mapa de tela carregado",
+                new_screen: "Pronto para nova tela",
+                deleted: "Mapa excluído"
+            },
+            error: {
+                missing_name: "Por favor, forneça um nome para o elemento",
+                missing_screen_name: "Por favor, forneça um Nome para a Tela",
+                save_failed: "Falha ao salvar mapa da tela"
+            },
+            confirm: {
+                delete: "Tem certeza que deseja excluir este mapa?",
+                discard: "Descartar alterações atuais?"
+            }
         },
         performance: {
             fetch_error: "Falha ao buscar estatísticas",

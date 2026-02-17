@@ -13,6 +13,10 @@
     "fs:default",
     "fs:allow-read-file",
     "fs:allow-exists",
+    "fs:allow-write-text-file",
+    "fs:allow-create",
+    "fs:allow-remove",
+    "fs:allow-applocaldata-write-recursive",
     "notification:default",
     "http:default"
   ],
@@ -22,6 +26,9 @@
       "allow": [
         {
           "path": "**"
+        },
+        {
+          "path": "$APPLOCALDATA/**"
         }
       ]
     },
