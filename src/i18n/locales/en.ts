@@ -110,6 +110,13 @@ export const en = {
         common: {
             cancel: "Cancel",
             save: "Save",
+            undo: "Undo",
+            redo: "Redo",
+            copy: "Copy",
+            download: "Download",
+            downloading: "Downloading...",
+            clear: "Clear",
+            coming_soon: "Module {{module}} coming soon...",
             error_occurred: "An error occurred: {{error}}",
             delete: "Delete",
             edit: "Edit",
@@ -197,6 +204,54 @@ export const en = {
         },
         console: {
             waiting: "Waiting for output..."
+        },
+        dashboard: {
+            description: "QA Helper Tools: Scenario generation, image editing, and documentation.",
+            tabs: {
+                scenarios: "Scenario Generator",
+                images: "Image Editor",
+                history: "History"
+            },
+            input: {
+                title: "Requirements",
+                placeholder: "Paste your requirements or acceptance criteria here..."
+            },
+            editor: {
+                title: "Generated Scenarios",
+                placeholder: "Generated scenarios will appear here. You can edit and paste images..."
+            },
+            history: {
+                title: "File History",
+                empty: "No files generated."
+            },
+            image: {
+                title: "Image Editor",
+                new: "New Image / Paste",
+                open: "Open Image",
+                opened: "Image Loaded!",
+                copy: "Copy Image",
+                pasted: "Image pasted!",
+                no_clipboard: "No image in clipboard.",
+                copied: "Copied to clipboard!",
+                tools: {
+                    cursor: "Cursor",
+                    arrow: "Arrow",
+                    rect: "Rectangle",
+                    crop: "Crop Area"
+                }
+            },
+            actions: {
+                generate: "Generate Scenarios",
+                generated_success: "TEST CASES GENERATED SUCCESSFULLY (via {{method}})",
+                gemini_failed: "Gemini generation failed: {{error}}",
+                using_local_generator: "Using local generator. {{message}}",
+                export_xlsx: "Excel (.xlsx)",
+                export_docx: "Word (.docx)"
+            },
+            export: {
+                success: "Exported successfully!",
+                error: "Export error"
+            }
         },
         devices: {
             load_error: "Failed to load devices"
@@ -426,7 +481,14 @@ export const en = {
             ai: {
                 title: "AI Integration (Google Gemini)",
                 key: "API Key",
-                placeholder: "Enter your Gemini API Key"
+                model: "Model ID",
+                check_models: "Check available models",
+                loading_models: "Loading models...",
+                models_fetched: "Models fetched",
+                models_found_desc: "{{count}} models found. Check the dropdown.",
+                no_models_found: "No Gemini models found for this key.",
+                placeholder: "Enter your Gemini API Key",
+                help: "Get your free API Key at"
             },
             system: {
                 title: "System Versions",
@@ -467,6 +529,7 @@ export const en = {
             }
         },
         sidebar: {
+            dashboard: "QA Dashboard",
             run: "Run",
             description_run: "Device management and automation execution.",
             tests: "Tests",

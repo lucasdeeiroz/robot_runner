@@ -6,9 +6,9 @@ import { Play, Wifi, Smartphone, RefreshCw, Wrench, ScanEye, PlayCircle } from "
 import { PageHeader } from "@/components/organisms/PageHeader";
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
-import { TestsSubTab } from "../components/tabs/TestsSubTab";
-import { ConnectSubTab } from "../components/tabs/ConnectSubTab";
-import { InspectorSubTab } from "../components/tabs/InspectorSubTab";
+import { TestsSubTab } from "@/components/tabs/run/TestsSubTab";
+import { ConnectSubTab } from "@/components/tabs/run/ConnectSubTab";
+import { InspectorSubTab } from "@/components/tabs/run/InspectorSubTab";
 import { useTestSessions } from "@/lib/testSessionStore";
 
 import { useSettings } from "@/lib/settings";

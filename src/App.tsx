@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Layout } from "./components/templates/Layout";
 import { RunPage } from "./pages/RunPage";
 import { TestsPage } from "./pages/TestsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { AboutPage } from "./pages/AboutPage";
+import { DashboardPage } from "./pages/DashboardPage";
 import { TestSessionProvider } from "./lib/testSessionStore";
 import { Toaster } from "sonner";
 import { useSettings } from "./lib/settings";
@@ -15,6 +17,7 @@ import { argbFromHex, themeFromSourceColor, TonalPalette } from "@material/mater
 
 function App() {
   const [activePage, setActivePage] = useState("run");
+  const { t } = useTranslation();
   const { settings, checkSystemVersions, systemCheckStatus, loading: settings_loading, checkForAppUpdate } = useSettings();
 
   // State to track if we should show the overlay or if it has been dismissed/handled
@@ -202,13 +205,14 @@ function App() {
                 transition={{ duration: 0.3, ease: [0.2, 0, 0, 1] }}
               >
                 {activePage === 'tests' && <TestsPage />}
+                {activePage === 'dashboard' && <DashboardPage />}
                 {activePage === 'settings' && <SettingsPage />}
                 {activePage === 'about' && <AboutPage />}
 
                 {/* Placeholder for other pages */}
-                {activePage !== 'tests' && activePage !== 'settings' && activePage !== 'about' && (
+                {activePage !== 'tests' && activePage !== 'settings' && activePage !== 'about' && activePage !== 'dashboard' && (
                   <div className="p-12 text-center border-2 border-dashed border-outline-variant/30 rounded-2xl m-4">
-                    <p className="text-on-surface-variant/80">Module {activePage} coming soon...</p>
+                    <p className="text-on-surface-variant/80">{t('common.coming_soon', { module: activePage })}</p>
                   </div>
                 )}
               </motion.div>

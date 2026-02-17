@@ -1,5 +1,5 @@
 import { useSettings } from "@/lib/settings";
-import { Moon, Sun, Globe, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2, Settings as SettingsIcon } from "lucide-react";
+import { Moon, Sun, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2, Settings as SettingsIcon, Sparkles } from "lucide-react";
 import { Switch } from "@/components/atoms/Switch";
 import { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -10,6 +10,7 @@ import clsx from "clsx";
 import { useTranslation } from "react-i18next";
 import { feedback } from "@/lib/feedback";
 import { TOOL_LINKS } from "@/lib/tools";
+import { getAvailableModels } from "@/lib/dashboard/gemini";
 import { Modal } from "@/components/organisms/Modal";
 import { ConfirmationModal } from "@/components/organisms/ConfirmationModal";
 
@@ -100,6 +101,10 @@ export function SettingsPage() {
     const [appiumLogs, setAppiumLogs] = useState<string[]>([]);
     const [showAppiumLogs, setShowAppiumLogs] = useState(false);
     const logsContainerRef = useRef<HTMLDivElement>(null);
+
+    // AI Models State
+    const [availableModels, setAvailableModels] = useState<string[]>(['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-2.0-pro']);
+    const [showModelList, setShowModelList] = useState(false);
 
     useEffect(() => {
         // Cached System Versions
@@ -265,7 +270,37 @@ export function SettingsPage() {
                         </Button>
                     </>
                 }
-            />
+            >
+                <div className="mt-4 pt-4 border-t border-outline-variant/30 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                    <div>
+                        <Select
+                            value={settings.language}
+                            onChange={(e) => updateSetting('language', e.target.value)}
+                            label={t('settings.language')}
+                            options={[
+                                { value: "en_US", label: "English (US)" },
+                                { value: "pt_BR", label: "Português (Brasil)" },
+                                { value: "es_ES", label: "Español" }
+                            ]}
+                        />
+                    </div>
+
+                    <div className="flex items-center justify-between bg-surface-variant/5 hover:bg-surface-variant/10 p-3 rounded-2xl transition-colors select-none cursor-pointer" onClick={() => updateSetting('recycleDeviceViews', !settings.recycleDeviceViews)}>
+                        <div>
+                            <label className="block text-sm text-on-surface-variant/80 font-medium mb-0.5 pointer-events-none">
+                                {t('settings.recycle_device_views')}
+                            </label>
+                            <p className="text-[10px] text-on-surface-variant/60 pointer-events-none">
+                                {t('settings.recycle_device_views_desc', { defaultValue: "Reuse existing tabs when running tests on the same device" })}
+                            </p>
+                        </div>
+                        <Switch
+                            checked={settings.recycleDeviceViews}
+                            onCheckedChange={(c: boolean) => updateSetting('recycleDeviceViews', c)}
+                        />
+                    </div>
+                </div>
+            </Section>
 
             {/* Modal for Create/Rename */}
             <Modal
@@ -540,36 +575,94 @@ export function SettingsPage() {
                         </div>
                     </Section>
 
-                    {/* General Settings */}
-                    <Section title={t('settings.general')} icon={Globe}>
+                    {/* AI Settings */}
+                    <Section title={t('settings.ai.title')} icon={Sparkles}>
                         <div>
-                            <Select
-                                value={settings.language}
-                                onChange={(e) => updateSetting('language', e.target.value)}
-                                label={t('settings.language')}
-                                options={[
-                                    { value: "en_US", label: "English (US)" },
-                                    { value: "pt_BR", label: "Português (Brasil)" },
-                                    { value: "es_ES", label: "Español" }
-                                ]}
+                            <Input
+                                label={t('settings.ai.key')}
+                                type="password"
+                                value={settings.geminiApiKey || ''}
+                                onChange={(e) => updateSetting('geminiApiKey', e.target.value)}
+                                placeholder={t('settings.ai.placeholder')}
                             />
-                        </div>
+                            <p className="text-[10px] text-on-surface-variant/80 mt-2">
+                                {t('settings.ai.help')}{' '}
+                                <a
+                                    href="https://aistudio.google.com/app/apikey"
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-primary hover:underline"
+                                >
+                                    Google AI Studio
+                                </a>
+                            </p>
+                            <div className="mt-4 flex gap-2 items-end">
+                                <div className="flex-1">
+                                    <div className="relative">
+                                        <Input
+                                            label={t('settings.ai.model')}
+                                            type="text"
+                                            value={settings.geminiModel || 'gemini-1.5-flash'}
+                                            onChange={(e) => updateSetting('geminiModel', e.target.value)}
+                                            placeholder="gemini-1.5-flash"
+                                            onFocus={() => setShowModelList(true)}
+                                            onBlur={() => setTimeout(() => setShowModelList(false), 200)}
+                                        />
+                                        {showModelList && availableModels.length > 0 && (
+                                            <div className="absolute z-10 w-full mt-1 bg-surface border border-outline-variant/30 rounded-2xl shadow-lg max-h-48 overflow-auto custom-scrollbar">
+                                                {availableModels.map(model => (
+                                                    <button
+                                                        key={model}
+                                                        className="w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors"
+                                                        onClick={() => {
+                                                            updateSetting('geminiModel', model);
+                                                            setShowModelList(false);
+                                                        }}
+                                                    >
+                                                        {model}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                <Button
+                                    variant="ghost"
+                                    onClick={async () => {
+                                        if (!settings.geminiApiKey) {
+                                            feedback.toast.error("common.error_occurred", { error: "API Key required" });
+                                            return;
+                                        }
+                                        const toastId = feedback.toast.loading(t('settings.ai.loading_models'));
+                                        try {
+                                            const models = await getAvailableModels(settings.geminiApiKey);
 
-                        <div className="flex items-center justify-between pt-4 border-t border-outline-variant/30 mt-4">
-                            <div>
-                                <label className="block text-sm text-on-surface-variant/80 font-medium mb-1">
-                                    {t('settings.recycle_device_views')}
-                                </label>
-                                <p className="text-xs text-on-surface-variant/80">
-                                    {t('settings.recycle_device_views_desc', { defaultValue: "Reuse existing tabs when running tests on the same device" })}
-                                </p>
+                                            if (models.length > 0) {
+                                                setAvailableModels(models);
+                                                setShowModelList(true);
+                                                feedback.toast.dismiss(toastId);
+                                                feedback.toast.success(t('settings.ai.models_fetched'), {
+                                                    description: t('settings.ai.models_found_desc', { count: models.length })
+                                                });
+                                            } else {
+                                                feedback.toast.dismiss(toastId);
+                                                feedback.toast.info(t('settings.ai.no_models_found'));
+                                            }
+                                        } catch (e: any) {
+                                            feedback.toast.dismiss(toastId);
+                                            feedback.toast.error("common.error_occurred", { error: e.message });
+                                        }
+                                    }}
+                                    title={t('settings.ai.check_models')}
+                                    className="mb-[2px]"
+                                >
+                                    <Server size={18} />
+                                </Button>
                             </div>
-                            <Switch
-                                checked={settings.recycleDeviceViews}
-                                onCheckedChange={(c: boolean) => updateSetting('recycleDeviceViews', c)}
-                            />
                         </div>
                     </Section>
+
+
                 </div >
 
                 {/* System Versions */}

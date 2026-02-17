@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { useSettings } from "@/lib/settings";
-import { HistoryCharts } from "../organisms/HistoryCharts";
+import { HistoryCharts } from "@/components/organisms/HistoryCharts";
 import { XCircle, FileText, Folder, Calendar, ChevronDown, ChevronRight, CheckCircle, Clock, PieChart, Search, RefreshCw } from 'lucide-react';
 import clsx from 'clsx';
 import { invoke } from '@tauri-apps/api/core';

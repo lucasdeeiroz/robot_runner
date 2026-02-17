@@ -113,6 +113,13 @@ export const es = {
         common: {
             cancel: "Cancelar",
             save: "Guardar",
+            undo: "Deshacer",
+            redo: "Rehacer",
+            copy: "Copiar",
+            download: "Descargar",
+            downloading: "Descargando...",
+            clear: "Limpiar",
+            coming_soon: "Módulo {{module}} próximamente...",
             error_occurred: "Ocurrió un error: {{error}}",
             delete: "Eliminar",
             edit: "Editar",
@@ -200,6 +207,54 @@ export const es = {
         },
         console: {
             waiting: "Esperando salida..."
+        },
+        dashboard: {
+            description: "Herramientas auxiliares para QA: Generación de escenarios, edición de imágenes y documentación.",
+            tabs: {
+                scenarios: "Generador de Escenarios",
+                images: "Editor de Imágenes",
+                history: "Historial"
+            },
+            input: {
+                title: "Requisitos",
+                placeholder: "Pegue aquí sus requisitos o criterios de aceptación..."
+            },
+            editor: {
+                title: "Escenarios Generados",
+                placeholder: "Los escenarios generados aparecerán aquí. Puede editar y pegar imágenes..."
+            },
+            history: {
+                title: "Historial de Archivos",
+                empty: "Ningún archivo generado."
+            },
+            image: {
+                title: "Editor de Imágenes",
+                new: "Nueva Imagen / Pegar",
+                open: "Abrir Imagen",
+                opened: "¡Imagen Cargada!",
+                copy: "Copiar Imagen",
+                pasted: "¡Imagen pegada!",
+                no_clipboard: "No hay imagen en el portapapeles.",
+                copied: "¡Copiado al portapapeles!",
+                tools: {
+                    cursor: "Cursor",
+                    arrow: "Flecha",
+                    rect: "Rectángulo",
+                    crop: "Área de Recorte"
+                }
+            },
+            actions: {
+                generate: "Generar Escenarios",
+                generated_success: "CASOS DE PRUEBA GENERADOS CON ÉXITO (vía {{method}})",
+                gemini_failed: "Fallo en la generación vía Gemini: {{error}}",
+                using_local_generator: "Usando generador local. {{message}}",
+                export_xlsx: "Excel (.xlsx)",
+                export_docx: "Word (.docx)"
+            },
+            export: {
+                success: "¡Exportado con éxito!",
+                error: "Error al exportar"
+            }
         },
         devices: {
             load_error: "Error al cargar dispositivos"
@@ -426,7 +481,14 @@ export const es = {
             ai: {
                 title: "Integración IA (Google Gemini)",
                 key: "Clave API",
-                placeholder: "Ingrese su Clave API Gemini"
+                model: "ID del Modelo",
+                check_models: "Verificar modelos disponibles",
+                loading_models: "Cargando modelos...",
+                models_fetched: "Modelos obtenidos",
+                models_found_desc: "{{count}} modelos encontrados. Verifique la lista.",
+                no_models_found: "No se encontraron modelos Gemini para esta clave.",
+                placeholder: "Ingrese su Clave API Gemini",
+                help: "Obtenga su Clave API gratuita en"
             },
             system: {
                 title: "Versiones del Sistema",
@@ -467,6 +529,7 @@ export const es = {
             }
         },
         sidebar: {
+            dashboard: "Dashboard QA",
             run: "Ejecutar",
             description_run: "Gestión de dispositivos y ejecución de automatización.",
             tests: "Pruebas",

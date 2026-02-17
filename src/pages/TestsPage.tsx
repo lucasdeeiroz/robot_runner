@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTestSessions } from "@/lib/testSessionStore";
-import { ToolboxView } from "../components/tabs/ToolboxView";
-import { HistorySubTab } from "../components/tabs/HistorySubTab";
+import { ToolboxView } from "@/components/tabs/tests/toolbox/ToolboxView";
+import { HistorySubTab } from "@/components/tabs/tests/HistorySubTab";
 import { AndroidVersionPill } from "@/components/atoms/AndroidVersionPill";
 import { XCircle, LayoutGrid, Minimize2, Maximize2, FileText } from 'lucide-react';
 import { PageHeader } from "@/components/organisms/PageHeader";
