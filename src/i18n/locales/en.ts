@@ -364,6 +364,10 @@ export const en = {
             title: "Mapper",
             empty: "Select a device to start mapping",
             refresh: "Refresh Source",
+            flowchart: {
+                open: "Open Flowchart",
+                title: "Navigation Flow"
+            },
             properties: "Element Properties",
             clear_selection: "Clear Selection",
             section_title: "Screen Mapper",
@@ -460,6 +464,8 @@ export const en = {
             },
             confirm: {
                 delete: "Are you sure you want to delete this map?",
+                delete_title: "Delete Screen Map?",
+                delete_desc: "Are you sure you want to delete this screen map? This action cannot be undone.",
                 discard: "Discard current changes?"
             }
         },

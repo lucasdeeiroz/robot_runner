@@ -367,6 +367,10 @@ export const es = {
             title: "Mapeador",
             empty: "Seleccione un dispositivo para iniciar el mapeo",
             refresh: "Actualizar Fuente",
+            flowchart: {
+                open: "Abrir Diagrama de Flujo",
+                title: "Flujo de Navegación"
+            },
             properties: "Propiedades del Elemento",
             clear_selection: "Limpiar Selección",
             section_title: "Mapeador de Pantalla",
@@ -463,6 +467,8 @@ export const es = {
             },
             confirm: {
                 delete: "¿Está seguro de que desea eliminar este mapa?",
+                delete_title: "¿Eliminar Mapa de Pantalla?",
+                delete_desc: "¿Estás seguro de que deseas eliminar este mapa de pantalla? Esta acción no se puede deshacer.",
                 discard: "¿Descartar los cambios actuales?"
             }
         },

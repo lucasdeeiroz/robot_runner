@@ -367,6 +367,10 @@ export const pt = {
             title: "Mapeador",
             empty: "Selecione um dispositivo para iniciar o mapeamento",
             refresh: "Atualizar Fonte",
+            flowchart: {
+                open: "Abrir Fluxograma",
+                title: "Fluxo de Navegação"
+            },
             properties: "Propriedades do Elemento",
             clear_selection: "Limpar Seleção",
             section_title: "Mapeador de Tela",
@@ -463,6 +467,8 @@ export const pt = {
             },
             confirm: {
                 delete: "Tem certeza que deseja excluir este mapa?",
+                delete_title: "Excluir Mapeamento de Tela?",
+                delete_desc: "Tem certeza que deseja excluir este mapeamento? Esta ação não pode ser desfeita.",
                 discard: "Descartar alterações atuais?"
             }
         },

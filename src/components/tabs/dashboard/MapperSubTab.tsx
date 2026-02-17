@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Maximize, Check, Scan, MousePointerClick, Move, Home, ArrowLeft, Rows, X, RefreshCw, Wrench, Save } from 'lucide-react';
+import { Maximize, Check, Scan, MousePointerClick, Move, Home, ArrowLeft, Rows, X, RefreshCw, Wrench, Save, GitGraph } from 'lucide-react';
 import { XMLParser } from 'fast-xml-parser';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
@@ -18,6 +18,7 @@ import { Device, UIElementType, UIElementMap, ScreenMap } from '@/lib/types';
 import { saveScreenMap, listScreenMaps, deleteScreenMap } from '@/lib/dashboard/mapperPersistence';
 import { useSettings } from '@/lib/settings';
 import { ConfirmationModal } from '@/components/organisms/ConfirmationModal';
+import { FlowchartModal } from '@/components/organisms/FlowchartModal';
 
 interface MapperSubTabProps {
     onNavigate?: (tab: string) => void;
@@ -43,6 +44,7 @@ export function MapperSubTab({ onNavigate, isActive }: MapperSubTabProps) {
     // Helper state for confirmation modal
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [screenToDelete, setScreenToDelete] = useState<string | null>(null);
+    const [isFlowchartOpen, setIsFlowchartOpen] = useState(false);
 
     useEffect(() => {
         loadSavedMaps();
@@ -571,6 +573,13 @@ export function MapperSubTab({ onNavigate, isActive }: MapperSubTabProps) {
                             {loading ? <ExpressiveLoading size="xsm" variant="circular" /> : <RefreshCw size={16} />}
                             <span className={clsx(isNarrow && "hidden")}>{t('mapper.refresh')}</span>
                         </button>
+                        <button
+                            onClick={() => setIsFlowchartOpen(true)}
+                            className="p-2 hover:bg-surface-variant/30 rounded-2xl text-on-surface/80 hover:text-primary transition-colors"
+                            title={t('mapper.flowchart.open', 'Open Flowchart')}
+                        >
+                            <GitGraph size={18} />
+                        </button>
                         <DeviceSelector
                             devices={devices}
                             selectedDevices={selectedDevices}
@@ -742,8 +751,7 @@ export function MapperSubTab({ onNavigate, isActive }: MapperSubTabProps) {
                                     </div>
                                 </div>
 
-                                {/* All Attributes */}
-                                {/* --- SCREEN MAPPER UI (Replaces All Attributes) --- */}
+                                {/* --- SCREEN MAPPER UI --- */}
                                 <div className="mt-6 border-t border-outline-variant/30 pt-4">
                                     <h3 className="text-sm font-semibold text-primary uppercase tracking-wider mb-4 flex items-center gap-2">
                                         <Wrench size={14} /> {t('mapper.screen_mapper')}
@@ -875,6 +883,7 @@ export function MapperSubTab({ onNavigate, isActive }: MapperSubTabProps) {
                                         setScreenType('screen');
                                         setMappedElements([]);
                                         setScreenshot(null);
+                                        refreshAll();
                                         setSavedMaps(prev => [...prev]);
                                         feedback.toast.success(t('mapper.feedback.new_screen'));
                                     }}
@@ -929,7 +938,10 @@ export function MapperSubTab({ onNavigate, isActive }: MapperSubTabProps) {
                                 </div>
 
                                 <button
-                                    onClick={handleSaveScreen}
+                                    onClick={() => {
+                                        handleSaveScreen();
+                                        refreshAll();
+                                    }}
                                     className="flex-1 bg-primary text-on-primary py-1.5 rounded text-sm font-medium hover:bg-primary/90 flex items-center justify-center gap-2 transition-colors shadow-sm"
                                 >
                                     <Save size={14} />
@@ -940,7 +952,7 @@ export function MapperSubTab({ onNavigate, isActive }: MapperSubTabProps) {
                                     <button
                                         onClick={(e) => {
                                             const map = savedMaps.find(m => m.name === screenName);
-                                            if (map) handleDeleteScreen(map.id, e);
+                                            if (map) handleDeleteScreen(map.id, e)
                                         }}
                                         className="px-3 py-1.5 bg-error/10 text-error border border-error/20 rounded text-sm font-medium hover:bg-error/20 transition-colors"
                                         title={t('mapper.action.discard_desc')}
@@ -954,10 +966,26 @@ export function MapperSubTab({ onNavigate, isActive }: MapperSubTabProps) {
                 </div >
             </div >
 
+            <FlowchartModal
+                isOpen={isFlowchartOpen}
+                onClose={() => setIsFlowchartOpen(false)}
+                maps={savedMaps}
+                onEditScreen={(name) => {
+                    const map = savedMaps.find(m => m.name === name);
+                    if (map) {
+                        handleLoadScreen(map);
+                        setIsFlowchartOpen(false);
+                    }
+                }}
+            />
+
             <ConfirmationModal
                 isOpen={isDeleteModalOpen}
                 onClose={() => setIsDeleteModalOpen(false)}
-                onConfirm={confirmDeleteScreen}
+                onConfirm={() => {
+                    confirmDeleteScreen();
+                    refreshAll();
+                }}
                 title={t('mapper.confirm.delete_title', 'Delete Screen Map?')}
                 description={t('mapper.confirm.delete_desc', 'Are you sure you want to delete this screen map? This action cannot be undone.')}
                 variant="danger"
