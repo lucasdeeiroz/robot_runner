@@ -14,6 +14,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import "./App.css";
 import { motion, AnimatePresence } from "framer-motion";
 import { argbFromHex, themeFromSourceColor, TonalPalette } from "@material/material-color-utilities";
+import { DeviceProvider } from "./lib/deviceStore";
 
 function App() {
   const [activePage, setActivePage] = useState("run");
@@ -164,62 +165,64 @@ function App() {
 
   return (
     <TestSessionProvider>
-      <Toaster richColors position="bottom-right" theme={settings.theme === 'dark' ? 'dark' : 'light'} />
-      <AnimatePresence>
-        {showOverlay && (
-          <SystemCheckOverlay
-            status={systemCheckStatus}
-            onCriticalExit={handleCriticalExit}
-            onTestingRedirect={handleTestingRedirect}
-            onMirroringContinue={handleMirroringContinue}
-            onDismiss={handleDismiss}
-          />
-        )}
-      </AnimatePresence>
-      <Layout activePage={activePage} onNavigate={setActivePage}>
-        <div className="max-w-7xl mx-auto h-full flex flex-col relative overflow-hidden">
-          {/* RunPage - Kept mounted to preserve state */}
-          <motion.div
-            className="absolute inset-0 flex flex-col"
-            initial={false}
-            animate={{
-              opacity: activePage === 'run' ? 1 : 0,
-              zIndex: activePage === 'run' ? 10 : 0,
-              pointerEvents: activePage === 'run' ? 'auto' : 'none',
-              scale: activePage === 'run' ? 1 : 0.98
-            }}
-            transition={{ duration: 0.3 }}
-          >
-            <RunPage onNavigate={setActivePage} initialTab={initialSubTab} />
-          </motion.div>
+      <DeviceProvider>
+        <Toaster richColors position="bottom-right" theme={settings.theme === 'dark' ? 'dark' : 'light'} />
+        <AnimatePresence>
+          {showOverlay && (
+            <SystemCheckOverlay
+              status={systemCheckStatus}
+              onCriticalExit={handleCriticalExit}
+              onTestingRedirect={handleTestingRedirect}
+              onMirroringContinue={handleMirroringContinue}
+              onDismiss={handleDismiss}
+            />
+          )}
+        </AnimatePresence>
+        <Layout activePage={activePage} onNavigate={setActivePage}>
+          <div className="max-w-7xl mx-auto h-full flex flex-col relative overflow-hidden">
+            {/* RunPage - Kept mounted to preserve state */}
+            <motion.div
+              className="absolute inset-0 flex flex-col"
+              initial={false}
+              animate={{
+                opacity: activePage === 'run' ? 1 : 0,
+                zIndex: activePage === 'run' ? 10 : 0,
+                pointerEvents: activePage === 'run' ? 'auto' : 'none',
+                scale: activePage === 'run' ? 1 : 0.98
+              }}
+              transition={{ duration: 0.3 }}
+            >
+              <RunPage onNavigate={setActivePage} initialTab={initialSubTab} />
+            </motion.div>
 
-          {/* Other Pages - Transitions using AnimatePresence */}
-          <AnimatePresence mode="wait">
-            {activePage !== 'run' && (
-              <motion.div
-                key={activePage}
-                className="absolute inset-0 flex flex-col z-20 overflow-y-auto overflow-x-hidden custom-scrollbar"
-                initial={{ opacity: 0, scale: 0.98, x: 20 }}
-                animate={{ opacity: 1, scale: 1, x: 0 }}
-                exit={{ opacity: 0, scale: 0.98, x: -20 }}
-                transition={{ duration: 0.3, ease: [0.2, 0, 0, 1] }}
-              >
-                {activePage === 'tests' && <TestsPage />}
-                {activePage === 'dashboard' && <DashboardPage onNavigate={setActivePage} />}
-                {activePage === 'settings' && <SettingsPage />}
-                {activePage === 'about' && <AboutPage />}
+            {/* Other Pages - Transitions using AnimatePresence */}
+            <AnimatePresence mode="wait">
+              {activePage !== 'run' && (
+                <motion.div
+                  key={activePage}
+                  className="absolute inset-0 flex flex-col z-20 overflow-y-auto overflow-x-hidden custom-scrollbar"
+                  initial={{ opacity: 0, scale: 0.98, x: 20 }}
+                  animate={{ opacity: 1, scale: 1, x: 0 }}
+                  exit={{ opacity: 0, scale: 0.98, x: -20 }}
+                  transition={{ duration: 0.3, ease: [0.2, 0, 0, 1] }}
+                >
+                  {activePage === 'tests' && <TestsPage />}
+                  {activePage === 'dashboard' && <DashboardPage onNavigate={setActivePage} />}
+                  {activePage === 'settings' && <SettingsPage />}
+                  {activePage === 'about' && <AboutPage />}
 
-                {/* Placeholder for other pages */}
-                {activePage !== 'tests' && activePage !== 'settings' && activePage !== 'about' && activePage !== 'dashboard' && (
-                  <div className="p-12 text-center border-2 border-dashed border-outline-variant/30 rounded-2xl m-4">
-                    <p className="text-on-surface-variant/80">{t('common.coming_soon', { module: activePage })}</p>
-                  </div>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </Layout>
+                  {/* Placeholder for other pages */}
+                  {activePage !== 'tests' && activePage !== 'settings' && activePage !== 'about' && activePage !== 'dashboard' && (
+                    <div className="p-12 text-center border-2 border-dashed border-outline-variant/30 rounded-2xl m-4">
+                      <p className="text-on-surface-variant/80">{t('common.coming_soon', { module: activePage })}</p>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </Layout>
+      </DeviceProvider>
     </TestSessionProvider>
   );
 }

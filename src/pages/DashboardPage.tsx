@@ -15,6 +15,10 @@ import { TabBar } from '@/components/organisms/TabBar';
 import { useSettings } from '@/lib/settings';
 import { generateRefinedTestCases } from '@/lib/dashboard/gemini';
 import { feedback } from '@/lib/feedback';
+import { useDevices } from '@/lib/deviceStore';
+import { DeviceSelector } from '@/components/molecules/DeviceSelector';
+import { useTestSessions } from '@/lib/testSessionStore';
+import { Device } from '@/lib/types';
 
 interface DashboardPageProps {
     onNavigate?: (page: string) => void;
@@ -26,6 +30,30 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
     const [generatedContent, setGeneratedContent] = useState('');
     const { settings } = useSettings();
     const [isGenerating, setIsGenerating] = useState(false);
+
+    // Device Management (Global)
+    const { devices, selectedDevices, loading: loadingDevices, loadDevices: refreshDevices, setSelectedDevices } = useDevices();
+    const { sessions, addToolboxSession } = useTestSessions();
+    const busyDeviceIds = sessions.filter(s => s.status === 'running' && s.type === 'test').map(s => s.deviceUdid);
+
+    const handleDeviceToggle = (udid: string) => {
+        // Enforce Single Selection for Dashboard
+        if (selectedDevices.includes(udid)) {
+            setSelectedDevices([]);
+        } else {
+            setSelectedDevices([udid]);
+        }
+    };
+
+    const selectedDeviceId = selectedDevices[0] || null;
+
+    const handleOpenToolbox = (device: Device) => {
+        const name = device.model;
+        addToolboxSession(device.udid, name, device.model, device.android_version || undefined);
+        if (onNavigate) {
+            onNavigate('tests');
+        }
+    };
 
     const handleGenerate = async (text: string, language: string) => {
         if (!text.trim()) return;
@@ -76,6 +104,17 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
                 variant="pills"
                 className="z-20 relative"
                 layoutId="dashboard-page-tabs"
+                menus={
+                    <DeviceSelector
+                        devices={devices}
+                        selectedDevices={selectedDevices}
+                        toggleDevice={handleDeviceToggle}
+                        loadingDevices={loadingDevices}
+                        loadDevices={refreshDevices}
+                        handleOpenToolbox={handleOpenToolbox}
+                        busyDeviceIds={busyDeviceIds}
+                    />
+                }
             />
 
             <div className="flex-1 min-h-0 bg-surface p-4 rounded-2xl border border-outline-variant/30 overflow-hidden relative z-10 flex flex-col">
@@ -109,7 +148,10 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
 
                 {/* MAPPER TAB */}
                 <div className={clsx("h-full", activeTab === 'mapper' ? "block" : "hidden")}>
-                    <MapperSubTab isActive={activeTab === 'mapper'} onNavigate={onNavigate} />
+                    <MapperSubTab
+                        isActive={activeTab === 'mapper'}
+                        selectedDeviceId={selectedDeviceId}
+                    />
                 </div>
             </div>
         </div>

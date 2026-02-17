@@ -10,22 +10,21 @@ import { feedback } from "@/lib/feedback";
 import { Section } from "@/components/organisms/Section";
 import { t } from 'i18next';
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
-import { DeviceSelector } from "@/components/molecules/DeviceSelector";
 import { Combobox } from "@/components/atoms/Combobox";
 import { Select } from "@/components/atoms/Select";
 import { useTestSessions } from '@/lib/testSessionStore';
-import { Device, UIElementType, UIElementMap, ScreenMap } from '@/lib/types';
+import { UIElementType, UIElementMap, ScreenMap } from '@/lib/types';
 import { saveScreenMap, listScreenMaps, deleteScreenMap } from '@/lib/dashboard/mapperPersistence';
 import { useSettings } from '@/lib/settings';
 import { ConfirmationModal } from '@/components/organisms/ConfirmationModal';
 import { FlowchartModal } from '@/components/organisms/FlowchartModal';
 
 interface MapperSubTabProps {
-    onNavigate?: (tab: string) => void;
     isActive: boolean;
+    selectedDeviceId: string | null;
 }
 
-export function MapperSubTab({ onNavigate, isActive }: MapperSubTabProps) {
+export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) {
     const { t } = useTranslation();
     const { activeProfileId } = useSettings();
     const [screenshot, setScreenshot] = useState<string | null>(null);
@@ -180,22 +179,13 @@ export function MapperSubTab({ onNavigate, isActive }: MapperSubTabProps) {
     };
 
 
-    // State for devices (Restored)
-    const [devices, setDevices] = useState<Device[]>([]);
-    const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
-
-    const [loadingDevices, setLoadingDevices] = useState(false);
-
-    const { sessions, addToolboxSession } = useTestSessions();
+    // State for devices (REMOVED - Managed by Parent)
+    const { sessions } = useTestSessions();
     // Only 'test' type sessions mark device as busy
     const busyDeviceIds = sessions.filter(s => s.status === 'running' && s.type === 'test').map(s => s.deviceUdid);
 
-    useEffect(() => {
-        loadDevices();
-    }, []);
-
     // Derived State
-    const selectedDevice = selectedDevices[0];
+    const selectedDevice = selectedDeviceId; // Prop-driven
     const isTestRunning = selectedDevice ? busyDeviceIds.includes(selectedDevice) : false;
     const prevTestRunning = useRef(isTestRunning);
 
@@ -261,44 +251,7 @@ export function MapperSubTab({ onNavigate, isActive }: MapperSubTabProps) {
 
 
 
-    const loadDevices = async () => {
-        setLoadingDevices(true);
-        try {
-            const list = await invoke<Device[]>('get_connected_devices');
-            setDevices(list);
 
-            if (selectedDevices.length === 0 && list.length > 0) {
-                setSelectedDevices([list[0].udid]);
-            } else {
-                const valid = selectedDevices.filter(id => list.find(d => d.udid === id));
-                if (valid.length === 0 && list.length > 0) {
-                    setSelectedDevices([list[0].udid]);
-                } else if (valid.length !== selectedDevices.length) {
-                    setSelectedDevices(valid);
-                }
-            }
-
-        } catch (e) {
-            feedback.toast.error("devices.load_error", e);
-        } finally {
-            setLoadingDevices(false);
-        }
-    };
-
-    const toggleDevice = (udid: string) => {
-        // Single-select required
-        setSelectedDevices([udid]);
-    };
-
-    const handleOpenToolbox = (device: Device) => {
-        // const ver = device.android_version ? `Android ${device.android_version}` : device.udid;
-        // const name = `${device.model} (${ver})`;
-        const name = device.model; // Clean name without version
-        addToolboxSession(device.udid, name, device.model, device.android_version || undefined);
-        if (onNavigate) {
-            onNavigate('tests');
-        }
-    };
 
     // Main fetch logic
     useEffect(() => {
@@ -580,15 +533,7 @@ export function MapperSubTab({ onNavigate, isActive }: MapperSubTabProps) {
                         >
                             <GitGraph size={18} />
                         </button>
-                        <DeviceSelector
-                            devices={devices}
-                            selectedDevices={selectedDevices}
-                            toggleDevice={toggleDevice}
-                            loadingDevices={loadingDevices}
-                            loadDevices={loadDevices}
-                            handleOpenToolbox={handleOpenToolbox}
-                            busyDeviceIds={busyDeviceIds}
-                        />
+
                     </>
                 }
             />

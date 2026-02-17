@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { Play, Wifi, ScanEye, PlayCircle } from "lucide-react";
 import { PageHeader } from "@/components/organisms/PageHeader";
 import clsx from "clsx";
@@ -8,10 +7,10 @@ import { TestsSubTab } from "@/components/tabs/run/TestsSubTab";
 import { ConnectSubTab } from "@/components/tabs/run/ConnectSubTab";
 import { InspectorSubTab } from "@/components/tabs/run/InspectorSubTab";
 import { useTestSessions } from "@/lib/testSessionStore";
+import { useDevices } from '@/lib/deviceStore'; // Import Global Store
 
 import { useSettings } from "@/lib/settings";
 import { Device } from "@/lib/types";
-import { feedback } from "@/lib/feedback";
 
 // Atoms & Molecules
 import { TabItem } from "@/components/molecules/Tabs";
@@ -75,60 +74,27 @@ export function RunPage({ onNavigate, initialTab }: RunPageProps) {
         { id: 'inspector', label: !isNarrow ? t('run_tab.inspector') : '', icon: ScanEye },
     ];
 
-    // State for devices (Restored)
-    const [devices, setDevices] = useState<Device[]>([]);
-    const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
-
-    const [loadingDevices, setLoadingDevices] = useState(false);
+    // Global Device State
+    const { devices, selectedDevices, loading: loadingDevices, loadDevices, setSelectedDevices } = useDevices();
 
     const { sessions, addToolboxSession } = useTestSessions();
     // Only 'test' type sessions mark device as busy
     const busyDeviceIds = sessions.filter(s => s.status === 'running' && s.type === 'test').map(s => s.deviceUdid);
-
-
-    useEffect(() => {
-        loadDevices();
-    }, []);
 
     // Enforce single selection when switching away from 'tests' tab
     useEffect(() => {
         if (activeTab !== 'tests' && selectedDevices.length > 1) {
             setSelectedDevices([selectedDevices[0]]);
         }
-    }, [activeTab]);
-
-    const loadDevices = async () => {
-        setLoadingDevices(true);
-        try {
-            const list = await invoke<Device[]>('get_connected_devices');
-            setDevices(list);
-
-            if (selectedDevices.length === 0 && list.length > 0) {
-                setSelectedDevices([list[0].udid]);
-            } else {
-                const valid = selectedDevices.filter(id => list.find(d => d.udid === id));
-                if (valid.length === 0 && list.length > 0) {
-                    setSelectedDevices([list[0].udid]);
-                } else if (valid.length !== selectedDevices.length) {
-                    setSelectedDevices(valid);
-                }
-            }
-
-        } catch (e) {
-            feedback.toast.error("devices.load_error", e);
-        } finally {
-            setLoadingDevices(false);
-        }
-    };
+    }, [activeTab, selectedDevices, setSelectedDevices]);
 
     const toggleDevice = (udid: string) => {
         if (activeTab === 'tests') {
             // Multi-select allowed
-            setSelectedDevices(prev =>
-                prev.includes(udid)
-                    ? prev.filter(id => id !== udid)
-                    : [...prev, udid]
-            );
+            const newSelection = selectedDevices.includes(udid)
+                ? selectedDevices.filter(id => id !== udid)
+                : [...selectedDevices, udid];
+            setSelectedDevices(newSelection);
         } else {
             // Single-select required
             setSelectedDevices([udid]);
