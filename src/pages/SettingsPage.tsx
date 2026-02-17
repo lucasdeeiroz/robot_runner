@@ -1,11 +1,13 @@
 import { useSettings } from "@/lib/settings";
-import { Moon, Sun, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2, Settings as SettingsIcon, Sparkles } from "lucide-react";
+import { Moon, Sun, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2, Settings as SettingsIcon, Sparkles, FileJson } from "lucide-react";
 import { Switch } from "@/components/atoms/Switch";
 import { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readFile } from "@tauri-apps/plugin-fs";
+import { appDataDir, join } from "@tauri-apps/api/path";
+import { openPath } from "@tauri-apps/plugin-opener";
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
 import { feedback } from "@/lib/feedback";
@@ -203,6 +205,16 @@ export function SettingsPage() {
         }
     };
 
+    const handleOpenSettingsFile = async () => {
+        try {
+            const appData = await appDataDir();
+            const settingsPath = await join(appData, 'settings.json');
+            await openPath(settingsPath);
+        } catch (e) {
+            feedback.toast.error("settings.error.open_file", e);
+        }
+    };
+
     return (
         <div ref={containerRef} className="space-y-4 animate-in fade-in duration-500 pb-12">
             {/* Delete Confirmation Modal */}
@@ -235,10 +247,20 @@ export function SettingsPage() {
                                 size="icon"
                                 onClick={() => handleDeleteClick(activeProfileId)}
                                 className="text-on-surface/80 hover:text-error hover:bg-error-container/10"
+                                title={t('settings.profiles.delete')}
                             >
                                 <Trash2 size={16} />
                             </Button>
                         )}
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={handleOpenSettingsFile}
+                            className="text-on-surface/80 hover:text-primary hover:bg-primary/10"
+                            title={t('settings.action.open_file')}
+                        >
+                            <FileJson size={16} />
+                        </Button>
                         <Select
                             options={profiles.map(p => ({
                                 label: p.id === 'default' && p.name === 'Default' ? t('settings.profiles.default') : p.name,

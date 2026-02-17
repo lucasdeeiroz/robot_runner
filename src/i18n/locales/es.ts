@@ -621,6 +621,9 @@ export const es = {
                 confirm_delete: "¿Estás seguro de que deseas eliminar este perfil? Esto no se puede deshacer.",
                 default: "Predeterminado"
             },
+            action: {
+                open_file: "Abrir Archivo de Configuración"
+            },
             path_labels: {
                 suites: "Directorio de Suites",
                 tests: "Directorio de Pruebas",

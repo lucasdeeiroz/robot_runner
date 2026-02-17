@@ -621,6 +621,9 @@ export const en = {
                 confirm_delete: "Are you sure you want to delete this profile? This cannot be undone.",
                 default: "Default"
             },
+            action: {
+                open_file: "Open Settings File"
+            },
             path_labels: {
                 suites: "Suites Directory",
                 tests: "Tests Directory",

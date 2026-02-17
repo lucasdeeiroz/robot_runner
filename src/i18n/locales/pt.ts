@@ -624,6 +624,9 @@ export const pt = {
                 confirm_delete: "Tem certeza que deseja excluir este perfil? Isso não pode ser desfeito.",
                 default: "Padrão"
             },
+            action: {
+                open_file: "Abrir Arquivo de Configurações"
+            },
             path_labels: {
                 suites: "Diretório de Suítes",
                 tests: "Diretório de Testes",
