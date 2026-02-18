@@ -215,25 +215,34 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, activeProf
             const gridX = Math.round((mouseX - NODE_OFFSET_X) / CELL_WIDTH);
             const gridY = Math.round((mouseY - NODE_OFFSET_Y) / CELL_HEIGHT);
 
-            setLayout(prev => ({
-                ...prev,
-                nodes: {
-                    ...prev.nodes,
-                    [dragItem.id]: { gridX: Math.max(0, gridX), gridY: Math.max(0, gridY) }
-                }
-            }));
+            // Check grid occupancy (exclude self)
+            const isOccupied = Object.entries(layout.nodes).some(([name, pos]) => {
+                if (name === dragItem.id) return false;
+                return pos.gridX === Math.max(0, gridX) && pos.gridY === Math.max(0, gridY);
+            });
+
+            if (!isOccupied) {
+                setLayout(prev => ({
+                    ...prev,
+                    nodes: {
+                        ...prev.nodes,
+                        [dragItem.id]: { gridX: Math.max(0, gridX), gridY: Math.max(0, gridY) }
+                    }
+                }));
+            }
         }
 
         // Edge Connection Dragging (Source / Target)
         if (dragItem?.type === 'source' || dragItem?.type === 'target') {
             // Manual collision detection for ports
-            // Usually drag causes capture, preventing hover. So we check elementFromPoint.
             const el = document.elementFromPoint(e.clientX, e.clientY);
             const portEl = el?.closest('[data-port-id]');
 
             if (portEl) {
                 const portId = portEl.getAttribute('data-port-id');
                 const nodeId = portEl.getAttribute('data-node-id');
+                // Only allow hovering if not dragged from same node (optional, but good)
+                // Actually, self-loops are allowed.
                 if (portId && nodeId) {
                     setHoveredPort({ nodeId, portId });
                 }
@@ -247,9 +256,52 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, activeProf
             // Lane Snapping for Vertices
             let snapped = { x: mouseX, y: mouseY };
 
-            // If dragging a vertex, we might want 4-lane logic (snap to grid lines)
+            // Smart Snapping to Edge Extremities (Start/End)
             if (dragItem.type === 'vertex') {
+                // Default grid snap
                 snapped = snapToLanes(mouseX, mouseY);
+
+                // Try to get Edge Start/End for Align-Snapping
+                const edgeId = dragItem.id;
+                const parts = edgeId.split('-');
+                if (parts.length >= 3) {
+                    const sourceName = parts[0];
+                    const targetName = parts[parts.length - 1];
+                    const sourceLayout = layout.nodes[sourceName];
+                    const targetLayout = layout.nodes[targetName];
+                    const edge = layout.edges[edgeId];
+
+                    if (sourceLayout && targetLayout && edge) {
+                        const sourceMap = maps.find(m => m.name === sourceName);
+                        const targetMap = maps.find(m => m.name === targetName);
+                        if (sourceMap && targetMap) {
+                            const sOrigin = getPixelCoords(sourceLayout.gridX, sourceLayout.gridY);
+                            const tOrigin = getPixelCoords(targetLayout.gridX, targetLayout.gridY);
+                            let startPoint = { x: 0, y: 0 };
+                            let endPoint = { x: 0, y: 0 };
+
+                            if (edge.sourceHandle) startPoint = getPortCoords(sOrigin.x, sOrigin.y, edge.sourceHandle);
+                            else {
+                                const dx = targetLayout.gridX - sourceLayout.gridX;
+                                startPoint = getPortCoords(sOrigin.x, sOrigin.y, dx >= 0 ? 'right-3' : 'left-3');
+                            }
+
+                            if (edge.targetHandle) endPoint = getPortCoords(tOrigin.x, tOrigin.y, edge.targetHandle);
+                            else {
+                                const dx = targetLayout.gridX - sourceLayout.gridX;
+                                endPoint = getPortCoords(tOrigin.x, tOrigin.y, dx >= 0 ? 'left-3' : 'right-3');
+                            }
+
+                            // Snap X to Start/End X if close (20px threshold)
+                            if (Math.abs(snapped.x - startPoint.x) < 20) snapped.x = startPoint.x;
+                            if (Math.abs(snapped.x - endPoint.x) < 20) snapped.x = endPoint.x;
+
+                            // Snap Y to Start/End Y if close
+                            if (Math.abs(snapped.y - startPoint.y) < 20) snapped.y = startPoint.y;
+                            if (Math.abs(snapped.y - endPoint.y) < 20) snapped.y = endPoint.y;
+                        }
+                    }
+                }
             }
 
             // Segment Dragging
@@ -279,33 +331,24 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, activeProf
                             currentPoints[index + 1].x = snappedX;
                         }
 
-                        // Helper: If dragging the first segment (0), we can't really move it if start is fixed.
-                        // But if we are in a 3-segment orthogonal router, dragging the middle one is common.
-                        // For now, let's just support dragging existing vertices or converting default path to vertices.
-
-                        // Since we don't have a complex orthogonal router, let's just return for now if no vertices,
-                        // OR implement a simple "split and move" later.
-                        // The user asked for dragging segments.
-                        // The simplest way is: defined vertices.
-
                         newVertices = currentPoints.slice(1, -1);
                     } else {
                         newVertices = [...prevEdge.vertices];
-                        // Map segment index to vertex index
-                        // Segment i connects points[i] and points[i+1]
-                        // points[0] = Start (Fixed)
-                        // points[1] = Vertex 0
-                        // points[2] = Vertex 1 ...
 
-                        // If dragging Segment 1 (Vertex 0 -> Vertex 1):
-                        // We update Vertex 0 and Vertex 1 coords.
-
+                        // Update vertices based on segment drag
                         if (isHorizontal) {
-                            if (index - 1 >= 0) newVertices[index - 1] = { ...newVertices[index - 1], y: snappedY };
-                            if (index < newVertices.length) newVertices[index] = { ...newVertices[index], y: snappedY };
+                            const vIndex1 = index - 1; // Start of segment (if vertex)
+                            const vIndex2 = index;     // End of segment (if vertex)
+
+                            if (vIndex1 >= 0 && vIndex1 < newVertices.length) newVertices[vIndex1].y = snappedY;
+                            if (vIndex2 >= 0 && vIndex2 < newVertices.length) newVertices[vIndex2].y = snappedY;
+
                         } else {
-                            if (index - 1 >= 0) newVertices[index - 1] = { ...newVertices[index - 1], x: snappedX };
-                            if (index < newVertices.length) newVertices[index] = { ...newVertices[index], x: snappedX };
+                            const vIndex1 = index - 1;
+                            const vIndex2 = index;
+
+                            if (vIndex1 >= 0 && vIndex1 < newVertices.length) newVertices[vIndex1].x = snappedX;
+                            if (vIndex2 >= 0 && vIndex2 < newVertices.length) newVertices[vIndex2].x = snappedX;
                         }
                     }
 
@@ -330,6 +373,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, activeProf
                     if (newVertices[dragItem.index]) {
                         newVertices[dragItem.index] = snapped;
                     }
+
                     return { ...prev, edges: { ...prev.edges, [edgeId]: { ...edge, vertices: newVertices } } };
                 }
                 return prev;
@@ -338,6 +382,9 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, activeProf
     };
 
     const handleMouseUp = () => {
+        // Grid Occupancy is handled in MouseMove (we don't allow move if occupied)
+
+        // Port Occupancy
         if (dragItem?.type === 'source' || dragItem?.type === 'target') {
             if (hoveredPort) {
                 // Check if port is occupied
@@ -370,19 +417,199 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, activeProf
             }
         }
 
+        // Edge Cleanups (Merge/Straighten) on Drop
+        if (dragItem?.type === 'vertex' || dragItem?.type === 'segment') {
+            setLayout(prev => {
+                const edgeId = dragItem.id;
+                const edge = prev.edges[edgeId];
+                if (!edge || !edge.vertices) return prev;
+
+                // 1. Get Full Path Context (Start, End)
+                // We need to re-calculate Start/End to do 3-point collinear check with endpoints
+                let startPoint = { x: 0, y: 0 };
+                let endPoint = { x: 0, y: 0 };
+
+                // Parse ID: source-element-target
+                const parts = edgeId.split('-');
+                if (parts.length >= 3) {
+                    const sourceName = parts[0];
+                    const targetName = parts[parts.length - 1]; // Last part is target
+                    // Note: element name could contain hyphens, so this is risky if names have hyphens.
+                    // But names usually don't have hyphens in this app context (or handled).
+                    // Actually, let's use a safer find if possible. 
+                    // Given the constraint, we might need to rely on `maps` find or store source/target in edge.
+                    // Let's iterate maps to match source/target from ID? No, ID is constructed.
+                    // Let's assume standard names for now or use the helper if available.
+
+                    const sourceMap = maps.find(m => m.name === sourceName);
+                    const targetMap = maps.find(m => m.name === targetName);
+                    const sourceLayout = prev.nodes[sourceName];
+                    const targetLayout = prev.nodes[targetName];
+
+                    if (sourceMap && targetMap && sourceLayout && targetLayout) {
+                        const sOrigin = getPixelCoords(sourceLayout.gridX, sourceLayout.gridY);
+                        const tOrigin = getPixelCoords(targetLayout.gridX, targetLayout.gridY);
+
+                        if (edge.sourceHandle) startPoint = getPortCoords(sOrigin.x, sOrigin.y, edge.sourceHandle);
+                        else {
+                            const dx = targetLayout.gridX - sourceLayout.gridX;
+                            startPoint = getPortCoords(sOrigin.x, sOrigin.y, dx >= 0 ? 'right-3' : 'left-3');
+                        }
+
+                        if (edge.targetHandle) endPoint = getPortCoords(tOrigin.x, tOrigin.y, edge.targetHandle);
+                        else {
+                            const dx = targetLayout.gridX - sourceLayout.gridX;
+                            endPoint = getPortCoords(tOrigin.x, tOrigin.y, dx >= 0 ? 'left-3' : 'right-3');
+                        }
+                    }
+                }
+
+                // 2. Merge duplicated vertices and Remove vertices overlapping Start/End
+                let cleaned = edge.vertices.filter((v, i, arr) => {
+                    // Start point overlap logic (Increased threshold to 15px)
+                    if (Math.abs(v.x - startPoint.x) < 15 && Math.abs(v.y - startPoint.y) < 15) return false;
+                    // End point overlap logic (Increased threshold to 15px)
+                    if (Math.abs(v.x - endPoint.x) < 15 && Math.abs(v.y - endPoint.y) < 15) return false;
+
+                    if (i === 0) return true;
+                    // Internal duplicates logic
+                    const p = arr[i - 1];
+                    return (Math.abs(v.x - p.x) > 10 || Math.abs(v.y - p.y) > 10);
+                });
+
+                // 3. Remove collinear with Start/End
+                // Full path: [start, ...cleaned, end]
+                const fullPath = [startPoint, ...cleaned, endPoint];
+
+                // We check internal points (indices 1 to length-2)
+                const toRemove = new Set<number>();
+
+                for (let i = 1; i < fullPath.length - 1; i++) {
+                    const p0 = fullPath[i - 1];
+                    const p1 = fullPath[i];
+                    const p2 = fullPath[i + 1];
+
+                    // Collinearity check: Distance of p1 from line p0-p2
+                    // Dist = |(y2-y1)x0 - (x2-x1)y0 + x2y1 - y2x1| / sqrt((y2-y1)^2 + (x2-x1)^2)
+                    // Simplified Cross Product Area: 
+                    const crossProduct = (p1.y - p0.y) * (p2.x - p1.x) - (p2.y - p1.y) * (p1.x - p0.x);
+
+                    // Normalize by distance squared? 
+                    // Let's use simple distance from line segment logic if P0 != P2
+                    const l2 = (p2.x - p0.x) ** 2 + (p2.y - p0.y) ** 2;
+                    if (l2 === 0) continue; // p0 == p2
+
+                    // Since we want "visually straight", absolute cross product is okay-ish but depends on length.
+                    // Better: Distance < Threshold
+                    // Area = 0.5 * Base * Height -> Height = |CrossProduct| / Sqrt(l2)
+
+                    const dist = Math.abs(crossProduct) / Math.sqrt(l2);
+
+                    if (dist < 15) { // Increased threshold to 15px for straightening
+                        // Index in 'cleaned' is i-1
+                        toRemove.add(i - 1);
+                    }
+                }
+
+                cleaned = cleaned.filter((_, i) => !toRemove.has(i));
+
+                return {
+                    ...prev,
+                    edges: { ...prev.edges, [edgeId]: { ...edge, vertices: cleaned } }
+                };
+            });
+        }
+
         setIsDraggingCanvas(false);
         setDragItem(null);
         setHoveredPort(null);
     };
 
+    // --- Zoom Logic ---
+
+    const performZoom = (change: number, center?: { x: number, y: number }) => {
+        if (!containerRef.current) return;
+
+        const rect = containerRef.current.getBoundingClientRect();
+
+        // If no center provided (e.g. buttons), use center of viewport
+        const viewportX = center ? center.x : rect.width / 2;
+        const viewportY = center ? center.y : rect.height / 2;
+
+        // Calculate point in "Content Space" before zoom
+        // ContentX = (ViewportX - OffsetX) / Scale
+        const contentX = (viewportX - offset.x) / scale;
+        const contentY = (viewportY - offset.y) / scale;
+
+        // Calculate New Scale
+        const newScale = Math.min(Math.max(scale + change, 0.1), 3);
+        if (newScale === scale) return;
+
+        // Calculate New Offset to preserve content point at viewport point
+        // ViewportX = ContentX * NewScale + NewOffsetX
+        // NewOffsetX = ViewportX - ContentX * NewScale
+        const newOffsetX = viewportX - (contentX * newScale);
+        const newOffsetY = viewportY - (contentY * newScale);
+
+        setScale(newScale);
+        setOffset({ x: newOffsetX, y: newOffsetY });
+    };
+
     const handleWheel = (e: React.WheelEvent) => {
         e.stopPropagation();
         if (e.ctrlKey || e.metaKey) {
-            const delta = e.deltaY > 0 ? 0.9 : 1.1;
-            setScale(s => Math.min(Math.max(s * delta, 0.1), 3));
+            const rect = containerRef.current?.getBoundingClientRect();
+            if (!rect) return;
+
+            // Calculate Mouse Position relative to Container
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            // Standard delta direction
+            const pixelDelta = e.deltaY > 0 ? -0.1 : 0.1;
+
+            performZoom(pixelDelta, { x: mouseX, y: mouseY });
         }
     };
 
+    const handleSegmentDoubleClick = (e: React.MouseEvent, edgeId: string, segmentIndex: number) => {
+        e.stopPropagation();
+        const rect = containerRef.current?.getBoundingClientRect();
+        if (!rect) return;
+
+        const mouseX = (e.clientX - rect.left - offset.x) / scale;
+        const mouseY = (e.clientY - rect.top - offset.y) / scale;
+
+        setLayout(prev => {
+            const edge = prev.edges[edgeId];
+            if (!edge) return prev;
+
+            const newVertices = [...(edge.vertices || [])];
+            // Insert at segmentIndex
+            newVertices.splice(segmentIndex, 0, { x: mouseX, y: mouseY });
+
+            return {
+                ...prev,
+                edges: { ...prev.edges, [edgeId]: { ...edge, vertices: newVertices } }
+            };
+        });
+    };
+
+    const handleVertexDoubleClick = (e: React.MouseEvent, edgeId: string, vertexIndex: number) => {
+        e.stopPropagation();
+        setLayout(prev => {
+            const edge = prev.edges[edgeId];
+            if (!edge || !edge.vertices) return prev;
+
+            const newVertices = [...edge.vertices];
+            newVertices.splice(vertexIndex, 1);
+
+            return {
+                ...prev,
+                edges: { ...prev.edges, [edgeId]: { ...edge, vertices: newVertices } }
+            };
+        });
+    };
 
     // --- Render Logic ---
 
@@ -441,18 +668,28 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, activeProf
 
                 let points = [startPoint, ...(edgeData.vertices || []), endPoint];
 
+                // Default routing for new/unmodified edges (standard dogleg or straight)
                 if ((!edgeData.vertices || edgeData.vertices.length === 0)) {
-                    // Manual midpoint calculation based on possibly dynamic start/end
-                    const midX = (startPoint.x + endPoint.x) / 2;
-                    const snappedMidX = getClosestLane(midX);
-                    points = [startPoint, { x: snappedMidX, y: startPoint.y }, { x: snappedMidX, y: endPoint.y }, endPoint];
+                    // Check for straight alignment
+                    if (Math.abs(startPoint.x - endPoint.x) < 10) {
+                        // Vertical Straight Line
+                        points = [startPoint, endPoint];
+                    } else if (Math.abs(startPoint.y - endPoint.y) < 10) {
+                        // Horizontal Straight Line
+                        points = [startPoint, endPoint];
+                    } else {
+                        // Standard dogleg routing
+                        const midX = (startPoint.x + endPoint.x) / 2;
+                        const snappedMidX = getClosestLane(midX);
+                        points = [startPoint, { x: snappedMidX, y: startPoint.y }, { x: snappedMidX, y: endPoint.y }, endPoint];
+                    }
                 }
 
                 layouts.push({ edgeId, points, startPoint, endPoint, elName: el.name });
             });
         });
         return layouts;
-    }, [maps, layout, dragItem, cursorPos]);
+    }, [maps, layout, dragItem, cursorPos]); // layout change (edges/nodes) triggers recalc
 
     // Layer 1: Lines (Z-Index 10) - Beneath Nodes
     const renderEdgeLines = useMemo(() => {
@@ -475,6 +712,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, activeProf
     // Layer 2: Controls & Interaction (Z-Index 30) - Above Nodes
     const renderEdgeControls = useMemo(() => {
         const isDraggingConnection = dragItem?.type === 'source' || dragItem?.type === 'target';
+        const isDraggingEdge = dragItem?.type === 'segment' || dragItem?.type === 'vertex' || isDraggingConnection;
 
         return edgeLayouts.map(({ edgeId, points, startPoint, endPoint, elName }) => {
             const segments: React.ReactNode[] = [];
@@ -499,6 +737,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, activeProf
                             e.stopPropagation();
                             setDragItem({ type: 'segment', id: edgeId, index: i, points: points });
                         }}
+                        onDoubleClick={(e) => handleSegmentDoubleClick(e, edgeId, i)}
                     />
                 );
             }
@@ -515,18 +754,40 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, activeProf
 
                     {segments}
 
-                    {/* Label */}
-                    {points.length >= 2 && (
-                        <foreignObject x={(points[0].x + points[1].x) / 2 - 60} y={(points[0].y + points[1].y) / 2 - 12} width={120} height={24} style={{ overflow: 'visible' }} className={isDraggingConnection ? "pointer-events-none" : ""}>
-                            <div className="bg-surface/90 text-on-surface text-[10px] px-2 py-0.5 rounded-full text-center truncate border border-outline-variant/50 shadow-sm pointer-events-auto select-none hover:border-primary hover:text-primary transition-colors cursor-move"
-                                onMouseDown={(e) => {
-                                    // Make label draggable or just pass through
-                                    e.stopPropagation();
-                                }}>
-                                {elName}
-                            </div>
-                        </foreignObject>
-                    )}
+                    {/* Label (Hidden during ANY drag to prevent visual noise) */}
+                    {points.length >= 2 && !isDraggingEdge && (() => {
+                        // Find the middle segment for better centering
+                        const midSegIndex = Math.floor((points.length - 1) / 2);
+                        const pA = points[midSegIndex];
+                        const pB = points[midSegIndex + 1];
+
+                        // Midpoint of the central segment
+                        const midX = (pA.x + pB.x) / 2;
+                        const midY = (pA.y + pB.y) / 2;
+
+                        // Apply Offset: Below (+15) and Left (-15)
+                        // foreignObject is centered by subtracting half width (60) and half height (12)
+                        // Final X = midX - 75
+                        // Final Y = midY + 3
+
+                        return (
+                            <foreignObject
+                                x={midX - 75}
+                                y={midY + 3}
+                                width={120}
+                                height={24}
+                                style={{ overflow: 'visible' }}
+                            >
+                                <div className="bg-surface/90 text-on-surface text-[10px] px-2 py-0.5 rounded-full text-center truncate border border-outline-variant/50 shadow-sm pointer-events-auto select-none hover:border-primary hover:text-primary transition-colors cursor-move"
+                                    onMouseDown={(e) => {
+                                        // Make label draggable or just pass through
+                                        e.stopPropagation();
+                                    }}>
+                                    {elName}
+                                </div>
+                            </foreignObject>
+                        );
+                    })()}
 
                     {/* Source Handle */}
                     <circle cx={startPoint.x} cy={startPoint.y} r={6} fill="transparent"
@@ -551,7 +812,9 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, activeProf
                                 "cursor-move opacity-0 hover:opacity-100",
                                 isDraggingConnection ? "pointer-events-none" : "pointer-events-auto"
                             )}
-                            onMouseDown={(e) => { e.stopPropagation(); setDragItem({ type: 'vertex', id: edgeId, index: idx }); }} />
+                            onMouseDown={(e) => { e.stopPropagation(); setDragItem({ type: 'vertex', id: edgeId, index: idx }); }}
+                            onDoubleClick={(e) => handleVertexDoubleClick(e, edgeId, idx)}
+                        />
                     ))}
                 </g>
             );
@@ -578,9 +841,9 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, activeProf
                         </button>
                         <div className="h-6 w-px bg-outline-variant/30 mx-2" />
                         <div className="flex bg-surface-variant/30 rounded-lg p-1 mr-4">
-                            <button onClick={() => setScale(s => s - 0.1)} className="p-1.5 hover:bg-surface/50 rounded text-on-surface-variant"><ZoomOut size={16} /></button>
+                            <button onClick={() => performZoom(-0.1)} className="p-1.5 hover:bg-surface/50 rounded text-on-surface-variant"><ZoomOut size={16} /></button>
                             <span className="px-2 text-xs flex items-center text-on-surface-variant/80 min-w-[3rem] justify-center">{Math.round(scale * 100)}%</span>
-                            <button onClick={() => setScale(s => s + 0.1)} className="p-1.5 hover:bg-surface/50 rounded text-on-surface-variant"><ZoomIn size={16} /></button>
+                            <button onClick={() => performZoom(0.1)} className="p-1.5 hover:bg-surface/50 rounded text-on-surface-variant"><ZoomIn size={16} /></button>
                         </div>
                         <button onClick={onClose} className="p-2 hover:bg-error/10 hover:text-error rounded-full transition-colors text-on-surface/60"><X size={20} /></button>
                     </div>
@@ -709,7 +972,9 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, activeProf
                                             });
 
                                             const isHovered = hoveredPort?.nodeId === name && hoveredPort?.portId === p.id;
-                                            const showPorts = (dragItem?.type === 'source' || dragItem?.type === 'target');
+                                            // Show ports ONLY when dragging connection
+                                            const isDraggingConnection = dragItem?.type === 'source' || dragItem?.type === 'target';
+                                            const showPorts = isDraggingConnection;
 
                                             return (
                                                 <div
@@ -729,10 +994,10 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, activeProf
                                                         className={clsx(
                                                             "w-4 h-4 rounded-full border border-solid transition-all flex items-center justify-center",
                                                             isTrulyOccupied
-                                                                ? (showPorts ? "bg-error/20 border-error" : "bg-outline-variant/50 border-transparent scale-50 opacity-0 group-hover/card:opacity-100")
+                                                                ? (showPorts ? "bg-error/20 border-error" : "opacity-0 scale-0") // Hide occupied unless error showing
                                                                 : (showPorts || isHovered)
                                                                     ? "bg-surface border-outline-variant opacity-100 scale-100"
-                                                                    : "opacity-0 scale-0",
+                                                                    : "opacity-0 scale-0", // Hide if not dragging
                                                             isHovered && !isTrulyOccupied && "bg-primary border-primary scale-125",
                                                             isHovered && isTrulyOccupied && "cursor-not-allowed"
                                                         )}
