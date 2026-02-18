@@ -37,7 +37,7 @@ export async function listScreenMaps(profileId: string): Promise<ScreenMap[]> {
         const maps: ScreenMap[] = [];
 
         for (const entry of entries) {
-            if (entry.isFile && entry.name.endsWith('.json')) {
+            if (entry.isFile && entry.name.endsWith('.json') && entry.name !== 'flowchart_layout.json') {
                 try {
                     const content = await readTextFile(`${dir}/${entry.name}`, { baseDir: BaseDirectory.AppLocalData });
                     const map = JSON.parse(content) as ScreenMap;
@@ -57,4 +57,33 @@ export async function listScreenMaps(profileId: string): Promise<ScreenMap[]> {
 export async function deleteScreenMap(profileId: string, id: string): Promise<void> {
     const fileName = `${id}.json`;
     await remove(`${getMapsDir(profileId)}/${fileName}`, { baseDir: BaseDirectory.AppLocalData });
+}
+
+
+// --- Flowchart Layout Persistence ---
+
+import { FlowchartLayout } from '@/lib/types';
+
+export async function saveFlowchartLayout(profileId: string, layout: FlowchartLayout): Promise<void> {
+    await ensureDir(profileId);
+    const fileName = 'flowchart_layout.json';
+    const content = JSON.stringify(layout, null, 2);
+    await writeTextFile(`${getMapsDir(profileId)}/${fileName}`, content, { baseDir: BaseDirectory.AppLocalData });
+}
+
+export async function loadFlowchartLayout(profileId: string): Promise<FlowchartLayout | null> {
+    try {
+        await ensureDir(profileId);
+        const fileName = 'flowchart_layout.json';
+        const path = `${getMapsDir(profileId)}/${fileName}`;
+        const layoutExists = await exists(path, { baseDir: BaseDirectory.AppLocalData });
+
+        if (!layoutExists) return null;
+
+        const content = await readTextFile(path, { baseDir: BaseDirectory.AppLocalData });
+        return JSON.parse(content) as FlowchartLayout;
+    } catch (e) {
+        console.warn("Failed to load flowchart layout", e);
+        return null;
+    }
 }

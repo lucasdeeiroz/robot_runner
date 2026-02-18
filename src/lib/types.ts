@@ -52,3 +52,22 @@ export interface ScreenMap {
     elements: UIElementMap[];
     base64_preview?: string; // Optional: Screenshot thumbnail
 }
+
+// --- Flowchart Layout ---
+
+export interface LayoutNode {
+    gridX: number;
+    gridY: number;
+}
+
+export interface LayoutEdge {
+    vertices?: { x: number, y: number }[]; // Manual waypoints
+    sourceHandle?: string;
+    targetHandle?: string;
+}
+
+export interface FlowchartLayout {
+    version: number;
+    nodes: Record<string, LayoutNode>; // key: Screen Name
+    edges: Record<string, LayoutEdge>; // key: Edge ID
+}
