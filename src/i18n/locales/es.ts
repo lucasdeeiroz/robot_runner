@@ -165,6 +165,8 @@ export const es = {
                 disconnect: "Desconectar",
                 disconnect_all: "Desconectar Todos",
                 enable_remote: "Habilitar Conexión Remota",
+                enable_tcpip: "Habilitar 5555",
+                enable_tcpip_tooltip: "Ejecutar 'adb tcpip 5555'",
                 pair: "Emparejar",
                 paste_url: "Pegar URL",
                 rerun_failed: "Reejecutar Fallos",
@@ -196,7 +198,10 @@ export const es = {
                 payment_required_title: "Pago de Ngrok Requerido",
                 payment_required_desc: "Las cuentas gratuitas de ngrok requieren una tarjeta de crédito válida para usar túneles TCP. No se te cobrará.",
                 add_card: "Añadir Tarjeta",
-                cancel_card: "Cancelar"
+                cancel_card: "Cancelar",
+                enabling_tcpip: "Habilitando TCP/IP 5555...",
+                tcpip_enabled: "TCP/IP 5555 Habilitado",
+                tcpip_failed: "Fallo al habilitar TCP/IP"
             },
             security_warning: {
                 title: "Advertencia de Seguridad",

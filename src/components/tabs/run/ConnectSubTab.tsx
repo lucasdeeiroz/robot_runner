@@ -229,6 +229,26 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
         }
     };
 
+    const handleEnableTcpIp = async () => {
+        if (!selectedDevice) return;
+        setLoading(true);
+        setStatusMsg({ text: t('connect.status.enabling_tcpip', "Enabling TCP/IP 5555..."), type: 'info' });
+        try {
+            await invoke('run_adb_command', {
+                device: selectedDevice,
+                args: ['tcpip', '5555']
+            });
+            setPort("5555");
+            setStatusMsg({ text: t('connect.status.tcpip_enabled', "TCP/IP 5555 Enabled"), type: 'success' });
+            feedback.toast.success("connect.status.tcpip_enabled");
+        } catch (e) {
+            setStatusMsg({ text: `${t('connect.status.tcpip_failed', "Failed to enable TCP/IP")}: ${e}`, type: 'error' });
+            feedback.toast.error("connect.status.tcpip_failed", e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="h-full space-y-6 overflow-auto">
             <ConfirmationModal
@@ -312,7 +332,19 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                         />
                     </div>
                     <div>
-                        <label className="block text-xs font-medium text-on-surface-variant/80 mb-1 ml-1">{t('connect.labels.port')}</label>
+                        <div className="flex justify-between items-center mb-1">
+                            <label className="block text-xs font-medium text-on-surface-variant/80 ml-1">{t('connect.labels.port')}</label>
+                            {selectedDevice && (
+                                <button
+                                    onClick={handleEnableTcpIp}
+                                    className="text-[10px] text-primary hover:underline cursor-pointer"
+                                    disabled={loading}
+                                    title={t('connect.actions.enable_tcpip_tooltip', "Run 'adb tcpip 5555'")}
+                                >
+                                    {t('connect.actions.enable_tcpip', "Enable 5555")}
+                                </button>
+                            )}
+                        </div>
                         <input
                             type="text"
                             placeholder="5555"
