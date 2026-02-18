@@ -921,6 +921,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                         setIsFlowchartOpen(false);
                     }
                 }}
+                onRefresh={loadSavedMaps}
                 activeProfileId={activeProfileId}
             />
 

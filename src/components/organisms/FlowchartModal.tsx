@@ -1,21 +1,25 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ScreenMap, FlowchartLayout } from '@/lib/types';
-import { X, ZoomIn, ZoomOut, Maximize, Pencil, Save } from 'lucide-react';
+import { X, ZoomIn, ZoomOut, Maximize, Pencil, Save, Upload, Download, Plus, Camera } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
-import { saveFlowchartLayout, loadFlowchartLayout } from '@/lib/dashboard/mapperPersistence';
+import { saveFlowchartLayout, loadFlowchartLayout, exportMapperData, importMapperData, saveScreenMap } from '@/lib/dashboard/mapperPersistence';
 import { feedback } from '@/lib/feedback';
+import { save, open } from '@tauri-apps/plugin-dialog';
+import { invoke } from '@tauri-apps/api/core';
+import { toPng } from 'html-to-image';
 
 interface FlowchartModalProps {
     isOpen: boolean;
     onClose: () => void;
     maps: ScreenMap[];
     onEditScreen?: (screenName: string) => void;
+    onRefresh?: () => void;
     activeProfileId: string;
 }
 
-// --- Constants ---
+
 const CELL_WIDTH = 300;
 const CELL_HEIGHT = 400;
 const NODE_WIDTH = 220;
@@ -75,12 +79,13 @@ const generatePorts = (): Port[] => {
 const NODE_PORTS = generatePorts();
 
 
-export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, activeProfileId }: FlowchartModalProps) {
+export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh, activeProfileId }: FlowchartModalProps) {
     const { t } = useTranslation();
     const [scale, setScale] = useState(1);
     const [offset, setOffset] = useState({ x: 0, y: 0 });
     const [isDraggingCanvas, setIsDraggingCanvas] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
+    const contentRef = useRef<HTMLDivElement>(null);
     const dragStart = useRef({ x: 0, y: 0 });
 
     // Layout State
@@ -100,6 +105,15 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, activeProf
 
     // For rendering potential connections
     const [hoveredPort, setHoveredPort] = useState<{ nodeId: string, portId: string } | null>(null);
+    const [hoveredEdge, setHoveredEdge] = useState<string | null>(null);
+
+    // Quick Connect State
+    const [quickConnectData, setQuickConnectData] = useState<{
+        sourceNodeId: string;
+        sourcePortId: string;
+        sourceElement?: string; // If mapped element
+    } | null>(null);
+    const [isQuickConnectOpen, setIsQuickConnectOpen] = useState(false);
 
 
     // Load Layout
@@ -123,6 +137,165 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, activeProf
     const saveLayout = async () => {
         await saveFlowchartLayout(activeProfileId, layout);
         feedback.toast.success(t('common.saved', 'Saved'));
+    };
+
+    const handleExport = async () => {
+        try {
+            const data = await exportMapperData(activeProfileId);
+            const path = await save({
+                filters: [{ name: 'Robot Runner Flow', extensions: ['json'] }],
+                defaultPath: `flowchart_export_${new Date().toISOString().split('T')[0]}.json`
+            });
+
+            if (path) {
+                // Use generic save_file command from backend if available, or just writeTextFile from fs
+                // Since we don't have a direct "write arbitrary file" from fs plugin that isn't sandboxed easily in frontend without config,
+                // we'll rely on the standard "save_file" command if it exists, or try to use the fs plugin with absolute path if allowed.
+                // Given the context, let's try using the backend command 'save_file' which is common in this project for arbitrary paths.
+                // If not, we might need to add it. But let's check if we used it before? 
+                // We used `writeTextFile` in persistence.
+
+                // Let's assume we can use writeTextFile from @tauri-apps/plugin-fs with the absolute path returned by dialog.
+                // Note: File System Access API might be restricted.
+                // A safe bet is using a backend command. 
+                // Let's try to use the `writeTextFile` from `mapperPersistence` which imports it from `plugin-fs`.
+                // Actually, `mapperPersistence` uses `BaseDirectory.AppLocalData`.
+                // We need to write to `path`.
+
+                // For now, let's try `invoke('save_content', { path, content: data })` assuming we have a generic file saver.
+                // If not, I'll add one or use `writeTextFile` directly if I import it.
+                // Let's check `src-tauri/src/lib.rs`? No access.
+                // Let's assume `writeTextFile` works if we don't pass BaseDirectory?
+                // No, it usually requires BaseDirectory or scope.
+
+                // Let's try `writeTextFile` from `@tauri-apps/plugin-fs` directly. I need to add it to imports if I use it.
+                // But I didn't add it to imports.
+
+                // Wait, I can just use `invoke("save_file", ...)` if I implemented it.
+                // I see `save_file` used in other contexts? 
+                // Let's use `invoke` for now, targeting a command `save_file`. 
+                // If it fails, I'll fix it.
+                await invoke('save_file', { path, content: data, append: false });
+                feedback.toast.success(t('mapper.flowchart.export_success'));
+            }
+        } catch (e) {
+            console.error(e);
+            feedback.toast.error(t('mapper.flowchart.export_error'));
+        }
+    };
+
+    const handleImport = async () => {
+        try {
+            const path = await open({
+                filters: [{ name: 'Robot Runner Flow', extensions: ['json'] }],
+                multiple: false
+            });
+
+            if (path && typeof path === 'string') {
+                const content = await invoke<string>('read_file', { path });
+                await importMapperData(activeProfileId, content);
+                feedback.toast.success(t('mapper.flowchart.import_success'));
+                if (onRefresh) onRefresh();
+                loadLayout(); // Reload layout in this modal
+            }
+        } catch (e) {
+            console.error(e);
+            feedback.toast.error(t('mapper.flowchart.import_error'));
+        }
+    };
+
+    const handleExportImage = async () => {
+        if (!contentRef.current) return;
+        try {
+            const dataUrl = await toPng(contentRef.current, {
+                backgroundColor: '#1a1b1e', // Dark theme background
+                style: {
+                    transform: 'none', // Reset scale/translate to capture full resolution
+                },
+                width: 3000, // Force large width to capture everything
+                height: 3000
+            });
+
+            const base64Data = dataUrl.split(',')[1];
+            const binaryString = atob(base64Data);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+
+            const path = await save({
+                filters: [{ name: 'Image', extensions: ['png'] }],
+                defaultPath: `flowchart_${new Date().toISOString().split('T')[0]}.png`
+            });
+
+            if (path) {
+                await invoke('save_image', { path, content: Array.from(bytes) });
+                feedback.toast.success(t('mapper.flowchart.export_success'));
+            }
+        } catch (e) {
+            console.error(e);
+            feedback.toast.error(t('mapper.flowchart.export_error'));
+        }
+    };
+
+    const handleQuickConnect = (nodeId: string, portId: string) => {
+        setQuickConnectData({ sourceNodeId: nodeId, sourcePortId: portId });
+        setIsQuickConnectOpen(true);
+    };
+
+    const confirmQuickConnect = async (targetScreenName: string, sourceElementName?: string) => {
+        if (!quickConnectData) return;
+
+        const { sourceNodeId, sourcePortId } = quickConnectData;
+        const sourceMap = maps.find(m => m.name === sourceNodeId);
+
+        if (!sourceMap) return;
+
+        if (!sourceElementName) {
+            feedback.toast.error("Please select a source element");
+            return;
+        }
+
+        const elementIndex = sourceMap.elements.findIndex(el => el.name === sourceElementName);
+        if (elementIndex === -1) {
+            feedback.toast.error("Element not found");
+            return;
+        }
+
+        const updatedElements = [...sourceMap.elements];
+        updatedElements[elementIndex] = { ...updatedElements[elementIndex], navigates_to: targetScreenName };
+        const updatedMap = { ...sourceMap, elements: updatedElements };
+
+        // 2. Update Layout (Add Edge)
+        const edgeId = `${sourceNodeId}-${sourceElementName}-${targetScreenName}`;
+
+        const updatedLayout = {
+            ...layout,
+            edges: {
+                ...layout.edges,
+                [edgeId]: {
+                    sourceHandle: sourcePortId,
+                    targetHandle: 'left-3',
+                }
+            }
+        };
+
+        try {
+            setIsQuickConnectOpen(false);
+            setQuickConnectData(null);
+
+            await saveScreenMap(activeProfileId, updatedMap);
+            await saveFlowchartLayout(activeProfileId, updatedLayout);
+
+            // Update Local State
+            setLayout(updatedLayout);
+            if (onRefresh) onRefresh();
+            feedback.toast.success(t('common.saved', 'Saved'));
+        } catch (e) {
+            console.error(e);
+            feedback.toast.error("Failed to save connection");
+        }
     };
 
     // Auto-Layout New Nodes
@@ -691,9 +864,19 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, activeProf
         return layouts;
     }, [maps, layout, dragItem, cursorPos]); // layout change (edges/nodes) triggers recalc
 
+    // NEW: Sorted layouts for Z-indexing (Hovered edge last = on top)
+    const sortedEdgeLayouts = useMemo(() => {
+        if (!hoveredEdge) return edgeLayouts;
+        return [...edgeLayouts].sort((a, b) => {
+            if (a.edgeId === hoveredEdge) return 1;
+            if (b.edgeId === hoveredEdge) return -1;
+            return 0;
+        });
+    }, [edgeLayouts, hoveredEdge]);
+
     // Layer 1: Lines (Z-Index 10) - Beneath Nodes
     const renderEdgeLines = useMemo(() => {
-        return edgeLayouts.map(({ edgeId, points }) => {
+        return sortedEdgeLayouts.map(({ edgeId, points }) => {
             let d = `M ${points[0].x} ${points[0].y}`;
             for (let i = 0; i < points.length - 1; i++) {
                 const p2 = points[i + 1];
@@ -702,19 +885,19 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, activeProf
 
             return (
                 <g key={`${edgeId}-line`}>
-                    <path d={d} stroke="#9ca3af" strokeWidth={2} fill="none" markerEnd="url(#arrowhead)"
-                        className="group-hover/edge:stroke-primary transition-colors pointer-events-none" />
+                    <path d={d} stroke={hoveredEdge === edgeId ? "#3b82f6" : "#9ca3af"} strokeWidth={hoveredEdge === edgeId ? 3 : 2} fill="none" markerEnd={hoveredEdge === edgeId ? "url(#arrowhead-highlighted)" : "url(#arrowhead)"}
+                        className="transition-colors pointer-events-none" />
                 </g>
             );
         });
-    }, [edgeLayouts]);
+    }, [sortedEdgeLayouts, hoveredEdge]);
 
-    // Layer 2: Controls & Interaction (Z-Index 30) - Above Nodes
+    // Layer 2: Controls & Interaction (Z-Index 50) - Above Nodes
     const renderEdgeControls = useMemo(() => {
         const isDraggingConnection = dragItem?.type === 'source' || dragItem?.type === 'target';
         const isDraggingEdge = dragItem?.type === 'segment' || dragItem?.type === 'vertex' || isDraggingConnection;
 
-        return edgeLayouts.map(({ edgeId, points, startPoint, endPoint, elName }) => {
+        return sortedEdgeLayouts.map(({ edgeId, points, startPoint, endPoint, elName }) => {
             const segments: React.ReactNode[] = [];
             for (let i = 0; i < points.length - 1; i++) {
                 const p1 = points[i];
@@ -743,7 +926,10 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, activeProf
             }
 
             return (
-                <g key={`${edgeId}-ctrl`} className="group/edge pointer-events-auto">
+                <g key={`${edgeId}-ctrl`} className="group/edge pointer-events-auto"
+                    onMouseEnter={() => setHoveredEdge(edgeId)}
+                    onMouseLeave={() => setHoveredEdge(null)}
+                >
                     {/* Hover Hit Area (Duplicate Path for Hover detection if needed, or stick to segments) */}
                     {/* The problem: If we only have segments, the gaps might be missing? No, segments cover it. */}
                     {/* However, purely for visual hover effect on the line, we might need a transparent path here too if we want 'group-hover' to work across layers */}
@@ -762,23 +948,43 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, activeProf
                         const pB = points[midSegIndex + 1];
 
                         // Midpoint of the central segment
-                        const midX = (pA.x + pB.x) / 2;
-                        const midY = (pA.y + pB.y) / 2;
-
-                        // Apply Offset: Below (+15) and Left (-15)
-                        // foreignObject is centered by subtracting half width (60) and half height (12)
-                        // Final X = midX - 75
-                        // Final Y = midY + 3
+                        let midX = (pA.x + pB.x) / 2;
+                        let midY = (pA.y + pB.y) / 2;
+                        if (pA.x > pB.x) {
+                            midX = midX - 10;
+                        }
+                        else if (pA.x == pB.x) {
+                            midX = midX - 2;
+                        }
+                        else {
+                            midX = midX - 110;
+                        }
+                        if (pA.y > pB.y) {
+                            midY = midY + 10;
+                        }
+                        else if (pA.y == pB.y) {
+                            midY = midY + 2;
+                        }
+                        else {
+                            midY = midY - 30;
+                        }
 
                         return (
                             <foreignObject
-                                x={midX - 75}
-                                y={midY + 3}
+                                // Apply Offset: Below (+15) and Left (-15)
+                                // foreignObject is centered by subtracting half width (60) and half height (12)
+                                // Final X = midX - 122
+                                // Final Y = midY + 10
+                                x={midX}
+                                y={midY}
                                 width={120}
                                 height={24}
                                 style={{ overflow: 'visible' }}
                             >
-                                <div className="bg-surface/90 text-on-surface text-[10px] px-2 py-0.5 rounded-full text-center truncate border border-outline-variant/50 shadow-sm pointer-events-auto select-none hover:border-primary hover:text-primary transition-colors cursor-move"
+                                <div className={clsx(
+                                    "text-on-surface text-[10px] px-2 py-0.5 rounded-full text-center truncate border shadow-sm pointer-events-auto select-none transition-colors cursor-move",
+                                    hoveredEdge === edgeId ? "bg-surface border-primary text-primary ring-1 ring-primary" : "bg-surface/90 border-outline-variant/50 hover:border-primary hover:text-primary"
+                                )}
                                     onMouseDown={(e) => {
                                         // Make label draggable or just pass through
                                         e.stopPropagation();
@@ -819,7 +1025,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, activeProf
                 </g>
             );
         });
-    }, [edgeLayouts, dragItem]); // Added dragItem dependency for re-render on drag start
+    }, [sortedEdgeLayouts, dragItem]); // Added sortedEdgeLayouts dependency // Added dragItem dependency for re-render on drag start
 
 
     if (!isOpen) return null;
@@ -833,11 +1039,20 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, activeProf
                     <h2 className="text-lg font-semibold text-on-surface flex items-center gap-2">
                         <Maximize className="text-primary" size={20} />
                         {t('mapper.flowchart.title', 'Navigation Flow')}
-                        <span className="text-xs font-normal text-on-surface-variant/50 ml-2">(Enhanced)</span>
                     </h2>
                     <div className="flex items-center gap-2">
+                        <button onClick={handleImport} className="p-2 hover:bg-primary/10 text-primary rounded-full" title={t('mapper.flowchart.import', 'Import Flow')}>
+                            <Download size={20} />
+                        </button>
+                        <button onClick={handleExport} className="p-2 hover:bg-primary/10 text-primary rounded-full" title={t('mapper.flowchart.export', 'Export Flow')}>
+                            <Upload size={20} />
+                        </button>
                         <button onClick={saveLayout} className="p-2 hover:bg-primary/10 text-primary rounded-full" title={t('common.save')}>
                             <Save size={20} />
+                        </button>
+                        <div className="h-4 w-px bg-outline-variant/30 mx-2" />
+                        <button onClick={handleExportImage} className="p-2 hover:bg-primary/10 text-primary rounded-full" title={t('mapper.flowchart.export_image', 'Export Image')}>
+                            <Camera size={20} />
                         </button>
                         <div className="h-6 w-px bg-outline-variant/30 mx-2" />
                         <div className="flex bg-surface-variant/30 rounded-lg p-1 mr-4">
@@ -849,23 +1064,25 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, activeProf
                     </div>
                 </div>
 
-                {/* Canvas */}
+                {/* Canvas Container */}
                 <div
                     ref={containerRef}
-                    className="flex-1 overflow-hidden relative bg-surface-variant/5 cursor-move"
+                    className="flex-1 bg-surface-variant/5 relative overflow-hidden cursor-grab active:cursor-grabbing"
                     onMouseDown={handleCanvasMouseDown}
                     onMouseMove={handleMouseMove}
                     onMouseUp={handleMouseUp}
                     onMouseLeave={handleMouseUp}
                     onWheel={handleWheel}
-                    data-bg="true"
                 >
+                    {/* Flowchart Content */}
                     <div
-                        className="absolute origin-top-left transition-transform duration-75"
+                        ref={contentRef}
+                        className="absolute inset-0 z-0 bg-surface-variant/5 lines-bg"
                         style={{
                             transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
-                            width: 3000,
-                            height: 3000
+                            transformOrigin: '0 0',
+                            width: '3000px',
+                            height: '3000px'
                         }}
                     >
                         {/* Grid Background */}
@@ -886,16 +1103,19 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, activeProf
                                 <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
                                     <polygon points="0 0, 10 3.5, 0 7" fill="#9ca3af" />
                                 </marker>
+                                <marker id="arrowhead-highlighted" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                                    <polygon points="0 0, 10 3.5, 0 7" fill="#3b82f6" />
+                                </marker>
                             </defs>
                             {renderEdgeLines}
                         </svg>
 
-                        {/* Edges Layer (Controls) - Z-Index 30 (Above Nodes) */}
-                        <svg className="absolute top-0 left-0 w-full h-full pointer-events-none" style={{ zIndex: 30, overflow: 'visible' }}>
+                        {/* Edges Layer (Controls) - Z-Index 50 (Above Nodes) */}
+                        <svg className="absolute top-0 left-0 w-full h-full pointer-events-none" style={{ zIndex: 50, overflow: 'visible' }}>
                             {renderEdgeControls}
                         </svg>
 
-                        {/* Nodes (Z-Index 20) */}
+                        {/* Nodes (Z-Index 40) */}
                         {Object.entries(layout.nodes).map(([name, pos]) => {
                             const data = maps.find(m => m.name === name);
                             if (!data) return null;
@@ -909,7 +1129,8 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, activeProf
                                     className={clsx(
                                         "absolute flex flex-col bg-surface border rounded-xl overflow-visible shadow-sm hover:shadow-xl transition-shadow group/card",
                                         data.type === 'modal' ? 'border-dashed border-tertiary' : 'border-outline-variant/60',
-                                        isDraggingThis ? 'z-50 ring-2 ring-primary shadow-2xl opacity-90' : 'z-20'
+                                        isDraggingThis ? 'z-[55] ring-2 ring-primary shadow-2xl opacity-90' : 'z-40'
+                                        // Lift dragged node above Edge Controls (50) but below Ports (60)
                                     )}
                                     style={{
                                         left: pixel.x,
@@ -923,18 +1144,25 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, activeProf
                                         setDragItem({ type: 'node', id: name });
                                     }}
                                 >
-                                    {/* Content */}
-                                    <div className="h-48 w-full bg-surface-variant/20 relative overflow-hidden flex items-center justify-center p-2 pointer-events-none rounded-t-xl">
+                                    {/* Content - Full Card Image */}
+                                    <div className="absolute inset-0 z-0 flex items-center justify-center bg-surface-variant/20 rounded-xl overflow-hidden">
                                         {data.base64_preview ? (
-                                            <img src={`data:image/png;base64,${data.base64_preview}`} className="max-h-full max-w-full object-contain shadow-sm rounded" />
+                                            <img
+                                                src={`data:image/png;base64,${data.base64_preview}`}
+                                                className="w-full h-full object-contain opacity-90 transition-opacity group-hover/card:opacity-100 placeholder:opacity-100"
+                                                alt={data.name}
+                                            />
                                         ) : (
                                             <span className="text-xs text-on-surface-variant/50">No Preview</span>
                                         )}
-                                        <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-black/60 text-[10px] text-white backdrop-blur-sm">
-                                            {data.type}
+                                        {/* Type Badge - Top Right */}
+                                        <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-black/60 text-[10px] text-white backdrop-blur-sm z-10">
+                                            {t(`mapper.screen_types.${data.type}`, data.type)}
                                         </div>
                                     </div>
-                                    <div className="flex-1 p-3 flex flex-col justify-center border-t border-outline-variant/10 bg-surface rounded-b-xl pointer-events-none">
+
+                                    {/* Footer Overlay */}
+                                    <div className="absolute bottom-0 left-0 right-0 p-3 flex flex-col justify-center bg-surface/50 border-t border-outline-variant/10 rounded-b-xl z-20 transition-colors group-hover/card:bg-surface/70">
                                         <div className="flex items-center justify-between gap-2 pointer-events-auto">
                                             <h3 className="font-semibold text-sm text-on-surface truncate" title={data.name}>
                                                 {data.name}
@@ -954,67 +1182,209 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, activeProf
                                             )}
                                         </div>
                                         <div className="text-xs text-on-surface-variant/70 mt-1 pointer-events-auto">
-                                            {data.elements.length} {t('mapper.elements', 'elements')}
+                                            {t('mapper.elements_mapped_count', { count: data.elements.length })}
                                         </div>
                                     </div>
+                                </div>
+                            );
+                        })}
 
-                                    {/* Ports Layer (Moved to end and pointer-events-auto) */}
-                                    <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 100 }}>
-                                        {NODE_PORTS.map(p => {
+                        {/* Global Ports Layer (Z-Index 60 - Topmost) */}
+                        {Object.entries(layout.nodes).map(([name, pos]) => {
+                            const data = maps.find(m => m.name === name);
+                            if (!data) return null;
+                            const pixel = getPixelCoords(pos.gridX, pos.gridY);
 
+                            return (
+                                <React.Fragment key={`${name}-ports`}>
+                                    {NODE_PORTS.map(p => {
+                                        // Correct Layout-Based Occupancy Check
+                                        const isTrulyOccupied = maps.some(m => {
+                                            const sourceLayout = layout.nodes[m.name];
+                                            if (!sourceLayout) return false;
 
-                                            // Correct Layout-Based Occupancy Check
-                                            const isTrulyOccupied = Object.entries(layout.edges).some(([eKey, edge]) => {
-                                                const [sName, _, tName] = eKey.split('-'); // rudimentary parsing
-                                                if (sName === name && edge.sourceHandle === p.id) return true;
-                                                if (tName === name && edge.targetHandle === p.id) return true;
+                                            return m.elements.some(el => {
+                                                const targetName = el.navigates_to;
+                                                if (!targetName) return false;
+
+                                                const targetLayout = layout.nodes[targetName];
+                                                if (!targetLayout) return false;
+
+                                                const edgeId = `${m.name}-${el.name}-${targetName}`;
+                                                const edgeData = layout.edges[edgeId] || {};
+
+                                                // Determine used handles (explicit or default)
+                                                let sHandle = edgeData.sourceHandle;
+                                                let tHandle = edgeData.targetHandle;
+
+                                                // If no explicit handle, calculate default
+                                                if (!sHandle || !tHandle) {
+                                                    const dx = targetLayout.gridX - sourceLayout.gridX;
+                                                    if (!sHandle) sHandle = dx >= 0 ? 'right-3' : 'left-3';
+                                                    if (!tHandle) tHandle = dx >= 0 ? 'left-3' : 'right-3';
+                                                }
+
+                                                // Check Source
+                                                if (m.name === name && sHandle === p.id) return true;
+                                                // Check Target
+                                                if (targetName === name && tHandle === p.id) return true;
+
                                                 return false;
                                             });
+                                        });
 
-                                            const isHovered = hoveredPort?.nodeId === name && hoveredPort?.portId === p.id;
-                                            // Show ports ONLY when dragging connection
-                                            const isDraggingConnection = dragItem?.type === 'source' || dragItem?.type === 'target';
-                                            const showPorts = isDraggingConnection;
+                                        const isHovered = hoveredPort?.nodeId === name && hoveredPort?.portId === p.id;
 
-                                            return (
+                                        // Visibility & Interaction Logic
+                                        const isDraggingConnection = dragItem?.type === 'source' || dragItem?.type === 'target';
+                                        const canQuickConnect = !isDraggingConnection && !isDraggingCanvas && !dragItem && !isTrulyOccupied;
+                                        const showPorts = isDraggingConnection || (canQuickConnect && isHovered);
+
+                                        // INTERACTION RULE:
+                                        // 1. If Dragging Connection: ALWAYS clickable (to drop).
+                                        // 2. If NOT Occupied: Clickable (for Quick Connect).
+                                        // 3. If Occupied: NOT Clickable (Pass through to Edge Handle underneath).
+                                        const isInteractive = isDraggingConnection || canQuickConnect;
+
+                                        return (
+                                            <div
+                                                key={`${name}-${p.id}`}
+                                                data-port-id={p.id}
+                                                data-node-id={name}
+                                                className={clsx(
+                                                    "absolute w-12 h-12 rounded-full flex items-center justify-center",
+                                                    isInteractive ? "pointer-events-auto" : "pointer-events-none"
+                                                )}
+                                                style={{
+                                                    zIndex: 60,
+                                                    left: pixel.x + p.x - 24,
+                                                    top: pixel.y + p.y - 24,
+                                                    backgroundColor: 'rgba(255, 255, 255, 0.001)' // Force positive hit-test even if transparent
+                                                }}
+                                                onMouseEnter={() => setHoveredPort({ nodeId: name, portId: p.id })}
+                                                onMouseLeave={() => setHoveredPort(null)}
+                                                onMouseDown={(e) => {
+                                                    if (isInteractive) e.stopPropagation();
+                                                }}
+                                                onClick={(e) => {
+                                                    if (canQuickConnect) {
+                                                        e.stopPropagation();
+                                                        handleQuickConnect(name, p.id);
+                                                    }
+                                                }}
+                                            >
+                                                {/* Visual Port Loop / Plus */}
                                                 <div
-                                                    key={p.id}
-                                                    data-port-id={p.id}
-                                                    data-node-id={name}
-                                                    className="absolute w-12 h-12 rounded-full flex items-center justify-center pointer-events-auto z-50" // Hit Area: 48px
-                                                    style={{
-                                                        left: p.x - 24, // Center the 48px container
-                                                        top: p.y - 24
-                                                    }}
-                                                    onMouseEnter={() => setHoveredPort({ nodeId: name, portId: p.id })}
-                                                    onMouseLeave={() => setHoveredPort(null)}
+                                                    className={clsx(
+                                                        "w-4 h-4 rounded-full border border-solid transition-all flex items-center justify-center bg-surface pointer-events-none",
+                                                        showPorts ? "opacity-100 scale-100" : "opacity-0 scale-0",
+                                                        isDraggingConnection ? (isHovered ? "border-primary bg-primary/20 scale-125" : "border-outline-variant/50") : (
+                                                            canQuickConnect && isHovered ? "border-primary scale-125 shadow-lg" : "border-outline-variant/30"
+                                                        )
+                                                    )}
                                                 >
-                                                    {/* Visual Port */}
-                                                    <div
-                                                        className={clsx(
-                                                            "w-4 h-4 rounded-full border border-solid transition-all flex items-center justify-center",
-                                                            isTrulyOccupied
-                                                                ? (showPorts ? "bg-error/20 border-error" : "opacity-0 scale-0") // Hide occupied unless error showing
-                                                                : (showPorts || isHovered)
-                                                                    ? "bg-surface border-outline-variant opacity-100 scale-100"
-                                                                    : "opacity-0 scale-0", // Hide if not dragging
-                                                            isHovered && !isTrulyOccupied && "bg-primary border-primary scale-125",
-                                                            isHovered && isTrulyOccupied && "cursor-not-allowed"
-                                                        )}
-                                                    >
-                                                        {isTrulyOccupied && showPorts && <div className="w-1.5 h-1.5 rounded-full bg-error" />}
-                                                    </div>
+                                                    {isHovered && canQuickConnect && (
+                                                        <Plus size={10} className="text-primary" />
+                                                    )}
+                                                    {isDraggingConnection && isHovered && (
+                                                        <div className="w-2 h-2 rounded-full bg-primary/50" />
+                                                    )}
                                                 </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </React.Fragment>
                             );
                         })}
                     </div>
                 </div>
             </div>
+
+            {/* Quick Connect Modal */}
+            {isQuickConnectOpen && quickConnectData && (
+                <QuickConnectDialog
+                    maps={maps}
+                    sourceNodeId={quickConnectData.sourceNodeId}
+                    onClose={() => {
+                        setIsQuickConnectOpen(false);
+                        setQuickConnectData(null);
+                    }}
+                    onConfirm={confirmQuickConnect}
+                />
+            )}
         </div>,
         document.body
+    );
+}
+
+function QuickConnectDialog({ maps, sourceNodeId, onClose, onConfirm }: {
+    maps: ScreenMap[],
+    sourceNodeId: string,
+    onClose: () => void,
+    onConfirm: (target: string, element: string) => void
+}) {
+    const { t } = useTranslation();
+    const sourceMap = maps.find(m => m.name === sourceNodeId);
+    const [selectedElement, setSelectedElement] = useState<string>("");
+    const [selectedTarget, setSelectedTarget] = useState<string>("");
+
+    const availableElements = sourceMap?.elements.filter(el => !el.navigates_to) || [];
+    const availableTargets = maps.filter(m => m.name !== sourceNodeId).map(m => m.name);
+
+    return (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
+            <div className="bg-surface p-6 rounded-2xl shadow-xl w-96 border border-outline-variant/30" onClick={e => e.stopPropagation()}>
+                <h3 className="text-lg font-semibold mb-4 text-on-surface flex items-center gap-2">
+                    <Plus size={20} className="text-primary" />
+                    {t('mapper.flowchart.quick_connect', 'Quick Connect')}
+                </h3>
+
+                <div className="space-y-4">
+                    <div className="space-y-1">
+                        <label className="text-xs font-medium text-on-surface-variant uppercase">{t('mapper.flowchart.source_element', 'Source Element')}</label>
+                        <select
+                            className="w-full p-2 rounded-lg bg-surface-variant/10 border border-outline-variant/30 text-sm focus:border-primary outline-none text-on-surface"
+                            value={selectedElement}
+                            onChange={e => setSelectedElement(e.target.value)}
+                        >
+                            <option value="">{t('mapper.flowchart.select_element', 'Select Element')}</option>
+                            {availableElements.map(el => (
+                                <option key={el.name} value={el.name}>{el.name} ({el.type})</option>
+                            ))}
+                        </select>
+                        {availableElements.length === 0 && (
+                            <p className="text-xs text-error">{t('mapper.flowchart.no_elements', 'No unmapped elements available.')}</p>
+                        )}
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-xs font-medium text-on-surface-variant uppercase">{t('mapper.flowchart.target_screen', 'Target Screen')}</label>
+                        <select
+                            className="w-full p-2 rounded-lg bg-surface-variant/10 border border-outline-variant/30 text-sm focus:border-primary outline-none text-on-surface"
+                            value={selectedTarget}
+                            onChange={e => setSelectedTarget(e.target.value)}
+                        >
+                            <option value="">{t('mapper.flowchart.select_target', 'Select Target')}</option>
+                            {availableTargets.map(name => (
+                                <option key={name} value={name}>{name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="flex justify-end gap-2 mt-6">
+                        <button onClick={onClose} className="px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-variant/20 rounded-lg">
+                            {t('mapper.flowchart.cancel', 'Cancel')}
+                        </button>
+                        <button
+                            onClick={() => onConfirm(selectedTarget, selectedElement)}
+                            disabled={!selectedElement || !selectedTarget}
+                            className="px-4 py-2 text-sm bg-primary text-on-primary rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {t('mapper.flowchart.connect', 'Connect')}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     );
 }

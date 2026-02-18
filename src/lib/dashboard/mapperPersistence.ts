@@ -87,3 +87,46 @@ export async function loadFlowchartLayout(profileId: string): Promise<FlowchartL
         return null;
     }
 }
+
+// --- Export / Import ---
+
+export interface MapperExportData {
+    screens: ScreenMap[];
+    layout: FlowchartLayout | null;
+}
+
+export async function exportMapperData(profileId: string): Promise<string> {
+    const screens = await listScreenMaps(profileId);
+    const layout = await loadFlowchartLayout(profileId);
+
+    const data: MapperExportData = {
+        screens,
+        layout
+    };
+
+    return JSON.stringify(data, null, 2);
+}
+
+export async function importMapperData(profileId: string, jsonContent: string): Promise<void> {
+    try {
+        const data = JSON.parse(jsonContent) as MapperExportData;
+
+        if (!Array.isArray(data.screens)) {
+            throw new Error("Invalid import data: 'screens' is not an array");
+        }
+
+        // Save all screens
+        for (const screen of data.screens) {
+            await saveScreenMap(profileId, screen);
+        }
+
+        // Save layout if present
+        if (data.layout) {
+            await saveFlowchartLayout(profileId, data.layout);
+        }
+
+    } catch (e) {
+        console.error("Failed to import mapper data", e);
+        throw e;
+    }
+}
