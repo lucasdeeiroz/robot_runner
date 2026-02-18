@@ -331,7 +331,7 @@ export const pt = {
                 all: "Todos Atributos",
                 xpath: "XPath",
                 resource_id: "Resource ID",
-                access_id: "Access ID",
+                access_id: "Accessibility ID",
                 class: "Classe",
                 identifiers: "Identificadores",
                 hierarchy: "Hierarquia"
@@ -425,8 +425,8 @@ export const pt = {
             attributes: {
                 copied: "Copiado!",
                 xpath: "XPath",
-                resource_id: "ID de Recurso",
-                access_id: "ID de Acesso",
+                resource_id: "Resource ID",
+                access_id: "Accessibility ID",
                 identifiers: "Identificadores",
                 hierarchy: "Hierarquia"
             },

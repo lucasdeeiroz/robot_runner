@@ -328,7 +328,7 @@ export const en = {
                 all: "All Attributes",
                 xpath: "XPath",
                 resource_id: "Resource ID",
-                access_id: "Access ID",
+                access_id: "Accessibility ID",
                 class: "Class",
                 identifiers: "Identifiers",
                 hierarchy: "Hierarchy"
@@ -423,7 +423,7 @@ export const en = {
                 copied: "Copied!",
                 xpath: "XPath",
                 resource_id: "Resource ID",
-                access_id: "Access ID",
+                access_id: "Accessibility ID",
                 identifiers: "Identifiers",
                 hierarchy: "Hierarchy"
             },

@@ -669,8 +669,17 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                             <div className="p-4 space-y-6">
                                 {/* Quick Copy Actions */}
                                 <div className="space-y-4">
+                                    {/* Breadcrumbs */}
+                                    <div className="mt-1">
+                                        <h3 className="text-xs font-semibold text-on-surface-variant/80 uppercase tracking-wider mb-2">{t('mapper.attributes.hierarchy')}</h3>
+                                        <NodeBreadcrumbs
+                                            node={selectedNode}
+                                            onSelect={setSelectedNode}
+                                            onHover={setHoveredNode}
+                                        />
+                                    </div>
                                     <h3 className="text-xs font-semibold text-on-surface-variant/80 uppercase tracking-wider">{t('mapper.attributes.identifiers')}</h3>
-                                    <div className="grid grid-cols-1 gap-2">
+                                    <div className="grid grid-cols-2 gap-2">
                                         <CopyButton
                                             label={t('mapper.attributes.access_id')}
                                             value={selectedNode.attributes['content-desc']}
@@ -682,16 +691,6 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                             value={selectedNode.attributes['resource-id']}
                                             onCopy={(v) => copyToClipboard(v, 'rid')}
                                             active={copied === 'rid'}
-                                        />
-                                    </div>
-
-                                    {/* Breadcrumbs */}
-                                    <div className="mt-4">
-                                        <h3 className="text-xs font-semibold text-on-surface-variant/80 uppercase tracking-wider mb-2">{t('mapper.attributes.hierarchy')}</h3>
-                                        <NodeBreadcrumbs
-                                            node={selectedNode}
-                                            onSelect={setSelectedNode}
-                                            onHover={setHoveredNode}
                                         />
                                     </div>
                                 </div>
