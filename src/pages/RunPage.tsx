@@ -102,8 +102,7 @@ export function RunPage({ onNavigate, initialTab }: RunPageProps) {
     };
 
     const handleOpenToolbox = (device: Device) => {
-        // const ver = device.android_version ? `Android ${device.android_version}` : device.udid;
-        // const name = `${device.model} (${ver})`;
+
         const name = device.model; // Clean name without version
         addToolboxSession(device.udid, name, device.model, device.android_version || undefined);
         if (onNavigate) {

@@ -76,7 +76,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                 setStatusMsg({ text: t('connect.status.ip_not_found'), type: 'info' });
             }
         } catch (e) {
-            // console.log("Failed to auto-detect IP:", e);
+
             setStatusMsg({ text: t('connect.status.ip_not_found'), type: 'info' });
         }
     };

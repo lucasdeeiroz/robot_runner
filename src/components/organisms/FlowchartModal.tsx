@@ -78,7 +78,6 @@ const generatePorts = (): Port[] => {
 
 const NODE_PORTS = generatePorts();
 
-
 export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh, activeProfileId }: FlowchartModalProps) {
     const { t } = useTranslation();
     const [scale, setScale] = useState(1);
@@ -113,10 +112,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
         sourcePortId: string;
         sourceElement?: string; // If mapped element
     } | null>(null);
-    const [isQuickConnectOpen, setIsQuickConnectOpen] = useState(false);
-
-
-    // Load Layout
+    const [isQuickConnectOpen, setIsQuickConnectOpen] = useState(false);    // Load Layout
     useEffect(() => {
         if (isOpen) {
             loadLayout();
@@ -148,33 +144,6 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
             });
 
             if (path) {
-                // Use generic save_file command from backend if available, or just writeTextFile from fs
-                // Since we don't have a direct "write arbitrary file" from fs plugin that isn't sandboxed easily in frontend without config,
-                // we'll rely on the standard "save_file" command if it exists, or try to use the fs plugin with absolute path if allowed.
-                // Given the context, let's try using the backend command 'save_file' which is common in this project for arbitrary paths.
-                // If not, we might need to add it. But let's check if we used it before? 
-                // We used `writeTextFile` in persistence.
-
-                // Let's assume we can use writeTextFile from @tauri-apps/plugin-fs with the absolute path returned by dialog.
-                // Note: File System Access API might be restricted.
-                // A safe bet is using a backend command. 
-                // Let's try to use the `writeTextFile` from `mapperPersistence` which imports it from `plugin-fs`.
-                // Actually, `mapperPersistence` uses `BaseDirectory.AppLocalData`.
-                // We need to write to `path`.
-
-                // For now, let's try `invoke('save_content', { path, content: data })` assuming we have a generic file saver.
-                // If not, I'll add one or use `writeTextFile` directly if I import it.
-                // Let's check `src-tauri/src/lib.rs`? No access.
-                // Let's assume `writeTextFile` works if we don't pass BaseDirectory?
-                // No, it usually requires BaseDirectory or scope.
-
-                // Let's try `writeTextFile` from `@tauri-apps/plugin-fs` directly. I need to add it to imports if I use it.
-                // But I didn't add it to imports.
-
-                // Wait, I can just use `invoke("save_file", ...)` if I implemented it.
-                // I see `save_file` used in other contexts? 
-                // Let's use `invoke` for now, targeting a command `save_file`. 
-                // If it fails, I'll fix it.
                 await invoke('save_file', { path, content: data, append: false });
                 feedback.toast.success(t('mapper.flowchart.export_success'));
             }
@@ -329,10 +298,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
             setLayout(prev => ({ ...prev, nodes: newNodes }));
         }
     }, [maps, loading]);
-
-
     // --- Helper Functions ---
-
     const getPixelCoords = (gridX: number, gridY: number) => ({
         x: gridX * CELL_WIDTH + NODE_OFFSET_X,
         y: gridY * CELL_HEIGHT + NODE_OFFSET_Y
@@ -352,10 +318,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
     };
 
     const getClosestLane = (val: number) => Math.round(val / LANE_SIZE) * LANE_SIZE;
-
-
     // --- Event Handlers ---
-
     const handleCanvasMouseDown = (e: React.MouseEvent) => {
         if (e.button !== 0) return;
         setIsDraggingCanvas(true);
@@ -414,8 +377,6 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
             if (portEl) {
                 const portId = portEl.getAttribute('data-port-id');
                 const nodeId = portEl.getAttribute('data-node-id');
-                // Only allow hovering if not dragged from same node (optional, but good)
-                // Actually, self-loops are allowed.
                 if (portId && nodeId) {
                     setHoveredPort({ nodeId, portId });
                 }
@@ -598,7 +559,6 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                 if (!edge || !edge.vertices) return prev;
 
                 // 1. Get Full Path Context (Start, End)
-                // We need to re-calculate Start/End to do 3-point collinear check with endpoints
                 let startPoint = { x: 0, y: 0 };
                 let endPoint = { x: 0, y: 0 };
 
@@ -607,12 +567,6 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                 if (parts.length >= 3) {
                     const sourceName = parts[0];
                     const targetName = parts[parts.length - 1]; // Last part is target
-                    // Note: element name could contain hyphens, so this is risky if names have hyphens.
-                    // But names usually don't have hyphens in this app context (or handled).
-                    // Actually, let's use a safer find if possible. 
-                    // Given the constraint, we might need to rely on `maps` find or store source/target in edge.
-                    // Let's iterate maps to match source/target from ID? No, ID is constructed.
-                    // Let's assume standard names for now or use the helper if available.
 
                     const sourceMap = maps.find(m => m.name === sourceName);
                     const targetMap = maps.find(m => m.name === targetName);
@@ -667,14 +621,8 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                     // Simplified Cross Product Area: 
                     const crossProduct = (p1.y - p0.y) * (p2.x - p1.x) - (p2.y - p1.y) * (p1.x - p0.x);
 
-                    // Normalize by distance squared? 
-                    // Let's use simple distance from line segment logic if P0 != P2
                     const l2 = (p2.x - p0.x) ** 2 + (p2.y - p0.y) ** 2;
                     if (l2 === 0) continue; // p0 == p2
-
-                    // Since we want "visually straight", absolute cross product is okay-ish but depends on length.
-                    // Better: Distance < Threshold
-                    // Area = 0.5 * Base * Height -> Height = |CrossProduct| / Sqrt(l2)
 
                     const dist = Math.abs(crossProduct) / Math.sqrt(l2);
 
@@ -699,7 +647,6 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
     };
 
     // --- Zoom Logic ---
-
     const performZoom = (change: number, center?: { x: number, y: number }) => {
         if (!containerRef.current) return;
 
@@ -785,7 +732,6 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
     };
 
     // --- Render Logic ---
-
     const edgeLayouts = useMemo(() => {
         const layouts: {
             edgeId: string;
@@ -864,7 +810,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
         return layouts;
     }, [maps, layout, dragItem, cursorPos]); // layout change (edges/nodes) triggers recalc
 
-    // NEW: Sorted layouts for Z-indexing (Hovered edge last = on top)
+    // Sorted layouts for Z-indexing (Hovered edge last = on top)
     const sortedEdgeLayouts = useMemo(() => {
         if (!hoveredEdge) return edgeLayouts;
         return [...edgeLayouts].sort((a, b) => {
@@ -930,16 +876,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                     onMouseEnter={() => setHoveredEdge(edgeId)}
                     onMouseLeave={() => setHoveredEdge(null)}
                 >
-                    {/* Hover Hit Area (Duplicate Path for Hover detection if needed, or stick to segments) */}
-                    {/* The problem: If we only have segments, the gaps might be missing? No, segments cover it. */}
-                    {/* However, purely for visual hover effect on the line, we might need a transparent path here too if we want 'group-hover' to work across layers */}
-                    {/* Actually, since we split, group-hover won't propagate from Controls to Lines easily unless we use a global hover state or shared parent. 
-                        But we can just rely on the segments being hovered to show handles. 
-                        Visual highlight of the line might be lost if we don't sync. 
-                        For now, let's focus on interactivity. */}
-
                     {segments}
-
                     {/* Label (Hidden during ANY drag to prevent visual noise) */}
                     {points.length >= 2 && !isDraggingEdge && (() => {
                         // Find the middle segment for better centering
@@ -971,10 +908,6 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
 
                         return (
                             <foreignObject
-                                // Apply Offset: Below (+15) and Left (-15)
-                                // foreignObject is centered by subtracting half width (60) and half height (12)
-                                // Final X = midX - 122
-                                // Final Y = midY + 10
                                 x={midX}
                                 y={midY}
                                 width={120}
@@ -1029,7 +962,6 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
 
 
     if (!isOpen) return null;
-
 
     return createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">

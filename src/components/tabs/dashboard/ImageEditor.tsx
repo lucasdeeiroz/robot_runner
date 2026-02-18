@@ -37,8 +37,6 @@ export function ImageEditor() {
         }
     }, [elements]);
 
-
-
     const saveState = () => {
         setUndoStack(prev => [...prev, elements]);
         setRedoStack([]);
@@ -143,16 +141,11 @@ export function ImageEditor() {
             });
 
             if (selected) {
-                // selected is string or string[] but multiple is false, so string | null.
-                // However, open type might return string | null.
-                // We cast to string just to be safe if check passed.
                 const filePath = selected as string;
 
                 // Read file
-                const contents = await readFile(filePath);
+                const contents = await readFile(filePath)
 
-                // Determine mime type roughly (or just use generic image)
-                // For simplified logic, we try to create a blobUrl
                 const blob = new Blob([contents]);
                 const url = URL.createObjectURL(blob);
 
@@ -250,9 +243,6 @@ export function ImageEditor() {
             color: currentTool === 'arrow' ? '#ef4444' : currentTool === 'rect' ? '#3b82f6' : '#22c55e',
             lineWidth: 3
         };
-
-        // If crop, we might want to actually crop the canvas logic, but for "drawing a crop box" implies visual aid? 
-        // dashboard.js logic: "crop" just draws a dashed box.
 
         setElements(prev => [...prev, newElement]);
     };

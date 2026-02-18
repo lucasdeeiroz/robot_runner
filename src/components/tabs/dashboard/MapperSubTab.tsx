@@ -207,7 +207,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
 
     const [loading, setLoading] = useState(false);
-    // const [viewMode, setViewMode] = useState<'properties' | 'xml'>('properties');
+
     const [copied, setCopied] = useState<string | null>(null);
 
     // Interaction Mode
@@ -248,10 +248,6 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         }]);
         setTimeout(() => setSwipes(prev => prev.filter(s => s.id !== id)), 600);
     };
-
-
-
-
 
     // Main fetch logic
     useEffect(() => {
@@ -367,8 +363,6 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     };
 
     const [availableNodes, setAvailableNodes] = useState<InspectorNode[]>([]);
-
-    // ...
 
     const processMouseInteraction = (e: React.MouseEvent<HTMLImageElement>, isHover: boolean) => {
         if (!rootNode || !imgRef.current) return false;
@@ -787,8 +781,6 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                         </div>
                                     </div>
                                 </div>
-
-
                             </div>
                         ) : (
                             <div className="flex flex-col items-center justify-center h-full text-on-surface/80 p-8 text-center">

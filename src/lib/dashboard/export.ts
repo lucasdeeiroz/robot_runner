@@ -392,7 +392,6 @@ export async function exportToDocx(content: string, language: string = 'en') {
 
     // 4. Append End of Content (Images if passed, though we are mostly parsing text now)
     // If we want to support images from the DOM, we'd need to mix the approaches.
-    // For now, the requirement focuses on the text structure which was broken.
     // We can add a placeholder for Evidence.
 
     children.push(

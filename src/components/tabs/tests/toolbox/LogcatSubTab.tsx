@@ -122,7 +122,7 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false }: LogcatSu
     }, [settings.tools.appPackage]);
 
     const startLogcat = async () => {
-        // console.log("Starting logcat for", selectedDevice);
+
 
         let dumpFile = null;
         if (settings.paths.logcat) {
@@ -134,7 +134,7 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false }: LogcatSu
         setCurrentDumpFile(dumpFile);
 
         const activeFilter = selectedPackage || null;
-        // console.log("Package:", activeFilter, "Level:", logLevel);
+
 
         try {
             setLogs([]); // Clear previous logs for clarity
@@ -171,7 +171,7 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false }: LogcatSu
     const [lastSavedFile, setLastSavedFile] = useState<string | null>(null);
 
     const stopLogcat = async () => {
-        // console.log("Stopping logcat for", selectedDevice);
+
         try {
             await invoke('stop_logcat', { device: selectedDevice });
             if (!isMounted.current) return; // Prevent state update if unmounted

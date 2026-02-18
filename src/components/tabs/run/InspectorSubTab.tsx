@@ -43,7 +43,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
     }, [containerRef]);
 
     const [loading, setLoading] = useState(false);
-    // const [viewMode, setViewMode] = useState<'properties' | 'xml'>('properties');
+
     const [copied, setCopied] = useState<string | null>(null);
 
     // Interaction Mode

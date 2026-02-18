@@ -91,7 +91,6 @@ function App() {
 
     const colorHex = colors[settings.primaryColor] || colors.blue;
 
-    // Generate and apply Material 3 theme
     // Generate and apply Material 3 theme manually to match Tailwind's expected RGB format
     try {
       const theme = themeFromSourceColor(argbFromHex(colorHex));

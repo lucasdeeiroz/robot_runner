@@ -220,7 +220,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         const activeId = storeData.activeProfileId;
         const currentProfile = storeData.profiles[activeId];
 
-        // console.log(`[Settings] Updating ${key} to ${value} for profile ${activeId}`);
+
 
         if (!currentProfile) {
             feedback.toast.error("settings.profile_not_found");

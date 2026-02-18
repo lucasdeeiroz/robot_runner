@@ -8,7 +8,6 @@ export interface Device {
 }
 
 // --- Screen Mapper Types ---
-
 export type UIElementType =
     | 'button'
     | 'input'
@@ -54,7 +53,6 @@ export interface ScreenMap {
 }
 
 // --- Flowchart Layout ---
-
 export interface LayoutNode {
     gridX: number;
     gridY: number;

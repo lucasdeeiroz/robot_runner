@@ -77,9 +77,9 @@ export function transformXmlToTree(rawNode: any, parent?: InspectorNode): Inspec
 
     if (attributes['bounds']) {
         node.bounds = parseBounds(attributes['bounds']);
-        // console.log("Parsed bounds for", node.tagName, attributes['bounds'], node.bounds);
+
     } else {
-        // console.log("No bounds for", node.tagName, attributes);
+
     }
 
     // Link parent for children

@@ -59,9 +59,7 @@ export async function deleteScreenMap(profileId: string, id: string): Promise<vo
     await remove(`${getMapsDir(profileId)}/${fileName}`, { baseDir: BaseDirectory.AppLocalData });
 }
 
-
 // --- Flowchart Layout Persistence ---
-
 import { FlowchartLayout } from '@/lib/types';
 
 export async function saveFlowchartLayout(profileId: string, layout: FlowchartLayout): Promise<void> {
@@ -89,7 +87,6 @@ export async function loadFlowchartLayout(profileId: string): Promise<FlowchartL
 }
 
 // --- Export / Import ---
-
 export interface MapperExportData {
     screens: ScreenMap[];
     layout: FlowchartLayout | null;
