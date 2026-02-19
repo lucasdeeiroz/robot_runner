@@ -8,6 +8,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from "react-i18next";
 import { feedback } from '@/lib/feedback';
 import { Section } from "@/components/organisms/Section";
+import { Button } from "@/components/atoms/Button";
 import { AndroidVersionPill } from "@/components/atoms/AndroidVersionPill";
 import { Input } from "@/components/atoms/Input";
 import { Select } from "@/components/atoms/Select";
@@ -170,19 +171,20 @@ export function HistorySubTab() {
         return (
             <div key={group} className="space-y-2">
                 {groupBy !== 'none' && (
-                    <button
+                    <Button
                         onClick={() => toggleGroup(group)}
-                        className="flex items-center gap-2 w-full text-left bg-surface-variant/30 px-3 py-2 rounded-2xl hover:bg-outline-variant transition-colors sticky top-0 backdrop-blur-sm z-10"
+                        variant="ghost"
+                        className="flex items-center gap-2 w-full justify-start bg-surface-variant/30 px-3 py-2 rounded-2xl hover:bg-outline-variant transition-colors sticky top-0 backdrop-blur-sm z-10 h-auto"
                     >
                         {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                        <span className="font-semibold text-sm text-on-surface-variant/80">
+                        <span className="font-semibold text-sm text-on-surface-variant/80 flex-1 text-left">
                             {group === 'PASS' ? <span className="text-on-success-container/10">{group}</span> :
                                 group === 'FAIL' ? <span className="text-error-container/80">{group}</span> : group}
                         </span>
                         <span className="text-xs text-on-surface-variant/80 bg-outline-variant px-1.5 py-0.5 rounded-2xl">
                             {logs.length}
                         </span>
-                    </button>
+                    </Button>
                 )}
 
                 {isExpanded && (
@@ -233,20 +235,25 @@ export function HistorySubTab() {
                                     </span>
                                     <div className="border border-outline-variant/30 py-2">
                                     </div>
-                                    <button
+                                    <Button
                                         onClick={() => openLog(log.log_html_path)}
-                                        className="flex items-center gap-2 px-3 py-1.5 bg-surface-variant/30 hover:bg-primary/10 text-on-surface-variant/80 hover:text-primary rounded-2xl text-xs font-medium transition-colors"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="flex items-center gap-2 px-3 py-1.5 bg-surface-variant/30 hover:bg-primary/10 text-on-surface-variant/80 hover:text-primary rounded-2xl text-xs font-medium transition-colors h-auto"
                                         title={isHistoryNarrow ? t('tests_page.report') : log.log_html_path}
+                                        leftIcon={<FileText size={14} />}
                                     >
-                                        <FileText size={14} /> {!isHistoryNarrow && t('tests_page.report')}
-                                    </button>
-                                    <button
+                                        {!isHistoryNarrow && t('tests_page.report')}
+                                    </Button>
+                                    <Button
                                         onClick={() => openLog(log.path)}
-                                        className="flex items-center justify-center p-1.5 bg-surface-variant/30 hover:bg-outline-variant text-on-surface-variant/80 rounded-2xl transition-colors"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="p-1.5 bg-surface-variant/30 hover:bg-outline-variant text-on-surface-variant/80 rounded-2xl transition-colors h-auto w-auto"
                                         title={t('tests_page.open_folder')}
                                     >
                                         <Folder size={14} />
-                                    </button>
+                                    </Button>
                                 </div>
                             </div>
                         ))}
@@ -264,13 +271,15 @@ export function HistorySubTab() {
                 variant="transparent"
                 className="p-0 pb-4 mb-4"
                 status={
-                    <button
+                    <Button
                         onClick={() => loadHistory(true)}
-                        className="p-1.5 text-on-surface-variant/80 hover:bg-surface-variant/30 rounded-2xl transition-colors"
+                        variant="ghost"
+                        size="sm"
+                        className="p-1.5 text-on-surface-variant/80 hover:bg-surface-variant/30 rounded-2xl transition-colors h-auto"
                         title={t('tests_page.actions.refresh')}
                     >
                         {loadingHistory ? <ExpressiveLoading size="xsm" variant="circular" /> : <RefreshCw size={16} />}
-                    </button>
+                    </Button>
                 }
                 menus={!isHistoryNarrow ? (
                     <div className="flex flex-wrap gap-2">
@@ -312,18 +321,20 @@ export function HistorySubTab() {
                 ) : null
                 }
                 actions={
-                    <button
+                    <Button
                         onClick={() => setShowCharts(!showCharts)}
+                        variant="ghost"
+                        size="sm"
                         className={clsx(
-                            "px-3 py-1.5 rounded-2xl flex items-center gap-2 text-sm font-medium transition-colors",
+                            "px-3 py-1.5 rounded-2xl flex items-center gap-2 text-sm font-medium transition-colors h-auto",
                             showCharts
                                 ? "bg-primary/10 text-primary"
                                 : "bg-surface-variant/30 text-on-surface-variant/80 hover:bg-outline-variant"
                         )}
                         title={showCharts ? t('tests_page.charts.hide') : t('tests_page.charts.show')}
+                        leftIcon={<PieChart size={16} />}
                     >
-                        <PieChart size={16} />
-                    </button>
+                    </Button>
                 }
             />
 

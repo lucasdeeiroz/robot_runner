@@ -1,5 +1,5 @@
 import { useSettings } from "@/lib/settings";
-import { Moon, Sun, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2, Settings as SettingsIcon, Sparkles, FileJson } from "lucide-react";
+import { Moon, Sun, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2, Settings as SettingsIcon, Sparkles, FileJson, RefreshCcw } from "lucide-react";
 import { Switch } from "@/components/atoms/Switch";
 import { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -331,29 +331,29 @@ export function SettingsPage() {
                 title={isRenaming ? t('settings.profiles.rename') : t('settings.profiles.create')}
             >
                 <form onSubmit={handleProfileSubmit} className="space-y-4">
-                    <input
+                    <Input
                         autoFocus
-                        type="text"
                         value={newProfileName}
                         onChange={(e) => setNewProfileName(e.target.value)}
                         placeholder={t('settings.profiles.name_placeholder')}
-                        className="w-full bg-surface/50 border border-outline-variant/30 rounded-2xl px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 text-on-surface/80"
+                        className="bg-surface/50"
                     />
                     <div className="flex justify-end gap-2">
-                        <button
+                        <Button
                             type="button"
+                            variant="ghost"
                             onClick={() => setShowProfileModal(false)}
-                            className="px-4 py-2 text-on-surface-variant/80 hover:text-on-surface-variant/80"
+                            className="text-on-surface-variant/80 hover:text-on-surface-variant/80"
                         >
                             {t('common.cancel')}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             type="submit"
                             disabled={!newProfileName.trim()}
-                            className="px-4 py-2 bg-primary hover:opacity-90 text-on-primary rounded-2xl disabled:opacity-50 transition-all active:scale-95"
+                            variant="primary"
                         >
                             {t('common.save')}
-                        </button>
+                        </Button>
                     </div>
                 </form>
             </Modal>
@@ -554,11 +554,12 @@ export function SettingsPage() {
                                     { id: 'cyan', hex: '#0891b2' },
                                     { id: 'pink', hex: '#db2777' },
                                 ].map((color) => (
-                                    <button
+                                    <Button
                                         key={color.id}
                                         onClick={() => updateSetting('primaryColor', color.id)}
+                                        variant="ghost"
                                         className={clsx(
-                                            "w-8 h-8 rounded-2xl transition-all active:scale-95 ring-offset-2 ring-offset-on-primary flex items-center justify-center",
+                                            "w-8 h-8 rounded-2xl p-0 min-w-0 transition-transform",
                                             settings.primaryColor === color.id ? "ring-2 scale-110" : "hover:scale-105"
                                         )}
                                         style={{ backgroundColor: color.hex, borderColor: color.hex, '--tw-ring-color': color.hex } as any}
@@ -567,7 +568,7 @@ export function SettingsPage() {
                                         {settings.primaryColor === color.id && (
                                             <div className="w-2.5 h-2.5 bg-on-primary rounded-2xl shadow-sm" />
                                         )}
-                                    </button>
+                                    </Button>
                                 ))}
                             </div>
                         </div>
@@ -692,13 +693,15 @@ export function SettingsPage() {
                     title={t('settings.system.title')}
                     icon={Monitor}
                     actions={
-                        <button
+                        <Button
                             onClick={checkSystemVersions}
                             disabled={systemCheckStatus.loading}
+                            variant="ghost"
+                            size="icon"
                             className={
                                 clsx(
-                                    "p-2 rounded-2xl transition-all active:scale-95 hover:bg-surface-variant/30",
-                                    systemCheckStatus.loading ? "text-primary" : "text-on-surface-variant/80 hover:text-primary"
+                                    "rounded-2xl hover:bg-surface-variant/30",
+                                    systemCheckStatus.loading ? "text-primary bg-primary/10" : "text-on-surface-variant/80 hover:text-primary"
                                 )
                             }
                             title={t('common.loading')}
@@ -706,9 +709,9 @@ export function SettingsPage() {
                             {systemCheckStatus.loading ? (
                                 <ExpressiveLoading size="xsm" variant="circular" />
                             ) : (
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" /><path d="M16 16h5v5" /></svg>
+                                <RefreshCcw size={18} />
                             )}
-                        </button>
+                        </Button>
                     }
                 >
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

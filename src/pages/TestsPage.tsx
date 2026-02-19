@@ -11,6 +11,7 @@ import { TabBar } from "@/components/organisms/TabBar";
 import { useDevices } from '@/lib/deviceStore';
 import { DeviceSelector } from '@/components/molecules/DeviceSelector';
 import { Device } from '@/lib/types';
+import { Button } from '@/components/atoms/Button';
 
 export function TestsPage() {
     const { t } = useTranslation();
@@ -226,10 +227,12 @@ export function TestsPage() {
                 }
                 actions={
                     sessions.length >= 2 ? (
-                        <button
+                        <Button
+                            variant="ghost"
+                            size="icon"
                             onClick={() => setIsGridView(!isGridView)}
                             className={clsx(
-                                "p-2 rounded-2xl border transition-all shrink-0",
+                                "rounded-2xl border transition-all shrink-0",
                                 isGridView
                                     ? "bg-primary/10 border-none text-primary"
                                     : "bg-transparent border-none text-on-surface-variant/80 hover:text-on-surface-variant/80 hover:bg-surface-variant/30"
@@ -237,7 +240,7 @@ export function TestsPage() {
                             title={isGridView ? t('toolbox.actions.switch_to_tabs') : t('toolbox.actions.switch_to_grid')}
                         >
                             <LayoutGrid size={20} />
-                        </button>
+                        </Button>
                     ) : undefined
                 }
             />
@@ -307,31 +310,37 @@ function GridItem({ title, children, onClose, onHide, className, onMaximize }: {
                 </span>
                 <div className="flex items-center gap-1">
                     {onMaximize && (
-                        <button
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={onMaximize}
-                            className="p-1 text-on-surface/80 hover:text-on-surface-variant/80 rounded"
+                            className="h-6 w-6 p-0 text-on-surface/80 hover:text-on-surface-variant/80"
                             title={t('common.maximize')}
                         >
                             <Maximize2 size={14} />
-                        </button>
+                        </Button>
                     )}
                     {onHide && (
-                        <button
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={onHide}
-                            className="p-1 text-on-surface/80 hover:text-on-surface-variant/80 rounded"
+                            className="h-6 w-6 p-0 text-on-surface/80 hover:text-on-surface-variant/80"
                             title={t('common.minimize')}
                         >
                             <Minimize2 size={14} />
-                        </button>
+                        </Button>
                     )}
                     {onClose && (
-                        <button
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={onClose}
-                            className="p-1 text-on-surface/80 hover:text-error rounded"
+                            className="h-6 w-6 p-0 text-on-surface/80 hover:text-error hover:bg-error/10"
                             title={t('common.close')}
                         >
                             <XCircle size={14} />
-                        </button>
+                        </Button>
                     )}
                 </div>
             </div>

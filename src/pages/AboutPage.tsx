@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import packageJson from '../../package.json';
 import { useSettings } from "@/lib/settings";
+import { Button } from "@/components/atoms/Button";
 import { Section } from "@/components/organisms/Section";
 import { InfoCard } from "@/components/molecules/InfoCard";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
@@ -63,18 +64,20 @@ export function AboutPage() {
                     <div className="inline-flex items-center gap-2 pl-3 pr-1.5 py-1 rounded-2xl bg-primary/10 border border-primary/20 text-primary text-sm font-medium">
                         <span>v{appVersion}</span>
                         <div className="w-px h-3 bg-primary/20 mx-0.5" />
-                        <button
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={handleCheckUpdate}
                             disabled={isChecking}
                             title={isChecking ? t('about.checking') : t('about.update_check')}
-                            className="p-1 rounded-2xl hover:bg-primary/10 text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="p-1 h-auto rounded-2xl hover:bg-primary/10 text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {isChecking ? (
                                 <ExpressiveLoading size="xsm" variant="circular" />
                             ) : (
                                 <RefreshCcw size={13} />
                             )}
-                        </button>
+                        </Button>
 
                         {updateAvailable && (
                             <a

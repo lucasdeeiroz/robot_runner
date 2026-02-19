@@ -10,6 +10,7 @@ import { feedback } from "@/lib/feedback";
 import { Section } from "@/components/organisms/Section";
 import { t } from 'i18next';
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
+import { Button } from "@/components/atoms/Button";
 
 interface InspectorSubTabProps {
     selectedDevice: string;
@@ -313,51 +314,58 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
                         </div>
                         <div className="h-4 w-px bg-surface/80 mx-1" />
                         <div className="flex gap-1">
-                            <button onClick={() => sendAdbInput('keyevent 4')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" title={t('inspector.nav.back')}><ArrowLeft size={16} /></button>
-                            <button onClick={() => sendAdbInput('keyevent 3')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" title={t('inspector.nav.home')}><Home size={16} /></button>
-                            <button onClick={() => sendAdbInput('keyevent 187')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" title={t('inspector.nav.recents')}><Rows size={16} /></button>
+                            <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 4')} className="h-7 w-7 p-0 text-on-surface-variant/80" title={t('inspector.nav.back')}><ArrowLeft size={16} /></Button>
+                            <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 3')} className="h-7 w-7 p-0 text-on-surface-variant/80" title={t('inspector.nav.home')}><Home size={16} /></Button>
+                            <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 187')} className="h-7 w-7 p-0 text-on-surface-variant/80" title={t('inspector.nav.recents')}><Rows size={16} /></Button>
                         </div>
                     </div>
                 }
                 menus={
                     <div className="flex bg-surface-variant/30 p-0.5 rounded-2xl">
-                        <button
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => setInteractionMode('inspect')}
-                            className={clsx("p-1.5 rounded-2xl transition-all", interactionMode === 'inspect' ? "bg-primary/10 shadow-sm text-primary" : "text-on-surface/80 hover:text-on-surface-variant/80")}
+                            className={clsx("h-7 w-7 p-0 rounded-2xl transition-all", interactionMode === 'inspect' ? "bg-primary/10 shadow-sm text-primary" : "text-on-surface/80 hover:text-on-surface-variant/80")}
                             title={t('inspector.modes.inspect')}
                         >
                             <Scan size={16} />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => setInteractionMode('tap')}
-                            className={clsx("p-1.5 rounded-2xl transition-all", interactionMode === 'tap' ? "bg-primary/10 shadow-sm text-primary" : "text-on-surface/80 hover:text-on-surface-variant/80")}
+                            className={clsx("h-7 w-7 p-0 rounded-2xl transition-all", interactionMode === 'tap' ? "bg-primary/10 shadow-sm text-primary" : "text-on-surface/80 hover:text-on-surface-variant/80")}
                             title={t('inspector.modes.tap')}
                         >
                             <MousePointerClick size={16} />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => setInteractionMode('swipe')}
-                            className={clsx("p-1.5 rounded-2xl transition-all", interactionMode === 'swipe' ? "bg-primary/10 shadow-sm text-primary" : "text-on-surface/80 hover:text-on-surface-variant/80")}
+                            className={clsx("h-7 w-7 p-0 rounded-2xl transition-all", interactionMode === 'swipe' ? "bg-primary/10 shadow-sm text-primary" : "text-on-surface/80 hover:text-on-surface-variant/80")}
                             title={t('inspector.modes.swipe')}
                         >
                             <Move size={16} />
-                        </button>
+                        </Button>
                     </div>
                 }
                 actions={
                     <>
-                        <button
+                        <Button
                             onClick={refreshAll}
                             disabled={loading}
+                            variant="outline"
                             className={clsx(
-                                "flex items-center gap-2 px-3 py-1.5 bg-surface-variant/30 border border-outline-variant/30 rounded-2xl hover:bg-surface/50 text-sm font-medium transition-colors disabled:opacity-50",
+                                "h-8 px-3 bg-surface-variant/30 border-outline-variant/30 hover:bg-surface/50 text-sm font-medium",
                                 loading && "cursor-wait"
                             )}
                             title={t('inspector.refresh')}
                         >
                             {loading ? <ExpressiveLoading size="xsm" variant="circular" /> : <RefreshCw size={16} />}
-                            <span className={clsx(isNarrow && "hidden")}>{t('inspector.refresh')}</span>
-                        </button>
+                            <span className={clsx("ml-2", isNarrow && "hidden")}>{t('inspector.refresh')}</span>
+                        </Button>
                     </>
                 }
             />
@@ -475,16 +483,18 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
 
                         {/* Clear Selection Button */}
                         {selectedNode && (
-                            <button
+                            <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => {
                                     setSelectedNode(null);
                                     setAvailableNodes([]);
                                 }}
-                                className="p-1.5 text-on-surface/80 hover:text-error hover:bg-error-container/10 rounded-2xl transition-colors ml-2"
+                                className="h-7 w-7 p-0 text-on-surface/80 hover:text-error hover:bg-error-container/10 ml-2"
                                 title={t('inspector.clear_selection')}
                             >
                                 <X size={16} />
-                            </button>
+                            </Button>
                         )}
                     </div>
 
@@ -608,10 +618,11 @@ function NodeBreadcrumbs({ node, onSelect, onHover }: { node: InspectorNode, onS
 function CopyButton({ label, value, onCopy, active }: { label: string, value: string | undefined, onCopy: (v: string) => void, active: boolean }) {
     if (!value) return null; // Don't show if empty
     return (
-        <button
+        <Button
+            variant="ghost"
             onClick={() => onCopy(value)}
             className={clsx(
-                "flex flex-col items-start p-2 rounded-2xl border transition-all text-left",
+                "flex flex-col items-start p-2 rounded-2xl border transition-all text-left h-auto",
                 active
                     ? "bg-success-container/10 border-success-container/20 text-on-success-container"
                     : "bg-surface/50 border-outline-variant/30 hover:border-info-container/50"
@@ -626,6 +637,6 @@ function CopyButton({ label, value, onCopy, active }: { label: string, value: st
                 </div>
             </span>
             <span className="text-xs font-mono truncate w-full" title={value}>{value}</span>
-        </button>
+        </Button>
     );
 }

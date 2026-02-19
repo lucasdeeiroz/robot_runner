@@ -1126,7 +1126,9 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                                                 {data.name}
                                             </h3>
                                             {onEditScreen && (
-                                                <button
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         onEditScreen(data.name);
@@ -1136,7 +1138,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                                                     title={t('mapper.action.edit')}
                                                 >
                                                     <Pencil size={14} />
-                                                </button>
+                                                </Button>
                                             )}
                                         </div>
                                         <div className="text-xs text-on-surface-variant/70 mt-1 pointer-events-auto">
