@@ -75,3 +75,16 @@ pub fn save_file(path: String, content: String, append: bool) -> Result<(), Stri
         .map_err(|e| e.to_string())?;
     Ok(())
 }
+
+#[command]
+pub fn read_file(path: String) -> Result<String, String> {
+    fs::read_to_string(&path).map_err(|e| e.to_string())
+}
+
+#[command]
+pub fn save_image(path: String, content: Vec<u8>) -> Result<(), String> {
+    use std::io::Write;
+    let mut file = fs::File::create(&path).map_err(|e| e.to_string())?;
+    file.write_all(&content).map_err(|e| e.to_string())?;
+    Ok(())
+}

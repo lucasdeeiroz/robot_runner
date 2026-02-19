@@ -52,12 +52,18 @@ export interface AppSettings {
         appPackage: string; // for monitoring/logcat filtering
         ngrokToken: string;
     };
+
+    // AI
+    geminiApiKey?: string;
+    geminiModel: string;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
     theme: 'dark',
     language: 'en_US',
     primaryColor: 'blue',
+    geminiApiKey: '',
+    geminiModel: 'gemini-1.5-flash',
     recycleDeviceViews: false, // Default to false
     appiumHost: '127.0.0.1',
     appiumPort: 4723,
@@ -214,7 +220,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         const activeId = storeData.activeProfileId;
         const currentProfile = storeData.profiles[activeId];
 
-        // console.log(`[Settings] Updating ${key} to ${value} for profile ${activeId}`);
+
 
         if (!currentProfile) {
             feedback.toast.error("settings.profile_not_found");

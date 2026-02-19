@@ -1,6 +1,6 @@
 
 import { getVersion } from '@tauri-apps/api/app';
-// import { fetch } from '@tauri-apps/plugin-http'; // Using native fetch for CORS support
+
 import { gt } from 'semver';
 
 interface GitHubRelease {
@@ -41,10 +41,8 @@ export async function checkForUpdates(): Promise<UpdateInfo> {
 
         const data = await response.json() as GitHubRelease;
         const latestTag = data.tag_name.replace(/^v/, ''); // Remove 'v' prefix if present
-        // console.log("[Updater] Latest tag from GitHub:", data.tag_name, "Parsed:", latestTag);
 
         const available = gt(latestTag, currentVersion);
-        // console.log("[Updater] Update available?", available);
 
         return {
             available,

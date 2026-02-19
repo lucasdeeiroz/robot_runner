@@ -1,13 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTestSessions } from "@/lib/testSessionStore";
-import { ToolboxView } from "../components/tabs/ToolboxView";
-import { HistorySubTab } from "../components/tabs/HistorySubTab";
+import { ToolboxView } from "@/components/tabs/tests/toolbox/ToolboxView";
+import { HistorySubTab } from "@/components/tabs/tests/HistorySubTab";
 import { AndroidVersionPill } from "@/components/atoms/AndroidVersionPill";
 import { XCircle, LayoutGrid, Minimize2, Maximize2, FileText } from 'lucide-react';
 import { PageHeader } from "@/components/organisms/PageHeader";
 import clsx from 'clsx';
 import { useTranslation } from "react-i18next";
 import { TabBar } from "@/components/organisms/TabBar";
+import { useDevices } from '@/lib/deviceStore';
+import { DeviceSelector } from '@/components/molecules/DeviceSelector';
+import { Device } from '@/lib/types';
 
 export function TestsPage() {
     const { t } = useTranslation();
@@ -21,6 +24,32 @@ export function TestsPage() {
     // Smart Grid State
     const gridContainerRef = useRef<HTMLDivElement>(null);
     const [gridCols, setGridCols] = useState(1);
+
+    // Device Management (Global)
+    const { devices, selectedDevices, loading: loadingDevices, loadDevices: refreshDevices, setSelectedDevices } = useDevices();
+
+    // Toolbox session helper
+    const { addToolboxSession } = useTestSessions();
+    const busyDeviceIds = sessions.filter(s => s.status === 'running' && s.type === 'test').map(s => s.deviceUdid);
+
+    const handleDeviceToggle = (udid: string) => {
+        // Enforce Single Selection
+        if (selectedDevices.includes(udid)) {
+            setSelectedDevices([]);
+        } else {
+            setSelectedDevices([udid]);
+        }
+    };
+
+
+
+    const handleOpenToolbox = (device: Device) => {
+        const name = device.model;
+        addToolboxSession(device.udid, name, device.model, device.android_version || undefined);
+        // Switch to the new session tab
+        setActiveSessionId(device.udid); // Toolbox sessions use UDID as runId often
+        setSubTab(device.udid);
+    };
 
 
 
@@ -153,11 +182,11 @@ export function TestsPage() {
                             label: (
                                 <div className="flex items-center gap-2">
                                     {/* Status Dot */}
-                                    {s.type === 'toolbox' && <span className="w-2.5 h-2.5 rounded-2xl bg-on-surface/10" />}
-                                    {s.type === 'test' && s.status === 'running' && <span className="w-2.5 h-2.5 rounded-2xl bg-orange-500 animate-pulse" />}
-                                    {s.type === 'test' && s.status === 'finished' && isSuccess && <span className="w-2.5 h-2.5 rounded-2xl bg-success" />}
-                                    {s.type === 'test' && isFailed && <span className="w-2.5 h-2.5 rounded-2xl bg-error" />}
-                                    {s.type === 'test' && s.status === 'error' && <span className="w-2.5 h-2.5 rounded-2xl bg-error" />}
+                                    {s.type === 'toolbox' && <span className="w-2.5 h-2.5 rounded-full bg-on-surface/10" />}
+                                    {s.type === 'test' && s.status === 'running' && <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse" />}
+                                    {s.type === 'test' && s.status === 'finished' && isSuccess && <span className="w-2.5 h-2.5 rounded-full bg-success" />}
+                                    {s.type === 'test' && isFailed && <span className="w-2.5 h-2.5 rounded-full bg-error" />}
+                                    {s.type === 'test' && s.status === 'error' && <span className="w-2.5 h-2.5 rounded-full bg-error" />}
 
                                     <span>{s.deviceModel || s.deviceName}</span>
                                     <AndroidVersionPill version={s.androidVersion} />
@@ -184,6 +213,17 @@ export function TestsPage() {
                 variant="pills"
                 className="z-10 shrink-0"
                 layoutId="tests-page-tabs"
+                menus={
+                    <DeviceSelector
+                        devices={devices}
+                        selectedDevices={selectedDevices}
+                        toggleDevice={handleDeviceToggle}
+                        loadingDevices={loadingDevices}
+                        loadDevices={refreshDevices}
+                        handleOpenToolbox={handleOpenToolbox}
+                        busyDeviceIds={busyDeviceIds}
+                    />
+                }
                 actions={
                     sessions.length >= 2 ? (
                         <button

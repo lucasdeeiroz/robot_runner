@@ -5,6 +5,7 @@ import {
     Menu,
     FileText,
     Info,
+    LayoutDashboard,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSettings } from "@/lib/settings";
@@ -53,6 +54,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
     const navItems = useMemo(() => [
         { id: 'run', label: t('sidebar.run'), icon: PlayCircle },
         { id: 'tests', label: t('sidebar.tests'), icon: FileText },
+        { id: 'dashboard', label: t('sidebar.dashboard'), icon: LayoutDashboard }, // Dashboard Button
         { id: 'settings', label: t('sidebar.settings'), icon: Settings },
         { id: 'about', label: t('sidebar.about'), icon: Info },
     ], [t]);

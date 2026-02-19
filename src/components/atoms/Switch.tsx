@@ -21,7 +21,7 @@ export function Switch({ checked, onCheckedChange, className }: SwitchProps) {
         >
             <span
                 className={clsx(
-                    "pointer-events-none block h-5 w-5 rounded-2xl bg-surface shadow-lg ring-0 transition-transform",
+                    "pointer-events-none block h-5 w-5 rounded-full bg-surface shadow-lg ring-0 transition-transform",
                     checked ? "translate-x-5" : "translate-x-0"
                 )}
             />

@@ -272,7 +272,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                 await new Promise(r => setTimeout(r, 2000));
             }
 
-            // console.log("Invoking run_robot_test for Re-run", {
+
             //     runId: newRunId,
             //     working_dir: settings.paths.automationRoot,
             //     outputDir

@@ -79,6 +79,8 @@ pub fn run() {
             adb::network::get_device_ip,
             files::list_directory,
             files::save_file,
+            files::read_file,
+            files::save_image,
             // Packages
             adb::packages::get_installed_packages,
             adb::packages::uninstall_package,

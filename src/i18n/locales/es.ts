@@ -113,6 +113,15 @@ export const es = {
         common: {
             cancel: "Cancelar",
             save: "Guardar",
+            saved: "Guardado",
+            undo: "Deshacer",
+            redo: "Rehacer",
+            copy: "Copiar",
+            copied: "¡Copiado!",
+            download: "Descargar",
+            downloading: "Descargando...",
+            clear: "Limpiar",
+            coming_soon: "Módulo {{module}} próximamente...",
             error_occurred: "Ocurrió un error: {{error}}",
             delete: "Eliminar",
             edit: "Editar",
@@ -158,6 +167,8 @@ export const es = {
                 disconnect: "Desconectar",
                 disconnect_all: "Desconectar Todos",
                 enable_remote: "Habilitar Conexión Remota",
+                enable_tcpip: "Habilitar 5555",
+                enable_tcpip_tooltip: "Ejecutar 'adb tcpip 5555'",
                 pair: "Emparejar",
                 paste_url: "Pegar URL",
                 rerun_failed: "Reejecutar Fallos",
@@ -189,7 +200,10 @@ export const es = {
                 payment_required_title: "Pago de Ngrok Requerido",
                 payment_required_desc: "Las cuentas gratuitas de ngrok requieren una tarjeta de crédito válida para usar túneles TCP. No se te cobrará.",
                 add_card: "Añadir Tarjeta",
-                cancel_card: "Cancelar"
+                cancel_card: "Cancelar",
+                enabling_tcpip: "Habilitando TCP/IP 5555...",
+                tcpip_enabled: "TCP/IP 5555 Habilitado",
+                tcpip_failed: "Fallo al habilitar TCP/IP"
             },
             security_warning: {
                 title: "Advertencia de Seguridad",
@@ -200,6 +214,55 @@ export const es = {
         },
         console: {
             waiting: "Esperando salida..."
+        },
+        dashboard: {
+            description: "Herramientas auxiliares para QA: Generación de escenarios, edición de imágenes y documentación.",
+            tabs: {
+                scenarios: "Generador de Escenarios",
+                images: "Editor de Imágenes",
+                history: "Historial",
+                mapper: "Mapeador"
+            },
+            input: {
+                title: "Requisitos",
+                placeholder: "Pegue aquí sus requisitos o criterios de aceptación..."
+            },
+            editor: {
+                title: "Escenarios Generados",
+                placeholder: "Los escenarios generados aparecerán aquí. Puede editar y pegar imágenes..."
+            },
+            history: {
+                title: "Historial de Archivos",
+                empty: "Ningún archivo generado."
+            },
+            image: {
+                title: "Editor de Imágenes",
+                new: "Nueva Imagen / Pegar",
+                open: "Abrir Imagen",
+                opened: "¡Imagen Cargada!",
+                copy: "Copiar Imagen",
+                pasted: "¡Imagen pegada!",
+                no_clipboard: "No hay imagen en el portapapeles.",
+                copied: "¡Copiado al portapapeles!",
+                tools: {
+                    cursor: "Cursor",
+                    arrow: "Flecha",
+                    rect: "Rectángulo",
+                    crop: "Área de Recorte"
+                }
+            },
+            actions: {
+                generate: "Generar Escenarios",
+                generated_success: "CASOS DE PRUEBA GENERADOS CON ÉXITO (vía {{method}})",
+                gemini_failed: "Fallo en la generación vía Gemini: {{error}}",
+                using_local_generator: "Usando generador local. {{message}}",
+                export_xlsx: "Excel (.xlsx)",
+                export_docx: "Word (.docx)"
+            },
+            export: {
+                success: "¡Exportado con éxito!",
+                error: "Error al exportar"
+            }
         },
         devices: {
             load_error: "Error al cargar dispositivos"
@@ -270,7 +333,7 @@ export const es = {
                 all: "Todos los Atributos",
                 xpath: "XPath",
                 resource_id: "Resource ID",
-                access_id: "Access ID",
+                access_id: "Accessibility ID",
                 class: "Clase",
                 identifiers: "Identificadores",
                 hierarchy: "Jerarquía"
@@ -306,6 +369,132 @@ export const es = {
             lines: "líneas",
             no_logs: "Ningún log capturado",
             select_device: "Seleccione un dispositivo para ver logs"
+        },
+        mapper: {
+            title: "Mapeador",
+            empty: "Seleccione un dispositivo para iniciar el mapeo",
+            refresh: "Actualizar Fuente",
+            flowchart: {
+                open: "Abrir Diagrama de Flujo",
+                export: "Exportar Flujo",
+                export_image: "Exportar Imagen",
+                import: "Importar Flujo",
+                export_success: "¡Flujo exportado con éxito!",
+                import_success: "¡Flujo importado con éxito!",
+                export_error: "Error al exportar flujo.",
+                import_error: "Error al importar flujo.",
+                quick_connect: "Conexión Rápida",
+                source_element: "Elemento de Origen",
+                target_screen: "Pantalla de Destino",
+                select_element: "Seleccionar Elemento",
+                select_target: "Seleccionar Destino",
+                connect: "Conectar",
+                cancel: "Cancelar",
+                no_elements: "No hay elementos asignados disponibles.",
+                title: "Flujo de Navegación"
+            },
+            properties: "Propiedades del Elemento",
+            clear_selection: "Limpiar Selección",
+            section_title: "Mapeador de Pantalla",
+            screen_mapper: "Mapeador de Pantalla",
+            screen_settings: "Ajustes de Pantalla",
+            saved_screens: "Pantallas Guardadas",
+            no_saved_maps: "No se encontraron mapas guardados",
+            items: "ítems",
+            elements_mapped_count: "{{count}} elementos mapeados",
+            elements_mapped: "elementos mapeados",
+            select_element: "Seleccione un elemento en la captura de pantalla",
+            types: {
+                button: "Botón",
+                input: "Entrada",
+                text: "Texto",
+                link: "Enlace",
+                toggle: "Alternador",
+                checkbox: "Casilla",
+                image: "Imagen",
+                menu: "Menú",
+                scroll_view: "Desplazamiento",
+                tab: "Pestaña"
+            },
+            screen_types: {
+                screen: "Pantalla",
+                modal: "Modal",
+                tab: "Pestaña",
+                drawer: "Cajón"
+            },
+            modes: {
+                inspect: "Modo Inspección",
+                tap: "Modo Toque",
+                swipe: "Modo Deslizar"
+            },
+            status: {
+                fetching: "Obteniendo estado del dispositivo...",
+                ready: "Listo",
+                loading: "Cargando...",
+                no_screenshot: "Sin captura de pantalla",
+                paused_test: "Mapeador desactivado durante la prueba"
+            },
+            nav: {
+                home: "Inicio",
+                back: "Atrás",
+                recents: "Recientes"
+            },
+            attributes: {
+                copied: "¡Copiado!",
+                xpath: "XPath",
+                resource_id: "Resource ID",
+                access_id: "Accessibility ID",
+                identifiers: "Identificadores",
+                hierarchy: "Jerarquía"
+            },
+            input: {
+                element_type: "Tipo de Elemento",
+                element_name: "Nombre del Elemento",
+                navigates_to: "Navega A (Opcional)",
+                menu_options: "Opciones de Menú (Separadas por comas)",
+                parent_screen: "Pantalla Padre",
+                select_existing: "Seleccionar Elemento Existente"
+            },
+            placeholder: {
+                select_element: "Elija un elemento para editar...",
+                element_name: "ej: Botón de Inicio",
+                navigates_to: "Nombre de la Pantalla",
+                menu_options: "Opción 1, Opción 2...",
+                parent_screen: "Nombre de la Pantalla Padre",
+                screen_name: "Nombre de la Pantalla (Único)"
+            },
+            action: {
+                add: "Añadir Mapeo",
+                update: "Actualizar",
+                remove: "Eliminar",
+                save_screen: "Guardar Pantalla",
+                load: "Cargar",
+                new: "Nuevo",
+                discard: "Descartar",
+                discard_desc: "Descartar Pantalla",
+                delete: "Eliminar"
+            },
+            feedback: {
+                mapped: "¡Elemento mapeado!",
+                updated: "Mapeador Actualizado",
+                removed: "Mapeo eliminado",
+                empty_map: "Aún no hay elementos mapeados",
+                saved: "¡Pantalla mapeada con éxito!",
+                loaded: "Mapa de pantalla cargado",
+                new_screen: "Listo para nueva pantalla",
+                deleted: "Mapa eliminado"
+            },
+            error: {
+                missing_name: "Por favor proporcione un nombre para el elemento",
+                missing_screen_name: "Por favor proporcione un Nombre para la Pantalla",
+                save_failed: "Error al guardar mapa de pantalla"
+            },
+            confirm: {
+                delete: "¿Está seguro de que desea eliminar este mapa?",
+                delete_title: "¿Eliminar Mapa de Pantalla?",
+                delete_desc: "¿Estás seguro de que deseas eliminar este mapa de pantalla? Esta acción no se puede deshacer.",
+                discard: "¿Descartar los cambios actuales?"
+            }
         },
         performance: {
             fetch_error: "Error al obtener estadísticas",
@@ -426,7 +615,14 @@ export const es = {
             ai: {
                 title: "Integración IA (Google Gemini)",
                 key: "Clave API",
-                placeholder: "Ingrese su Clave API Gemini"
+                model: "ID del Modelo",
+                check_models: "Verificar modelos disponibles",
+                loading_models: "Cargando modelos...",
+                models_fetched: "Modelos obtenidos",
+                models_found_desc: "{{count}} modelos encontrados. Verifique la lista.",
+                no_models_found: "No se encontraron modelos Gemini para esta clave.",
+                placeholder: "Ingrese su Clave API Gemini",
+                help: "Obtenga su Clave API gratuita en"
             },
             system: {
                 title: "Versiones del Sistema",
@@ -455,6 +651,9 @@ export const es = {
                 confirm_delete: "¿Estás seguro de que deseas eliminar este perfil? Esto no se puede deshacer.",
                 default: "Predeterminado"
             },
+            action: {
+                open_file: "Abrir Archivo de Configuración"
+            },
             path_labels: {
                 suites: "Directorio de Suites",
                 tests: "Directorio de Pruebas",
@@ -467,6 +666,7 @@ export const es = {
             }
         },
         sidebar: {
+            dashboard: "Dashboard QA",
             run: "Ejecutar",
             description_run: "Gestión de dispositivos y ejecución de automatización.",
             tests: "Pruebas",

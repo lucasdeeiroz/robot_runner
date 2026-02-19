@@ -18,23 +18,45 @@ if (!/^\d+\.\d+\.\d+/.test(newVersion)) {
     process.exit(1);
 }
 
+// Normalize version (remove leading zeros, e.g., 2.1.000 -> 2.1.0)
+const normalizedVersion = newVersion.split('.').map(v => parseInt(v, 10)).join('.');
+if (normalizedVersion !== newVersion) {
+    console.log(`Normalized version ${newVersion} to ${normalizedVersion}`);
+}
+const versionToUse = normalizedVersion;
+
 const rootDir = path.resolve(__dirname, '..');
 
 const files = [
     {
         path: path.join(rootDir, 'package.json'),
         regex: /"version":\s*"[^"]+"/,
-        replacement: `"version": "${newVersion}"`
+        replacement: `"version": "${versionToUse}"`
     },
     {
         path: path.join(rootDir, 'src-tauri', 'tauri.conf.json'),
         regex: /"version":\s*"[^"]+"/,
-        replacement: `"version": "${newVersion}"`
+        replacement: `"version": "${versionToUse}"`
     },
     {
         path: path.join(rootDir, 'src-tauri', 'Cargo.toml'),
         regex: /^version\s*=\s*"[^"]+"/m,
-        replacement: `version = "${newVersion}"`
+        replacement: `version = "${versionToUse}"`
+    },
+    {
+        path: path.join(rootDir, 'src-tauri', 'Cargo.lock'),
+        regex: /(name\s*=\s*"robot_runner"[\r\n]+\s*version\s*=\s*)"[^"]+"/,
+        replacement: `$1"${versionToUse}"`
+    },
+    {
+        path: path.join(rootDir, 'package-lock.json'),
+        regex: /("name":\s*"robot_runner",\s*"version":\s*)"[^"]+"/,
+        replacement: `$1"${versionToUse}"`
+    },
+    {
+        path: path.join(rootDir, 'package-lock.json'),
+        regex: /("":\s*\{\s*"name":\s*"robot_runner",\s*"version":\s*)"[^"]+"/,
+        replacement: `$1"${versionToUse}"`
     }
 ];
 

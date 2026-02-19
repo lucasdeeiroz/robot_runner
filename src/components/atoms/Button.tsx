@@ -44,8 +44,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
     return (
         <motion.button
             ref={ref}
-            whileHover={{ scale: 1.02, filter: "brightness(1.05)" }}
-            whileTap={{ scale: 0.95 }}
+            whileHover={!disabled && !isLoading ? { scale: 1.02, filter: "brightness(1.05)" } : undefined}
+            whileTap={!disabled && !isLoading ? { scale: 0.95 } : undefined}
             transition={{ type: "spring", stiffness: 400, damping: 17 }}
             className={twMerge(
                 'inline-flex items-center justify-center rounded-2xl font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50 select-none cursor-pointer',
