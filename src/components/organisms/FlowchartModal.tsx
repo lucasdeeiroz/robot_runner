@@ -9,6 +9,8 @@ import { feedback } from '@/lib/feedback';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
 import { toPng } from 'html-to-image';
+import { Button } from '../atoms/Button';
+import { Select } from '../atoms/Select';
 
 interface FlowchartModalProps {
     isOpen: boolean;
@@ -967,32 +969,56 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-surface w-[90vw] h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-outline-variant/30">
                 {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant/30 bg-surface">
+                <div className="flex items-center justify-between px-6 py-2 border-b border-outline-variant/30 bg-surface">
                     <h2 className="text-lg font-semibold text-on-surface flex items-center gap-2">
                         <Maximize className="text-primary" size={20} />
                         {t('mapper.flowchart.title', 'Navigation Flow')}
                     </h2>
                     <div className="flex items-center gap-2">
-                        <button onClick={handleImport} className="p-2 hover:bg-primary/10 text-primary rounded-full" title={t('mapper.flowchart.import', 'Import Flow')}>
-                            <Download size={20} />
-                        </button>
-                        <button onClick={handleExport} className="p-2 hover:bg-primary/10 text-primary rounded-full" title={t('mapper.flowchart.export', 'Export Flow')}>
-                            <Upload size={20} />
-                        </button>
-                        <button onClick={saveLayout} className="p-2 hover:bg-primary/10 text-primary rounded-full" title={t('common.save')}>
-                            <Save size={20} />
-                        </button>
+                        <Button
+                            onClick={handleImport}
+                            className="p-2 hover:bg-primary/10 text-primary rounded-full"
+                            title={t('mapper.flowchart.import', 'Import Flow')}>
+                            <Download size={16} />
+                        </Button>
+                        <Button
+                            onClick={handleExport}
+                            className="p-2 hover:bg-primary/10 text-primary rounded-full"
+                            title={t('mapper.flowchart.export', 'Export Flow')}>
+                            <Upload size={16} />
+                        </Button>
+                        <Button
+                            onClick={saveLayout}
+                            className="p-2 hover:bg-primary/10 text-primary rounded-full"
+                            title={t('common.save')}>
+                            <Save size={16} />
+                        </Button>
                         <div className="h-4 w-px bg-outline-variant/30 mx-2" />
-                        <button onClick={handleExportImage} className="p-2 hover:bg-primary/10 text-primary rounded-full" title={t('mapper.flowchart.export_image', 'Export Image')}>
-                            <Camera size={20} />
-                        </button>
+                        <Button
+                            onClick={handleExportImage}
+                            className="p-2 hover:bg-primary/10 text-primary rounded-full"
+                            title={t('mapper.flowchart.export_image', 'Export Image')}>
+                            <Camera size={16} />
+                        </Button>
                         <div className="h-6 w-px bg-outline-variant/30 mx-2" />
                         <div className="flex bg-surface-variant/30 rounded-lg p-1 mr-4">
-                            <button onClick={() => performZoom(-0.1)} className="p-1.5 hover:bg-surface/50 rounded text-on-surface-variant"><ZoomOut size={16} /></button>
+                            <Button
+                                onClick={() => performZoom(-0.1)}
+                                className="p-1.5 hover:bg-surface/50 rounded text-on-surface-variant">
+                                <ZoomOut size={16} />
+                            </Button>
                             <span className="px-2 text-xs flex items-center text-on-surface-variant/80 min-w-[3rem] justify-center">{Math.round(scale * 100)}%</span>
-                            <button onClick={() => performZoom(0.1)} className="p-1.5 hover:bg-surface/50 rounded text-on-surface-variant"><ZoomIn size={16} /></button>
+                            <Button
+                                onClick={() => performZoom(0.1)}
+                                className="p-1.5 hover:bg-surface/50 rounded text-on-surface-variant">
+                                <ZoomIn size={16} />
+                            </Button>
                         </div>
-                        <button onClick={onClose} className="p-2 hover:bg-error/10 hover:text-error rounded-full transition-colors text-on-surface/60"><X size={20} /></button>
+                        <Button
+                            onClick={onClose}
+                            className="p-2 hover:bg-error/10 hover:text-error rounded-full transition-colors text-on-surface/60">
+                            <X size={16} />
+                        </Button>
                     </div>
                 </div>
 
@@ -1274,16 +1300,12 @@ function QuickConnectDialog({ maps, sourceNodeId, onClose, onConfirm }: {
                 <div className="space-y-4">
                     <div className="space-y-1">
                         <label className="text-xs font-medium text-on-surface-variant uppercase">{t('mapper.flowchart.source_element', 'Source Element')}</label>
-                        <select
+                        <Select
                             className="w-full p-2 rounded-lg bg-surface-variant/10 border border-outline-variant/30 text-sm focus:border-primary outline-none text-on-surface"
-                            value={selectedElement}
                             onChange={e => setSelectedElement(e.target.value)}
+                            options={availableElements.map(el => ({ value: el.name, label: el.name }))}
                         >
-                            <option value="">{t('mapper.flowchart.select_element', 'Select Element')}</option>
-                            {availableElements.map(el => (
-                                <option key={el.name} value={el.name}>{el.name} ({el.type})</option>
-                            ))}
-                        </select>
+                        </Select>
                         {availableElements.length === 0 && (
                             <p className="text-xs text-error">{t('mapper.flowchart.no_elements', 'No unmapped elements available.')}</p>
                         )}
@@ -1291,29 +1313,26 @@ function QuickConnectDialog({ maps, sourceNodeId, onClose, onConfirm }: {
 
                     <div className="space-y-1">
                         <label className="text-xs font-medium text-on-surface-variant uppercase">{t('mapper.flowchart.target_screen', 'Target Screen')}</label>
-                        <select
+                        <Select
                             className="w-full p-2 rounded-lg bg-surface-variant/10 border border-outline-variant/30 text-sm focus:border-primary outline-none text-on-surface"
-                            value={selectedTarget}
                             onChange={e => setSelectedTarget(e.target.value)}
+                            options={availableTargets.map(name => ({ value: name, label: name }))}
                         >
-                            <option value="">{t('mapper.flowchart.select_target', 'Select Target')}</option>
-                            {availableTargets.map(name => (
-                                <option key={name} value={name}>{name}</option>
-                            ))}
-                        </select>
+                        </Select>
                     </div>
 
                     <div className="flex justify-end gap-2 mt-6">
-                        <button onClick={onClose} className="px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-variant/20 rounded-lg">
+                        <Button
+                            onClick={onClose}
+                            className="px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-variant/20 rounded-lg">
                             {t('mapper.flowchart.cancel', 'Cancel')}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             onClick={() => onConfirm(selectedTarget, selectedElement)}
-                            disabled={!selectedElement || !selectedTarget}
                             className="px-4 py-2 text-sm bg-primary text-on-primary rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {t('mapper.flowchart.connect', 'Connect')}
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </div>

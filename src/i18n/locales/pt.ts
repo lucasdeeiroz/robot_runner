@@ -451,9 +451,11 @@ export const pt = {
                 element_name: "Nome do Elemento",
                 navigates_to: "Navega Para (Opcional)",
                 menu_options: "Opções de Menu (Separadas por vírgula)",
-                parent_screen: "Tela Pai"
+                parent_screen: "Tela Pai",
+                select_existing: "Selecionar Elemento Existente"
             },
             placeholder: {
+                select_element: "Escolha um elemento para editar...",
                 element_name: "ex: Botão de Login",
                 navigates_to: "Nome da Tela",
                 menu_options: "Opção 1, Opção 2...",

@@ -9,6 +9,7 @@ interface ComboboxProps {
     onChange: (value: string) => void;
     options: string[];
     placeholder?: string;
+    triggerClassName?: string;
     className?: string;
     disabled?: boolean;
     required?: boolean;
@@ -21,6 +22,7 @@ export function Combobox({
     options,
     placeholder,
     className,
+    triggerClassName,
     disabled = false,
     required = false
 }: ComboboxProps) {
@@ -46,9 +48,6 @@ export function Combobox({
                 // When closing, if the search term matches an option exactly, ensure consistency?
                 // Or just leave it as free text. The requirement allows creating new ones.
                 // So whatever is typed is potentially valid.
-                // However, if the user typed "Log" and didn't select "Login", the value is "Log". That's correct.
-                // But we should ensure the parent component receives the latest typed value on blur or change.
-                // We are calling onChange on every input change, so parent state is already "Log".
             }
         };
 
@@ -59,9 +58,8 @@ export function Combobox({
     }, []);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const newValue = e.target.value;
-        setSearchTerm(newValue);
-        onChange(newValue);
+        setSearchTerm(e.target.value);
+        onChange(e.target.value);
         setIsOpen(true);
     };
 
@@ -88,7 +86,8 @@ export function Combobox({
                     disabled={disabled}
                     className={clsx(
                         "w-full bg-surface-variant/10 border border-outline-variant/30 rounded px-3 py-2 text-sm focus:border-primary focus:outline-none transition-colors pr-8",
-                        disabled && "opacity-50 cursor-not-allowed"
+                        disabled && "opacity-50 cursor-not-allowed",
+                        triggerClassName
                     )}
                 />
                 <div

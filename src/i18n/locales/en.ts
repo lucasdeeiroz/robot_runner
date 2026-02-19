@@ -448,9 +448,11 @@ export const en = {
                 element_name: "Element Name",
                 navigates_to: "Navigates To (Optional)",
                 menu_options: "Menu Options (Comma separated)",
-                parent_screen: "Parent Screen"
+                parent_screen: "Parent Screen",
+                select_existing: "Select Existing Element"
             },
             placeholder: {
+                select_element: "Choose an element to edit...",
                 element_name: "e.g. Login Button",
                 navigates_to: "Screen Name",
                 menu_options: "Option 1, Option 2...",

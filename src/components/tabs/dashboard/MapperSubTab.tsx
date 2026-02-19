@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Maximize, Check, Scan, MousePointerClick, Move, Home, ArrowLeft, Rows, X, RefreshCw, Wrench, Save, GitGraph } from 'lucide-react';
+import { Maximize, Check, Scan, MousePointerClick, Move, Home, ArrowLeft, Rows, X, RefreshCw, Wrench, Save, GitGraph, Trash2, Upload, Download } from 'lucide-react';
 import { XMLParser } from 'fast-xml-parser';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
@@ -14,10 +14,12 @@ import { Combobox } from "@/components/atoms/Combobox";
 import { Select } from "@/components/atoms/Select";
 import { useTestSessions } from '@/lib/testSessionStore';
 import { UIElementType, UIElementMap, ScreenMap } from '@/lib/types';
-import { saveScreenMap, listScreenMaps, deleteScreenMap } from '@/lib/dashboard/mapperPersistence';
+import { saveScreenMap, listScreenMaps, deleteScreenMap, exportMapperData, importMapperData } from '@/lib/dashboard/mapperPersistence';
 import { useSettings } from '@/lib/settings';
+import { save, open } from '@tauri-apps/plugin-dialog';
 import { ConfirmationModal } from '@/components/organisms/ConfirmationModal';
 import { FlowchartModal } from '@/components/organisms/FlowchartModal';
+import { Button } from '@/components/atoms/Button';
 
 interface MapperSubTabProps {
     isActive: boolean;
@@ -82,8 +84,13 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     };
 
     const saveElementMapping = () => {
-        if (!selectedNode || !currentElement.name) {
+        if (!currentElement.name) {
             feedback.toast.error(t('mapper.error.missing_name'));
+            return;
+        }
+
+        if (!selectedNode && !currentElement.id) {
+            feedback.toast.error(t('mapper.error.no_element_selected'));
             return;
         }
 
@@ -178,6 +185,43 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         }
     };
 
+
+    const handleExport = async () => {
+        try {
+            const data = await exportMapperData(activeProfileId);
+            const path = await save({
+                filters: [{ name: 'Robot Runner Flow', extensions: ['json'] }],
+                defaultPath: `flowchart_export_${new Date().toISOString().split('T')[0]}.json`
+            });
+
+            if (path) {
+                await invoke('save_file', { path, content: data, append: false });
+                feedback.toast.success(t('mapper.flowchart.export_success'));
+            }
+        } catch (e) {
+            console.error(e);
+            feedback.toast.error(t('mapper.flowchart.export_error'));
+        }
+    };
+
+    const handleImport = async () => {
+        try {
+            const path = await open({
+                filters: [{ name: 'Robot Runner Flow', extensions: ['json'] }],
+                multiple: false
+            });
+
+            if (path && typeof path === 'string') {
+                const content = await invoke<string>('read_file', { path });
+                await importMapperData(activeProfileId, content);
+                feedback.toast.success(t('mapper.flowchart.import_success'));
+                loadSavedMaps(); // Refresh list
+            }
+        } catch (e) {
+            console.error(e);
+            feedback.toast.error(t('mapper.flowchart.import_error'));
+        }
+    };
 
     // State for devices (REMOVED - Managed by Parent)
     const { sessions } = useTestSessions();
@@ -521,11 +565,15 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                             <span className={clsx(isNarrow && "hidden")}>{t('mapper.refresh')}</span>
                         </button>
                         <button
-                            onClick={() => setIsFlowchartOpen(true)}
-                            className="p-2 hover:bg-surface-variant/30 rounded-2xl text-on-surface/80 hover:text-primary transition-colors"
+                            onClick={() => {
+                                loadSavedMaps();
+                                setIsFlowchartOpen(true);
+                            }}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-primary text-on-primary rounded-2xl hover:bg-primary/90 transition-colors shadow-sm text-sm font-medium"
                             title={t('mapper.flowchart.open', 'Open Flowchart')}
                         >
-                            <GitGraph size={18} />
+                            <GitGraph size={16} />
+                            <span className={clsx(isNarrow && "hidden")}>{t('mapper.flowchart.open', 'Open Flowchart')}</span>
                         </button>
 
                     </>
@@ -659,11 +707,10 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                     </div>
 
                     <div className="flex-1 overflow-y-auto custom-scrollbar p-0">
-                        {selectedNode ? (
-                            <div className="p-4 space-y-6">
-                                {/* Quick Copy Actions */}
-                                <div className="space-y-4">
-                                    {/* Breadcrumbs */}
+                        <div className="pl-4 pr-4">
+                            {/* Quick Copy Actions / Identifiers (Only if node selected) */}
+                            {selectedNode && (
+                                <div className="pt-4 pb-4 space-y-4">
                                     <div className="mt-1">
                                         <h3 className="text-xs font-semibold text-on-surface-variant/80 uppercase tracking-wider mb-2">{t('mapper.attributes.hierarchy')}</h3>
                                         <NodeBreadcrumbs
@@ -672,122 +719,174 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                             onHover={setHoveredNode}
                                         />
                                     </div>
-                                    <h3 className="text-xs font-semibold text-on-surface-variant/80 uppercase tracking-wider">{t('mapper.attributes.identifiers')}</h3>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <CopyButton
-                                            label={t('mapper.attributes.access_id')}
-                                            value={selectedNode.attributes['content-desc']}
-                                            onCopy={(v) => copyToClipboard(v, 'aid')}
-                                            active={copied === 'aid'}
-                                        />
-                                        <CopyButton
-                                            label={t('mapper.attributes.resource_id')}
-                                            value={selectedNode.attributes['resource-id']}
-                                            onCopy={(v) => copyToClipboard(v, 'rid')}
-                                            active={copied === 'rid'}
-                                        />
-                                    </div>
                                 </div>
+                            )}
 
-                                {/* --- SCREEN MAPPER UI --- */}
-                                <div className="mt-6 border-t border-outline-variant/30 pt-4">
-                                    <h3 className="text-sm font-semibold text-primary uppercase tracking-wider mb-4 flex items-center gap-2">
+                            {/* --- SCREEN MAPPER UI --- */}
+                            <div className={clsx("pt-4 pb-4 border-t border-outline-variant/30", !selectedNode && "mt-0 border-t-0 pt-0")}>
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-sm font-semibold text-primary uppercase tracking-wider flex items-center gap-2">
                                         <Wrench size={14} /> {t('mapper.screen_mapper')}
                                     </h3>
-
-                                    <div className="space-y-4">
-                                        {/* Name and Type Row */}
-                                        <div className="grid grid-cols-[1fr_auto] gap-2 items-start">
-                                            <div className="space-y-1">
-                                                <label className="text-xs text-on-surface-variant/80 font-medium">{t('mapper.input.element_name')} <span className="text-error">*</span></label>
-                                                <input
-                                                    type="text"
-                                                    value={currentElement.name || ''}
-                                                    onChange={(e) => updateElement('name', e.target.value)}
-                                                    className="w-full bg-surface-variant/10 border border-outline-variant/30 rounded px-3 py-2 text-sm focus:border-primary focus:outline-none transition-colors"
-                                                    placeholder={t('mapper.placeholder.element_name')}
-                                                />
-                                            </div>
-                                            <div className="w-32 space-y-1">
-                                                <label className="text-xs text-on-surface-variant/80 font-medium">{t('mapper.input.element_type')}</label>
-                                                <Select
-                                                    value={currentElement.type || 'button'}
-                                                    onChange={(e) => updateElement('type', e.target.value)}
-                                                    options={(['button', 'input', 'text', 'link', 'toggle', 'checkbox', 'image', 'menu', 'scroll_view', 'tab'] as UIElementType[]).map(type => ({
-                                                        label: t(`mapper.types.${type}`),
-                                                        value: type
-                                                    }))}
-                                                />
-                                            </div>
+                                    {/* Saved Elements Dropdown */}
+                                    {mappedElements.length > 0 && (
+                                        <div className="ml-auto">
+                                            <Combobox
+                                                value={mappedElements.find(e => e.id === currentElement.id)?.name || ''}
+                                                onChange={(name) => {
+                                                    const el = mappedElements.find(e => e.name === name);
+                                                    if (el) {
+                                                        setCurrentElement(el);
+                                                        setSelectedNode(null); // Clear selection to Switch context
+                                                    }
+                                                }}
+                                                options={mappedElements.map(e => e.name)}
+                                                placeholder={mappedElements.length + ' ' + t('mapper.elements_mapped')}
+                                                triggerClassName="h-8 text-xs bg-surface-variant/10"
+                                            />
                                         </div>
+                                    )}
+                                    {mappedElements.find(e => e.id === currentElement.id) && (
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={removeElementMapping}
+                                            className="p-2 ml-2 text-on-surface/80 hover:text-error hover:bg-error-container/10"
+                                            title={t('mapper.action.remove')}
+                                        >
+                                            <Trash2 size={16} />
+                                        </Button>
+                                    )}
+                                    <Button
+                                        onClick={saveElementMapping}
+                                        variant="primary"
+                                        size="sm"
+                                        className="p-2 ml-2 hover:text-on-surface"
+                                        title={mappedElements.find(e => e.id === currentElement.id) ? t('mapper.action.update') : t('mapper.action.add')}
+                                    >
+                                        {mappedElements.find(e => e.id === currentElement.id) ? t('mapper.action.update') : t('mapper.action.add')}
+                                    </Button>
+                                </div>
 
-                                        <div className="grid grid-cols-[1fr_auto] gap-2 items-start">
-                                            <div className="space-y-4">
-                                                {/* Navigation Target */}
+                                {/* Identifiers Section - Moved here as requested */}
+                                <div className="mb-2 space-y-2">
+                                    {(selectedNode || currentElement.accessibility_id || currentElement.android_id) && (
+                                        <h3 className="text-xs text-on-surface-variant/80 font-medium">{t('mapper.attributes.identifiers')}</h3>
+                                    )}
+
+                                    {selectedNode ? (
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <CopyButton
+                                                label={t('mapper.attributes.access_id')}
+                                                value={selectedNode.attributes['content-desc']}
+                                                onCopy={(v) => copyToClipboard(v, 'aid')}
+                                                active={copied === 'aid'}
+                                            />
+                                            <CopyButton
+                                                label={t('mapper.attributes.resource_id')}
+                                                value={selectedNode.attributes['resource-id']}
+                                                onCopy={(v) => copyToClipboard(v, 'rid')}
+                                                active={copied === 'rid'}
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {currentElement.accessibility_id && (
+                                                <CopyButton
+                                                    label={t('mapper.attributes.access_id')}
+                                                    value={currentElement.accessibility_id}
+                                                    onCopy={(v) => copyToClipboard(v, 'aid')}
+                                                    active={copied === 'aid'}
+                                                />
+                                            )}
+                                            {currentElement.android_id && (
+                                                <CopyButton
+                                                    label={t('mapper.attributes.resource_id')}
+                                                    value={currentElement.android_id}
+                                                    onCopy={(v) => copyToClipboard(v, 'rid')}
+                                                    active={copied === 'rid'}
+                                                />
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="space-y-4">
+                                    {/* Name and Type Row */}
+                                    <div className="grid grid-cols-[1fr_auto] gap-2 items-start">
+                                        <div className="space-y-1">
+                                            <label className="text-xs text-on-surface-variant/80 font-medium">{t('mapper.input.element_name')} <span className="text-error">*</span></label>
+                                            <input
+                                                type="text"
+                                                value={currentElement.name || ''}
+                                                onChange={(e) => updateElement('name', e.target.value)}
+                                                className="w-full bg-surface-variant/10 border border-outline-variant/30 rounded px-3 py-2 text-sm focus:border-primary focus:outline-none transition-colors"
+                                                placeholder={t('mapper.placeholder.element_name')}
+                                            />
+                                        </div>
+                                        <div className="w-32 space-y-1">
+                                            <label className="text-xs text-on-surface-variant/80 font-medium">{t('mapper.input.element_type')}</label>
+                                            <Select
+                                                value={currentElement.type || 'button'}
+                                                onChange={(e) => updateElement('type', e.target.value)}
+                                                options={(['button', 'input', 'text', 'link', 'toggle', 'checkbox', 'image', 'menu', 'scroll_view', 'tab'] as UIElementType[]).map(type => ({
+                                                    label: t(`mapper.types.${type}`),
+                                                    value: type
+                                                }))}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-[1fr_auto] gap-2 items-start">
+                                        <div className="space-y-4">
+                                            {/* Navigation Target */}
+                                            <div className="space-y-1">
+                                                <Combobox
+                                                    label={t('mapper.input.navigates_to')}
+                                                    value={currentElement.navigates_to || ''}
+                                                    onChange={(val) => updateElement('navigates_to', val)}
+                                                    options={savedMaps.map(m => m.name)}
+                                                    placeholder={t('mapper.placeholder.navigates_to')}
+                                                />
+                                            </div>
+
+                                            {/* Complex: Menu Options */}
+                                            {currentElement.type === 'menu' && (
                                                 <div className="space-y-1">
-                                                    <Combobox
-                                                        label={t('mapper.input.navigates_to')}
-                                                        value={currentElement.navigates_to || ''}
-                                                        onChange={(val) => updateElement('navigates_to', val)}
-                                                        options={savedMaps.map(m => m.name)}
-                                                        placeholder={t('mapper.placeholder.navigates_to')}
+                                                    <label className="text-xs text-on-surface-variant/80 font-medium">{t('mapper.input.menu_options')}</label>
+                                                    <textarea
+                                                        value={currentElement.menu_options?.join(',') || ''}
+                                                        onChange={(e) => updateElement('menu_options', e.target.value.split(','))}
+                                                        className="w-full bg-surface-variant/10 border border-outline-variant/30 rounded px-2 py-1.5 text-sm focus:border-primary focus:outline-none transition-colors resize-none h-20"
+                                                        placeholder={t('mapper.placeholder.menu_options')}
                                                     />
                                                 </div>
+                                            )}
 
-                                                {/* Complex: Menu Options */}
-                                                {currentElement.type === 'menu' && (
-                                                    <div className="space-y-1">
-                                                        <label className="text-xs text-on-surface-variant/80 font-medium">{t('mapper.input.menu_options')}</label>
-                                                        <textarea
-                                                            value={currentElement.menu_options?.join(',') || ''}
-                                                            onChange={(e) => updateElement('menu_options', e.target.value.split(','))}
-                                                            className="w-full bg-surface-variant/10 border border-outline-variant/30 rounded px-2 py-1.5 text-sm focus:border-primary focus:outline-none transition-colors resize-none h-20"
-                                                            placeholder={t('mapper.placeholder.menu_options')}
-                                                        />
-                                                    </div>
-                                                )}
+                                            {/* Complex: Tab Parent */}
+                                            {currentElement.type === 'tab' && (
+                                                <div className="space-y-1">
+                                                    <Combobox
+                                                        label={t('mapper.input.parent_screen')}
+                                                        value={currentElement.parent_screen || ''}
+                                                        onChange={(val) => updateElement('parent_screen', val)}
+                                                        options={savedMaps.map(m => m.name)}
+                                                        placeholder={t('mapper.placeholder.parent_screen')}
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
 
-                                                {/* Complex: Tab Parent */}
-                                                {currentElement.type === 'tab' && (
-                                                    <div className="space-y-1">
-                                                        <Combobox
-                                                            label={t('mapper.input.parent_screen')}
-                                                            value={currentElement.parent_screen || ''}
-                                                            onChange={(val) => updateElement('parent_screen', val)}
-                                                            options={savedMaps.map(m => m.name)}
-                                                            placeholder={t('mapper.placeholder.parent_screen')}
-                                                        />
-                                                    </div>
-                                                )}
-                                            </div>
+                                        {/* Action Buttons Column */}
+                                        <div className="flex flex-col gap-2 pt-6 w-32">
 
-                                            {/* Action Buttons Column */}
-                                            <div className="flex flex-col gap-2 pt-6 w-32">
-                                                <button
-                                                    onClick={saveElementMapping}
-                                                    className="w-full bg-primary text-on-primary py-2 rounded text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm"
-                                                >
-                                                    {mappedElements.find(e => e.id === currentElement.id) ? t('mapper.action.update') : t('mapper.action.add')}
-                                                </button>
-                                                {mappedElements.find(e => e.id === currentElement.id) && (
-                                                    <button
-                                                        onClick={removeElementMapping}
-                                                        className="w-full px-3 py-2 bg-error/10 text-error border border-error/20 rounded text-sm font-medium hover:bg-error/20 transition-colors"
-                                                    >
-                                                        {t('mapper.action.remove')}
-                                                    </button>
-                                                )}
-                                            </div>
+
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center h-full text-on-surface/80 p-8 text-center">
-                                <Scan size={48} className="mb-4 opacity-20" />
-                                <p className="text-sm">{t('mapper.select_element')}</p>
-                            </div>
-                        )}
+                        </div>
+
                     </div>
 
                     {/* ALWAYS VISIBLE: Screen Settings Footer */}
@@ -813,7 +912,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                             </div>
 
                             <div className="flex gap-2 pt-2">
-                                <button
+                                <Button
                                     onClick={() => {
                                         setScreenName('');
                                         setScreenType('screen');
@@ -826,18 +925,18 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                     className="px-3 py-1.5 bg-surface border border-outline-variant/30 rounded text-sm font-medium hover:bg-surface-variant/10 text-on-surface/80 flex items-center gap-2 transition-colors"
                                     title={t('mapper.action.new')}
                                 >
-                                    <Wrench size={14} />
+                                    <Wrench size={16} />
                                     {t('mapper.action.new')}
-                                </button>
+                                </Button>
 
                                 <div className="relative">
-                                    <button
+                                    <Button
                                         onClick={() => setShowLoadMenu(!showLoadMenu)}
                                         className="px-3 py-1.5 bg-surface border border-outline-variant/30 rounded text-sm font-medium hover:bg-surface-variant/10 text-on-surface/80 flex items-center gap-2 transition-colors"
                                         title={t('mapper.action.load')}
                                     >
-                                        <RefreshCw size={14} />
-                                    </button>
+                                        <RefreshCw size={16} />
+                                    </Button>
                                     {/* Load Menu Dropdown */}
                                     {showLoadMenu && (
                                         <div className="absolute bottom-full left-0 mb-2 w-64 bg-surface rounded-xl shadow-xl border border-outline-variant/30 overflow-hidden z-50 flex flex-col max-h-60">
@@ -858,13 +957,15 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                                 <span className="text-sm font-medium text-on-surface">{map.name}</span>
                                                                 <span className="text-[10px] text-on-surface-variant/50 uppercase">{t(`mapper.screen_types.${map.type}`)}</span>
                                                             </div>
-                                                            <button
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
                                                                 onClick={(e) => handleDeleteScreen(map.id, e)}
                                                                 className="p-1.5 opacity-0 group-hover:opacity-100 hover:text-error hover:bg-error/10 rounded transition-all"
                                                                 title={t('mapper.action.delete')}
                                                             >
-                                                                <X size={14} />
-                                                            </button>
+                                                                <Trash2 size={16} />
+                                                            </Button>
                                                         </div>
                                                     ))
                                                 )}
@@ -873,29 +974,43 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                     )}
                                 </div>
 
-                                <button
-                                    onClick={() => {
-                                        handleSaveScreen();
-                                        refreshAll();
-                                    }}
-                                    className="flex-1 bg-primary text-on-primary py-1.5 rounded text-sm font-medium hover:bg-primary/90 flex items-center justify-center gap-2 transition-colors shadow-sm"
-                                >
-                                    <Save size={14} />
-                                    {t('mapper.action.save_screen')}
-                                </button>
-
+                                <Button
+                                    onClick={handleImport}
+                                    className="ml-2 p-2 hover:bg-primary/10 text-primary rounded-full"
+                                    title={t('mapper.flowchart.import', 'Import Flow')}>
+                                    <Download size={16} />
+                                </Button>
+                                <Button
+                                    onClick={handleExport}
+                                    className="ml-2 p-2 mr-auto hover:bg-primary/10 text-primary rounded-full"
+                                    title={t('mapper.flowchart.export', 'Export Flow')}>
+                                    <Upload size={16} />
+                                </Button>
                                 {screenName && savedMaps.find(m => m.name === screenName) && (
-                                    <button
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
                                         onClick={(e) => {
                                             const map = savedMaps.find(m => m.name === screenName);
                                             if (map) handleDeleteScreen(map.id, e)
                                         }}
-                                        className="px-3 py-1.5 bg-error/10 text-error border border-error/20 rounded text-sm font-medium hover:bg-error/20 transition-colors"
+                                        className="p-2 text-on-surface/80 hover:text-error hover:bg-error-container/10"
                                         title={t('mapper.action.discard_desc')}
                                     >
-                                        {t('mapper.action.discard')}
-                                    </button>
+                                        <Trash2 size={16} />
+                                    </Button>
                                 )}
+                                <Button
+                                    onClick={() => {
+                                        handleSaveScreen();
+                                        refreshAll();
+                                    }}
+                                    className="px-3 py-1.5 bg-primary text-on-primary text-sm font-medium hover:bg-primary/90 flex items-center justify-center gap-2 transition-colors shadow-sm"
+                                >
+                                    <Save size={16} />
+                                    {t('mapper.action.save_screen')}
+                                </Button>
+
                             </div>
                         </div>
                     </div>
