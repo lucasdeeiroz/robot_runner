@@ -117,6 +117,7 @@ export const pt = {
             undo: "Desfazer",
             redo: "Refazer",
             copy: "Copiar",
+            copied: "Copiado!",
             download: "Baixar",
             downloading: "Baixando...",
             clear: "Limpar",

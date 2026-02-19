@@ -119,7 +119,7 @@ export function exportToXlsx(content: string, language: string = 'en') {
     tests.forEach(testContent => {
         const uniqueDescription = testContent.replace(/\n/g, "\n");
 
-        let stepsText = "https://sua-url.com";
+        let stepsText = "N/A";
         let scenarioDescription = uniqueDescription;
 
         // Regex to find Passos/Steps section

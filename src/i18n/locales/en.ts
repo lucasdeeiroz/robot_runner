@@ -114,6 +114,7 @@ export const en = {
             undo: "Undo",
             redo: "Redo",
             copy: "Copy",
+            copied: "Copied!",
             download: "Download",
             downloading: "Downloading...",
             clear: "Clear",

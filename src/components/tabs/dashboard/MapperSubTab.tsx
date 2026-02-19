@@ -393,7 +393,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         if (!coords) return;
 
         if (interactionMode === 'tap') {
-            sendAdbInput(`tap ${coords.x} ${coords.y} `);
+            sendAdbInput(`tap ${coords.x} ${coords.y}`);
             addTapAnimation(coords.x, coords.y);
         } else if (interactionMode === 'inspect') {
             if (!processMouseInteraction(e, false)) return;

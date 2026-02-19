@@ -117,6 +117,7 @@ export const es = {
             undo: "Deshacer",
             redo: "Rehacer",
             copy: "Copiar",
+            copied: "¡Copiado!",
             download: "Descargar",
             downloading: "Descargando...",
             clear: "Limpiar",
