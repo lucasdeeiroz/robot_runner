@@ -11,14 +11,16 @@ import { Toaster } from "sonner";
 import { useSettings } from "./lib/settings";
 import { SystemCheckOverlay } from "./components/organisms/SystemCheckOverlay";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { Onboarding } from "./components/organisms/Onboarding";
 import "./App.css";
 import { motion, AnimatePresence } from "framer-motion";
 import { argbFromHex, themeFromSourceColor, TonalPalette } from "@material/material-color-utilities";
 import { DeviceProvider } from "./lib/deviceStore";
+import { ExpressiveLoading } from "./components/atoms/ExpressiveLoading";
 
 function App() {
   const [activePage, setActivePage] = useState("run");
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { settings, checkSystemVersions, systemCheckStatus, loading: settings_loading, checkForAppUpdate } = useSettings();
 
   // State to track if we should show the overlay or if it has been dismissed/handled
@@ -65,7 +67,21 @@ function App() {
     }
   }, [systemCheckStatus]);
 
-
+  // Sync settings language with i18n globally
+  useEffect(() => {
+    if (settings.language) {
+      const langMap: Record<string, string> = {
+        'en_US': 'en',
+        'pt_BR': 'pt',
+        'es_ES': 'es'
+      };
+      const mappedLang = langMap[settings.language] || 'en';
+      if (i18n.language !== mappedLang) {
+        i18n.changeLanguage(mappedLang);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.language]);
   // Apply theme and primary color immediately when settings change or load
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -159,7 +175,11 @@ function App() {
 
   // Prevent rendering (and thus flash) until settings are loaded
   if (settings_loading) {
-    return null; // Or a minimal loading spinner matching the system theme background if possible, but null is safest for "no flash" if the HTML bg is neutral or handled by index.html
+    return (
+      <div className="w-screen h-screen flex flex-col items-center justify-center bg-surface text-primary">
+        <ExpressiveLoading size="lg" />
+      </div>
+    );
   }
 
   return (
@@ -167,8 +187,15 @@ function App() {
       <DeviceProvider>
         <Toaster richColors position="bottom-right" theme={settings.theme === 'dark' ? 'dark' : 'light'} />
         <AnimatePresence>
-          {showOverlay && (
+          {!settings.usageMode && (
+            <Onboarding key="onboarding-flow" onComplete={() => {
+              // Trigger a manual check version after onboarding is complete
+              checkSystemVersions();
+            }} />
+          )}
+          {showOverlay && settings.usageMode && (
             <SystemCheckOverlay
+              key="system-check-overlay"
               status={systemCheckStatus}
               onCriticalExit={handleCriticalExit}
               onTestingRedirect={handleTestingRedirect}

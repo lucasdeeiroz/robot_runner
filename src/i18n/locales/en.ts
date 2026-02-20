@@ -113,6 +113,9 @@ export const en = {
             saved: "Saved",
             undo: "Undo",
             redo: "Redo",
+            next: "Next",
+            back: "Back",
+            finish: "Finish",
             copy: "Copy",
             copied: "Copied!",
             download: "Download",
@@ -388,7 +391,14 @@ export const en = {
                 connect: "Connect",
                 cancel: "Cancel",
                 no_elements: "No mapped elements available.",
-                title: "Navigation Flow"
+                title: "Navigation Flow",
+                unsaved_changes: {
+                    title: "Unsaved Changes",
+                    message: "You have unsaved changes. Do you want to save before exiting?",
+                    save_and_exit: "Save and Exit",
+                    exit_without_saving: "Exit without Saving",
+                    cancel: "Cancel"
+                }
             },
             properties: "Element Properties",
             clear_selection: "Clear Selection",
@@ -671,6 +681,8 @@ export const en = {
             description_run: "Device management and automation execution.",
             tests: "Tests",
             description_tests: "Execution history and result analysis.",
+            toolbox: "Toolbox",
+            description_toolbox: "Everyday tools for debugging and manual testing.",
             ai_assistant: "AI Assistant",
             settings: "Settings",
             description_settings: "Configure application preferences and integrations.",
@@ -801,6 +813,23 @@ export const en = {
         updater: {
             version_check_error: "Failed to get app version",
             check_error: "Failed to check for updates"
+        },
+        onboarding: {
+            title: "Welcome to Robot Runner!",
+            description: "Let's set up your profile to optimize your experience. This will only take a moment.",
+            step1_title: "Select your Language",
+            step2_title: "Choose your Usage Mode",
+            error_no_mode: "Please select a usage mode to continue.",
+            mode: {
+                explorer: {
+                    title: "Explorer",
+                    description: "Everyday tools for debugging and manual testing (ADB, Scrcpy, etc.). No setup required."
+                },
+                automator: {
+                    title: "Automator",
+                    description: "Develop and run automated tests using Robot Framework and Appium."
+                }
+            }
         }
     }
 };

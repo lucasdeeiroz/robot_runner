@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTestSessions } from "@/lib/testSessionStore";
+import { useSettings } from "@/lib/settings";
 import { ToolboxView } from "@/components/tabs/tests/toolbox/ToolboxView";
 import { HistorySubTab } from "@/components/tabs/tests/HistorySubTab";
 import { AndroidVersionPill } from "@/components/atoms/AndroidVersionPill";
@@ -11,11 +12,15 @@ import { TabBar } from "@/components/organisms/TabBar";
 import { useDevices } from '@/lib/deviceStore';
 import { DeviceSelector } from '@/components/molecules/DeviceSelector';
 import { Device } from '@/lib/types';
+import { Button } from '@/components/atoms/Button';
 
 export function TestsPage() {
     const { t } = useTranslation();
+    const { settings } = useSettings();
     const { sessions, activeSessionId, setActiveSessionId, clearSession } = useTestSessions();
-    const [subTab, setSubTab] = useState<'history' | string>('history');
+    const isExplorer = settings.usageMode === 'explorer';
+    const initialTab = isExplorer ? (sessions.length > 0 ? sessions[0].runId : '') : 'history';
+    const [subTab, setSubTab] = useState<'history' | string>(initialTab);
 
     const [isGridView, setIsGridView] = useState(false);
     // Track visible sessions in Grid View. Default to all active session IDs.
@@ -136,9 +141,9 @@ export function TestsPage() {
         if (activeSessionId !== 'dashboard') {
             setSubTab(activeSessionId);
         } else {
-            setSubTab('history');
+            setSubTab(isExplorer ? (sessions.length > 0 ? sessions[0].runId : '') : 'history');
         }
-    }, [activeSessionId]);
+    }, [activeSessionId, isExplorer, sessions]);
 
     const handleTabChange = (id: string) => {
         setSubTab(id);
@@ -168,11 +173,11 @@ export function TestsPage() {
             {/* Modified Tabs Row with Grid Toggle */}
             <TabBar
                 tabs={[
-                    {
+                    ...(isExplorer ? [] : [{
                         id: 'history',
                         label: t('tests_page.history'),
                         selected: isGridView ? false : undefined
-                    },
+                    }]),
                     ...sessions.map(s => {
                         const isSuccess = s.exitCode && (s.exitCode.includes("exit code: 0") || s.exitCode === "0");
                         const isFailed = s.status === 'finished' && !isSuccess;
@@ -211,7 +216,7 @@ export function TestsPage() {
                     }
                 }}
                 variant="pills"
-                className="z-10 shrink-0"
+                className="z-20 relative shrink-0"
                 layoutId="tests-page-tabs"
                 menus={
                     <DeviceSelector
@@ -222,14 +227,22 @@ export function TestsPage() {
                         loadDevices={refreshDevices}
                         handleOpenToolbox={handleOpenToolbox}
                         busyDeviceIds={busyDeviceIds}
+                        onDropdownOpen={() => {
+                            if (selectedDevices.length > 1) {
+                                setSelectedDevices([selectedDevices[0]]);
+                            }
+                        }}
+                        compact={sessions.length >= 2}
                     />
                 }
                 actions={
                     sessions.length >= 2 ? (
-                        <button
+                        <Button
+                            variant="ghost"
+                            size="icon"
                             onClick={() => setIsGridView(!isGridView)}
                             className={clsx(
-                                "p-2 rounded-2xl border transition-all shrink-0",
+                                "rounded-2xl border transition-all shrink-0",
                                 isGridView
                                     ? "bg-primary/10 border-none text-primary"
                                     : "bg-transparent border-none text-on-surface-variant/80 hover:text-on-surface-variant/80 hover:bg-surface-variant/30"
@@ -237,7 +250,7 @@ export function TestsPage() {
                             title={isGridView ? t('toolbox.actions.switch_to_tabs') : t('toolbox.actions.switch_to_grid')}
                         >
                             <LayoutGrid size={20} />
-                        </button>
+                        </Button>
                     ) : undefined
                 }
             />
@@ -278,13 +291,14 @@ export function TestsPage() {
                 </div>
             ) : (
                 <div className="flex-1 min-h-0 relative">
-                    {subTab === 'history' ? (
+                    {subTab === 'history' && !isExplorer ? (
                         <HistorySubTab />
                     ) : activeSession ? (
                         <ToolboxView key={activeSession.deviceUdid || activeSession.runId} session={activeSession} />
                     ) : (
-                        <div className="h-full flex items-center justify-center text-on-surface/80">
-                            {t('tests_page.session_not_found')}
+                        <div className="h-full flex items-center justify-center text-on-surface/80 flex-col gap-4">
+                            <FileText size={48} className="opacity-20" />
+                            <p>{t('tests_page.session_not_found')}</p>
                         </div>
                     )}
                 </div>
@@ -307,31 +321,37 @@ function GridItem({ title, children, onClose, onHide, className, onMaximize }: {
                 </span>
                 <div className="flex items-center gap-1">
                     {onMaximize && (
-                        <button
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={onMaximize}
-                            className="p-1 text-on-surface/80 hover:text-on-surface-variant/80 rounded"
+                            className="h-6 w-6 p-0 text-on-surface/80 hover:text-on-surface-variant/80"
                             title={t('common.maximize')}
                         >
                             <Maximize2 size={14} />
-                        </button>
+                        </Button>
                     )}
                     {onHide && (
-                        <button
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={onHide}
-                            className="p-1 text-on-surface/80 hover:text-on-surface-variant/80 rounded"
+                            className="h-6 w-6 p-0 text-on-surface/80 hover:text-on-surface-variant/80"
                             title={t('common.minimize')}
                         >
                             <Minimize2 size={14} />
-                        </button>
+                        </Button>
                     )}
                     {onClose && (
-                        <button
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={onClose}
-                            className="p-1 text-on-surface/80 hover:text-error rounded"
+                            className="h-6 w-6 p-0 text-on-surface/80 hover:text-error hover:bg-error/10"
                             title={t('common.close')}
                         >
                             <XCircle size={14} />
-                        </button>
+                        </Button>
                     )}
                 </div>
             </div>

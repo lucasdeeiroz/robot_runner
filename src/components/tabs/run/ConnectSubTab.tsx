@@ -11,6 +11,8 @@ import { SplitButton } from "@/components/molecules/SplitButton";
 import { Section } from "@/components/organisms/Section";
 import { Alert } from "@/components/atoms/Alert";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
+import { Input } from "@/components/atoms/Input";
+import { Button } from "@/components/atoms/Button";
 
 interface ConnectSubTabProps {
     onDeviceConnected: () => void;
@@ -323,12 +325,11 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                                 {t('connect.actions.paste_url') || "Paste URL"}
                             </button>
                         </div>
-                        <input
-                            type="text"
+                        <Input
                             placeholder="0.tcp.ngrok.io"
                             value={ip}
                             onChange={e => setIp(e.target.value)}
-                            className="w-full bg-surface border border-outline-variant/30 rounded-2xl px-3 py-2 text-on-surface/80 outline-none focus:ring-2 focus:ring-primary transition-all font-mono"
+                            className="font-mono bg-surface"
                         />
                     </div>
                     <div>
@@ -345,22 +346,20 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                                 </button>
                             )}
                         </div>
-                        <input
-                            type="text"
+                        <Input
                             placeholder="5555"
                             value={port}
                             onChange={e => setPort(e.target.value)}
-                            className="w-full bg-surface border border-outline-variant/30 rounded-2xl px-3 py-2 text-on-surface/80 outline-none focus:ring-2 focus:ring-primary transition-all font-mono"
+                            className="font-mono bg-surface"
                         />
                     </div>
                     <div>
                         <label className="block text-xs font-medium text-on-surface-variant/80 mb-1 ml-1">{t('connect.labels.code')}</label>
-                        <input
-                            type="text"
+                        <Input
                             placeholder="123456"
                             value={code}
                             onChange={e => setCode(e.target.value)}
-                            className="w-full bg-surface border border-outline-variant/30 rounded-2xl px-3 py-2 text-on-surface/80 outline-none focus:ring-2 focus:ring-primary transition-all font-mono"
+                            className="font-mono bg-surface"
                         />
                     </div>
                 </div>
@@ -466,13 +465,14 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                                     </div>
                                 </div>
 
-                                <button
+                                <Button
                                     onClick={handleStartNgrok}
                                     disabled={!settings.tools.ngrokToken}
-                                    className="w-full py-2 bg-purple-600 hover:bg-purple-500 text-on-primary rounded-2xl font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="w-full bg-purple-600 hover:bg-purple-500 text-on-primary justify-center"
+                                    leftIcon={<Link size={18} />}
                                 >
-                                    <Link size={18} /> {t('connect.actions.start_tunnel')}
-                                </button>
+                                    {t('connect.actions.start_tunnel')}
+                                </Button>
                             </div>
                         ) : (
                             <div className="space-y-4">
@@ -487,23 +487,27 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                                             <span className="text-xs font-bold text-on-success-container/10 uppercase tracking-wider">{t('connect.status.tunnel_active')}</span>
                                             <div className="flex items-center gap-2 bg-on-primary px-3 py-1.5 rounded-2xl border border-success-container/20">
                                                 <span className="font-mono text-lg text-on-surface/50 select-all">{ngrokUrl}</span>
-                                                <button
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
                                                     onClick={() => { navigator.clipboard.writeText(ngrokUrl); setNgrokStatusMsg({ text: t('connect.actions.copy'), type: 'success' }); }}
-                                                    className="p-1 hover:bg-surface-variant/30 rounded text-on-surface/80 hover:text-on-surface-variant/80"
+                                                    className="p-1 h-auto text-on-surface/80 hover:text-on-surface-variant/80"
                                                     title="Copy URL"
                                                 >
                                                     <Copy size={16} />
-                                                </button>
+                                                </Button>
                                             </div>
                                             <span className="text-xs text-on-surface-variant/80">{t('connect.status.forwarding')}</span>
                                         </div>
 
-                                        <button
+                                        <Button
                                             onClick={handleStopNgrok}
-                                            className="w-full py-2 bg-error-container hover:bg-error-container/20 text-error-container/80 rounded-2xl font-medium transition-colors flex items-center justify-center gap-2"
+                                            variant="danger"
+                                            className="w-full bg-error-container hover:bg-error-container/20 text-error-container/80 justify-center border-none"
+                                            leftIcon={<Unplug size={18} />}
                                         >
-                                            <Unplug size={18} /> {t('connect.actions.stop_tunnel')}
-                                        </button>
+                                            {t('connect.actions.stop_tunnel')}
+                                        </Button>
                                     </div>
                                 )}
                             </div>
@@ -514,14 +518,14 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                 {/* Full-section Overlay for First-time Enable */}
                 {!isNgrokEnabled && (
                     <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-surface/60 backdrop-blur-[3px] rounded-2xl transition-all animate-in fade-in duration-300">
-                        <button
+                        <Button
                             onClick={() => setShowSecurityModal(true)}
-                            className="bg-error-container/80 hover:bg-error-container/60 text-on-surface/80 px-6 py-3 rounded-2xl shadow-lg font-bold transition-all hover:scale-105 active:scale-95 flex items-center gap-2"
+                            className="bg-error-container/80 hover:bg-error-container/60 text-on-surface/80 px-6 py-6 h-auto shadow-lg font-bold text-base"
+                            leftIcon={<Globe size={20} />}
                             aria-describedby="enable-remote-description"
                         >
-                            <Globe size={20} />
                             {t('connect.actions.enable_remote')}
-                        </button>
+                        </Button>
                         <p
                             id="enable-remote-description"
                             className="mt-3 text-sm text-on-surface-variant/80 font-medium max-w-xs text-center"

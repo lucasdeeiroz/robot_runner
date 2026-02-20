@@ -1,13 +1,93 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Robot Runner</title>
-  </head>
 
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Robot Runner</title>
+  <style>
+    body,
+    html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #fcfcfc;
+    }
+
+    #root {
+      width: 100vw;
+      height: 100vh;
+    }
+
+    @media (prefers-color-scheme: dark) {
+
+      body,
+      html {
+        background-color: #111318;
+      }
+    }
+
+    .initial-loader {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #2563eb;
+    }
+
+    .initial-loader svg {
+      height: 2rem;
+      width: 8rem;
+      overflow: visible;
+    }
+
+    .loader-track {
+      opacity: 0.2;
+    }
+
+    .loader-snake {
+      stroke-dasharray: 30 178;
+      animation: initial-snake-length 1.5s ease-in-out infinite alternate, initial-snake-offset 2s linear infinite;
+    }
+
+    @keyframes initial-snake-length {
+      0% {
+        stroke-dasharray: 30 178;
+      }
+
+      100% {
+        stroke-dasharray: 60 148;
+      }
+    }
+
+    @keyframes initial-snake-offset {
+      0% {
+        stroke-dashoffset: 0;
+      }
+
+      100% {
+        stroke-dashoffset: -208;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="root">
+    <div class="initial-loader">
+      <svg viewBox="0 0 100 20" preserveAspectRatio="none">
+        <path class="loader-track" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M 0 10 Q 12.5 2 25 10 T 50 10 T 75 10 T 100 10 T 125 10 T 150 10 T 175 10 T 200 10" />
+        <path class="loader-snake" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M 0 10 Q 12.5 2 25 10 T 50 10 T 75 10 T 100 10 T 125 10 T 150 10 T 175 10 T 200 10" />
+      </svg>
+    </div>
+  </div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
 </html>

@@ -12,6 +12,8 @@ import { t } from 'i18next';
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 import { Combobox } from "@/components/atoms/Combobox";
 import { Select } from "@/components/atoms/Select";
+import { Input } from "@/components/atoms/Input";
+import { Textarea } from "@/components/atoms/Textarea";
 import { useTestSessions } from '@/lib/testSessionStore';
 import { UIElementType, UIElementMap, ScreenMap } from '@/lib/types';
 import { saveScreenMap, listScreenMaps, deleteScreenMap, exportMapperData, importMapperData } from '@/lib/dashboard/mapperPersistence';
@@ -519,40 +521,48 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                         </div>
                         <div className="h-4 w-px bg-surface/80 mx-1" />
                         <div className="flex gap-1">
-                            <button onClick={() => sendAdbInput('keyevent 4')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" title={t('mapper.nav.back')}><ArrowLeft size={16} /></button>
-                            <button onClick={() => sendAdbInput('keyevent 3')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" title={t('mapper.nav.home')}><Home size={16} /></button>
-                            <button onClick={() => sendAdbInput('keyevent 187')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" title={t('mapper.nav.recents')}><Rows size={16} /></button>
+                            <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 4')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" title={t('mapper.nav.back')}><ArrowLeft size={16} /></Button>
+                            <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 3')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" title={t('mapper.nav.home')}><Home size={16} /></Button>
+                            <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 187')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" title={t('mapper.nav.recents')}><Rows size={16} /></Button>
                         </div>
                     </div>
                 }
                 menus={
                     <div className="flex bg-surface-variant/30 p-0.5 rounded-2xl">
-                        <button
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => setInteractionMode('inspect')}
                             className={clsx("p-1.5 rounded-2xl transition-all", interactionMode === 'inspect' ? "bg-primary/10 shadow-sm text-primary" : "text-on-surface/80 hover:text-on-surface-variant/80")}
                             title={t('mapper.modes.inspect')}
                         >
                             <Scan size={16} />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => setInteractionMode('tap')}
                             className={clsx("p-1.5 rounded-2xl transition-all", interactionMode === 'tap' ? "bg-primary/10 shadow-sm text-primary" : "text-on-surface/80 hover:text-on-surface-variant/80")}
                             title={t('mapper.modes.tap')}
                         >
                             <MousePointerClick size={16} />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => setInteractionMode('swipe')}
                             className={clsx("p-1.5 rounded-2xl transition-all", interactionMode === 'swipe' ? "bg-primary/10 shadow-sm text-primary" : "text-on-surface/80 hover:text-on-surface-variant/80")}
                             title={t('mapper.modes.swipe')}
                         >
                             <Move size={16} />
-                        </button>
+                        </Button>
                     </div>
                 }
                 actions={
                     <>
-                        <button
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={refreshAll}
                             disabled={loading}
                             className={clsx(
@@ -563,8 +573,10 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                         >
                             {loading ? <ExpressiveLoading size="xsm" variant="circular" /> : <RefreshCw size={16} />}
                             <span className={clsx(isNarrow && "hidden")}>{t('mapper.refresh')}</span>
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            variant="primary"
+                            size="sm"
                             onClick={() => {
                                 loadSavedMaps();
                                 setIsFlowchartOpen(true);
@@ -574,7 +586,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                         >
                             <GitGraph size={16} />
                             <span className={clsx(isNarrow && "hidden")}>{t('mapper.flowchart.open', 'Open Flowchart')}</span>
-                        </button>
+                        </Button>
 
                     </>
                 }
@@ -816,11 +828,10 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                     <div className="grid grid-cols-[1fr_auto] gap-2 items-start">
                                         <div className="space-y-1">
                                             <label className="text-xs text-on-surface-variant/80 font-medium">{t('mapper.input.element_name')} <span className="text-error">*</span></label>
-                                            <input
-                                                type="text"
+                                            <Input
                                                 value={currentElement.name || ''}
                                                 onChange={(e) => updateElement('name', e.target.value)}
-                                                className="w-full bg-surface-variant/10 border border-outline-variant/30 rounded px-3 py-2 text-sm focus:border-primary focus:outline-none transition-colors"
+                                                className="bg-surface-variant/10"
                                                 placeholder={t('mapper.placeholder.element_name')}
                                             />
                                         </div>
@@ -854,10 +865,10 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                             {currentElement.type === 'menu' && (
                                                 <div className="space-y-1">
                                                     <label className="text-xs text-on-surface-variant/80 font-medium">{t('mapper.input.menu_options')}</label>
-                                                    <textarea
+                                                    <Textarea
                                                         value={currentElement.menu_options?.join(',') || ''}
                                                         onChange={(e) => updateElement('menu_options', e.target.value.split(','))}
-                                                        className="w-full bg-surface-variant/10 border border-outline-variant/30 rounded px-2 py-1.5 text-sm focus:border-primary focus:outline-none transition-colors resize-none h-20"
+                                                        className="bg-surface-variant/10 h-20"
                                                         placeholder={t('mapper.placeholder.menu_options')}
                                                     />
                                                 </div>

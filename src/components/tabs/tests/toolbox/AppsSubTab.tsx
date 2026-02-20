@@ -12,6 +12,7 @@ import { ConfirmationModal } from "@/components/organisms/ConfirmationModal";
 import { feedback } from "@/lib/feedback";
 import { Section } from "@/components/organisms/Section";
 import { Button } from "@/components/atoms/Button";
+import { Input } from "@/components/atoms/Input";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 
 interface PackageInfo {
@@ -206,43 +207,48 @@ export function AppsSubTab({ isTestRunning = false }: AppsSubTabProps) {
                 className="border-b border-outline-variant/30 pb-2 mb-2 p-2"
                 status={
                     <div className="flex items-center gap-2">
-                        <button
+                        <Button
                             onClick={fetchPackages}
                             disabled={loading}
-                            className="p-1.5 hover:bg-surface-variant/50 text-on-surface-variant/80 rounded transition-colors"
+                            variant="ghost"
+                            size="sm"
+                            className="p-1.5 hover:bg-surface-variant/50 text-on-surface-variant/80 rounded transition-colors h-auto"
                             title={t('apps.actions.refresh')}
                         >
                             {loading ? <ExpressiveLoading size="xsm" variant="circular" /> : <RefreshCw size={14} />}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             onClick={() => setSortBy(prev => prev === 'name' ? 'package' : 'name')}
-                            className="p-1.5 hover:bg-surface-variant/50 text-on-surface-variant/80 rounded transition-colors"
+                            variant="ghost"
+                            size="sm"
+                            className="p-1.5 hover:bg-surface-variant/50 text-on-surface-variant/80 rounded transition-colors h-auto"
                             title={sortBy === 'name' ? t('apps.actions.sort_by_package') : t('apps.actions.sort_by_name')}
                         >
                             {sortBy === 'name' ? <ArrowDownAZ size={14} /> : <Package size={14} />}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             onClick={() => setShowSystem(!showSystem)}
+                            variant="ghost"
+                            size="sm"
                             className={clsx(
-                                "p-1.5 rounded border text-xs flex items-center gap-1.5 transition-colors",
+                                "p-1.5 rounded border text-xs flex items-center gap-1.5 transition-colors h-auto",
                                 showSystem ? "bg-primary-container border-primary-container text-on-primary-container" : "bg-transparent border-outline-variant/30 text-on-surface-variant/80 hover:text-on-surface/80"
                             )}
                             title={t('apps.toggle_system', "Toggle System Apps")}
                         >
                             <Smartphone size={14} />
                             {/* <span className="hidden xl:inline">System</span> */}
-                        </button>
+                        </Button>
                     </div>
                 }
                 menus={!isNarrow ? (
                     <div className="relative">
-                        <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-on-surface-variant/80" />
-                        <input
-                            type="text"
+                        <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-on-surface-variant/80 z-10" />
+                        <Input
                             value={search}
                             onChange={e => setSearch(e.target.value)}
                             placeholder={t('apps.search_placeholder', "Search packages...")}
-                            className="bg-surface border border-outline-variant/30 rounded-2xl px-8 py-1.5 text-xs text-on-surface/80 focus:outline-none focus:border-primary/50 w-64 transition-all"
+                            className="bg-surface border border-outline-variant/30 rounded-2xl pl-8 py-1.5 text-xs text-on-surface/80 focus:outline-none focus:border-primary/50 w-64 transition-all"
                         />
                     </div>
                 ) : null}

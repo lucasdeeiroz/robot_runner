@@ -7,6 +7,7 @@ import { Modal } from "@/components/organisms/Modal";
 import { feedback } from "@/lib/feedback";
 import { Section } from "@/components/organisms/Section";
 import { Button } from "@/components/atoms/Button";
+import { Input } from "@/components/atoms/Input";
 
 interface CommandsSubTabProps {
     selectedDevice: string;
@@ -179,13 +180,15 @@ export function CommandsSubTab({ selectedDevice, isTestRunning = false }: Comman
                 // menus={!isNarrow ? null : null} // Placeholder removed
 
                 actions={
-                    <button
+                    <Button
                         onClick={() => setHistory([])}
-                        className="p-1 hover:text-error transition-colors"
+                        variant="ghost"
+                        size="icon"
+                        className="p-1 hover:text-error text-on-surface-variant/80"
                         title={t('commands.clear')}
                     >
                         <Trash2 size={16} />
-                    </button>
+                    </Button>
                 }
             />
 
@@ -210,15 +213,16 @@ export function CommandsSubTab({ selectedDevice, isTestRunning = false }: Comman
                 <div className="flex gap-2 flex-wrap">
                     <span className="text-xs font-semibold text-on-surface/80 self-center mr-2">{t('commands.quick')}:</span>
                     {quickActions.map(action => (
-                        <button
+                        <Button
                             key={action.label}
                             onClick={() => executeCommand(action.cmd, action.label)}
                             disabled={isExecuting || isTestRunning}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-surface-variant/30 hover:bg-outline-variant rounded-2xl text-xs font-medium transition-colors border border-outline-variant/30 disabled:opacity-50"
+                            variant="outline"
+                            className="bg-surface-variant/30 hover:bg-outline-variant text-xs font-medium border-outline-variant/30 h-auto py-1.5 px-3"
+                            leftIcon={action.icon}
                         >
-                            {action.icon}
                             {action.label}
-                        </button>
+                        </Button>
                     ))}
                 </div>
 
@@ -231,21 +235,24 @@ export function CommandsSubTab({ selectedDevice, isTestRunning = false }: Comman
                                 key={saved.id}
                                 className="group flex items-center gap-1 bg-warning-container/50 border border-warning/20 rounded-2xl px-1 pr-2 overflow-hidden"
                             >
-                                <button
+                                <Button
                                     onClick={() => setCommand(saved.cmd)} // Fill input
                                     disabled={isTestRunning}
-                                    className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-on-warning-container hover:text-on-warning-container/50 transition-colors disabled:opacity-50"
+                                    variant="ghost"
+                                    className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-on-warning-container hover:text-on-warning-container/50 h-auto"
                                     title={saved.cmd}
+                                    leftIcon={<Star size={12} className="fill-warning/40 text-warning-container/60" />}
                                 >
-                                    <Star size={12} className="fill-warning/40 text-warning-container/60" />
                                     {saved.label}
-                                </button>
-                                <button
+                                </Button>
+                                <Button
                                     onClick={(e) => deleteSavedCommand(saved.id, e)}
-                                    className="p-1 text-warning/80 hover:text-error transition-colors opacity-0 group-hover:opacity-100"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="p-1 h-5 w-5 text-warning/80 hover:text-error opacity-0 group-hover:opacity-100"
                                 >
                                     <X size={12} />
-                                </button>
+                                </Button>
                             </div>
                         ))}
                     </div>
@@ -257,26 +264,26 @@ export function CommandsSubTab({ selectedDevice, isTestRunning = false }: Comman
             <div className="flex gap-2">
                 <div className="flex-1 flex items-center gap-2 bg-surface p-2 border-t border-outline-variant/30 rounded-2xl">
                     <Terminal size={18} className="text-on-surface-variant/80" />
-                    <input
-                        type="text"
+                    <Input
                         value={command}
                         onChange={e => setCommand(e.target.value)}
                         onKeyDown={handleKeyDown}
                         placeholder={t('commands.input_placeholder', "Enter command...")}
-                        className="flex-1 bg-transparent border-none outline-none text-sm text-on-surface/80 font-mono placeholder:text-on-surface-variant/80/50"
+                        className="flex-1 border-none outline-none font-mono text-sm bg-transparent"
                         autoComplete="off"
                         disabled={isExecuting}
                     />
                 </div>
 
-                <button
+                <Button
                     onClick={openSaveModal}
                     disabled={!command.trim() || isExecuting}
-                    className="px-3 bg-surface-variant/30 hover:bg-outline-variant text-on-surface-variant/80 rounded-2xl transition-colors border border-outline-variant/30 disabled:opacity-50"
+                    variant="ghost"
+                    className="px-3 bg-surface-variant/30 hover:bg-outline-variant text-on-surface-variant/80 border border-outline-variant/30"
                     title={t('commands.actions.save')}
                 >
                     <Save size={18} />
-                </button>
+                </Button>
 
                 {isExecuting ? (
                     <Button
@@ -308,12 +315,11 @@ export function CommandsSubTab({ selectedDevice, isTestRunning = false }: Comman
                         <label className="block text-sm font-medium text-on-surface-variant/80 mb-1">
                             {t('commands.modal.label')}
                         </label>
-                        <input
-                            type="text"
+                        <Input
                             value={saveLabel}
                             onChange={(e) => setSaveLabel(e.target.value)}
                             placeholder={t('commands.modal.placeholder')}
-                            className="w-full px-3 py-2 bg-on-primary border border-outline-variant/30 rounded-2xl focus:ring-2 focus:ring-primary outline-none"
+                            className="bg-on-primary border-outline-variant/30 focus:ring-2 focus:ring-primary"
                             autoFocus
                         />
                     </div>
@@ -326,19 +332,20 @@ export function CommandsSubTab({ selectedDevice, isTestRunning = false }: Comman
                         </div>
                     </div>
                     <div className="flex justify-end gap-3 pt-4">
-                        <button
+                        <Button
                             onClick={() => setIsSaveModalOpen(false)}
-                            className="px-4 py-2 text-sm font-medium text-on-surface-variant/80 hover:bg-surface-variant/30 rounded-2xl transition-colors"
+                            variant="ghost"
+                            className="text-on-surface-variant/80 hover:bg-surface-variant/30"
                         >
                             {t('commands.modal.cancel')}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             onClick={confirmSaveCommand}
                             disabled={!saveLabel.trim()}
-                            className="px-4 py-2 text-sm font-medium bg-primary text-on-primary hover:opacity-90 rounded-2xl shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                            variant="primary"
                         >
                             {t('commands.modal.save')}
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </Modal>

@@ -1,9 +1,9 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/atoms/Button';
+import { Textarea } from '@/components/atoms/Textarea';
 import { useTranslation } from 'react-i18next';
 import { Wand2, Eraser } from 'lucide-react';
-import clsx from 'clsx';
 
 interface ScenarioInputProps {
     onGenerate: (text: string, language: string) => void;
@@ -44,14 +44,12 @@ export function ScenarioInput({ onGenerate, onClear, isLoading = false }: Scenar
                 </div>
             </div>
 
-            <textarea
+            <Textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder={t('dashboard.input.placeholder', "Paste your requirements or acceptance criteria here...")}
-                className={clsx(
-                    "flex-1 w-full bg-surface-variant/30 text-on-surface p-3 rounded-2xl resize-none outline-none border border-transparent focus:border-primary/50 transition-all text-sm font-mono custom-scrollbar",
-                    "placeholder:text-on-surface-variant/50"
-                )}
+                containerClassName="flex-1 flex flex-col min-h-0"
+                className="flex-1 font-mono custom-scrollbar resize-none"
             />
 
             <Button

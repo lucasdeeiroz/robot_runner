@@ -23,48 +23,56 @@ pub struct SystemVersions {
 }
 
 #[command]
-pub async fn get_system_versions(check_ngrok: bool) -> SystemVersions {
+pub async fn get_system_versions(check_automator: bool, check_ngrok: bool) -> SystemVersions {
     let adb_raw = get_version("adb", &["--version"]);
     let adb = extract_version(&adb_raw, r"Android Debug Bridge version ([\d\.]+)");
 
-    let node = get_version("node", &["--version"]); // Usually just vX.X.X
+    let mut node = "Not Checked".to_string();
+    let mut appium = "Not Checked".to_string();
+    let mut uiautomator2 = "Not Checked".to_string();
+    let mut python = "Not Checked".to_string();
+    let mut robot = "Not Checked".to_string();
+    let mut appium_lib = "Not Checked".to_string();
 
-    // Check Appium and determine command
-    let (appium_raw, appium_cmd) = if let Some(v) = try_get_version("appium", &["--version"]) {
-        (v, "appium")
-    } else if let Some(v) = try_get_version("appium.cmd", &["--version"]) {
-        (v, "appium.cmd")
-    } else {
-        ("Not Found".to_string(), "appium")
-    };
-    let appium = appium_raw; // usually just X.X.X
+    if check_automator {
+        node = get_version("node", &["--version"]); // Usually just vX.X.X
 
-    // Check UiAutomator2 using the found Appium command
-    let uiautomator2 = if appium != "Not Found" {
-        check_uiautomator2(appium_cmd)
-    } else {
-        "Not Found".to_string()
-    };
+        // Check Appium and determine command
+        let (appium_raw, appium_cmd) = if let Some(v) = try_get_version("appium", &["--version"]) {
+            (v, "appium")
+        } else if let Some(v) = try_get_version("appium.cmd", &["--version"]) {
+            (v, "appium.cmd")
+        } else {
+            ("Not Found".to_string(), "appium")
+        };
+        appium = appium_raw;
 
-    let python_raw = get_version("python", &["--version"]);
-    let python = extract_version(&python_raw, r"Python ([\d\.]+)");
+        // Check UiAutomator2 using the found Appium command
+        uiautomator2 = if appium != "Not Found" {
+            check_uiautomator2(appium_cmd)
+        } else {
+            "Not Found".to_string()
+        };
 
-    // Check Robot - Output often exits with 1, so use loose check
-    let robot_raw = if let Some(v) = try_get_version_loose("robot", &["--version"]) {
-        v
-    } else if let Some(v) = try_get_version_loose("python", &["-m", "robot", "--version"]) {
-        v
-    } else {
-        "Not Found".to_string()
-    };
-    let robot = extract_version(&robot_raw, r"Robot Framework ([\d\.]+)");
+        let python_raw = get_version("python", &["--version"]);
+        python = extract_version(&python_raw, r"Python ([\d\.]+)");
 
-    // Check robotframework-appiumlibrary using direct python import
-    // This is more robust than parsing pip show output
-    let appium_lib = get_version("python", &[
-        "-c", 
-        "import importlib.metadata; print(importlib.metadata.version('robotframework-appiumlibrary'))"
-    ]);
+        // Check Robot - Output often exits with 1, so use loose check
+        let robot_raw = if let Some(v) = try_get_version_loose("robot", &["--version"]) {
+            v
+        } else if let Some(v) = try_get_version_loose("python", &["-m", "robot", "--version"]) {
+            v
+        } else {
+            "Not Found".to_string()
+        };
+        robot = extract_version(&robot_raw, r"Robot Framework ([\d\.]+)");
+
+        // Check robotframework-appiumlibrary using direct python import
+        appium_lib = get_version("python", &[
+            "-c", 
+            "import importlib.metadata; print(importlib.metadata.version('robotframework-appiumlibrary'))"
+        ]);
+    }
 
     let scrcpy_raw = get_version("scrcpy", &["--version"]);
     let scrcpy = extract_version(&scrcpy_raw, r"scrcpy ([\d\.]+)");

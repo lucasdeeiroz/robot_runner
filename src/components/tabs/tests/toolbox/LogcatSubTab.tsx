@@ -207,13 +207,15 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false }: LogcatSu
                 status={
                     <div className="text-xs text-on-surface/80">
                         {logs.length} {t('logcat.lines')}
-                        <button
+                        <Button
                             onClick={() => { setLogs([]); }}
-                            className="px-3 py-1.5 ml-2 rounded-2xl text-xs font-medium items-center justify-center gap-2 bg-surface text-on-surface/80 border border-outline-variant/30 hover:bg-surface-variant/50 transition-colors"
+                            variant="ghost"
+                            size="sm"
+                            className="px-3 py-1.5 ml-2 rounded-2xl text-xs font-medium items-center justify-center gap-2 bg-surface text-on-surface/80 border border-outline-variant/30 hover:bg-surface-variant/50 transition-colors h-auto"
                             title={t('logcat.clear')}
                         >
                             <Eraser size={14} />
-                        </button>
+                        </Button>
                     </div>
                 }
                 menus={!isNarrow ? (

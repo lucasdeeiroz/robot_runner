@@ -113,6 +113,11 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
                         loadDevices={refreshDevices}
                         handleOpenToolbox={handleOpenToolbox}
                         busyDeviceIds={busyDeviceIds}
+                        onDropdownOpen={() => {
+                            if (selectedDevices.length > 1) {
+                                setSelectedDevices([selectedDevices[0]]);
+                            }
+                        }}
                     />
                 }
             />

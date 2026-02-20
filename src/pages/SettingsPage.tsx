@@ -1,5 +1,5 @@
 import { useSettings } from "@/lib/settings";
-import { Moon, Sun, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2, Settings as SettingsIcon, Sparkles, FileJson } from "lucide-react";
+import { Moon, Sun, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2, Settings as SettingsIcon, Sparkles, FileJson, RefreshCcw } from "lucide-react";
 import { Switch } from "@/components/atoms/Switch";
 import { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -33,7 +33,7 @@ import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 
 export function SettingsPage() {
     const { settings, updateSetting, loading, profiles, activeProfileId, createProfile, switchProfile, renameProfile, deleteProfile, systemVersions, checkSystemVersions, systemCheckStatus, isNgrokEnabled } = useSettings();
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
 
     // Profile Management Details
     const [showProfileModal, setShowProfileModal] = useState(false);
@@ -56,17 +56,7 @@ export function SettingsPage() {
         return () => observer.disconnect();
     }, []);
 
-    // Sync settings language with i18n
-    useEffect(() => {
-        if (settings.language && settings.language !== i18n.language) {
-            const langMap: Record<string, string> = {
-                'en_US': 'en',
-                'pt_BR': 'pt',
-                'es_ES': 'es'
-            };
-            i18n.changeLanguage(langMap[settings.language] || 'en');
-        }
-    }, [settings.language, i18n]);
+
 
     const handleLogoUpload = async (key: 'customLogoLight' | 'customLogoDark') => {
         try {
@@ -293,7 +283,7 @@ export function SettingsPage() {
                     </>
                 }
             >
-                <div className="mt-4 pt-4 border-t border-outline-variant/30 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                <div className="mt-4 pt-4 border-t border-outline-variant/30 grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
                     <div>
                         <Select
                             value={settings.language}
@@ -307,12 +297,30 @@ export function SettingsPage() {
                         />
                     </div>
 
-                    <div className="flex items-center justify-between bg-surface-variant/5 hover:bg-surface-variant/10 p-3 rounded-2xl transition-colors select-none cursor-pointer" onClick={() => updateSetting('recycleDeviceViews', !settings.recycleDeviceViews)}>
+                    <div>
+                        <Select
+                            value={settings.usageMode || 'explorer'}
+                            onChange={async (e) => {
+                                const mode = e.target.value as 'explorer' | 'automator';
+                                updateSetting('usageMode', mode);
+                                if (mode === 'automator') {
+                                    checkSystemVersions(mode);
+                                }
+                            }}
+                            label={t('onboarding.step2_title')}
+                            options={[
+                                { value: "explorer", label: t('onboarding.mode.explorer.title') },
+                                { value: "automator", label: t('onboarding.mode.automator.title') }
+                            ]}
+                        />
+                    </div>
+
+                    <div className="flex items-center justify-between bg-surface-variant/5 hover:bg-surface-variant/10 p-3 rounded-2xl transition-colors select-none cursor-pointer h-[68px]" onClick={() => updateSetting('recycleDeviceViews', !settings.recycleDeviceViews)}>
                         <div>
                             <label className="block text-sm text-on-surface-variant/80 font-medium mb-0.5 pointer-events-none">
                                 {t('settings.recycle_device_views')}
                             </label>
-                            <p className="text-[10px] text-on-surface-variant/60 pointer-events-none">
+                            <p className="text-[10px] text-on-surface-variant/60 pointer-events-none mt-1">
                                 {t('settings.recycle_device_views_desc', { defaultValue: "Reuse existing tabs when running tests on the same device" })}
                             </p>
                         </div>
@@ -331,29 +339,29 @@ export function SettingsPage() {
                 title={isRenaming ? t('settings.profiles.rename') : t('settings.profiles.create')}
             >
                 <form onSubmit={handleProfileSubmit} className="space-y-4">
-                    <input
+                    <Input
                         autoFocus
-                        type="text"
                         value={newProfileName}
                         onChange={(e) => setNewProfileName(e.target.value)}
                         placeholder={t('settings.profiles.name_placeholder')}
-                        className="w-full bg-surface/50 border border-outline-variant/30 rounded-2xl px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 text-on-surface/80"
+                        className="bg-surface/50"
                     />
                     <div className="flex justify-end gap-2">
-                        <button
+                        <Button
                             type="button"
+                            variant="ghost"
                             onClick={() => setShowProfileModal(false)}
-                            className="px-4 py-2 text-on-surface-variant/80 hover:text-on-surface-variant/80"
+                            className="text-on-surface-variant/80 hover:text-on-surface-variant/80"
                         >
                             {t('common.cancel')}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             type="submit"
                             disabled={!newProfileName.trim()}
-                            className="px-4 py-2 bg-primary hover:opacity-90 text-on-primary rounded-2xl disabled:opacity-50 transition-all active:scale-95"
+                            variant="primary"
                         >
                             {t('common.save')}
-                        </button>
+                        </Button>
                     </div>
                 </form>
             </Modal>
@@ -361,95 +369,99 @@ export function SettingsPage() {
             <div className="grid gap-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Appium Server Config & Control */}
-                    <Section
-                        title={t('settings.appium.title')}
-                        icon={Server}
-                        status={
-                            <div className={clsx("flex items-center gap-2 px-3 py-1 rounded-2xl text-xs font-semibold border",
-                                appiumStatus.running
-                                    ? "bg-success-container/10 text-on-success-container/10 border-success-container/20"
-                                    : "bg-surface-variant/30 text-on-surface-variant/80 border-outline-variant")}>
-                                <div className={clsx("w-2 h-2 rounded-2xl", appiumStatus.running ? "bg-success" : "bg-on-surface/10")} />
-                                {appiumStatus.running ? t('settings.appium.running', { pid: appiumStatus.pid }) : t('settings.appium.stopped')}
+                    {settings.usageMode !== 'explorer' && (
+                        <Section
+                            title={t('settings.appium.title')}
+                            icon={Server}
+                            status={
+                                <div className={clsx("flex items-center gap-2 px-3 py-1 rounded-2xl text-xs font-semibold border",
+                                    appiumStatus.running
+                                        ? "bg-success-container/10 text-on-success-container/10 border-success-container/20"
+                                        : "bg-surface-variant/30 text-on-surface-variant/80 border-outline-variant")}>
+                                    <div className={clsx("w-2 h-2 rounded-2xl", appiumStatus.running ? "bg-success" : "bg-on-surface/10")} />
+                                    {appiumStatus.running ? t('settings.appium.running', { pid: appiumStatus.pid }) : t('settings.appium.stopped')}
+                                </div>
+                            }
+                            actions={
+                                <>
+                                    <Button
+                                        onClick={() => setShowAppiumLogs(!showAppiumLogs)}
+                                        size="icon"
+                                        variant="ghost"
+                                        className={clsx(showAppiumLogs ? "bg-primary/10 text-primary" : "text-on-surface/80")}
+                                        title={t('settings.appium.logs')}
+                                        disabled={!appiumStatus.running && systemCheckStatus?.missingAppium?.length > 0}
+                                    >
+                                        <Terminal size={18} />
+                                    </Button>
+
+                                    <Button
+                                        onClick={toggleAppium}
+                                        variant={appiumStatus.running ? "danger" : "primary"}
+                                        className="shadow-lg hover:shadow-xl transition-all"
+                                        disabled={!appiumStatus.running && systemCheckStatus?.missingAppium?.length > 0}
+                                        leftIcon={appiumStatus.running ? <Square size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
+                                    >
+                                        {!isNarrow && (appiumStatus.running ? t('settings.appium.stop') : t('settings.appium.start'))}
+                                    </Button>
+                                </>
+                            }
+                        >
+
+                            <div className="grid grid-cols-2 gap-4 mb-4">
+                                <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
+                                    <Input
+                                        label={t('settings.appium.host')}
+                                        type="text"
+                                        value={settings.appiumHost}
+                                        onChange={(e) => updateSetting('appiumHost', e.target.value)}
+                                        disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
+                                    />
+                                </div>
+                                <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
+                                    <Input
+                                        label={t('settings.appium.port')}
+                                        type="number"
+                                        value={settings.appiumPort}
+                                        onChange={(e) => updateSetting('appiumPort', Number(e.target.value))}
+                                        disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
+                                    />
+                                </div>
                             </div>
-                        }
-                        actions={
-                            <>
-                                <Button
-                                    onClick={() => setShowAppiumLogs(!showAppiumLogs)}
-                                    size="icon"
-                                    variant="ghost"
-                                    className={clsx(showAppiumLogs ? "bg-primary/10 text-primary" : "text-on-surface/80")}
-                                    title={t('settings.appium.logs')}
-                                    disabled={!appiumStatus.running && systemCheckStatus?.missingAppium?.length > 0}
+                            <div className="mb-4">
+                                <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
+                                    <Input
+                                        label={t('settings.tool_config.appium_args')}
+                                        type="text"
+                                        value={settings.tools.appiumArgs}
+                                        onChange={(e) => updateSetting('tools', { ...settings.tools, appiumArgs: e.target.value })}
+                                        disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
+                                        placeholder="--allow-insecure chromedriver"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Logs Output */}
+                            {showAppiumLogs && (
+                                <div
+                                    ref={logsContainerRef}
+                                    className="mt-4 bg-surface/50 border border-outline-variant/30 rounded-2xl p-3 font-mono text-xs h-64 overflow-auto custom-scrollbar shadow-inner"
                                 >
-                                    <Terminal size={18} />
-                                </Button>
-
-                                <Button
-                                    onClick={toggleAppium}
-                                    variant={appiumStatus.running ? "danger" : "primary"}
-                                    className="shadow-lg hover:shadow-xl transition-all"
-                                    disabled={!appiumStatus.running && systemCheckStatus?.missingAppium?.length > 0}
-                                    leftIcon={appiumStatus.running ? <Square size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
-                                >
-                                    {!isNarrow && (appiumStatus.running ? t('settings.appium.stop') : t('settings.appium.start'))}
-                                </Button>
-                            </>
-                        }
-                    >
-
-                        <div className="grid grid-cols-2 gap-4 mb-4">
-                            <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
-                                <Input
-                                    label={t('settings.appium.host')}
-                                    type="text"
-                                    value={settings.appiumHost}
-                                    onChange={(e) => updateSetting('appiumHost', e.target.value)}
-                                    disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
-                                />
-                            </div>
-                            <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
-                                <Input
-                                    label={t('settings.appium.port')}
-                                    type="number"
-                                    value={settings.appiumPort}
-                                    onChange={(e) => updateSetting('appiumPort', Number(e.target.value))}
-                                    disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
-                                />
-                            </div>
-                        </div>
-                        <div className="mb-4">
-                            <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
-                                <Input
-                                    label={t('settings.tool_config.appium_args')}
-                                    type="text"
-                                    value={settings.tools.appiumArgs}
-                                    onChange={(e) => updateSetting('tools', { ...settings.tools, appiumArgs: e.target.value })}
-                                    disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
-                                    placeholder="--allow-insecure chromedriver"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Logs Output */}
-                        {showAppiumLogs && (
-                            <div
-                                ref={logsContainerRef}
-                                className="mt-4 bg-surface/50 border border-outline-variant/30 rounded-2xl p-3 font-mono text-xs h-64 overflow-auto custom-scrollbar shadow-inner"
-                            >
-                                {appiumLogs.length === 0 && <span className="text-on-surface-variant/80 italic">{t('settings.appium.waiting')}</span>}
-                                {appiumLogs.map((log, i) => (
-                                    <div key={i} className="text-on-surface-variant/80 on-primaryspace-pre-wrap border-b border-outline-variant/30 pb-0.5 mb-0.5">{log}</div>
-                                ))}
-                            </div>
-                        )}
-                    </Section>
+                                    {appiumLogs.length === 0 && <span className="text-on-surface-variant/80 italic">{t('settings.appium.waiting')}</span>}
+                                    {appiumLogs.map((log, i) => (
+                                        <div key={i} className="text-on-surface-variant/80 on-primaryspace-pre-wrap border-b border-outline-variant/30 pb-0.5 mb-0.5">{log}</div>
+                                    ))}
+                                </div>
+                            )}
+                        </Section>
+                    )}
 
                     {/* Tool Options */}
                     <Section title={t('settings.tools')} icon={Wrench}>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {['robotArgs', 'scrcpyArgs'].map((key) => {
+                                if (key === 'robotArgs' && settings.usageMode === 'explorer') return null;
+
                                 let isDisabled = false;
                                 if (key === 'robotArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
                                 if (key === 'scrcpyArgs' && systemCheckStatus?.missingMirroring?.length > 0) isDisabled = true;
@@ -507,6 +519,7 @@ export function SettingsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {(['automationRoot', 'resources', 'tests', 'suites', 'logs', 'logcat', 'screenshots', 'recordings'] as Array<keyof typeof settings.paths>).map((key) => {
                             const isTestingPath = ['automationRoot', 'resources', 'tests', 'suites'].includes(key);
+                            if (isTestingPath && settings.usageMode === 'explorer') return null;
                             const isDisabled = isTestingPath && systemCheckStatus?.missingTesting?.length > 0;
                             return (
                                 <PathInput
@@ -554,11 +567,12 @@ export function SettingsPage() {
                                     { id: 'cyan', hex: '#0891b2' },
                                     { id: 'pink', hex: '#db2777' },
                                 ].map((color) => (
-                                    <button
+                                    <Button
                                         key={color.id}
                                         onClick={() => updateSetting('primaryColor', color.id)}
+                                        variant="ghost"
                                         className={clsx(
-                                            "w-8 h-8 rounded-2xl transition-all active:scale-95 ring-offset-2 ring-offset-on-primary flex items-center justify-center",
+                                            "w-8 h-8 rounded-2xl p-0 min-w-0 transition-transform",
                                             settings.primaryColor === color.id ? "ring-2 scale-110" : "hover:scale-105"
                                         )}
                                         style={{ backgroundColor: color.hex, borderColor: color.hex, '--tw-ring-color': color.hex } as any}
@@ -567,7 +581,7 @@ export function SettingsPage() {
                                         {settings.primaryColor === color.id && (
                                             <div className="w-2.5 h-2.5 bg-on-primary rounded-2xl shadow-sm" />
                                         )}
-                                    </button>
+                                    </Button>
                                 ))}
                             </div>
                         </div>
@@ -692,13 +706,15 @@ export function SettingsPage() {
                     title={t('settings.system.title')}
                     icon={Monitor}
                     actions={
-                        <button
-                            onClick={checkSystemVersions}
+                        <Button
+                            onClick={() => checkSystemVersions()}
                             disabled={systemCheckStatus.loading}
+                            variant="ghost"
+                            size="icon"
                             className={
                                 clsx(
-                                    "p-2 rounded-2xl transition-all active:scale-95 hover:bg-surface-variant/30",
-                                    systemCheckStatus.loading ? "text-primary" : "text-on-surface-variant/80 hover:text-primary"
+                                    "rounded-2xl hover:bg-surface-variant/30",
+                                    systemCheckStatus.loading ? "text-primary bg-primary/10" : "text-on-surface-variant/80 hover:text-primary"
                                 )
                             }
                             title={t('common.loading')}
@@ -706,15 +722,19 @@ export function SettingsPage() {
                             {systemCheckStatus.loading ? (
                                 <ExpressiveLoading size="xsm" variant="circular" />
                             ) : (
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" /><path d="M16 16h5v5" /></svg>
+                                <RefreshCcw size={18} />
                             )}
-                        </button>
+                        </Button>
                     }
                 >
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {systemVersions ? (
                             (['adb', 'node', 'appium', 'uiautomator2', 'python', 'robot', 'appium_lib', 'scrcpy', 'ngrok'] as Array<keyof typeof systemVersions>)
-                                .filter(key => key !== 'ngrok' || isNgrokEnabled)
+                                .filter(key => {
+                                    if (key === 'ngrok' && !isNgrokEnabled) return false;
+                                    if (settings.usageMode === 'explorer' && ['node', 'appium', 'uiautomator2', 'python', 'robot', 'appium_lib'].includes(key)) return false;
+                                    return true;
+                                })
                                 .map((key) => (
                                     <InfoCard
                                         key={key}

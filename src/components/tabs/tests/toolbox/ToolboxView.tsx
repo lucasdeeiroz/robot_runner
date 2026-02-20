@@ -282,7 +282,9 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                 className="z-10 shrink-0"
                 menus={
                     !isCompact && (
-                        <button
+                        <Button
+                            variant="ghost"
+                            size="icon"
                             onClick={() => {
                                 if (!isGridView) {
                                     const defaults: ToolTab[] = ['console', 'logcat', 'performance'];
@@ -291,7 +293,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                                 setIsGridView(!isGridView);
                             }}
                             className={clsx(
-                                "p-1.5 rounded-2xl transition-all flex items-center justify-center border border-transparent",
+                                "p-1.5 rounded-2xl transition-all flex items-center justify-center border border-transparent h-8 w-8",
                                 isGridView
                                     ? "bg-primary/10 text-primary border-none"
                                     : "text-on-surface/80 hover:text-on-surface/80 hover:bg-surface-variant/30"
@@ -299,18 +301,20 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                             title={isGridView ? t('toolbox.actions.switch_to_tabs') : t('toolbox.actions.switch_to_grid')}
                         >
                             <LayoutGrid size={18} />
-                        </button>
+                        </Button>
                     )
                 }
                 actions={
                     <div className="flex items-center gap-2">
                         {/* Session Controls */}
                         <div className="flex bg-surface p-1 rounded-2xl border border-outline-variant/30">
-                            <button
+                            <Button
+                                variant="ghost"
+                                size="icon"
                                 onClick={handleScrcpy}
                                 disabled={isMirrorDisabled}
                                 className={clsx(
-                                    "p-1.5 rounded-2xl transition-all",
+                                    "p-1.5 rounded-2xl transition-all h-8 w-8",
                                     isMirrorDisabled
                                         ? "text-on-surface/80 cursor-not-allowed"
                                         : "text-on-surface/80 hover:text-primary hover:bg-primary/10"
@@ -318,7 +322,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                                 title={isMirrorDisabled ? t('startup.mirroring.description') : t('scrcpy.title')}
                             >
                                 <Cast size={18} />
-                            </button>
+                            </Button>
                             <div className="w-px h-4 bg-surface/80 mx-1 self-center" />
                             <Button
                                 variant="ghost"
@@ -502,22 +506,26 @@ function GridToolItem({ title, children, className, onHide, minimizeLabel, onMax
                 </span>
                 <div className="flex items-center gap-1">
                     {onMaximize && (
-                        <button
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={onMaximize}
-                            className="p-1 text-on-surface/80 hover:text-on-surface-variant/80 rounded"
+                            className="p-1 h-6 w-6 text-on-surface/80 hover:text-on-surface-variant/80 rounded"
                             title={maximizeLabel || "Maximize"}
                         >
                             <Maximize2 size={14} />
-                        </button>
+                        </Button>
                     )}
                     {onHide && (
-                        <button
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={onHide}
-                            className="p-1 text-on-surface/80 hover:text-on-surface-variant/80 rounded"
+                            className="p-1 h-6 w-6 text-on-surface/80 hover:text-on-surface-variant/80 rounded"
                             title={minimizeLabel || "Minimize"}
                         >
                             <Minimize2 size={14} />
-                        </button>
+                        </Button>
                     )}
                 </div>
             </div>

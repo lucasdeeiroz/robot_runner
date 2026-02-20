@@ -1,10 +1,9 @@
 
-import { useEffect, useRef } from 'react';
 import { Button } from '@/components/atoms/Button';
+import { Textarea } from '@/components/atoms/Textarea';
 import { useTranslation } from 'react-i18next';
 import { FileDown, FileText, Copy, Trash2 } from 'lucide-react';
 import { feedback } from '@/lib/feedback';
-import clsx from 'clsx';
 import { exportToXlsx, exportToDocx } from '@/lib/dashboard/export';
 import { addToHistory } from './HistoryPanel';
 
@@ -16,25 +15,12 @@ interface ScenarioEditorProps {
 
 export function ScenarioEditor({ content, onUpdate, onClear }: ScenarioEditorProps) {
     const { t, i18n } = useTranslation();
-    const editorRef = useRef<HTMLDivElement>(null);
 
-    // Sync content to editable div initially or when regenerated
-    useEffect(() => {
-        if (editorRef.current && content !== editorRef.current.innerText) {
-            editorRef.current.innerText = content;
-        }
-    }, [content]);
 
-    const handleInput = () => {
-        if (editorRef.current) {
-            onUpdate(editorRef.current.innerText);
-        }
-    };
-
-    const handleExportXlsx = () => {
+    const handleExportXlsx = async () => {
         if (!content.trim()) return;
         try {
-            const blob = exportToXlsx(content, i18n.language);
+            const blob = await exportToXlsx(content, i18n.language);
             if (blob) {
                 addToHistory("XLSX", `cenarios_${new Date().getTime()}.xlsx`, blob);
             }
@@ -45,7 +31,7 @@ export function ScenarioEditor({ content, onUpdate, onClear }: ScenarioEditorPro
     };
 
     const handleExportDocx = async () => {
-        if (!editorRef.current || !content.trim()) return;
+        if (!content.trim()) return;
         try {
             const blob = await exportToDocx(content, i18n.language);
             if (blob) {
@@ -93,16 +79,12 @@ export function ScenarioEditor({ content, onUpdate, onClear }: ScenarioEditorPro
                 </div>
             </div>
 
-            <div
-                ref={editorRef}
-                contentEditable
-                onInput={handleInput}
-                className={clsx(
-                    "flex-1 w-full bg-surface-variant/30 text-on-surface p-4 rounded-2xl outline-none border border-transparent focus:border-primary/50 transition-all text-sm font-mono custom-scrollbar overflow-y-auto whitespace-pre-wrap",
-                    "empty:before:content-[attr(data-placeholder)] empty:before:text-on-surface-variant/50"
-                )}
-                data-placeholder={t('dashboard.editor.placeholder', "Generated scenarios will appear here. You can edit and paste images...")}
-                style={{ minHeight: '200px' }}
+            <Textarea
+                value={content}
+                onChange={(e) => onUpdate(e.target.value)}
+                placeholder={t('dashboard.editor.placeholder', "Generated scenarios will appear here...")}
+                containerClassName="flex-1 flex flex-col min-h-0"
+                className="flex-1 font-mono custom-scrollbar resize-none whitespace-pre-wrap"
             />
 
             <div className="grid grid-cols-2 gap-3">

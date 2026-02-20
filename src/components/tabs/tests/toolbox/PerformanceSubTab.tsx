@@ -104,9 +104,11 @@ export function PerformanceSubTab({
                 variant="transparent"
                 status={
                     <div className="flex items-center gap-2">
-                        <button
+                        <Button
                             onClick={onRefresh}
-                            className="p-1.5 hover:bg-surface-variant/30 rounded transition-all active:scale-95"
+                            variant="ghost"
+                            size="sm"
+                            className="p-1.5 hover:bg-surface-variant/30 rounded transition-all active:scale-95 h-auto"
                             title={t('performance.refresh')}
                         >
                             {isLoading ? (
@@ -114,16 +116,18 @@ export function PerformanceSubTab({
                             ) : (
                                 <RefreshCw size={16} className="text-on-surface-variant/80" />
                             )}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             onClick={() => setAutoRefresh(!autoRefresh)}
+                            variant="ghost"
+                            size="sm"
                             className={clsx(
-                                "text-xs px-2 py-1 rounded border transition-all active:scale-95",
+                                "text-xs px-2 py-1 rounded border transition-all active:scale-95 h-auto",
                                 autoRefresh ? "bg-primary/10 text-primary border-primary/20" : "bg-surface/50 text-on-surface-variant/80 border-outline-variant"
                             )}
                         >
                             {t('performance.auto', "Auto")}
-                        </button>
+                        </Button>
                     </div>
                 }
                 menus={!isNarrow ? (

@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ScreenMap, FlowchartLayout } from '@/lib/types';
-import { X, ZoomIn, ZoomOut, Maximize, Pencil, Save, Upload, Download, Plus, Camera } from 'lucide-react';
+import { X, ZoomIn, ZoomOut, Maximize, Pencil, Save, Upload, Download, Plus, Camera, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
 import { saveFlowchartLayout, loadFlowchartLayout, exportMapperData, importMapperData, saveScreenMap } from '@/lib/dashboard/mapperPersistence';
@@ -114,7 +114,13 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
         sourcePortId: string;
         sourceElement?: string; // If mapped element
     } | null>(null);
-    const [isQuickConnectOpen, setIsQuickConnectOpen] = useState(false);    // Load Layout
+    const [isQuickConnectOpen, setIsQuickConnectOpen] = useState(false);
+
+    // Unsaved Changes State
+    const [isDirty, setIsDirty] = useState(false);
+    const [showUnsavedChangesModal, setShowUnsavedChangesModal] = useState(false);
+
+    // Load Layout
     useEffect(() => {
         if (isOpen) {
             loadLayout();
@@ -134,7 +140,28 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
 
     const saveLayout = async () => {
         await saveFlowchartLayout(activeProfileId, layout);
+        setIsDirty(false);
         feedback.toast.success(t('common.saved', 'Saved'));
+    };
+
+    const handleClose = () => {
+        if (isDirty) {
+            setShowUnsavedChangesModal(true);
+        } else {
+            onClose();
+        }
+    };
+
+    const handleSaveAndExit = async () => {
+        await saveLayout();
+        setShowUnsavedChangesModal(false);
+        onClose();
+    };
+
+    const handleExitWithoutSaving = () => {
+        setIsDirty(false);
+        setShowUnsavedChangesModal(false);
+        onClose();
     };
 
     const handleExport = async () => {
@@ -261,6 +288,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
 
             // Update Local State
             setLayout(updatedLayout);
+            setIsDirty(true);
             if (onRefresh) onRefresh();
             feedback.toast.success(t('common.saved', 'Saved'));
         } catch (e) {
@@ -367,6 +395,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                         [dragItem.id]: { gridX: Math.max(0, gridX), gridY: Math.max(0, gridY) }
                     }
                 }));
+                setIsDirty(true);
             }
         }
 
@@ -496,6 +525,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                         }
                     };
                 });
+                setIsDirty(true);
                 return;
             }
 
@@ -514,6 +544,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                 }
                 return prev;
             });
+            setIsDirty(true);
         }
     };
 
@@ -547,6 +578,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                             }
                         }
                     }));
+                    setIsDirty(true);
                 } else {
                     feedback.toast.error("Port already occupied");
                 }
@@ -636,11 +668,17 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
 
                 cleaned = cleaned.filter((_, i) => !toRemove.has(i));
 
+                if (JSON.stringify(prev.edges[edgeId]?.vertices) !== JSON.stringify(cleaned)) {
+                    // Only dirty if actually changed (optimization)
+                    // But strictly speaking, if we dragged, it's dirty.
+                }
+
                 return {
                     ...prev,
                     edges: { ...prev.edges, [edgeId]: { ...edge, vertices: cleaned } }
                 };
             });
+            setIsDirty(true);
         }
 
         setIsDraggingCanvas(false);
@@ -715,6 +753,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                 edges: { ...prev.edges, [edgeId]: { ...edge, vertices: newVertices } }
             };
         });
+        setIsDirty(true);
     };
 
     const handleVertexDoubleClick = (e: React.MouseEvent, edgeId: string, vertexIndex: number) => {
@@ -731,6 +770,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                 edges: { ...prev.edges, [edgeId]: { ...edge, vertices: newVertices } }
             };
         });
+        setIsDirty(true);
     };
 
     // --- Render Logic ---
@@ -1015,7 +1055,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                             </Button>
                         </div>
                         <Button
-                            onClick={onClose}
+                            onClick={handleClose}
                             className="p-2 hover:bg-error/10 hover:text-error rounded-full transition-colors text-on-surface/60">
                             <X size={16} />
                         </Button>
@@ -1126,17 +1166,19 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                                                 {data.name}
                                             </h3>
                                             {onEditScreen && (
-                                                <button
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         onEditScreen(data.name);
-                                                        onClose();
+                                                        handleClose();
                                                     }}
                                                     className="p-1.5 hover:bg-primary/10 text-on-surface-variant hover:text-primary rounded-full transition-all"
                                                     title={t('mapper.action.edit')}
                                                 >
                                                     <Pencil size={14} />
-                                                </button>
+                                                </Button>
                                             )}
                                         </div>
                                         <div className="text-xs text-on-surface-variant/70 mt-1 pointer-events-auto">
@@ -1270,6 +1312,14 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                     onConfirm={confirmQuickConnect}
                 />
             )}
+            {/* Unsaved Changes Modal */}
+            {showUnsavedChangesModal && (
+                <UnsavedChangesDialog
+                    onCancel={() => setShowUnsavedChangesModal(false)}
+                    onSaveAndExit={handleSaveAndExit}
+                    onExitWithoutSaving={handleExitWithoutSaving}
+                />
+            )}
         </div>,
         document.body
     );
@@ -1283,11 +1333,20 @@ function QuickConnectDialog({ maps, sourceNodeId, onClose, onConfirm }: {
 }) {
     const { t } = useTranslation();
     const sourceMap = maps.find(m => m.name === sourceNodeId);
-    const [selectedElement, setSelectedElement] = useState<string>("");
-    const [selectedTarget, setSelectedTarget] = useState<string>("");
 
-    const availableElements = sourceMap?.elements.filter(el => !el.navigates_to) || [];
-    const availableTargets = maps.filter(m => m.name !== sourceNodeId).map(m => m.name);
+    const availableElements = useMemo(() => sourceMap?.elements.filter(el => !el.navigates_to) || [], [sourceMap]);
+    const availableTargets = useMemo(() => maps.filter(m => m.name !== sourceNodeId).map(m => m.name), [maps, sourceNodeId]);
+
+    const [selectedElement, setSelectedElement] = useState<string>(availableElements[0]?.name || "");
+    const [selectedTarget, setSelectedTarget] = useState<string>(availableTargets[0] || "");
+
+    useEffect(() => {
+        if (!selectedElement && availableElements.length > 0) setSelectedElement(availableElements[0].name);
+    }, [availableElements]);
+
+    useEffect(() => {
+        if (!selectedTarget && availableTargets.length > 0) setSelectedTarget(availableTargets[0]);
+    }, [availableTargets]);
 
     return (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
@@ -1302,6 +1361,7 @@ function QuickConnectDialog({ maps, sourceNodeId, onClose, onConfirm }: {
                         <label className="text-xs font-medium text-on-surface-variant uppercase">{t('mapper.flowchart.source_element', 'Source Element')}</label>
                         <Select
                             className="w-full p-2 rounded-lg bg-surface-variant/10 border border-outline-variant/30 text-sm focus:border-primary outline-none text-on-surface"
+                            value={selectedElement}
                             onChange={e => setSelectedElement(e.target.value)}
                             options={availableElements.map(el => ({ value: el.name, label: el.name }))}
                         >
@@ -1315,6 +1375,7 @@ function QuickConnectDialog({ maps, sourceNodeId, onClose, onConfirm }: {
                         <label className="text-xs font-medium text-on-surface-variant uppercase">{t('mapper.flowchart.target_screen', 'Target Screen')}</label>
                         <Select
                             className="w-full p-2 rounded-lg bg-surface-variant/10 border border-outline-variant/30 text-sm focus:border-primary outline-none text-on-surface"
+                            value={selectedTarget}
                             onChange={e => setSelectedTarget(e.target.value)}
                             options={availableTargets.map(name => ({ value: name, label: name }))}
                         >
@@ -1332,6 +1393,57 @@ function QuickConnectDialog({ maps, sourceNodeId, onClose, onConfirm }: {
                             className="px-4 py-2 text-sm bg-primary text-on-primary rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {t('mapper.flowchart.connect', 'Connect')}
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function UnsavedChangesDialog({ onCancel, onSaveAndExit, onExitWithoutSaving }: {
+    onCancel: () => void,
+    onSaveAndExit: () => void,
+    onExitWithoutSaving: () => void
+}) {
+    const { t } = useTranslation();
+
+    return (
+        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onCancel}>
+            <div className="bg-surface p-6 rounded-2xl shadow-xl w-96 border border-outline-variant/30" onClick={e => e.stopPropagation()}>
+                <div className="flex flex-col items-center text-center">
+                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4 bg-warning-container/50 text-on-surface/80">
+                        <AlertTriangle size={24} />
+                    </div>
+
+                    <h3 className="text-lg font-semibold text-on-surface/80 mb-2">
+                        {t('mapper.flowchart.unsaved_changes.title', 'Unsaved Changes')}
+                    </h3>
+
+                    <p className="text-sm text-on-surface-variant/80 mb-6">
+                        {t('mapper.flowchart.unsaved_changes.message', 'You have unsaved changes. Do you want to save before exiting?')}
+                    </p>
+
+                    <div className="flex flex-col gap-2 w-full">
+                        <Button
+                            onClick={onSaveAndExit}
+                            className="w-full bg-primary text-on-primary hover:bg-primary/90"
+                        >
+                            {t('mapper.flowchart.unsaved_changes.save_and_exit', 'Save and Exit')}
+                        </Button>
+                        <Button
+                            onClick={onExitWithoutSaving}
+                            variant="danger"
+                            className="w-full bg-error-container text-error hover:bg-error-container/80"
+                        >
+                            {t('mapper.flowchart.unsaved_changes.exit_without_saving', 'Exit without Saving')}
+                        </Button>
+                        <Button
+                            onClick={onCancel}
+                            variant="ghost"
+                            className="w-full"
+                        >
+                            {t('mapper.flowchart.unsaved_changes.cancel', 'Cancel')}
                         </Button>
                     </div>
                 </div>
