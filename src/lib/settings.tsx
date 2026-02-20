@@ -27,6 +27,7 @@ export interface AppSettings {
     customLogoLight?: string;
     customLogoDark?: string;
     recycleDeviceViews: boolean; // New setting
+    usageMode?: 'explorer' | 'automator';
 
     // Appium
     appiumHost: string;
@@ -96,21 +97,6 @@ interface SettingsStoreData {
     activeProfileId: string;
     profiles: Record<string, Profile>;
 }
-
-interface SettingsContextType {
-    settings: AppSettings;
-    activeProfileId: string;
-    profiles: Profile[];
-    updateSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
-    createProfile: (name: string) => void;
-    switchProfile: (id: string) => void;
-    renameProfile: (id: string, name: string) => void;
-    deleteProfile: (id: string) => void;
-    loading: boolean;
-    systemVersions: SystemVersions | null;
-    checkSystemVersions: () => Promise<void>;
-}
-
 // Initial Check Status Interface
 export interface SystemCheckStatus {
     loading: boolean;
@@ -122,6 +108,7 @@ export interface SystemCheckStatus {
     missingTunnelling: string[]; // Ngrok -- affects Connect Tab remote features
 }
 
+
 interface SettingsContextType {
     settings: AppSettings;
     activeProfileId: string;
@@ -133,7 +120,7 @@ interface SettingsContextType {
     deleteProfile: (id: string) => void;
     loading: boolean;
     systemVersions: SystemVersions | null;
-    checkSystemVersions: () => Promise<void>;
+    checkSystemVersions: (forceUsageMode?: 'explorer' | 'automator') => Promise<void>;
     systemCheckStatus: SystemCheckStatus;
     updateInfo: UpdateInfo | null;
     checkForAppUpdate: (manual?: boolean) => Promise<void>;
@@ -217,29 +204,30 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     };
 
     const updateSetting = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
-        const activeId = storeData.activeProfileId;
-        const currentProfile = storeData.profiles[activeId];
+        setStoreData((currentStoreData) => {
+            const activeId = currentStoreData.activeProfileId;
+            const currentProfile = currentStoreData.profiles[activeId];
 
-
-
-        if (!currentProfile) {
-            feedback.toast.error("settings.profile_not_found");
-            return;
-        }
-
-        const updatedSettings = { ...currentProfile.settings, [key]: value };
-        const updatedProfile = { ...currentProfile, settings: updatedSettings };
-
-        const newData = {
-            ...storeData,
-            profiles: {
-                ...storeData.profiles,
-                [activeId]: updatedProfile
+            if (!currentProfile) {
+                feedback.toast.error("settings.profile_not_found");
+                return currentStoreData;
             }
-        };
 
-        setStoreData(newData);
-        saveStore(newData);
+            const updatedSettings = { ...currentProfile.settings, [key]: value };
+            const updatedProfile = { ...currentProfile, settings: updatedSettings };
+
+            const newData = {
+                ...currentStoreData,
+                profiles: {
+                    ...currentStoreData.profiles,
+                    [activeId]: updatedProfile
+                }
+            };
+
+            // Fire and forget save to disk
+            saveStore(newData);
+            return newData;
+        });
     };
 
     const createProfile = (name: string) => {
@@ -319,8 +307,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const checkSystemVersions = async () => {
         setSystemCheckStatus(prev => ({ ...prev, loading: true }));
         try {
-            // Conditionally skip ngrok check if not enabled
-            const versions = await invoke<SystemVersions>('get_system_versions', { checkNgrok: isNgrokEnabled });
+            // Conditionally skip ngrok and automator dependencies checks
+            const versions = await invoke<SystemVersions>('get_system_versions', {
+                checkAutomator: activeProfile.settings.usageMode !== 'explorer',
+                checkNgrok: isNgrokEnabled
+            });
 
             setSystemVersions(versions);
 
@@ -335,15 +326,17 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                 missingCritical.push('ADB');
             }
 
-            // Appium Tools
-            if (versions.node === 'Not Found') missingAppium.push('Node.js');
-            if (versions.appium === 'Not Found') missingAppium.push('Appium (Node.js)');
-            if (versions.uiautomator2 === 'Not Found') missingAppium.push('UiAutomator2 (Appium)');
+            // Appium Tools (Only check if not explorer)
+            if (activeProfile.settings.usageMode !== 'explorer') {
+                if (versions.node === 'Not Found') missingAppium.push('Node.js');
+                if (versions.appium === 'Not Found') missingAppium.push('Appium (Node.js)');
+                if (versions.uiautomator2 === 'Not Found') missingAppium.push('UiAutomator2 (Appium)');
 
-            // Testing Tools
-            if (versions.python === 'Not Found') missingTesting.push('Python');
-            if (versions.robot === 'Not Found') missingTesting.push('Robot Framework (Python)');
-            if (versions.appium_lib === 'Not Found') missingTesting.push('AppiumLibrary (Robot Framework)');
+                // Testing Tools
+                if (versions.python === 'Not Found') missingTesting.push('Python');
+                if (versions.robot === 'Not Found') missingTesting.push('Robot Framework (Python)');
+                if (versions.appium_lib === 'Not Found') missingTesting.push('AppiumLibrary (Robot Framework)');
+            }
 
             // Mirroring Tools
             if (versions.scrcpy === 'Not Found') missingMirroring.push('Scrcpy');

@@ -116,6 +116,9 @@ export const es = {
             saved: "Guardado",
             undo: "Deshacer",
             redo: "Rehacer",
+            next: "Siguiente",
+            back: "Volver",
+            finish: "Finalizar",
             copy: "Copiar",
             copied: "¡Copiado!",
             download: "Descargar",
@@ -678,6 +681,8 @@ export const es = {
             description_run: "Gestión de dispositivos y ejecución de automatización.",
             tests: "Pruebas",
             description_tests: "Historial de ejecuciones y análisis de resultados.",
+            toolbox: "Herramientas",
+            description_toolbox: "Herramientas cotidianas para depuración y pruebas manuales.",
             ai_assistant: "Asistente IA",
             settings: "Configuración",
             description_settings: "Configure las preferencias e integraciones de la aplicación.",
@@ -808,6 +813,23 @@ export const es = {
         updater: {
             version_check_error: "Error al obtener versión de la aplicación",
             check_error: "Error al buscar actualizaciones"
+        },
+        onboarding: {
+            title: "¡Bienvenido a Robot Runner!",
+            description: "Vamos a configurar tu perfil para optimizar tu experiencia. Solo tomará un momento.",
+            step1_title: "Selecciona tu Idioma",
+            step2_title: "Elige tu Modo de Uso",
+            error_no_mode: "Por favor, selecciona un modo de uso para continuar.",
+            mode: {
+                explorer: {
+                    title: "Explorador",
+                    description: "Herramientas cotidianas para depuración y pruebas manuales (ADB, Scrcpy, etc.). Sin configuración."
+                },
+                automator: {
+                    title: "Automatizador",
+                    description: "Desarrolla y ejecuta pruebas automatizadas usando Robot Framework y Appium."
+                }
+            }
         }
     }
-}
+};

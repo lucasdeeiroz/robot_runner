@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTestSessions } from "@/lib/testSessionStore";
+import { useSettings } from "@/lib/settings";
 import { ToolboxView } from "@/components/tabs/tests/toolbox/ToolboxView";
 import { HistorySubTab } from "@/components/tabs/tests/HistorySubTab";
 import { AndroidVersionPill } from "@/components/atoms/AndroidVersionPill";
@@ -15,8 +16,11 @@ import { Button } from '@/components/atoms/Button';
 
 export function TestsPage() {
     const { t } = useTranslation();
+    const { settings } = useSettings();
     const { sessions, activeSessionId, setActiveSessionId, clearSession } = useTestSessions();
-    const [subTab, setSubTab] = useState<'history' | string>('history');
+    const isExplorer = settings.usageMode === 'explorer';
+    const initialTab = isExplorer ? (sessions.length > 0 ? sessions[0].runId : '') : 'history';
+    const [subTab, setSubTab] = useState<'history' | string>(initialTab);
 
     const [isGridView, setIsGridView] = useState(false);
     // Track visible sessions in Grid View. Default to all active session IDs.
@@ -137,9 +141,9 @@ export function TestsPage() {
         if (activeSessionId !== 'dashboard') {
             setSubTab(activeSessionId);
         } else {
-            setSubTab('history');
+            setSubTab(isExplorer ? (sessions.length > 0 ? sessions[0].runId : '') : 'history');
         }
-    }, [activeSessionId]);
+    }, [activeSessionId, isExplorer, sessions]);
 
     const handleTabChange = (id: string) => {
         setSubTab(id);
@@ -169,11 +173,11 @@ export function TestsPage() {
             {/* Modified Tabs Row with Grid Toggle */}
             <TabBar
                 tabs={[
-                    {
+                    ...(isExplorer ? [] : [{
                         id: 'history',
                         label: t('tests_page.history'),
                         selected: isGridView ? false : undefined
-                    },
+                    }]),
                     ...sessions.map(s => {
                         const isSuccess = s.exitCode && (s.exitCode.includes("exit code: 0") || s.exitCode === "0");
                         const isFailed = s.status === 'finished' && !isSuccess;
@@ -287,13 +291,14 @@ export function TestsPage() {
                 </div>
             ) : (
                 <div className="flex-1 min-h-0 relative">
-                    {subTab === 'history' ? (
+                    {subTab === 'history' && !isExplorer ? (
                         <HistorySubTab />
                     ) : activeSession ? (
                         <ToolboxView key={activeSession.deviceUdid || activeSession.runId} session={activeSession} />
                     ) : (
-                        <div className="h-full flex items-center justify-center text-on-surface/80">
-                            {t('tests_page.session_not_found')}
+                        <div className="h-full flex items-center justify-center text-on-surface/80 flex-col gap-4">
+                            <FileText size={48} className="opacity-20" />
+                            <p>{t('tests_page.session_not_found')}</p>
                         </div>
                     )}
                 </div>

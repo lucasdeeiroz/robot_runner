@@ -26,7 +26,7 @@ interface RunPageProps {
 
 export function RunPage({ onNavigate, initialTab }: RunPageProps) {
     const { t } = useTranslation();
-    const { systemCheckStatus } = useSettings();
+    const { systemCheckStatus, settings } = useSettings();
     const containerRef = useRef<HTMLDivElement>(null);
     const [isNarrow, setIsNarrow] = useState(false);
 
@@ -41,35 +41,40 @@ export function RunPage({ onNavigate, initialTab }: RunPageProps) {
         return () => observer.disconnect();
     }, []);
 
+    const isLauncherDisabled = (systemCheckStatus?.missingTesting?.length ?? 0) > 0 || settings.usageMode === 'explorer';
+    const isInspectorDisabled = false;
+
     const [activeTab, setActiveTab] = useState<TabType>(() => {
-        if (initialTab && !(initialTab === 'tests' && systemCheckStatus?.missingAppium?.length > 0 || systemCheckStatus?.missingTesting?.length > 0)) return initialTab;
-        if (systemCheckStatus?.missingTesting?.length > 0) return 'connect';
+        if (initialTab && !(initialTab === 'tests' && isLauncherDisabled) && !(initialTab === 'inspector' && isInspectorDisabled)) return initialTab;
+        if (isLauncherDisabled) return 'connect';
         return 'tests';
     });
 
     // Safety check if status updates later
     useEffect(() => {
-        if (activeTab === 'tests' && (systemCheckStatus?.missingAppium?.length > 0 || systemCheckStatus?.missingTesting?.length > 0)) {
+        if (activeTab === 'tests' && isLauncherDisabled) {
+            setActiveTab('connect');
+        } else if (activeTab === 'inspector' && isInspectorDisabled) {
             setActiveTab('connect');
         }
-    }, [systemCheckStatus, activeTab]);
+    }, [systemCheckStatus, settings.usageMode, activeTab]);
 
     // React to initialTab changes if they come later (e.g. redirect)
     useEffect(() => {
         if (initialTab) {
-            if (initialTab === 'tests' && (systemCheckStatus?.missingAppium?.length > 0 || systemCheckStatus?.missingTesting?.length > 0)) {
+            if (initialTab === 'tests' && isLauncherDisabled) {
+                setActiveTab('connect');
+            } else if (initialTab === 'inspector' && isInspectorDisabled) {
                 setActiveTab('connect');
             } else {
                 setActiveTab(initialTab);
             }
         }
-    }, [initialTab]);
-
-    const isLauncherDisabled = systemCheckStatus?.missingTesting?.length > 0;
+    }, [initialTab, isLauncherDisabled, isInspectorDisabled]);
 
     // Define Tabs
     const tabs: TabItem[] = [
-        { id: 'tests', label: !isNarrow ? t('run_tab.launcher') : '', icon: Play },
+        ...(settings.usageMode === 'explorer' ? [] : [{ id: 'tests', label: !isNarrow ? t('run_tab.launcher') : '', icon: Play }]),
         { id: 'connect', label: !isNarrow ? t('run_tab.connect') : '', icon: Wifi },
         { id: 'inspector', label: !isNarrow ? t('run_tab.inspector') : '', icon: ScanEye },
     ];
@@ -126,6 +131,7 @@ export function RunPage({ onNavigate, initialTab }: RunPageProps) {
                 activeId={activeTab}
                 onChange={(id) => {
                     if (id === 'tests' && isLauncherDisabled) return;
+                    if (id === 'inspector' && isInspectorDisabled) return;
                     setActiveTab(id as TabType);
                 }}
                 variant="pills"
@@ -145,9 +151,11 @@ export function RunPage({ onNavigate, initialTab }: RunPageProps) {
 
             {/* Main Content Area */}
             <div className="flex-1 min-h-0 bg-surface p-4 overflow-hidden relative z-10 rounded-2xl border border-outline-variant/30">
-                <div className={clsx("h-full", activeTab === 'tests' ? "block" : "hidden")}>
-                    <TestsSubTab selectedDevices={selectedDevices} devices={devices} onNavigate={onNavigate} />
-                </div>
+                {settings.usageMode !== 'explorer' && (
+                    <div className={clsx("h-full", activeTab === 'tests' ? "block" : "hidden")}>
+                        <TestsSubTab selectedDevices={selectedDevices} devices={devices} onNavigate={onNavigate} />
+                    </div>
+                )}
 
                 <div className={clsx("h-full", activeTab === 'connect' ? "block" : "hidden")}>
                     <ConnectSubTab onDeviceConnected={loadDevices} selectedDevice={selectedDevices[0]} />
