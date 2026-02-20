@@ -600,7 +600,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                         <div className="relative h-full w-full flex items-center justify-center">
                             <img
                                 ref={imgRef}
-                                src={`data: image / png; base64, ${screenshot} `}
+                                src={`data:image/png;base64,${screenshot}`}
                                 alt="Device Screenshot"
                                 className="h-full w-auto object-contain shadow-lg rounded-2xl select-none max-w-full"
                                 onMouseMove={handleImageMouseMove}

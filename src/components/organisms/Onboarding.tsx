@@ -59,7 +59,8 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                 className="bg-surface border border-outline-variant/30 shadow-2xl rounded-3xl p-8 max-w-2xl w-full"
             >
                 <div className="flex flex-col items-center mb-8">
-                    <h1 className="mt-4 text-3xl font-bold text-on-surface">{t('onboarding.title')}</h1>
+                    <img src="/logo.png" alt="Robot Runner Logo" className="w-16 h-16 object-contain mb-8 shadow-sm bg-surface-variant/30" />
+                    <h1 className="text-3xl font-bold text-on-surface">{t('onboarding.title')}</h1>
                     <p className="text-on-surface-variant/80 text-center mt-4 max-w-lg">
                         {t('onboarding.description')}
                     </p>
