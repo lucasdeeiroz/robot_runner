@@ -388,7 +388,14 @@ export const en = {
                 connect: "Connect",
                 cancel: "Cancel",
                 no_elements: "No mapped elements available.",
-                title: "Navigation Flow"
+                title: "Navigation Flow",
+                unsaved_changes: {
+                    title: "Unsaved Changes",
+                    message: "You have unsaved changes. Do you want to save before exiting?",
+                    save_and_exit: "Save and Exit",
+                    exit_without_saving: "Exit without Saving",
+                    cancel: "Cancel"
+                }
             },
             properties: "Element Properties",
             clear_selection: "Clear Selection",

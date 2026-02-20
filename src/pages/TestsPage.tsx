@@ -212,7 +212,7 @@ export function TestsPage() {
                     }
                 }}
                 variant="pills"
-                className="z-10 shrink-0"
+                className="z-20 relative shrink-0"
                 layoutId="tests-page-tabs"
                 menus={
                     <DeviceSelector
@@ -223,6 +223,12 @@ export function TestsPage() {
                         loadDevices={refreshDevices}
                         handleOpenToolbox={handleOpenToolbox}
                         busyDeviceIds={busyDeviceIds}
+                        onDropdownOpen={() => {
+                            if (selectedDevices.length > 1) {
+                                setSelectedDevices([selectedDevices[0]]);
+                            }
+                        }}
+                        compact={sessions.length >= 2}
                     />
                 }
                 actions={

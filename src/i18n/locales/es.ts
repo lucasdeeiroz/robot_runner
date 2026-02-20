@@ -391,7 +391,14 @@ export const es = {
                 connect: "Conectar",
                 cancel: "Cancelar",
                 no_elements: "No hay elementos asignados disponibles.",
-                title: "Flujo de Navegación"
+                title: "Flujo de Navegación",
+                unsaved_changes: {
+                    title: "Cambios no guardados",
+                    message: "Tienes cambios no guardados. ¿Quieres guardar antes de salir?",
+                    save_and_exit: "Guardar y Salir",
+                    exit_without_saving: "Salir sin Guardar",
+                    cancel: "Cancelar"
+                }
             },
             properties: "Propiedades del Elemento",
             clear_selection: "Limpiar Selección",

@@ -391,7 +391,14 @@ export const pt = {
                 connect: "Conectar",
                 cancel: "Cancelar",
                 no_elements: "Nenhum elemento mapeado disponível.",
-                title: "Fluxo de Navegação"
+                title: "Fluxo de Navegação",
+                unsaved_changes: {
+                    title: "Alterações não salvas",
+                    message: "Você tem alterações não salvas. Deseja salvar antes de sair?",
+                    save_and_exit: "Salvar e Sair",
+                    exit_without_saving: "Sair sem Salvar",
+                    cancel: "Cancelar"
+                }
             },
             properties: "Propriedades do Elemento",
             clear_selection: "Limpar Seleção",
