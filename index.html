@@ -13,6 +13,7 @@
       width: 100%;
       height: 100%;
       background-color: #fcfcfc;
+      overflow: hidden;
     }
 
     #root {
@@ -38,9 +39,10 @@
     }
 
     .initial-loader svg {
-      height: 2rem;
-      width: 8rem;
+      height: 4rem;
+      width: 4rem;
       overflow: visible;
+      animation: initial-rotate 8s linear infinite;
     }
 
     .loader-track {
@@ -48,17 +50,26 @@
     }
 
     .loader-snake {
-      stroke-dasharray: 30 178;
-      animation: initial-snake-length 1.5s ease-in-out infinite alternate, initial-snake-offset 2s linear infinite;
+      animation: initial-snake-length 2s ease-in-out infinite alternate, initial-snake-offset 2.5s linear infinite;
+    }
+
+    @keyframes initial-rotate {
+      from {
+        transform: rotate(0deg);
+      }
+
+      to {
+        transform: rotate(360deg);
+      }
     }
 
     @keyframes initial-snake-length {
       0% {
-        stroke-dasharray: 30 178;
+        stroke-dasharray: 15 111.33;
       }
 
       100% {
-        stroke-dasharray: 60 148;
+        stroke-dasharray: 50 76.33;
       }
     }
 
@@ -68,7 +79,7 @@
       }
 
       100% {
-        stroke-dashoffset: -208;
+        stroke-dashoffset: -126.33;
       }
     }
   </style>
@@ -77,13 +88,13 @@
 <body>
   <div id="root">
     <div class="initial-loader">
-      <svg viewBox="0 0 100 20" preserveAspectRatio="none">
-        <path class="loader-track" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"
+      <svg viewBox="0 0 48 48">
+        <path class="loader-track" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"
           stroke-linejoin="round"
-          d="M 0 10 Q 12.5 2 25 10 T 50 10 T 75 10 T 100 10 T 125 10 T 150 10 T 175 10 T 200 10" />
-        <path class="loader-snake" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"
+          d="M 44.00 24.00L 45.16 25.33L 45.94 26.77L 46.10 28.22L 45.56 29.54L 44.42 30.63L 42.89 31.48L 41.26 32.12L 39.84 32.71L 38.81 33.40L 38.26 34.36L 38.09 35.66L 38.13 37.27L 38.12 39.03L 37.84 40.73L 37.15 42.10L 36.03 42.96L 34.56 43.21L 32.91 42.93L 31.25 42.30L 29.73 41.62L 28.41 41.18L 27.28 41.19L 26.24 41.75L 25.18 42.76L 24.00 44.00L 22.67 45.16L 21.23 45.94L 19.78 46.10L 18.46 45.56L 17.37 44.42L 16.52 42.89L 15.88 41.26L 15.29 39.84L 14.60 38.81L 13.64 38.26L 12.34 38.09L 10.73 38.13L 8.97 38.12L 7.27 37.84L 5.90 37.15L 5.04 36.03L 4.79 34.56L 5.07 32.91L 5.70 31.25L 6.38 29.73L 6.82 28.41L 6.81 27.28L 6.25 26.24L 5.24 25.18L 4.00 24.00L 2.84 22.67L 2.06 21.23L 1.90 19.78L 2.44 18.46L 3.58 17.37L 5.11 16.52L 6.74 15.88L 8.16 15.29L 9.19 14.60L 9.74 13.64L 9.91 12.34L 9.87 10.73L 9.88 8.97L 10.16 7.27L 10.85 5.90L 11.97 5.04L 13.44 4.79L 15.09 5.07L 16.75 5.70L 18.27 6.38L 19.59 6.82L 20.72 6.81L 21.76 6.25L 22.82 5.24L 24.00 4.00L 25.33 2.84L 26.77 2.06L 28.22 1.90L 29.54 2.44L 30.63 3.58L 31.48 5.11L 32.12 6.74L 32.71 8.16L 33.40 9.19L 34.36 9.74L 35.66 9.91L 37.27 9.87L 39.03 9.88L 40.73 10.16L 42.10 10.85L 42.96 11.97L 43.21 13.44L 42.93 15.09L 42.30 16.75L 41.62 18.27L 41.18 19.59L 41.19 20.72L 41.75 21.76L 42.76 22.82L 44.00 24.00 Z" />
+        <path class="loader-snake" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"
           stroke-linejoin="round"
-          d="M 0 10 Q 12.5 2 25 10 T 50 10 T 75 10 T 100 10 T 125 10 T 150 10 T 175 10 T 200 10" />
+          d="M 44.00 24.00L 45.16 25.33L 45.94 26.77L 46.10 28.22L 45.56 29.54L 44.42 30.63L 42.89 31.48L 41.26 32.12L 39.84 32.71L 38.81 33.40L 38.26 34.36L 38.09 35.66L 38.13 37.27L 38.12 39.03L 37.84 40.73L 37.15 42.10L 36.03 42.96L 34.56 43.21L 32.91 42.93L 31.25 42.30L 29.73 41.62L 28.41 41.18L 27.28 41.19L 26.24 41.75L 25.18 42.76L 24.00 44.00L 22.67 45.16L 21.23 45.94L 19.78 46.10L 18.46 45.56L 17.37 44.42L 16.52 42.89L 15.88 41.26L 15.29 39.84L 14.60 38.81L 13.64 38.26L 12.34 38.09L 10.73 38.13L 8.97 38.12L 7.27 37.84L 5.90 37.15L 5.04 36.03L 4.79 34.56L 5.07 32.91L 5.70 31.25L 6.38 29.73L 6.82 28.41L 6.81 27.28L 6.25 26.24L 5.24 25.18L 4.00 24.00L 2.84 22.67L 2.06 21.23L 1.90 19.78L 2.44 18.46L 3.58 17.37L 5.11 16.52L 6.74 15.88L 8.16 15.29L 9.19 14.60L 9.74 13.64L 9.91 12.34L 9.87 10.73L 9.88 8.97L 10.16 7.27L 10.85 5.90L 11.97 5.04L 13.44 4.79L 15.09 5.07L 16.75 5.70L 18.27 6.38L 19.59 6.82L 20.72 6.81L 21.76 6.25L 22.82 5.24L 24.00 4.00L 25.33 2.84L 26.77 2.06L 28.22 1.90L 29.54 2.44L 30.63 3.58L 31.48 5.11L 32.12 6.74L 32.71 8.16L 33.40 9.19L 34.36 9.74L 35.66 9.91L 37.27 9.87L 39.03 9.88L 40.73 10.16L 42.10 10.85L 42.96 11.97L 43.21 13.44L 42.93 15.09L 42.30 16.75L 41.62 18.27L 41.18 19.59L 41.19 20.72L 41.75 21.76L 42.76 22.82L 44.00 24.00 Z" />
       </svg>
     </div>
   </div>

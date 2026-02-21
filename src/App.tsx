@@ -177,7 +177,7 @@ function App() {
   if (settings_loading) {
     return (
       <div className="w-screen h-screen flex flex-col items-center justify-center bg-surface text-primary">
-        <ExpressiveLoading size="lg" />
+        <ExpressiveLoading variant="circular" size="lg" />
       </div>
     );
   }
