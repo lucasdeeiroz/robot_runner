@@ -15,7 +15,7 @@ export function Layout({ children, activePage, onNavigate }: LayoutProps) {
         >
             <Sidebar activePage={activePage} onNavigate={onNavigate} />
             <main
-                className="flex-1 overflow-auto p-6 transition-colors duration-300"
+                className="flex-1 h-full overflow-y-auto transition-colors duration-300 p-6 custom-scrollbar"
                 style={{ backgroundColor: 'var(--bg-app)' }}
             >
                 {children}

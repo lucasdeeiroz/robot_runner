@@ -14,6 +14,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Onboarding } from "./components/organisms/Onboarding";
 import "./App.css";
 import { motion, AnimatePresence } from "framer-motion";
+import clsx from "clsx";
 import { argbFromHex, themeFromSourceColor, TonalPalette } from "@material/material-color-utilities";
 import { DeviceProvider } from "./lib/deviceStore";
 import { ExpressiveLoading } from "./components/atoms/ExpressiveLoading";
@@ -205,15 +206,15 @@ function App() {
           )}
         </AnimatePresence>
         <Layout activePage={activePage} onNavigate={setActivePage}>
-          <div className="max-w-7xl mx-auto h-full flex flex-col relative overflow-hidden">
+          <div className="max-w-7xl mx-auto min-h-full flex flex-col relative">
             {/* RunPage - Kept mounted to preserve state */}
+            {/* When active, it is relative to drive the container height. When not, it is absolute/hidden. */}
             <motion.div
-              className="absolute inset-0 flex flex-col"
+              className={clsx("flex flex-col w-full", activePage === 'run' ? "relative" : "absolute inset-0 pointer-events-none opacity-0")}
               initial={false}
               animate={{
                 opacity: activePage === 'run' ? 1 : 0,
                 zIndex: activePage === 'run' ? 10 : 0,
-                pointerEvents: activePage === 'run' ? 'auto' : 'none',
                 scale: activePage === 'run' ? 1 : 0.98
               }}
               transition={{ duration: 0.3 }}
@@ -226,10 +227,10 @@ function App() {
               {activePage !== 'run' && (
                 <motion.div
                   key={activePage}
-                  className="absolute inset-0 flex flex-col z-20 overflow-y-auto overflow-x-hidden custom-scrollbar"
+                  className="relative w-full flex flex-col z-20"
                   initial={{ opacity: 0, scale: 0.98, x: 20 }}
                   animate={{ opacity: 1, scale: 1, x: 0 }}
-                  exit={{ opacity: 0, scale: 0.98, x: -20 }}
+                  exit={{ opacity: 0, scale: 0.98, x: -20, position: 'absolute' }}
                   transition={{ duration: 0.3, ease: [0.2, 0, 0, 1] }}
                 >
                   {activePage === 'tests' && <TestsPage />}
