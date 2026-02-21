@@ -197,7 +197,7 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false }: LogcatSu
     }
 
     return (
-        <div ref={containerRef} className="h-full flex flex-col p-2 overflow-y-auto">
+        <div ref={containerRef} className="h-full flex-1 min-h-0 flex flex-col p-2">
             {/* Toolbar */}
             <Section
                 title={t('logcat.title', 'Logcat')}

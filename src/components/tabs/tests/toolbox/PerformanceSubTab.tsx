@@ -97,7 +97,7 @@ export function PerformanceSubTab({
     }
 
     return (
-        <div ref={containerRef} className="h-full flex flex-col p-4 overflow-y-auto">
+        <div ref={containerRef} className="flex-1 min-h-[400px] flex flex-col p-4 overflow-y-auto">
             <Section
                 title={t('performance.title')}
                 icon={Activity}

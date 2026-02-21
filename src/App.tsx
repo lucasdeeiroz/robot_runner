@@ -206,7 +206,7 @@ function App() {
           )}
         </AnimatePresence>
         <Layout activePage={activePage} onNavigate={setActivePage}>
-          <div className="max-w-7xl mx-auto min-h-full flex flex-col relative">
+          <div className="max-w-7xl mx-auto h-full flex flex-col relative">
             {/* RunPage - Kept mounted to preserve state */}
             {/* When active, it is relative to drive the container height. When not, it is absolute/hidden. */}
             <motion.div

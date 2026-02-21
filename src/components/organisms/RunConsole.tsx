@@ -487,7 +487,7 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
                         role="button"
                         onClick={(e) => { e.stopPropagation(); toggleNode(node.id); }}
                         className={clsx(
-                            "flex items-center gap-2 text-sm font-bold text-on-surface-variant/80 hover:text-black mb-2 group w-full text-left relative z-10 cursor-pointer select-none rounded p-1 hover:bg-black/5 transition-colors",
+                            "flex items-center gap-2 text-sm font-bold text-on-surface-variant/80 hover:text-on-surface mb-2 group w-full text-left relative z-10 cursor-pointer select-none rounded p-1 hover:bg-surface-variant/30 transition-colors",
                             `border-l-4 ${borderColor}`
                         )}
                     >

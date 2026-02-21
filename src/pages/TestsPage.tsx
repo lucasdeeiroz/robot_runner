@@ -157,7 +157,7 @@ export function TestsPage() {
     const activeSession = sessions.find(s => s.runId === subTab);
 
     return (
-        <div className="h-full flex flex-col space-y-4">
+        <div className="h-full flex-1 min-h-0 flex flex-col space-y-4">
             <PageHeader
                 title={t('sidebar.tests')}
                 description={t('sidebar.description_tests')}
@@ -256,54 +256,59 @@ export function TestsPage() {
             />
 
             {/* Content */}
-            {isGridView ? (
-                <div
-                    ref={gridContainerRef}
-                    className="flex-1 min-h-0 overflow-y-auto grid gap-4 pb-4 content-start"
-                    style={{ gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`, gridAutoRows: 'minmax(480px, 1fr)' }}
-                >
-                    {/* Session Grid Items */}
-                    {visibleSessions.map((s) => {
-                        return (
-                            <GridItem
-                                key={s.runId}
-                                className="min-w-0 h-full"
-                                title={
-                                    <div className="flex items-center gap-2">
-                                        {s.type === 'toolbox' && <span className="w-2 h-2 rounded-2xl bg-on-surface/10" />}
-                                        {s.type === 'test' && s.status === 'running' && <span className="w-2 h-2 rounded-2xl bg-orange-500 animate-pulse" />}
-                                        {s.type === 'test' && s.status === 'finished' && <span className={clsx("w-2 h-2 rounded-2xl", (s.exitCode?.includes("0") || s.exitCode === "0") ? "bg-success" : "bg-error")} />}
-                                        <span>{s.deviceModel || s.deviceName}</span>
-                                        <AndroidVersionPill version={s.androidVersion} className="bg-surface-variant/30" />
-                                    </div>
-                                }
-                                onClose={() => clearSession(s.runId)}
-                                onHide={() => toggleGridSession(s.runId)}
-                                onMaximize={() => {
-                                    setIsGridView(false);
-                                    handleTabChange(s.runId);
-                                }}
-                            >
-                                <ToolboxView session={s} isCompact={true} />
-                            </GridItem>
-                        );
-                    })}
-                </div>
-            ) : (
-                <div className="flex-1 min-h-0 relative">
-                    {subTab === 'history' && !isExplorer ? (
-                        <HistorySubTab />
-                    ) : activeSession ? (
-                        <ToolboxView key={activeSession.deviceUdid || activeSession.runId} session={activeSession} />
-                    ) : (
-                        <div className="h-full flex items-center justify-center text-on-surface/80 flex-col gap-4">
-                            <FileText size={48} className="opacity-20" />
-                            <p>{t('tests_page.session_not_found')}</p>
-                        </div>
-                    )}
-                </div>
-            )
-            }
+            <div className="h-full flex-1 min-h-0 flex flex-col relative">
+                {isGridView ? (
+                    <div
+                        ref={gridContainerRef}
+                        className="h-full flex-1 min-h-0 overflow-y-auto grid gap-4 pb-4 content-start"
+                        style={{ gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`, gridAutoRows: 'minmax(480px, 1fr)' }}
+                    >
+                        {/* Session Grid Items */}
+                        {visibleSessions.map((s) => {
+                            return (
+                                <GridItem
+                                    key={s.runId}
+                                    className="min-w-0 h-full"
+                                    title={
+                                        <div className="flex items-center gap-2">
+                                            {s.type === 'toolbox' && <span className="w-2 h-2 rounded-2xl bg-on-surface/10" />}
+                                            {s.type === 'test' && s.status === 'running' && <span className="w-2 h-2 rounded-2xl bg-orange-500 animate-pulse" />}
+                                            {s.type === 'test' && s.status === 'finished' && <span className={clsx("w-2 h-2 rounded-2xl", (s.exitCode?.includes("0") || s.exitCode === "0") ? "bg-success" : "bg-error")} />}
+                                            <span>{s.deviceModel || s.deviceName}</span>
+                                            <AndroidVersionPill version={s.androidVersion} className="bg-surface-variant/30" />
+                                        </div>
+                                    }
+                                    onClose={() => clearSession(s.runId)}
+                                    onHide={() => toggleGridSession(s.runId)}
+                                    onMaximize={() => {
+                                        setIsGridView(false);
+                                        handleTabChange(s.runId);
+                                    }}
+                                >
+                                    <ToolboxView session={s} isCompact={true} />
+                                </GridItem>
+                            );
+                        })}
+                    </div>
+                ) : (
+                    <div className="h-full flex-1 min-h-0 flex flex-col relative font-inter">
+                        {subTab === 'history' && !isExplorer ? (
+                            <div className="flex-1 flex flex-col">
+                                <HistorySubTab />
+                            </div>
+                        ) : activeSession ? (
+                            <div className="flex-1 flex flex-col">
+                                <ToolboxView key={activeSession.deviceUdid || activeSession.runId} session={activeSession} />
+                            </div>
+                        ) : (
+                            <div className="flex-1 flex flex-col items-center justify-center text-on-surface/80 gap-4">
+                                <FileText size={48} className="opacity-20" />
+                                <p>{t('tests_page.session_not_found')}</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
         </div >
     );
 }

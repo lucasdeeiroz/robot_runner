@@ -107,10 +107,13 @@ body {
 
 /* Generic Global Scroll Rule */
 /* Targets the page wrappers inside the centered Layout container to allow natural growth */
+/* We use flex and min-h instead of height: auto to allow children to use flex-1 */
+main>div,
 main>div>div,
 main>div>div>div {
-  height: auto !important;
-  min-height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
   overflow: visible !important;
 }
 

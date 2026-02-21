@@ -198,7 +198,7 @@ export function AppsSubTab({ isTestRunning = false }: AppsSubTabProps) {
 
 
     return (
-        <div ref={containerRef} className="h-full flex flex-col p-2 overflow-y-auto">
+        <div ref={containerRef} className="h-full flex-1 min-h-0 flex flex-col p-2">
             {/* Toolbar */}
             <Section
                 title={t('apps.title', 'Apps')}
@@ -296,6 +296,7 @@ export function AppsSubTab({ isTestRunning = false }: AppsSubTabProps) {
                     <Virtuoso
                         data={filtered}
                         className="custom-scrollbar"
+                        style={{ height: '100%' }}
                         itemContent={(_index, pkg) => (
                             <div className="px-3 py-2 border-b border-outline-variant/30 hover:bg-surface-variant/20 group flex items-center gap-3">
                                 <div className={clsx(
