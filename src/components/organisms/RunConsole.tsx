@@ -134,6 +134,8 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
         const IS_MAESTRO_SUITE_END = (l: string) => /Flow (Passed|Failed) in/.test(l) || /\d+\/\d+ Flow (Passed|Failed) in/.test(l);
         const IS_MAESTRO_TEST_START = (l: string) => l.includes("Running flow ");
         const IS_MAESTRO_TEST_END = (l: string) => /^\[(Passed|Failed)\]\s+.*\(\d+s\)/.test(l.trim());
+        const IS_MAVEN_TEST_START = (l: string) => l.startsWith("[INFO] Running ");
+        const IS_MAVEN_TEST_END = (l: string) => l.includes("Tests run: ") && l.includes("Failures: ");
 
         if (currentCount > processedCount) {
             const newLogs = logs.slice(processedCount);
@@ -337,6 +339,29 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
                         };
                         if (activeSuite()) activeSuite()!.children.push(instantTest);
                         else root.push(instantTest);
+                    }
+                }
+                else if (IS_MAVEN_TEST_START(line)) {
+                    closeCurrentTest();
+                    const name = line.replace("[INFO] Running ", "").trim();
+                    currentTest = {
+                        type: 'test',
+                        name,
+                        status: 'RUNNING',
+                        logs: [line],
+                        id: `mvn-test-${processedCountRef.current + idx}`
+                    };
+                    if (activeSuite()) activeSuite()!.children.push(currentTest);
+                    else root.push(currentTest);
+                }
+                else if (IS_MAVEN_TEST_END(line)) {
+                    if (currentTest) {
+                        const isFailed = line.includes("Failures: 0") && line.includes("Errors: 0") ? false : true;
+                        currentTest.status = isFailed ? "FAIL" : "PASS";
+                        currentTest.logs.push(line);
+                        currentTest = null;
+                    } else {
+                        addToCurrentContext({ type: 'text', content: line, id: nodeId });
                     }
                 }
                 else {

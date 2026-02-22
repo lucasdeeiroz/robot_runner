@@ -257,7 +257,11 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
 
     const tabs = [
         { id: 'file', label: !isNarrow ? t('tests.mode.file') : '', icon: FileCode },
-        { id: 'folder', label: !isNarrow ? t('tests.mode.folder') : '', icon: FolderOpen },
+        {
+            id: 'folder',
+            label: !isNarrow ? (settings.automationFramework === 'appium' ? t('tests.mode.project') : t('tests.mode.folder')) : '',
+            icon: FolderOpen
+        },
         { id: 'args', label: !isNarrow ? t('tests.mode.args') : '', icon: FileText, disabled: settings.automationFramework && settings.automationFramework !== 'robot' },
     ].filter(tab => {
         if (tab.id === 'args' && settings.automationFramework && settings.automationFramework !== 'robot') return false;
@@ -324,6 +328,16 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                         />
                     </div>
                 </div>
+
+                {/* Framework specific tips */}
+                {settings.automationFramework === 'appium' && mode === 'folder' && (
+                    <div className="absolute bottom-4 left-4 right-4 animate-in fade-in slide-in-from-bottom-2 duration-300 pointer-events-none">
+                        <div className="bg-surface-container/80 backdrop-blur-md border border-outline/10 text-on-surface-variant text-[11px] px-3 py-2 rounded-lg shadow-lg flex items-center gap-2 max-w-fit">
+                            <FileText size={14} className="text-primary" />
+                            <span>{t('tests.tips.appium_maven')}</span>
+                        </div>
+                    </div>
+                )}
 
                 <TabBar
                     layoutId="tests-sub-tab"

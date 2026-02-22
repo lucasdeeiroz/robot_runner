@@ -721,12 +721,16 @@ export const en = {
             mode: {
                 file: "Test File",
                 folder: "Test Folder",
+                project: "Project",
                 args: "Argument File"
             },
             target: "Target",
             no_selection: "No valid selection",
             run_all: "Run All Tests",
             run_selected: "Run Selected Test",
+            tips: {
+                appium_maven: "Select the Maven project root (where pom.xml is located)."
+            },
             status: {
                 checking: "Checking Appium...",
                 starting: "Starting Appium...",

@@ -721,12 +721,16 @@ export const es = {
             mode: {
                 file: "Archivo de Prueba",
                 folder: "Carpeta de Pruebas",
+                project: "Proyecto",
                 args: "Archivo de Args"
             },
             target: "Objetivo",
             no_selection: "Sin selección válida",
             run_all: "Ejecutar Todas",
             run_selected: "Ejecutar Seleccionada",
+            tips: {
+                appium_maven: "Seleccione la raíz del proyecto Maven (donde se encuentra pom.xml)."
+            },
             status: {
                 checking: "Verificando Appium...",
                 starting: "Iniciando Appium...",

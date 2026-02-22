@@ -10,7 +10,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 pub struct TestState(pub Mutex<HashMap<String, Child>>);
 
 #[tauri::command]
-pub async fn stop_robot_test(state: State<'_, TestState>, run_id: String) -> Result<String, String> {
+pub async fn stop_test(state: State<'_, TestState>, run_id: String) -> Result<String, String> {
     let mut procs = state.0.lock().map_err(|e| e.to_string())?;
 
     if let Some(child) = procs.get_mut(&run_id) {
@@ -285,6 +285,10 @@ pub fn run_appium_test(
     output_dir: String,
     appium_java_args: Option<String>,
 ) -> Result<String, String> {
+    let abs_project_path = std::fs::canonicalize(&project_path)
+        .map(|p| p.to_string_lossy().to_string().replace(r"\\?\", ""))
+        .unwrap_or_else(|_| project_path.clone());
+
     let abs_output_dir = std::fs::canonicalize(&output_dir)
         .map(|p| p.to_string_lossy().to_string().replace(r"\\?\", ""))
         .unwrap_or_else(|_| output_dir.clone());
@@ -304,7 +308,17 @@ pub fn run_appium_test(
     );
     let _ = std::fs::write(metadata_path, metadata_json);
 
-    let mut cmd = Command::new("mvn");
+    let mut cmd;
+    #[cfg(target_os = "windows")]
+    {
+        cmd = Command::new("cmd");
+        cmd.arg("/C").arg("mvn");
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        cmd = Command::new("mvn");
+    }
+
     if let Some(args) = appium_java_args {
         if !args.is_empty() {
              for arg in args.split_whitespace() {
@@ -317,7 +331,7 @@ pub fn run_appium_test(
         cmd.arg("test");
     }
 
-    spawn_and_monitor(app, state, run_id, cmd, Some(project_path))
+    spawn_and_monitor(app, state, run_id, cmd, Some(abs_project_path))
 }
 
 fn spawn_and_monitor(

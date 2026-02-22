@@ -226,7 +226,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
         }));
 
         try {
-            await invoke('stop_robot_test', { runId: targetBackendId });
+            await invoke('stop_test', { runId: targetBackendId });
         } catch (e) {
             feedback.toast.error("session.stop_error", e);
             setSessions(prev => prev.map(s => {

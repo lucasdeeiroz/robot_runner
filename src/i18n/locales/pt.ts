@@ -724,12 +724,16 @@ export const pt = {
             mode: {
                 file: "Arquivo de Teste",
                 folder: "Pasta de Testes",
+                project: "Projeto",
                 args: "Arquivo de Args"
             },
             target: "Alvo",
             no_selection: "Nenhuma seleção válida",
             run_all: "Executar Todos",
             run_selected: "Executar Selecionado",
+            tips: {
+                appium_maven: "Selecione a raiz do projeto Maven (onde está o pom.xml)."
+            },
             status: {
                 checking: "Verificando Appium...",
                 starting: "Iniciando Appium...",
