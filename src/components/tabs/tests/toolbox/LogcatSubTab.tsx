@@ -14,9 +14,10 @@ import { Select } from "@/components/atoms/Select";
 interface LogcatSubTabProps {
     selectedDevice: string;
     isTestRunning?: boolean;
+    allowActionsDuringTest?: boolean;
 }
 
-export function LogcatSubTab({ selectedDevice, isTestRunning = false }: LogcatSubTabProps) {
+export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActionsDuringTest = false }: LogcatSubTabProps) {
     const { t } = useTranslation();
     const [isStreaming, setIsStreaming] = useState(false);
     const [logs, setLogs] = useState<string[]>([]);
@@ -66,7 +67,9 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false }: LogcatSu
         let interval: NodeJS.Timeout;
         let pollingOffset = 0; // Local offset for this session
 
-        if (isStreaming && selectedDevice && !isTestRunning) { // Pause polling during active tests
+        const shouldStream = isStreaming && selectedDevice && (!isTestRunning || allowActionsDuringTest);
+
+        if (shouldStream) { // Pause polling during active tests unless allowed
 
             interval = setInterval(async () => {
                 try {
@@ -101,7 +104,7 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false }: LogcatSu
         return () => {
             if (interval) clearInterval(interval);
         };
-    }, [isStreaming, selectedDevice, isTestRunning]);
+    }, [isStreaming, selectedDevice, isTestRunning, allowActionsDuringTest]);
 
     const [selectedPackage, setSelectedPackage] = useState("");
     const [logLevel, setLogLevel] = useState("E");
@@ -258,7 +261,7 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false }: LogcatSu
                             onClick={isStreaming ? stopLogcat : startLogcat}
                             variant={isStreaming ? "danger" : "primary"}
                             size="sm"
-                            disabled={isTestRunning}
+                            disabled={isTestRunning && !allowActionsDuringTest}
                             leftIcon={isStreaming ? <Square size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
                         >
                             {!isNarrow && t(isStreaming ? 'logcat.stop' : 'logcat.start')}

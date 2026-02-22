@@ -88,6 +88,9 @@ export const en = {
             empty: "Select a device to execute commands",
             input_placeholder: "Enter ADB command (e.g. 'shell ls -la')",
             waiting: "Waiting for commands...",
+            status: {
+                test_running: "Test execution in progress"
+            },
             clear: "Clear Console",
             quick: "Quick",
             saved: "Saved",
@@ -598,6 +601,8 @@ export const en = {
             general: "General",
             recycle_device_views: "Recycle Device Screen",
             recycle_device_views_desc: "Reuse existing tabs when running tests on the same device",
+            allow_actions_during_test: "Allow Actions During Test",
+            allow_actions_during_test_desc: "Allow specific actions to be performed even while a test is running. (Experimental)",
             language: "Language",
             appearance: {
                 title: "Appearance",

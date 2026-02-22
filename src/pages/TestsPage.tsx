@@ -4,7 +4,7 @@ import { useSettings } from "@/lib/settings";
 import { ToolboxView } from "@/components/tabs/tests/toolbox/ToolboxView";
 import { HistorySubTab } from "@/components/tabs/tests/HistorySubTab";
 import { AndroidVersionPill } from "@/components/atoms/AndroidVersionPill";
-import { XCircle, LayoutGrid, Minimize2, Maximize2, FileText } from 'lucide-react';
+import { XCircle, LayoutGrid, Minimize2, Maximize2, FileText, Settings } from 'lucide-react';
 import { PageHeader } from "@/components/organisms/PageHeader";
 import clsx from 'clsx';
 import { useTranslation } from "react-i18next";
@@ -13,14 +13,23 @@ import { useDevices } from '@/lib/deviceStore';
 import { DeviceSelector } from '@/components/molecules/DeviceSelector';
 import { Device } from '@/lib/types';
 import { Button } from '@/components/atoms/Button';
+import { Switch } from "@/components/atoms/Switch";
+import { AnimatePresence } from 'framer-motion';
+import { StaggerContainer, StaggerItem } from '@/components/motion/MotionPrimitives';
+import { useOutsideClick } from '@/hooks/useOutsideClick';
 
 export function TestsPage() {
     const { t } = useTranslation();
-    const { settings } = useSettings();
+    const { settings, updateSetting } = useSettings();
     const { sessions, activeSessionId, setActiveSessionId, clearSession } = useTestSessions();
     const isExplorer = settings.usageMode === 'explorer';
     const initialTab = isExplorer ? (sessions.length > 0 ? sessions[0].runId : '') : 'history';
     const [subTab, setSubTab] = useState<'history' | string>(initialTab);
+
+    // Settings Dropdown State
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const settingsRef = useRef<HTMLDivElement>(null);
+    useOutsideClick(settingsRef, () => setIsSettingsOpen(false));
 
     const [isGridView, setIsGridView] = useState(false);
     // Track visible sessions in Grid View. Default to all active session IDs.
@@ -218,40 +227,99 @@ export function TestsPage() {
                 variant="pills"
                 className="z-20 relative shrink-0"
                 layoutId="tests-page-tabs"
-                menus={
-                    <DeviceSelector
-                        devices={devices}
-                        selectedDevices={selectedDevices}
-                        toggleDevice={handleDeviceToggle}
-                        loadingDevices={loadingDevices}
-                        loadDevices={refreshDevices}
-                        handleOpenToolbox={handleOpenToolbox}
-                        busyDeviceIds={busyDeviceIds}
-                        onDropdownOpen={() => {
-                            if (selectedDevices.length > 1) {
-                                setSelectedDevices([selectedDevices[0]]);
-                            }
-                        }}
-                        compact={sessions.length >= 2}
-                    />
-                }
                 actions={
-                    sessions.length >= 2 ? (
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setIsGridView(!isGridView)}
-                            className={clsx(
-                                "rounded-2xl border transition-all shrink-0",
-                                isGridView
-                                    ? "bg-primary/10 border-none text-primary"
-                                    : "bg-transparent border-none text-on-surface-variant/80 hover:text-on-surface-variant/80 hover:bg-surface-variant/30"
-                            )}
-                            title={isGridView ? t('toolbox.actions.switch_to_tabs') : t('toolbox.actions.switch_to_grid')}
-                        >
-                            <LayoutGrid size={20} />
-                        </Button>
-                    ) : undefined
+                    <div className="flex items-center gap-2">
+                        {sessions.length >= 2 ? (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setIsGridView(!isGridView)}
+                                className={clsx(
+                                    "rounded-2xl border transition-all shrink-0",
+                                    isGridView
+                                        ? "bg-primary/10 border-none text-primary"
+                                        : "bg-transparent border-none text-on-surface-variant/80 hover:text-on-surface-variant/80 hover:bg-surface-variant/30"
+                                )}
+                                title={isGridView ? t('toolbox.actions.switch_to_tabs') : t('toolbox.actions.switch_to_grid')}
+                            >
+                                <LayoutGrid size={20} />
+                            </Button>
+                        ) : undefined}
+                        <DeviceSelector
+                            devices={devices}
+                            selectedDevices={selectedDevices}
+                            toggleDevice={handleDeviceToggle}
+                            loadingDevices={loadingDevices}
+                            loadDevices={refreshDevices}
+                            handleOpenToolbox={handleOpenToolbox}
+                            busyDeviceIds={busyDeviceIds}
+                            onDropdownOpen={() => {
+                                if (selectedDevices.length > 1) {
+                                    setSelectedDevices([selectedDevices[0]]);
+                                }
+                            }}
+                            compact={sessions.length >= 2}
+                        />
+                        <div ref={settingsRef} className="relative">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                                className={clsx(
+                                    "rounded-2xl border transition-all shrink-0 h-8 w-8",
+                                    isSettingsOpen
+                                        ? "bg-primary/10 border-none text-primary"
+                                        : "bg-transparent border-none text-on-surface-variant/80 hover:text-on-surface-variant/80 hover:bg-surface-variant/30"
+                                )}
+                                title={t('settings.title')}
+                            >
+                                <Settings size={20} />
+                            </Button>
+
+                            <AnimatePresence>
+                                {isSettingsOpen && (
+                                    <StaggerContainer
+                                        className="absolute top-full right-0 mt-2 w-72 bg-surface backdrop-blur-md border border-outline-variant/30 rounded-2xl shadow-xl p-3 z-50 flex flex-col gap-4"
+                                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                                    >
+                                        <div className="text-xs font-bold uppercase tracking-wider text-on-surface-variant/60 px-1">
+                                            {t('settings.tool_options', 'Tool Options')}
+                                        </div>
+
+                                        <StaggerItem className="flex items-center justify-between gap-4">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-sm font-medium text-on-surface/80">
+                                                    {t('settings.recycle_device_views')}
+                                                </div>
+                                                <div className="text-[10px] text-on-surface-variant/60 leading-tight mt-0.5">
+                                                    {t('settings.recycle_device_views_desc')}
+                                                </div>
+                                            </div>
+                                            <Switch
+                                                checked={settings.recycleDeviceViews}
+                                                onCheckedChange={(c) => updateSetting('recycleDeviceViews', c)}
+                                            />
+                                        </StaggerItem>
+
+                                        <StaggerItem className="flex items-center justify-between gap-4">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-sm font-medium text-on-surface/80">
+                                                    {t('settings.allow_actions_during_test', 'Allow Actions During Test')}
+                                                </div>
+                                                <div className="text-[10px] text-on-surface-variant/60 leading-tight mt-0.5">
+                                                    {t('settings.allow_actions_during_test_desc', 'Enable Inspector, Mapper and other tools even while a test is running')}
+                                                </div>
+                                            </div>
+                                            <Switch
+                                                checked={settings.allowActionsDuringTest}
+                                                onCheckedChange={(c) => updateSetting('allowActionsDuringTest', c)}
+                                            />
+                                        </StaggerItem>
+                                    </StaggerContainer>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    </div>
                 }
             />
 

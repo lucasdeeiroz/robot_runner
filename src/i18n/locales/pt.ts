@@ -601,6 +601,8 @@ export const pt = {
             general: "Geral",
             recycle_device_views: "Reciclar Tela de Dispositivo",
             recycle_device_views_desc: "Reutilizar abas existentes ao executar testes no mesmo dispositivo",
+            allow_actions_during_test: "Permitir Ações Durante o Teste",
+            allow_actions_during_test_desc: "Permite que o Inspetor, Mapeador e outras ferramentas funcionem mesmo com um teste em execução. (Experimental)",
             language: "Idioma",
             appearance: {
                 title: "Aparência",

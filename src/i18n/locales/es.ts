@@ -531,7 +531,10 @@ export const es = {
             device_stats: "Rendimiento del Dispositivo",
             app_stats: "Rendimiento de la Aplicación",
             auto: "Auto",
-            na: "N/D"
+            na: "N/D",
+            status: {
+                paused_test: "Monitoreo de rendimiento pausado durante la prueba"
+            }
         },
         run_tab: {
             launcher: "Lanzador",
@@ -598,6 +601,8 @@ export const es = {
             general: "General",
             recycle_device_views: "Reciclar Pantalla del Dispositivo",
             recycle_device_views_desc: "Reutilizar pestañas existentes al ejecutar pruebas en el mismo dispositivo",
+            allow_actions_during_test: "Permitir Acciones Durante la Prueba",
+            allow_actions_during_test_desc: "Permite que el Inspector, Mapeador y otras herramientas funcionen incluso con una prueba en ejecución. (Experimental)",
             language: "Idioma",
             appearance: {
                 title: "Apariencia",

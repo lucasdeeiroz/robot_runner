@@ -12,6 +12,7 @@ import { Input } from "@/components/atoms/Input";
 interface CommandsSubTabProps {
     selectedDevice: string;
     isTestRunning?: boolean;
+    allowActionsDuringTest?: boolean;
 }
 
 interface SavedCommand {
@@ -20,7 +21,7 @@ interface SavedCommand {
     cmd: string;
 }
 
-export function CommandsSubTab({ selectedDevice, isTestRunning = false }: CommandsSubTabProps) {
+export function CommandsSubTab({ selectedDevice, isTestRunning = false, allowActionsDuringTest = false }: CommandsSubTabProps) {
     const { t } = useTranslation();
     const [command, setCommand] = useState("");
     const [history, setHistory] = useState<string[]>([]);
@@ -236,7 +237,7 @@ export function CommandsSubTab({ selectedDevice, isTestRunning = false }: Comman
                         <Button
                             key={action.label}
                             onClick={() => executeCommand(action.cmd, action.label)}
-                            disabled={isExecuting || isTestRunning}
+                            disabled={isExecuting || (isTestRunning && !allowActionsDuringTest)}
                             variant="outline"
                             className="bg-surface-variant/30 hover:bg-outline-variant text-xs font-medium border-outline-variant/30 h-auto py-1.5 px-3"
                             leftIcon={action.icon}
@@ -257,7 +258,7 @@ export function CommandsSubTab({ selectedDevice, isTestRunning = false }: Comman
                             >
                                 <Button
                                     onClick={() => setCommand(saved.cmd)} // Fill input
-                                    disabled={isTestRunning}
+                                    disabled={isTestRunning && !allowActionsDuringTest}
                                     variant="ghost"
                                     className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-on-warning-container hover:text-on-warning-container/50 h-auto"
                                     title={saved.cmd}
@@ -316,7 +317,7 @@ export function CommandsSubTab({ selectedDevice, isTestRunning = false }: Comman
                 ) : (
                     <Button
                         onClick={handleSend}
-                        disabled={!command.trim() || isTestRunning}
+                        disabled={!command.trim() || (isTestRunning && !allowActionsDuringTest)}
                         variant="primary"
                     >
                         <Send size={18} />

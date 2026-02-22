@@ -224,7 +224,13 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
     // The hook handles pausing it during active tests efficiently.
     const initialAutoRefresh = true;
 
-    const performanceState = usePerformanceRecorder(session.deviceUdid, isPerformanceActive, isTestRunning, initialAutoRefresh);
+    const performanceState = usePerformanceRecorder(
+        session.deviceUdid,
+        isPerformanceActive,
+        isTestRunning,
+        initialAutoRefresh,
+        settings.allowActionsDuringTest
+    );
 
     // Combine feedback paths (add performance saved path)
     const activeSavedPath = screenshotSaver.lastSavedPath || recordingSaver.lastSavedPath;
@@ -444,17 +450,18 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                                     {tool === 'console' && (
                                         <RunConsole logs={session.logs} isRunning={session.status === 'running'} testPath={session.testPath} />
                                     )}
-                                    {tool === 'logcat' && <LogcatSubTab key={session.deviceUdid} selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} />}
-                                    {tool === 'commands' && <CommandsSubTab selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} />}
+                                    {tool === 'logcat' && <LogcatSubTab key={session.deviceUdid} selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
+                                    {tool === 'commands' && <CommandsSubTab selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
                                     {tool === 'performance' && (
                                         <PerformanceSubTab
                                             selectedDevice={session.deviceUdid}
                                             {...performanceState}
                                             onRefresh={performanceState.fetchStats}
                                             isTestRunning={isTestRunning}
+                                            allowActionsDuringTest={settings.allowActionsDuringTest}
                                         />
                                     )}
-                                    {tool === 'apps' && <AppsSubTab isTestRunning={isTestRunning} />}
+                                    {tool === 'apps' && <AppsSubTab isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
                                 </GridToolItem>
                             );
                         });
@@ -467,11 +474,11 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                     </div>
 
                     <div className={clsx("h-full flex-1 min-h-0 flex flex-col", activeTool === 'logcat' ? "flex" : "hidden")}>
-                        <LogcatSubTab key={session.deviceUdid} selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} />
+                        <LogcatSubTab key={session.deviceUdid} selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />
                     </div>
 
                     <div className={clsx("h-full flex-1 min-h-0 flex flex-col", activeTool === 'commands' ? "flex" : "hidden")}>
-                        <CommandsSubTab selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} />
+                        <CommandsSubTab selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />
                     </div>
 
                     <div className={clsx("h-full flex-1 min-h-0 flex flex-col", activeTool === 'performance' ? "flex" : "hidden")}>
@@ -480,11 +487,12 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                             {...performanceState}
                             onRefresh={performanceState.fetchStats}
                             isTestRunning={isTestRunning}
+                            allowActionsDuringTest={settings.allowActionsDuringTest}
                         />
                     </div>
 
                     <div className={clsx("h-full flex-1 min-h-0 flex flex-col", activeTool === 'apps' ? "flex" : "hidden")}>
-                        <AppsSubTab isTestRunning={isTestRunning} />
+                        <AppsSubTab isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />
                     </div>
                 </div>
             )}

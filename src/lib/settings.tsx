@@ -30,6 +30,7 @@ export interface AppSettings {
     customLogoLight?: string;
     customLogoDark?: string;
     recycleDeviceViews: boolean; // New setting
+    allowActionsDuringTest: boolean; // Control whether actions are allowed during test
     usageMode?: 'explorer' | 'automator';
     automationFramework?: 'robot' | 'appium' | 'maestro';
 
@@ -72,6 +73,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     geminiApiKey: '',
     geminiModel: 'gemini-1.5-flash',
     recycleDeviceViews: false, // Default to false
+    allowActionsDuringTest: false, // Default to false (blocking)
     appiumHost: '127.0.0.1',
     appiumPort: 4723,
     paths: {

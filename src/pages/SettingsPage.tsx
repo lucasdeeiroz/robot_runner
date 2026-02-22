@@ -1,6 +1,5 @@
 import { useSettings } from "@/lib/settings";
 import { Moon, Sun, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2, Settings as SettingsIcon, Sparkles, FileJson, RefreshCcw } from "lucide-react";
-import { Switch } from "@/components/atoms/Switch";
 import { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -334,38 +333,6 @@ export function SettingsPage() {
                         </div>
                     )}
 
-                    {settings.usageMode === 'explorer' && (
-                        <div className="flex md:col-span-2 items-center justify-between bg-surface-variant/5 hover:bg-surface-variant/10 p-3 rounded-2xl transition-colors select-none cursor-pointer h-[68px]" onClick={() => updateSetting('recycleDeviceViews', !settings.recycleDeviceViews)}>
-                            <div>
-                                <label className="block text-sm text-on-surface-variant/80 font-medium mb-0.5 pointer-events-none">
-                                    {t('settings.recycle_device_views')}
-                                </label>
-                                <p className="text-[10px] text-on-surface-variant/60 pointer-events-none mt-1">
-                                    {t('settings.recycle_device_views_desc', { defaultValue: "Reuse existing tabs when running tests on the same device" })}
-                                </p>
-                            </div>
-                            <Switch
-                                checked={settings.recycleDeviceViews}
-                                onCheckedChange={(c: boolean) => updateSetting('recycleDeviceViews', c)}
-                            />
-                        </div>
-                    )}
-                    {settings.usageMode === 'automator' && (
-                        <div className="flex md:col-span-1 items-center justify-between bg-surface-variant/5 hover:bg-surface-variant/10 p-3 rounded-2xl transition-colors select-none cursor-pointer h-[68px]" onClick={() => updateSetting('recycleDeviceViews', !settings.recycleDeviceViews)}>
-                            <div>
-                                <label className="block text-sm text-on-surface-variant/80 font-medium mb-0.5 pointer-events-none">
-                                    {t('settings.recycle_device_views')}
-                                </label>
-                                <p className="text-[10px] text-on-surface-variant/60 pointer-events-none mt-1">
-                                    {t('settings.recycle_device_views_desc', { defaultValue: "Reuse existing tabs when running tests on the same device" })}
-                                </p>
-                            </div>
-                            <Switch
-                                checked={settings.recycleDeviceViews}
-                                onCheckedChange={(c: boolean) => updateSetting('recycleDeviceViews', c)}
-                            />
-                        </div>
-                    )}
                 </div>
             </Section>
 
