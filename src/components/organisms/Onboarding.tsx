@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useSettings } from '@/lib/settings';
 import { Button } from '@/components/atoms/Button';
 import { Select } from '@/components/atoms/Select';
-import { Compass, Bot, CheckCircle2 } from 'lucide-react';
+import { Compass, Bot, CheckCircle2, Zap, Terminal } from 'lucide-react';
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
 import { feedback } from '@/lib/feedback';
@@ -19,6 +19,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
     const [step, setStep] = useState(1);
     const [selectedLanguage, setSelectedLanguage] = useState(settings.language || 'en_US');
     const [selectedMode, setSelectedMode] = useState<'explorer' | 'automator' | undefined>(settings.usageMode);
+    const [selectedFramework, setSelectedFramework] = useState<'robot' | 'appium' | 'maestro' | undefined>(settings.automationFramework || 'robot');
 
     useEffect(() => {
         // Apply language choice immediately for the UI
@@ -39,9 +40,16 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             feedback.toast.error(t('onboarding.error_no_mode'));
             return;
         }
-        // We might need to ensure updateSetting isn't overwriting itself if called sequentially synchronously in a stale closure. Let's add a small timeout or just call onComplete which will trigger re-renders.
+        if (selectedMode === 'automator' && !selectedFramework) {
+            feedback.toast.error(t('onboarding.error_no_framework'));
+            return;
+        }
+
         updateSetting('usageMode', selectedMode);
         updateSetting('language', selectedLanguage);
+        if (selectedMode === 'automator') {
+            updateSetting('automationFramework', selectedFramework);
+        }
 
         // Re-check system versions so missing automation tools warn if they chose automator
         if (selectedMode === 'automator') {
@@ -59,7 +67,8 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                 className="bg-surface border border-outline-variant/30 shadow-2xl rounded-3xl p-8 max-w-2xl w-full"
             >
                 <div className="flex flex-col items-center mb-8">
-                    <h1 className="mt-4 text-3xl font-bold text-on-surface">{t('onboarding.title')}</h1>
+                    <img src="/logo.png" alt="Robot Runner Logo" className="w-16 h-16 object-contain mb-8 shadow-sm bg-surface-variant/30" />
+                    <h1 className="text-3xl font-bold text-on-surface">{t('onboarding.title')}</h1>
                     <p className="text-on-surface-variant/80 text-center mt-4 max-w-lg">
                         {t('onboarding.description')}
                     </p>
@@ -159,8 +168,118 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                             </Button>
                             <Button
                                 variant="primary"
-                                onClick={handleComplete}
+                                onClick={() => {
+                                    if (selectedMode === 'automator') {
+                                        setStep(3);
+                                    } else {
+                                        handleComplete();
+                                    }
+                                }}
                                 disabled={!selectedMode}
+                            >
+                                {selectedMode === 'automator' ? t('common.next') : t('common.finish')}
+                            </Button>
+                        </div>
+                    </motion.div>
+                )}
+
+                {step === 3 && (
+                    <motion.div
+                        key="step3"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                        className="space-y-6"
+                    >
+                        <h2 className="text-xl font-semibold mb-4 text-center text-on-surface">{t('onboarding.step3_title')}</h2>
+                        <div className="grid grid-cols-1 gap-4">
+                            {/* Robot Framework */}
+                            <div
+                                onClick={() => setSelectedFramework('robot')}
+                                className={clsx(
+                                    "relative p-4 rounded-2xl border-2 cursor-pointer transition-all hover:shadow-md flex items-center gap-4",
+                                    selectedFramework === 'robot'
+                                        ? "bg-primary/5 border-primary"
+                                        : "bg-surface border-outline-variant/30 hover:bg-surface-variant/30"
+                                )}
+                            >
+                                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary flex-shrink-0">
+                                    <Bot size={24} />
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="text-lg font-bold text-on-surface">{t('onboarding.framework.robot.title')}</h3>
+                                    <p className="text-sm text-on-surface-variant/80">
+                                        {t('onboarding.framework.robot.description')}
+                                    </p>
+                                </div>
+                                {selectedFramework === 'robot' && (
+                                    <div className="text-primary">
+                                        <CheckCircle2 size={24} />
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Appium Java */}
+                            <div
+                                onClick={() => setSelectedFramework('appium')}
+                                className={clsx(
+                                    "relative p-4 rounded-2xl border-2 cursor-pointer transition-all hover:shadow-md flex items-center gap-4",
+                                    selectedFramework === 'appium'
+                                        ? "bg-primary/5 border-primary"
+                                        : "bg-surface border-outline-variant/30 hover:bg-surface-variant/30"
+                                )}
+                            >
+                                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary flex-shrink-0">
+                                    <Terminal size={24} />
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="text-lg font-bold text-on-surface">{t('onboarding.framework.appium.title')}</h3>
+                                    <p className="text-sm text-on-surface-variant/80">
+                                        {t('onboarding.framework.appium.description')}
+                                    </p>
+                                </div>
+                                {selectedFramework === 'appium' && (
+                                    <div className="text-primary">
+                                        <CheckCircle2 size={24} />
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Maestro */}
+                            <div
+                                onClick={() => setSelectedFramework('maestro')}
+                                className={clsx(
+                                    "relative p-4 rounded-2xl border-2 cursor-pointer transition-all hover:shadow-md flex items-center gap-4",
+                                    selectedFramework === 'maestro'
+                                        ? "bg-primary/5 border-primary"
+                                        : "bg-surface border-outline-variant/30 hover:bg-surface-variant/30"
+                                )}
+                            >
+                                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary flex-shrink-0">
+                                    <Zap size={24} />
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="text-lg font-bold text-on-surface">{t('onboarding.framework.maestro.title')}</h3>
+                                    <p className="text-sm text-on-surface-variant/80">
+                                        {t('onboarding.framework.maestro.description')}
+                                    </p>
+                                </div>
+                                {selectedFramework === 'maestro' && (
+                                    <div className="text-primary">
+                                        <CheckCircle2 size={24} />
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="flex justify-between mt-8">
+                            <Button variant="ghost" onClick={() => setStep(2)}>
+                                {t('common.back')}
+                            </Button>
+                            <Button
+                                variant="primary"
+                                onClick={handleComplete}
+                                disabled={!selectedFramework}
                             >
                                 {t('common.finish')}
                             </Button>

@@ -21,7 +21,13 @@ export interface DeviceStats {
     app_stats?: AppStats;
 }
 
-export function usePerformanceRecorder(selectedDevice: string, isActive: boolean, isTestRunning: boolean = false, initialAutoRefresh: boolean = true) {
+export function usePerformanceRecorder(
+    selectedDevice: string,
+    isActive: boolean,
+    isTestRunning: boolean = false,
+    initialAutoRefresh: boolean = true,
+    allowActionsDuringTest: boolean = false
+) {
     const { t } = useTranslation();
     const { settings } = useSettings();
     const [stats, setStats] = useState<DeviceStats | null>(null);
@@ -38,10 +44,10 @@ export function usePerformanceRecorder(selectedDevice: string, isActive: boolean
     // Fetch Stats Loop
     useEffect(() => {
         let interval: NodeJS.Timeout;
-        // Update if active AND auto-refresh is on AND test is NOT running, OR if recording
-        const shouldUpdate = selectedDevice && ((autoRefresh && isActive && !isTestRunning) || isRecording);
+        // Update if active AND auto-refresh is on AND (test is NOT running OR actions are allowed), OR if recording
+        const shouldUpdate = selectedDevice && ((autoRefresh && isActive && (!isTestRunning || allowActionsDuringTest)) || isRecording);
 
-        // If a test is running, we strictly pause auto-polling.
+        // If a test is running, we strictly pause auto-polling unless allowed.
         const pollInterval = 2000;
 
         if (shouldUpdate) {
@@ -49,14 +55,14 @@ export function usePerformanceRecorder(selectedDevice: string, isActive: boolean
             interval = setInterval(fetchStats, pollInterval);
         }
         return () => clearInterval(interval);
-    }, [selectedDevice, autoRefresh, selectedPackage, isActive, isRecording, isTestRunning]);
+    }, [selectedDevice, autoRefresh, selectedPackage, isActive, isRecording, isTestRunning, allowActionsDuringTest]);
 
-    // Clear stats when test starts to show "Paused" state
+    // Clear stats when test starts to show "Paused" state, UNLESS allowed
     useEffect(() => {
-        if (isTestRunning) {
+        if (isTestRunning && !allowActionsDuringTest) {
             setStats(null);
         }
-    }, [isTestRunning]);
+    }, [isTestRunning, allowActionsDuringTest]);
 
     const fetchStats = async () => {
         if (isLoading) return; // Prevent stacking requests

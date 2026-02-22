@@ -24,6 +24,7 @@ interface PerformanceSubTabProps {
     lastSaved: string | null;
     setLastSaved: (val: string | null) => void;
     isTestRunning?: boolean;
+    allowActionsDuringTest?: boolean;
 
     onRefresh: () => void;
     isLoading?: boolean;
@@ -42,6 +43,7 @@ export function PerformanceSubTab({
     lastSaved,
     setLastSaved,
     isTestRunning = false,
+    allowActionsDuringTest = false,
 
     onRefresh,
     isLoading = false
@@ -97,7 +99,7 @@ export function PerformanceSubTab({
     }
 
     return (
-        <div ref={containerRef} className="h-full flex flex-col p-4 overflow-y-auto">
+        <div ref={containerRef} className="flex-1 min-h-[400px] flex flex-col p-4 overflow-y-auto">
             <Section
                 title={t('performance.title')}
                 icon={Activity}
@@ -153,7 +155,7 @@ export function PerformanceSubTab({
                             onClick={toggleRecording}
                             variant={isRecording ? "danger" : "secondary"}
                             size="sm"
-                            disabled={isTestRunning}
+                            disabled={isTestRunning && !allowActionsDuringTest}
                             leftIcon={isRecording ? <Square size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
                             title={isRecording ? t('performance.stop_record') : t('performance.start_record')}
                         >
@@ -177,7 +179,7 @@ export function PerformanceSubTab({
                     onClose={() => setLastSaved(null)}
                 />
 
-                {(isTestRunning && !stats) ? (
+                {(isTestRunning && !allowActionsDuringTest && !stats) ? (
                     <div className="absolute inset-0 flex-1 flex flex-col items-center justify-center text-on-surface-variant/80 text-sm">
                         <Activity size={32} className="opacity-20 mb-2" />
                         <p>{t('performance.status.paused_test', "Performance monitoring paused during test")}</p>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/atoms/Button';
 import { Smartphone, RefreshCw, Wrench } from 'lucide-react';
@@ -8,6 +8,7 @@ import { StaggerContainer, StaggerItem } from '@/components/motion/MotionPrimiti
 import { Device } from '@/lib/types';
 import { Badge } from '@/components/atoms/Badge';
 import { AndroidVersionPill } from '@/components/atoms/AndroidVersionPill';
+import { useOutsideClick } from '@/hooks/useOutsideClick';
 
 
 interface DeviceSelectorProps {
@@ -35,11 +36,19 @@ export function DeviceSelector({
 }: DeviceSelectorProps) {
     const { t } = useTranslation();
     const [isDeviceDropdownOpen, setIsDeviceDropdownOpen] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    useOutsideClick(containerRef, () => {
+        if (isDeviceDropdownOpen) {
+            setIsDeviceDropdownOpen(false);
+        }
+    });
 
     const showFull = !compact || isDeviceDropdownOpen;
 
     return (
         <div
+            ref={containerRef}
             className="flex items-center gap-3 relative"
             onClick={() => isDeviceDropdownOpen && setIsDeviceDropdownOpen(false)}
         >

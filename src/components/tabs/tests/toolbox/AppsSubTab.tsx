@@ -24,9 +24,10 @@ interface PackageInfo {
 
 interface AppsSubTabProps {
     isTestRunning?: boolean;
+    allowActionsDuringTest?: boolean;
 }
 
-export function AppsSubTab({ isTestRunning = false }: AppsSubTabProps) {
+export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = false }: AppsSubTabProps) {
     const { t } = useTranslation();
     const { sessions, activeSessionId } = useTestSessions();
     const activeSession = sessions.find(s => s.runId === activeSessionId);
@@ -86,10 +87,10 @@ export function AppsSubTab({ isTestRunning = false }: AppsSubTabProps) {
     };
 
     useEffect(() => {
-        if (!isTestRunning) {
+        if (!isTestRunning || allowActionsDuringTest) {
             fetchPackages();
         }
-    }, [activeDevice, isTestRunning]); // Don't auto-fetch if test running, but let user manually refresh if they really want via button
+    }, [activeDevice, isTestRunning, allowActionsDuringTest]); // Don't auto-fetch if test running unless allowed, but let user manually refresh if they really want via button
 
     const friendlyNames = useMemo(() => calculateUniqueLabels(packages), [packages]);
 
@@ -198,7 +199,7 @@ export function AppsSubTab({ isTestRunning = false }: AppsSubTabProps) {
 
 
     return (
-        <div ref={containerRef} className="h-full flex flex-col p-2 overflow-y-auto">
+        <div ref={containerRef} className="h-full flex-1 min-h-0 flex flex-col p-2">
             {/* Toolbar */}
             <Section
                 title={t('apps.title', 'Apps')}
@@ -258,7 +259,7 @@ export function AppsSubTab({ isTestRunning = false }: AppsSubTabProps) {
                             onClick={handleInstall}
                             variant="ghost"
                             size="sm"
-                            disabled={isTestRunning}
+                            disabled={isTestRunning && !allowActionsDuringTest}
                             className="bg-on-success-container/10/10 hover:bg-on-success-container/10/20 text-success border border-on-success-container/10/20"
                             title={t('apps.actions.install')}
                             leftIcon={<Upload size={14} />}
@@ -296,6 +297,7 @@ export function AppsSubTab({ isTestRunning = false }: AppsSubTabProps) {
                     <Virtuoso
                         data={filtered}
                         className="custom-scrollbar"
+                        style={{ height: '100%' }}
                         itemContent={(_index, pkg) => (
                             <div className="px-3 py-2 border-b border-outline-variant/30 hover:bg-surface-variant/20 group flex items-center gap-3">
                                 <div className={clsx(

@@ -12,6 +12,7 @@ import { Input } from "@/components/atoms/Input";
 interface CommandsSubTabProps {
     selectedDevice: string;
     isTestRunning?: boolean;
+    allowActionsDuringTest?: boolean;
 }
 
 interface SavedCommand {
@@ -20,13 +21,14 @@ interface SavedCommand {
     cmd: string;
 }
 
-export function CommandsSubTab({ selectedDevice, isTestRunning = false }: CommandsSubTabProps) {
+export function CommandsSubTab({ selectedDevice, isTestRunning = false, allowActionsDuringTest = false }: CommandsSubTabProps) {
     const { t } = useTranslation();
     const [command, setCommand] = useState("");
     const [history, setHistory] = useState<string[]>([]);
     const [isExecuting, setIsExecuting] = useState(false);
     const [savedCommands, setSavedCommands] = useState<SavedCommand[]>([]);
     const [currentCmdId, setCurrentCmdId] = useState<string | null>(null);
+    const historyRef = useRef<HTMLDivElement>(null);
 
     // Save Command Modal State
     const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
@@ -113,6 +115,11 @@ export function CommandsSubTab({ selectedDevice, isTestRunning = false }: Comman
 
             listenersRef.current.push(unlistenOutput, unlistenClose);
 
+            // Auto-scroll on start
+            setTimeout(() => {
+                if (historyRef.current) historyRef.current.scrollTop = historyRef.current.scrollHeight;
+            }, 100);
+
             await invoke("start_adb_command", {
                 id: cmdId,
                 device: selectedDevice,
@@ -125,6 +132,17 @@ export function CommandsSubTab({ selectedDevice, isTestRunning = false }: Comman
             setCurrentCmdId(null);
         }
     };
+
+    // Auto-scroll effect
+    useEffect(() => {
+        const el = historyRef.current;
+        if (!el) return;
+
+        const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+        if (isAtBottom) {
+            el.scrollTop = el.scrollHeight;
+        }
+    }, [history]);
 
     const handleCancel = async () => {
         if (currentCmdId) {
@@ -166,7 +184,7 @@ export function CommandsSubTab({ selectedDevice, isTestRunning = false }: Comman
     }
 
     return (
-        <div className="h-full flex flex-col p-2 overflow-y-auto">
+        <div className="h-full flex-1 min-h-0 flex flex-col p-2 overflow-hidden">
             <Section
                 title={t('commands.title', 'ADB Commands')}
                 icon={Terminal}
@@ -193,7 +211,10 @@ export function CommandsSubTab({ selectedDevice, isTestRunning = false }: Comman
             />
 
             {/* Console Output */}
-            <div className="relative flex-1 bg-surface text-on-surface/50 font-mono text-xs rounded-2xl border border-outline-variant/30 p-4 overflow-y-auto on-primaryspace-pre-wrap">
+            <div
+                ref={historyRef}
+                className="relative flex-1 min-h-0 bg-surface text-on-surface/50 font-mono text-xs rounded-2xl border border-outline-variant/30 p-4 overflow-y-auto on-primaryspace-pre-wrap custom-scrollbar"
+            >
                 {history.length === 0 && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-on-surface-variant/80 font-sans text-sm">
                         <Terminal size={32} className="opacity-20 mb-2" />
@@ -216,7 +237,7 @@ export function CommandsSubTab({ selectedDevice, isTestRunning = false }: Comman
                         <Button
                             key={action.label}
                             onClick={() => executeCommand(action.cmd, action.label)}
-                            disabled={isExecuting || isTestRunning}
+                            disabled={isExecuting || (isTestRunning && !allowActionsDuringTest)}
                             variant="outline"
                             className="bg-surface-variant/30 hover:bg-outline-variant text-xs font-medium border-outline-variant/30 h-auto py-1.5 px-3"
                             leftIcon={action.icon}
@@ -237,7 +258,7 @@ export function CommandsSubTab({ selectedDevice, isTestRunning = false }: Comman
                             >
                                 <Button
                                     onClick={() => setCommand(saved.cmd)} // Fill input
-                                    disabled={isTestRunning}
+                                    disabled={isTestRunning && !allowActionsDuringTest}
                                     variant="ghost"
                                     className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-on-warning-container hover:text-on-warning-container/50 h-auto"
                                     title={saved.cmd}
@@ -296,7 +317,7 @@ export function CommandsSubTab({ selectedDevice, isTestRunning = false }: Comman
                 ) : (
                     <Button
                         onClick={handleSend}
-                        disabled={!command.trim() || isTestRunning}
+                        disabled={!command.trim() || (isTestRunning && !allowActionsDuringTest)}
                         variant="primary"
                     >
                         <Send size={18} />

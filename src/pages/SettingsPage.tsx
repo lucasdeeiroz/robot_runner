@@ -1,6 +1,5 @@
 import { useSettings } from "@/lib/settings";
 import { Moon, Sun, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2, Settings as SettingsIcon, Sparkles, FileJson, RefreshCcw } from "lucide-react";
-import { Switch } from "@/components/atoms/Switch";
 import { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -206,7 +205,7 @@ export function SettingsPage() {
     };
 
     return (
-        <div ref={containerRef} className="space-y-4 animate-in fade-in duration-500 pb-12">
+        <div ref={containerRef} className="space-y-4 animate-in fade-in duration-500">
             {/* Delete Confirmation Modal */}
             <ConfirmationModal
                 isOpen={!!showDeleteConfirm}
@@ -283,7 +282,10 @@ export function SettingsPage() {
                     </>
                 }
             >
-                <div className="mt-4 pt-4 border-t border-outline-variant/30 grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+                <div className={clsx(
+                    "mt-4 pt-4 border-t border-outline-variant/30 grid gap-6 items-end",
+                    settings.usageMode === 'automator' ? "grid-cols-1 md:grid-cols-3" : "grid-cols-1 md:grid-cols-2"
+                )}>
                     <div>
                         <Select
                             value={settings.language}
@@ -315,21 +317,26 @@ export function SettingsPage() {
                         />
                     </div>
 
-                    <div className="flex items-center justify-between bg-surface-variant/5 hover:bg-surface-variant/10 p-3 rounded-2xl transition-colors select-none cursor-pointer h-[68px]" onClick={() => updateSetting('recycleDeviceViews', !settings.recycleDeviceViews)}>
+                    {settings.usageMode === 'automator' && (
                         <div>
-                            <label className="block text-sm text-on-surface-variant/80 font-medium mb-0.5 pointer-events-none">
-                                {t('settings.recycle_device_views')}
-                            </label>
-                            <p className="text-[10px] text-on-surface-variant/60 pointer-events-none mt-1">
-                                {t('settings.recycle_device_views_desc', { defaultValue: "Reuse existing tabs when running tests on the same device" })}
-                            </p>
+                            <Select
+                                value={settings.automationFramework || 'robot'}
+                                onChange={async (e) => {
+                                    const framework = e.target.value as 'robot' | 'appium' | 'maestro';
+                                    updateSetting('automationFramework', framework);
+                                    checkSystemVersions('automator');
+                                }}
+                                label={t('onboarding.step3_title')}
+                                options={[
+                                    { value: "robot", label: t('onboarding.framework.robot.title') },
+                                    { value: "appium", label: t('onboarding.framework.appium.title') },
+                                    { value: "maestro", label: t('onboarding.framework.maestro.title') }
+                                ]}
+                            />
                         </div>
-                        <Switch
-                            checked={settings.recycleDeviceViews}
-                            onCheckedChange={(c: boolean) => updateSetting('recycleDeviceViews', c)}
-                        />
-                    </div>
+                    )}
                 </div>
+
             </Section>
 
             {/* Modal for Create/Rename */}
@@ -369,7 +376,7 @@ export function SettingsPage() {
             <div className="grid gap-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Appium Server Config & Control */}
-                    {settings.usageMode !== 'explorer' && (
+                    {(settings.usageMode === 'automator' && settings.automationFramework !== 'maestro') && (
                         <Section
                             title={t('settings.appium.title')}
                             icon={Server}
@@ -449,7 +456,7 @@ export function SettingsPage() {
                                 >
                                     {appiumLogs.length === 0 && <span className="text-on-surface-variant/80 italic">{t('settings.appium.waiting')}</span>}
                                     {appiumLogs.map((log, i) => (
-                                        <div key={i} className="text-on-surface-variant/80 on-primaryspace-pre-wrap border-b border-outline-variant/30 pb-0.5 mb-0.5">{log}</div>
+                                        <div key={i} className="text-on-surface-variant/80 space-pre-wrap border-b border-outline-variant/30 pb-0.5 mb-0.5">{log}</div>
                                     ))}
                                 </div>
                             )}
@@ -457,19 +464,30 @@ export function SettingsPage() {
                     )}
 
                     {/* Tool Options */}
-                    <Section title={t('settings.tools')} icon={Wrench}>
+                    <Section
+                        title={t('settings.tools')}
+                        icon={Wrench}
+                        className={clsx((settings.usageMode === 'explorer' || settings.automationFramework === 'maestro') && "col-span-full")}
+                    >
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {['robotArgs', 'scrcpyArgs'].map((key) => {
-                                if (key === 'robotArgs' && settings.usageMode === 'explorer') return null;
+                            {['robotArgs', 'maestroArgs', 'appiumJavaArgs', 'scrcpyArgs'].map((key) => {
+                                if (key === 'robotArgs' && (settings.usageMode === 'explorer' || (settings.automationFramework && settings.automationFramework !== 'robot'))) return null;
+                                if (key === 'maestroArgs' && (settings.usageMode === 'explorer' || settings.automationFramework !== 'maestro')) return null;
+                                if (key === 'appiumJavaArgs' && (settings.usageMode === 'explorer' || settings.automationFramework !== 'appium')) return null;
 
                                 let isDisabled = false;
                                 if (key === 'robotArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
+                                if (key === 'maestroArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
+                                if (key === 'appiumJavaArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
                                 if (key === 'scrcpyArgs' && systemCheckStatus?.missingMirroring?.length > 0) isDisabled = true;
 
+                                let labelKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+                                if (key === 'appiumJavaArgs') labelKey = 'appium_java_args';
+
                                 return (
-                                    <div key={key}>
+                                    <div key={key} className={clsx(key === 'scrcpyArgs' && settings.usageMode === 'explorer' && "col-span-1 md:col-span-2")}>
                                         <Input
-                                            label={t(`settings.tool_config.${key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)}` as any)}
+                                            label={t(`settings.tool_config.${labelKey}` as any)}
                                             type="text"
                                             value={(settings.tools as any)[key]}
                                             onChange={(e) => updateSetting('tools', { ...settings.tools, [key]: e.target.value })}
@@ -514,6 +532,7 @@ export function SettingsPage() {
                     </Section>
                 </div>
 
+
                 {/* Path Configuration */}
                 <Section title={t('settings.paths.title')} icon={FolderOpen}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -538,8 +557,6 @@ export function SettingsPage() {
 
                 {/* Appearance & General */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-
                     <Section
                         title={t('settings.appearance.title')}
                         icon={Moon}
@@ -729,10 +746,19 @@ export function SettingsPage() {
                 >
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {systemVersions ? (
-                            (['adb', 'node', 'appium', 'uiautomator2', 'python', 'robot', 'appium_lib', 'scrcpy', 'ngrok'] as Array<keyof typeof systemVersions>)
+                            (['adb', 'node', 'appium', 'uiautomator2', 'python', 'robot', 'appium_lib', 'java', 'maven', 'maestro', 'scrcpy', 'ngrok'] as Array<keyof typeof systemVersions>)
                                 .filter(key => {
                                     if (key === 'ngrok' && !isNgrokEnabled) return false;
-                                    if (settings.usageMode === 'explorer' && ['node', 'appium', 'uiautomator2', 'python', 'robot', 'appium_lib'].includes(key)) return false;
+                                    if (settings.usageMode === 'explorer' && ['node', 'appium', 'uiautomator2', 'python', 'robot', 'appium_lib', 'java', 'maven', 'maestro'].includes(key)) return false;
+
+                                    // Framework-specific filtering
+                                    if (settings.usageMode === 'automator') {
+                                        if (['python', 'robot', 'appium_lib'].includes(key) && settings.automationFramework !== 'robot') return false;
+                                        if (['java', 'maven'].includes(key) && settings.automationFramework !== 'appium') return false;
+                                        if (['maestro'].includes(key) && settings.automationFramework !== 'maestro') return false;
+                                        if (['appium', 'uiautomator2'].includes(key) && settings.automationFramework !== 'appium' && settings.automationFramework !== 'robot') return false;
+                                    }
+
                                     return true;
                                 })
                                 .map((key) => (

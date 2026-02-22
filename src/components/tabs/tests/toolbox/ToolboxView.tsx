@@ -224,7 +224,13 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
     // The hook handles pausing it during active tests efficiently.
     const initialAutoRefresh = true;
 
-    const performanceState = usePerformanceRecorder(session.deviceUdid, isPerformanceActive, isTestRunning, initialAutoRefresh);
+    const performanceState = usePerformanceRecorder(
+        session.deviceUdid,
+        isPerformanceActive,
+        isTestRunning,
+        initialAutoRefresh,
+        settings.allowActionsDuringTest
+    );
 
     // Combine feedback paths (add performance saved path)
     const activeSavedPath = screenshotSaver.lastSavedPath || recordingSaver.lastSavedPath;
@@ -237,7 +243,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
 
     return (
         <div ref={containerRef} className={clsx(
-            "h-full flex flex-col space-y-4 pointer-events-auto relative z-10 bg-surface",
+            "h-full flex-1 min-h-0 flex flex-col space-y-4 pointer-events-auto relative z-10 bg-surface",
             !isCompact && "rounded-2xl p-4 border border-outline-variant/30",
             isCompact && "p-2"
         )}>
@@ -408,7 +414,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
 
             {/* Tool Content */}
             {isGridView ? (
-                <div className="flex-1 min-h-0 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-4 pb-2 auto-rows-[minmax(300px,1fr)]">
+                <div className="h-full flex-1 min-h-0 grid grid-cols-1 md:grid-cols-2 gap-4 pb-2 auto-rows-fr overflow-hidden">
                     {(() => {
                         const allTools: ToolTab[] = ['console', 'logcat', 'performance', 'commands', 'apps'];
                         const visibleTools = allTools.filter(t =>
@@ -444,47 +450,49 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                                     {tool === 'console' && (
                                         <RunConsole logs={session.logs} isRunning={session.status === 'running'} testPath={session.testPath} />
                                     )}
-                                    {tool === 'logcat' && <LogcatSubTab key={session.deviceUdid} selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} />}
-                                    {tool === 'commands' && <CommandsSubTab selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} />}
+                                    {tool === 'logcat' && <LogcatSubTab key={session.deviceUdid} selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
+                                    {tool === 'commands' && <CommandsSubTab selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
                                     {tool === 'performance' && (
                                         <PerformanceSubTab
                                             selectedDevice={session.deviceUdid}
                                             {...performanceState}
                                             onRefresh={performanceState.fetchStats}
                                             isTestRunning={isTestRunning}
+                                            allowActionsDuringTest={settings.allowActionsDuringTest}
                                         />
                                     )}
-                                    {tool === 'apps' && <AppsSubTab isTestRunning={isTestRunning} />}
+                                    {tool === 'apps' && <AppsSubTab isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
                                 </GridToolItem>
                             );
                         });
                     })()}
                 </div>
             ) : (
-                <div className="flex-1 min-h-0 bg-surface border border-outline-variant/30 rounded-2xl overflow-hidden relative">
-                    <div className={clsx("h-full flex flex-col overflow-hidden", activeTool === 'console' && session.type === 'test' ? "block" : "hidden")}>
+                <div className="h-full flex-1 min-h-0 bg-surface border border-outline-variant/30 rounded-2xl overflow-hidden relative">
+                    <div className={clsx("h-full flex-1 min-h-0 flex flex-col overflow-hidden", activeTool === 'console' && session.type === 'test' ? "flex" : "hidden")}>
                         <RunConsole logs={session.logs} isRunning={session.status === 'running'} testPath={session.testPath} />
                     </div>
 
-                    <div className={clsx("h-full", activeTool === 'logcat' ? "block" : "hidden")}>
-                        <LogcatSubTab key={session.deviceUdid} selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} />
+                    <div className={clsx("h-full flex-1 min-h-0 flex flex-col", activeTool === 'logcat' ? "flex" : "hidden")}>
+                        <LogcatSubTab key={session.deviceUdid} selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />
                     </div>
 
-                    <div className={clsx("h-full", activeTool === 'commands' ? "block" : "hidden")}>
-                        <CommandsSubTab selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} />
+                    <div className={clsx("h-full flex-1 min-h-0 flex flex-col", activeTool === 'commands' ? "flex" : "hidden")}>
+                        <CommandsSubTab selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />
                     </div>
 
-                    <div className={clsx("h-full", activeTool === 'performance' ? "block" : "hidden")}>
+                    <div className={clsx("h-full flex-1 min-h-0 flex flex-col", activeTool === 'performance' ? "flex" : "hidden")}>
                         <PerformanceSubTab
                             selectedDevice={session.deviceUdid}
                             {...performanceState}
                             onRefresh={performanceState.fetchStats}
                             isTestRunning={isTestRunning}
+                            allowActionsDuringTest={settings.allowActionsDuringTest}
                         />
                     </div>
 
-                    <div className={clsx("h-full", activeTool === 'apps' ? "block" : "hidden")}>
-                        <AppsSubTab isTestRunning={isTestRunning} />
+                    <div className={clsx("h-full flex-1 min-h-0 flex flex-col", activeTool === 'apps' ? "flex" : "hidden")}>
+                        <AppsSubTab isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />
                     </div>
                 </div>
             )}

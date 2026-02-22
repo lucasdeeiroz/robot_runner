@@ -507,7 +507,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     }
 
     return (
-        <div ref={setContainerRef} className="h-full w-full flex flex-col space-y-4">
+        <div ref={setContainerRef} className="flex-1 min-h-[700px] flex flex-col space-y-4">
             {/* Toolbar - Now at the Top */}
             <Section
                 title={t('mapper.title', 'Mapper')}
@@ -592,7 +592,6 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 }
             />
 
-            {/* Main Content: Split View */}
             <div className="flex-1 grid grid-cols-[auto_1fr] gap-4 min-h-0 overflow-hidden">
                 {/* Left: Device Screen (Adaptive) */}
                 <div className="flex items-center justify-center overflow-hidden relative">
@@ -600,7 +599,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                         <div className="relative h-full w-full flex items-center justify-center">
                             <img
                                 ref={imgRef}
-                                src={`data: image / png; base64, ${screenshot} `}
+                                src={`data:image/png;base64,${screenshot}`}
                                 alt="Device Screenshot"
                                 className="h-full w-auto object-contain shadow-lg rounded-2xl select-none max-w-full"
                                 onMouseMove={handleImageMouseMove}
@@ -655,7 +654,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                 <div className="absolute w-full h-full top-0 left-0 pointer-events-none z-30">
                                     <div
                                         className="absolute w-4 h-4 bg-orange-500 rounded-2xl -ml-2 -mt-2 opacity-50"
-                                        style={{ left: swipeStart.x, top: swipeStart.y }}
+                                        style={{ left: swipeStart?.x, top: swipeStart?.y }}
                                     />
                                 </div>
                             )}
@@ -677,7 +676,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 </div>
 
                 {/* Right: Properties Scroll View */}
-                <div className="bg-surface border border-outline-variant/30 rounded-2xl flex flex-col overflow-hidden shadow-sm h-full">
+                <div className="bg-surface border border-outline-variant/30 rounded-2xl flex flex-col overflow-hidden shadow-sm flex-1">
                     <div className="flex items-center justify-between border-b border-outline-variant/30 shrink-0 bg-surface/50 pr-2">
                         {availableNodes.length > 1 ? (
                             <div className="flex overflow-x-auto custom-scrollbar flex-1">
@@ -726,7 +725,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                     <div className="mt-1">
                                         <h3 className="text-xs font-semibold text-on-surface-variant/80 uppercase tracking-wider mb-2">{t('mapper.attributes.hierarchy')}</h3>
                                         <NodeBreadcrumbs
-                                            node={selectedNode}
+                                            node={selectedNode!}
                                             onSelect={setSelectedNode}
                                             onHover={setHoveredNode}
                                         />
@@ -790,13 +789,13 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                         <div className="grid grid-cols-2 gap-2">
                                             <CopyButton
                                                 label={t('mapper.attributes.access_id')}
-                                                value={selectedNode.attributes['content-desc']}
+                                                value={selectedNode?.attributes['content-desc']}
                                                 onCopy={(v) => copyToClipboard(v, 'aid')}
                                                 active={copied === 'aid'}
                                             />
                                             <CopyButton
                                                 label={t('mapper.attributes.resource_id')}
-                                                value={selectedNode.attributes['resource-id']}
+                                                value={selectedNode?.attributes['resource-id']}
                                                 onCopy={(v) => copyToClipboard(v, 'rid')}
                                                 active={copied === 'rid'}
                                             />

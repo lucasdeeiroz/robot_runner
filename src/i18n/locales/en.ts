@@ -16,6 +16,8 @@ export const en = {
                 vite: { name: "Vite", desc: "Next-generation build tool enabling an ultra-fast development environment." },
                 appium: { name: "Appium", desc: "Leading automation platform for native, hybrid, and mobile web testing." },
                 robot: { name: "Robot Framework", desc: "Generic open source automation framework for acceptance testing." },
+                maestro: { name: "Maestro", desc: "The simplest and most effective UI testing framework for mobile app automation." },
+                maven: { name: "Maven", desc: "Reliable build automation tool used primarily for Java projects." },
                 tailwind: { name: "TailwindCSS", desc: "Utility-first CSS framework for rapid and consistent styling." },
                 lucide: { name: "Lucide", desc: "Beautiful and consistent vector icon library." }
             },
@@ -86,6 +88,9 @@ export const en = {
             empty: "Select a device to execute commands",
             input_placeholder: "Enter ADB command (e.g. 'shell ls -la')",
             waiting: "Waiting for commands...",
+            status: {
+                test_running: "Test execution in progress"
+            },
             clear: "Clear Console",
             quick: "Quick",
             saved: "Saved",
@@ -596,6 +601,8 @@ export const en = {
             general: "General",
             recycle_device_views: "Recycle Device Screen",
             recycle_device_views_desc: "Reuse existing tabs when running tests on the same device",
+            allow_actions_during_test: "Allow Actions During Test",
+            allow_actions_during_test_desc: "Allow specific actions to be performed even while a test is running. (Experimental)",
             language: "Language",
             appearance: {
                 title: "Appearance",
@@ -617,6 +624,8 @@ export const en = {
                 appium_args: "Appium Arguments",
                 scrcpy_args: "Scrcpy Arguments",
                 robot_args: "Robot Framework Arguments",
+                maestro_args: "Maestro Arguments",
+                appium_java_args: "Appium Java Arguments",
                 app_packages: "App Packages",
                 add_package: "Add Package",
                 add_package_placeholder: "Add package (Press Enter)",
@@ -645,6 +654,9 @@ export const en = {
                     python: "Python",
                     robot: "Robot Framework (Python)",
                     appium_lib: "Appium Library (Robot Framework)",
+                    java: "Java (JDK)",
+                    maven: "Maven",
+                    maestro: "Maestro",
                     scrcpy: "Scrcpy",
                     ngrok: "Ngrok (Tunnelling)"
                 }
@@ -714,12 +726,16 @@ export const en = {
             mode: {
                 file: "Test File",
                 folder: "Test Folder",
+                project: "Project",
                 args: "Argument File"
             },
             target: "Target",
             no_selection: "No valid selection",
             run_all: "Run All Tests",
             run_selected: "Run Selected Test",
+            tips: {
+                appium_maven: "Select the Maven project root (where pom.xml is located)."
+            },
             status: {
                 checking: "Checking Appium...",
                 starting: "Starting Appium...",
@@ -827,7 +843,23 @@ export const en = {
                 },
                 automator: {
                     title: "Automator",
-                    description: "Develop and run automated tests using Robot Framework and Appium."
+                    description: "Develop and run automated tests using Robot Framework, Appium, or Maestro."
+                }
+            },
+            step3_title: "Select your Framework",
+            error_no_framework: "Please select a framework to continue.",
+            framework: {
+                robot: {
+                    title: "Robot Framework",
+                    description: "Python-based framework. Best for high-level mobile/web automation."
+                },
+                appium: {
+                    title: "Appium (Java)",
+                    description: "Standard Java/Maven project. Best for specialized native automation."
+                },
+                maestro: {
+                    title: "Maestro",
+                    description: "YAML-based flows. Best for ultra-fast UI testing and simplicity."
                 }
             }
         }
