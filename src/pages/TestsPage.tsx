@@ -157,7 +157,7 @@ export function TestsPage() {
     const activeSession = sessions.find(s => s.runId === subTab);
 
     return (
-        <div className="h-full flex-1 min-h-0 flex flex-col space-y-4">
+        <div className="h-full flex-1 min-h-0 flex flex-col gap-4">
             <PageHeader
                 title={t('sidebar.tests')}
                 description={t('sidebar.description_tests')}

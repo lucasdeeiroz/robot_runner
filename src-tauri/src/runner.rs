@@ -200,12 +200,20 @@ pub fn run_maestro_test(
     device: Option<String>,
     maestro_args: Option<String>,
     working_dir: Option<String>,
+    timestamp_outputs: Option<bool>,
 ) -> Result<String, String> {
     let abs_output_dir = std::fs::canonicalize(&output_dir)
         .map(|p| p.to_string_lossy().to_string().replace(r"\\?\", ""))
         .unwrap_or_else(|_| output_dir.clone());
 
     let _ = std::fs::create_dir_all(&abs_output_dir);
+
+    // Determine report filename
+    let mut report_filename = "output-maestro.xml".to_string();
+    if let Some(true) = timestamp_outputs {
+        let timestamp = chrono::Local::now().format("%Y%m%d-%H%M%S").to_string();
+        report_filename = format!("output-maestro-{}.xml", timestamp);
+    }
     
     // Metadata
     let metadata_path = std::path::Path::new(&abs_output_dir).join("metadata.json");
@@ -242,7 +250,7 @@ pub fn run_maestro_test(
     }
 
     // Add report output
-    let report_path = std::path::Path::new(&abs_output_dir).join("maestro_report.xml");
+    let report_path = std::path::Path::new(&abs_output_dir).join(report_filename);
     cmd_args.push("--format".to_string());
     cmd_args.push("junit".to_string());
     cmd_args.push("--output".to_string());

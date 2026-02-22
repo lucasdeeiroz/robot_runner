@@ -206,7 +206,7 @@ export function SettingsPage() {
     };
 
     return (
-        <div ref={containerRef} className="space-y-4 animate-in fade-in duration-500 pb-12">
+        <div ref={containerRef} className="space-y-4 animate-in fade-in duration-500">
             {/* Delete Confirmation Modal */}
             <ConfirmationModal
                 isOpen={!!showDeleteConfirm}
@@ -283,7 +283,7 @@ export function SettingsPage() {
                     </>
                 }
             >
-                <div className="mt-4 pt-4 border-t border-outline-variant/30 grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+                <div className="mt-4 pt-4 border-t border-outline-variant/30 grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
                     <div>
                         <Select
                             value={settings.language}
@@ -334,20 +334,38 @@ export function SettingsPage() {
                         </div>
                     )}
 
-                    <div className="flex items-center justify-between bg-surface-variant/5 hover:bg-surface-variant/10 p-3 rounded-2xl transition-colors select-none cursor-pointer h-[68px]" onClick={() => updateSetting('recycleDeviceViews', !settings.recycleDeviceViews)}>
-                        <div>
-                            <label className="block text-sm text-on-surface-variant/80 font-medium mb-0.5 pointer-events-none">
-                                {t('settings.recycle_device_views')}
-                            </label>
-                            <p className="text-[10px] text-on-surface-variant/60 pointer-events-none mt-1">
-                                {t('settings.recycle_device_views_desc', { defaultValue: "Reuse existing tabs when running tests on the same device" })}
-                            </p>
+                    {settings.usageMode === 'explorer' && (
+                        <div className="flex md:col-span-2 items-center justify-between bg-surface-variant/5 hover:bg-surface-variant/10 p-3 rounded-2xl transition-colors select-none cursor-pointer h-[68px]" onClick={() => updateSetting('recycleDeviceViews', !settings.recycleDeviceViews)}>
+                            <div>
+                                <label className="block text-sm text-on-surface-variant/80 font-medium mb-0.5 pointer-events-none">
+                                    {t('settings.recycle_device_views')}
+                                </label>
+                                <p className="text-[10px] text-on-surface-variant/60 pointer-events-none mt-1">
+                                    {t('settings.recycle_device_views_desc', { defaultValue: "Reuse existing tabs when running tests on the same device" })}
+                                </p>
+                            </div>
+                            <Switch
+                                checked={settings.recycleDeviceViews}
+                                onCheckedChange={(c: boolean) => updateSetting('recycleDeviceViews', c)}
+                            />
                         </div>
-                        <Switch
-                            checked={settings.recycleDeviceViews}
-                            onCheckedChange={(c: boolean) => updateSetting('recycleDeviceViews', c)}
-                        />
-                    </div>
+                    )}
+                    {settings.usageMode === 'automator' && (
+                        <div className="flex md:col-span-1 items-center justify-between bg-surface-variant/5 hover:bg-surface-variant/10 p-3 rounded-2xl transition-colors select-none cursor-pointer h-[68px]" onClick={() => updateSetting('recycleDeviceViews', !settings.recycleDeviceViews)}>
+                            <div>
+                                <label className="block text-sm text-on-surface-variant/80 font-medium mb-0.5 pointer-events-none">
+                                    {t('settings.recycle_device_views')}
+                                </label>
+                                <p className="text-[10px] text-on-surface-variant/60 pointer-events-none mt-1">
+                                    {t('settings.recycle_device_views_desc', { defaultValue: "Reuse existing tabs when running tests on the same device" })}
+                                </p>
+                            </div>
+                            <Switch
+                                checked={settings.recycleDeviceViews}
+                                onCheckedChange={(c: boolean) => updateSetting('recycleDeviceViews', c)}
+                            />
+                        </div>
+                    )}
                 </div>
             </Section>
 
@@ -386,9 +404,9 @@ export function SettingsPage() {
             </Modal>
 
             <div className="grid gap-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Appium Server Config & Control */}
-                    {settings.usageMode !== 'explorer' && (
+                {(settings.usageMode !== 'explorer' && settings.automationFramework !== 'maestro') && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Appium Server Config & Control */}
                         <Section
                             title={t('settings.appium.title')}
                             icon={Server}
@@ -473,72 +491,139 @@ export function SettingsPage() {
                                 </div>
                             )}
                         </Section>
-                    )}
 
-                    {/* Tool Options */}
-                    <Section title={t('settings.tools')} icon={Wrench}>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {['robotArgs', 'maestroArgs', 'appiumJavaArgs', 'scrcpyArgs'].map((key) => {
-                                if (key === 'robotArgs' && (settings.usageMode === 'explorer' || (settings.automationFramework && settings.automationFramework !== 'robot'))) return null;
-                                if (key === 'maestroArgs' && (settings.usageMode === 'explorer' || settings.automationFramework !== 'maestro')) return null;
-                                if (key === 'appiumJavaArgs' && (settings.usageMode === 'explorer' || settings.automationFramework !== 'appium')) return null;
+                        {/* Tool Options */}
+                        <Section title={t('settings.tools')} icon={Wrench}>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {['robotArgs', 'maestroArgs', 'appiumJavaArgs', 'scrcpyArgs'].map((key) => {
+                                    if (key === 'robotArgs' && (settings.usageMode === 'explorer' || (settings.automationFramework && settings.automationFramework !== 'robot'))) return null;
+                                    if (key === 'maestroArgs' && (settings.usageMode === 'explorer' || settings.automationFramework !== 'maestro')) return null;
+                                    if (key === 'appiumJavaArgs' && (settings.usageMode === 'explorer' || settings.automationFramework !== 'appium')) return null;
 
-                                let isDisabled = false;
-                                if (key === 'robotArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
-                                if (key === 'maestroArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
-                                if (key === 'appiumJavaArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
-                                if (key === 'scrcpyArgs' && systemCheckStatus?.missingMirroring?.length > 0) isDisabled = true;
+                                    let isDisabled = false;
+                                    if (key === 'robotArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
+                                    if (key === 'maestroArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
+                                    if (key === 'appiumJavaArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
+                                    if (key === 'scrcpyArgs' && systemCheckStatus?.missingMirroring?.length > 0) isDisabled = true;
 
-                                let labelKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-                                if (key === 'appiumJavaArgs') labelKey = 'appium_java_args'; // special case if not standard regex
+                                    let labelKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+                                    if (key === 'appiumJavaArgs') labelKey = 'appium_java_args'; // special case if not standard regex
 
-                                return (
-                                    <div key={key}>
-                                        <Input
-                                            label={t(`settings.tool_config.${labelKey}` as any)}
-                                            type="text"
-                                            value={(settings.tools as any)[key]}
-                                            onChange={(e) => updateSetting('tools', { ...settings.tools, [key]: e.target.value })}
-                                            disabled={isDisabled}
-                                            title={isDisabled ? "Dependency missing" : ""}
-                                        />
-                                    </div>
-                                );
-                            })}
-                            {/* App Packages List */}
-                            <div className="col-span-1 md:col-span-2">
-                                <TagInput
-                                    label={t('settings.tool_config.app_packages')}
-                                    tags={settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean)}
-                                    onAdd={(tag) => {
-                                        const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
-                                        if (!current.includes(tag)) {
-                                            updateSetting('tools', { ...settings.tools, appPackage: [...current, tag].join(', ') });
-                                        }
-                                    }}
-                                    onRemove={(tag) => {
-                                        const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
-                                        updateSetting('tools', { ...settings.tools, appPackage: current.filter(t => t !== tag).join(', ') });
-                                    }}
-                                    placeholder={t('settings.tool_config.add_package_placeholder')}
-                                />
-                            </div>
-                            {isNgrokEnabled && (
+                                    return (
+                                        <div key={key}>
+                                            <Input
+                                                label={t(`settings.tool_config.${labelKey}` as any)}
+                                                type="text"
+                                                value={(settings.tools as any)[key]}
+                                                onChange={(e) => updateSetting('tools', { ...settings.tools, [key]: e.target.value })}
+                                                disabled={isDisabled}
+                                                title={isDisabled ? "Dependency missing" : ""}
+                                            />
+                                        </div>
+                                    );
+                                })}
+                                {/* App Packages List */}
                                 <div className="col-span-1 md:col-span-2">
-                                    <Input
-                                        label={t('settings.tool_config.ngrok_token')}
-                                        type="password"
-                                        value={settings.tools.ngrokToken || ''}
-                                        onChange={(e) => updateSetting('tools', { ...settings.tools, ngrokToken: e.target.value })}
-                                        placeholder="Authorization Token"
-                                        disabled={systemCheckStatus?.missingTunnelling?.length > 0}
-                                        title={systemCheckStatus?.missingTunnelling?.length > 0 ? "Ngrok not found" : ""}
+                                    <TagInput
+                                        label={t('settings.tool_config.app_packages')}
+                                        tags={settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean)}
+                                        onAdd={(tag) => {
+                                            const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
+                                            if (!current.includes(tag)) {
+                                                updateSetting('tools', { ...settings.tools, appPackage: [...current, tag].join(', ') });
+                                            }
+                                        }}
+                                        onRemove={(tag) => {
+                                            const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
+                                            updateSetting('tools', { ...settings.tools, appPackage: current.filter(t => t !== tag).join(', ') });
+                                        }}
+                                        placeholder={t('settings.tool_config.add_package_placeholder')}
                                     />
                                 </div>
-                            )}
-                        </div>
-                    </Section>
-                </div>
+                                {isNgrokEnabled && (
+                                    <div className="col-span-1 md:col-span-2">
+                                        <Input
+                                            label={t('settings.tool_config.ngrok_token')}
+                                            type="password"
+                                            value={settings.tools.ngrokToken || ''}
+                                            onChange={(e) => updateSetting('tools', { ...settings.tools, ngrokToken: e.target.value })}
+                                            placeholder="Authorization Token"
+                                            disabled={systemCheckStatus?.missingTunnelling?.length > 0}
+                                            title={systemCheckStatus?.missingTunnelling?.length > 0 ? "Ngrok not found" : ""}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        </Section>
+                    </div>
+                )}
+                {(settings.usageMode === 'explorer' || settings.automationFramework === 'maestro') && (
+                    <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
+                        {/* Tool Options */}
+                        <Section title={t('settings.tools')} icon={Wrench}>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {['robotArgs', 'maestroArgs', 'appiumJavaArgs', 'scrcpyArgs'].map((key) => {
+                                    if (key === 'robotArgs' && (settings.usageMode === 'explorer' || settings.automationFramework !== 'robot')) return null;
+                                    if (key === 'maestroArgs' && (settings.usageMode === 'explorer' || settings.automationFramework !== 'maestro')) return null;
+                                    if (key === 'appiumJavaArgs' && (settings.usageMode === 'explorer' || settings.automationFramework !== 'appium')) return null;
+
+                                    let isDisabled = false;
+                                    if (key === 'robotArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
+                                    if (key === 'maestroArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
+                                    if (key === 'appiumJavaArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
+                                    if (key === 'scrcpyArgs' && systemCheckStatus?.missingMirroring?.length > 0) isDisabled = true;
+
+                                    let labelKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+                                    if (key === 'appiumJavaArgs') labelKey = 'appium_java_args'; // special case if not standard regex
+
+                                    return (
+                                        <div key={key}>
+                                            <Input
+                                                label={t(`settings.tool_config.${labelKey}` as any)}
+                                                type="text"
+                                                value={(settings.tools as any)[key]}
+                                                onChange={(e) => updateSetting('tools', { ...settings.tools, [key]: e.target.value })}
+                                                disabled={isDisabled}
+                                                title={isDisabled ? "Dependency missing" : ""}
+                                            />
+                                        </div>
+                                    );
+                                })}
+                                {/* App Packages List */}
+                                <div className="col-span-1 md:col-span-2">
+                                    <TagInput
+                                        label={t('settings.tool_config.app_packages')}
+                                        tags={settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean)}
+                                        onAdd={(tag) => {
+                                            const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
+                                            if (!current.includes(tag)) {
+                                                updateSetting('tools', { ...settings.tools, appPackage: [...current, tag].join(', ') });
+                                            }
+                                        }}
+                                        onRemove={(tag) => {
+                                            const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
+                                            updateSetting('tools', { ...settings.tools, appPackage: current.filter(t => t !== tag).join(', ') });
+                                        }}
+                                        placeholder={t('settings.tool_config.add_package_placeholder')}
+                                    />
+                                </div>
+                                {isNgrokEnabled && (
+                                    <div className="col-span-1 md:col-span-2">
+                                        <Input
+                                            label={t('settings.tool_config.ngrok_token')}
+                                            type="password"
+                                            value={settings.tools.ngrokToken || ''}
+                                            onChange={(e) => updateSetting('tools', { ...settings.tools, ngrokToken: e.target.value })}
+                                            placeholder="Authorization Token"
+                                            disabled={systemCheckStatus?.missingTunnelling?.length > 0}
+                                            title={systemCheckStatus?.missingTunnelling?.length > 0 ? "Ngrok not found" : ""}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        </Section>
+                    </div>
+                )}
 
                 {/* Path Configuration */}
                 <Section title={t('settings.paths.title')} icon={FolderOpen}>

@@ -43,7 +43,7 @@ export function AboutPage() {
     };
 
     return (
-        <div className="space-y-4 pb-12">
+        <div className="h-full flex flex-col gap-4">
 
 
             <PageHeader

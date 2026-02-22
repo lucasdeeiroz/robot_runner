@@ -19,6 +19,8 @@ export interface TestSession {
     deviceModel?: string; // New
     androidVersion?: string; // New
     lastActiveTool?: string; // Persist active tool across mounts
+    framework: 'robot' | 'maestro' | 'appium'; // New field
+    timestampOutputs?: boolean; // New field
 }
 
 interface TestOutputPayload {
@@ -33,7 +35,7 @@ interface TestFinishedPayload {
 
 interface TestSessionContextType {
     sessions: TestSession[];
-    addSession: (runId: string, deviceUdid: string, deviceName: string, testPath: string, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string) => void;
+    addSession: (runId: string, deviceUdid: string, deviceName: string, testPath: string, framework: 'robot' | 'maestro' | 'appium', timestampOutputs: boolean, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string) => void;
     addToolboxSession: (deviceUdid: string, deviceName: string, deviceModel?: string, androidVersion?: string) => void; // New action
     rerunSession: (runId: string, rerunFailedFrom?: string) => Promise<void>;
     stopSession: (runId: string) => Promise<void>;
@@ -92,7 +94,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
 
     const { settings } = useSettings();
 
-    const addSession = useCallback((runId: string, deviceUdid: string, deviceName: string, testPath: string, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string) => {
+    const addSession = useCallback((runId: string, deviceUdid: string, deviceName: string, testPath: string, framework: 'robot' | 'maestro' | 'appium', timestampOutputs: boolean, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string) => {
         setSessions(prev => {
             // Check for recycling
             if (settings.recycleDeviceViews) {
@@ -119,6 +121,8 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                         argumentsFile,
                         deviceModel,
                         androidVersion,
+                        framework,
+                        timestampOutputs,
                         exitCode: undefined // clear previous exit code
                     };
 
@@ -137,6 +141,8 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     deviceUdid,
                     deviceName,
                     testPath,
+                    framework,
+                    timestampOutputs,
                     logs: [`[System] Starting test session: ${runId}`, `[System] Device: ${deviceName}`, `[System] Suite: ${testPath}`, '----------------------------------------'],
                     status: 'running',
                     argumentsFile: argumentsFile,
@@ -180,7 +186,9 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     logs: [],
                     status: 'stopped',
                     deviceModel,
-                    androidVersion
+                    androidVersion,
+                    framework: 'robot', // Default but not really used for toolbox
+                    timestampOutputs: false
                 }
             ];
         });
@@ -257,11 +265,11 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
         }
 
         // Add new session immediately
-        addSession(newRunId, session.deviceUdid, session.deviceName, session.testPath, session.argumentsFile, session.deviceModel, session.androidVersion);
+        addSession(newRunId, session.deviceUdid, session.deviceName, session.testPath, session.framework, session.timestampOutputs || false, session.argumentsFile, session.deviceModel, session.androidVersion);
 
         try {
             // Check Appium (Skip for Maestro)
-            const fw = settings.automationFramework || 'robot';
+            const fw = session.framework;
             if (fw !== 'maestro') {
                 const status = await invoke<{ running: boolean }>('get_appium_status');
                 if (!status.running) {
@@ -275,24 +283,36 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                 }
             }
 
-
-            //     runId: newRunId,
-            //     working_dir: settings.paths.automationRoot,
-            //     outputDir
-            // });
-
-            // Run Test
-            await invoke("run_robot_test", {
-                runId: newRunId,
-                testPath: session.testPath === session.argumentsFile ? null : session.testPath,
-                outputDir: outputDir,
-                device: session.deviceUdid === 'local' ? null : session.deviceUdid,
-                argumentsFile: session.argumentsFile,
-                deviceModel: session.deviceModel, // Pass deviceModel
-                androidVersion: session.androidVersion, // Pass androidVersion
-                workingDir: settings.paths.automationRoot, // Pass configured automation root (camelCase for Tauri)
-                rerunFailedFrom: rerunFailedFrom
-            });
+            if (fw === 'robot') {
+                await invoke("run_robot_test", {
+                    runId: newRunId,
+                    testPath: session.testPath === session.argumentsFile ? null : session.testPath,
+                    outputDir: outputDir,
+                    device: session.deviceUdid === 'local' ? null : session.deviceUdid,
+                    argumentsFile: session.argumentsFile,
+                    deviceModel: session.deviceModel,
+                    androidVersion: session.androidVersion,
+                    workingDir: settings.paths.automationRoot,
+                    rerunFailedFrom: rerunFailedFrom
+                });
+            } else if (fw === 'maestro') {
+                await invoke("run_maestro_test", {
+                    runId: newRunId,
+                    testPath: session.testPath,
+                    outputDir: outputDir,
+                    device: session.deviceUdid === 'local' ? null : session.deviceUdid,
+                    maestroArgs: settings.tools.maestroArgs,
+                    working_dir: settings.paths.automationRoot,
+                    timestampOutputs: session.timestampOutputs
+                });
+            } else if (fw === 'appium') {
+                await invoke("run_appium_test", {
+                    runId: newRunId,
+                    projectPath: session.testPath,
+                    outputDir: outputDir,
+                    appiumJavaArgs: settings.tools.appiumJavaArgs
+                });
+            }
 
         } catch (e) {
             feedback.toast.error("session.rerun_error", e);

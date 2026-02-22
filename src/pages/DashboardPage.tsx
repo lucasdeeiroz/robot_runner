@@ -90,7 +90,7 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
     ];
 
     return (
-        <div className="h-full flex flex-col space-y-4">
+        <div className="h-full flex flex-col gap-4">
             <PageHeader
                 title={t('sidebar.dashboard', "QA Dashboard")}
                 description={t('dashboard.description', "Auxiliary tools for QA: Scenario generation, image editing and documentation.")}
@@ -122,7 +122,7 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
                 }
             />
 
-            <div className="flex-1 min-h-0 bg-surface p-4 rounded-2xl border border-outline-variant/30 relative z-10 flex flex-col">
+            <div className="flex-1 min-h-0 bg-surface p-4 border border-outline-variant/30 rounded-2xl relative z-10 flex flex-col">
                 {/* SCENARIOS TAB */}
                 <div className={clsx("flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-4", activeTab === 'scenarios' ? "block" : "hidden")}>
                     <div className="bg-surface-variant/10 rounded-2xl p-4 border border-outline-variant/30 flex flex-col min-h-0 flex-1">

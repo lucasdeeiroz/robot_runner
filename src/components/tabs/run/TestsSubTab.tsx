@@ -154,7 +154,19 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     argFileArg = targetPath;
                 }
 
-                addSession(runId, deviceUdid || "local", devName, testPathArg || argFileArg || "Unknown", argFileArg, devModel, devVer);
+                const fw = settings.automationFramework || 'robot';
+
+                addSession(
+                    runId,
+                    deviceUdid || "local",
+                    devName,
+                    testPathArg || argFileArg || "Unknown",
+                    fw as 'robot' | 'maestro' | 'appium',
+                    dontOverwrite,
+                    argFileArg,
+                    devModel,
+                    devVer
+                );
 
                 // Extract Suite Name from path
                 let suiteName = "UnknownSuite";
@@ -185,8 +197,6 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     workingDir = settings.paths.automationRoot;
                 }
 
-                const fw = settings.automationFramework || 'robot';
-
                 if (fw === 'robot') {
                     invoke("run_robot_test", {
                         runId,
@@ -206,7 +216,8 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                         outputDir: logDir,
                         device: deviceUdid === 'local' ? null : deviceUdid,
                         maestroArgs: settings.tools.maestroArgs,
-                        working_dir: settings.paths.automationRoot
+                        working_dir: settings.paths.automationRoot,
+                        timestampOutputs: dontOverwrite
                     }).catch(e => {
                         feedback.toast.error("tests.launch_failed", e);
                     });

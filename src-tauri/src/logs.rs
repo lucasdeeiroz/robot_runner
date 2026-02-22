@@ -270,25 +270,49 @@ fn parse_log_entry(folder_path: &Path, xml_path: &Path) -> Option<TestLog> {
     }
 
     // Generic fallback for Maven/Maestro
-    let suite_name = folder_path.file_name()
+    let mut suite_name = folder_path.file_name()
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or("Unknown".to_string());
     
-    let timestamp = meta_timestamp.unwrap_or_else(|| {
+    // Attempt to parse suite name from XML
+    let re_suite_xml = Regex::new(r#"<testsuite\s+[^>]*name="([^"]+)""#).ok();
+    if let Some(re) = re_suite_xml {
+        if let Some(caps) = re.captures(&content) {
+            suite_name = caps.get(1).map(|m| m.as_str().to_string()).unwrap_or(suite_name);
+        }
+    }
+
+    // Attempt to parse duration
+    let mut xml_duration = None;
+    let re_time_xml = Regex::new(r#"time="([^"]+)""#).ok();
+    if let Some(re) = re_time_xml {
+        if let Some(caps) = re.captures(&content) {
+            xml_duration = caps.get(1).map(|m| format!("{}s", m.as_str()));
+        }
+    }
+
+    // Attempt to parse timestamp from XML (JUnit format)
+    let mut xml_timestamp = None;
+    let re_ts_xml = Regex::new(r#"timestamp="([^"]+)""#).ok();
+    if let Some(re) = re_ts_xml {
+        if let Some(caps) = re.captures(&content) {
+            xml_timestamp = caps.get(1).map(|m| m.as_str().to_string());
+        }
+    }
+
+    let timestamp = xml_timestamp.or(meta_timestamp).unwrap_or_else(|| {
         fs::metadata(xml_path).ok()
             .and_then(|m| m.modified().ok())
             .map(|m| chrono::DateTime::<chrono::Local>::from(m).to_rfc3339())
             .unwrap_or_default()
     });
 
-    // Simple status check: if it's a JUnit XML (common for Maven/Maestro)
-    let status = if content.contains("errors=\"0\"") && content.contains("failures=\"0\"") {
-        "PASS".to_string()
-    } else if content.contains("errors=\"") || content.contains("failures=\"") {
-        "FAIL".to_string()
-    } else {
-        "DONE".to_string()
-    };
+    // Status check
+    let is_fail = (content.contains("failures=\"") && !content.contains("failures=\"0\"")) ||
+                 (content.contains("errors=\"") && !content.contains("errors=\"0\"")) ||
+                 content.contains("status=\"FAILED\"");
+
+    let status = if is_fail { "FAIL".to_string() } else { "PASS".to_string() };
 
     Some(TestLog {
         path: abs_folder_path.to_string_lossy().to_string(),
@@ -299,8 +323,8 @@ fn parse_log_entry(folder_path: &Path, xml_path: &Path) -> Option<TestLog> {
         device_model,
         android_version,
         timestamp,
-        duration: "Framework Managed".to_string(),
-        log_html_path: "".to_string(), // No HTML log for these frameworks usually
+        duration: xml_duration.unwrap_or_else(|| "Framework Managed".to_string()),
+        log_html_path: xml_path.to_string_lossy().to_string(), // Maestro report is the XML
     })
 }
 

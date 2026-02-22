@@ -12,6 +12,7 @@ interface RunConsoleProps {
 interface TextNode {
     type: 'text';
     content: string;
+    isSystem?: boolean;
     id: string;
 }
 
@@ -127,78 +128,61 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
         const IS_SINGLE = (l: string) => /^-{10,}$/.test(l.trim());
         const IS_STATUS = (l: string) => / \|\s+(PASS|FAIL)\s+\|/.test(l); // Loose match for table status
         const IS_SUMMARY = (l: string) => /^\d+ tests?, \d+ passed, \d+ failed/.test(l.trim());
-        const IS_SYSTEM = (l: string) => l.trim().startsWith('[System]') || l.trim().startsWith('[Error]') || /^\s*(Output|Log|Report|STDERR|STDOUT):/.test(l) || /^\[(Waiting|Passed|Failed)\]/.test(l.trim());
+        const IS_MAESTRO_VERBOSE = (l: string) => /disableAnsi=false/.test(l) || /\(\[\s*(INFO|DEBUG|ERROR|WARN|TRACE)\s*\]\)/.test(l);
+        const IS_SYSTEM = (l: string) => l.trim().startsWith('[System]') || l.trim().startsWith('[Error]') || /^\s*(Output|Log|Report|STDERR|STDOUT):/.test(l) || IS_MAESTRO_VERBOSE(l);
+        const IS_MAESTRO_SUITE_START = (l: string) => l.includes("Debug output path:") || l.includes("Waiting for flows to complete...");
+        const IS_MAESTRO_SUITE_END = (l: string) => /Flow (Passed|Failed) in/.test(l) || /\d+\/\d+ Flow (Passed|Failed) in/.test(l);
+        const IS_MAESTRO_TEST_START = (l: string) => l.includes("Running flow ");
+        const IS_MAESTRO_TEST_END = (l: string) => /^\[(Passed|Failed)\]\s+.*\(\d+s\)/.test(l.trim());
 
         if (currentCount > processedCount) {
             const newLogs = logs.slice(processedCount);
             const linearNodes = parsedNodesRef.current;
 
             for (let i = 0; i < newLogs.length; i++) {
-                const line = newLogs[i];
+                let line = newLogs[i];
+                const isSystem = IS_SYSTEM(line);
 
-                // Pattern Recognition
+                // Clean Maestro verbose noise
+                if (IS_MAESTRO_VERBOSE(line)) {
+                    line = line.replace(/.*disableAnsi=false.*?\]\)\s*/, '').trim();
+                }
+
+                if (!line) continue;
+
                 if (IS_DOUBLE(line)) {
-                    // Double Divider. 
                     const last = linearNodes[linearNodes.length - 1];
                     const prev = linearNodes[linearNodes.length - 2];
-
-                    // Check for Suite Header Sandwich (==== Name ====)
-                    // We allow 'prev' to be a 'suite-start' or 'suite-end' to handle shared delimiters (==== Name1 ==== Name2 ====)
                     const isPrevDouble = prev?.type === 'text' && IS_DOUBLE(prev.content);
                     const isPrevSuite = prev?.type === 'suite-start' || prev?.type === 'suite-end';
 
                     if (last?.type === 'text' && !IS_SYSTEM(last.content) && (isPrevDouble || isPrevSuite)) {
-                        // Found Sandwich!
                         const suiteName = last.content.trim();
-
-                        linearNodes.pop(); // Remove Name (Text)
-                        if (isPrevDouble) {
-                            linearNodes.pop(); // Remove Opening Double Divider
-                        }
-                        // If isPrevSuite, we don't remove it, as it serves as the shared boundary
-
-                        linearNodes.push({
-                            type: 'suite-start',
-                            name: suiteName.split(' :: ')[0],
-                            originalLine: suiteName,
-                            id: `suite-start-${processedCount + i}`
-                        });
+                        linearNodes.pop();
+                        if (isPrevDouble) linearNodes.pop();
+                        linearNodes.push({ type: 'suite-start', name: suiteName.split(' :: ')[0], originalLine: suiteName, id: `suite-start-${processedCount + i}` });
                         continue;
                     }
 
-                    // Case B: Closing a Suite End? (Summary , ====)
                     if (last?.type === 'text' && IS_SUMMARY(last.content)) {
                         const summaryLine = last.content;
-
-                        // Scan backwards for Status Line (max 5 lines)
-                        // It must be a text node matching IS_STATUS
                         let statusNodeIndex = -1;
                         for (let k = 1; k <= 5; k++) {
                             const node = linearNodes[linearNodes.length - 1 - k];
-                            if (!node) break;
-                            if (node.type !== 'text') break; // Don't cross structural boundaries
-
+                            if (!node || node.type !== 'text') break;
                             if (IS_STATUS(node.content)) {
                                 const match = node.content.match(/^(.*?)\s*\|\s+(PASS|FAIL)\s+\|\s*$/);
-                                if (match) {
-                                    statusNodeIndex = linearNodes.length - 1 - k;
-                                }
+                                if (match) statusNodeIndex = linearNodes.length - 1 - k;
                                 break;
                             }
                         }
-
                         if (statusNodeIndex !== -1) {
                             const statusNode = linearNodes[statusNodeIndex] as TextNode;
                             const match = statusNode.content.match(/^(.*?)\s*\|\s+(PASS|FAIL)\s+\|\s*$/);
-
                             if (match) {
                                 const name = match[1].trim();
                                 const status = match[2] as 'PASS' | 'FAIL';
-
-                                // Clean up linearNodes: Remove everything from StatusNode to Last (Summary)
-                                // This removes Status, Summary, and any intervening text/divs
                                 linearNodes.splice(statusNodeIndex);
-
                                 let doc = undefined;
                                 let finalName = name;
                                 if (finalName.includes(' :: ')) {
@@ -206,24 +190,19 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
                                     finalName = parts[0].trim();
                                     doc = parts.slice(1).join(' :: ');
                                 }
-
-                                linearNodes.push({
-                                    type: 'suite-end',
-                                    name: finalName,
-                                    status,
-                                    documentation: doc,
-                                    summary: summaryLine,
-                                    id: `suite-end-${processedCount + i}`
-                                });
+                                linearNodes.push({ type: 'suite-end', name: finalName, status, documentation: doc, summary: summaryLine, id: `suite-end-${processedCount + i}` });
                                 continue;
                             }
                         }
                     }
-
-                    linearNodes.push({ type: 'text', content: line, id: `div-${processedCount + i}` });
-
+                    linearNodes.push({ type: 'text', content: line, isSystem, id: `div-${processedCount + i}` });
+                } else if (IS_MAESTRO_SUITE_START(line)) {
+                    linearNodes.push({ type: 'suite-start', name: 'Maestro Suite', originalLine: line, id: `m-suite-start-${processedCount + i}` });
+                } else if (IS_MAESTRO_SUITE_END(line)) {
+                    const status = line.includes("Passed") ? "PASS" : "FAIL";
+                    linearNodes.push({ type: 'suite-end', name: 'Maestro Suite', status, summary: line, id: `m-suite-end-${processedCount + i}` });
                 } else {
-                    linearNodes.push({ type: 'text', content: line, id: `txt-${processedCount + i}` });
+                    linearNodes.push({ type: 'text', content: line, isSystem, id: `txt-${processedCount + i}` });
                 }
             }
 
@@ -324,12 +303,44 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
             } else if (node.type === 'text') {
                 const line = node.content;
 
-                if (IS_SINGLE(line)) {
+                if (IS_SINGLE(line) || IS_DOUBLE(line)) {
                     if (currentTest) closeCurrentTest();
-                } else if (IS_DOUBLE(line)) {
-                    if (currentTest) closeCurrentTest();
-                } else {
-                    const isSys = IS_SYSTEM(line);
+                }
+                else if (IS_MAESTRO_TEST_START(line)) {
+                    closeCurrentTest();
+                    const name = line.replace(/.*Running flow\s+/, '').trim();
+                    currentTest = {
+                        type: 'test',
+                        name,
+                        status: 'RUNNING',
+                        logs: [line],
+                        id: `m-test-${processedCountRef.current + idx}`
+                    };
+                    if (activeSuite()) activeSuite()!.children.push(currentTest);
+                    else root.push(currentTest);
+                }
+                else if (IS_MAESTRO_TEST_END(line)) {
+                    const status = line.toLowerCase().includes("passed") ? "PASS" : "FAIL";
+                    if (currentTest) {
+                        currentTest.status = status;
+                        currentTest.logs.push(line);
+                        currentTest = null;
+                    } else {
+                        // Non-verbose mode: Instant test result
+                        const name = line.replace(/^\[(Passed|Failed)\]\s+/, '').replace(/\s+\(\d+s\)$/, '').trim();
+                        const instantTest: TestNode = {
+                            type: 'test',
+                            name,
+                            status,
+                            logs: [line],
+                            id: `m-instant-${processedCountRef.current + idx}`
+                        };
+                        if (activeSuite()) activeSuite()!.children.push(instantTest);
+                        else root.push(instantTest);
+                    }
+                }
+                else {
+                    const isSys = node.isSystem;
                     if (isSys) {
                         if (currentTest) {
                             currentTest.logs.push(line);
@@ -365,7 +376,10 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
                             currentTest.logs.push(line);
                         } else {
                             // Heuristic: New Test Start
-                            if (line.trim().length > 0) {
+                            // If we are in a Maestro suite, we ONLY start tests via IS_MAESTRO_TEST_START (handled above)
+                            const isMaestroSuite = activeSuite()?.name.includes('Maestro');
+
+                            if (line.trim().length > 0 && !isMaestroSuite) {
                                 let name = line.trim();
                                 if (name.includes(' :: ')) name = name.split(' :: ')[0].trim();
 

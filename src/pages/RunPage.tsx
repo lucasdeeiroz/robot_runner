@@ -116,7 +116,7 @@ export function RunPage({ onNavigate, initialTab }: RunPageProps) {
     };
 
     return (
-        <div ref={containerRef} className="h-full flex flex-col space-y-4">
+        <div ref={containerRef} className="h-full flex flex-col gap-4">
             <PageHeader
                 title={t('sidebar.run')}
                 description={t('sidebar.description_run')}
@@ -150,7 +150,7 @@ export function RunPage({ onNavigate, initialTab }: RunPageProps) {
             />
 
             {/* Main Content Area */}
-            <div className="h-full flex-1 min-h-0 bg-surface p-4 relative z-10 rounded-2xl border border-outline-variant/30 flex flex-col">
+            <div className="flex-1 min-h-0 bg-surface p-4 relative z-10 rounded-2xl border border-outline-variant/30 flex flex-col">
                 {settings.usageMode !== 'explorer' && (
                     <div className={clsx("h-full flex-1 min-h-0", activeTab === 'tests' ? "flex flex-col" : "hidden")}>
                         <TestsSubTab selectedDevices={selectedDevices} devices={devices} onNavigate={onNavigate} />
