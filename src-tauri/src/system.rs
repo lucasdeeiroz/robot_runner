@@ -19,11 +19,14 @@ pub struct SystemVersions {
     pub python: String,
     pub node: String,
     pub appium_lib: String,
+    pub java: String,
+    pub maven: String,
+    pub maestro: String,
     pub ngrok: String,
 }
 
 #[command]
-pub async fn get_system_versions(check_automator: bool, check_ngrok: bool) -> SystemVersions {
+pub async fn get_system_versions(check_automator: bool, framework: Option<String>, check_ngrok: bool) -> SystemVersions {
     let adb_raw = get_version("adb", &["--version"]);
     let adb = extract_version(&adb_raw, r"Android Debug Bridge version ([\d\.]+)");
 
@@ -33,45 +36,68 @@ pub async fn get_system_versions(check_automator: bool, check_ngrok: bool) -> Sy
     let mut python = "Not Checked".to_string();
     let mut robot = "Not Checked".to_string();
     let mut appium_lib = "Not Checked".to_string();
+    let mut java = "Not Checked".to_string();
+    let mut maven = "Not Checked".to_string();
+    let mut maestro = "Not Checked".to_string();
 
     if check_automator {
         node = get_version("node", &["--version"]); // Usually just vX.X.X
 
-        // Check Appium and determine command
-        let (appium_raw, appium_cmd) = if let Some(v) = try_get_version("appium", &["--version"]) {
-            (v, "appium")
-        } else if let Some(v) = try_get_version("appium.cmd", &["--version"]) {
-            (v, "appium.cmd")
-        } else {
-            ("Not Found".to_string(), "appium")
-        };
-        appium = appium_raw;
+        // Framework specific checks
+        let fw = framework.unwrap_or_else(|| "robot".to_string());
+        if fw == "appium" || fw == "robot" {
+            // Check Appium and determine command
+            let (appium_raw, appium_cmd) = if let Some(v) = try_get_version("appium", &["--version"]) {
+                (v, "appium")
+            } else if let Some(v) = try_get_version("appium.cmd", &["--version"]) {
+                (v, "appium.cmd")
+            } else {
+                ("Not Found".to_string(), "appium")
+            };
+            appium = appium_raw;
 
-        // Check UiAutomator2 using the found Appium command
-        uiautomator2 = if appium != "Not Found" {
-            check_uiautomator2(appium_cmd)
-        } else {
-            "Not Found".to_string()
-        };
+            // Check UiAutomator2 using the found Appium command
+            uiautomator2 = if appium != "Not Found" {
+                check_uiautomator2(appium_cmd)
+            } else {
+                "Not Found".to_string()
+            };
+        }
+        if fw == "appium" {
+            let java_raw = get_version("java", &["-version"]);
+            java = extract_version(&java_raw, r#"version "([^"]+)""#);
+            if java == "Not Found" {
+                 // Fallback for newer java versions or different output format
+                 java = extract_version(&java_raw, r"openjdk ([\d\.]+)");
+            }
 
-        let python_raw = get_version("python", &["--version"]);
-        python = extract_version(&python_raw, r"Python ([\d\.]+)");
-
-        // Check Robot - Output often exits with 1, so use loose check
-        let robot_raw = if let Some(v) = try_get_version_loose("robot", &["--version"]) {
-            v
-        } else if let Some(v) = try_get_version_loose("python", &["-m", "robot", "--version"]) {
-            v
-        } else {
-            "Not Found".to_string()
-        };
-        robot = extract_version(&robot_raw, r"Robot Framework ([\d\.]+)");
-
-        // Check robotframework-appiumlibrary using direct python import
-        appium_lib = get_version("python", &[
-            "-c", 
-            "import importlib.metadata; print(importlib.metadata.version('robotframework-appiumlibrary'))"
-        ]);
+            let maven_raw = get_version("mvn", &["-version"]);
+            maven = extract_version(&maven_raw, r"Apache Maven ([\d\.]+)");
+        }
+        
+        if fw == "maestro" {
+             let maestro_raw = get_version("maestro", &["--version"]);
+             maestro = extract_version(&maestro_raw, r"([\d\.]+)");
+        }
+        if fw == "robot" {
+            let python_raw = get_version("python", &["--version"]);
+            python = extract_version(&python_raw, r"Python ([\d\.]+)");
+            // Check Robot - Output often exits with 1, so use loose check
+            let robot_raw = if let Some(v) = try_get_version_loose("robot", &["--version"]) {
+                v
+            } else if let Some(v) = try_get_version_loose("python", &["-m", "robot", "--version"]) {
+                v
+            } else {
+                "Not Found".to_string()
+            };
+            robot = extract_version(&robot_raw, r"Robot Framework ([\d\.]+)");
+    
+            // Check robotframework-appiumlibrary using direct python import
+            appium_lib = get_version("python", &[
+                "-c", 
+                "import importlib.metadata; print(importlib.metadata.version('robotframework-appiumlibrary'))"
+            ]);
+        }
     }
 
     let scrcpy_raw = get_version("scrcpy", &["--version"]);
@@ -93,6 +119,9 @@ pub async fn get_system_versions(check_automator: bool, check_ngrok: bool) -> Sy
         python,
         node,
         appium_lib,
+        java,
+        maven,
+        maestro,
         ngrok,
     }
 }

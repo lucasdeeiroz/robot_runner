@@ -156,9 +156,16 @@ fn parse_log_entry(folder_path: &Path, xml_path: &Path) -> Option<TestLog> {
     let mut meta_timestamp = None;
     let mut device_model = None;
     let mut android_version = None;
+    let mut framework = "robot".to_string();
 
     if metadata_path.exists() {
         if let Ok(meta_content) = fs::read_to_string(&metadata_path) {
+            let re_fw = Regex::new(r#""framework"\s*:\s*"([^"]+)""#).ok();
+            if let Some(re) = re_fw {
+                if let Some(caps) = re.captures(&meta_content) {
+                    framework = caps.get(1).map(|m| m.as_str().to_string()).unwrap_or("robot".to_string());
+                }
+            }
             let re_dev = Regex::new(r#""device_udid"\s*:\s*"([^"]+)""#).ok();
             if let Some(re) = re_dev {
                 if let Some(caps) = re.captures(&meta_content) {
@@ -209,55 +216,91 @@ fn parse_log_entry(folder_path: &Path, xml_path: &Path) -> Option<TestLog> {
         }
     }
 
-    // Regex to find suite name
-    let re_suite = Regex::new(r#"<suite.*name="([^"]+)""#).ok()?;
-    let suite_name = re_suite
-        .captures(&content)
-        .map(|c| c.get(1).map_or("Unknown", |m| m.as_str()))
-        .unwrap_or("Unknown")
-        .to_string();
-
-    // Regex to find status
-    let re_stat = Regex::new(r#"<stat pass="(\d+)" fail="(\d+)".*>All Tests</stat>"#).ok()?;
-    let (pass, fail) = if let Some(caps) = re_stat.captures(&content) {
-        (
-            caps[1].parse::<i32>().unwrap_or(0),
-            caps[2].parse::<i32>().unwrap_or(0),
-        )
-    } else {
-        (0, 0)
-    };
-
-    let status = if fail > 0 { "FAIL" } else { "PASS" }.to_string();
-
-    // Timestamp logic: Prefer metadata, fall back to XML
-    let timestamp = if let Some(ts) = meta_timestamp {
-        ts
-    } else {
-        let re_time = Regex::new(r#"generated="([^"]+)""#).ok()?;
-        re_time
+    if framework == "robot" {
+        // Regex to find suite name
+        let re_suite = Regex::new(r#"<suite.*name="([^"]+)""#).ok()?;
+        let suite_name = re_suite
             .captures(&content)
-            .map(|c| c.get(1).map_or("", |m| m.as_str()))
-            .unwrap_or("")
-            .to_string()
-    };
+            .map(|c| c.get(1).map_or("Unknown", |m| m.as_str()))
+            .unwrap_or("Unknown")
+            .to_string();
 
-    let log_html_path = abs_folder_path
-        .join("log.html")
-        .to_string_lossy()
-        .to_string();
+        // Regex to find status
+        let re_stat = Regex::new(r#"<stat pass="(\d+)" fail="(\d+)".*>All Tests</stat>"#).ok()?;
+        let (pass, fail) = if let Some(caps) = re_stat.captures(&content) {
+            (
+                caps[1].parse::<i32>().unwrap_or(0),
+                caps[2].parse::<i32>().unwrap_or(0),
+            )
+        } else {
+            (0, 0)
+        };
+
+        let status = if fail > 0 { "FAIL" } else { "PASS" }.to_string();
+
+        // Timestamp logic: Prefer metadata, fall back to XML
+        let timestamp = if let Some(ts) = meta_timestamp {
+            ts
+        } else {
+            let re_time = Regex::new(r#"generated="([^"]+)""#).ok()?;
+            re_time
+                .captures(&content)
+                .map(|c| c.get(1).map_or("", |m| m.as_str()))
+                .unwrap_or("")
+                .to_string()
+        };
+
+        let log_html_path = abs_folder_path
+            .join("log.html")
+            .to_string_lossy()
+            .to_string();
+
+        return Some(TestLog {
+            path: abs_folder_path.to_string_lossy().to_string(),
+            xml_path: xml_path.to_string_lossy().to_string(),
+            suite_name,
+            status,
+            device_udid,
+            device_model,
+            android_version,
+            timestamp,
+            duration: format!("{} P / {} F", pass, fail),
+            log_html_path,
+        });
+    }
+
+    // Generic fallback for Maven/Maestro
+    let suite_name = folder_path.file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or("Unknown".to_string());
+    
+    let timestamp = meta_timestamp.unwrap_or_else(|| {
+        fs::metadata(xml_path).ok()
+            .and_then(|m| m.modified().ok())
+            .map(|m| chrono::DateTime::<chrono::Local>::from(m).to_rfc3339())
+            .unwrap_or_default()
+    });
+
+    // Simple status check: if it's a JUnit XML (common for Maven/Maestro)
+    let status = if content.contains("errors=\"0\"") && content.contains("failures=\"0\"") {
+        "PASS".to_string()
+    } else if content.contains("errors=\"") || content.contains("failures=\"") {
+        "FAIL".to_string()
+    } else {
+        "DONE".to_string()
+    };
 
     Some(TestLog {
         path: abs_folder_path.to_string_lossy().to_string(),
         xml_path: xml_path.to_string_lossy().to_string(),
-        suite_name,
+        suite_name: format!("[{}] {}", framework.to_uppercase(), suite_name),
         status,
         device_udid,
         device_model,
         android_version,
         timestamp,
-        duration: format!("{} P / {} F", pass, fail),
-        log_html_path,
+        duration: "Framework Managed".to_string(),
+        log_html_path: "".to_string(), // No HTML log for these frameworks usually
     })
 }
 

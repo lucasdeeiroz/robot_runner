@@ -42,6 +42,8 @@ pub fn run() {
             adb::shell::restart_adb_server,
             adb::device::get_connected_devices,
             runner::run_robot_test,
+            runner::run_maestro_test,
+            runner::run_appium_test,
             runner::stop_robot_test,
             inspector::get_screenshot,
             inspector::get_xml_dump,

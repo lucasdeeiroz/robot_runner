@@ -13,6 +13,9 @@ export interface SystemVersions {
     python: string;
     robot: string;
     appium_lib: string;
+    java: string;
+    maven: string;
+    maestro: string;
     scrcpy: string;
     ngrok: string;
 }
@@ -28,6 +31,7 @@ export interface AppSettings {
     customLogoDark?: string;
     recycleDeviceViews: boolean; // New setting
     usageMode?: 'explorer' | 'automator';
+    automationFramework?: 'robot' | 'appium' | 'maestro';
 
     // Appium
     appiumHost: string;
@@ -50,6 +54,8 @@ export interface AppSettings {
         appiumArgs: string;
         scrcpyArgs: string;
         robotArgs: string;
+        maestroArgs: string;
+        appiumJavaArgs: string;
         appPackage: string; // for monitoring/logcat filtering
         ngrokToken: string;
     };
@@ -82,6 +88,8 @@ const DEFAULT_SETTINGS: AppSettings = {
         appiumArgs: '--relaxed-security',
         scrcpyArgs: '-m 1024 -b 2M --max-fps=30 --no-audio --stay-awake',
         robotArgs: '--split-log',
+        maestroArgs: '',
+        appiumJavaArgs: 'test',
         appPackage: 'com.android.chrome, com.chrome.beta',
         ngrokToken: ''
     }
@@ -310,6 +318,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             // Conditionally skip ngrok and automator dependencies checks
             const versions = await invoke<SystemVersions>('get_system_versions', {
                 checkAutomator: activeProfile.settings.usageMode !== 'explorer',
+                framework: activeProfile.settings.automationFramework,
                 checkNgrok: isNgrokEnabled
             });
 
@@ -329,13 +338,26 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             // Appium Tools (Only check if not explorer)
             if (activeProfile.settings.usageMode !== 'explorer') {
                 if (versions.node === 'Not Found') missingAppium.push('Node.js');
-                if (versions.appium === 'Not Found') missingAppium.push('Appium (Node.js)');
-                if (versions.uiautomator2 === 'Not Found') missingAppium.push('UiAutomator2 (Appium)');
 
-                // Testing Tools
-                if (versions.python === 'Not Found') missingTesting.push('Python');
-                if (versions.robot === 'Not Found') missingTesting.push('Robot Framework (Python)');
-                if (versions.appium_lib === 'Not Found') missingTesting.push('AppiumLibrary (Robot Framework)');
+                // Framework Specific Tools
+                if (activeProfile.settings.automationFramework === 'robot') {
+                    if (versions.appium === 'Not Found') missingAppium.push('Appium (Node.js)');
+                    if (versions.uiautomator2 === 'Not Found') missingAppium.push('UiAutomator2 (Appium)');
+                    if (versions.python === 'Not Found') missingTesting.push('Python');
+                    if (versions.robot === 'Not Found') missingTesting.push('Robot Framework (Python)');
+                    if (versions.appium_lib === 'Not Found') missingTesting.push('AppiumLibrary (Robot Framework)');
+                }
+
+                if (activeProfile.settings.automationFramework === 'appium') {
+                    if (versions.appium === 'Not Found') missingAppium.push('Appium (Node.js)');
+                    if (versions.uiautomator2 === 'Not Found') missingAppium.push('UiAutomator2 (Appium)');
+                    if (versions.java === 'Not Found') missingTesting.push('Java (JDK)');
+                    if (versions.maven === 'Not Found') missingTesting.push('Maven');
+                }
+
+                if (activeProfile.settings.automationFramework === 'maestro') {
+                    if (versions.maestro === 'Not Found') missingTesting.push('Maestro');
+                }
             }
 
             // Mirroring Tools

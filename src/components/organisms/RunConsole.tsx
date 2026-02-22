@@ -127,7 +127,7 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
         const IS_SINGLE = (l: string) => /^-{10,}$/.test(l.trim());
         const IS_STATUS = (l: string) => / \|\s+(PASS|FAIL)\s+\|/.test(l); // Loose match for table status
         const IS_SUMMARY = (l: string) => /^\d+ tests?, \d+ passed, \d+ failed/.test(l.trim());
-        const IS_SYSTEM = (l: string) => l.trim().startsWith('[System]') || l.trim().startsWith('[Error]') || /^\s*(Output|Log|Report|STDERR|STDOUT):/.test(l);
+        const IS_SYSTEM = (l: string) => l.trim().startsWith('[System]') || l.trim().startsWith('[Error]') || /^\s*(Output|Log|Report|STDERR|STDOUT):/.test(l) || /^\[(Waiting|Passed|Failed)\]/.test(l.trim());
 
         if (currentCount > processedCount) {
             const newLogs = logs.slice(processedCount);
@@ -336,22 +336,27 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
 
                             // Heuristic: If system says we stopped/finished, identify if we need to force-fail the current test/suite
                             if (line.includes('[System] Finished:') || line.includes('[System] Stopping...') || line.includes('[System] Toolbox session stopped')) {
+                                const isSuccess = line.toLowerCase().includes('exit code: 0');
+                                const finalStatus = isSuccess ? 'PASS' : 'FAIL';
+
                                 if (currentTest.status === 'RUNNING') {
-                                    currentTest.status = 'FAIL';
+                                    currentTest.status = finalStatus;
                                 }
                                 currentTest = null;
 
-                                // Also fail all open suites since they won't get a proper closure
+                                // Also update all open suites
                                 suiteStack.forEach(s => {
-                                    if (s.status === 'RUNNING') s.status = 'FAIL';
+                                    if (s.status === 'RUNNING') s.status = finalStatus;
                                 });
                             }
                         } else {
                             addToCurrentContext({ type: 'text', content: line, id: nodeId });
                             // Also check for suites if we are at root level (e.g. suite setup failure or global stop)
                             if (line.includes('[System] Finished:') || line.includes('[System] Stopping...') || line.includes('[System] Toolbox session stopped')) {
+                                const isSuccess = line.toLowerCase().includes('exit code: 0');
+                                const finalStatus = isSuccess ? 'PASS' : 'FAIL';
                                 suiteStack.forEach(s => {
-                                    if (s.status === 'RUNNING') s.status = 'FAIL';
+                                    if (s.status === 'RUNNING') s.status = finalStatus;
                                 });
                             }
                         }
@@ -546,8 +551,14 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
                         ))}
                     </div>
                 ) : (
-                    <div className="relative z-10 w-full">
+                    <div className="relative z-10 w-full mb-8">
                         {tree.map(node => renderNode(node))}
+                        {isRunning && (
+                            <div className="text-primary mt-4 flex items-center gap-2 text-sm italic opacity-70 animate-pulse ml-2">
+                                <ExpressiveLoading size="sm" variant="circular" />
+                                {t('run_tab.console.processing', "Processando...")}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

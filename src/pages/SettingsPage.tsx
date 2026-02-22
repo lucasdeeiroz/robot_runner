@@ -315,6 +315,25 @@ export function SettingsPage() {
                         />
                     </div>
 
+                    {settings.usageMode === 'automator' && (
+                        <div>
+                            <Select
+                                value={settings.automationFramework || 'robot'}
+                                onChange={async (e) => {
+                                    const framework = e.target.value as 'robot' | 'appium' | 'maestro';
+                                    updateSetting('automationFramework', framework);
+                                    checkSystemVersions('automator');
+                                }}
+                                label={t('onboarding.step3_title')}
+                                options={[
+                                    { value: "robot", label: t('onboarding.framework.robot.title') },
+                                    { value: "appium", label: t('onboarding.framework.appium.title') },
+                                    { value: "maestro", label: t('onboarding.framework.maestro.title') }
+                                ]}
+                            />
+                        </div>
+                    )}
+
                     <div className="flex items-center justify-between bg-surface-variant/5 hover:bg-surface-variant/10 p-3 rounded-2xl transition-colors select-none cursor-pointer h-[68px]" onClick={() => updateSetting('recycleDeviceViews', !settings.recycleDeviceViews)}>
                         <div>
                             <label className="block text-sm text-on-surface-variant/80 font-medium mb-0.5 pointer-events-none">
@@ -459,17 +478,24 @@ export function SettingsPage() {
                     {/* Tool Options */}
                     <Section title={t('settings.tools')} icon={Wrench}>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {['robotArgs', 'scrcpyArgs'].map((key) => {
-                                if (key === 'robotArgs' && settings.usageMode === 'explorer') return null;
+                            {['robotArgs', 'maestroArgs', 'appiumJavaArgs', 'scrcpyArgs'].map((key) => {
+                                if (key === 'robotArgs' && (settings.usageMode === 'explorer' || (settings.automationFramework && settings.automationFramework !== 'robot'))) return null;
+                                if (key === 'maestroArgs' && (settings.usageMode === 'explorer' || settings.automationFramework !== 'maestro')) return null;
+                                if (key === 'appiumJavaArgs' && (settings.usageMode === 'explorer' || settings.automationFramework !== 'appium')) return null;
 
                                 let isDisabled = false;
                                 if (key === 'robotArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
+                                if (key === 'maestroArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
+                                if (key === 'appiumJavaArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
                                 if (key === 'scrcpyArgs' && systemCheckStatus?.missingMirroring?.length > 0) isDisabled = true;
+
+                                let labelKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+                                if (key === 'appiumJavaArgs') labelKey = 'appium_java_args'; // special case if not standard regex
 
                                 return (
                                     <div key={key}>
                                         <Input
-                                            label={t(`settings.tool_config.${key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)}` as any)}
+                                            label={t(`settings.tool_config.${labelKey}` as any)}
                                             type="text"
                                             value={(settings.tools as any)[key]}
                                             onChange={(e) => updateSetting('tools', { ...settings.tools, [key]: e.target.value })}
@@ -729,10 +755,19 @@ export function SettingsPage() {
                 >
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {systemVersions ? (
-                            (['adb', 'node', 'appium', 'uiautomator2', 'python', 'robot', 'appium_lib', 'scrcpy', 'ngrok'] as Array<keyof typeof systemVersions>)
+                            (['adb', 'node', 'appium', 'uiautomator2', 'python', 'robot', 'appium_lib', 'java', 'maven', 'maestro', 'scrcpy', 'ngrok'] as Array<keyof typeof systemVersions>)
                                 .filter(key => {
                                     if (key === 'ngrok' && !isNgrokEnabled) return false;
-                                    if (settings.usageMode === 'explorer' && ['node', 'appium', 'uiautomator2', 'python', 'robot', 'appium_lib'].includes(key)) return false;
+                                    if (settings.usageMode === 'explorer' && ['node', 'appium', 'uiautomator2', 'python', 'robot', 'appium_lib', 'java', 'maven', 'maestro'].includes(key)) return false;
+
+                                    // Framework-specific filtering
+                                    if (settings.usageMode === 'automator') {
+                                        if (['python', 'robot', 'appium_lib'].includes(key) && settings.automationFramework !== 'robot') return false;
+                                        if (['java', 'maven'].includes(key) && settings.automationFramework !== 'appium') return false;
+                                        if (['maestro'].includes(key) && settings.automationFramework !== 'maestro') return false;
+                                        if (['appium', 'uiautomator2'].includes(key) && settings.automationFramework !== 'appium' && settings.automationFramework !== 'robot') return false;
+                                    }
+
                                     return true;
                                 })
                                 .map((key) => (

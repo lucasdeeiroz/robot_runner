@@ -17,6 +17,8 @@ const TOOLS = [
     { key: 'vite', url: 'https://vitejs.dev' },
     { key: 'appium', url: 'https://appium.io' },
     { key: 'robot', url: 'https://robotframework.org' },
+    { key: 'maestro', url: 'https://maestro.mobile.dev' },
+    { key: 'maven', url: 'https://maven.apache.org' },
     { key: 'tailwind', url: 'https://tailwindcss.com' },
     { key: 'lucide', url: 'https://lucide.dev' }
 ];

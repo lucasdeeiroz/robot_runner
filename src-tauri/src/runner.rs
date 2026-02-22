@@ -186,8 +186,139 @@ pub fn run_robot_test(
     let mut cmd = Command::new("python");
     cmd.arg("-m").arg("robot");
     cmd.args(&args);
-    // println!("Running command: {}", args.join(" "));
+    
+    spawn_and_monitor(app, state, run_id, cmd, working_dir)
+}
 
+#[tauri::command]
+pub fn run_maestro_test(
+    app: AppHandle,
+    state: State<'_, TestState>,
+    run_id: String,
+    test_path: String,
+    output_dir: String,
+    device: Option<String>,
+    maestro_args: Option<String>,
+    working_dir: Option<String>,
+) -> Result<String, String> {
+    let abs_output_dir = std::fs::canonicalize(&output_dir)
+        .map(|p| p.to_string_lossy().to_string().replace(r"\\?\", ""))
+        .unwrap_or_else(|_| output_dir.clone());
+
+    let _ = std::fs::create_dir_all(&abs_output_dir);
+    
+    // Metadata
+    let metadata_path = std::path::Path::new(&abs_output_dir).join("metadata.json");
+    let metadata_json = format!(
+        r#"{{
+            "run_id": "{}",
+            "framework": "maestro",
+            "test_path": "{}",
+            "timestamp": "{}"
+        }}"#,
+        run_id,
+        test_path.replace("\\", "\\\\").replace("\"", "\\\""),
+        chrono::Local::now().to_rfc3339()
+    );
+    let _ = std::fs::write(metadata_path, metadata_json);
+
+    let mut cmd_args = vec![];
+    
+    // maestro [args] test [path] --udid [udid] --output [report_path]
+    if let Some(args) = maestro_args {
+        if !args.is_empty() {
+            for arg in args.split_whitespace() {
+                 cmd_args.push(arg.to_string());
+            }
+        }
+    }
+
+    cmd_args.push("test".to_string());
+    cmd_args.push(test_path);
+
+    if let Some(d) = device {
+        cmd_args.push("--udid".to_string());
+        cmd_args.push(d);
+    }
+
+    // Add report output
+    let report_path = std::path::Path::new(&abs_output_dir).join("maestro_report.xml");
+    cmd_args.push("--format".to_string());
+    cmd_args.push("junit".to_string());
+    cmd_args.push("--output".to_string());
+    cmd_args.push(report_path.to_string_lossy().to_string());
+
+    let mut cmd;
+    #[cfg(target_os = "windows")]
+    {
+        // Use shell on Windows to resolve maestro.cmd/ps1
+        cmd = Command::new("cmd");
+        cmd.arg("/C").arg("maestro");
+        for arg in cmd_args {
+            cmd.arg(arg);
+        }
+    }
+    
+    #[cfg(not(target_os = "windows"))]
+    {
+        cmd = Command::new("maestro");
+        cmd.args(cmd_args);
+    }
+
+    spawn_and_monitor(app, state, run_id, cmd, working_dir)
+}
+
+#[tauri::command]
+pub fn run_appium_test(
+    app: AppHandle,
+    state: State<'_, TestState>,
+    run_id: String,
+    project_path: String,
+    output_dir: String,
+    appium_java_args: Option<String>,
+) -> Result<String, String> {
+    let abs_output_dir = std::fs::canonicalize(&output_dir)
+        .map(|p| p.to_string_lossy().to_string().replace(r"\\?\", ""))
+        .unwrap_or_else(|_| output_dir.clone());
+
+    let _ = std::fs::create_dir_all(&abs_output_dir);
+
+    // Metadata
+    let metadata_path = std::path::Path::new(&abs_output_dir).join("metadata.json");
+    let metadata_json = format!(
+        r#"{{
+            "run_id": "{}",
+            "framework": "appium",
+            "timestamp": "{}"
+        }}"#,
+        run_id,
+        chrono::Local::now().to_rfc3339()
+    );
+    let _ = std::fs::write(metadata_path, metadata_json);
+
+    let mut cmd = Command::new("mvn");
+    if let Some(args) = appium_java_args {
+        if !args.is_empty() {
+             for arg in args.split_whitespace() {
+                 cmd.arg(arg);
+             }
+        } else {
+             cmd.arg("test");
+        }
+    } else {
+        cmd.arg("test");
+    }
+
+    spawn_and_monitor(app, state, run_id, cmd, Some(project_path))
+}
+
+fn spawn_and_monitor(
+    app: AppHandle,
+    state: State<'_, TestState>,
+    run_id: String,
+    mut cmd: Command,
+    working_dir: Option<String>,
+) -> Result<String, String> {
     if let Some(wd) = working_dir {
         if !wd.is_empty() {
             cmd.current_dir(wd);
@@ -201,16 +332,10 @@ pub fn run_robot_test(
     }
 
     let mut child = cmd
-        .env("PYTHONIOENCODING", "utf-8")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| {
-            format!(
-                "Failed to start robot: {}. Make sure 'robot' is requested in PATH.",
-                e
-            )
-        })?;
+        .map_err(|e| format!("Failed to spawn process: {}", e))?;
 
     let stdout = child.stdout.take().ok_or("Failed to open stdout")?;
     let stderr = child.stderr.take().ok_or("Failed to open stderr")?;

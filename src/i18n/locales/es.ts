@@ -16,6 +16,8 @@ export const es = {
                 vite: { name: "Vite", desc: "Herramienta de compilación de próxima generación para un desarrollo ultrarrápido." },
                 appium: { name: "Appium", desc: "Plataforma de automatización líder para pruebas móviles nativas, híbridas y web." },
                 robot: { name: "Robot Framework", desc: "Framework de automatización genérico para pruebas de aceptación." },
+                maestro: { name: "Maestro", desc: "El framework de pruebas de UI más simple y eficaz para la automatización móvil." },
+                maven: { name: "Maven", desc: "Herramienta confiable de automatización de compilaciones utilizada principalmente para proyectos Java." },
                 tailwind: { name: "TailwindCSS", desc: "Framework CSS de utilidad primero para un estilo rápido y consistente." },
                 lucide: { name: "Lucide", desc: "Biblioteca de iconos vectoriales hermosa y consistente." }
             },
@@ -617,6 +619,8 @@ export const es = {
                 appium_args: "Argumentos Appium",
                 scrcpy_args: "Argumentos Scrcpy",
                 robot_args: "Argumentos Robot Framework",
+                maestro_args: "Argumentos Maestro",
+                appium_java_args: "Argumentos Appium Java",
                 app_packages: "Paquetes de Aplicaciones",
                 add_package: "Añadir Paquete",
                 add_package_placeholder: "Añadir paquete (Presione Enter)",
@@ -645,8 +649,11 @@ export const es = {
                     python: "Python",
                     robot: "Robot Framework (Python)",
                     appium_lib: "Appium Library (Robot Framework)",
+                    java: "Java (JDK)",
+                    maven: "Maven",
+                    maestro: "Maestro",
                     scrcpy: "Scrcpy",
-                    ngrok: "Ngrok (Túneles)"
+                    ngrok: "Ngrok (Tunnelling)"
                 }
             },
             folder_select: "Seleccionar Carpeta",
@@ -826,8 +833,24 @@ export const es = {
                     description: "Herramientas cotidianas para depuración y pruebas manuales (ADB, Scrcpy, etc.). Sin configuración."
                 },
                 automator: {
-                    title: "Automatizador",
-                    description: "Desarrolla y ejecuta pruebas automatizadas usando Robot Framework y Appium."
+                    title: "Automator",
+                    description: "Desarrolle y ejecute pruebas automatizadas utilizando Robot Framework, Appium o Maestro."
+                }
+            },
+            step3_title: "Seleccione su Framework",
+            error_no_framework: "Por favor, seleccione un framework para continuar.",
+            framework: {
+                robot: {
+                    title: "Robot Framework",
+                    description: "Framework basado en Python. Ideal para automatización web/móvil de alto nivel."
+                },
+                appium: {
+                    title: "Appium (Java)",
+                    description: "Proyecto Java/Maven estándar. Ideal para automatización nativa especializada."
+                },
+                maestro: {
+                    title: "Maestro",
+                    description: "Flujos basados en YAML. Ideal para pruebas de UI ultra rápidas y simplicidad."
                 }
             }
         }

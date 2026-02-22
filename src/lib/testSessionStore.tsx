@@ -260,16 +260,19 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
         addSession(newRunId, session.deviceUdid, session.deviceName, session.testPath, session.argumentsFile, session.deviceModel, session.androidVersion);
 
         try {
-            // Check Appium
-            const status = await invoke<{ running: boolean }>('get_appium_status');
-            if (!status.running) {
-                await invoke('start_appium_server', {
-                    host: settings.appiumHost,
-                    port: settings.appiumPort,
-                    args: settings.tools.appiumArgs
-                });
-                // Brief wait for stabilization
-                await new Promise(r => setTimeout(r, 2000));
+            // Check Appium (Skip for Maestro)
+            const fw = settings.automationFramework || 'robot';
+            if (fw !== 'maestro') {
+                const status = await invoke<{ running: boolean }>('get_appium_status');
+                if (!status.running) {
+                    await invoke('start_appium_server', {
+                        host: settings.appiumHost,
+                        port: settings.appiumPort,
+                        args: settings.tools.appiumArgs
+                    });
+                    // Brief wait for stabilization
+                    await new Promise(r => setTimeout(r, 2000));
+                }
             }
 
 

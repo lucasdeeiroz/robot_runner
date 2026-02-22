@@ -74,45 +74,49 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
         setIsLaunching(true);
         setLaunchStatus(t('tests.status.checking'));
 
+        const fw = settings.automationFramework || 'robot';
+
         try {
-            // 1. Check/Start Appium
-            const status = await invoke<{ running: boolean }>('get_appium_status');
-            if (!status.running) {
-                setLaunchStatus(t('tests.status.starting'));
-                await invoke('start_appium_server', {
-                    host: settings.appiumHost,
-                    port: settings.appiumPort,
-                    args: settings.tools.appiumArgs
-                });
-
-
-                // Allow process to initialize (Backend Check + Delay)
-                setLaunchStatus(t('tests.status.waiting_server'));
-                let isReady = false;
-                for (let i = 0; i < 20; i++) {
-                    const s = await invoke<{ running: boolean }>('get_appium_status');
-                    if (s.running) {
-                        isReady = true;
-                        break;
-                    }
-                    await new Promise(r => setTimeout(r, 500));
-                }
-
-                // Check if Appium is ready
-                if (!isReady) {
-                    // Appium did not report as running within the timeout
-                    setLaunchStatus(t('tests.status.server_not_ready'));
-                    setWarningModal({
-                        isOpen: true,
-                        message: t('tests.alerts.server_not_ready'),
+            // 1. Check/Start Appium (Skip for Maestro)
+            if (fw !== 'maestro') {
+                const status = await invoke<{ running: boolean }>('get_appium_status');
+                if (!status.running) {
+                    setLaunchStatus(t('tests.status.starting'));
+                    await invoke('start_appium_server', {
+                        host: settings.appiumHost,
+                        port: settings.appiumPort,
+                        args: settings.tools.appiumArgs
                     });
-                    setIsLaunching(false);
-                    return;
-                }
 
-                // Stabilization delay to ensure port binding
-                if (isReady) {
-                    await new Promise(r => setTimeout(r, 3000));
+
+                    // Allow process to initialize (Backend Check + Delay)
+                    setLaunchStatus(t('tests.status.waiting_server'));
+                    let isReady = false;
+                    for (let i = 0; i < 20; i++) {
+                        const s = await invoke<{ running: boolean }>('get_appium_status');
+                        if (s.running) {
+                            isReady = true;
+                            break;
+                        }
+                        await new Promise(r => setTimeout(r, 500));
+                    }
+
+                    // Check if Appium is ready
+                    if (!isReady) {
+                        // Appium did not report as running within the timeout
+                        setLaunchStatus(t('tests.status.server_not_ready'));
+                        setWarningModal({
+                            isOpen: true,
+                            message: t('tests.alerts.server_not_ready'),
+                        });
+                        setIsLaunching(false);
+                        return;
+                    }
+
+                    // Stabilization delay to ensure port binding
+                    if (isReady) {
+                        await new Promise(r => setTimeout(r, 3000));
+                    }
                 }
             }
 
@@ -181,17 +185,41 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     workingDir = settings.paths.automationRoot;
                 }
 
-                invoke("run_robot_test", {
-                    runId,
-                    testPath: testPathArg, // Now optional
-                    outputDir: logDir,
-                    device: deviceUdid === 'Start local Server' ? null : deviceUdid,
-                    argumentsFile: argFileArg,
-                    timestampOutputs: dontOverwrite,
-                    workingDir
-                }).catch(e => {
-                    feedback.toast.error("tests.launch_failed", e);
-                });
+                const fw = settings.automationFramework || 'robot';
+
+                if (fw === 'robot') {
+                    invoke("run_robot_test", {
+                        runId,
+                        testPath: testPathArg,
+                        outputDir: logDir,
+                        device: deviceUdid === 'Start local Server' ? null : deviceUdid,
+                        argumentsFile: argFileArg,
+                        timestampOutputs: dontOverwrite,
+                        workingDir
+                    }).catch(e => {
+                        feedback.toast.error("tests.launch_failed", e);
+                    });
+                } else if (fw === 'maestro') {
+                    invoke("run_maestro_test", {
+                        runId,
+                        testPath: targetPath,
+                        outputDir: logDir,
+                        device: deviceUdid === 'local' ? null : deviceUdid,
+                        maestroArgs: settings.tools.maestroArgs,
+                        working_dir: settings.paths.automationRoot
+                    }).catch(e => {
+                        feedback.toast.error("tests.launch_failed", e);
+                    });
+                } else if (fw === 'appium') {
+                    invoke("run_appium_test", {
+                        runId,
+                        projectPath: targetPath,
+                        outputDir: logDir,
+                        appiumJavaArgs: settings.tools.appiumJavaArgs
+                    }).catch(e => {
+                        feedback.toast.error("tests.launch_failed", e);
+                    });
+                }
             }
 
             // 3. Redirect
@@ -219,8 +247,20 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
     const tabs = [
         { id: 'file', label: !isNarrow ? t('tests.mode.file') : '', icon: FileCode },
         { id: 'folder', label: !isNarrow ? t('tests.mode.folder') : '', icon: FolderOpen },
-        { id: 'args', label: !isNarrow ? t('tests.mode.args') : '', icon: FileText },
-    ];
+        { id: 'args', label: !isNarrow ? t('tests.mode.args') : '', icon: FileText, disabled: settings.automationFramework && settings.automationFramework !== 'robot' },
+    ].filter(tab => {
+        if (tab.id === 'args' && settings.automationFramework && settings.automationFramework !== 'robot') return false;
+        if (tab.id === 'file' && settings.automationFramework === 'appium') return false; // Appium Java usually runs the whole project
+        return true;
+    });
+
+    useEffect(() => {
+        // Validation: If current mode is disabled/filtered out, switch to first available
+        const currentTab = tabs.find(t => t.id === mode);
+        if (!currentTab && tabs.length > 0) {
+            setMode(tabs[0].id as SelectionMode);
+        }
+    }, [settings.automationFramework, mode, tabs]);
 
     return (
         <div ref={containerRef} className="h-full flex flex-col w-full overflow-hidden">
@@ -252,8 +292,11 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                                         else setSelectedPath("");
                                     } else {
                                         if (!entry.is_dir) {
-                                            if (mode === 'file' && !entry.name.endsWith('.robot')) {
-                                                setSelectedPath("");
+                                            const fw = settings.automationFramework || 'robot';
+                                            if (mode === 'file') {
+                                                if (fw === 'robot' && !entry.name.endsWith('.robot')) setSelectedPath("");
+                                                else if (fw === 'maestro' && !(entry.name.endsWith('.yaml') || entry.name.endsWith('.yml'))) setSelectedPath("");
+                                                else setSelectedPath(entry.path);
                                             } else if (mode === 'args' && !(entry.name.endsWith('.txt') || entry.name.endsWith('.args'))) {
                                                 setSelectedPath("");
                                             } else {
