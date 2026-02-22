@@ -261,7 +261,7 @@ export function TestsPage() {
                     <div
                         ref={gridContainerRef}
                         className="h-full flex-1 min-h-0 overflow-y-auto grid gap-4 pb-4 content-start"
-                        style={{ gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`, gridAutoRows: 'minmax(480px, 1fr)' }}
+                        style={{ gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`, gridAutoRows: '520px' }}
                     >
                         {/* Session Grid Items */}
                         {visibleSessions.map((s) => {
@@ -297,7 +297,7 @@ export function TestsPage() {
                                 <HistorySubTab />
                             </div>
                         ) : activeSession ? (
-                            <div className="flex-1 flex flex-col">
+                            <div className="flex-1 min-h-0 flex flex-col">
                                 <ToolboxView key={activeSession.deviceUdid || activeSession.runId} session={activeSession} />
                             </div>
                         ) : (

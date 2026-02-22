@@ -408,7 +408,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
 
             {/* Tool Content */}
             {isGridView ? (
-                <div className="h-full flex-1 min-h-0 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-4 pb-2 auto-rows-[minmax(300px,1fr)]">
+                <div className="h-full flex-1 min-h-0 grid grid-cols-1 md:grid-cols-2 gap-4 pb-2 auto-rows-fr overflow-hidden">
                     {(() => {
                         const allTools: ToolTab[] = ['console', 'logcat', 'performance', 'commands', 'apps'];
                         const visibleTools = allTools.filter(t =>
@@ -462,19 +462,19 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                 </div>
             ) : (
                 <div className="h-full flex-1 min-h-0 bg-surface border border-outline-variant/30 rounded-2xl overflow-hidden relative">
-                    <div className={clsx("h-full flex-1 min-h-0 flex flex-col overflow-hidden", activeTool === 'console' && session.type === 'test' ? "block" : "hidden")}>
+                    <div className={clsx("h-full flex-1 min-h-0 flex flex-col overflow-hidden", activeTool === 'console' && session.type === 'test' ? "flex" : "hidden")}>
                         <RunConsole logs={session.logs} isRunning={session.status === 'running'} testPath={session.testPath} />
                     </div>
 
-                    <div className={clsx("h-full flex-1 min-h-0", activeTool === 'logcat' ? "block" : "hidden")}>
+                    <div className={clsx("h-full flex-1 min-h-0 flex flex-col", activeTool === 'logcat' ? "flex" : "hidden")}>
                         <LogcatSubTab key={session.deviceUdid} selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} />
                     </div>
 
-                    <div className={clsx("h-full flex-1 min-h-0", activeTool === 'commands' ? "block" : "hidden")}>
+                    <div className={clsx("h-full flex-1 min-h-0 flex flex-col", activeTool === 'commands' ? "flex" : "hidden")}>
                         <CommandsSubTab selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} />
                     </div>
 
-                    <div className={clsx("h-full flex-1 min-h-0", activeTool === 'performance' ? "block" : "hidden")}>
+                    <div className={clsx("h-full flex-1 min-h-0 flex flex-col", activeTool === 'performance' ? "flex" : "hidden")}>
                         <PerformanceSubTab
                             selectedDevice={session.deviceUdid}
                             {...performanceState}
@@ -483,7 +483,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                         />
                     </div>
 
-                    <div className={clsx("h-full flex-1 min-h-0", activeTool === 'apps' ? "block" : "hidden")}>
+                    <div className={clsx("h-full flex-1 min-h-0 flex flex-col", activeTool === 'apps' ? "flex" : "hidden")}>
                         <AppsSubTab isTestRunning={isTestRunning} />
                     </div>
                 </div>

@@ -81,22 +81,24 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
     const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
     const containerRef = useRef<HTMLDivElement>(null);
 
-    // Auto-scroll on new logs
+    // Incremental Parsing State
+    const [tree, setTree] = useState<LogNode[]>([]);
+
     // Auto-scroll on new logs with stick-to-bottom logic
     useEffect(() => {
         const el = containerRef.current;
         if (!el || el.clientHeight === 0) return;
 
-        // Tolerance for floating point sizes or small mismatches
-        const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 50;
+        const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
 
         if (isAtBottom || logs.length < 5) {
-            el.scrollTop = el.scrollHeight;
+            // Small timeout to allow the latest tree nodes to render
+            const timer = setTimeout(() => {
+                el.scrollTop = el.scrollHeight;
+            }, 60);
+            return () => clearTimeout(timer);
         }
-    }, [logs, isRunning, isRawMode]);
-
-    // Incremental Parsing State
-    const [tree, setTree] = useState<LogNode[]>([]);
+    }, [logs, tree, isRunning, isRawMode]);
 
     // Persistent Parsing Context
     const parsedNodesRef = useRef<LinearNode[]>([]);
@@ -566,7 +568,7 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
     };
 
     return (
-        <div className="h-full flex flex-col bg-surface rounded-2xl font-mono text-sm border border-outline-variant/30 shadow-inner pointer-events-auto relative z-0 isolate overflow-hidden">
+        <div className="h-full flex-1 min-h-0 flex flex-col bg-surface rounded-2xl font-mono text-sm border border-outline-variant/30 shadow-inner pointer-events-auto relative z-0 isolate overflow-hidden">
             <div className="flex items-center justify-between p-2 border-b border-outline-variant/30 bg-surface/80 backdrop-blur shrink-0 z-20">
                 <span className="text-xs text-on-surface-variant/80 font-mono truncate px-2" title={testPath}>{testPath}</span>
                 <button
@@ -578,7 +580,7 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
                 </button>
             </div>
 
-            <div ref={containerRef} className="flex-1 overflow-auto p-4 custom-scrollbar relative z-0">
+            <div ref={containerRef} className="h-full flex-1 min-h-0 flex flex-col bg-surface overflow-y-auto p-4 font-mono text-xs custom-scrollbar relative">
                 {logs.length === 0 && (
                     <div className="text-on-surface-variant/80 italic opacity-50 select-none pb-4">{t('run_tab.console.waiting')}</div>
                 )}
