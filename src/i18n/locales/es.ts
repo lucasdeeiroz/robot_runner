@@ -318,7 +318,11 @@ export const es = {
             update_error: "Error al actualizar inspector",
             input_error: "Error al enviar entrada",
             empty: "Seleccione un dispositivo para iniciar el Inspector",
-            refresh: "Actualizar Fuente",
+            refresh: "Actualizar Origen",
+            search: {
+                placeholder: "Buscar por ID, XPath, etc...",
+                clear: "Limpiar búsqueda"
+            },
             modes: {
                 inspect: "Modo Inspección",
                 tap: "Modo Toque",
@@ -333,6 +337,28 @@ export const es = {
             },
             properties: "Propiedades del Nodo",
             select_element: "Seleccione un elemento en la pantalla",
+            nav: {
+                home: "Inicio",
+                back: "Atrás",
+                recents: "Recientes"
+            },
+            modal: {
+                edit_xpath: "Editar XPath",
+                edit_selector: "Editar Selector",
+                match_type: "Tipo de Coincidencia",
+                match_type_equals: "Igual",
+                match_type_contains: "Contiene",
+                match_type_starts_with: "Comienza Con",
+                match_type_ends_with: "Termina Con",
+                match_type_regex: "Regex/Matches",
+                preferred_attr: "Atributo Preferido",
+                preferred_attr_resource_id: "Resource ID",
+                preferred_attr_text: "Texto",
+                preferred_attr_content_desc: "Content Desc",
+                preferred_attr_class: "Solo Clase",
+                result: "Resultado",
+                use_wrapper: "Usar wrapper new UiSelector()"
+            },
             attributes: {
                 copied: "¡Copiado!",
                 all: "Todos los Atributos",
@@ -342,12 +368,6 @@ export const es = {
                 class: "Clase",
                 identifiers: "Identificadores",
                 hierarchy: "Jerarquía"
-            },
-            clear_selection: "Limpiar Selección",
-            nav: {
-                home: "Inicio",
-                back: "Atrás",
-                recents: "Recientes"
             }
         },
         logcat: {

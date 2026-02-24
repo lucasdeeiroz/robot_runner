@@ -319,6 +319,10 @@ export const en = {
             input_error: "Failed to send input",
             empty: "Select a device to start Inspector",
             refresh: "Refresh Source",
+            search: {
+                placeholder: "Search by ID, XPath, etc...",
+                clear: "Clear Search"
+            },
             modes: {
                 inspect: "Inspect Mode",
                 tap: "Tap Mode",
@@ -333,6 +337,28 @@ export const en = {
             },
             properties: "Node Properties",
             select_element: "Select an element on the screenshot",
+            nav: {
+                home: "Home",
+                back: "Back",
+                recents: "Recents"
+            },
+            modal: {
+                edit_xpath: "Edit XPath",
+                edit_selector: "Edit Selector",
+                match_type: "Match Type",
+                match_type_equals: "Equals",
+                match_type_contains: "Contains",
+                match_type_starts_with: "Starts With",
+                match_type_ends_with: "Ends With",
+                match_type_regex: "Regex/Matches",
+                preferred_attr: "Preferred Attribute",
+                preferred_attr_resource_id: "Resource ID",
+                preferred_attr_text: "Text",
+                preferred_attr_content_desc: "Content Desc",
+                preferred_attr_class: "Class Only",
+                result: "Result",
+                use_wrapper: "Use new UiSelector() wrapper"
+            },
             attributes: {
                 copied: "Copied!",
                 all: "All Attributes",
@@ -342,12 +368,6 @@ export const en = {
                 class: "Class",
                 identifiers: "Identifiers",
                 hierarchy: "Hierarchy"
-            },
-            clear_selection: "Clear Selection",
-            nav: {
-                home: "Home",
-                back: "Back",
-                recents: "Recents"
             }
         },
         logcat: {

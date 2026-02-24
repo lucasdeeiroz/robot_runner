@@ -1,14 +1,13 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Maximize, Check, Scan, MousePointerClick, Move, Home, ArrowLeft, Rows, X, RefreshCw, Wrench, Save, GitGraph, Trash2, Upload, Download } from 'lucide-react';
+import { Maximize, Check, Scan, Home, ArrowLeft, Rows, X, RefreshCw, Wrench, Save, GitGraph, Trash2, Upload, Download } from 'lucide-react';
 import { XMLParser } from 'fast-xml-parser';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { InspectorNode, transformXmlToTree, findNodesAtCoords, generateXPath } from '@/lib/inspectorUtils';
 import { feedback } from "@/lib/feedback";
 import { Section } from "@/components/organisms/Section";
-import { t } from 'i18next';
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 import { Combobox } from "@/components/atoms/Combobox";
 import { Select } from "@/components/atoms/Select";
@@ -256,9 +255,9 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
     const [copied, setCopied] = useState<string | null>(null);
 
-    // Interaction Mode
-    const [interactionMode, setInteractionMode] = useState<'inspect' | 'tap' | 'swipe'>('inspect');
+    // Interaction State
     const [swipeStart, setSwipeStart] = useState<{ x: number, y: number } | null>(null);
+    const [isDragging, setIsDragging] = useState(false);
 
     const imgRef = useRef<HTMLImageElement>(null);
 
@@ -343,21 +342,20 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             feedback.toast.success(t('mapper.feedback.updated'));
 
         } catch (e) {
-            feedback.toast.error("mapper.update_error", e);
+            feedback.toast.error(t("mapper.update_error"), e);
         } finally {
             setLoading(false);
         }
     };
 
     const sendAdbInput = async (cmd: string) => {
-        if (!selectedDevice || isTestRunning) return;
         const args = ['shell', 'input', ...cmd.split(' ')];
         try {
             await invoke('run_adb_command', { device: selectedDevice, args });
             // Auto-refresh after input to show updated state
             setTimeout(refreshAll, 1500);
         } catch (e) {
-            feedback.toast.error("mapper.input_error", e);
+            feedback.toast.error(t("mapper.input_error"), e);
         }
     };
 
@@ -373,39 +371,46 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     };
 
     const handleImageMouseDown = (e: React.MouseEvent<HTMLImageElement>) => {
-        if (interactionMode === 'swipe') {
-            const coords = getCoords(e);
-            if (coords) setSwipeStart(coords);
+        const coords = getCoords(e);
+        if (coords) {
+            setSwipeStart(coords);
+            setIsDragging(false);
         }
     };
 
     const handleImageMouseUp = (e: React.MouseEvent<HTMLImageElement>) => {
-        if (interactionMode === 'swipe' && swipeStart) {
+        if (swipeStart) {
             const end = getCoords(e);
-            if (end) {
+            if (end && isDragging) {
+                // Dragged -> Swipe
                 sendAdbInput(`swipe ${swipeStart.x} ${swipeStart.y} ${end.x} ${end.y} 500`);
                 addSwipeAnimation(swipeStart.x, swipeStart.y, end.x, end.y);
+            } else if (end && !isDragging) {
+                // Not dragged -> Select
+                processMouseInteraction(e, false);
             }
-            setSwipeStart(null);
         }
+        setSwipeStart(null);
+        setIsDragging(false);
     };
 
-    const handleImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
+    const handleScreenshotDoubleClick = (e: React.MouseEvent<HTMLImageElement>) => {
         const coords = getCoords(e);
-        if (!coords) return;
-
-        if (interactionMode === 'tap') {
+        if (coords) {
             sendAdbInput(`tap ${coords.x} ${coords.y}`);
             addTapAnimation(coords.x, coords.y);
-        } else if (interactionMode === 'inspect') {
-            if (!processMouseInteraction(e, false)) return;
         }
     };
 
     const handleImageMouseMove = (e: React.MouseEvent<HTMLImageElement>) => {
-        if (interactionMode === 'inspect') {
-            processMouseInteraction(e, true);
+        if (swipeStart) {
+            const coords = getCoords(e);
+            if (coords) {
+                const dist = Math.sqrt(Math.pow(coords.x - swipeStart.x, 2) + Math.pow(coords.y - swipeStart.y, 2));
+                if (dist > 10) setIsDragging(true);
+            }
         }
+        processMouseInteraction(e, true);
     };
 
     const [availableNodes, setAvailableNodes] = useState<InspectorNode[]>([]);
@@ -527,37 +532,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                         </div>
                     </div>
                 }
-                menus={
-                    <div className="flex bg-surface-variant/30 p-0.5 rounded-2xl">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setInteractionMode('inspect')}
-                            className={clsx("p-1.5 rounded-2xl transition-all", interactionMode === 'inspect' ? "bg-primary/10 shadow-sm text-primary" : "text-on-surface/80 hover:text-on-surface-variant/80")}
-                            title={t('mapper.modes.inspect')}
-                        >
-                            <Scan size={16} />
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setInteractionMode('tap')}
-                            className={clsx("p-1.5 rounded-2xl transition-all", interactionMode === 'tap' ? "bg-primary/10 shadow-sm text-primary" : "text-on-surface/80 hover:text-on-surface-variant/80")}
-                            title={t('mapper.modes.tap')}
-                        >
-                            <MousePointerClick size={16} />
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setInteractionMode('swipe')}
-                            className={clsx("p-1.5 rounded-2xl transition-all", interactionMode === 'swipe' ? "bg-primary/10 shadow-sm text-primary" : "text-on-surface/80 hover:text-on-surface-variant/80")}
-                            title={t('mapper.modes.swipe')}
-                        >
-                            <Move size={16} />
-                        </Button>
-                    </div>
-                }
+                menus={null}
                 actions={
                     <>
                         <Button
@@ -594,7 +569,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
             <div className="flex-1 grid grid-cols-[auto_1fr] gap-4 min-h-0 overflow-hidden">
                 {/* Left: Device Screen (Adaptive) */}
-                <div className="flex items-center justify-center overflow-hidden relative">
+                <div className="flex items-center justify-center overflow-hidden relative max-w-[60vw]">
                     {screenshot ? (
                         <div className="relative h-full w-full flex items-center justify-center">
                             <img
@@ -603,9 +578,9 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                 alt="Device Screenshot"
                                 className="h-full w-auto object-contain shadow-lg rounded-2xl select-none max-w-full"
                                 onMouseMove={handleImageMouseMove}
-                                onClick={handleImageClick}
                                 onMouseDown={handleImageMouseDown}
                                 onMouseUp={handleImageMouseUp}
+                                onDoubleClick={handleScreenshotDoubleClick}
                                 draggable={false}
                             />
                             {/* Animation Layers */}
@@ -650,7 +625,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                             ))}
 
                             {/* Ongoing Swipe Preview */}
-                            {interactionMode === 'swipe' && swipeStart && (
+                            {isDragging && swipeStart && (
                                 <div className="absolute w-full h-full top-0 left-0 pointer-events-none z-30">
                                     <div
                                         className="absolute w-4 h-4 bg-orange-500 rounded-2xl -ml-2 -mt-2 opacity-50"
@@ -781,45 +756,24 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
                                 {/* Identifiers Section - Moved here as requested */}
                                 <div className="mb-2 space-y-2">
-                                    {(selectedNode || currentElement.accessibility_id || currentElement.android_id) && (
-                                        <h3 className="text-xs text-on-surface-variant/80 font-medium">{t('mapper.attributes.identifiers')}</h3>
-                                    )}
-
-                                    {selectedNode ? (
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <CopyButton
-                                                label={t('mapper.attributes.access_id')}
-                                                value={selectedNode?.attributes['content-desc']}
-                                                onCopy={(v) => copyToClipboard(v, 'aid')}
-                                                active={copied === 'aid'}
-                                            />
-                                            <CopyButton
-                                                label={t('mapper.attributes.resource_id')}
-                                                value={selectedNode?.attributes['resource-id']}
-                                                onCopy={(v) => copyToClipboard(v, 'rid')}
-                                                active={copied === 'rid'}
-                                            />
-                                        </div>
-                                    ) : (
-                                        <div className="grid grid-cols-2 gap-2">
-                                            {currentElement.accessibility_id && (
-                                                <CopyButton
-                                                    label={t('mapper.attributes.access_id')}
-                                                    value={currentElement.accessibility_id}
-                                                    onCopy={(v) => copyToClipboard(v, 'aid')}
-                                                    active={copied === 'aid'}
-                                                />
-                                            )}
-                                            {currentElement.android_id && (
-                                                <CopyButton
-                                                    label={t('mapper.attributes.resource_id')}
-                                                    value={currentElement.android_id}
-                                                    onCopy={(v) => copyToClipboard(v, 'rid')}
-                                                    active={copied === 'rid'}
-                                                />
-                                            )}
-                                        </div>
-                                    )}
+                                    <h3 className="text-xs font-semibold text-on-surface-variant/80 uppercase tracking-wider">{t('inspector.attributes.identifiers')}</h3>
+                                    <div className={clsx(
+                                        "grid grid-cols-1 gap-2",
+                                        selectedNode?.attributes['content-desc'] && selectedNode?.attributes['resource-id'] ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 md:grid-cols-1"
+                                    )}>
+                                        <CopyButton
+                                            label={t('inspector.attributes.access_id')}
+                                            value={selectedNode?.attributes['content-desc']}
+                                            onCopy={(v) => copyToClipboard(v, 'aid')}
+                                            active={copied === 'aid'}
+                                        />
+                                        <CopyButton
+                                            label={t('inspector.attributes.resource_id')}
+                                            value={selectedNode?.attributes['resource-id']}
+                                            onCopy={(v) => copyToClipboard(v, 'rid')}
+                                            active={copied === 'rid'}
+                                        />
+                                    </div>
                                 </div>
 
                                 <div className="space-y-4">
@@ -1106,12 +1060,14 @@ function NodeBreadcrumbs({ node, onSelect, onHover }: { node: InspectorNode, onS
 }
 
 function CopyButton({ label, value, onCopy, active }: { label: string, value: string | undefined, onCopy: (v: string) => void, active: boolean }) {
+    const { t } = useTranslation();
     if (!value) return null; // Don't show if empty
     return (
-        <button
+        <Button
+            variant="ghost"
             onClick={() => onCopy(value)}
             className={clsx(
-                "flex flex-col items-start p-2 rounded-2xl border transition-all text-left",
+                "flex flex-col items-start p-2 rounded-2xl border transition-all text-left h-auto",
                 active
                     ? "bg-success-container/10 border-success-container/20 text-on-success-container"
                     : "bg-surface/50 border-outline-variant/30 hover:border-info-container/50"
@@ -1122,10 +1078,10 @@ function CopyButton({ label, value, onCopy, active }: { label: string, value: st
                     {label}
                 </div>
                 <div className="text-success">
-                    {active && <div className="flex items-center gap-1"><Check size={12} />{t("mapper.attributes.copied")}</div>}
+                    {active && <div className="flex items-center gap-1"><Check size={12} />{t("inspector.attributes.copied")}</div>}
                 </div>
             </span>
             <span className="text-xs font-mono truncate w-full" title={value}>{value}</span>
-        </button>
+        </Button>
     );
 }
