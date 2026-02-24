@@ -184,6 +184,8 @@ pub fn run_robot_test(
     let _ = std::fs::write(metadata_path, metadata_json);
 
     let mut cmd = Command::new("python");
+    cmd.env("PYTHONIOENCODING", "utf-8");
+    cmd.env("PYTHONUTF8", "1");
     cmd.arg("-m").arg("robot");
     cmd.args(&args);
     
@@ -273,6 +275,8 @@ pub fn run_maestro_test(
         cmd.args(cmd_args);
     }
 
+    cmd.env("JAVA_TOOL_OPTIONS", "-Dfile.encoding=UTF-8");
+
     spawn_and_monitor(app, state, run_id, cmd, working_dir)
 }
 
@@ -330,6 +334,8 @@ pub fn run_appium_test(
     } else {
         cmd.arg("test");
     }
+
+    cmd.env("JAVA_TOOL_OPTIONS", "-Dfile.encoding=UTF-8");
 
     spawn_and_monitor(app, state, run_id, cmd, Some(abs_project_path))
 }

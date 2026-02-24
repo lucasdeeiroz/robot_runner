@@ -319,6 +319,10 @@ export const pt = {
             input_error: "Falha ao enviar input",
             empty: "Selecione um dispositivo para iniciar o Inspetor",
             refresh: "Atualizar Fonte",
+            search: {
+                placeholder: "Buscar por ID, XPath, etc...",
+                clear: "Limpar busca"
+            },
             modes: {
                 inspect: "Modo Inspeção",
                 tap: "Modo Toque",
@@ -333,6 +337,28 @@ export const pt = {
             },
             properties: "Propriedades do Nó",
             select_element: "Selecione um elemento na tela",
+            nav: {
+                home: "Início",
+                back: "Voltar",
+                recents: "Recentes"
+            },
+            modal: {
+                edit_xpath: "Editar XPath",
+                edit_selector: "Editar Seletor",
+                match_type: "Tipo de Correspondência",
+                match_type_equals: "Igual",
+                match_type_contains: "Contém",
+                match_type_starts_with: "Começa Com",
+                match_type_ends_with: "Termina Com",
+                match_type_regex: "Regex/Matches",
+                preferred_attr: "Atributo Preferencial",
+                preferred_attr_resource_id: "Resource ID",
+                preferred_attr_text: "Texto",
+                preferred_attr_content_desc: "Content Desc",
+                preferred_attr_class: "Somente Classe",
+                result: "Resultado",
+                use_wrapper: "Usar wrapper new UiSelector()"
+            },
             attributes: {
                 copied: "Copiado!",
                 all: "Todos Atributos",
@@ -342,12 +368,6 @@ export const pt = {
                 class: "Classe",
                 identifiers: "Identificadores",
                 hierarchy: "Hierarquia"
-            },
-            clear_selection: "Limpar Seleção",
-            nav: {
-                home: "Início",
-                back: "Voltar",
-                recents: "Recentes"
             }
         },
         logcat: {
