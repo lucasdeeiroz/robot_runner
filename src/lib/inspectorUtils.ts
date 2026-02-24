@@ -325,7 +325,7 @@ export function findNodesByLocator(root: InspectorNode, locator: string): Inspec
  * Generates an optimized XPath for the given node.
  * Priorities: resource-id > text > content-desc > class + index
  */
-export function generateXPath(node: InspectorNode, attr?: string, type: 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'matches' = 'equals'): string {
+export function generateXPath(node: InspectorNode, attr?: string, type: 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'matches' = 'equals', addons: string[] = []): string {
     if (!node.parent) return '/*';
 
     const attributes = node.attributes;
@@ -334,13 +334,20 @@ export function generateXPath(node: InspectorNode, attr?: string, type: 'equals'
 
     if (preferredAttr && attributes[preferredAttr]) {
         const val = attributes[preferredAttr];
+        let base = "";
         switch (type) {
-            case 'contains': return `//${className}[contains(@${preferredAttr}, "${val}")]`;
-            case 'startsWith': return `//${className}[starts-with(@${preferredAttr}, "${val}")]`;
-            case 'endsWith': return `//${className}[ends-with(@${preferredAttr}, "${val}")]`;
-            case 'matches': return `//${className}[matches(@${preferredAttr}, "${val}")]`;
-            default: return `//${className}[@${preferredAttr}="${val}"]`;
+            case 'contains': base = `//${className}[contains(@${preferredAttr}, "${val}")]`; break;
+            case 'startsWith': base = `//${className}[starts-with(@${preferredAttr}, "${val}")]`; break;
+            case 'endsWith': base = `//${className}[ends-with(@${preferredAttr}, "${val}")]`; break;
+            case 'matches': base = `//${className}[matches(@${preferredAttr}, "${val}")]`; break;
+            default: base = `//${className}[@${preferredAttr}="${val}"]`;
         }
+
+        if (addons.length > 0) {
+            const extra = addons.map(a => `@${a}="${attributes[a]}"`).join(' and ');
+            base = base.replace(/\]$/, ` and ${extra}]`);
+        }
+        return base;
     }
 
     let path = '';
@@ -364,7 +371,8 @@ export function generateXPath(node: InspectorNode, attr?: string, type: 'equals'
 export function generateUiSelector(node: InspectorNode, options: {
     attr: 'resource-id' | 'content-desc' | 'text',
     type: 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'matches',
-    useUiSelectorWrapper: boolean
+    useUiSelectorWrapper: boolean,
+    addons?: string[]
 }): string {
     const value = node.attributes[options.attr] || "";
     let method = "";
@@ -384,6 +392,22 @@ export function generateUiSelector(node: InspectorNode, options: {
         case 'matches': op = "Matches"; break;
     }
 
-    const selector = `new UiSelector().${method}${op}("${value}")`;
-    return options.useUiSelectorWrapper ? selector : `${method}${op}("${value}")`;
+    let selectorArr = [`${method}${op}("${value}")`];
+
+    if (options.addons && options.addons.length > 0) {
+        options.addons.forEach(a => {
+            let m = "";
+            switch (a) {
+                case 'resource-id': m = "resourceId"; break;
+                case 'content-desc': m = "description"; break;
+                case 'text': m = "text"; break;
+                case 'class': m = "className"; break;
+                default: m = a.replace(/-([a-z])/g, g => g[1].toUpperCase());
+            }
+            selectorArr.push(`${m}("${node.attributes[a]}")`);
+        });
+    }
+
+    const fullSelector = selectorArr.join('.');
+    return options.useUiSelectorWrapper ? `new UiSelector().${fullSelector}` : fullSelector;
 }

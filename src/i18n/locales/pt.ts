@@ -357,7 +357,18 @@ export const pt = {
                 preferred_attr_content_desc: "Content Desc",
                 preferred_attr_class: "Somente Classe",
                 result: "Resultado",
-                use_wrapper: "Usar wrapper new UiSelector()"
+                use_wrapper: "Usar wrapper new UiSelector()",
+                additional_attrs: "Atributos Adicionais",
+                attr_resource_id: "Resource ID",
+                attr_text: "Texto",
+                attr_content_desc: "Content Desc",
+                attr_class: "Classe",
+                attr_index: "Índice",
+                attr_clickable: "Clicável",
+                attr_enabled: "Habilitado",
+                attr_checked: "Marcado",
+                attr_selected: "Selecionado",
+                attr_focusable: "Focável"
             },
             attributes: {
                 copied: "Copiado!",

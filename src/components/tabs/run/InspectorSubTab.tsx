@@ -60,7 +60,8 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
     const [editOptions, setEditOptions] = useState({
         type: 'equals' as 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'matches',
         useUiSelectorWrapper: true,
-        xpathAttr: 'resource-id' as string
+        xpathAttr: 'resource-id' as string,
+        selectedAddons: [] as string[]
     });
     const [customLocator, setCustomLocator] = useState("");
 
@@ -258,38 +259,49 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
         setEditingAttr(attr);
         setIsEditModalOpen(true);
         if (selectedNode) {
+            let initialAttr = editOptions.xpathAttr;
             if (attr === 'xpath') {
-                // Ensure the initial attribute is one the node actually has
                 const attrs = selectedNode.attributes;
-                let initialAttr = editOptions.xpathAttr;
                 if (!attrs[initialAttr]) {
                     if (attrs['resource-id']) initialAttr = 'resource-id';
                     else if (attrs['text']) initialAttr = 'text';
                     else if (attrs['content-desc']) initialAttr = 'content-desc';
                     else if (attrs['class']) initialAttr = 'class';
-
-                    setEditOptions(prev => ({ ...prev, xpathAttr: initialAttr }));
                 }
-                setCustomLocator(generateXPath(selectedNode, initialAttr, editOptions.type));
+            } else {
+                initialAttr = attr;
+            }
+
+            const newOpts = {
+                ...editOptions,
+                xpathAttr: initialAttr,
+                selectedAddons: [] // Reset addons when opening modal
+            };
+            setEditOptions(newOpts);
+
+            if (attr === 'xpath') {
+                setCustomLocator(generateXPath(selectedNode, initialAttr, editOptions.type, []));
             } else {
                 setCustomLocator(generateUiSelector(selectedNode, {
                     attr: attr as any,
                     type: editOptions.type,
-                    useUiSelectorWrapper: editOptions.useUiSelectorWrapper
+                    useUiSelectorWrapper: editOptions.useUiSelectorWrapper,
+                    addons: []
                 }));
             }
         }
     };
 
-    const updateCustomLocator = (options: any) => {
+    const updateCustomLocator = (options: typeof editOptions) => {
         if (!selectedNode || !editingAttr) return;
         if (editingAttr === 'xpath') {
-            setCustomLocator(generateXPath(selectedNode, options.xpathAttr, options.type));
+            setCustomLocator(generateXPath(selectedNode, options.xpathAttr, options.type, options.selectedAddons));
         } else {
             setCustomLocator(generateUiSelector(selectedNode, {
                 attr: editingAttr as any,
                 type: options.type,
-                useUiSelectorWrapper: options.useUiSelectorWrapper
+                useUiSelectorWrapper: options.useUiSelectorWrapper,
+                addons: options.selectedAddons
             }));
         }
     };
@@ -600,6 +612,48 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
                             />
                         </div>
                     )}
+
+                    <div className="space-y-2 pt-2">
+                        <label className="text-xs font-medium text-on-surface-variant/80">{t('inspector.modal.additional_attrs', 'Additional Attributes')}</label>
+                        <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto custom-scrollbar p-1 border border-outline-variant/30 rounded-lg">
+                            {[
+                                { label: t('inspector.modal.attr_resource_id', 'Resource ID'), value: 'resource-id' },
+                                { label: t('inspector.modal.attr_text', 'Text'), value: 'text' },
+                                { label: t('inspector.modal.attr_content_desc', 'Content Desc'), value: 'content-desc' },
+                                { label: t('inspector.modal.attr_class', 'Class'), value: 'class' },
+                                { label: t('inspector.modal.attr_index', 'Index'), value: 'index' },
+                                { label: t('inspector.modal.attr_clickable', 'Clickable'), value: 'clickable' },
+                                { label: t('inspector.modal.attr_enabled', 'Enabled'), value: 'enabled' },
+                                { label: t('inspector.modal.attr_checked', 'Checked'), value: 'checked' },
+                                { label: t('inspector.modal.attr_selected', 'Selected'), value: 'selected' },
+                                { label: t('inspector.modal.attr_focusable', 'Focusable'), value: 'focusable' },
+                            ].filter(opt =>
+                                selectedNode?.attributes[opt.value] !== undefined &&
+                                (editingAttr === 'xpath' ? opt.value !== editOptions.xpathAttr : opt.value !== editingAttr)
+                            ).map(opt => (
+                                <div key={opt.value} className="flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        id={`addon-${opt.value}`}
+                                        checked={editOptions.selectedAddons.includes(opt.value)}
+                                        onChange={(e) => {
+                                            const newAddons = e.target.checked
+                                                ? [...editOptions.selectedAddons, opt.value]
+                                                : editOptions.selectedAddons.filter(a => a !== opt.value);
+                                            const newOpts = { ...editOptions, selectedAddons: newAddons };
+                                            setEditOptions(newOpts);
+                                            updateCustomLocator(newOpts);
+                                        }}
+                                        className="rounded border-outline-variant/30 text-primary focus:ring-primary/20 h-3.5 w-3.5"
+                                    />
+                                    <label htmlFor={`addon-${opt.value}`} className="text-xs text-on-surface-variant/80 cursor-pointer truncate" title={opt.label}>
+                                        {opt.label}
+                                    </label>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
                     <div className="space-y-1 pt-4 border-t border-outline-variant/30">
                         <label className="text-xs font-medium text-on-surface-variant/80">{t('inspector.modal.result')}</label>
                         <div className="flex bg-surface-variant/20 p-3 rounded-2xl border border-outline-variant/30">
