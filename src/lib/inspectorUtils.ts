@@ -29,6 +29,50 @@ export function parseBounds(boundsStr: string): { x: number; y: number; w: numbe
 }
 
 /**
+ * Transforms coordinates if there is an orientation mismatch between the UI dump and the screenshot.
+ * Handles the case where the screenshot might be rotated relative to the XML bounds.
+ */
+export function transformBounds(
+    bounds: { x: number; y: number; w: number; h: number },
+    xmlRootWidth: number,
+    xmlRootHeight: number,
+    actualImgWidth: number,
+    actualImgHeight: number
+): { x: number; y: number; w: number; h: number } {
+    // Detect if we need to swap/rotate
+    const xmlIsPortrait = xmlRootHeight > xmlRootWidth;
+    const imgIsPortrait = actualImgHeight > actualImgWidth;
+
+    if (xmlIsPortrait !== imgIsPortrait) {
+        // Simple swap for orientation mismatch (Landscape screenshot vs Portrait XML)
+        // This assumes the coordinates are relative to the top-left in the current orientation
+        // but the bounds themselves might need swapping if it's a 90deg rotation.
+
+        // Usually, Android dumps in portrait (e.g. 1080x2400) even if rotated,
+        // but some systems might dump in the current orientation (2400x1080).
+        // If we have a mismatch, we likely need to "project" the portrait coordinates onto a landscape canvas.
+
+        // Calculate normalized positions (0-1)
+        const nx = bounds.x / xmlRootWidth;
+        const ny = bounds.y / xmlRootHeight;
+        const nw = bounds.w / xmlRootWidth;
+        const nh = bounds.h / xmlRootHeight;
+
+        // Project onto landscape
+        // Note: Simple scaling might be enough if the "stretched" look is just a scaling bug,
+        // but sometimes the axes are swapped.
+        return {
+            x: nx * actualImgWidth,
+            y: ny * actualImgHeight,
+            w: nw * actualImgWidth,
+            h: nh * actualImgHeight
+        };
+    }
+
+    return bounds;
+}
+
+/**
  * Recursively converts the raw fast-xml-parser object into a cleaner InspectorNode tree.
  * Adds computed bounds and parent references.
  */
@@ -84,6 +128,24 @@ export function transformXmlToTree(rawNode: any, parent?: InspectorNode): Inspec
 
     // Link parent for children
     node.children.forEach(c => c.parent = node);
+
+    // If node has no bounds but has children, compute a bounding box
+    if (!node.bounds && node.children.length > 0) {
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        let hasValidChild = false;
+        node.children.forEach(c => {
+            if (c.bounds) {
+                hasValidChild = true;
+                minX = Math.min(minX, c.bounds.x);
+                minY = Math.min(minY, c.bounds.y);
+                maxX = Math.max(maxX, c.bounds.x + c.bounds.w);
+                maxY = Math.max(maxY, c.bounds.y + c.bounds.h);
+            }
+        });
+        if (hasValidChild) {
+            node.bounds = { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+        }
+    }
 
     return node;
 }
