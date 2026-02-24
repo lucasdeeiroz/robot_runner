@@ -569,7 +569,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
             <div className="flex-1 grid grid-cols-[auto_1fr] gap-4 min-h-0 overflow-hidden">
                 {/* Left: Device Screen (Adaptive) */}
-                <div className="flex items-center justify-center overflow-hidden relative max-w-[60vw]">
+                <div className="flex items-center justify-center overflow-hidden relative max-w-[30vw]">
                     {screenshot ? (
                         <div className="relative h-full w-full flex items-center justify-center">
                             <img
