@@ -14,14 +14,28 @@ interface GeminiResponse {
     };
 }
 
+import { ScreenMap } from '@/lib/types';
+
 export async function generateRefinedTestCases(
     requirements: string,
     apiKey: string,
     model: string = 'gemini-2.5-flash',
-    language: string = 'en'
+    language: string = 'en',
+    appMapping?: ScreenMap[]
 ): Promise<string> {
     if (!apiKey) {
         throw new Error("Missing Gemini API Key");
+    }
+
+    let mappingContext = "";
+    if (appMapping && appMapping.length > 0) {
+        mappingContext = "\n\nAPPLICATION MAPPING (Use these element names and types for precision):\n";
+        appMapping.forEach(screen => {
+            mappingContext += `- Screen: "${screen.name}" (${screen.type})\n`;
+            screen.elements.forEach(el => {
+                mappingContext += `  * Element: "${el.name}" (Type: ${el.type})\n`;
+            });
+        });
     }
 
     const systemInstruction = `
@@ -52,6 +66,8 @@ RULES:
 5. Keep steps concise and reusable.
 6. Identify the story id and names if possible. If not found, use "000000" as the ID and "N/A" as the name.
 7. The output has only one story, but it can have multiple scenarios.
+8. ${appMapping ? "PRIORITIZE using the names and screens provided in the APPLICATION MAPPING context below. If a requirement mentions an action that matches a mapped element, use that element's specific name." : "Generate generic but professional steps since no specific app mapping was provided."}
+${mappingContext}
 `.trim();
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
