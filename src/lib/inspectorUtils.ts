@@ -131,17 +131,18 @@ export function findNodesByLocator(root: InspectorNode, locator: string): Inspec
     const results: InspectorNode[] = [];
     if (!locator) return results;
 
-    const trimmed = locator.trim();
+    // Unescape \n to actual newline and \t to actual tab
+    const trimmed = locator.trim().replace(/\\n/g, '\n').replace(/\\t/g, '\t');
 
     // 1. UiAutomator Support: new UiSelector().text("...")
     if (trimmed.includes('UiSelector()')) {
-        // Simple parser for common methods
-        const methodMatch = trimmed.match(/\.\w+\s*\(.*?\)/g);
+        // Simple parser for common methods (matching across newlines using [\s\S])
+        const methodMatch = trimmed.match(/\.\w+\s*\((\s*["'][\s\S]*?["']\s*)\)/g);
         if (methodMatch) {
             const search = (node: InspectorNode) => {
                 let matchesAll = true;
                 methodMatch.forEach(m => {
-                    const parts = m.match(/\.(\w+)\s*\(\s*["'](.*?)["']\s*\)/);
+                    const parts = m.match(/\.(\w+)\s*\(\s*["']([\s\S]*?)["']\s*\)/);
                     if (parts) {
                         const [, method, val] = parts;
 
@@ -221,84 +222,95 @@ export function findNodesByLocator(root: InspectorNode, locator: string): Inspec
         findByExactXPath(root);
         if (results.length > 0) return results;
 
-        // Attribute Match: //tag[@attr="value"]
-        const attrMatch = trimmed.match(/^\/\/(.*?)\s*\[\s*@(.*?)\s*=\s*['"](.*?)['"]\s*\]$/);
-        if (attrMatch) {
-            const [, tag, attr, val] = attrMatch;
-            const search = (node: InspectorNode) => {
-                const nodeTag = node.tagName.split('.').pop() || '*';
-                const matchesTag = tag === '*' || tag === node.tagName || nodeTag === tag || node.attributes['class'] === tag;
-                const matchesAttr = node.attributes[attr] === val;
-                if (matchesTag && matchesAttr) results.push(node);
+        const search = (node: InspectorNode) => {
+            // Extract the tag and the content inside the brackets [...]
+            // e.g. //android.view.View[contains(@text, "val") and @resource-id="id"]
+            const xpathParts = trimmed.match(/^\/\/(.*?)\s*\[([\s\S]*)\]$/);
+            if (!xpathParts) {
+                // If it's a simple tag like //android.widget.Button
+                const simpleTagMatch = trimmed.match(/^\/\/(.*?)$/);
+                if (simpleTagMatch) {
+                    const [, tag] = simpleTagMatch;
+                    const nodeTag = node.tagName.split('.').pop() || '*';
+                    const matchesTag = tag === '*' || tag === node.tagName || nodeTag === tag || node.attributes['class'] === tag;
+                    if (matchesTag) results.push(node);
+                }
                 node.children.forEach(search);
-            };
-            search(root);
-            if (results.length > 0) return results;
-        }
+                return;
+            }
 
-        // Starts-with Match: //tag[starts-with(@attr, "value")]
-        const startsWithMatch = trimmed.match(/^\/\/(.*?)\s*\[\s*starts-with\s*\(\s*@(.*?)\s*,\s*['"](.*?)['"]\s*\)\s*\]$/);
-        if (startsWithMatch) {
-            const [, tag, attr, val] = startsWithMatch;
-            const search = (node: InspectorNode) => {
-                const nodeTag = node.tagName.split('.').pop() || '*';
-                const matchesTag = tag === '*' || tag === node.tagName || nodeTag === tag || node.attributes['class'] === tag;
-                const matchesAttr = node.attributes[attr]?.startsWith(val);
-                if (matchesTag && matchesAttr) results.push(node);
-                node.children.forEach(search);
-            };
-            search(root);
-            if (results.length > 0) return results;
-        }
+            const [_, tag, predicates] = xpathParts;
 
-        // Ends-with Match: //tag[ends-with(@attr, "value")]
-        const endsWithMatch = trimmed.match(/^\/\/(.*?)\s*\[\s*ends-with\s*\(\s*@(.*?)\s*,\s*['"](.*?)['"]\s*\)\s*\]$/) ||
-            trimmed.match(/^\/\/(.*?)\s*\[\s*substring\s*\(\s*@(.*?)\s*,\s*string-length\s*\(\s*@.*?\s*\)\s*-\s*string-length\s*\(\s*['"](.*?)['"]\s*\)\s*\+\s*1\s*\)\s*=\s*['"].*?['"]\s*\]$/);
-        if (endsWithMatch) {
-            const [, tag, attr, val] = endsWithMatch;
-            const search = (node: InspectorNode) => {
-                const nodeTag = node.tagName.split('.').pop() || '*';
-                const matchesTag = tag === '*' || tag === node.tagName || nodeTag === tag || node.attributes['class'] === tag;
-                const matchesAttr = node.attributes[attr]?.endsWith(val);
-                if (matchesTag && matchesAttr) results.push(node);
+            // Tag logic
+            const nodeTag = node.tagName.split('.').pop() || '*';
+            const matchesTag = tag === '*' || tag === node.tagName || nodeTag === tag || node.attributes['class'] === tag;
+            if (!matchesTag) {
                 node.children.forEach(search);
-            };
-            search(root);
-            if (results.length > 0) return results;
-        }
+                return;
+            }
 
-        // Matches Match: //tag[matches(@attr, "value")]
-        const matchesMatch = trimmed.match(/^\/\/(.*?)\s*\[\s*matches\s*\(\s*@(.*?)\s*,\s*['"](.*?)['"]\s*\)\s*\]$/);
-        if (matchesMatch) {
-            const [, tag, attr, val] = matchesMatch;
-            const search = (node: InspectorNode) => {
-                const nodeTag = node.tagName.split('.').pop() || '*';
-                const matchesTag = tag === '*' || tag === node.tagName || nodeTag === tag || node.attributes['class'] === tag;
-                try {
-                    const re = new RegExp(val);
-                    const matchesAttr = re.test(node.attributes[attr] || "");
-                    if (matchesTag && matchesAttr) results.push(node);
-                } catch { }
-                node.children.forEach(search);
-            };
-            search(root);
-            if (results.length > 0) return results;
-        }
+            // Predicate logic: split by ' and '
+            const conds = predicates.split(/\s+and\s+/i);
+            let matchesAll = true;
 
-        // Contains Match: //tag[contains(@attr, "value")]
-        const containsMatch = trimmed.match(/^\/\/(.*?)\s*\[\s*contains\s*\(\s*@(.*?)\s*,\s*['"](.*?)['"]\s*\)\s*\]$/);
-        if (containsMatch) {
-            const [, tag, attr, val] = containsMatch;
-            const search = (node: InspectorNode) => {
-                const nodeTag = node.tagName.split('.').pop() || '*';
-                const matchesTag = tag === '*' || tag === node.tagName || nodeTag === tag || node.attributes['class'] === tag;
-                const matchesAttr = node.attributes[attr]?.includes(val);
-                if (matchesTag && matchesAttr) results.push(node);
-                node.children.forEach(search);
-            };
-            search(root);
-            if (results.length > 0) return results;
-        }
+            for (const cond of conds) {
+                const c = cond.trim();
+
+                // 1. Simple: @attr="val"
+                const simpleMatch = c.match(/^@(.*?)\s*=\s*['"]([\s\S]*?)['"]$/);
+                if (simpleMatch) {
+                    const [_, attr, val] = simpleMatch;
+                    if (node.attributes[attr] !== val) { matchesAll = false; break; }
+                    continue;
+                }
+
+                // 2. Contains: contains(@attr, "val")
+                const containsMatch = c.match(/^contains\s*\(\s*@(.*?)\s*,\s*['"]([\s\S]*?)['"]\s*\)$/);
+                if (containsMatch) {
+                    const [_, attr, val] = containsMatch;
+                    if (!node.attributes[attr]?.includes(val)) { matchesAll = false; break; }
+                    continue;
+                }
+
+                // 3. Starts-with: starts-with(@attr, "val")
+                const startsWithMatch = c.match(/^starts-with\s*\(\s*@(.*?)\s*,\s*['"]([\s\S]*?)['"]\s*\)$/);
+                if (startsWithMatch) {
+                    const [_, attr, val] = startsWithMatch;
+                    if (!node.attributes[attr]?.startsWith(val)) { matchesAll = false; break; }
+                    continue;
+                }
+
+                // 4. Ends-with: ends-with(@attr, "val")
+                const endsWithMatch = c.match(/^ends-with\s*\(\s*@(.*?)\s*,\s*['"](.*?)['"]\s*\)$/) ||
+                    c.match(/^substring\s*\(\s*@(.*?)\s*,\s*string-length\s*\(\s*@.*?\s*\)\s*-\s*string-length\s*\(\s*['"](.*?)['"]\s*\)\s*\+\s*1\s*\)\s*=\s*['"](.*?)['"]$/);
+                if (endsWithMatch) {
+                    const [_, attr, val] = endsWithMatch;
+                    if (!node.attributes[attr]?.endsWith(val)) { matchesAll = false; break; }
+                    continue;
+                }
+
+                // 5. Matches: matches(@attr, "re")
+                const regexMatch = c.match(/^matches\s*\(\s*@(.*?)\s*,\s*['"](.*?)['"]\s*\)$/);
+                if (regexMatch) {
+                    const [_, attr, val] = regexMatch;
+                    try {
+                        const re = new RegExp(val);
+                        if (!re.test(node.attributes[attr] || "")) { matchesAll = false; break; }
+                    } catch { matchesAll = false; break; }
+                    continue;
+                }
+
+                // If we don't recognize the condition, we assume it's a mismatch for safety
+                matchesAll = false;
+                break;
+            }
+
+            if (matchesAll) results.push(node);
+            node.children.forEach(search);
+        };
+
+        search(root);
+        return results;
     }
 
     // 4. Default Fallback Search
