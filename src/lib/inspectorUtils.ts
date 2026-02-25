@@ -343,7 +343,7 @@ export function findNodesByLocator(root: InspectorNode, locator: string): Inspec
                 }
 
                 // 4. Ends-with: ends-with(@attr, "val")
-                const endsWithMatch = c.match(/^ends-with\s*\(\s*@(.*?)\s*,\s*['"](.*?)['"]\s*\)$/) ||
+                const endsWithMatch = c.match(/^ends-with\s*\(\s*@(.*?)\s*,\s*['"]([\s\S]*?)['"]\s*\)$/) ||
                     c.match(/^substring\s*\(\s*@(.*?)\s*,\s*string-length\s*\(\s*@.*?\s*\)\s*-\s*string-length\s*\(\s*['"](.*?)['"]\s*\)\s*\+\s*1\s*\)\s*=\s*['"](.*?)['"]$/);
                 if (endsWithMatch) {
                     const [_, attr, val] = endsWithMatch;
