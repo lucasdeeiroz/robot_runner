@@ -556,12 +556,15 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
                                 <div>
                                     <h3 className="text-xs font-semibold text-on-surface-variant/80 uppercase tracking-wider mb-2">{t('inspector.attributes.all')}</h3>
                                     <div className="border border-outline-variant/30 rounded-2xl overflow-hidden text-sm">
-                                        {Object.entries(selectedNode.attributes).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => (
-                                            <div key={key} className="flex flex-col border-b border-outline-variant/30 last:border-0">
-                                                <div className="bg-surface-variant/80 px-3 py-1.5 text-xs text-on-surface-variant/80 font-medium break-all">{key}</div>
-                                                <div className="bg-surface px-3 py-2 font-mono text-on-surface-variant/80 break-all">{String(value)}</div>
-                                            </div>
-                                        ))}
+                                        {Object.entries(selectedNode.attributes)
+                                            .filter(([key, value]) => key !== undefined && value !== undefined && value !== null && value !== '')
+                                            .sort(([a], [b]) => a.localeCompare(b))
+                                            .map(([key, value]) => (
+                                                <div key={key} className="flex flex-col border-b border-outline-variant/30 last:border-0">
+                                                    <div className="bg-surface-variant/80 px-3 py-1.5 text-xs text-on-surface-variant/80 font-medium break-all">{key}</div>
+                                                    <div className="bg-surface px-3 py-2 font-mono text-on-surface-variant/80 break-all">{String(value)}</div>
+                                                </div>
+                                            ))}
                                     </div>
                                 </div>
                             </div>
@@ -656,6 +659,8 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
                                 { label: t('inspector.modal.attr_focusable', 'Focusable'), value: 'focusable' },
                             ].filter(opt =>
                                 selectedNode?.attributes[opt.value] !== undefined &&
+                                selectedNode?.attributes[opt.value] !== null &&
+                                selectedNode?.attributes[opt.value] !== '' &&
                                 (editingAttr === 'xpath' ? opt.value !== editOptions.xpathAttr : opt.value !== editingAttr)
                             ).map(opt => (
                                 <div key={opt.value} className="flex items-center gap-2">

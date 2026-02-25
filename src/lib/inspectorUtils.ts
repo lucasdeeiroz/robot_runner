@@ -343,8 +343,8 @@ export function findNodesByLocator(root: InspectorNode, locator: string): Inspec
                 }
 
                 // 4. Ends-with: ends-with(@attr, "val")
-                const endsWithMatch = c.match(/^ends-with\s*\(\s*@(.*?)\s*,\s*['"]([\s\S]*?)['"]\s*\)$/) ||
-                    c.match(/^substring\s*\(\s*@(.*?)\s*,\s*string-length\s*\(\s*@.*?\s*\)\s*-\s*string-length\s*\(\s*['"](.*?)['"]\s*\)\s*\+\s*1\s*\)\s*=\s*['"](.*?)['"]$/);
+                const endsWithMatch = c.match(/^ends-with\s*\(\s*@([\s\S]*?)\s*,\s*['"]([\s\S]*?)['"]\s*\)$/) ||
+                    c.match(/^substring\s*\(\s*@([\s\S]*?)\s*,\s*string-length\s*\(\s*@.*?\s*\)\s*-\s*string-length\s*\(\s*['"]([\s\S]*?)['"]\s*\)\s*\+\s*1\s*\)\s*=\s*['"]([\s\S]*?)['"]$/);
                 if (endsWithMatch) {
                     const [_, attr, val] = endsWithMatch;
                     if (!node.attributes[attr]?.endsWith(val)) { matchesAll = false; break; }
@@ -418,7 +418,7 @@ export function generateXPath(node: InspectorNode, attr?: string, type: 'equals'
         }
 
         if (addons.length > 0) {
-            const extra = addons.map(a => `@${a}="${attributes[a]}"`).join(' and ');
+            const extra = addons.filter(a => attributes[a] !== undefined && attributes[a] !== null && attributes[a] !== '').map(a => `@${a}="${attributes[a]}"`).join(' and ');
             base = base.replace(/\]$/, ` and ${extra}]`);
         }
         return base;
@@ -478,7 +478,11 @@ export function generateUiSelector(node: InspectorNode, options: {
                 case 'class': m = "className"; break;
                 default: m = a.replace(/-([a-z])/g, g => g[1].toUpperCase());
             }
-            selectorArr.push(`${m}("${node.attributes[a]}")`);
+            const attrValue = node.attributes[a];
+            if (attrValue === undefined || attrValue === null || attrValue === "") {
+                return;
+            }
+            selectorArr.push(`${m}("${attrValue}")`);
         });
     }
 
