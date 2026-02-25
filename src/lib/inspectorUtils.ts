@@ -352,7 +352,7 @@ export function findNodesByLocator(root: InspectorNode, locator: string): Inspec
                 }
 
                 // 5. Matches: matches(@attr, "re")
-                const regexMatch = c.match(/^matches\s*\(\s*@(.*?)\s*,\s*['"](.*?)['"]\s*\)$/);
+                const regexMatch = c.match(/^matches\s*\(\s*@(.*?)\s*,\s*['"]([\s\S]*?)['"]\s*\)$/);
                 if (regexMatch) {
                     const [_, attr, val] = regexMatch;
                     try {
