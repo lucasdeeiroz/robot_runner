@@ -421,14 +421,14 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
             />
 
             <div className="flex-1 grid grid-cols-[auto_1fr] gap-4 min-h-0 overflow-hidden">
-                <div className="flex flex-col items-center justify-center overflow-hidden relative max-w-[35vw] bg-surface-variant/5 border border-outline-variant/20 rounded-2xl p-4">
+                <div className="flex flex-col items-center justify-center overflow-hidden relative max-w-[30vw] bg-surface-variant/5 border border-outline-variant/20 rounded-2xl p-4">
                     {screenshot ? (
-                        <div className="relative inline-block shadow-2xl rounded-lg overflow-hidden border border-outline-variant/30">
+                        <div className="relative inline-block shadow-2xl rounded-lg border border-outline-variant/30 flex-shrink-0 mb-4">
                             <img
                                 ref={imgRef}
                                 src={`data:image/png;base64,${screenshot}`}
                                 alt="Device Screenshot"
-                                className="block w-auto h-auto max-w-full max-h-[750px] select-none"
+                                className="block w-auto h-auto max-w-full max-h-[650px] select-none rounded-lg"
                                 onLoad={(e) => {
                                     const img = e.currentTarget;
                                     setImgLayout({
