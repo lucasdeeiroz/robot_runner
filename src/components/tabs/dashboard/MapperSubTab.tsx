@@ -5,7 +5,7 @@ import { Maximize, Check, Scan, Home, ArrowLeft, Rows, X, RefreshCw, Wrench, Sav
 import { XMLParser } from 'fast-xml-parser';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
-import { InspectorNode, transformXmlToTree, findNodesAtCoords, generateXPath } from '@/lib/inspectorUtils';
+import { InspectorNode, transformXmlToTree, findNodesAtCoords, generateXPath, transformBounds } from '@/lib/inspectorUtils';
 import { feedback } from "@/lib/feedback";
 import { Section } from "@/components/organisms/Section";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
@@ -32,6 +32,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     const { activeProfileId } = useSettings();
     const [screenshot, setScreenshot] = useState<string | null>(null);
     const [rootNode, setRootNode] = useState<InspectorNode | null>(null);
+    const [imgLayout, setImgLayout] = useState<{ width: number, height: number, naturalWidth: number, naturalHeight: number } | null>(null);
     const [selectedNode, setSelectedNode] = useState<InspectorNode | null>(null);
     const [hoveredNode, setHoveredNode] = useState<InspectorNode | null>(null);
 
@@ -479,15 +480,29 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     };
 
     const getHighlighterStyle = (node: InspectorNode | null, color: string) => {
-        if (!node || !node.bounds || !imgRef.current) return {};
-        const rect = imgRef.current.getBoundingClientRect();
-        const scaleX = rect.width / imgRef.current.naturalWidth;
-        const scaleY = rect.height / imgRef.current.naturalHeight;
+        if (!node || !node.bounds || !imgLayout || !rootNode) return {};
+
+        const { width: dispWidth, height: dispHeight, naturalWidth, naturalHeight } = imgLayout;
+
+        const xmlWidth = rootNode.bounds?.w || naturalWidth;
+        const xmlHeight = rootNode.bounds?.h || naturalHeight;
+
+        const transformedBounds = transformBounds(
+            node.bounds,
+            xmlWidth,
+            xmlHeight,
+            naturalWidth,
+            naturalHeight
+        );
+
+        const scaleX = dispWidth / naturalWidth;
+        const scaleY = dispHeight / naturalHeight;
+
         return {
-            left: node.bounds.x * scaleX,
-            top: node.bounds.y * scaleY,
-            width: node.bounds.w * scaleX,
-            height: node.bounds.h * scaleY,
+            left: (transformedBounds.x * scaleX),
+            top: (transformedBounds.y * scaleY),
+            width: transformedBounds.w * scaleX,
+            height: transformedBounds.h * scaleY,
             borderColor: color,
             display: 'block'
         };
@@ -569,14 +584,23 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
             <div className="flex-1 grid grid-cols-[auto_1fr] gap-4 min-h-0 overflow-hidden">
                 {/* Left: Device Screen (Adaptive) */}
-                <div className="flex items-center justify-center overflow-hidden relative max-w-[60vw]">
+                <div className="flex flex-col items-center justify-center overflow-hidden relative max-w-[30vw] bg-surface-variant/5 border border-outline-variant/20 rounded-2xl p-4">
                     {screenshot ? (
-                        <div className="relative h-full w-full flex items-center justify-center">
+                        <div className="relative inline-block shadow-2xl rounded-lg border border-outline-variant/30 flex-shrink-0 mb-4">
                             <img
                                 ref={imgRef}
                                 src={`data:image/png;base64,${screenshot}`}
                                 alt="Device Screenshot"
-                                className="h-full w-auto object-contain shadow-lg rounded-2xl select-none max-w-full"
+                                className="block w-auto h-auto max-w-full max-h-[650px] select-none rounded-lg"
+                                onLoad={(e) => {
+                                    const img = e.currentTarget;
+                                    setImgLayout({
+                                        width: img.clientWidth,
+                                        height: img.clientHeight,
+                                        naturalWidth: img.naturalWidth,
+                                        naturalHeight: img.naturalHeight
+                                    });
+                                }}
                                 onMouseMove={handleImageMouseMove}
                                 onMouseDown={handleImageMouseDown}
                                 onMouseUp={handleImageMouseUp}

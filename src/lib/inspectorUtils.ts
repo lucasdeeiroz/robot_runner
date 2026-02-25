@@ -29,6 +29,50 @@ export function parseBounds(boundsStr: string): { x: number; y: number; w: numbe
 }
 
 /**
+ * Transforms coordinates if there is an orientation mismatch between the UI dump and the screenshot.
+ * Handles the case where the screenshot might be rotated relative to the XML bounds.
+ */
+export function transformBounds(
+    bounds: { x: number; y: number; w: number; h: number },
+    xmlRootWidth: number,
+    xmlRootHeight: number,
+    actualImgWidth: number,
+    actualImgHeight: number
+): { x: number; y: number; w: number; h: number } {
+    // Detect if we need to swap/rotate
+    const xmlIsPortrait = xmlRootHeight > xmlRootWidth;
+    const imgIsPortrait = actualImgHeight > actualImgWidth;
+
+    if (xmlIsPortrait !== imgIsPortrait) {
+        // Simple swap for orientation mismatch (Landscape screenshot vs Portrait XML)
+        // This assumes the coordinates are relative to the top-left in the current orientation
+        // but the bounds themselves might need swapping if it's a 90deg rotation.
+
+        // Usually, Android dumps in portrait (e.g. 1080x2400) even if rotated,
+        // but some systems might dump in the current orientation (2400x1080).
+        // If we have a mismatch, we likely need to "project" the portrait coordinates onto a landscape canvas.
+
+        // Calculate normalized positions (0-1)
+        const nx = bounds.x / xmlRootWidth;
+        const ny = bounds.y / xmlRootHeight;
+        const nw = bounds.w / xmlRootWidth;
+        const nh = bounds.h / xmlRootHeight;
+
+        // Project onto landscape
+        // Note: Simple scaling might be enough if the "stretched" look is just a scaling bug,
+        // but sometimes the axes are swapped.
+        return {
+            x: nx * actualImgWidth,
+            y: ny * actualImgHeight,
+            w: nw * actualImgWidth,
+            h: nh * actualImgHeight
+        };
+    }
+
+    return bounds;
+}
+
+/**
  * Recursively converts the raw fast-xml-parser object into a cleaner InspectorNode tree.
  * Adds computed bounds and parent references.
  */
@@ -85,6 +129,24 @@ export function transformXmlToTree(rawNode: any, parent?: InspectorNode): Inspec
     // Link parent for children
     node.children.forEach(c => c.parent = node);
 
+    // If node has no bounds but has children, compute a bounding box
+    if (!node.bounds && node.children.length > 0) {
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        let hasValidChild = false;
+        node.children.forEach(c => {
+            if (c.bounds) {
+                hasValidChild = true;
+                minX = Math.min(minX, c.bounds.x);
+                minY = Math.min(minY, c.bounds.y);
+                maxX = Math.max(maxX, c.bounds.x + c.bounds.w);
+                maxY = Math.max(maxY, c.bounds.y + c.bounds.h);
+            }
+        });
+        if (hasValidChild) {
+            node.bounds = { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+        }
+    }
+
     return node;
 }
 
@@ -131,17 +193,18 @@ export function findNodesByLocator(root: InspectorNode, locator: string): Inspec
     const results: InspectorNode[] = [];
     if (!locator) return results;
 
-    const trimmed = locator.trim();
+    // Unescape \n to actual newline and \t to actual tab
+    const trimmed = locator.trim().replace(/\\n/g, '\n').replace(/\\t/g, '\t');
 
     // 1. UiAutomator Support: new UiSelector().text("...")
     if (trimmed.includes('UiSelector()')) {
-        // Simple parser for common methods
-        const methodMatch = trimmed.match(/\.\w+\s*\(.*?\)/g);
+        // Simple parser for common methods (matching across newlines using [\s\S])
+        const methodMatch = trimmed.match(/\.\w+\s*\((\s*["'][\s\S]*?["']\s*)\)/g);
         if (methodMatch) {
             const search = (node: InspectorNode) => {
                 let matchesAll = true;
                 methodMatch.forEach(m => {
-                    const parts = m.match(/\.(\w+)\s*\(\s*["'](.*?)["']\s*\)/);
+                    const parts = m.match(/\.(\w+)\s*\(\s*["']([\s\S]*?)["']\s*\)/);
                     if (parts) {
                         const [, method, val] = parts;
 
@@ -221,84 +284,95 @@ export function findNodesByLocator(root: InspectorNode, locator: string): Inspec
         findByExactXPath(root);
         if (results.length > 0) return results;
 
-        // Attribute Match: //tag[@attr="value"]
-        const attrMatch = trimmed.match(/^\/\/(.*?)\s*\[\s*@(.*?)\s*=\s*['"](.*?)['"]\s*\]$/);
-        if (attrMatch) {
-            const [, tag, attr, val] = attrMatch;
-            const search = (node: InspectorNode) => {
-                const nodeTag = node.tagName.split('.').pop() || '*';
-                const matchesTag = tag === '*' || tag === node.tagName || nodeTag === tag || node.attributes['class'] === tag;
-                const matchesAttr = node.attributes[attr] === val;
-                if (matchesTag && matchesAttr) results.push(node);
+        const search = (node: InspectorNode) => {
+            // Extract the tag and the content inside the brackets [...]
+            // e.g. //android.view.View[contains(@text, "val") and @resource-id="id"]
+            const xpathParts = trimmed.match(/^\/\/(.*?)\s*\[([\s\S]*)\]$/);
+            if (!xpathParts) {
+                // If it's a simple tag like //android.widget.Button
+                const simpleTagMatch = trimmed.match(/^\/\/(.*?)$/);
+                if (simpleTagMatch) {
+                    const [, tag] = simpleTagMatch;
+                    const nodeTag = node.tagName.split('.').pop() || '*';
+                    const matchesTag = tag === '*' || tag === node.tagName || nodeTag === tag || node.attributes['class'] === tag;
+                    if (matchesTag) results.push(node);
+                }
                 node.children.forEach(search);
-            };
-            search(root);
-            if (results.length > 0) return results;
-        }
+                return;
+            }
 
-        // Starts-with Match: //tag[starts-with(@attr, "value")]
-        const startsWithMatch = trimmed.match(/^\/\/(.*?)\s*\[\s*starts-with\s*\(\s*@(.*?)\s*,\s*['"](.*?)['"]\s*\)\s*\]$/);
-        if (startsWithMatch) {
-            const [, tag, attr, val] = startsWithMatch;
-            const search = (node: InspectorNode) => {
-                const nodeTag = node.tagName.split('.').pop() || '*';
-                const matchesTag = tag === '*' || tag === node.tagName || nodeTag === tag || node.attributes['class'] === tag;
-                const matchesAttr = node.attributes[attr]?.startsWith(val);
-                if (matchesTag && matchesAttr) results.push(node);
-                node.children.forEach(search);
-            };
-            search(root);
-            if (results.length > 0) return results;
-        }
+            const [_, tag, predicates] = xpathParts;
 
-        // Ends-with Match: //tag[ends-with(@attr, "value")]
-        const endsWithMatch = trimmed.match(/^\/\/(.*?)\s*\[\s*ends-with\s*\(\s*@(.*?)\s*,\s*['"](.*?)['"]\s*\)\s*\]$/) ||
-            trimmed.match(/^\/\/(.*?)\s*\[\s*substring\s*\(\s*@(.*?)\s*,\s*string-length\s*\(\s*@.*?\s*\)\s*-\s*string-length\s*\(\s*['"](.*?)['"]\s*\)\s*\+\s*1\s*\)\s*=\s*['"].*?['"]\s*\]$/);
-        if (endsWithMatch) {
-            const [, tag, attr, val] = endsWithMatch;
-            const search = (node: InspectorNode) => {
-                const nodeTag = node.tagName.split('.').pop() || '*';
-                const matchesTag = tag === '*' || tag === node.tagName || nodeTag === tag || node.attributes['class'] === tag;
-                const matchesAttr = node.attributes[attr]?.endsWith(val);
-                if (matchesTag && matchesAttr) results.push(node);
+            // Tag logic
+            const nodeTag = node.tagName.split('.').pop() || '*';
+            const matchesTag = tag === '*' || tag === node.tagName || nodeTag === tag || node.attributes['class'] === tag;
+            if (!matchesTag) {
                 node.children.forEach(search);
-            };
-            search(root);
-            if (results.length > 0) return results;
-        }
+                return;
+            }
 
-        // Matches Match: //tag[matches(@attr, "value")]
-        const matchesMatch = trimmed.match(/^\/\/(.*?)\s*\[\s*matches\s*\(\s*@(.*?)\s*,\s*['"](.*?)['"]\s*\)\s*\]$/);
-        if (matchesMatch) {
-            const [, tag, attr, val] = matchesMatch;
-            const search = (node: InspectorNode) => {
-                const nodeTag = node.tagName.split('.').pop() || '*';
-                const matchesTag = tag === '*' || tag === node.tagName || nodeTag === tag || node.attributes['class'] === tag;
-                try {
-                    const re = new RegExp(val);
-                    const matchesAttr = re.test(node.attributes[attr] || "");
-                    if (matchesTag && matchesAttr) results.push(node);
-                } catch { }
-                node.children.forEach(search);
-            };
-            search(root);
-            if (results.length > 0) return results;
-        }
+            // Predicate logic: split by ' and '
+            const conds = predicates.split(/\s+and\s+/i);
+            let matchesAll = true;
 
-        // Contains Match: //tag[contains(@attr, "value")]
-        const containsMatch = trimmed.match(/^\/\/(.*?)\s*\[\s*contains\s*\(\s*@(.*?)\s*,\s*['"](.*?)['"]\s*\)\s*\]$/);
-        if (containsMatch) {
-            const [, tag, attr, val] = containsMatch;
-            const search = (node: InspectorNode) => {
-                const nodeTag = node.tagName.split('.').pop() || '*';
-                const matchesTag = tag === '*' || tag === node.tagName || nodeTag === tag || node.attributes['class'] === tag;
-                const matchesAttr = node.attributes[attr]?.includes(val);
-                if (matchesTag && matchesAttr) results.push(node);
-                node.children.forEach(search);
-            };
-            search(root);
-            if (results.length > 0) return results;
-        }
+            for (const cond of conds) {
+                const c = cond.trim();
+
+                // 1. Simple: @attr="val"
+                const simpleMatch = c.match(/^@(.*?)\s*=\s*['"]([\s\S]*?)['"]$/);
+                if (simpleMatch) {
+                    const [_, attr, val] = simpleMatch;
+                    if (node.attributes[attr] !== val) { matchesAll = false; break; }
+                    continue;
+                }
+
+                // 2. Contains: contains(@attr, "val")
+                const containsMatch = c.match(/^contains\s*\(\s*@(.*?)\s*,\s*['"]([\s\S]*?)['"]\s*\)$/);
+                if (containsMatch) {
+                    const [_, attr, val] = containsMatch;
+                    if (!node.attributes[attr]?.includes(val)) { matchesAll = false; break; }
+                    continue;
+                }
+
+                // 3. Starts-with: starts-with(@attr, "val")
+                const startsWithMatch = c.match(/^starts-with\s*\(\s*@(.*?)\s*,\s*['"]([\s\S]*?)['"]\s*\)$/);
+                if (startsWithMatch) {
+                    const [_, attr, val] = startsWithMatch;
+                    if (!node.attributes[attr]?.startsWith(val)) { matchesAll = false; break; }
+                    continue;
+                }
+
+                // 4. Ends-with: ends-with(@attr, "val")
+                const endsWithMatch = c.match(/^ends-with\s*\(\s*@([\s\S]*?)\s*,\s*['"]([\s\S]*?)['"]\s*\)$/) ||
+                    c.match(/^substring\s*\(\s*@([\s\S]*?)\s*,\s*string-length\s*\(\s*@.*?\s*\)\s*-\s*string-length\s*\(\s*['"]([\s\S]*?)['"]\s*\)\s*\+\s*1\s*\)\s*=\s*['"]([\s\S]*?)['"]$/);
+                if (endsWithMatch) {
+                    const [_, attr, val] = endsWithMatch;
+                    if (!node.attributes[attr]?.endsWith(val)) { matchesAll = false; break; }
+                    continue;
+                }
+
+                // 5. Matches: matches(@attr, "re")
+                const regexMatch = c.match(/^matches\s*\(\s*@(.*?)\s*,\s*['"]([\s\S]*?)['"]\s*\)$/);
+                if (regexMatch) {
+                    const [_, attr, val] = regexMatch;
+                    try {
+                        const re = new RegExp(val);
+                        if (!re.test(node.attributes[attr] || "")) { matchesAll = false; break; }
+                    } catch { matchesAll = false; break; }
+                    continue;
+                }
+
+                // If we don't recognize the condition, we assume it's a mismatch for safety
+                matchesAll = false;
+                break;
+            }
+
+            if (matchesAll) results.push(node);
+            node.children.forEach(search);
+        };
+
+        search(root);
+        return results;
     }
 
     // 4. Default Fallback Search
@@ -325,7 +399,7 @@ export function findNodesByLocator(root: InspectorNode, locator: string): Inspec
  * Generates an optimized XPath for the given node.
  * Priorities: resource-id > text > content-desc > class + index
  */
-export function generateXPath(node: InspectorNode, attr?: string, type: 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'matches' = 'equals'): string {
+export function generateXPath(node: InspectorNode, attr?: string, type: 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'matches' = 'equals', addons: string[] = []): string {
     if (!node.parent) return '/*';
 
     const attributes = node.attributes;
@@ -334,13 +408,20 @@ export function generateXPath(node: InspectorNode, attr?: string, type: 'equals'
 
     if (preferredAttr && attributes[preferredAttr]) {
         const val = attributes[preferredAttr];
+        let base = "";
         switch (type) {
-            case 'contains': return `//${className}[contains(@${preferredAttr}, "${val}")]`;
-            case 'startsWith': return `//${className}[starts-with(@${preferredAttr}, "${val}")]`;
-            case 'endsWith': return `//${className}[ends-with(@${preferredAttr}, "${val}")]`;
-            case 'matches': return `//${className}[matches(@${preferredAttr}, "${val}")]`;
-            default: return `//${className}[@${preferredAttr}="${val}"]`;
+            case 'contains': base = `//${className}[contains(@${preferredAttr}, "${val}")]`; break;
+            case 'startsWith': base = `//${className}[starts-with(@${preferredAttr}, "${val}")]`; break;
+            case 'endsWith': base = `//${className}[ends-with(@${preferredAttr}, "${val}")]`; break;
+            case 'matches': base = `//${className}[matches(@${preferredAttr}, "${val}")]`; break;
+            default: base = `//${className}[@${preferredAttr}="${val}"]`;
         }
+
+        if (addons.length > 0) {
+            const extra = addons.filter(a => attributes[a] !== undefined && attributes[a] !== null && attributes[a] !== '').map(a => `@${a}="${attributes[a]}"`).join(' and ');
+            base = base.replace(/\]$/, ` and ${extra}]`);
+        }
+        return base;
     }
 
     let path = '';
@@ -364,7 +445,8 @@ export function generateXPath(node: InspectorNode, attr?: string, type: 'equals'
 export function generateUiSelector(node: InspectorNode, options: {
     attr: 'resource-id' | 'content-desc' | 'text',
     type: 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'matches',
-    useUiSelectorWrapper: boolean
+    useUiSelectorWrapper: boolean,
+    addons?: string[]
 }): string {
     const value = node.attributes[options.attr] || "";
     let method = "";
@@ -384,6 +466,26 @@ export function generateUiSelector(node: InspectorNode, options: {
         case 'matches': op = "Matches"; break;
     }
 
-    const selector = `new UiSelector().${method}${op}("${value}")`;
-    return options.useUiSelectorWrapper ? selector : `${method}${op}("${value}")`;
+    let selectorArr = [`${method}${op}("${value}")`];
+
+    if (options.addons && options.addons.length > 0) {
+        options.addons.forEach(a => {
+            let m = "";
+            switch (a) {
+                case 'resource-id': m = "resourceId"; break;
+                case 'content-desc': m = "description"; break;
+                case 'text': m = "text"; break;
+                case 'class': m = "className"; break;
+                default: m = a.replace(/-([a-z])/g, g => g[1].toUpperCase());
+            }
+            const attrValue = node.attributes[a];
+            if (attrValue === undefined || attrValue === null || attrValue === "") {
+                return;
+            }
+            selectorArr.push(`${m}("${attrValue}")`);
+        });
+    }
+
+    const fullSelector = selectorArr.join('.');
+    return options.useUiSelectorWrapper ? `new UiSelector().${fullSelector}` : fullSelector;
 }

@@ -8,6 +8,7 @@ import { ScenarioEditor } from '@/components/tabs/dashboard/ScenarioEditor';
 import { ImageEditor } from '@/components/tabs/dashboard/ImageEditor';
 import { HistoryPanel } from '@/components/tabs/dashboard/HistoryPanel';
 import { MapperSubTab } from '@/components/tabs/dashboard/MapperSubTab';
+import { listScreenMaps } from '@/lib/dashboard/mapperPersistence';
 import { generateTestCases } from '@/lib/dashboard/generator';
 import clsx from 'clsx';
 import { TabItem } from '@/components/molecules/Tabs';
@@ -28,7 +29,7 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
     const { t } = useTranslation();
     const [activeTab, setActiveTab] = useState('scenarios');
     const [generatedContent, setGeneratedContent] = useState('');
-    const { settings } = useSettings();
+    const { settings, activeProfileId } = useSettings();
     const [isGenerating, setIsGenerating] = useState(false);
 
     // Device Management (Global)
@@ -62,7 +63,8 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
         if (settings.geminiApiKey) {
             setIsGenerating(true);
             try {
-                const aiResponse = await generateRefinedTestCases(text, settings.geminiApiKey, settings.geminiModel, language);
+                const maps = await listScreenMaps(activeProfileId);
+                const aiResponse = await generateRefinedTestCases(text, settings.geminiApiKey, settings.geminiModel, language, maps);
                 setGeneratedContent(aiResponse);
                 feedback.toast.success("dashboard.actions.generated_success", { method: "Gemini AI" });
                 return;

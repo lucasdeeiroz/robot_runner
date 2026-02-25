@@ -5,7 +5,7 @@ import { Maximize, Check, Scan, Home, ArrowLeft, Rows, X, RefreshCw, Search, Pen
 import { XMLParser } from 'fast-xml-parser';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
-import { InspectorNode, transformXmlToTree, findNodesAtCoords, generateXPath, findNodesByLocator, generateUiSelector } from '@/lib/inspectorUtils';
+import { InspectorNode, transformXmlToTree, findNodesAtCoords, generateXPath, findNodesByLocator, generateUiSelector, transformBounds } from '@/lib/inspectorUtils';
 import { feedback } from "@/lib/feedback";
 import { Section } from "@/components/organisms/Section";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
@@ -24,6 +24,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
     const { t } = useTranslation();
     const [screenshot, setScreenshot] = useState<string | null>(null);
     const [rootNode, setRootNode] = useState<InspectorNode | null>(null);
+    const [imgLayout, setImgLayout] = useState<{ width: number, height: number, naturalWidth: number, naturalHeight: number } | null>(null);
     const [selectedNode, setSelectedNode] = useState<InspectorNode | null>(null);
     const [hoveredNode, setHoveredNode] = useState<InspectorNode | null>(null);
     const [availableNodes, setAvailableNodes] = useState<InspectorNode[]>([]);
@@ -60,7 +61,8 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
     const [editOptions, setEditOptions] = useState({
         type: 'equals' as 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'matches',
         useUiSelectorWrapper: true,
-        xpathAttr: 'resource-id' as string
+        xpathAttr: 'resource-id' as string,
+        selectedAddons: [] as string[]
     });
     const [customLocator, setCustomLocator] = useState("");
 
@@ -240,15 +242,32 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
     };
 
     const getHighlighterStyle = (node: InspectorNode | null, color: string) => {
-        if (!node || !node.bounds || !imgRef.current) return {};
-        const rect = imgRef.current.getBoundingClientRect();
-        const scaleX = rect.width / imgRef.current.naturalWidth;
-        const scaleY = rect.height / imgRef.current.naturalHeight;
+        if (!node || !node.bounds || !imgLayout || !rootNode) return {};
+
+        // Use natural dimensions from the captured layout
+        const { width: dispWidth, height: dispHeight, naturalWidth, naturalHeight } = imgLayout;
+
+        // Detect XML orientation from rootNode bounds (now reliably computed in transformXmlToTree)
+        const xmlWidth = rootNode.bounds?.w || naturalWidth;
+        const xmlHeight = rootNode.bounds?.h || naturalHeight;
+
+        // Transform bounds if there's an orientation mismatch
+        const transformedBounds = transformBounds(
+            node.bounds,
+            xmlWidth,
+            xmlHeight,
+            naturalWidth,
+            naturalHeight
+        );
+
+        const scaleX = dispWidth / naturalWidth;
+        const scaleY = dispHeight / naturalHeight;
+
         return {
-            left: node.bounds.x * scaleX,
-            top: node.bounds.y * scaleY,
-            width: node.bounds.w * scaleX,
-            height: node.bounds.h * scaleY,
+            left: (transformedBounds.x * scaleX),
+            top: (transformedBounds.y * scaleY),
+            width: transformedBounds.w * scaleX,
+            height: transformedBounds.h * scaleY,
             borderColor: color,
             display: 'block'
         };
@@ -258,38 +277,49 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
         setEditingAttr(attr);
         setIsEditModalOpen(true);
         if (selectedNode) {
+            let initialAttr = editOptions.xpathAttr;
             if (attr === 'xpath') {
-                // Ensure the initial attribute is one the node actually has
                 const attrs = selectedNode.attributes;
-                let initialAttr = editOptions.xpathAttr;
                 if (!attrs[initialAttr]) {
                     if (attrs['resource-id']) initialAttr = 'resource-id';
                     else if (attrs['text']) initialAttr = 'text';
                     else if (attrs['content-desc']) initialAttr = 'content-desc';
                     else if (attrs['class']) initialAttr = 'class';
-
-                    setEditOptions(prev => ({ ...prev, xpathAttr: initialAttr }));
                 }
-                setCustomLocator(generateXPath(selectedNode, initialAttr, editOptions.type));
+            } else {
+                initialAttr = attr;
+            }
+
+            const newOpts = {
+                ...editOptions,
+                xpathAttr: initialAttr,
+                selectedAddons: [] // Reset addons when opening modal
+            };
+            setEditOptions(newOpts);
+
+            if (attr === 'xpath') {
+                setCustomLocator(generateXPath(selectedNode, initialAttr, editOptions.type, []));
             } else {
                 setCustomLocator(generateUiSelector(selectedNode, {
                     attr: attr as any,
                     type: editOptions.type,
-                    useUiSelectorWrapper: editOptions.useUiSelectorWrapper
+                    useUiSelectorWrapper: editOptions.useUiSelectorWrapper,
+                    addons: []
                 }));
             }
         }
     };
 
-    const updateCustomLocator = (options: any) => {
+    const updateCustomLocator = (options: typeof editOptions) => {
         if (!selectedNode || !editingAttr) return;
         if (editingAttr === 'xpath') {
-            setCustomLocator(generateXPath(selectedNode, options.xpathAttr, options.type));
+            setCustomLocator(generateXPath(selectedNode, options.xpathAttr, options.type, options.selectedAddons));
         } else {
             setCustomLocator(generateUiSelector(selectedNode, {
                 attr: editingAttr as any,
                 type: options.type,
-                useUiSelectorWrapper: options.useUiSelectorWrapper
+                useUiSelectorWrapper: options.useUiSelectorWrapper,
+                addons: options.selectedAddons
             }));
         }
     };
@@ -391,14 +421,23 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
             />
 
             <div className="flex-1 grid grid-cols-[auto_1fr] gap-4 min-h-0 overflow-hidden">
-                <div className="flex items-center justify-center overflow-hidden relative max-w-[60vw]">
+                <div className="flex flex-col items-center justify-center overflow-hidden relative max-w-[30vw] bg-surface-variant/5 border border-outline-variant/20 rounded-2xl p-4">
                     {screenshot ? (
-                        <div className="relative h-full w-full flex items-center justify-center">
+                        <div className="relative inline-block shadow-2xl rounded-lg border border-outline-variant/30 flex-shrink-0 mb-4">
                             <img
                                 ref={imgRef}
                                 src={`data:image/png;base64,${screenshot}`}
                                 alt="Device Screenshot"
-                                className="h-full w-auto object-contain shadow-lg rounded-2xl select-none max-w-full"
+                                className="block w-auto h-auto max-w-full max-h-[650px] select-none rounded-lg"
+                                onLoad={(e) => {
+                                    const img = e.currentTarget;
+                                    setImgLayout({
+                                        width: img.clientWidth,
+                                        height: img.clientHeight,
+                                        naturalWidth: img.naturalWidth,
+                                        naturalHeight: img.naturalHeight
+                                    });
+                                }}
                                 onMouseMove={handleImageMouseMove}
                                 onMouseDown={handleImageMouseDown}
                                 onMouseUp={handleImageMouseUp}
@@ -517,12 +556,15 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
                                 <div>
                                     <h3 className="text-xs font-semibold text-on-surface-variant/80 uppercase tracking-wider mb-2">{t('inspector.attributes.all')}</h3>
                                     <div className="border border-outline-variant/30 rounded-2xl overflow-hidden text-sm">
-                                        {Object.entries(selectedNode.attributes).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => (
-                                            <div key={key} className="flex flex-col border-b border-outline-variant/30 last:border-0">
-                                                <div className="bg-surface-variant/80 px-3 py-1.5 text-xs text-on-surface-variant/80 font-medium break-all">{key}</div>
-                                                <div className="bg-surface px-3 py-2 font-mono text-on-surface-variant/80 break-all">{String(value)}</div>
-                                            </div>
-                                        ))}
+                                        {Object.entries(selectedNode.attributes)
+                                            .filter(([key, value]) => key !== undefined && value !== undefined && value !== null && value !== '')
+                                            .sort(([a], [b]) => a.localeCompare(b))
+                                            .map(([key, value]) => (
+                                                <div key={key} className="flex flex-col border-b border-outline-variant/30 last:border-0">
+                                                    <div className="bg-surface-variant/80 px-3 py-1.5 text-xs text-on-surface-variant/80 font-medium break-all">{key}</div>
+                                                    <div className="bg-surface px-3 py-2 font-mono text-on-surface-variant/80 break-all">{String(value)}</div>
+                                                </div>
+                                            ))}
                                     </div>
                                 </div>
                             </div>
@@ -600,6 +642,50 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
                             />
                         </div>
                     )}
+
+                    <div className="space-y-2 pt-2">
+                        <label className="text-xs font-medium text-on-surface-variant/80">{t('inspector.modal.additional_attrs', 'Additional Attributes')}</label>
+                        <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto custom-scrollbar p-1 border border-outline-variant/30 rounded-lg">
+                            {[
+                                { label: t('inspector.modal.attr_resource_id', 'Resource ID'), value: 'resource-id' },
+                                { label: t('inspector.modal.attr_text', 'Text'), value: 'text' },
+                                { label: t('inspector.modal.attr_content_desc', 'Content Desc'), value: 'content-desc' },
+                                { label: t('inspector.modal.attr_class', 'Class'), value: 'class' },
+                                { label: t('inspector.modal.attr_index', 'Index'), value: 'index' },
+                                { label: t('inspector.modal.attr_clickable', 'Clickable'), value: 'clickable' },
+                                { label: t('inspector.modal.attr_enabled', 'Enabled'), value: 'enabled' },
+                                { label: t('inspector.modal.attr_checked', 'Checked'), value: 'checked' },
+                                { label: t('inspector.modal.attr_selected', 'Selected'), value: 'selected' },
+                                { label: t('inspector.modal.attr_focusable', 'Focusable'), value: 'focusable' },
+                            ].filter(opt =>
+                                selectedNode?.attributes[opt.value] !== undefined &&
+                                selectedNode?.attributes[opt.value] !== null &&
+                                selectedNode?.attributes[opt.value] !== '' &&
+                                (editingAttr === 'xpath' ? opt.value !== editOptions.xpathAttr : opt.value !== editingAttr)
+                            ).map(opt => (
+                                <div key={opt.value} className="flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        id={`addon-${opt.value}`}
+                                        checked={editOptions.selectedAddons.includes(opt.value)}
+                                        onChange={(e) => {
+                                            const newAddons = e.target.checked
+                                                ? [...editOptions.selectedAddons, opt.value]
+                                                : editOptions.selectedAddons.filter(a => a !== opt.value);
+                                            const newOpts = { ...editOptions, selectedAddons: newAddons };
+                                            setEditOptions(newOpts);
+                                            updateCustomLocator(newOpts);
+                                        }}
+                                        className="rounded border-outline-variant/30 text-primary focus:ring-primary/20 h-3.5 w-3.5"
+                                    />
+                                    <label htmlFor={`addon-${opt.value}`} className="text-xs text-on-surface-variant/80 cursor-pointer truncate" title={opt.label}>
+                                        {opt.label}
+                                    </label>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
                     <div className="space-y-1 pt-4 border-t border-outline-variant/30">
                         <label className="text-xs font-medium text-on-surface-variant/80">{t('inspector.modal.result')}</label>
                         <div className="flex bg-surface-variant/20 p-3 rounded-2xl border border-outline-variant/30">
@@ -648,7 +734,7 @@ function NodeBreadcrumbs({ node, onSelect, onHover }: { node: InspectorNode, onS
 
 function CopyButton({ label, value, onCopy, onEdit, active }: { label: string, value: string | undefined, onCopy: (v: string) => void, onEdit: () => void, active: boolean }) {
     const { t } = useTranslation();
-    if (!value) return null; // Don't show if empty
+    if (value === undefined || value === null || value === '') return null; // Don't show if empty
     return (
         <div
             onClick={() => onCopy(value)}
