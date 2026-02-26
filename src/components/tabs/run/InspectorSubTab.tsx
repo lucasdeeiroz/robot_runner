@@ -372,14 +372,18 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
                 className="p-0"
                 status={
                     <div className="flex items-center gap-2">
-                        <div className="text-xs text-on-surface/80">
-                            {loading ? t('inspector.status.fetching') : t('inspector.status.ready')}
+                        <div className="flex items-center gap-2">
+                            <span className={clsx(
+                                "px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider",
+                                screenshot ? "bg-success/10 text-success" : "bg-warning/10 text-warning"
+                            )}>
+                                {screenshot ? t('inspector.status.ready') : (loading ? t('inspector.status.fetching') : t('inspector.status.loading'))}
+                            </span>
                         </div>
-                        <div className="h-4 w-px bg-surface/80 mx-1" />
                         <div className="flex gap-1">
-                            <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 4')} className="h-7 w-7 p-0 text-on-surface-variant/80" title={t('inspector.nav.back')}><ArrowLeft size={16} /></Button>
-                            <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 3')} className="h-7 w-7 p-0 text-on-surface-variant/80" title={t('inspector.nav.home')}><Home size={16} /></Button>
-                            <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 187')} className="h-7 w-7 p-0 text-on-surface-variant/80" title={t('inspector.nav.recents')}><Rows size={16} /></Button>
+                            <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 4')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" title={t('inspector.nav.back')}><ArrowLeft size={16} /></Button>
+                            <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 3')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" title={t('inspector.nav.home')}><Home size={16} /></Button>
+                            <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 187')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" title={t('inspector.nav.recents')}><Rows size={16} /></Button>
                         </div>
                     </div>
                 }

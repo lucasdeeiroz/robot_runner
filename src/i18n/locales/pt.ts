@@ -475,6 +475,8 @@ export const pt = {
                 scroll_view: "Rolagem",
                 tab: "Aba"
             },
+            screen_name: "Nome da Tela",
+            screen_type: "Tipo de Tela",
             screen_types: {
                 screen: "Tela",
                 modal: "Modal",
@@ -523,9 +525,9 @@ export const pt = {
                 screen_name: "Nome da Tela (Único)"
             },
             action: {
-                add: "Adicionar Mapeamento",
-                update: "Atualizar",
-                remove: "Remover",
+                add: "Adicionar Elemento",
+                update: "Atualizar Elemento",
+                remove: "Remover Elemento",
                 save_screen: "Salvar Tela",
                 load: "Carregar",
                 new: "Novo",
@@ -535,8 +537,8 @@ export const pt = {
             },
             feedback: {
                 mapped: "Elemento mapeado!",
-                updated: "Mapeador Atualizado",
-                removed: "Mapeamento removido",
+                updated: "Elemento Atualizado",
+                removed: "Elemento removido",
                 empty_map: "Nenhum elemento mapeado ainda",
                 saved: "Tela mapeada com sucesso!",
                 loaded: "Mapa de tela carregado",

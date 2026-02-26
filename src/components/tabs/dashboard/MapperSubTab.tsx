@@ -1,10 +1,11 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Maximize, Check, Scan, Home, ArrowLeft, Rows, X, RefreshCw, Wrench, Save, GitGraph, Trash2, Upload, Download } from 'lucide-react';
+import { Maximize, Check, Scan, Home, ArrowLeft, Rows, X, RefreshCw, Save, GitGraph, Trash2, Upload, Download, Plus, FileClock, FileInput, SearchCode } from 'lucide-react';
 import { XMLParser } from 'fast-xml-parser';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
+import { useOutsideClick } from '@/hooks/useOutsideClick';
 import { InspectorNode, transformXmlToTree, findNodesAtCoords, generateXPath, transformBounds } from '@/lib/inspectorUtils';
 import { feedback } from "@/lib/feedback";
 import { Section } from "@/components/organisms/Section";
@@ -43,11 +44,14 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     const [currentElement, setCurrentElement] = useState<Partial<UIElementMap>>({});
     const [savedMaps, setSavedMaps] = useState<ScreenMap[]>([]);
     const [showLoadMenu, setShowLoadMenu] = useState(false);
+    const loadMenuRef = useRef<HTMLDivElement>(null);
 
     // Helper state for confirmation modal
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [screenToDelete, setScreenToDelete] = useState<string | null>(null);
     const [isFlowchartOpen, setIsFlowchartOpen] = useState(false);
+
+    useOutsideClick(loadMenuRef, () => setShowLoadMenu(false));
 
     useEffect(() => {
         loadSavedMaps();
@@ -543,12 +547,19 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                         className="p-0"
                         status={
                             <div className="flex items-center gap-2">
-                                <span className={clsx(
-                                    "px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider",
-                                    screenshot ? "bg-success/10 text-success" : "bg-warning/10 text-warning"
-                                )}>
-                                    {screenshot ? t('mapper.status.ready') : (loading ? t('mapper.status.fetching') : t('mapper.status.loading'))}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                    <span className={clsx(
+                                        "px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider",
+                                        screenshot ? "bg-success/10 text-success" : "bg-warning/10 text-warning"
+                                    )}>
+                                        {screenshot ? t('mapper.status.ready') : (loading ? t('mapper.status.fetching') : t('mapper.status.loading'))}
+                                    </span>
+                                </div>
+                                <div className="flex gap-1">
+                                    <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 4')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" title={t('mapper.nav.back')}><ArrowLeft size={16} /></Button>
+                                    <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 3')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" title={t('mapper.nav.home')}><Home size={16} /></Button>
+                                    <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 187')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" title={t('mapper.nav.recents')}><Rows size={16} /></Button>
+                                </div>
                             </div>
                         }
                         menus={null}
@@ -584,17 +595,6 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                             </>
                         }
                     >
-                        <div className="flex items-center gap-2 mb-4 bg-surface-variant/20 p-2 rounded-2xl border border-outline-variant/30">
-                            <div className="text-xs text-on-surface/80">
-                                {loading ? t('mapper.status.fetching') : t('mapper.status.ready')}
-                            </div>
-                            <div className="h-4 w-px bg-surface/80 mx-1" />
-                            <div className="flex gap-1">
-                                <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 4')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" title={t('mapper.nav.back')}><ArrowLeft size={16} /></Button>
-                                <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 3')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" title={t('mapper.nav.home')}><Home size={16} /></Button>
-                                <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 187')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" title={t('mapper.nav.recents')}><Rows size={16} /></Button>
-                            </div>
-                        </div>
                     </Section>
 
                     <div className="flex-1 grid grid-cols-[auto_1fr] gap-4 min-h-0 overflow-hidden">
@@ -661,6 +661,98 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
                         {/* Properties Panel */}
                         <div className="bg-surface border border-outline-variant/30 rounded-2xl flex flex-col overflow-hidden shadow-sm flex-1">
+                            {/* Screen Settings Footer */}
+                            <div className="p-4 border-t border-outline-variant/30 bg-surface/50 space-y-3">
+                                <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
+                                    <Combobox
+                                        label={t('mapper.screen_name')}
+                                        value={screenName}
+                                        onChange={setScreenName}
+                                        options={savedMaps.map(m => m.name)}
+                                        placeholder={t('mapper.placeholder.screen_name')}
+                                    />
+                                    <div className="w-32">
+                                        <Select
+                                            label={t('mapper.screen_type')}
+                                            value={screenType}
+                                            onChange={(e) => setScreenType(e.target.value as any)}
+                                            options={['screen', 'modal', 'tab', 'drawer'].map(type => ({
+                                                label: t(`mapper.screen_types.${type}`),
+                                                value: type
+                                            }))}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <Button onClick={() => { handleSaveScreen(); refreshAll(); }} variant="primary">
+                                        <Save size={16} className="mr-2" /> {t('mapper.action.save_screen')}
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => {
+                                            setScreenName('');
+                                            setScreenType('screen');
+                                            setMappedElements([]);
+                                            setScreenshot(null);
+                                            refreshAll();
+                                        }}
+                                        className="gap-2"
+                                    >
+                                        <Plus size={16} /> {t('mapper.action.new')}
+                                    </Button>
+                                    <div className="relative group" ref={loadMenuRef}>
+                                        <Button variant="ghost" size="icon" onClick={() => setShowLoadMenu(!showLoadMenu)}><FileClock size={16} /></Button>
+                                        {showLoadMenu && (
+                                            <div className="absolute top-full left-0 mt-2 w-64 bg-surface rounded-xl shadow-xl border border-outline-variant/30 overflow-hidden z-[100] flex flex-col max-h-60">
+                                                <div className="p-3 border-b border-outline-variant/30 text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest bg-surface-variant/5">
+                                                    {t('mapper.saved_screens')}
+                                                </div>
+                                                <div className="overflow-y-auto custom-scrollbar flex-1">
+                                                    {savedMaps.length === 0 ? (
+                                                        <div className="p-4 text-center text-xs text-on-surface-variant/50 italic">{t('mapper.no_saved_maps')}</div>
+                                                    ) : (
+                                                        savedMaps.map(map => (
+                                                            <div
+                                                                key={map.id}
+                                                                onClick={() => handleLoadScreen(map)}
+                                                                className="flex items-center justify-between p-3 hover:bg-surface-variant/10 cursor-pointer border-b border-outline-variant/5 last:border-0 transition-colors group/item"
+                                                            >
+                                                                <div className="flex flex-col gap-0.5">
+                                                                    <span className="text-sm font-medium text-on-surface">{map.name}</span>
+                                                                    <span className="text-[10px] text-on-surface-variant/50 uppercase">{t(`mapper.screen_types.${map.type}`)}</span>
+                                                                </div>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    onClick={(e) => handleDeleteScreen(map.id, e)}
+                                                                    className="p-1.5 opacity-0 group-hover/item:opacity-100 hover:text-error hover:bg-error/10 rounded transition-all"
+                                                                >
+                                                                    <Trash2 size={16} />
+                                                                </Button>
+                                                            </div>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex-1 flex justify-end gap-2">
+                                        <Button onClick={handleImport} variant="ghost" size="icon"><Download size={16} /></Button>
+                                        <Button onClick={handleExport} variant="ghost" size="icon"><Upload size={16} /></Button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between border-t border-b border-outline-variant/30 p-4">
+                                <h3 className="text-sm font-semibold text-primary uppercase tracking-wider flex items-center gap-2">
+                                    <SearchCode size={14} /> {t('mapper.screen_mapper')}
+                                </h3>
+                                <div className="flex gap-2">
+                                    {mappedElements.find(e => e.id === currentElement.id) && (
+                                        <Button variant="ghost" size="icon" onClick={removeElementMapping} className="text-error" title={t('mapper.action.remove')}><Trash2 size={16} /></Button>
+                                    )}
+                                    <Button onClick={saveElementMapping} variant="primary" size="sm"><FileInput size={16} className="mr-2" />{mappedElements.find(e => e.id === currentElement.id) ? t('mapper.action.update') : t('mapper.action.add')}</Button>
+                                </div>
+                            </div>
                             <div className="flex items-center justify-between border-b border-outline-variant/30 shrink-0 bg-surface/50 pr-2">
                                 {availableNodes.length > 1 ? (
                                     <div className="flex overflow-x-auto custom-scrollbar flex-1">
@@ -699,7 +791,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
                             <div className="flex-1 overflow-y-auto custom-scrollbar p-0">
                                 <div className="p-4 space-y-4">
-                                    {selectedNode && (
+                                    {selectedNode ? (
                                         <>
                                             <NodeBreadcrumbs
                                                 node={selectedNode}
@@ -708,19 +800,6 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                             />
 
                                             <div className="pt-4 border-t border-outline-variant/30">
-                                                <div className="flex items-center justify-between mb-4">
-                                                    <h3 className="text-sm font-semibold text-primary uppercase tracking-wider flex items-center gap-2">
-                                                        <Wrench size={14} /> {t('mapper.screen_mapper')}
-                                                    </h3>
-                                                    <div className="flex gap-2">
-                                                        {mappedElements.find(e => e.id === currentElement.id) && (
-                                                            <Button variant="ghost" size="icon" onClick={removeElementMapping} className="text-error" title={t('mapper.action.remove')}><Trash2 size={16} /></Button>
-                                                        )}
-                                                        <Button onClick={saveElementMapping} variant="primary" size="sm">
-                                                            {mappedElements.find(e => e.id === currentElement.id) ? t('mapper.action.update') : t('mapper.action.add')}
-                                                        </Button>
-                                                    </div>
-                                                </div>
 
                                                 {/* Identifiers Section */}
                                                 <div className="mb-4 space-y-2">
@@ -789,91 +868,15 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                 </div>
                                             </div>
                                         </>
+                                    ) : !selectedNode && (
+                                        <div className="flex flex-col items-center justify-center h-full text-on-surface/80 p-8 text-center">
+                                            <Scan size={48} className="mb-4 opacity-20" />
+                                            <p className="text-sm">{t('mapper.select_element')}</p>
+                                        </div>
                                     )}
                                 </div>
                             </div>
 
-                            {/* Screen Settings Footer */}
-                            <div className="p-4 border-t border-outline-variant/30 bg-surface/50 space-y-3">
-                                <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
-                                    <Combobox
-                                        label={t('mapper.screen_name')}
-                                        value={screenName}
-                                        onChange={setScreenName}
-                                        options={savedMaps.map(m => m.name)}
-                                        placeholder={t('mapper.placeholder.screen_name')}
-                                    />
-                                    <div className="w-32">
-                                        <Select
-                                            label={t('mapper.screen_type')}
-                                            value={screenType}
-                                            onChange={(e) => setScreenType(e.target.value as any)}
-                                            options={['screen', 'modal', 'tab', 'drawer'].map(type => ({
-                                                label: t(`mapper.screen_types.${type}`),
-                                                value: type
-                                            }))}
-                                        />
-                                    </div>
-                                </div>
-                                <div className="flex gap-2">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => {
-                                            setScreenName('');
-                                            setScreenType('screen');
-                                            setMappedElements([]);
-                                            setScreenshot(null);
-                                            refreshAll();
-                                        }}
-                                        className="gap-2"
-                                    >
-                                        <Wrench size={16} /> {t('mapper.action.new')}
-                                    </Button>
-                                    <div className="relative group">
-                                        <Button variant="ghost" size="icon" onClick={() => setShowLoadMenu(!showLoadMenu)}><RefreshCw size={16} /></Button>
-                                        {showLoadMenu && (
-                                            <div className="absolute bottom-full left-0 mb-2 w-64 bg-surface rounded-xl shadow-xl border border-outline-variant/30 overflow-hidden z-50 flex flex-col max-h-60">
-                                                <div className="p-3 border-b border-outline-variant/30 text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest bg-surface-variant/5">
-                                                    {t('mapper.saved_screens')}
-                                                </div>
-                                                <div className="overflow-y-auto custom-scrollbar flex-1">
-                                                    {savedMaps.length === 0 ? (
-                                                        <div className="p-4 text-center text-xs text-on-surface-variant/50 italic">{t('mapper.no_saved_maps')}</div>
-                                                    ) : (
-                                                        savedMaps.map(map => (
-                                                            <div
-                                                                key={map.id}
-                                                                onClick={() => handleLoadScreen(map)}
-                                                                className="flex items-center justify-between p-3 hover:bg-surface-variant/10 cursor-pointer border-b border-outline-variant/5 last:border-0 transition-colors group/item"
-                                                            >
-                                                                <div className="flex flex-col gap-0.5">
-                                                                    <span className="text-sm font-medium text-on-surface">{map.name}</span>
-                                                                    <span className="text-[10px] text-on-surface-variant/50 uppercase">{t(`mapper.screen_types.${map.type}`)}</span>
-                                                                </div>
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    onClick={(e) => handleDeleteScreen(map.id, e)}
-                                                                    className="p-1.5 opacity-0 group-hover/item:opacity-100 hover:text-error hover:bg-error/10 rounded transition-all"
-                                                                >
-                                                                    <Trash2 size={16} />
-                                                                </Button>
-                                                            </div>
-                                                        ))
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                    <Button onClick={handleImport} variant="ghost" size="icon"><Download size={16} /></Button>
-                                    <Button onClick={handleExport} variant="ghost" size="icon"><Upload size={16} /></Button>
-                                    <div className="flex-1" />
-                                    <Button onClick={() => { handleSaveScreen(); refreshAll(); }} variant="primary">
-                                        <Save size={16} className="mr-2" /> {t('mapper.action.save_screen')}
-                                    </Button>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </>
