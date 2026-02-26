@@ -3,19 +3,13 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PageHeader } from '@/components/organisms/PageHeader';
 import { LayoutDashboard } from 'lucide-react';
-import { ScenarioInput } from '@/components/tabs/dashboard/ScenarioInput';
-import { ScenarioEditor } from '@/components/tabs/dashboard/ScenarioEditor';
+import { AIGeneratorSubTab } from '@/components/tabs/dashboard/AIGeneratorSubTab';
 import { ImageEditor } from '@/components/tabs/dashboard/ImageEditor';
 import { HistoryPanel } from '@/components/tabs/dashboard/HistoryPanel';
 import { MapperSubTab } from '@/components/tabs/dashboard/MapperSubTab';
-import { listScreenMaps } from '@/lib/dashboard/mapperPersistence';
-import { generateTestCases } from '@/lib/dashboard/generator';
 import clsx from 'clsx';
 import { TabItem } from '@/components/molecules/Tabs';
 import { TabBar } from '@/components/organisms/TabBar';
-import { useSettings } from '@/lib/settings';
-import { generateRefinedTestCases } from '@/lib/dashboard/gemini';
-import { feedback } from '@/lib/feedback';
 import { useDevices } from '@/lib/deviceStore';
 import { DeviceSelector } from '@/components/molecules/DeviceSelector';
 import { useTestSessions } from '@/lib/testSessionStore';
@@ -28,9 +22,6 @@ interface DashboardPageProps {
 export function DashboardPage({ onNavigate }: DashboardPageProps) {
     const { t } = useTranslation();
     const [activeTab, setActiveTab] = useState('scenarios');
-    const [generatedContent, setGeneratedContent] = useState('');
-    const { settings, activeProfileId } = useSettings();
-    const [isGenerating, setIsGenerating] = useState(false);
 
     // Device Management (Global)
     const { devices, selectedDevices, loading: loadingDevices, loadDevices: refreshDevices, setSelectedDevices } = useDevices();
@@ -56,33 +47,6 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
         }
     };
 
-    const handleGenerate = async (text: string, language: string) => {
-        if (!text.trim()) return;
-
-        // 1. Try Gemini if API Key is present
-        if (settings.geminiApiKey) {
-            setIsGenerating(true);
-            try {
-                const maps = await listScreenMaps(activeProfileId);
-                const aiResponse = await generateRefinedTestCases(text, settings.geminiApiKey, settings.geminiModel, language, maps);
-                setGeneratedContent(aiResponse);
-                feedback.toast.success("dashboard.actions.generated_success", { method: "Gemini AI" });
-                return;
-            } catch (e: any) {
-                console.error("Gemini generation failed, falling back to local:", e);
-                feedback.toast.error("dashboard.actions.gemini_failed", { error: e.message });
-                // Fallthrough to local generator
-            } finally {
-                setIsGenerating(false);
-            }
-        } else {
-            feedback.toast.info("dashboard.actions.using_local_generator", { message: "Configure Gemini API Key in Settings for AI-powered generation." });
-        }
-
-        // 2. Fallback to Local Regex Generator
-        const scenarios = generateTestCases(text, language);
-        setGeneratedContent(scenarios);
-    };
 
     const tabs: TabItem[] = [
         { id: 'scenarios', label: t('dashboard.tabs.scenarios', "Scenario Generator") },
@@ -126,21 +90,8 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
 
             <div className="flex-1 min-h-0 bg-surface p-4 border border-outline-variant/30 rounded-2xl relative z-10 flex flex-col">
                 {/* SCENARIOS TAB */}
-                <div className={clsx("flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-4", activeTab === 'scenarios' ? "block" : "hidden")}>
-                    <div className="bg-surface-variant/10 rounded-2xl p-4 border border-outline-variant/30 flex flex-col min-h-0 flex-1">
-                        <ScenarioInput
-                            onGenerate={handleGenerate}
-                            onClear={() => setGeneratedContent('')}
-                            isLoading={isGenerating}
-                        />
-                    </div>
-                    <div className="bg-surface-variant/10 rounded-2xl p-4 border border-outline-variant/30 flex flex-col min-h-0 flex-1">
-                        <ScenarioEditor
-                            content={generatedContent}
-                            onUpdate={setGeneratedContent}
-                            onClear={() => setGeneratedContent('')}
-                        />
-                    </div>
+                <div className={clsx("flex-1 min-h-0", activeTab === 'scenarios' ? "flex flex-col" : "hidden")}>
+                    <AIGeneratorSubTab />
                 </div>
 
                 {/* IMAGES TAB */}

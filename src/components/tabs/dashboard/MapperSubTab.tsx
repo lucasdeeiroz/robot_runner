@@ -508,502 +508,376 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         };
     };
 
-    if (!selectedDevice) {
-        return (
-            <div className="h-full flex flex-col items-center justify-center text-on-surface/80">
-                <Scan size={48} className="mb-4 opacity-20" />
-                <p>{t('mapper.empty')}</p>
-            </div>
-        );
-    }
-
-    if (isTestRunning) {
-        return (
-            <div className="h-full flex flex-col items-center justify-center text-on-surface-variant/80 text-sm">
-                <Scan size={32} className="opacity-20 mb-2" />
-                <p>{t('mapper.status.paused_test', 'Mapper disabled during test')}</p>
-            </div>
-        );
-    }
-
     return (
         <div ref={setContainerRef} className="flex-1 min-h-[700px] flex flex-col space-y-4">
-            {/* Toolbar - Now at the Top */}
-            <Section
-                title={t('mapper.title', 'Mapper')}
-                icon={Scan}
-                variant="transparent"
-                className="p-0"
-                status={
-                    <div className="flex items-center gap-2">
-                        <div className="text-xs text-on-surface/80">
-                            {loading ? t('mapper.status.fetching') : t('mapper.status.ready')}
-                        </div>
-                        <div className="h-4 w-px bg-surface/80 mx-1" />
-                        <div className="flex gap-1">
-                            <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 4')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" title={t('mapper.nav.back')}><ArrowLeft size={16} /></Button>
-                            <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 3')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" title={t('mapper.nav.home')}><Home size={16} /></Button>
-                            <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 187')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" title={t('mapper.nav.recents')}><Rows size={16} /></Button>
-                        </div>
-                    </div>
-                }
-                menus={null}
-                actions={
-                    <>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={refreshAll}
-                            disabled={loading}
-                            className={clsx(
-                                "flex items-center gap-2 px-3 py-1.5 bg-surface-variant/30 border border-outline-variant/30 rounded-2xl hover:bg-surface/50 text-sm font-medium transition-colors disabled:opacity-50",
-                                loading && "cursor-wait"
-                            )}
-                            title={t('mapper.refresh')}
-                        >
-                            {loading ? <ExpressiveLoading size="xsm" variant="circular" /> : <RefreshCw size={16} />}
-                            <span className={clsx(isNarrow && "hidden")}>{t('mapper.refresh')}</span>
-                        </Button>
-                        <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={() => {
-                                loadSavedMaps();
-                                setIsFlowchartOpen(true);
-                            }}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-primary text-on-primary rounded-2xl hover:bg-primary/90 transition-colors shadow-sm text-sm font-medium"
-                            title={t('mapper.flowchart.open', 'Open Flowchart')}
-                        >
-                            <GitGraph size={16} />
-                            <span className={clsx(isNarrow && "hidden")}>{t('mapper.flowchart.open', 'Open Flowchart')}</span>
-                        </Button>
-
-                    </>
-                }
-            />
-
-            <div className="flex-1 grid grid-cols-[auto_1fr] gap-4 min-h-0 overflow-hidden">
-                {/* Left: Device Screen (Adaptive) */}
-                <div className="flex flex-col items-center justify-center overflow-hidden relative max-w-[30vw] bg-surface-variant/5 border border-outline-variant/20 rounded-2xl p-4">
-                    {screenshot ? (
-                        <div className="relative inline-block shadow-2xl rounded-lg border border-outline-variant/30 flex-shrink-0 mb-4">
-                            <img
-                                ref={imgRef}
-                                src={`data:image/png;base64,${screenshot}`}
-                                alt="Device Screenshot"
-                                className="block w-auto h-auto max-w-full max-h-[650px] select-none rounded-lg"
-                                onLoad={(e) => {
-                                    const img = e.currentTarget;
-                                    setImgLayout({
-                                        width: img.clientWidth,
-                                        height: img.clientHeight,
-                                        naturalWidth: img.naturalWidth,
-                                        naturalHeight: img.naturalHeight
-                                    });
-                                }}
-                                onMouseMove={handleImageMouseMove}
-                                onMouseDown={handleImageMouseDown}
-                                onMouseUp={handleImageMouseUp}
-                                onDoubleClick={handleScreenshotDoubleClick}
-                                draggable={false}
-                            />
-                            {/* Animation Layers */}
-                            {taps.map(tap => (
-                                <div
-                                    key={tap.id}
-                                    className="absolute rounded-2xl bg-surface border-2 border-on-primary animate-ping pointer-events-none"
-                                    style={{
-                                        left: tap.x - 20,
-                                        top: tap.y - 20,
-                                        width: 40,
-                                        height: 40,
-                                        animationDuration: '0.4s'
-                                    }}
-                                />
-                            ))}
-
-                            {swipes.map(swipe => (
-                                <svg
-                                    key={swipe.id}
-                                    className="absolute top-0 left-0 w-full h-full pointer-events-none"
-                                    style={{ zIndex: 30 }}
-                                >
-                                    <defs>
-                                        <marker id={`arrow-${swipe.id}`} markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
-                                            <path d="M0,0 L0,6 L9,3 z" fill="#f97316" />
-                                        </marker>
-                                    </defs>
-                                    <line
-                                        x1={swipe.startX} y1={swipe.startY}
-                                        x2={swipe.endX} y2={swipe.endY}
-                                        stroke="#f97316"
-                                        strokeWidth="4"
-                                        strokeOpacity="0.8"
-                                        markerEnd={`url(#arrow-${swipe.id})`}
-                                        className="transition-opacity duration-500 ease-out"
-                                        style={{ opacity: 0 }} // We'll need a way to fade it out, mapped to CSS animation or just state key
-                                    >
-                                        <animate attributeName="opacity" values="1;0" dur="0.5s" fill="freeze" />
-                                    </line>
-                                </svg>
-                            ))}
-
-                            {/* Ongoing Swipe Preview */}
-                            {isDragging && swipeStart && (
-                                <div className="absolute w-full h-full top-0 left-0 pointer-events-none z-30">
-                                    <div
-                                        className="absolute w-4 h-4 bg-orange-500 rounded-2xl -ml-2 -mt-2 opacity-50"
-                                        style={{ left: swipeStart?.x, top: swipeStart?.y }}
-                                    />
-                                </div>
-                            )}
-                            <div
-                                className="absolute border-2 border-info-container/80 pointer-events-none transition-all duration-75 z-10"
-                                style={{ ...getHighlighterStyle(hoveredNode, '#60a5fa'), display: hoveredNode?.bounds ? 'block' : 'none' }}
-                            />
-                            <div
-                                className="absolute border-2 border-error pointer-events-none z-20"
-                                style={{ ...getHighlighterStyle(selectedNode, '#ef4444'), display: selectedNode?.bounds ? 'block' : 'none' }}
-                            />
-                        </div>
-                    ) : (
-                        <div className="text-on-surface/80 flex flex-col items-center">
-                            {loading ? <ExpressiveLoading size="lg" variant="circular" className="mb-2" /> : <Maximize size={32} className="mb-2 opacity-50" />}
-                            <p>{loading ? t('mapper.status.loading') : t('mapper.status.no_screenshot')}</p>
-                        </div>
-                    )}
+            {!selectedDevice ? (
+                <div className="h-full flex-1 flex flex-col items-center justify-center text-on-surface/80">
+                    <Scan size={48} className="mb-4 opacity-20" />
+                    <p>{t('mapper.empty')}</p>
+                    <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => {
+                            loadSavedMaps();
+                            setIsFlowchartOpen(true);
+                        }}
+                        className="flex items-center gap-2 px-3 py-1.5 mt-4 bg-primary text-on-primary rounded-2xl hover:bg-primary/90 transition-colors shadow-sm text-sm font-medium"
+                        title={t('mapper.flowchart.open', 'Open Flowchart')}
+                    >
+                        <GitGraph size={16} />
+                        <span className={clsx(isNarrow && "hidden")}>{t('mapper.flowchart.open', 'Open Flowchart')}</span>
+                    </Button>
                 </div>
-
-                {/* Right: Properties Scroll View */}
-                <div className="bg-surface border border-outline-variant/30 rounded-2xl flex flex-col overflow-hidden shadow-sm flex-1">
-                    <div className="flex items-center justify-between border-b border-outline-variant/30 shrink-0 bg-surface/50 pr-2">
-                        {availableNodes.length > 1 ? (
-                            <div className="flex overflow-x-auto custom-scrollbar flex-1">
-                                {availableNodes.map((node) => (
-                                    <button
-                                        key={node.id}
-                                        onClick={() => setSelectedNode(node)}
-                                        className={clsx(
-                                            "px-4 py-3 text-sm font-medium border-b-2 transition-colors space-nowrap",
-                                            selectedNode === node
-                                                ? "border-primary text-primary bg-surface-variant/30"
-                                                : "border-transparent text-on-surface-variant/80 hover:text-on-surface-variant/80 hover:bg-surface-variant/30"
-                                        )}
-                                    >
-                                        {node.tagName}
-                                        {node.attributes['resource-id'] && <span className="ml-2 text-xs opacity-50 truncate max-w-[100px] inline-block align-bottom">{node.attributes['resource-id'].split('/').pop()}</span>}
-                                    </button>
-                                ))}
+            ) : isTestRunning ? (
+                <div className="h-full flex-1 flex flex-col items-center justify-center text-on-surface-variant/80 text-sm">
+                    <Scan size={32} className="opacity-20 mb-2" />
+                    <p>{t('mapper.status.paused_test', 'Mapper disabled during test')}</p>
+                </div>
+            ) : (
+                <>
+                    {/* Toolbar */}
+                    <Section
+                        title={t('mapper.title', 'Mapper')}
+                        icon={Scan}
+                        variant="transparent"
+                        className="p-0"
+                        status={
+                            <div className="flex items-center gap-2">
+                                <span className={clsx(
+                                    "px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider",
+                                    screenshot ? "bg-success/10 text-success" : "bg-warning/10 text-warning"
+                                )}>
+                                    {screenshot ? t('mapper.status.ready') : (loading ? t('mapper.status.fetching') : t('mapper.status.loading'))}
+                                </span>
                             </div>
-                        ) : (
-                            <div className="px-4 py-3 text-sm font-semibold text-on-surface-variant/80 flex-1">
-                                {t('mapper.properties')}
+                        }
+                        menus={null}
+                        actions={
+                            <>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={refreshAll}
+                                    disabled={loading}
+                                    className={clsx(
+                                        "flex items-center gap-2 px-3 py-1.5 bg-surface-variant/30 border border-outline-variant/30 rounded-2xl hover:bg-surface/50 text-sm font-medium transition-colors disabled:opacity-50",
+                                        loading && "cursor-wait"
+                                    )}
+                                    title={t('mapper.refresh')}
+                                >
+                                    {loading ? <ExpressiveLoading size="xsm" variant="circular" /> : <RefreshCw size={16} />}
+                                    <span className={clsx(isNarrow && "hidden")}>{t('mapper.refresh')}</span>
+                                </Button>
+                                <Button
+                                    variant="primary"
+                                    size="sm"
+                                    onClick={() => {
+                                        loadSavedMaps();
+                                        setIsFlowchartOpen(true);
+                                    }}
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-primary text-on-primary rounded-2xl hover:bg-primary/90 transition-colors shadow-sm text-sm font-medium"
+                                    title={t('mapper.flowchart.open', 'Open Flowchart')}
+                                >
+                                    <GitGraph size={16} />
+                                    <span className={clsx(isNarrow && "hidden")}>{t('mapper.flowchart.open', 'Open Flowchart')}</span>
+                                </Button>
+                            </>
+                        }
+                    >
+                        <div className="flex items-center gap-2 mb-4 bg-surface-variant/20 p-2 rounded-2xl border border-outline-variant/30">
+                            <div className="text-xs text-on-surface/80">
+                                {loading ? t('mapper.status.fetching') : t('mapper.status.ready')}
                             </div>
-                        )}
-
-                        {/* Clear Selection Button */}
-                        {selectedNode && (
-                            <button
-                                onClick={() => {
-                                    setSelectedNode(null);
-                                    setAvailableNodes([]);
-                                }}
-                                className="p-1.5 text-on-surface/80 hover:text-error hover:bg-error-container/10 rounded-2xl transition-colors ml-2"
-                                title={t('mapper.clear_selection')}
-                            >
-                                <X size={16} />
-                            </button>
-                        )}
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto custom-scrollbar p-0">
-                        <div className="pl-4 pr-4">
-                            {/* Quick Copy Actions / Identifiers (Only if node selected) */}
-                            {selectedNode && (
-                                <div className="pt-4 pb-4 space-y-4">
-                                    <div className="mt-1">
-                                        <h3 className="text-xs font-semibold text-on-surface-variant/80 uppercase tracking-wider mb-2">{t('mapper.attributes.hierarchy')}</h3>
-                                        <NodeBreadcrumbs
-                                            node={selectedNode!}
-                                            onSelect={setSelectedNode}
-                                            onHover={setHoveredNode}
-                                        />
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* --- SCREEN MAPPER UI --- */}
-                            <div className={clsx("pt-4 pb-4 border-t border-outline-variant/30", !selectedNode && "mt-0 border-t-0 pt-0")}>
-                                <div className="flex items-center justify-between mb-4">
-                                    <h3 className="text-sm font-semibold text-primary uppercase tracking-wider flex items-center gap-2">
-                                        <Wrench size={14} /> {t('mapper.screen_mapper')}
-                                    </h3>
-                                    {/* Saved Elements Dropdown */}
-                                    {mappedElements.length > 0 && (
-                                        <div className="ml-auto">
-                                            <Combobox
-                                                value={mappedElements.find(e => e.id === currentElement.id)?.name || ''}
-                                                onChange={(name) => {
-                                                    const el = mappedElements.find(e => e.name === name);
-                                                    if (el) {
-                                                        setCurrentElement(el);
-                                                        setSelectedNode(null); // Clear selection to Switch context
-                                                    }
-                                                }}
-                                                options={mappedElements.map(e => e.name)}
-                                                placeholder={mappedElements.length + ' ' + t('mapper.elements_mapped')}
-                                                triggerClassName="h-8 text-xs bg-surface-variant/10"
-                                            />
-                                        </div>
-                                    )}
-                                    {mappedElements.find(e => e.id === currentElement.id) && (
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={removeElementMapping}
-                                            className="p-2 ml-2 text-on-surface/80 hover:text-error hover:bg-error-container/10"
-                                            title={t('mapper.action.remove')}
-                                        >
-                                            <Trash2 size={16} />
-                                        </Button>
-                                    )}
-                                    <Button
-                                        onClick={saveElementMapping}
-                                        variant="primary"
-                                        size="sm"
-                                        className="p-2 ml-2 hover:text-on-surface"
-                                        title={mappedElements.find(e => e.id === currentElement.id) ? t('mapper.action.update') : t('mapper.action.add')}
-                                    >
-                                        {mappedElements.find(e => e.id === currentElement.id) ? t('mapper.action.update') : t('mapper.action.add')}
-                                    </Button>
-                                </div>
-
-                                {/* Identifiers Section - Moved here as requested */}
-                                <div className="mb-2 space-y-2">
-                                    <h3 className="text-xs font-semibold text-on-surface-variant/80 uppercase tracking-wider">{t('inspector.attributes.identifiers')}</h3>
-                                    <div className={clsx(
-                                        "grid grid-cols-1 gap-2",
-                                        selectedNode?.attributes['content-desc'] && selectedNode?.attributes['resource-id'] ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 md:grid-cols-1"
-                                    )}>
-                                        <CopyButton
-                                            label={t('inspector.attributes.access_id')}
-                                            value={selectedNode?.attributes['content-desc']}
-                                            onCopy={(v) => copyToClipboard(v, 'aid')}
-                                            active={copied === 'aid'}
-                                        />
-                                        <CopyButton
-                                            label={t('inspector.attributes.resource_id')}
-                                            value={selectedNode?.attributes['resource-id']}
-                                            onCopy={(v) => copyToClipboard(v, 'rid')}
-                                            active={copied === 'rid'}
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="space-y-4">
-                                    {/* Name and Type Row */}
-                                    <div className="grid grid-cols-[1fr_auto] gap-2 items-start">
-                                        <div className="space-y-1">
-                                            <label className="text-xs text-on-surface-variant/80 font-medium">{t('mapper.input.element_name')} <span className="text-error">*</span></label>
-                                            <Input
-                                                value={currentElement.name || ''}
-                                                onChange={(e) => updateElement('name', e.target.value)}
-                                                className="bg-surface-variant/10"
-                                                placeholder={t('mapper.placeholder.element_name')}
-                                            />
-                                        </div>
-                                        <div className="w-32 space-y-1">
-                                            <label className="text-xs text-on-surface-variant/80 font-medium">{t('mapper.input.element_type')}</label>
-                                            <Select
-                                                value={currentElement.type || 'button'}
-                                                onChange={(e) => updateElement('type', e.target.value)}
-                                                options={(['button', 'input', 'text', 'link', 'toggle', 'checkbox', 'image', 'menu', 'scroll_view', 'tab'] as UIElementType[]).map(type => ({
-                                                    label: t(`mapper.types.${type}`),
-                                                    value: type
-                                                }))}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-[1fr_auto] gap-2 items-start">
-                                        <div className="space-y-4">
-                                            {/* Navigation Target */}
-                                            <div className="space-y-1">
-                                                <Combobox
-                                                    label={t('mapper.input.navigates_to')}
-                                                    value={currentElement.navigates_to || ''}
-                                                    onChange={(val) => updateElement('navigates_to', val)}
-                                                    options={savedMaps.map(m => m.name)}
-                                                    placeholder={t('mapper.placeholder.navigates_to')}
-                                                />
-                                            </div>
-
-                                            {/* Complex: Menu Options */}
-                                            {currentElement.type === 'menu' && (
-                                                <div className="space-y-1">
-                                                    <label className="text-xs text-on-surface-variant/80 font-medium">{t('mapper.input.menu_options')}</label>
-                                                    <Textarea
-                                                        value={currentElement.menu_options?.join(',') || ''}
-                                                        onChange={(e) => updateElement('menu_options', e.target.value.split(','))}
-                                                        className="bg-surface-variant/10 h-20"
-                                                        placeholder={t('mapper.placeholder.menu_options')}
-                                                    />
-                                                </div>
-                                            )}
-
-                                            {/* Complex: Tab Parent */}
-                                            {currentElement.type === 'tab' && (
-                                                <div className="space-y-1">
-                                                    <Combobox
-                                                        label={t('mapper.input.parent_screen')}
-                                                        value={currentElement.parent_screen || ''}
-                                                        onChange={(val) => updateElement('parent_screen', val)}
-                                                        options={savedMaps.map(m => m.name)}
-                                                        placeholder={t('mapper.placeholder.parent_screen')}
-                                                    />
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Action Buttons Column */}
-                                        <div className="flex flex-col gap-2 pt-6 w-32">
-
-
-                                        </div>
-                                    </div>
-                                </div>
+                            <div className="h-4 w-px bg-surface/80 mx-1" />
+                            <div className="flex gap-1">
+                                <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 4')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" title={t('mapper.nav.back')}><ArrowLeft size={16} /></Button>
+                                <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 3')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" title={t('mapper.nav.home')}><Home size={16} /></Button>
+                                <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 187')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" title={t('mapper.nav.recents')}><Rows size={16} /></Button>
                             </div>
                         </div>
+                    </Section>
 
-                    </div>
-
-                    {/* ALWAYS VISIBLE: Screen Settings Footer */}
-                    <div className="p-4 border-t border-outline-variant/30 bg-surface/50">
-                        <div className="space-y-3">
-                            <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
-                                <Combobox
-                                    value={screenName}
-                                    onChange={setScreenName}
-                                    options={savedMaps.map(m => m.name)}
-                                    placeholder={t('mapper.placeholder.screen_name')}
-                                />
-                                <div className="w-32">
-                                    <Select
-                                        value={screenType}
-                                        onChange={(e) => setScreenType(e.target.value as any)}
-                                        options={['screen', 'modal', 'tab', 'drawer'].map(type => ({
-                                            label: t(`mapper.screen_types.${type}`),
-                                            value: type
-                                        }))}
+                    <div className="flex-1 grid grid-cols-[auto_1fr] gap-4 min-h-0 overflow-hidden">
+                        {/* Device Screen */}
+                        <div className="flex flex-col items-center justify-center overflow-hidden relative max-w-[30vw] bg-surface-variant/5 border border-outline-variant/20 rounded-2xl p-4">
+                            {screenshot ? (
+                                <div className="relative inline-block shadow-2xl rounded-lg border border-outline-variant/30 flex-shrink-0 mb-4">
+                                    <img
+                                        ref={imgRef}
+                                        src={`data:image/png;base64,${screenshot}`}
+                                        alt="Device Screenshot"
+                                        className="block w-auto h-auto max-w-full max-h-[650px] select-none rounded-lg"
+                                        onLoad={(e) => {
+                                            const img = e.currentTarget;
+                                            setImgLayout({
+                                                width: img.clientWidth,
+                                                height: img.clientHeight,
+                                                naturalWidth: img.naturalWidth,
+                                                naturalHeight: img.naturalHeight
+                                            });
+                                        }}
+                                        onMouseMove={handleImageMouseMove}
+                                        onMouseDown={handleImageMouseDown}
+                                        onMouseUp={handleImageMouseUp}
+                                        onDoubleClick={handleScreenshotDoubleClick}
+                                        draggable={false}
+                                    />
+                                    {/* Animation Layers */}
+                                    {taps.map(tap => (
+                                        <div
+                                            key={tap.id}
+                                            className="absolute rounded-full bg-primary/30 border-2 border-primary animate-ping pointer-events-none"
+                                            style={{ left: tap.x - 20, top: tap.y - 20, width: 40, height: 40 }}
+                                        />
+                                    ))}
+                                    {swipes.map(swipe => (
+                                        <svg key={swipe.id} className="absolute top-0 left-0 w-full h-full pointer-events-none z-30">
+                                            <line
+                                                x1={swipe.startX} y1={swipe.startY}
+                                                x2={swipe.endX} y2={swipe.endY}
+                                                stroke="var(--color-primary)"
+                                                strokeWidth="4"
+                                                strokeDasharray="8 4"
+                                                className="animate-pulse"
+                                            />
+                                        </svg>
+                                    ))}
+                                    <div
+                                        className="absolute border-2 border-info-container/80 pointer-events-none transition-all duration-75 z-10"
+                                        style={{ ...getHighlighterStyle(hoveredNode, '#60a5fa'), display: hoveredNode?.bounds ? 'block' : 'none' }}
+                                    />
+                                    <div
+                                        className="absolute border-2 border-error pointer-events-none z-20"
+                                        style={{ ...getHighlighterStyle(selectedNode, '#ef4444'), display: selectedNode?.bounds ? 'block' : 'none' }}
                                     />
                                 </div>
+                            ) : (
+                                <div className="text-on-surface/80 flex flex-col items-center">
+                                    {loading ? <ExpressiveLoading size="lg" variant="circular" className="mb-2" /> : <Maximize size={32} className="mb-2 opacity-50" />}
+                                    <p>{loading ? t('mapper.status.loading') : t('mapper.status.no_screenshot')}</p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Properties Panel */}
+                        <div className="bg-surface border border-outline-variant/30 rounded-2xl flex flex-col overflow-hidden shadow-sm flex-1">
+                            <div className="flex items-center justify-between border-b border-outline-variant/30 shrink-0 bg-surface/50 pr-2">
+                                {availableNodes.length > 1 ? (
+                                    <div className="flex overflow-x-auto custom-scrollbar flex-1">
+                                        {availableNodes.map((node) => (
+                                            <button
+                                                key={node.id}
+                                                onClick={() => setSelectedNode(node)}
+                                                className={clsx(
+                                                    "px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
+                                                    selectedNode === node
+                                                        ? "border-primary text-primary bg-surface-variant/30"
+                                                        : "border-transparent text-on-surface-variant/80 hover:text-on-surface-variant/80 hover:bg-surface-variant/30"
+                                                )}
+                                            >
+                                                {node.tagName}
+                                            </button>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="px-4 py-3 text-sm font-semibold text-on-surface-variant/80 flex-1">
+                                        {t('mapper.properties')}
+                                    </div>
+                                )}
+                                {selectedNode && (
+                                    <button
+                                        onClick={() => {
+                                            setSelectedNode(null);
+                                            setAvailableNodes([]);
+                                        }}
+                                        className="p-1.5 text-on-surface/80 hover:text-error hover:bg-error-container/10 rounded-2xl transition-colors ml-2"
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                )}
                             </div>
 
-                            <div className="flex gap-2 pt-2">
-                                <Button
-                                    onClick={() => {
-                                        setScreenName('');
-                                        setScreenType('screen');
-                                        setMappedElements([]);
-                                        setScreenshot(null);
-                                        refreshAll();
-                                        setSavedMaps(prev => [...prev]);
-                                        feedback.toast.success(t('mapper.feedback.new_screen'));
-                                    }}
-                                    className="px-3 py-1.5 bg-surface border border-outline-variant/30 rounded text-sm font-medium hover:bg-surface-variant/10 text-on-surface/80 flex items-center gap-2 transition-colors"
-                                    title={t('mapper.action.new')}
-                                >
-                                    <Wrench size={16} />
-                                    {t('mapper.action.new')}
-                                </Button>
+                            <div className="flex-1 overflow-y-auto custom-scrollbar p-0">
+                                <div className="p-4 space-y-4">
+                                    {selectedNode && (
+                                        <>
+                                            <NodeBreadcrumbs
+                                                node={selectedNode}
+                                                onSelect={setSelectedNode}
+                                                onHover={setHoveredNode}
+                                            />
 
-                                <div className="relative">
-                                    <Button
-                                        onClick={() => setShowLoadMenu(!showLoadMenu)}
-                                        className="px-3 py-1.5 bg-surface border border-outline-variant/30 rounded text-sm font-medium hover:bg-surface-variant/10 text-on-surface/80 flex items-center gap-2 transition-colors"
-                                        title={t('mapper.action.load')}
-                                    >
-                                        <RefreshCw size={16} />
-                                    </Button>
-                                    {/* Load Menu Dropdown */}
-                                    {showLoadMenu && (
-                                        <div className="absolute bottom-full left-0 mb-2 w-64 bg-surface rounded-xl shadow-xl border border-outline-variant/30 overflow-hidden z-50 flex flex-col max-h-60">
-                                            <div className="p-3 border-b border-outline-variant/30 text-xs font-bold text-on-surface-variant/50 uppercase tracking-wider bg-surface-variant/10">
-                                                {t('mapper.saved_screens')}
+                                            <div className="pt-4 border-t border-outline-variant/30">
+                                                <div className="flex items-center justify-between mb-4">
+                                                    <h3 className="text-sm font-semibold text-primary uppercase tracking-wider flex items-center gap-2">
+                                                        <Wrench size={14} /> {t('mapper.screen_mapper')}
+                                                    </h3>
+                                                    <div className="flex gap-2">
+                                                        {mappedElements.find(e => e.id === currentElement.id) && (
+                                                            <Button variant="ghost" size="icon" onClick={removeElementMapping} className="text-error" title={t('mapper.action.remove')}><Trash2 size={16} /></Button>
+                                                        )}
+                                                        <Button onClick={saveElementMapping} variant="primary" size="sm">
+                                                            {mappedElements.find(e => e.id === currentElement.id) ? t('mapper.action.update') : t('mapper.action.add')}
+                                                        </Button>
+                                                    </div>
+                                                </div>
+
+                                                {/* Identifiers Section */}
+                                                <div className="mb-4 space-y-2">
+                                                    <h3 className="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest">{t('inspector.attributes.identifiers')}</h3>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                        <CopyButton
+                                                            label={t('inspector.attributes.access_id')}
+                                                            value={selectedNode.attributes['content-desc']}
+                                                            onCopy={(v) => copyToClipboard(v, 'aid')}
+                                                            active={copied === 'aid'}
+                                                        />
+                                                        <CopyButton
+                                                            label={t('inspector.attributes.resource_id')}
+                                                            value={selectedNode.attributes['resource-id']}
+                                                            onCopy={(v) => copyToClipboard(v, 'rid')}
+                                                            active={copied === 'rid'}
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div className="grid grid-cols-1 gap-4">
+                                                    <Input
+                                                        label={t('mapper.input.element_name')}
+                                                        value={currentElement.name || ''}
+                                                        onChange={(e) => updateElement('name', e.target.value)}
+                                                        placeholder={t('mapper.placeholder.element_name')}
+                                                    />
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <Select
+                                                            label={t('mapper.input.element_type')}
+                                                            value={currentElement.type || 'button'}
+                                                            onChange={(e) => updateElement('type', e.target.value)}
+                                                            options={(['button', 'input', 'text', 'link', 'toggle', 'checkbox', 'image', 'menu', 'scroll_view', 'tab'] as UIElementType[]).map(type => ({
+                                                                label: t(`mapper.types.${type}`),
+                                                                value: type
+                                                            }))}
+                                                        />
+                                                        <Combobox
+                                                            label={t('mapper.input.navigates_to')}
+                                                            value={currentElement.navigates_to || ''}
+                                                            onChange={(val) => updateElement('navigates_to', val)}
+                                                            options={savedMaps.map(m => m.name)}
+                                                            placeholder={t('mapper.placeholder.navigates_to')}
+                                                        />
+                                                    </div>
+
+                                                    {/* Complex Fields */}
+                                                    {currentElement.type === 'menu' && (
+                                                        <Textarea
+                                                            label={t('mapper.input.menu_options')}
+                                                            value={currentElement.menu_options?.join(',') || ''}
+                                                            onChange={(e) => updateElement('menu_options', e.target.value.split(','))}
+                                                            placeholder={t('mapper.placeholder.menu_options')}
+                                                            className="h-20"
+                                                        />
+                                                    )}
+                                                    {currentElement.type === 'tab' && (
+                                                        <Combobox
+                                                            label={t('mapper.input.parent_screen')}
+                                                            value={currentElement.parent_screen || ''}
+                                                            onChange={(val) => updateElement('parent_screen', val)}
+                                                            options={savedMaps.map(m => m.name)}
+                                                            placeholder={t('mapper.placeholder.parent_screen')}
+                                                        />
+                                                    )}
+                                                </div>
                                             </div>
-                                            <div className="overflow-y-auto custom-scrollbar flex-1">
-                                                {savedMaps.length === 0 ? (
-                                                    <div className="p-4 text-center text-xs text-on-surface-variant/50 italic">{t('mapper.no_saved_maps')}</div>
-                                                ) : (
-                                                    savedMaps.map(map => (
-                                                        <div
-                                                            key={map.id}
-                                                            onClick={() => handleLoadScreen(map)}
-                                                            className="flex items-center justify-between p-3 hover:bg-surface-variant/20 cursor-pointer border-b border-outline-variant/10 last:border-0 transition-colors group"
-                                                        >
-                                                            <div className="flex flex-col gap-0.5">
-                                                                <span className="text-sm font-medium text-on-surface">{map.name}</span>
-                                                                <span className="text-[10px] text-on-surface-variant/50 uppercase">{t(`mapper.screen_types.${map.type}`)}</span>
-                                                            </div>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                onClick={(e) => handleDeleteScreen(map.id, e)}
-                                                                className="p-1.5 opacity-0 group-hover:opacity-100 hover:text-error hover:bg-error/10 rounded transition-all"
-                                                                title={t('mapper.action.delete')}
-                                                            >
-                                                                <Trash2 size={16} />
-                                                            </Button>
-                                                        </div>
-                                                    ))
-                                                )}
-                                            </div>
-                                        </div>
+                                        </>
                                     )}
                                 </div>
+                            </div>
 
-                                <Button
-                                    onClick={handleImport}
-                                    className="ml-2 p-2 hover:bg-primary/10 text-primary rounded-full"
-                                    title={t('mapper.flowchart.import', 'Import Flow')}>
-                                    <Download size={16} />
-                                </Button>
-                                <Button
-                                    onClick={handleExport}
-                                    className="ml-2 p-2 mr-auto hover:bg-primary/10 text-primary rounded-full"
-                                    title={t('mapper.flowchart.export', 'Export Flow')}>
-                                    <Upload size={16} />
-                                </Button>
-                                {screenName && savedMaps.find(m => m.name === screenName) && (
+                            {/* Screen Settings Footer */}
+                            <div className="p-4 border-t border-outline-variant/30 bg-surface/50 space-y-3">
+                                <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
+                                    <Combobox
+                                        label={t('mapper.screen_name')}
+                                        value={screenName}
+                                        onChange={setScreenName}
+                                        options={savedMaps.map(m => m.name)}
+                                        placeholder={t('mapper.placeholder.screen_name')}
+                                    />
+                                    <div className="w-32">
+                                        <Select
+                                            label={t('mapper.screen_type')}
+                                            value={screenType}
+                                            onChange={(e) => setScreenType(e.target.value as any)}
+                                            options={['screen', 'modal', 'tab', 'drawer'].map(type => ({
+                                                label: t(`mapper.screen_types.${type}`),
+                                                value: type
+                                            }))}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
                                     <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={(e) => {
-                                            const map = savedMaps.find(m => m.name === screenName);
-                                            if (map) handleDeleteScreen(map.id, e)
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            setScreenName('');
+                                            setScreenType('screen');
+                                            setMappedElements([]);
+                                            setScreenshot(null);
+                                            refreshAll();
                                         }}
-                                        className="p-2 text-on-surface/80 hover:text-error hover:bg-error-container/10"
-                                        title={t('mapper.action.discard_desc')}
+                                        className="gap-2"
                                     >
-                                        <Trash2 size={16} />
+                                        <Wrench size={16} /> {t('mapper.action.new')}
                                     </Button>
-                                )}
-                                <Button
-                                    onClick={() => {
-                                        handleSaveScreen();
-                                        refreshAll();
-                                    }}
-                                    className="px-3 py-1.5 bg-primary text-on-primary text-sm font-medium hover:bg-primary/90 flex items-center justify-center gap-2 transition-colors shadow-sm"
-                                >
-                                    <Save size={16} />
-                                    {t('mapper.action.save_screen')}
-                                </Button>
-
+                                    <div className="relative group">
+                                        <Button variant="ghost" size="icon" onClick={() => setShowLoadMenu(!showLoadMenu)}><RefreshCw size={16} /></Button>
+                                        {showLoadMenu && (
+                                            <div className="absolute bottom-full left-0 mb-2 w-64 bg-surface rounded-xl shadow-xl border border-outline-variant/30 overflow-hidden z-50 flex flex-col max-h-60">
+                                                <div className="p-3 border-b border-outline-variant/30 text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest bg-surface-variant/5">
+                                                    {t('mapper.saved_screens')}
+                                                </div>
+                                                <div className="overflow-y-auto custom-scrollbar flex-1">
+                                                    {savedMaps.length === 0 ? (
+                                                        <div className="p-4 text-center text-xs text-on-surface-variant/50 italic">{t('mapper.no_saved_maps')}</div>
+                                                    ) : (
+                                                        savedMaps.map(map => (
+                                                            <div
+                                                                key={map.id}
+                                                                onClick={() => handleLoadScreen(map)}
+                                                                className="flex items-center justify-between p-3 hover:bg-surface-variant/10 cursor-pointer border-b border-outline-variant/5 last:border-0 transition-colors group/item"
+                                                            >
+                                                                <div className="flex flex-col gap-0.5">
+                                                                    <span className="text-sm font-medium text-on-surface">{map.name}</span>
+                                                                    <span className="text-[10px] text-on-surface-variant/50 uppercase">{t(`mapper.screen_types.${map.type}`)}</span>
+                                                                </div>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    onClick={(e) => handleDeleteScreen(map.id, e)}
+                                                                    className="p-1.5 opacity-0 group-hover/item:opacity-100 hover:text-error hover:bg-error/10 rounded transition-all"
+                                                                >
+                                                                    <Trash2 size={16} />
+                                                                </Button>
+                                                            </div>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <Button onClick={handleImport} variant="ghost" size="icon"><Download size={16} /></Button>
+                                    <Button onClick={handleExport} variant="ghost" size="icon"><Upload size={16} /></Button>
+                                    <div className="flex-1" />
+                                    <Button onClick={() => { handleSaveScreen(); refreshAll(); }} variant="primary">
+                                        <Save size={16} className="mr-2" /> {t('mapper.action.save_screen')}
+                                    </Button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div >
-            </div >
+                </>
+            )}
 
             <FlowchartModal
                 isOpen={isFlowchartOpen}
@@ -1032,7 +906,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 variant="danger"
                 confirmText={t('mapper.action.delete')}
             />
-        </div >
+        </div>
     );
 }
 
