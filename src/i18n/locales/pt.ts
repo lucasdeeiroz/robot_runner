@@ -221,20 +221,17 @@ export const pt = {
             waiting: "Aguardando saída..."
         },
         dashboard: {
+            title: "Painel QA",
             description: "Ferramentas auxiliares para QA: Geração de cenários, edição de imagens e documentação.",
+            editor: {
+                title: "Conteúdo Gerado",
+                scenario_input: "Requisitos e Contexto"
+            },
             tabs: {
-                scenarios: "Gerador de Cenários",
+                scenarios: "Gerador IA",
                 images: "Editor de Imagens",
                 history: "Histórico",
                 mapper: "Mapeador"
-            },
-            input: {
-                title: "Requisitos",
-                placeholder: "Cole aqui seus requisitos ou critérios de aceite..."
-            },
-            editor: {
-                title: "Cenários Gerados",
-                placeholder: "Os cenários gerados aparecerão aqui. Você pode editar e colar imagens..."
             },
             history: {
                 title: "Histórico de Arquivos",
@@ -255,6 +252,25 @@ export const pt = {
                     rect: "Retângulo",
                     crop: "Área de Corte"
                 }
+            },
+            generator: {
+                title: "Gerador de Artefatos IA",
+                input_label: "Requisitos / Critérios de Aceite",
+                input_placeholder: "Cole seus requisitos, user story ou descrição de bug aqui...",
+                use_mapping: "Usar Mapeamento do App",
+                use_mapping_hint: "Incluir elementos de tela no contexto da IA para geração mais precisa",
+                type_label: "Tipo de Geração",
+                generate_button: "Gerar com IA",
+                generating: "Gerando...",
+                key_required: "Chave API do Gemini necessária. Configure em Definições.",
+                types: {
+                    test_case: "Casos de Teste (BDD)",
+                    pbi: "Item de Backlog (PBI)",
+                    improvement: "Melhoria Funcional",
+                    bug: "Relatório de Bug"
+                },
+                empty_state: "O conteúdo gerado aparecerá aqui...",
+                success: "Artefato gerado com sucesso usando {{method}}"
             },
             actions: {
                 generate: "Gerar Cenários",

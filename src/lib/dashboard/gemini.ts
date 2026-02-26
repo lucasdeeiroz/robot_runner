@@ -1,6 +1,4 @@
 
-
-
 interface GeminiResponse {
     candidates: {
         content: {
@@ -16,12 +14,15 @@ interface GeminiResponse {
 
 import { ScreenMap } from '@/lib/types';
 
+export type AIGenerationType = 'test_case' | 'pbi' | 'improvement' | 'bug';
+
 export async function generateRefinedTestCases(
     requirements: string,
     apiKey: string,
     model: string = 'gemini-2.5-flash',
     language: string = 'en',
-    appMapping?: ScreenMap[]
+    appMapping?: ScreenMap[],
+    generationType: AIGenerationType = 'test_case'
 ): Promise<string> {
     if (!apiKey) {
         throw new Error("Missing Gemini API Key");
@@ -38,35 +39,85 @@ export async function generateRefinedTestCases(
         });
     }
 
-    const systemInstruction = `
-You are a Senior QA Automation Engineer expert in Robot Framework (BDD).
-Your task is to convert the user's raw requirements/acceptance criteria into well-structured Gherkin (BDD) test scenarios.
+    let typeSpecificRules = "";
+    let mainObjective = "";
 
-RULES:
-1. Output ONLY the raw test scenarios. Do not include markdown code blocks (like \`\`\`gherkin), headers, or introductory text.
-2. Use the following format for each scenario:
-'''   
-   Story: [Story ID] - [Concise Story Title]
-
-   Scenario [number]: [Concise Test Title]
-   Tags: [@tag1, @tag2, ...]
-
+    switch (generationType) {
+        case 'test_case':
+            mainObjective = "convert the user's raw requirements into well-structured Gherkin (BDD) test scenarios.";
+            typeSpecificRules = `
+1. Use the Gherkin format (Given/When/Then).
+2. For each scenario, include:
+   Story: [Story ID] - [Title]
+   Scenario [number]: [Title]
+   Tags: [@tag1, ...]
    Given [context]
    When [action]
    Then [expected result]
-
    Steps:
    - [step 1]
-   - [step 2]
-   - [step 3]
    ...
-'''
-3. Maintain the language specified by the user (${language}). If needed, translate the Gherkin steps and the words 'Scenario', 'Story' and 'Steps' to the specified language.
-4. If the input is vague, infer the most logical Happy Path and at least one Sad Path.
-5. Keep steps concise and reusable.
-6. Identify the story id and names if possible. If not found, use "000000" as the ID and "N/A" as the name.
-7. The output has only one story, but it can have multiple scenarios.
-8. ${appMapping ? "PRIORITIZE using the names and screens provided in the APPLICATION MAPPING context below. If a requirement mentions an action that matches a mapped element, use that element's specific name." : "Generate generic but professional steps since no specific app mapping was provided."}
+3. If input is vague, infer Happy Path and at least one Sad Path.
+4. Separate multiple scenarios for the same story.
+`.trim();
+            break;
+        case 'pbi':
+            mainObjective = "convert requirements into detailed Product Backlog Items (PBIs/User Stories).";
+            typeSpecificRules = `
+1. Format each PBI as:
+   PBI: [ID] - [Title]
+   As a [role], I want [action], so that [value/benefit].
+   
+   Acceptance Criteria:
+   - [point 1]
+   - [point 2]
+   ...
+2. Focus on the user perspective and business value.
+`.trim();
+            break;
+        case 'improvement':
+            mainObjective = "analyze requirements and suggest UI/UX or functional improvements.";
+            typeSpecificRules = `
+1. Format as a list of improvements:
+   Improvement [number]: [Title]
+   Description: [What to change]
+   Rationale: [Why this is an improvement]
+   Priority: [Low/Medium/High]
+2. Suggest enhancements that would make the feature more robust or user-friendly.
+`.trim();
+            break;
+        case 'bug':
+            mainObjective = "transform a bug description into a professional, structured bug report.";
+            typeSpecificRules = `
+1. Format as:
+   Bug Report: [Title]
+   Severity: [S1/S2/S3]
+   
+   Summary: [Brief description]
+   
+   Steps to Reproduce:
+   1. [Step 1]
+   2. [Step 2]
+   ...
+   
+   Actual Result: [What currently happens]
+   Expected Result: [What should happen]
+   
+   Notes: [Optional environment details or hints]
+`.trim();
+            break;
+    }
+
+    const systemInstruction = `
+You are a Senior QA Specialist and Product Owner assistant.
+Your task is to ${mainObjective}
+
+RULES:
+1. Output ONLY the raw content without markdown code blocks, headers, or introductory text.
+2. ${typeSpecificRules}
+3. Maintain the language specified by the user (${language}). Translate all headers (Scenario, Bug Report, etc.) and the response structure to this language.
+4. Keep the content professional, concise, and technically accurate.
+5. ${appMapping ? "PRIORITIZE using the names and screens provided in the APPLICATION MAPPING context below. If a requirement mentions an action that matches a mapped element, use that element's specific name." : "Use generic but clear terminology."}
 ${mappingContext}
 `.trim();
 
@@ -80,6 +131,7 @@ ${mappingContext}
             },
             body: JSON.stringify({
                 contents: [{
+                    role: 'user',
                     parts: [{ text: requirements }]
                 }],
                 system_instruction: {
@@ -123,8 +175,6 @@ export async function getAvailableModels(apiKey: string): Promise<string[]> {
             throw new Error(`Failed to list models: ${response.statusText}`);
         }
         const data = await response.json();
-        // data.models is an array of objects like { name: "models/gemini-pro", ... }
-        // We want to extract "gemini-pro" from "models/gemini-pro"
         return data.models
             .map((m: any) => m.name.replace('models/', ''))
             .filter((name: string) => name.includes('gemini'));

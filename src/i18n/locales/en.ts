@@ -221,20 +221,17 @@ export const en = {
             waiting: "Waiting for output..."
         },
         dashboard: {
-            description: "QA Helper Tools: Scenario generation, image editing, and documentation.",
+            title: "QA Dashboard",
+            description: "Auxiliary tools for QA: Scenario generation, image editing and documentation.",
+            editor: {
+                title: "Generated Content",
+                scenario_input: "Requirements & Context"
+            },
             tabs: {
-                scenarios: "Scenario Generator",
+                scenarios: "AI Generator",
                 images: "Image Editor",
                 history: "History",
                 mapper: "Mapper"
-            },
-            input: {
-                title: "Requirements",
-                placeholder: "Paste your requirements or acceptance criteria here..."
-            },
-            editor: {
-                title: "Generated Scenarios",
-                placeholder: "Generated scenarios will appear here. You can edit and paste images..."
             },
             history: {
                 title: "File History",
@@ -255,6 +252,25 @@ export const en = {
                     rect: "Rectangle",
                     crop: "Crop Area"
                 }
+            },
+            generator: {
+                title: "AI Artifact Generator",
+                input_label: "Requirements / Acceptance Criteria",
+                input_placeholder: "Paste your requirements, user story, or bug description here...",
+                use_mapping: "Use App Mapping",
+                use_mapping_hint: "Include screen elements in AI context for more precise generation",
+                type_label: "Generation Type",
+                generate_button: "Generate with AI",
+                generating: "Generating...",
+                key_required: "Gemini API Key required. Please configure it in Settings.",
+                types: {
+                    test_case: "Test Cases (BDD)",
+                    pbi: "Product Backlog Item (PBI)",
+                    improvement: "Functional Improvement",
+                    bug: "Bug Report"
+                },
+                empty_state: "Generated content will appear here...",
+                success: "Artifact generated successfully using {{method}}"
             },
             actions: {
                 generate: "Generate Scenarios",
