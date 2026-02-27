@@ -706,8 +706,8 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
 
 function NodeBreadcrumbs({ node, onSelect, onHover }: { node: InspectorNode, onSelect: (n: InspectorNode) => void, onHover: (n: InspectorNode | null) => void }) {
     const { t } = useTranslation();
-    if (!node) return null;
     const [isExpanded, setIsExpanded] = useState(false);
+    if (!node) return null;
 
     let path: InspectorNode[] = [];
     let curr: InspectorNode | undefined = node;
