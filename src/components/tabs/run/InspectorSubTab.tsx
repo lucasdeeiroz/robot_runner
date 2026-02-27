@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Maximize, Check, Scan, Home, ArrowLeft, Rows, X, RefreshCw, Search, Pencil, Copy } from 'lucide-react';
+import { Maximize, Check, Scan, Home, ArrowLeft, Rows, X, RefreshCw, Search, Pencil, Copy, ChevronDown, ChevronUp } from 'lucide-react';
 import { XMLParser } from 'fast-xml-parser';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
@@ -553,7 +553,6 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
                                         />
                                     </div>
                                     <div className="mt-4">
-                                        <h3 className="text-xs font-semibold text-on-surface-variant/80 uppercase tracking-wider mb-2">{t('inspector.attributes.hierarchy')}</h3>
                                         <NodeBreadcrumbs node={selectedNode} onSelect={setSelectedNode} onHover={setHoveredNode} />
                                     </div>
                                 </div>
@@ -706,7 +705,10 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
 }
 
 function NodeBreadcrumbs({ node, onSelect, onHover }: { node: InspectorNode, onSelect: (n: InspectorNode) => void, onHover: (n: InspectorNode | null) => void }) {
+    const { t } = useTranslation();
     if (!node) return null;
+    const [isExpanded, setIsExpanded] = useState(false);
+
     let path: InspectorNode[] = [];
     let curr: InspectorNode | undefined = node;
     while (curr) {
@@ -715,23 +717,55 @@ function NodeBreadcrumbs({ node, onSelect, onHover }: { node: InspectorNode, onS
     }
     const contentIndex = path.findIndex(n => n.attributes['resource-id']?.endsWith(':id/content'));
     if (contentIndex !== -1) path = path.slice(contentIndex + 1);
+
     const cleanTag = (tag: string) => tag.replace('android.widget.', '').replace('android.view.', '');
+
+    const displayPath = isExpanded ? path : path.slice(-2);
+    const isHidden = path.length > 2 && !isExpanded;
+
     return (
-        <div className="flex flex-wrap items-center gap-1 text-xs text-on-surface-variant/80 font-mono p-2 bg-surface/50 rounded border border-outline-variant/30">
-            {path.map((n, i) => (
-                <div key={n.id} className="flex items-center">
-                    {i > 0 && <span className="mx-1 text-on-surface/80">&gt;</span>}
-                    <button
-                        onClick={() => onSelect(n)}
-                        onMouseEnter={() => onHover(n)}
-                        onMouseLeave={() => onHover(null)}
-                        className={clsx("hover:text-primary hover:underline transition-colors text-left", n === node ? "font-bold text-on-surface/80" : "")}
-                        title={generateXPath(n)}
+        <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+                <h3 className="text-xs font-semibold text-on-surface-variant/80 uppercase tracking-wider">{t('inspector.attributes.hierarchy', 'Hierarchy')}</h3>
+            </div>
+            <div className="flex flex-wrap items-center gap-1 text-xs text-on-surface-variant/80 font-mono p-2 bg-surface/50 rounded border border-outline-variant/30">
+                {isHidden && (
+                    <div className="flex items-center">
+                        <span className="px-1 opacity-50">...</span>
+                        <span className="mx-1 text-on-surface/80">&gt;</span>
+                    </div>
+                )}
+                {displayPath.map((n, i) => (
+                    <div key={n.id} className="flex items-center">
+                        {i > 0 && <span className="mx-1 text-on-surface/80">&gt;</span>}
+                        <button
+                            onClick={() => onSelect(n)}
+                            onMouseEnter={() => onHover(n)}
+                            onMouseLeave={() => onHover(null)}
+                            className={clsx(
+                                "hover:text-primary hover:underline transition-colors text-left",
+                                n === node ? "font-bold text-on-surface/80" : ""
+                            )}
+                            title={generateXPath(n)}
+                        >
+                            {cleanTag(n.tagName)}
+                            {n.attributes['resource-id'] && <span className="ml-1 text-primary">resource-id="{n.attributes['resource-id'].split('/').pop()}"</span>}
+                            {!n.attributes['resource-id'] && n.attributes['content-desc'] && <span className="ml-1 text-on-success-container/10">content-desc="{n.attributes['content-desc'].substring(0, 15)}..."</span>}
+                        </button>
+                    </div>
+                ))}
+                {path.length > 2 && (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setIsExpanded(!isExpanded)}
+                        className="h-6 px-2 text-[10px] gap-1 hover:bg-surface-variant/50 ml-auto"
                     >
-                        {cleanTag(n.tagName)}
-                    </button>
-                </div>
-            ))}
+                        {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                        {isExpanded ? t('common.collapse', 'Collapse') : t('common.expand', 'Expand')}
+                    </Button>
+                )}
+            </div>
         </div>
     );
 }

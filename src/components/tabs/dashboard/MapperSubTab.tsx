@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Maximize, Check, Scan, Home, ArrowLeft, Rows, X, RefreshCw, Save, GitGraph, Trash2, Upload, Download, Plus, FileClock, FileInput, SearchCode } from 'lucide-react';
+import { Maximize, Check, Scan, Home, ArrowLeft, Rows, X, RefreshCw, Save, GitGraph, Trash2, Upload, Download, Plus, FileClock, FileInput, SearchCode, ChevronDown, ChevronUp } from 'lucide-react';
 import { XMLParser } from 'fast-xml-parser';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
@@ -661,7 +661,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
                         {/* Properties Panel */}
                         <div className="bg-surface border border-outline-variant/30 rounded-2xl flex flex-col overflow-hidden shadow-sm flex-1">
-                            {/* Screen Settings Footer */}
+                            {/* Screen Settings */}
                             <div className="p-4 border-t border-outline-variant/30 bg-surface/50 space-y-3">
                                 <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
                                     <Combobox
@@ -793,82 +793,81 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                 <div className="p-4 space-y-4">
                                     {selectedNode ? (
                                         <>
-                                            <NodeBreadcrumbs
-                                                node={selectedNode}
-                                                onSelect={setSelectedNode}
-                                                onHover={setHoveredNode}
-                                            />
+                                            <div className="space-y-4">
+                                                <NodeBreadcrumbs
+                                                    node={selectedNode}
+                                                    onSelect={setSelectedNode}
+                                                    onHover={setHoveredNode}
+                                                />
+                                            </div>
 
-                                            <div className="pt-4 border-t border-outline-variant/30">
-
-                                                {/* Identifiers Section */}
-                                                <div className="mb-4 space-y-2">
-                                                    <h3 className="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest">{t('inspector.attributes.identifiers')}</h3>
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                                        <CopyButton
-                                                            label={t('inspector.attributes.access_id')}
-                                                            value={selectedNode.attributes['content-desc']}
-                                                            onCopy={(v) => copyToClipboard(v, 'aid')}
-                                                            active={copied === 'aid'}
-                                                        />
-                                                        <CopyButton
-                                                            label={t('inspector.attributes.resource_id')}
-                                                            value={selectedNode.attributes['resource-id']}
-                                                            onCopy={(v) => copyToClipboard(v, 'rid')}
-                                                            active={copied === 'rid'}
-                                                        />
-                                                    </div>
-                                                </div>
-
-                                                <div className="grid grid-cols-1 gap-4">
-                                                    <Input
-                                                        label={t('mapper.input.element_name')}
-                                                        value={currentElement.name || ''}
-                                                        onChange={(e) => updateElement('name', e.target.value)}
-                                                        placeholder={t('mapper.placeholder.element_name')}
+                                            {/* Identifiers Section */}
+                                            <div className="mb-4 space-y-2">
+                                                <h3 className="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest">{t('inspector.attributes.identifiers')}</h3>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                    <CopyButton
+                                                        label={t('inspector.attributes.access_id')}
+                                                        value={selectedNode.attributes['content-desc']}
+                                                        onCopy={(v: string) => copyToClipboard(v, 'aid')}
+                                                        active={copied === 'aid'}
                                                     />
-                                                    <div className="grid grid-cols-2 gap-4">
-                                                        <Select
-                                                            label={t('mapper.input.element_type')}
-                                                            value={currentElement.type || 'button'}
-                                                            onChange={(e) => updateElement('type', e.target.value)}
-                                                            options={(['button', 'input', 'text', 'link', 'toggle', 'checkbox', 'image', 'menu', 'scroll_view', 'tab'] as UIElementType[]).map(type => ({
-                                                                label: t(`mapper.types.${type}`),
-                                                                value: type
-                                                            }))}
-                                                        />
-                                                        <Combobox
-                                                            label={t('mapper.input.navigates_to')}
-                                                            value={currentElement.navigates_to || ''}
-                                                            onChange={(val) => updateElement('navigates_to', val)}
-                                                            options={savedMaps.map(m => m.name)}
-                                                            placeholder={t('mapper.placeholder.navigates_to')}
-                                                        />
-                                                    </div>
-
-                                                    {/* Complex Fields */}
-                                                    {currentElement.type === 'menu' && (
-                                                        <Textarea
-                                                            label={t('mapper.input.menu_options')}
-                                                            value={currentElement.menu_options?.join(',') || ''}
-                                                            onChange={(e) => updateElement('menu_options', e.target.value.split(','))}
-                                                            placeholder={t('mapper.placeholder.menu_options')}
-                                                            className="h-20"
-                                                        />
-                                                    )}
-                                                    {currentElement.type === 'tab' && (
-                                                        <Combobox
-                                                            label={t('mapper.input.parent_screen')}
-                                                            value={currentElement.parent_screen || ''}
-                                                            onChange={(val) => updateElement('parent_screen', val)}
-                                                            options={savedMaps.map(m => m.name)}
-                                                            placeholder={t('mapper.placeholder.parent_screen')}
-                                                        />
-                                                    )}
+                                                    <CopyButton
+                                                        label={t('inspector.attributes.resource_id')}
+                                                        value={selectedNode.attributes['resource-id']}
+                                                        onCopy={(v: string) => copyToClipboard(v, 'rid')}
+                                                        active={copied === 'rid'}
+                                                    />
                                                 </div>
                                             </div>
+
+                                            <div className="grid grid-cols-1 gap-4">
+                                                <Input
+                                                    label={t('mapper.input.element_name')}
+                                                    value={currentElement.name || ''}
+                                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateElement('name', e.target.value)}
+                                                    placeholder={t('mapper.placeholder.element_name')}
+                                                />
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <Select
+                                                        label={t('mapper.input.element_type')}
+                                                        value={currentElement.type || 'button'}
+                                                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => updateElement('type', e.target.value)}
+                                                        options={(['button', 'input', 'text', 'link', 'toggle', 'checkbox', 'image', 'menu', 'scroll_view', 'tab'] as UIElementType[]).map(type => ({
+                                                            label: t(`mapper.types.${type}`),
+                                                            value: type
+                                                        }))}
+                                                    />
+                                                    <Combobox
+                                                        label={t('mapper.input.navigates_to')}
+                                                        value={currentElement.navigates_to || ''}
+                                                        onChange={(val) => updateElement('navigates_to', val)}
+                                                        options={savedMaps.map(m => m.name)}
+                                                        placeholder={t('mapper.placeholder.navigates_to')}
+                                                    />
+                                                </div>
+
+                                                {/* Complex Fields */}
+                                                {currentElement.type === 'menu' && (
+                                                    <Textarea
+                                                        label={t('mapper.input.menu_options')}
+                                                        value={currentElement.menu_options?.join(',') || ''}
+                                                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => updateElement('menu_options', e.target.value.split(','))}
+                                                        placeholder={t('mapper.placeholder.menu_options')}
+                                                        className="h-20"
+                                                    />
+                                                )}
+                                                {currentElement.type === 'tab' && (
+                                                    <Combobox
+                                                        label={t('mapper.input.parent_screen')}
+                                                        value={currentElement.parent_screen || ''}
+                                                        onChange={(val) => updateElement('parent_screen', val)}
+                                                        options={savedMaps.map(m => m.name)}
+                                                        placeholder={t('mapper.placeholder.parent_screen')}
+                                                    />
+                                                )}
+                                            </div>
                                         </>
-                                    ) : !selectedNode && (
+                                    ) : (
                                         <div className="flex flex-col items-center justify-center h-full text-on-surface/80 p-8 text-center">
                                             <Scan size={48} className="mb-4 opacity-20" />
                                             <p className="text-sm">{t('mapper.select_element')}</p>
@@ -876,46 +875,48 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                     )}
                                 </div>
                             </div>
-
                         </div>
                     </div>
+
+                    <FlowchartModal
+                        isOpen={isFlowchartOpen}
+                        onClose={() => setIsFlowchartOpen(false)}
+                        maps={savedMaps}
+                        onEditScreen={(name) => {
+                            const map = savedMaps.find(m => m.name === name);
+                            if (map) {
+                                handleLoadScreen(map);
+                                setIsFlowchartOpen(false);
+                            }
+                        }}
+                        onRefresh={loadSavedMaps}
+                        activeProfileId={activeProfileId}
+                    />
+
+                    <ConfirmationModal
+                        isOpen={isDeleteModalOpen}
+                        onClose={() => setIsDeleteModalOpen(false)}
+                        onConfirm={() => {
+                            confirmDeleteScreen();
+                            refreshAll();
+                        }}
+                        title={t('mapper.confirm.delete_title', 'Delete Screen Map?')}
+                        description={t('mapper.confirm.delete_desc', 'Are you sure you want to delete this screen map? This action cannot be undone.')}
+                        variant="danger"
+                        confirmText={t('mapper.action.delete')}
+                    />
                 </>
             )}
-
-            <FlowchartModal
-                isOpen={isFlowchartOpen}
-                onClose={() => setIsFlowchartOpen(false)}
-                maps={savedMaps}
-                onEditScreen={(name) => {
-                    const map = savedMaps.find(m => m.name === name);
-                    if (map) {
-                        handleLoadScreen(map);
-                        setIsFlowchartOpen(false);
-                    }
-                }}
-                onRefresh={loadSavedMaps}
-                activeProfileId={activeProfileId}
-            />
-
-            <ConfirmationModal
-                isOpen={isDeleteModalOpen}
-                onClose={() => setIsDeleteModalOpen(false)}
-                onConfirm={() => {
-                    confirmDeleteScreen();
-                    refreshAll();
-                }}
-                title={t('mapper.confirm.delete_title', 'Delete Screen Map?')}
-                description={t('mapper.confirm.delete_desc', 'Are you sure you want to delete this screen map? This action cannot be undone.')}
-                variant="danger"
-                confirmText={t('mapper.action.delete')}
-            />
         </div>
     );
 }
 
-// ... (Helper Component)
+// --- Helper Components ---
+
 function NodeBreadcrumbs({ node, onSelect, onHover }: { node: InspectorNode, onSelect: (n: InspectorNode) => void, onHover: (n: InspectorNode | null) => void }) {
+    const { t } = useTranslation();
     if (!node) return null;
+    const [isExpanded, setIsExpanded] = useState(false);
 
     // 1. Build path from leaf to root
     let path: InspectorNode[] = [];
@@ -935,27 +936,50 @@ function NodeBreadcrumbs({ node, onSelect, onHover }: { node: InspectorNode, onS
 
     const cleanTag = (tag: string) => tag.replace('android.widget.', '').replace('android.view.', '');
 
+    // Determine visible path
+    const displayPath = isExpanded ? path : path.slice(-2);
+    const isHidden = path.length > 2 && !isExpanded;
+
     return (
-        <div className="flex flex-wrap items-center gap-1 text-xs text-on-surface-variant/80 font-mono p-2 bg-surface/50 rounded border border-outline-variant/30">
-            {path.map((n, i) => (
-                <div key={n.id} className="flex items-center">
-                    {i > 0 && <span className="mx-1 text-on-surface/80">&gt;</span>}
-                    <button
-                        onClick={() => onSelect(n)}
-                        onMouseEnter={() => onHover(n)}
-                        onMouseLeave={() => onHover(null)}
-                        className={clsx(
-                            "hover:text-primary hover:underline transition-colors text-left",
-                            n === node ? "font-bold text-on-surface/80" : ""
-                        )}
-                        title={generateXPath(n)}
+        <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-1 text-xs text-on-surface-variant/80 font-mono p-2 bg-surface/50 rounded border border-outline-variant/30">
+                {isHidden && (
+                    <div className="flex items-center">
+                        <span className="px-1 opacity-50">...</span>
+                        <span className="mx-1 text-on-surface/80">&gt;</span>
+                    </div>
+                )}
+                {displayPath.map((n, i) => (
+                    <div key={n.id} className="flex items-center">
+                        {i > 0 && <span className="mx-1 text-on-surface/80">&gt;</span>}
+                        <button
+                            onClick={() => onSelect(n)}
+                            onMouseEnter={() => onHover(n)}
+                            onMouseLeave={() => onHover(null)}
+                            className={clsx(
+                                "hover:text-primary hover:underline transition-colors text-left",
+                                n === node ? "font-bold text-on-surface/80" : ""
+                            )}
+                            title={generateXPath(n)}
+                        >
+                            {cleanTag(n.tagName)}
+                            {n.attributes['resource-id'] && <span className="ml-1 text-primary">resource-id="{n.attributes['resource-id'].split('/').pop()}"</span>}
+                            {!n.attributes['resource-id'] && n.attributes['content-desc'] && <span className="ml-1 text-on-success-container/10">content-desc="{n.attributes['content-desc'].substring(0, 15)}..."</span>}
+                        </button>
+                    </div>
+                ))}
+                {path.length > 2 && (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setIsExpanded(!isExpanded)}
+                        className="h-6 px-2 text-[10px] gap-1 hover:bg-surface-variant/50 ml-auto"
                     >
-                        {cleanTag(n.tagName)}
-                        {n.attributes['resource-id'] && <span className="ml-1 text-primary">resource-id="{n.attributes['resource-id'].split('/').pop()}"</span>}
-                        {!n.attributes['resource-id'] && n.attributes['content-desc'] && <span className="ml-1 text-on-success-container/10">content-desc="{n.attributes['content-desc'].substring(0, 15)}..."</span>}
-                    </button>
-                </div>
-            ))}
+                        {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                        {isExpanded ? t('common.collapse', 'Collapse') : t('common.expand', 'Expand')}
+                    </Button>
+                )}
+            </div>
         </div>
     );
 }

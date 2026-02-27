@@ -121,6 +121,8 @@ export const es = {
             next: "Siguiente",
             back: "Volver",
             finish: "Finalizar",
+            collapse: "Contraer",
+            expand: "Expandir",
             copy: "Copiar",
             copied: "¡Copiado!",
             download: "Descargar",

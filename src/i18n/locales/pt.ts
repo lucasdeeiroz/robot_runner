@@ -121,6 +121,8 @@ export const pt = {
             next: "Próximo",
             back: "Voltar",
             finish: "Concluir",
+            collapse: "Colapsar",
+            expand: "Expandir",
             copy: "Copiar",
             copied: "Copiado!",
             download: "Baixar",
