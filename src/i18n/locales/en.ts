@@ -540,7 +540,7 @@ export const en = {
             feedback: {
                 mapped: "Element mapped!",
                 updated: "Element Updated",
-                removed: "Element mapping removed",
+                removed: "Element removed",
                 empty_map: "No elements mapped yet",
                 saved: "Screen mapped successfully!",
                 loaded: "Screen map loaded",
