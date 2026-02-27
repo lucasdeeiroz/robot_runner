@@ -51,7 +51,11 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     const [screenToDelete, setScreenToDelete] = useState<string | null>(null);
     const [isFlowchartOpen, setIsFlowchartOpen] = useState(false);
 
-    useOutsideClick(loadMenuRef, () => setShowLoadMenu(false));
+    useOutsideClick(loadMenuRef, () => {
+        if (showLoadMenu) {
+            setShowLoadMenu(false);
+        }
+    });
 
     useEffect(() => {
         loadSavedMaps();
