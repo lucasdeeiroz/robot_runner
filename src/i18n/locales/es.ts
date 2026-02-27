@@ -121,6 +121,8 @@ export const es = {
             next: "Siguiente",
             back: "Volver",
             finish: "Finalizar",
+            collapse: "Contraer",
+            expand: "Expandir",
             copy: "Copiar",
             copied: "¡Copiado!",
             download: "Descargar",
@@ -475,6 +477,8 @@ export const es = {
                 scroll_view: "Desplazamiento",
                 tab: "Pestaña"
             },
+            screen_name: "Nombre de la Pantalla",
+            screen_type: "Tipo de Pantalla",
             screen_types: {
                 screen: "Pantalla",
                 modal: "Modal",
@@ -523,9 +527,9 @@ export const es = {
                 screen_name: "Nombre de la Pantalla (Único)"
             },
             action: {
-                add: "Añadir Mapeo",
-                update: "Actualizar",
-                remove: "Eliminar",
+                add: "Añadir Elemento",
+                update: "Actualizar Elemento",
+                remove: "Eliminar Elemento",
                 save_screen: "Guardar Pantalla",
                 load: "Cargar",
                 new: "Nuevo",
@@ -535,8 +539,8 @@ export const es = {
             },
             feedback: {
                 mapped: "¡Elemento mapeado!",
-                updated: "Mapeador Actualizado",
-                removed: "Mapeo eliminado",
+                updated: "Elemento Actualizado",
+                removed: "Elemento eliminado",
                 empty_map: "Aún no hay elementos mapeados",
                 saved: "¡Pantalla mapeada con éxito!",
                 loaded: "Mapa de pantalla cargado",

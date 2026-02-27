@@ -121,6 +121,8 @@ export const en = {
             next: "Next",
             back: "Back",
             finish: "Finish",
+            collapse: "Collapse",
+            expand: "Expand",
             copy: "Copy",
             copied: "Copied!",
             download: "Download",
@@ -475,6 +477,8 @@ export const en = {
                 scroll_view: "Scroll View",
                 tab: "Tab"
             },
+            screen_name: "Screen Name",
+            screen_type: "Screen Type",
             screen_types: {
                 screen: "Screen",
                 modal: "Modal",
@@ -523,9 +527,9 @@ export const en = {
                 screen_name: "Screen Name (Unique)"
             },
             action: {
-                add: "Add Mapping",
-                update: "Update",
-                remove: "Remove",
+                add: "Add Element",
+                update: "Update Element",
+                remove: "Remove Element",
                 save_screen: "Save Screen",
                 load: "Load",
                 new: "New",
@@ -535,8 +539,8 @@ export const en = {
             },
             feedback: {
                 mapped: "Element mapped!",
-                updated: "Mapper Updated",
-                removed: "Element mapping removed",
+                updated: "Element Updated",
+                removed: "Element removed",
                 empty_map: "No elements mapped yet",
                 saved: "Screen mapped successfully!",
                 loaded: "Screen map loaded",
