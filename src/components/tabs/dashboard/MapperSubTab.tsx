@@ -913,11 +913,11 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
 // --- Helper Components ---
 
-function NodeBreadcrumbs({ node, onSelect, onHover }: { node: InspectorNode, onSelect: (n: InspectorNode) => void, onHover: (n: InspectorNode | null) => void }) {
+function NodeBreadcrumbs({ node, onSelect, onHover }: { node: InspectorNode | null, onSelect: (n: InspectorNode) => void, onHover: (n: InspectorNode | null) => void }) {
     const { t } = useTranslation();
-    if (!node) return null;
     const [isExpanded, setIsExpanded] = useState(false);
 
+    if (!node) return null;
     // 1. Build path from leaf to root
     let path: InspectorNode[] = [];
     let curr: InspectorNode | undefined = node;
