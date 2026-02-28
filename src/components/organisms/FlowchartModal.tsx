@@ -476,6 +476,9 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
     // --- Event Handlers ---
     const handleCanvasMouseDown = (e: React.MouseEvent) => {
         if (e.button !== 0 && e.button !== 1) return;
+        if (e.button === 1) {
+            e.preventDefault();
+        }
         setIsDraggingCanvas(true);
         dragStart.current = { x: e.clientX - offset.x, y: e.clientY - offset.y };
     };
