@@ -363,7 +363,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
         const updatedMap = { ...sourceMap, elements: updatedElements };
 
         // 2. Update Layout (Add Edge)
-        const edgeId = `${sourceNodeId} -${sourceElementName} -${targetScreenName} `;
+        const edgeId = `${sourceNodeId}-${sourceElementName}-${targetScreenName}`;
 
         const updatedLayout = {
             ...layout,
