@@ -45,6 +45,8 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     const [savedMaps, setSavedMaps] = useState<ScreenMap[]>([]);
     const [showLoadMenu, setShowLoadMenu] = useState(false);
     const loadMenuRef = useRef<HTMLDivElement>(null);
+    const [showElementsMenu, setShowElementsMenu] = useState(false);
+    const elementsMenuRef = useRef<HTMLDivElement>(null);
 
     // Helper state for confirmation modal
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -52,9 +54,11 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     const [isFlowchartOpen, setIsFlowchartOpen] = useState(false);
 
     useOutsideClick(loadMenuRef, () => {
-        if (showLoadMenu) {
-            setShowLoadMenu(false);
-        }
+        if (showLoadMenu) setShowLoadMenu(false);
+    });
+
+    useOutsideClick(elementsMenuRef, () => {
+        if (showElementsMenu) setShowElementsMenu(false);
     });
 
     useEffect(() => {
@@ -125,10 +129,18 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         feedback.toast.success(t('mapper.feedback.mapped'));
     };
 
-    const removeElementMapping = () => {
-        if (!currentElement.id) return;
-        setMappedElements(prev => prev.filter(e => e.id !== currentElement.id));
-        setCurrentElement({ ...currentElement, id: undefined }); // Clear ID to reset state logic if needed, or just re-select
+    const removeElementMapping = (id?: string) => {
+        const targetId = id || currentElement.id;
+        if (!targetId) return;
+
+        setMappedElements(prev => prev.filter(e => e.id !== targetId));
+
+        // If deleting current element, clear fields
+        if (targetId === currentElement.id) {
+            setCurrentElement({});
+            setSelectedNode(null);
+        }
+
         feedback.toast.success(t('mapper.feedback.removed'));
     };
 
@@ -751,9 +763,73 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                     <SearchCode size={14} /> {t('mapper.screen_mapper')}
                                 </h3>
                                 <div className="flex gap-2">
-                                    {mappedElements.find(e => e.id === currentElement.id) && (
-                                        <Button variant="ghost" size="icon" onClick={removeElementMapping} className="text-error" title={t('mapper.action.remove')}><Trash2 size={16} /></Button>
-                                    )}
+                                    <div className="relative group" ref={elementsMenuRef}>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => setShowElementsMenu(!showElementsMenu)}
+                                            className={clsx(showElementsMenu ? "text-primary bg-primary/10" : "text-on-surface-variant/80")}
+                                            title={t('mapper.saved_elements', 'Saved Elements')}
+                                        >
+                                            <FileClock size={16} />
+                                        </Button>
+
+                                        {showElementsMenu && (
+                                            <div className="absolute top-full right-0 mt-2 w-64 bg-surface rounded-xl shadow-xl border border-outline-variant/30 overflow-hidden z-[100] flex flex-col max-h-60">
+                                                <div className="p-3 border-b border-outline-variant/30 text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest bg-surface-variant/5">
+                                                    {t('mapper.saved_elements', 'Saved Elements')}
+                                                </div>
+                                                <div className="overflow-y-auto custom-scrollbar flex-1">
+                                                    {mappedElements.length === 0 ? (
+                                                        <div className="p-4 text-center text-xs text-on-surface-variant/50 italic">{t('mapper.no_saved_elements', 'No elements mapped')}</div>
+                                                    ) : (
+                                                        mappedElements.map(el => (
+                                                            <div
+                                                                key={el.id}
+                                                                onClick={() => {
+                                                                    setCurrentElement(el);
+                                                                    // Try to find matching node in current tree if possible
+                                                                    if (rootNode) {
+                                                                        const findNodeById = (node: InspectorNode): InspectorNode | null => {
+                                                                            if (generateXPath(node) === el.id) return node;
+                                                                            for (const child of node.children) {
+                                                                                const found = findNodeById(child);
+                                                                                if (found) return found;
+                                                                            }
+                                                                            return null;
+                                                                        };
+                                                                        const matchingNode = findNodeById(rootNode);
+                                                                        if (matchingNode) setSelectedNode(matchingNode);
+                                                                    }
+                                                                    setShowElementsMenu(false);
+                                                                }}
+                                                                className={clsx(
+                                                                    "flex items-center justify-between p-3 hover:bg-surface-variant/10 cursor-pointer border-b border-outline-variant/5 last:border-0 transition-colors group/ele",
+                                                                    currentElement.id === el.id && "bg-primary/5"
+                                                                )}
+                                                            >
+                                                                <div className="flex flex-col gap-0.5 truncate pr-2">
+                                                                    <span className="text-sm font-medium text-on-surface truncate">{el.name}</span>
+                                                                    <span className="text-[10px] text-on-surface-variant/50 uppercase">{t(`mapper.types.${el.type}`)}</span>
+                                                                </div>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        removeElementMapping(el.id);
+                                                                    }}
+                                                                    className="p-1.5 opacity-0 group-hover/ele:opacity-100 hover:text-error hover:bg-error/10 rounded transition-all"
+                                                                >
+                                                                    <Trash2 size={16} />
+                                                                </Button>
+                                                            </div>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                     <Button onClick={saveElementMapping} variant="primary" size="sm"><FileInput size={16} className="mr-2" />{mappedElements.find(e => e.id === currentElement.id) ? t('mapper.action.update') : t('mapper.action.add')}</Button>
                                 </div>
                             </div>
