@@ -63,6 +63,7 @@ pub fn start_appium_server(
     state: State<'_, AppiumState>,
     host: String,
     port: u32,
+    base_path: String,
     args: String, // Extra args string
     app_handle: tauri::AppHandle,
 ) -> Result<String, String> {
@@ -86,6 +87,7 @@ pub fn start_appium_server(
     // Add Host and Port
     command.arg("--address").arg(&host);
     command.arg("--port").arg(&port.to_string());
+    command.arg("--base-path").arg(&base_path);
 
     // Add extra args
     if !args.trim().is_empty() {

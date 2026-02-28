@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ScreenMap, FlowchartLayout } from '@/lib/types';
-import { X, ZoomIn, ZoomOut, Maximize, Pencil, Save, Upload, Download, Plus, Camera, AlertTriangle } from 'lucide-react';
+import { X, ZoomIn, ZoomOut, Maximize, Pencil, Save, Upload, Download, Camera, Plus, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
 import { saveFlowchartLayout, loadFlowchartLayout, exportMapperData, importMapperData, saveScreenMap } from '@/lib/dashboard/mapperPersistence';
@@ -119,6 +119,23 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
     // Unsaved Changes State
     const [isDirty, setIsDirty] = useState(false);
     const [showUnsavedChangesModal, setShowUnsavedChangesModal] = useState(false);
+    const [isSpacePressed, setIsSpacePressed] = useState(false);
+
+    // Filtering State
+    const [filterTag, setFilterTag] = useState<string | null>(null);
+
+    const allTags = useMemo(() => {
+        const tags = maps.flatMap(m => m.tags || []);
+        return Array.from(new Set(tags)).sort();
+    }, [maps]);
+
+    const isInteracting = !!dragItem || isDraggingCanvas || isQuickConnectOpen;
+
+    const matchesFilter = (screenName: string) => {
+        if (!filterTag) return true;
+        const screen = maps.find(m => m.name === screenName);
+        return screen?.tags?.includes(filterTag) || false;
+    };
 
     // Load Layout
     useEffect(() => {
@@ -126,6 +143,56 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
             loadLayout();
         }
     }, [isOpen, activeProfileId]);
+
+    // Keyboard Listeners
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // 1. Space for Pan Mode
+            if (e.code === 'Space' && !isSpacePressed && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'SELECT') {
+                e.preventDefault();
+                setIsSpacePressed(true);
+            }
+
+            // 2. Arrows for Panning
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
+                if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'SELECT') return;
+                e.preventDefault();
+                const step = 40;
+                setOffset(prev => ({
+                    x: e.code === 'ArrowLeft' ? prev.x + step : (e.code === 'ArrowRight' ? prev.x - step : prev.x),
+                    y: e.code === 'ArrowUp' ? prev.y + step : (e.code === 'ArrowDown' ? prev.y - step : prev.y)
+                }));
+            }
+
+            // 3. Zoom Shortcuts (+, -, Ctrl+0)
+            if (e.key === '+' || e.key === '=') {
+                performZoom(0.1);
+            }
+            if (e.key === '-' || e.key === '_') {
+                performZoom(-0.1);
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+                e.preventDefault();
+                setScale(1);
+                setOffset({ x: 0, y: 0 });
+            }
+        };
+
+        const handleKeyUp = (e: KeyboardEvent) => {
+            if (e.code === 'Space') {
+                setIsSpacePressed(false);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('keyup', handleKeyUp);
+        };
+    }, [isOpen, isSpacePressed, scale, offset]);
 
     const loadLayout = async () => {
         setLoading(true);
@@ -136,6 +203,33 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
             setLayout({ version: 1, nodes: {}, edges: {} });
         }
         setLoading(false);
+        // Auto-center after layout is loaded
+        setTimeout(centerView, 100);
+    };
+
+    const centerView = () => {
+        if (!containerRef.current) return;
+        const nodePositions = Object.values(layout.nodes);
+        if (nodePositions.length === 0) {
+            setOffset({ x: 0, y: 0 });
+            return;
+        }
+
+        const minX = Math.min(...nodePositions.map(n => n.gridX * CELL_WIDTH + NODE_OFFSET_X));
+        const maxX = Math.max(...nodePositions.map(n => n.gridX * CELL_WIDTH + NODE_OFFSET_X + NODE_WIDTH));
+        const minY = Math.min(...nodePositions.map(n => n.gridY * CELL_HEIGHT + NODE_OFFSET_Y));
+        const maxY = Math.max(...nodePositions.map(n => n.gridY * CELL_HEIGHT + NODE_OFFSET_Y + NODE_HEIGHT));
+
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+
+        const containerWidth = containerRef.current.clientWidth;
+        const containerHeight = containerRef.current.clientHeight;
+
+        setOffset({
+            x: (containerWidth / 2) - (centerX * scale),
+            y: (containerHeight / 2) - (centerY * scale)
+        });
     };
 
     const saveLayout = async () => {
@@ -205,13 +299,16 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
     const handleExportImage = async () => {
         if (!contentRef.current) return;
         try {
+            const width = gridBounds.width * CELL_WIDTH;
+            const height = gridBounds.height * CELL_HEIGHT;
+
             const dataUrl = await toPng(contentRef.current, {
                 backgroundColor: '#1a1b1e', // Dark theme background
                 style: {
-                    transform: 'none', // Reset scale/translate to capture full resolution
+                    transform: `translate(${- gridBounds.minX * CELL_WIDTH}px, ${- gridBounds.minY * CELL_HEIGHT}px)`,
                 },
-                width: 3000, // Force large width to capture everything
-                height: 3000
+                width: width,
+                height: height
             });
 
             const base64Data = dataUrl.split(',')[1];
@@ -297,6 +394,34 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
         }
     };
 
+    // Dynamic Grid Calculation
+    const gridBounds = useMemo(() => {
+        const nodePositions = Object.values(layout.nodes);
+        if (nodePositions.length === 0) {
+            return { minX: 0, minY: 0, maxX: 5, maxY: 5, width: 10, height: 10 };
+        }
+
+        let minX = Math.min(...nodePositions.map(n => n.gridX));
+        let maxX = Math.max(...nodePositions.map(n => n.gridX));
+        let minY = Math.min(...nodePositions.map(n => n.gridY));
+        let maxY = Math.max(...nodePositions.map(n => n.gridY));
+
+        // Add 2 cells padding
+        const paddedMinX = minX - 2;
+        const paddedMaxX = maxX + 2;
+        const paddedMinY = minY - 2;
+        const paddedMaxY = maxY + 2;
+
+        return {
+            minX: paddedMinX,
+            minY: paddedMinY,
+            maxX: paddedMaxX,
+            maxY: paddedMaxY,
+            width: paddedMaxX - paddedMinX + 1,
+            height: paddedMaxY - paddedMinY + 1
+        };
+    }, [layout.nodes]);
+
     // Auto-Layout New Nodes
     useEffect(() => {
         if (loading) return;
@@ -350,7 +475,10 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
     const getClosestLane = (val: number) => Math.round(val / LANE_SIZE) * LANE_SIZE;
     // --- Event Handlers ---
     const handleCanvasMouseDown = (e: React.MouseEvent) => {
-        if (e.button !== 0) return;
+        if (e.button !== 0 && e.button !== 1) return;
+        if (e.button === 1) {
+            e.preventDefault();
+        }
         setIsDraggingCanvas(true);
         dragStart.current = { x: e.clientX - offset.x, y: e.clientY - offset.y };
     };
@@ -384,7 +512,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
             // Check grid occupancy (exclude self)
             const isOccupied = Object.entries(layout.nodes).some(([name, pos]) => {
                 if (name === dragItem.id) return false;
-                return pos.gridX === Math.max(0, gridX) && pos.gridY === Math.max(0, gridY);
+                return pos.gridX === gridX && pos.gridY === gridY;
             });
 
             if (!isOccupied) {
@@ -392,7 +520,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                     ...prev,
                     nodes: {
                         ...prev.nodes,
-                        [dragItem.id]: { gridX: Math.max(0, gridX), gridY: Math.max(0, gridY) }
+                        [dragItem.id]: { gridX, gridY }
                     }
                 }));
                 setIsDirty(true);
@@ -500,7 +628,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                     } else {
                         newVertices = [...prevEdge.vertices];
 
-                        // Update vertices based on segment drag
+                        // Update vertices based on segment drag (absolute)
                         if (isHorizontal) {
                             const vIndex1 = index - 1; // Start of segment (if vertex)
                             const vIndex2 = index;     // End of segment (if vertex)
@@ -627,9 +755,9 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
 
                 // 2. Merge duplicated vertices and Remove vertices overlapping Start/End
                 let cleaned = edge.vertices.filter((v, i, arr) => {
-                    // Start point overlap logic (Increased threshold to 15px)
+                    // Start point overlap logic (already absolute)
                     if (Math.abs(v.x - startPoint.x) < 15 && Math.abs(v.y - startPoint.y) < 15) return false;
-                    // End point overlap logic (Increased threshold to 15px)
+                    // End point overlap logic (already absolute)
                     if (Math.abs(v.x - endPoint.x) < 15 && Math.abs(v.y - endPoint.y) < 15) return false;
 
                     if (i === 0) return true;
@@ -650,18 +778,15 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                     const p1 = fullPath[i];
                     const p2 = fullPath[i + 1];
 
-                    // Collinearity check: Distance of p1 from line p0-p2
-                    // Dist = |(y2-y1)x0 - (x2-x1)y0 + x2y1 - y2x1| / sqrt((y2-y1)^2 + (x2-x1)^2)
-                    // Simplified Cross Product Area: 
+                    // Everything is absolute already
                     const crossProduct = (p1.y - p0.y) * (p2.x - p1.x) - (p2.y - p1.y) * (p1.x - p0.x);
 
                     const l2 = (p2.x - p0.x) ** 2 + (p2.y - p0.y) ** 2;
-                    if (l2 === 0) continue; // p0 == p2
+                    if (l2 === 0) continue;
 
                     const dist = Math.abs(crossProduct) / Math.sqrt(l2);
 
-                    if (dist < 15) { // Increased threshold to 15px for straightening
-                        // Index in 'cleaned' is i-1
+                    if (dist < 15) {
                         toRemove.add(i - 1);
                     }
                 }
@@ -729,6 +854,12 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
             const pixelDelta = e.deltaY > 0 ? -0.1 : 0.1;
 
             performZoom(pixelDelta, { x: mouseX, y: mouseY });
+        } else if (e.shiftKey) {
+            // Horizontal Pan
+            setOffset(prev => ({ ...prev, x: prev.x - e.deltaY }));
+        } else {
+            // Vertical Pan
+            setOffset(prev => ({ ...prev, y: prev.y - e.deltaY }));
         }
     };
 
@@ -746,7 +877,10 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
 
             const newVertices = [...(edge.vertices || [])];
             // Insert at segmentIndex
-            newVertices.splice(segmentIndex, 0, { x: mouseX, y: mouseY });
+            newVertices.splice(segmentIndex, 0, {
+                x: mouseX,
+                y: mouseY
+            });
 
             return {
                 ...prev,
@@ -781,6 +915,8 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
             startPoint: { x: number, y: number };
             endPoint: { x: number, y: number };
             elName: string;
+            sourceName: string;
+            targetName: string;
         }[] = [];
 
         maps.forEach(sourceMap => {
@@ -846,11 +982,11 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                     }
                 }
 
-                layouts.push({ edgeId, points, startPoint, endPoint, elName: el.name });
+                layouts.push({ edgeId, points, startPoint, endPoint, elName: el.name, sourceName: sourceMap.name, targetName });
             });
         });
         return layouts;
-    }, [maps, layout, dragItem, cursorPos]); // layout change (edges/nodes) triggers recalc
+    }, [maps, layout, dragItem, cursorPos, filterTag]);
 
     // Sorted layouts for Z-indexing (Hovered edge last = on top)
     const sortedEdgeLayouts = useMemo(() => {
@@ -864,28 +1000,34 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
 
     // Layer 1: Lines (Z-Index 10) - Beneath Nodes
     const renderEdgeLines = useMemo(() => {
-        return sortedEdgeLayouts.map(({ edgeId, points }) => {
-            let d = `M ${points[0].x} ${points[0].y}`;
+        return sortedEdgeLayouts.map(({ edgeId, points, sourceName, targetName }) => {
+            const isVisible = matchesFilter(sourceName) && matchesFilter(targetName);
+            if (!isVisible && !isInteracting) return null;
+
+            let d = `M ${points[0].x} ${points[0].y} `;
             for (let i = 0; i < points.length - 1; i++) {
                 const p2 = points[i + 1];
-                d += ` L ${p2.x} ${p2.y}`;
+                d += ` L ${p2.x} ${p2.y} `;
             }
 
             return (
-                <g key={`${edgeId}-line`}>
+                <g key={`${edgeId}-line`} className={clsx(!isVisible && "opacity-20 pointer-events-none")}>
                     <path d={d} stroke={hoveredEdge === edgeId ? "#3b82f6" : "#9ca3af"} strokeWidth={hoveredEdge === edgeId ? 3 : 2} fill="none" markerEnd={hoveredEdge === edgeId ? "url(#arrowhead-highlighted)" : "url(#arrowhead)"}
                         className="transition-colors pointer-events-none" />
                 </g>
             );
         });
-    }, [sortedEdgeLayouts, hoveredEdge]);
+    }, [sortedEdgeLayouts, hoveredEdge, filterTag, isInteracting]);
 
     // Layer 2: Controls & Interaction (Z-Index 50) - Above Nodes
     const renderEdgeControls = useMemo(() => {
         const isDraggingConnection = dragItem?.type === 'source' || dragItem?.type === 'target';
         const isDraggingEdge = dragItem?.type === 'segment' || dragItem?.type === 'vertex' || isDraggingConnection;
 
-        return sortedEdgeLayouts.map(({ edgeId, points, startPoint, endPoint, elName }) => {
+        return sortedEdgeLayouts.map(({ edgeId, points, startPoint, endPoint, elName, sourceName, targetName }) => {
+            const isVisible = matchesFilter(sourceName) && matchesFilter(targetName);
+            if (!isVisible && !isInteracting) return null;
+
             const segments: React.ReactNode[] = [];
             for (let i = 0; i < points.length - 1; i++) {
                 const p1 = points[i];
@@ -902,9 +1044,10 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                         className={clsx(
                             "cursor-pointer",
                             isHorizontal ? "cursor-row-resize" : "cursor-col-resize",
-                            isDraggingConnection ? "pointer-events-none" : "pointer-events-auto"
+                            (isDraggingConnection || !isVisible) ? "pointer-events-none" : "pointer-events-auto"
                         )}
                         onMouseDown={(e) => {
+                            if (isSpacePressed || e.button === 1 || !isVisible) return;
                             e.stopPropagation();
                             setDragItem({ type: 'segment', id: edgeId, index: i, points: points });
                         }}
@@ -914,8 +1057,8 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
             }
 
             return (
-                <g key={`${edgeId}-ctrl`} className="group/edge pointer-events-auto"
-                    onMouseEnter={() => setHoveredEdge(edgeId)}
+                <g key={`${edgeId}-ctrl`} className={clsx("group/edge pointer-events-auto", !isVisible && "opacity-20")}
+                    onMouseEnter={() => isVisible && setHoveredEdge(edgeId)}
                     onMouseLeave={() => setHoveredEdge(null)}
                 >
                     {segments}
@@ -961,7 +1104,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                                     hoveredEdge === edgeId ? "bg-surface border-primary text-primary ring-1 ring-primary" : "bg-surface/90 border-outline-variant/50 hover:border-primary hover:text-primary"
                                 )}
                                     onMouseDown={(e) => {
-                                        // Make label draggable or just pass through
+                                        if (isSpacePressed || e.button === 1) return;
                                         e.stopPropagation();
                                     }}>
                                     {elName}
@@ -976,7 +1119,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                             "cursor-grab hover:fill-primary/50",
                             (dragItem?.type === 'source' && dragItem.id === edgeId) ? "pointer-events-none" : (isDraggingConnection ? "pointer-events-none" : "pointer-events-auto")
                         )}
-                        onMouseDown={(e) => { e.stopPropagation(); setDragItem({ type: 'source', id: edgeId }); }} />
+                        onMouseDown={(e) => { if (isSpacePressed || e.button === 1) return; e.stopPropagation(); setDragItem({ type: 'source', id: edgeId }); }} />
 
                     {/* Target Handle */}
                     <circle cx={endPoint.x} cy={endPoint.y} r={6} fill="transparent"
@@ -984,7 +1127,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                             "cursor-grab hover:fill-primary/50",
                             (dragItem?.type === 'target' && dragItem.id === edgeId) ? "pointer-events-none" : (isDraggingConnection ? "pointer-events-none" : "pointer-events-auto")
                         )}
-                        onMouseDown={(e) => { e.stopPropagation(); setDragItem({ type: 'target', id: edgeId }); }} />
+                        onMouseDown={(e) => { if (isSpacePressed || e.button === 1) return; e.stopPropagation(); setDragItem({ type: 'target', id: edgeId }); }} />
 
                     {/* Vertices */}
                     {points.slice(1, -1).map((p, idx) => (
@@ -993,7 +1136,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                                 "cursor-move opacity-0 hover:opacity-100",
                                 isDraggingConnection ? "pointer-events-none" : "pointer-events-auto"
                             )}
-                            onMouseDown={(e) => { e.stopPropagation(); setDragItem({ type: 'vertex', id: edgeId, index: idx }); }}
+                            onMouseDown={(e) => { if (isSpacePressed || e.button === 1) return; e.stopPropagation(); setDragItem({ type: 'vertex', id: edgeId, index: idx }); }}
                             onDoubleClick={(e) => handleVertexDoubleClick(e, edgeId, idx)}
                         />
                     ))}
@@ -1011,7 +1154,6 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-2 border-b border-outline-variant/30 bg-surface">
                     <h2 className="text-lg font-semibold text-on-surface flex items-center gap-2">
-                        <Maximize className="text-primary" size={20} />
                         {t('mapper.flowchart.title', 'Navigation Flow')}
                     </h2>
                     <div className="flex items-center gap-2">
@@ -1036,9 +1178,28 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                         <div className="h-4 w-px bg-outline-variant/30 mx-2" />
                         <Button
                             onClick={handleExportImage}
-                            className="p-2 hover:bg-primary/10 text-primary rounded-full"
+                            className="p-2 hover:bg-primary/10 text-primary rounded-full transition-colors"
                             title={t('mapper.flowchart.export_image', 'Export Image')}>
                             <Camera size={16} />
+                        </Button>
+                        <div className="h-4 w-px bg-outline-variant/30 mx-1" />
+                        <div className="flex items-center gap-2 px-2 py-1 bg-surface-variant/10 rounded-lg border border-outline-variant/20 ml-2">
+                            <span className="text-[10px] uppercase font-bold text-on-surface-variant/70 whitespace-nowrap">{t('mapper.flowchart.filter_by_tag', 'Filter')}</span>
+                            <Select
+                                className="bg-transparent border-none text-xs font-semibold text-primary outline-none cursor-pointer py-0 h-6 min-w-[100px]"
+                                value={filterTag || ""}
+                                onChange={(e) => setFilterTag(e.target.value || null)}
+                                options={[
+                                    { value: "", label: t('mapper.flowchart.all_tags', 'All Tags') },
+                                    ...allTags.map(tag => ({ value: tag, label: tag }))
+                                ]}
+                            />
+                        </div>
+                        <Button
+                            onClick={centerView}
+                            className="p-2 hover:bg-primary/10 text-primary rounded-full"
+                            title={t('mapper.flowchart.center_view', 'Center View')}>
+                            <Maximize size={16} />
                         </Button>
                         <div className="h-6 w-px bg-outline-variant/30 mx-2" />
                         <div className="flex bg-surface-variant/30 rounded-lg p-1 mr-4">
@@ -1065,7 +1226,10 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                 {/* Canvas Container */}
                 <div
                     ref={containerRef}
-                    className="flex-1 bg-surface-variant/5 relative overflow-hidden cursor-grab active:cursor-grabbing"
+                    className={clsx(
+                        "flex-1 bg-surface-variant/5 relative overflow-hidden",
+                        isDraggingCanvas ? "cursor-grabbing" : (isSpacePressed ? "cursor-grab" : "cursor-default")
+                    )}
                     onMouseDown={handleCanvasMouseDown}
                     onMouseMove={handleMouseMove}
                     onMouseUp={handleMouseUp}
@@ -1079,19 +1243,24 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                         style={{
                             transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
                             transformOrigin: '0 0',
-                            width: '3000px',
-                            height: '3000px'
+                            width: `${gridBounds.width * CELL_WIDTH}px`,
+                            height: `${gridBounds.height * CELL_HEIGHT}px`
                         }}
                     >
                         {/* Grid Background */}
-                        <div className="absolute inset-0 pointer-events-none"
+                        <div className="absolute pointer-events-none"
                             style={{
                                 zIndex: 0,
+                                left: `${gridBounds.minX * CELL_WIDTH}px`,
+                                top: `${gridBounds.minY * CELL_HEIGHT}px`,
+                                width: `${gridBounds.width * CELL_WIDTH}px`,
+                                height: `${gridBounds.height * CELL_HEIGHT}px`,
                                 backgroundImage: `
-                                     linear-gradient(to right, rgba(0,0,0,0.05) 1px, transparent 1px),
-                                     linear-gradient(to bottom, rgba(0,0,0,0.05) 1px, transparent 1px)
-                                 `,
-                                backgroundSize: `${CELL_WIDTH}px ${CELL_HEIGHT}px`
+linear-gradient(to right, rgba(0,0,0,0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0,0,0,0.05) 1px, transparent 1px)
+        `,
+                                backgroundSize: `${CELL_WIDTH}px ${CELL_HEIGHT}px`,
+                                backgroundPosition: `0 0`
                             }}
                         />
 
@@ -1118,6 +1287,9 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                             const data = maps.find(m => m.name === name);
                             if (!data) return null;
 
+                            const isVisible = matchesFilter(name);
+                            if (!isVisible && !isInteracting) return null;
+
                             const pixel = getPixelCoords(pos.gridX, pos.gridY);
                             const isDraggingThis = dragItem?.type === 'node' && dragItem.id === name;
 
@@ -1127,7 +1299,8 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                                     className={clsx(
                                         "absolute flex flex-col bg-surface border rounded-xl overflow-visible shadow-sm hover:shadow-xl transition-shadow group/card",
                                         data.type === 'modal' ? 'border-dashed border-tertiary' : 'border-outline-variant/60',
-                                        isDraggingThis ? 'z-[55] ring-2 ring-primary shadow-2xl opacity-90' : 'z-40'
+                                        isDraggingThis ? 'z-[55] ring-2 ring-primary shadow-2xl opacity-90' : 'z-40',
+                                        !isVisible && "opacity-20 pointer-events-none"
                                         // Lift dragged node above Edge Controls (50) but below Ports (60)
                                     )}
                                     style={{
@@ -1138,6 +1311,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                                         cursor: isDraggingCanvas ? 'move' : 'grab'
                                     }}
                                     onMouseDown={(e) => {
+                                        if (isSpacePressed || e.button === 1 || !isVisible) return;
                                         e.stopPropagation();
                                         setDragItem({ type: 'node', id: name });
                                     }}
@@ -1193,6 +1367,9 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                         {Object.entries(layout.nodes).map(([name, pos]) => {
                             const data = maps.find(m => m.name === name);
                             if (!data) return null;
+                            const isVisible = matchesFilter(name);
+                            if (!isVisible && !isInteracting) return null;
+
                             const pixel = getPixelCoords(pos.gridX, pos.gridY);
 
                             return (
@@ -1264,6 +1441,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                                                 onMouseEnter={() => setHoveredPort({ nodeId: name, portId: p.id })}
                                                 onMouseLeave={() => setHoveredPort(null)}
                                                 onMouseDown={(e) => {
+                                                    if (isSpacePressed || e.button === 1) return;
                                                     if (isInteractive) e.stopPropagation();
                                                 }}
                                                 onClick={(e) => {

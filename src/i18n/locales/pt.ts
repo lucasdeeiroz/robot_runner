@@ -446,6 +446,9 @@ export const pt = {
                 cancel: "Cancelar",
                 no_elements: "Nenhum elemento mapeado disponível.",
                 title: "Fluxo de Navegação",
+                center_view: "Centralizar Visualização",
+                filter_by_tag: "Filtrar por Tag",
+                all_tags: "Todas as Tags",
                 unsaved_changes: {
                     title: "Alterações não salvas",
                     message: "Você tem alterações não salvas. Deseja salvar antes de sair?",
@@ -460,7 +463,9 @@ export const pt = {
             screen_mapper: "Mapeador de Tela",
             screen_settings: "Configurações da Tela",
             saved_screens: "Telas Salvas",
+            saved_elements: "Elementos Salvos",
             no_saved_maps: "Nenhum mapa salvo encontrado",
+            no_saved_elements: "Nenhum elemento mapeado",
             items: "itens",
             elements_mapped_count: "{{count}} elementos mapeados",
             elements_mapped: "elementos mapeados",
@@ -479,6 +484,7 @@ export const pt = {
             },
             screen_name: "Nome da Tela",
             screen_type: "Tipo de Tela",
+            screen_tags: "Tags",
             screen_types: {
                 screen: "Tela",
                 modal: "Modal",
@@ -524,7 +530,8 @@ export const pt = {
                 navigates_to: "Nome da Tela",
                 menu_options: "Opção 1, Opção 2...",
                 parent_screen: "Nome da Tela Pai",
-                screen_name: "Nome da Tela (Único)"
+                screen_name: "Nome da Tela (Único)",
+                screen_tags: "ex: Auth, Perfil"
             },
             action: {
                 add: "Adicionar Elemento",
@@ -672,6 +679,7 @@ export const pt = {
                 remove_logo: "Remover Logo"
             },
             tool_config: {
+                appium_base_path: "Caminho Base do Appium (Base Path)",
                 appium_args: "Argumentos Appium",
                 scrcpy_args: "Argumentos Scrcpy",
                 robot_args: "Argumentos Robot Framework",
@@ -794,6 +802,7 @@ export const pt = {
                 redirecting: "Redirecionando...",
                 failed: "Falha ao iniciar",
                 waiting_server: "Aguardando Servidor...",
+                waiting_server_rest: "Aguardando Appium...",
                 server_not_ready: "O Servidor Appium não está pronto"
             },
             alerts: {

@@ -276,6 +276,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     await invoke('start_appium_server', {
                         host: settings.appiumHost,
                         port: settings.appiumPort,
+                        base_path: settings.appiumBasePath,
                         args: settings.tools.appiumArgs
                     });
                     // Brief wait for stabilization

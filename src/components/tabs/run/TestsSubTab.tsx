@@ -85,6 +85,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     await invoke('start_appium_server', {
                         host: settings.appiumHost,
                         port: settings.appiumPort,
+                        base_path: settings.appiumBasePath,
                         args: settings.tools.appiumArgs
                     });
 
@@ -115,7 +116,34 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
 
                     // Stabilization delay to ensure port binding
                     if (isReady) {
-                        await new Promise(r => setTimeout(r, 3000));
+                        // Ensure no double slashes in URL
+                        const cleanBasePath = settings.appiumBasePath.startsWith('/')
+                            ? settings.appiumBasePath
+                            : `/${settings.appiumBasePath}`;
+                        const statusUrl = `http://${settings.appiumHost}:${settings.appiumPort}${cleanBasePath.endsWith('/') ? cleanBasePath : cleanBasePath + '/'}status`.replace(/([^:]\/)\/+/g, "$1");
+                        let isRestReady = false;
+
+                        // Poll REST API for up to 15 seconds
+                        for (let j = 0; j < 30; j++) {
+                            try {
+                                const response = await fetch(statusUrl);
+                                if (response.ok) {
+                                    isRestReady = true;
+                                    break;
+                                }
+                            } catch (e) {
+                                // Connection refused or other network error
+                            }
+                            await new Promise(r => setTimeout(r, 500));
+                        }
+
+                        if (!isRestReady) {
+                            console.warn("Appium process is running but REST API did not respond in time.");
+                            // We continue anyway as a fallback, but the warning helps debugging.
+                        }
+
+                        // Final short breath
+                        await new Promise(r => setTimeout(r, 1000));
                     }
                 }
             }

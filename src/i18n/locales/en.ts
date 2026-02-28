@@ -446,6 +446,9 @@ export const en = {
                 cancel: "Cancel",
                 no_elements: "No mapped elements available.",
                 title: "Navigation Flow",
+                center_view: "Center View",
+                filter_by_tag: "Filter by Tag",
+                all_tags: "All Tags",
                 unsaved_changes: {
                     title: "Unsaved Changes",
                     message: "You have unsaved changes. Do you want to save before exiting?",
@@ -460,7 +463,9 @@ export const en = {
             screen_mapper: "Screen Mapper",
             screen_settings: "Screen Settings",
             saved_screens: "Saved Screens",
+            saved_elements: "Saved Elements",
             no_saved_maps: "No saved maps found",
+            no_saved_elements: "No elements mapped",
             items: "items",
             elements_mapped_count: "{{count}} elements mapped",
             elements_mapped: "elements mapped",
@@ -479,6 +484,7 @@ export const en = {
             },
             screen_name: "Screen Name",
             screen_type: "Screen Type",
+            screen_tags: "Tags",
             screen_types: {
                 screen: "Screen",
                 modal: "Modal",
@@ -524,7 +530,8 @@ export const en = {
                 navigates_to: "Screen Name",
                 menu_options: "Option 1, Option 2...",
                 parent_screen: "Parent Screen Name",
-                screen_name: "Screen Name (Unique)"
+                screen_name: "Screen Name (Unique)",
+                screen_tags: "e.g. Auth, Profile"
             },
             action: {
                 add: "Add Element",
@@ -672,6 +679,7 @@ export const en = {
                 remove_logo: "Remove Logo"
             },
             tool_config: {
+                appium_base_path: "Appium Base Path",
                 appium_args: "Appium Arguments",
                 scrcpy_args: "Scrcpy Arguments",
                 robot_args: "Robot Framework Arguments",
@@ -794,6 +802,7 @@ export const en = {
                 redirecting: "Redirecting...",
                 failed: "Launch failed",
                 waiting_server: "Waiting for Server...",
+                waiting_server_rest: "Waiting for Appium...",
                 server_not_ready: "The Appium server is not ready"
             },
             alerts: {

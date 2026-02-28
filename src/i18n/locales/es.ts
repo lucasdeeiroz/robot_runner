@@ -446,6 +446,9 @@ export const es = {
                 cancel: "Cancelar",
                 no_elements: "No hay elementos asignados disponibles.",
                 title: "Flujo de Navegación",
+                center_view: "Centrar Vista",
+                filter_by_tag: "Filtrar por Etiqueta",
+                all_tags: "Todas las Etiquetas",
                 unsaved_changes: {
                     title: "Cambios no guardados",
                     message: "Tienes cambios no guardados. ¿Quieres guardar antes de salir?",
@@ -460,7 +463,9 @@ export const es = {
             screen_mapper: "Mapeador de Pantalla",
             screen_settings: "Ajustes de Pantalla",
             saved_screens: "Pantallas Guardadas",
+            saved_elements: "Elementos Guardados",
             no_saved_maps: "No se encontraron mapas guardados",
+            no_saved_elements: "No hay elementos mapeados",
             items: "ítems",
             elements_mapped_count: "{{count}} elementos mapeados",
             elements_mapped: "elementos mapeados",
@@ -479,6 +484,7 @@ export const es = {
             },
             screen_name: "Nombre de la Pantalla",
             screen_type: "Tipo de Pantalla",
+            screen_tags: "Etiquetas",
             screen_types: {
                 screen: "Pantalla",
                 modal: "Modal",
@@ -524,7 +530,8 @@ export const es = {
                 navigates_to: "Nombre de la Pantalla",
                 menu_options: "Opción 1, Opción 2...",
                 parent_screen: "Nombre de la Pantalla Padre",
-                screen_name: "Nombre de la Pantalla (Único)"
+                screen_name: "Nombre de la Pantalla (Único)",
+                screen_tags: "ej: Auth, Perfil"
             },
             action: {
                 add: "Añadir Elemento",
@@ -672,6 +679,7 @@ export const es = {
                 remove_logo: "Eliminar Logo"
             },
             tool_config: {
+                appium_base_path: "Ruta Base de Appium",
                 appium_args: "Argumentos Appium",
                 scrcpy_args: "Argumentos Scrcpy",
                 robot_args: "Argumentos Robot Framework",
@@ -794,6 +802,7 @@ export const es = {
                 redirecting: "Redirigiendo...",
                 failed: "Fallo al iniciar",
                 waiting_server: "Esperando al Servidor...",
+                waiting_server_rest: "Esperando Appium...",
                 server_not_ready: "El servidor Appium no está listo"
             },
             alerts: {
