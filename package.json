@@ -1,7 +1,7 @@
 {
   "name": "robot_runner",
   "private": true,
-  "version": "2.1.15",
+  "version": "2.1.20",
   "type": "module",
   "scripts": {
     "dev": "vite",
