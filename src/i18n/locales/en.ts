@@ -679,6 +679,7 @@ export const en = {
                 remove_logo: "Remove Logo"
             },
             tool_config: {
+                appium_base_path: "Appium Base Path",
                 appium_args: "Appium Arguments",
                 scrcpy_args: "Scrcpy Arguments",
                 robot_args: "Robot Framework Arguments",
@@ -801,6 +802,7 @@ export const en = {
                 redirecting: "Redirecting...",
                 failed: "Launch failed",
                 waiting_server: "Waiting for Server...",
+                waiting_server_rest: "Waiting for Appium...",
                 server_not_ready: "The Appium server is not ready"
             },
             alerts: {

@@ -150,6 +150,7 @@ export function SettingsPage() {
                 await invoke('start_appium_server', {
                     host: settings.appiumHost,
                     port: settings.appiumPort,
+                    basePath: settings.appiumBasePath,
                     args: settings.tools.appiumArgs
                 });
                 setShowAppiumLogs(true);
@@ -435,7 +436,17 @@ export function SettingsPage() {
                                     />
                                 </div>
                             </div>
-                            <div className="mb-4">
+                            <div className="grid grid-cols-2 gap-4 mb-4">
+                                <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
+                                    <Input
+                                        label={t('settings.tool_config.appium_base_path')}
+                                        type="text"
+                                        value={settings.appiumBasePath}
+                                        onChange={(e) => updateSetting('appiumBasePath', e.target.value)}
+                                        disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
+                                        placeholder="/wd/hub"
+                                    />
+                                </div>
                                 <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
                                     <Input
                                         label={t('settings.tool_config.appium_args')}

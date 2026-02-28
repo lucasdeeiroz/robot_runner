@@ -679,6 +679,7 @@ export const es = {
                 remove_logo: "Eliminar Logo"
             },
             tool_config: {
+                appium_base_path: "Ruta Base de Appium",
                 appium_args: "Argumentos Appium",
                 scrcpy_args: "Argumentos Scrcpy",
                 robot_args: "Argumentos Robot Framework",
@@ -801,6 +802,7 @@ export const es = {
                 redirecting: "Redirigiendo...",
                 failed: "Fallo al iniciar",
                 waiting_server: "Esperando al Servidor...",
+                waiting_server_rest: "Esperando Appium...",
                 server_not_ready: "El servidor Appium no está listo"
             },
             alerts: {

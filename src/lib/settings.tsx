@@ -37,6 +37,7 @@ export interface AppSettings {
     // Appium
     appiumHost: string;
     appiumPort: number;
+    appiumBasePath: string;
 
     // Paths
     paths: {
@@ -76,6 +77,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     allowActionsDuringTest: false, // Default to false (blocking)
     appiumHost: '127.0.0.1',
     appiumPort: 4723,
+    appiumBasePath: '/',
     paths: {
         automationRoot: '',
         resources: '',
