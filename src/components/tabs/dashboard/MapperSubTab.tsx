@@ -881,36 +881,36 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                             </div>
                         </div>
                     </div>
-
-                    <FlowchartModal
-                        isOpen={isFlowchartOpen}
-                        onClose={() => setIsFlowchartOpen(false)}
-                        maps={savedMaps}
-                        onEditScreen={(name) => {
-                            const map = savedMaps.find(m => m.name === name);
-                            if (map) {
-                                handleLoadScreen(map);
-                                setIsFlowchartOpen(false);
-                            }
-                        }}
-                        onRefresh={loadSavedMaps}
-                        activeProfileId={activeProfileId}
-                    />
-
-                    <ConfirmationModal
-                        isOpen={isDeleteModalOpen}
-                        onClose={() => setIsDeleteModalOpen(false)}
-                        onConfirm={() => {
-                            confirmDeleteScreen();
-                            refreshAll();
-                        }}
-                        title={t('mapper.confirm.delete_title', 'Delete Screen Map?')}
-                        description={t('mapper.confirm.delete_desc', 'Are you sure you want to delete this screen map? This action cannot be undone.')}
-                        variant="danger"
-                        confirmText={t('mapper.action.delete')}
-                    />
                 </>
             )}
+
+            <FlowchartModal
+                isOpen={isFlowchartOpen}
+                onClose={() => setIsFlowchartOpen(false)}
+                maps={savedMaps}
+                onEditScreen={(name) => {
+                    const map = savedMaps.find(m => m.name === name);
+                    if (map) {
+                        handleLoadScreen(map);
+                        setIsFlowchartOpen(false);
+                    }
+                }}
+                onRefresh={loadSavedMaps}
+                activeProfileId={activeProfileId}
+            />
+
+            <ConfirmationModal
+                isOpen={isDeleteModalOpen}
+                onClose={() => setIsDeleteModalOpen(false)}
+                onConfirm={() => {
+                    confirmDeleteScreen();
+                    refreshAll();
+                }}
+                title={t('mapper.confirm.delete_title', 'Delete Screen Map?')}
+                description={t('mapper.confirm.delete_desc', 'Are you sure you want to delete this screen map? This action cannot be undone.')}
+                variant="danger"
+                confirmText={t('mapper.action.delete')}
+            />
         </div>
     );
 }
