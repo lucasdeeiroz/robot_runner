@@ -1,65 +1,73 @@
-# Robot Runner
+# 🤖 Robot Runner
 
-**Robot Runner** is a modern, high-performance desktop application designed to streamline Android automation with **Robot Framework** and **Appium**. Built with **Tauri v2**, **React**, and **TypeScript**, it offers a native, resource-efficient experience for QA engineers and developers.
+**The Professional Command Center for Android Automation.**
 
-## 🚀 Key Features
+Robot Runner is a high-performance desktop ecosystem engineered to bridge the gap between manual exploration and professional automation. Built for **Quality Analysts**, **SDETs**, and **System Architects**, it streamlines the entire testing lifecycle—from initial device connection to AI-powered artifact generation—using a unified, resource-efficient interface.
 
-### 📱 Device Management
-*   **ADB Devices Detection:** Detects Android devices connected via USB or Wi-Fi.
-*   **Wireless Connection:** Connect devices wirelessly effortlessly using **Pairing Code** (Android 11+).
-*   **Remote Access:** Full support for remote devices via **ngrok** tunneling.
-*   **Device Diagnostics:** Built-in toolbox to analyze app/system performance, get app/system logs, and send ADB commands to the device.
+---
 
-### ⚡ Test Execution
-*   **Flexible Running Modes:**
-    *   **File Mode:** Select and run individual `.robot` files.
-    *   **Folder Mode:** Execute all tests within a specific directory.
-    *   **Argument Files:** Run complex test suites defined in `.args` or `.txt` files.
-*   **Smart Automation Root:** Define a specific working directory ("Automation Root") to resolve relative paths correctly in your argument files.
-*   **Live Logs:** View Appium and Robot Framework logs in real-time within the app.
+## 🌟 The QA Advantage: Why Robot Runner?
 
-### 🛠️ Advanced Tools
-*   **Configuration Profiles:** Create and switch between multiple configuration profiles (e.g., "Work Project", "App B", "Personal Project") to manage different path setups and settings instantly.
-*   **Inspector:** A powerful UI Inspector to visualize, select and copy locators from elements.
-*   **Screen Mirroring:** Embedded high-performance screen mirroring powered by `scrcpy` (works over USB and Wi-Fi).
-*   **Performance Monitoring:** Track CPU, RAM, and Battery usage of your device in real-time and export session data to CSV.
+In a traditional workflow, a QA engineer switches between Appium Inspector, terminal windows for ADB/Logcat and CLI commands, device monitoring tools, and various performance monitors. **Robot Runner eliminates this context-switching.** It provides a seamless, integrated environment where diagnostics and automation design happen in parallel.
 
-### 📜 History & Reports
-*   **Historical Logs:** Access past test runs, grouped by **Date**, **Device**, or **OS Version**.
-*   **Re-run Capabilities:** Quickly re-run any test from the history with the exact same parameters.
-*   **Logcat Viewer:** integrated Logcat viewer with filtering and search capabilities.
+---
 
-### 🌍 Internationalization
-*   Fully translated into **English**, **Portuguese (Brazil)**, and **Spanish**.
+## 🚀 Core Capabilities
+
+### 🎛️ Unified Device Command Center
+*   **Intelligent Discovery**: Instant detection of USB and Wi-Fi devices.
+*   **Wireless Freedom**: Seamless pairing via Android 11+ Pairing Codes and TCP/IP.
+*   **Global Reach**: Integrated **ngrok** tunneling for remote device testing across different networks.
+*   **High-Fidelity Mirroring**: Ultra-low latency screen mirroring powered by `scrcpy`, supporting full interaction (tap, double-tap, swipe) even during test design.
+
+### 🔍 Precision UI Inspection & Locator Strategy
+*   **Dynamic Locator Generation**: Instantly generate optimized XPaths and chained `UiSelector` methods.
+*   **Visual Selection**: Select elements directly from the screen mirroring.
+*   **Smart Selection Candidates**: The inspector automatically prioritizes elements based on automation best practices (`resource-id` > `content-desc` > `text`).
+*   **Multi-Attribute Locators**: Build complex, stable locators using multiple attributes (clickable, enabled, focusable) with support for match types (Equals, Contains, Regex).
+*   **Hierarchy Visualization**: Deep-dive into the view hierarchy with an interactive breadcrumb system and XML dump analysis.
+
+### 📊 Real-Time Diagnostics & Performance Monitoring
+*   **Smart Logcat**: Real-time system and app logs with advanced package-based filtering and search.
+*   **Deep Performance Insights**: Track **CPU usage**, **RAM consumption**, and **Battery health** (including temperature) in real-time.
+*   **App-Specific Metrics**: Monitor **FPS** and specific resource usage for the application under test.
+*   **Data-Driven QA**: Record performance sessions and export them to **CSV** for detailed bottleneck analysis and reporting.
+
+### 🧠 AI-Driven Mapping & Test Design
+*   **Visual App Mapping**: Create a digital twin of your application by mapping screens, modals, and drawers.
+*   **Flowchart Visualization**: Automatically generate interactive flowcharts of your app's navigation logic.
+*   **Screen Tagging**: Organize large-scale applications using custom tags for targeted filtering and analysis.
+*   **AI Artifact Generation**: Leverage **Google Gemini AI** to transform your app mapping into professional-grade **BDD Test Cases**, **Product Backlog Items (PBIs)**, or **Bug Reports**, exportable directly to **XLSX** and **DOCX**.
+
+### ⚡ Professional-Grade Execution
+*   **Execution Modes**: Native support for individual `.robot` files, entire directories, and complex `.args` configurations. Maestro is also supported.
+*   **Automation Root**: Intelligent working directory management to ensure relative path resolution for complex projects.
+*   **Configuration Profiles**: Instantly switch between multiple project setups, API keys, and environment variables.
+*   **Execution History**: Detailed historical logs and reports, organized by device, OS version, or date, with single-click "Re-run" capability.
 
 ---
 
 ## 📥 Installation
 
 ### Windows
-You can install Robot Runner using **WinGet** (recommended) or by downloading the installer from GitHub.
-
-**Option 1: WinGet (Recommended)**
-Open PowerShell or Command Prompt and run:
 ```powershell
 winget install lucasdeeiroz.RobotRunner
 ```
+Or download the latest `.exe` or `.msi` from the [Releases Page](https://github.com/lucasdeeiroz/robot_runner/releases).
 
-**Option 2: GitHub Releases**
-Download the latest version from the [Releases Page](https://github.com/lucasdeeiroz/robot_runner/releases).
-*   **Installer (.exe / .msi):** Standard installation wizard.
-*   **Portable (.exe):** Standalone executable (no installation required).
+### Linux & macOS
+Support for **AppImage**, **.deb**, **.rpm**, and **.dmg** available on the [Releases Page](https://github.com/lucasdeeiroz/robot_runner/releases).
 
-### Linux
-Robot Runner is available for major Linux distributions. Download the appropriate file from [Releases](https://github.com/lucasdeeiroz/robot_runner/releases):
-*   **.AppImage:** Universal Linux package (recommended). Make it executable (`chmod +x`) and run.
-*   **.deb:** For Debian/Ubuntu-based systems (`sudo dpkg -i ...`).
-*   **.rpm:** For Fedora/RHEL-based systems (`sudo rpm -i ...`).
+---
 
-### macOS
-Download for macOS from [Releases](https://github.com/lucasdeeiroz/robot_runner/releases):
-*   **.dmg:** Standard disk image installer. Drag to Applications.
-*   **.app.tar.gz:** Compressed application bundle.
+## 🛠️ Technical Stack & Architecture
+
+Robot Runner is built with modern, industrial-grade technologies for maximum performance and security:
+*   **Backend**: Rust (Fast, thread-safe process management).
+*   **Frontend**: React + TypeScript (Strict typing, responsive UI).
+*   **Runtime**: Tauri v2 (Low memory footprint, native system integration).
+*   **Automation Core**: Robot Framework + Appium.
+*   **Diagnostics**: ADB + Scrcpy integration.
 
 ---
 
@@ -68,7 +76,7 @@ Download for macOS from [Releases](https://github.com/lucasdeeiroz/robot_runner/
 To use Robot Runner with your project, you need to configure the paths in the **Settings** tab.
 
 ### 1. Project Structure
-Robot Runner works best with a standard Robot Framework structure. Recommended structure:
+Robot Runner works best with a standard Robot Framework structure:
 ```
 my-automation-project/    # Your Automation Root
 ├── suites/               # Your .robot test files
@@ -79,64 +87,17 @@ my-automation-project/    # Your Automation Root
 
 ### 2. Setting Up Paths
 Go to **Settings > Paths** and configure:
-*   **Suites Directory:** Point to your `suites/` folder. This is where the File Explorer will open by default.
-*   **Automation Root (Optional):** If your project uses relative paths (e.g., `Resource  ../resources/common.robot`), set this to your project's root folder (`my-automation-project/`). This ensures all imports resolve correctly during execution.
+*   **Suites Directory**: Point to your `suites/` folder.
+*   **Automation Root**: If your project uses relative paths (e.g., `Resource  ../resources/common.robot`), set this to your project's root folder.
 
-### 3. Appium Configuration
-*   Ensure **Appium** is installed (`npm install -g appium`).
-*   In **Settings > Appium**, configure the Host (default: `127.0.0.1`) and Port (default: `4723`).
-*   Robot Runner will attempt to automaticall start Appium if it's not running.
-*   If you use a custom Appium configuration, you can set arguments in the **Appium Arguments** field.
-
-### 4. Running Tests
+### 3. Running Tests
 1.  Go to the **Run** tab.
 2.  Select your target **Device**.
-3.  Choose your mode:
-    *   **File:** Browse and select a `.robot` file.
-    *   **Folder:** Select a folder to run all tests inside it.
-    *   **Args:** Select an argument file to run a specific configuration.
+3.  Choose your mode (**File**, **Folder**, or **Args**).
 4.  Click **Run**.
-
-### 5. History
-Go to **History** tab to view past test runs. You can:
-*   **View Logs:** View the logs for any test run.
-*   **View Report:** View the report for any test run.
-*   **Organize:** Organize your test runs by date, device, or OS version.
 
 ---
 
-## 🛠️ Prerequisites
-
-*   **Node.js** (v18+) & **npm**
-*   **Python** (3.8+) with `robotframework` and `robotframework-appiumlibrary` installed.
-*   **Appium Server** (`npm install -g appium`)
-*   **UiAutomator2 Driver** (`appium driver install uiautomator2`)
-*   **Android SDK Platform-Tools** (`adb` in system PATH)
-*   **Scrcpy** (Optional, for screen mirroring, in system PATH) - [Download](https://github.com/Genymobile/scrcpy)
-
-## 💻 Building from Source
-
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/lucasdeeiroz/robot_runner.git
-    cd robot_runner
-    ```
-
-2.  **Install dependencies:**
-    ```bash
-    npm install
-    ```
-
-3.  **Run in Development Mode:**
-    ```bash
-    npm run tauri dev
-    ```
-
-4.  **Build for Production:**
-    ```bash
-    npm run tauri build
-    ```
-
 ## 📄 License
 This project is licensed under the MIT License.
-Copyright (c) 2025 Lucas de Eiroz Rodrigues
+Copyright (c) 2026 Lucas de Eiroz Rodrigues
