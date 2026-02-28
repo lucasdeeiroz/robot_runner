@@ -481,6 +481,7 @@ export const es = {
             },
             screen_name: "Nombre de la Pantalla",
             screen_type: "Tipo de Pantalla",
+            screen_tags: "Etiquetas",
             screen_types: {
                 screen: "Pantalla",
                 modal: "Modal",
@@ -526,7 +527,8 @@ export const es = {
                 navigates_to: "Nombre de la Pantalla",
                 menu_options: "Opción 1, Opción 2...",
                 parent_screen: "Nombre de la Pantalla Padre",
-                screen_name: "Nombre de la Pantalla (Único)"
+                screen_name: "Nombre de la Pantalla (Único)",
+                screen_tags: "ej: Auth, Perfil"
             },
             action: {
                 add: "Añadir Elemento",

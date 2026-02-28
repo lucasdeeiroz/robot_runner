@@ -48,6 +48,7 @@ export interface ScreenMap {
     name: string; // User-defined Screen Name
     type: 'screen' | 'modal' | 'tab' | 'drawer';
     description?: string;
+    tags?: string[];
     elements: UIElementMap[];
     base64_preview?: string; // Optional: Screenshot thumbnail
 }

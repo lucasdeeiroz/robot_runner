@@ -481,6 +481,7 @@ export const pt = {
             },
             screen_name: "Nome da Tela",
             screen_type: "Tipo de Tela",
+            screen_tags: "Tags",
             screen_types: {
                 screen: "Tela",
                 modal: "Modal",
@@ -526,7 +527,8 @@ export const pt = {
                 navigates_to: "Nome da Tela",
                 menu_options: "Opção 1, Opção 2...",
                 parent_screen: "Nome da Tela Pai",
-                screen_name: "Nome da Tela (Único)"
+                screen_name: "Nome da Tela (Único)",
+                screen_tags: "ex: Auth, Perfil"
             },
             action: {
                 add: "Adicionar Elemento",

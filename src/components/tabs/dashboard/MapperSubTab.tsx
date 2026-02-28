@@ -12,6 +12,7 @@ import { Section } from "@/components/organisms/Section";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 import { Combobox } from "@/components/atoms/Combobox";
 import { Select } from "@/components/atoms/Select";
+import { TagInput } from "@/components/atoms/TagInput";
 import { Input } from "@/components/atoms/Input";
 import { Textarea } from "@/components/atoms/Textarea";
 import { useTestSessions } from '@/lib/testSessionStore';
@@ -40,6 +41,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     // --- Screen Mapper State ---
     const [screenName, setScreenName] = useState("");
     const [screenType, setScreenType] = useState<'screen' | 'modal' | 'tab' | 'drawer'>('screen');
+    const [screenTags, setScreenTags] = useState<string[]>([]);
     const [mappedElements, setMappedElements] = useState<UIElementMap[]>([]);
     const [currentElement, setCurrentElement] = useState<Partial<UIElementMap>>({});
     const [savedMaps, setSavedMaps] = useState<ScreenMap[]>([]);
@@ -159,6 +161,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             id: screenName.toLowerCase().replace(/\s+/g, '_'),
             name: screenName,
             type: screenType,
+            tags: screenTags.length > 0 ? screenTags : undefined,
             elements: mappedElements,
             base64_preview: screenshot || undefined
         };
@@ -175,6 +178,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     const handleLoadScreen = (map: ScreenMap) => {
         setScreenName(map.name);
         setScreenType(map.type);
+        setScreenTags(map.tags || []);
         setMappedElements(map.elements);
         if (map.base64_preview) {
             setScreenshot(map.base64_preview); // Optional: might want to keep live screenshot instead
@@ -201,6 +205,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             if (savedMaps.find(m => m.id === screenToDelete)?.name === screenName) {
                 setScreenName('');
                 setScreenType('screen');
+                setScreenTags([]);
                 setMappedElements([]);
                 setScreenshot(null);
             }
@@ -679,7 +684,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                         <div className="bg-surface border border-outline-variant/30 rounded-2xl flex flex-col overflow-hidden shadow-sm flex-1">
                             {/* Screen Settings */}
                             <div className="p-4 border-t border-outline-variant/30 bg-surface/50 space-y-3">
-                                <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
+                                <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-start">
                                     <Combobox
                                         label={t('mapper.screen_name')}
                                         value={screenName}
@@ -698,6 +703,15 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                             }))}
                                         />
                                     </div>
+                                    <div className="w-48">
+                                        <TagInput
+                                            label={t('mapper.screen_tags')}
+                                            tags={screenTags}
+                                            onChange={setScreenTags}
+                                            suggestions={[...new Set(savedMaps.flatMap(m => m.tags || []))]}
+                                            placeholder={t('mapper.placeholder.screen_tags')}
+                                        />
+                                    </div>
                                 </div>
                                 <div className="flex gap-2">
                                     <Button onClick={() => { handleSaveScreen(); refreshAll(); }} variant="primary">
@@ -708,6 +722,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                         onClick={() => {
                                             setScreenName('');
                                             setScreenType('screen');
+                                            setScreenTags([]);
                                             setMappedElements([]);
                                             setScreenshot(null);
                                             refreshAll();

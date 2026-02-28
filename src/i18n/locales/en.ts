@@ -481,6 +481,7 @@ export const en = {
             },
             screen_name: "Screen Name",
             screen_type: "Screen Type",
+            screen_tags: "Tags",
             screen_types: {
                 screen: "Screen",
                 modal: "Modal",
@@ -526,7 +527,8 @@ export const en = {
                 navigates_to: "Screen Name",
                 menu_options: "Option 1, Option 2...",
                 parent_screen: "Parent Screen Name",
-                screen_name: "Screen Name (Unique)"
+                screen_name: "Screen Name (Unique)",
+                screen_tags: "e.g. Auth, Profile"
             },
             action: {
                 add: "Add Element",
