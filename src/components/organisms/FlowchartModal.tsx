@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ScreenMap, FlowchartLayout } from '@/lib/types';
-import { X, ZoomIn, ZoomOut, Maximize, Pencil, Save, Upload, Download, Plus, Camera, AlertTriangle } from 'lucide-react';
+import { X, ZoomIn, ZoomOut, Maximize, Pencil, Save, Upload, Download, Camera, Plus, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
 import { saveFlowchartLayout, loadFlowchartLayout, exportMapperData, importMapperData, saveScreenMap } from '@/lib/dashboard/mapperPersistence';
@@ -187,6 +187,33 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
             setLayout({ version: 1, nodes: {}, edges: {} });
         }
         setLoading(false);
+        // Auto-center after layout is loaded
+        setTimeout(centerView, 100);
+    };
+
+    const centerView = () => {
+        if (!containerRef.current) return;
+        const nodePositions = Object.values(layout.nodes);
+        if (nodePositions.length === 0) {
+            setOffset({ x: 0, y: 0 });
+            return;
+        }
+
+        const minX = Math.min(...nodePositions.map(n => n.gridX * CELL_WIDTH + NODE_OFFSET_X));
+        const maxX = Math.max(...nodePositions.map(n => n.gridX * CELL_WIDTH + NODE_OFFSET_X + NODE_WIDTH));
+        const minY = Math.min(...nodePositions.map(n => n.gridY * CELL_HEIGHT + NODE_OFFSET_Y));
+        const maxY = Math.max(...nodePositions.map(n => n.gridY * CELL_HEIGHT + NODE_OFFSET_Y + NODE_HEIGHT));
+
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+
+        const containerWidth = containerRef.current.clientWidth;
+        const containerHeight = containerRef.current.clientHeight;
+
+        setOffset({
+            x: (containerWidth / 2) - (centerX * scale),
+            y: (containerHeight / 2) - (centerY * scale)
+        });
     };
 
     const saveLayout = async () => {
@@ -256,13 +283,16 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
     const handleExportImage = async () => {
         if (!contentRef.current) return;
         try {
+            const width = gridBounds.width * CELL_WIDTH;
+            const height = gridBounds.height * CELL_HEIGHT;
+
             const dataUrl = await toPng(contentRef.current, {
                 backgroundColor: '#1a1b1e', // Dark theme background
                 style: {
-                    transform: 'none', // Reset scale/translate to capture full resolution
+                    transform: `translate(${- gridBounds.minX * CELL_WIDTH}px, ${- gridBounds.minY * CELL_HEIGHT}px)`,
                 },
-                width: 3000, // Force large width to capture everything
-                height: 3000
+                width: width,
+                height: height
             });
 
             const base64Data = dataUrl.split(',')[1];
@@ -317,7 +347,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
         const updatedMap = { ...sourceMap, elements: updatedElements };
 
         // 2. Update Layout (Add Edge)
-        const edgeId = `${sourceNodeId}-${sourceElementName}-${targetScreenName}`;
+        const edgeId = `${sourceNodeId} -${sourceElementName} -${targetScreenName} `;
 
         const updatedLayout = {
             ...layout,
@@ -347,6 +377,34 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
             feedback.toast.error("Failed to save connection");
         }
     };
+
+    // Dynamic Grid Calculation
+    const gridBounds = useMemo(() => {
+        const nodePositions = Object.values(layout.nodes);
+        if (nodePositions.length === 0) {
+            return { minX: 0, minY: 0, maxX: 5, maxY: 5, width: 10, height: 10 };
+        }
+
+        let minX = Math.min(...nodePositions.map(n => n.gridX));
+        let maxX = Math.max(...nodePositions.map(n => n.gridX));
+        let minY = Math.min(...nodePositions.map(n => n.gridY));
+        let maxY = Math.max(...nodePositions.map(n => n.gridY));
+
+        // Add 2 cells padding
+        const paddedMinX = minX - 2;
+        const paddedMaxX = maxX + 2;
+        const paddedMinY = minY - 2;
+        const paddedMaxY = maxY + 2;
+
+        return {
+            minX: paddedMinX,
+            minY: paddedMinY,
+            maxX: paddedMaxX,
+            maxY: paddedMaxY,
+            width: paddedMaxX - paddedMinX + 1,
+            height: paddedMaxY - paddedMinY + 1
+        };
+    }, [layout.nodes]);
 
     // Auto-Layout New Nodes
     useEffect(() => {
@@ -435,7 +493,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
             // Check grid occupancy (exclude self)
             const isOccupied = Object.entries(layout.nodes).some(([name, pos]) => {
                 if (name === dragItem.id) return false;
-                return pos.gridX === Math.max(0, gridX) && pos.gridY === Math.max(0, gridY);
+                return pos.gridX === gridX && pos.gridY === gridY;
             });
 
             if (!isOccupied) {
@@ -443,7 +501,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                     ...prev,
                     nodes: {
                         ...prev.nodes,
-                        [dragItem.id]: { gridX: Math.max(0, gridX), gridY: Math.max(0, gridY) }
+                        [dragItem.id]: { gridX, gridY }
                     }
                 }));
                 setIsDirty(true);
@@ -551,7 +609,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                     } else {
                         newVertices = [...prevEdge.vertices];
 
-                        // Update vertices based on segment drag
+                        // Update vertices based on segment drag (absolute)
                         if (isHorizontal) {
                             const vIndex1 = index - 1; // Start of segment (if vertex)
                             const vIndex2 = index;     // End of segment (if vertex)
@@ -678,9 +736,9 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
 
                 // 2. Merge duplicated vertices and Remove vertices overlapping Start/End
                 let cleaned = edge.vertices.filter((v, i, arr) => {
-                    // Start point overlap logic (Increased threshold to 15px)
+                    // Start point overlap logic (already absolute)
                     if (Math.abs(v.x - startPoint.x) < 15 && Math.abs(v.y - startPoint.y) < 15) return false;
-                    // End point overlap logic (Increased threshold to 15px)
+                    // End point overlap logic (already absolute)
                     if (Math.abs(v.x - endPoint.x) < 15 && Math.abs(v.y - endPoint.y) < 15) return false;
 
                     if (i === 0) return true;
@@ -701,18 +759,15 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                     const p1 = fullPath[i];
                     const p2 = fullPath[i + 1];
 
-                    // Collinearity check: Distance of p1 from line p0-p2
-                    // Dist = |(y2-y1)x0 - (x2-x1)y0 + x2y1 - y2x1| / sqrt((y2-y1)^2 + (x2-x1)^2)
-                    // Simplified Cross Product Area: 
+                    // Everything is absolute already
                     const crossProduct = (p1.y - p0.y) * (p2.x - p1.x) - (p2.y - p1.y) * (p1.x - p0.x);
 
                     const l2 = (p2.x - p0.x) ** 2 + (p2.y - p0.y) ** 2;
-                    if (l2 === 0) continue; // p0 == p2
+                    if (l2 === 0) continue;
 
                     const dist = Math.abs(crossProduct) / Math.sqrt(l2);
 
-                    if (dist < 15) { // Increased threshold to 15px for straightening
-                        // Index in 'cleaned' is i-1
+                    if (dist < 15) {
                         toRemove.add(i - 1);
                     }
                 }
@@ -803,7 +858,10 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
 
             const newVertices = [...(edge.vertices || [])];
             // Insert at segmentIndex
-            newVertices.splice(segmentIndex, 0, { x: mouseX, y: mouseY });
+            newVertices.splice(segmentIndex, 0, {
+                x: mouseX,
+                y: mouseY
+            });
 
             return {
                 ...prev,
@@ -922,10 +980,10 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
     // Layer 1: Lines (Z-Index 10) - Beneath Nodes
     const renderEdgeLines = useMemo(() => {
         return sortedEdgeLayouts.map(({ edgeId, points }) => {
-            let d = `M ${points[0].x} ${points[0].y}`;
+            let d = `M ${points[0].x} ${points[0].y} `;
             for (let i = 0; i < points.length - 1; i++) {
                 const p2 = points[i + 1];
-                d += ` L ${p2.x} ${p2.y}`;
+                d += ` L ${p2.x} ${p2.y} `;
             }
 
             return (
@@ -1069,7 +1127,6 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-2 border-b border-outline-variant/30 bg-surface">
                     <h2 className="text-lg font-semibold text-on-surface flex items-center gap-2">
-                        <Maximize className="text-primary" size={20} />
                         {t('mapper.flowchart.title', 'Navigation Flow')}
                     </h2>
                     <div className="flex items-center gap-2">
@@ -1097,6 +1154,12 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                             className="p-2 hover:bg-primary/10 text-primary rounded-full"
                             title={t('mapper.flowchart.export_image', 'Export Image')}>
                             <Camera size={16} />
+                        </Button>
+                        <Button
+                            onClick={centerView}
+                            className="p-2 hover:bg-primary/10 text-primary rounded-full"
+                            title={t('mapper.flowchart.center_view', 'Center View')}>
+                            <Maximize size={16} />
                         </Button>
                         <div className="h-6 w-px bg-outline-variant/30 mx-2" />
                         <div className="flex bg-surface-variant/30 rounded-lg p-1 mr-4">
@@ -1140,19 +1203,24 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                         style={{
                             transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
                             transformOrigin: '0 0',
-                            width: '3000px',
-                            height: '3000px'
+                            width: `${gridBounds.width * CELL_WIDTH}px`,
+                            height: `${gridBounds.height * CELL_HEIGHT}px`
                         }}
                     >
                         {/* Grid Background */}
-                        <div className="absolute inset-0 pointer-events-none"
+                        <div className="absolute pointer-events-none"
                             style={{
                                 zIndex: 0,
+                                left: `${gridBounds.minX * CELL_WIDTH}px`,
+                                top: `${gridBounds.minY * CELL_HEIGHT}px`,
+                                width: `${gridBounds.width * CELL_WIDTH}px`,
+                                height: `${gridBounds.height * CELL_HEIGHT}px`,
                                 backgroundImage: `
-                                     linear-gradient(to right, rgba(0,0,0,0.05) 1px, transparent 1px),
-                                     linear-gradient(to bottom, rgba(0,0,0,0.05) 1px, transparent 1px)
-                                 `,
-                                backgroundSize: `${CELL_WIDTH}px ${CELL_HEIGHT}px`
+linear-gradient(to right, rgba(0,0,0,0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0,0,0,0.05) 1px, transparent 1px)
+        `,
+                                backgroundSize: `${CELL_WIDTH}px ${CELL_HEIGHT}px`,
+                                backgroundPosition: `0 0`
                             }}
                         />
 
