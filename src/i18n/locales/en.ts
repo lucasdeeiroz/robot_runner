@@ -446,6 +446,9 @@ export const en = {
                 cancel: "Cancel",
                 no_elements: "No mapped elements available.",
                 title: "Navigation Flow",
+                center_view: "Center View",
+                filter_by_tag: "Filter by Tag",
+                all_tags: "All Tags",
                 unsaved_changes: {
                     title: "Unsaved Changes",
                     message: "You have unsaved changes. Do you want to save before exiting?",

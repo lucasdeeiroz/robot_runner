@@ -121,6 +121,22 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
     const [showUnsavedChangesModal, setShowUnsavedChangesModal] = useState(false);
     const [isSpacePressed, setIsSpacePressed] = useState(false);
 
+    // Filtering State
+    const [filterTag, setFilterTag] = useState<string | null>(null);
+
+    const allTags = useMemo(() => {
+        const tags = maps.flatMap(m => m.tags || []);
+        return Array.from(new Set(tags)).sort();
+    }, [maps]);
+
+    const isInteracting = !!dragItem || isDraggingCanvas || isQuickConnectOpen;
+
+    const matchesFilter = (screenName: string) => {
+        if (!filterTag) return true;
+        const screen = maps.find(m => m.name === screenName);
+        return screen?.tags?.includes(filterTag) || false;
+    };
+
     // Load Layout
     useEffect(() => {
         if (isOpen) {
@@ -896,6 +912,8 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
             startPoint: { x: number, y: number };
             endPoint: { x: number, y: number };
             elName: string;
+            sourceName: string;
+            targetName: string;
         }[] = [];
 
         maps.forEach(sourceMap => {
@@ -961,11 +979,11 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                     }
                 }
 
-                layouts.push({ edgeId, points, startPoint, endPoint, elName: el.name });
+                layouts.push({ edgeId, points, startPoint, endPoint, elName: el.name, sourceName: sourceMap.name, targetName });
             });
         });
         return layouts;
-    }, [maps, layout, dragItem, cursorPos]); // layout change (edges/nodes) triggers recalc
+    }, [maps, layout, dragItem, cursorPos, filterTag]);
 
     // Sorted layouts for Z-indexing (Hovered edge last = on top)
     const sortedEdgeLayouts = useMemo(() => {
@@ -979,7 +997,10 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
 
     // Layer 1: Lines (Z-Index 10) - Beneath Nodes
     const renderEdgeLines = useMemo(() => {
-        return sortedEdgeLayouts.map(({ edgeId, points }) => {
+        return sortedEdgeLayouts.map(({ edgeId, points, sourceName, targetName }) => {
+            const isVisible = matchesFilter(sourceName) && matchesFilter(targetName);
+            if (!isVisible && !isInteracting) return null;
+
             let d = `M ${points[0].x} ${points[0].y} `;
             for (let i = 0; i < points.length - 1; i++) {
                 const p2 = points[i + 1];
@@ -987,20 +1008,23 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
             }
 
             return (
-                <g key={`${edgeId}-line`}>
+                <g key={`${edgeId}-line`} className={clsx(!isVisible && "opacity-20 pointer-events-none")}>
                     <path d={d} stroke={hoveredEdge === edgeId ? "#3b82f6" : "#9ca3af"} strokeWidth={hoveredEdge === edgeId ? 3 : 2} fill="none" markerEnd={hoveredEdge === edgeId ? "url(#arrowhead-highlighted)" : "url(#arrowhead)"}
                         className="transition-colors pointer-events-none" />
                 </g>
             );
         });
-    }, [sortedEdgeLayouts, hoveredEdge]);
+    }, [sortedEdgeLayouts, hoveredEdge, filterTag, isInteracting]);
 
     // Layer 2: Controls & Interaction (Z-Index 50) - Above Nodes
     const renderEdgeControls = useMemo(() => {
         const isDraggingConnection = dragItem?.type === 'source' || dragItem?.type === 'target';
         const isDraggingEdge = dragItem?.type === 'segment' || dragItem?.type === 'vertex' || isDraggingConnection;
 
-        return sortedEdgeLayouts.map(({ edgeId, points, startPoint, endPoint, elName }) => {
+        return sortedEdgeLayouts.map(({ edgeId, points, startPoint, endPoint, elName, sourceName, targetName }) => {
+            const isVisible = matchesFilter(sourceName) && matchesFilter(targetName);
+            if (!isVisible && !isInteracting) return null;
+
             const segments: React.ReactNode[] = [];
             for (let i = 0; i < points.length - 1; i++) {
                 const p1 = points[i];
@@ -1017,10 +1041,10 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                         className={clsx(
                             "cursor-pointer",
                             isHorizontal ? "cursor-row-resize" : "cursor-col-resize",
-                            isDraggingConnection ? "pointer-events-none" : "pointer-events-auto"
+                            (isDraggingConnection || !isVisible) ? "pointer-events-none" : "pointer-events-auto"
                         )}
                         onMouseDown={(e) => {
-                            if (isSpacePressed || e.button === 1) return;
+                            if (isSpacePressed || e.button === 1 || !isVisible) return;
                             e.stopPropagation();
                             setDragItem({ type: 'segment', id: edgeId, index: i, points: points });
                         }}
@@ -1030,8 +1054,8 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
             }
 
             return (
-                <g key={`${edgeId}-ctrl`} className="group/edge pointer-events-auto"
-                    onMouseEnter={() => setHoveredEdge(edgeId)}
+                <g key={`${edgeId}-ctrl`} className={clsx("group/edge pointer-events-auto", !isVisible && "opacity-20")}
+                    onMouseEnter={() => isVisible && setHoveredEdge(edgeId)}
                     onMouseLeave={() => setHoveredEdge(null)}
                 >
                     {segments}
@@ -1151,10 +1175,23 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                         <div className="h-4 w-px bg-outline-variant/30 mx-2" />
                         <Button
                             onClick={handleExportImage}
-                            className="p-2 hover:bg-primary/10 text-primary rounded-full"
+                            className="p-2 hover:bg-primary/10 text-primary rounded-full transition-colors"
                             title={t('mapper.flowchart.export_image', 'Export Image')}>
                             <Camera size={16} />
                         </Button>
+                        <div className="h-4 w-px bg-outline-variant/30 mx-1" />
+                        <div className="flex items-center gap-2 px-2 py-1 bg-surface-variant/10 rounded-lg border border-outline-variant/20 ml-2">
+                            <span className="text-[10px] uppercase font-bold text-on-surface-variant/70 whitespace-nowrap">{t('mapper.flowchart.filter_by_tag', 'Filter')}</span>
+                            <Select
+                                className="bg-transparent border-none text-xs font-semibold text-primary outline-none cursor-pointer py-0 h-6 min-w-[100px]"
+                                value={filterTag || ""}
+                                onChange={(e) => setFilterTag(e.target.value || null)}
+                                options={[
+                                    { value: "", label: t('mapper.flowchart.all_tags', 'All Tags') },
+                                    ...allTags.map(tag => ({ value: tag, label: tag }))
+                                ]}
+                            />
+                        </div>
                         <Button
                             onClick={centerView}
                             className="p-2 hover:bg-primary/10 text-primary rounded-full"
@@ -1247,6 +1284,9 @@ linear-gradient(to right, rgba(0,0,0,0.05) 1px, transparent 1px),
                             const data = maps.find(m => m.name === name);
                             if (!data) return null;
 
+                            const isVisible = matchesFilter(name);
+                            if (!isVisible && !isInteracting) return null;
+
                             const pixel = getPixelCoords(pos.gridX, pos.gridY);
                             const isDraggingThis = dragItem?.type === 'node' && dragItem.id === name;
 
@@ -1256,7 +1296,8 @@ linear-gradient(to right, rgba(0,0,0,0.05) 1px, transparent 1px),
                                     className={clsx(
                                         "absolute flex flex-col bg-surface border rounded-xl overflow-visible shadow-sm hover:shadow-xl transition-shadow group/card",
                                         data.type === 'modal' ? 'border-dashed border-tertiary' : 'border-outline-variant/60',
-                                        isDraggingThis ? 'z-[55] ring-2 ring-primary shadow-2xl opacity-90' : 'z-40'
+                                        isDraggingThis ? 'z-[55] ring-2 ring-primary shadow-2xl opacity-90' : 'z-40',
+                                        !isVisible && "opacity-20 pointer-events-none"
                                         // Lift dragged node above Edge Controls (50) but below Ports (60)
                                     )}
                                     style={{
@@ -1267,7 +1308,7 @@ linear-gradient(to right, rgba(0,0,0,0.05) 1px, transparent 1px),
                                         cursor: isDraggingCanvas ? 'move' : 'grab'
                                     }}
                                     onMouseDown={(e) => {
-                                        if (isSpacePressed || e.button === 1) return;
+                                        if (isSpacePressed || e.button === 1 || !isVisible) return;
                                         e.stopPropagation();
                                         setDragItem({ type: 'node', id: name });
                                     }}
@@ -1323,6 +1364,9 @@ linear-gradient(to right, rgba(0,0,0,0.05) 1px, transparent 1px),
                         {Object.entries(layout.nodes).map(([name, pos]) => {
                             const data = maps.find(m => m.name === name);
                             if (!data) return null;
+                            const isVisible = matchesFilter(name);
+                            if (!isVisible && !isInteracting) return null;
+
                             const pixel = getPixelCoords(pos.gridX, pos.gridY);
 
                             return (

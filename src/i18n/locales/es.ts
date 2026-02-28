@@ -446,6 +446,9 @@ export const es = {
                 cancel: "Cancelar",
                 no_elements: "No hay elementos asignados disponibles.",
                 title: "Flujo de Navegación",
+                center_view: "Centrar Vista",
+                filter_by_tag: "Filtrar por Etiqueta",
+                all_tags: "Todas las Etiquetas",
                 unsaved_changes: {
                     title: "Cambios no guardados",
                     message: "Tienes cambios no guardados. ¿Quieres guardar antes de salir?",

@@ -446,6 +446,9 @@ export const pt = {
                 cancel: "Cancelar",
                 no_elements: "Nenhum elemento mapeado disponível.",
                 title: "Fluxo de Navegação",
+                center_view: "Centralizar Visualização",
+                filter_by_tag: "Filtrar por Tag",
+                all_tags: "Todas as Tags",
                 unsaved_changes: {
                     title: "Alterações não salvas",
                     message: "Você tem alterações não salvas. Deseja salvar antes de sair?",
