@@ -611,7 +611,7 @@ export const en = {
             console: {
                 documentation: "Documentation: ",
                 fancy_mode: "Enable Fancy Mode",
-                raw_mode: "EnableRaw Mode",
+                raw_mode: "Enable Raw Mode",
                 running: "RUNNING",
                 pass: "PASS",
                 fail: "FAIL",
