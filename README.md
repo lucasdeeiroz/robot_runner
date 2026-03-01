@@ -45,6 +45,9 @@ In a traditional workflow, a QA engineer switches between Appium Inspector, term
 *   **Configuration Profiles**: Instantly switch between multiple project setups, API keys, and environment variables.
 *   **Execution History**: Detailed historical logs and reports, organized by device, OS version, or date, with single-click "Re-run" capability.
 
+### ▶️ Video Presentation
+[![Robot Runner Presentation](https://img.youtube.com/vi/sdpPV7L6GKg/0.jpg)](https://www.youtube.com/watch?v=sdpPV7L6GKg)
+
 ---
 
 ## 📥 Installation
