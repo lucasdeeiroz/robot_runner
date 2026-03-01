@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef, useEffect } from 'react';
+import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { ScreenMap, FlowchartLayout } from '@/lib/types';
 import { X, ZoomIn, ZoomOut, Maximize, Pencil, Save, Upload, Download, Camera, Plus, AlertTriangle } from 'lucide-react';
@@ -82,8 +82,13 @@ const NODE_PORTS = generatePorts();
 
 export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh, activeProfileId }: FlowchartModalProps) {
     const { t } = useTranslation();
-    const [scale, setScale] = useState(1);
-    const [offset, setOffset] = useState({ x: 0, y: 0 });
+    const [viewTransform, setViewTransform] = useState({ scale: 1, offset: { x: 0, y: 0 } });
+    const scale = viewTransform.scale;
+    const offset = viewTransform.offset;
+    const setOffset = (o: { x: number, y: number } | ((prev: { x: number, y: number }) => { x: number, y: number })) => setViewTransform(curr => ({ ...curr, offset: typeof o === 'function' ? o(curr.offset) : o }));
+
+    const transformRef = useRef(viewTransform);
+    useEffect(() => { transformRef.current = viewTransform; }, [viewTransform]);
     const [isDraggingCanvas, setIsDraggingCanvas] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
@@ -91,6 +96,8 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
 
     // Layout State
     const [layout, setLayout] = useState<FlowchartLayout>({ version: 1, nodes: {}, edges: {} });
+    const layoutRef = useRef(layout);
+    useEffect(() => { layoutRef.current = layout; }, [layout]);
     const [loading, setLoading] = useState(true);
 
     // Interaction State
@@ -120,6 +127,8 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
     const [isDirty, setIsDirty] = useState(false);
     const [showUnsavedChangesModal, setShowUnsavedChangesModal] = useState(false);
     const [isSpacePressed, setIsSpacePressed] = useState(false);
+    const isSpacePressedRef = useRef(isSpacePressed);
+    useEffect(() => { isSpacePressedRef.current = isSpacePressed; }, [isSpacePressed]);
 
     // Filtering State
     const [filterTag, setFilterTag] = useState<string | null>(null);
@@ -137,12 +146,98 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
         return screen?.tags?.includes(filterTag) || false;
     };
 
+    // --- Logic Callbacks ---
+
+    const centerView = useCallback(() => {
+        if (!containerRef.current) return;
+        const currentLayout = layoutRef.current;
+        const currentTransform = transformRef.current;
+
+        const nodePositions = Object.values(currentLayout.nodes);
+        if (nodePositions.length === 0) {
+            setOffset({ x: 0, y: 0 });
+            return;
+        }
+
+        const minX = Math.min(...nodePositions.map(n => n.gridX * CELL_WIDTH + NODE_OFFSET_X));
+        const maxX = Math.max(...nodePositions.map(n => n.gridX * CELL_WIDTH + NODE_OFFSET_X + NODE_WIDTH));
+        const minY = Math.min(...nodePositions.map(n => n.gridY * CELL_HEIGHT + NODE_OFFSET_Y));
+        const maxY = Math.max(...nodePositions.map(n => n.gridY * CELL_HEIGHT + NODE_OFFSET_Y + NODE_HEIGHT));
+
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+
+        const containerWidth = containerRef.current.clientWidth;
+        const containerHeight = containerRef.current.clientHeight;
+
+        setOffset({
+            x: (containerWidth / 2) - (centerX * currentTransform.scale),
+            y: (containerHeight / 2) - (centerY * currentTransform.scale)
+        });
+    }, []);
+
+    const loadLayout = useCallback(async () => {
+        setLoading(true);
+        const saved = await loadFlowchartLayout(activeProfileId);
+        if (saved) {
+            setLayout(saved);
+        } else {
+            setLayout({ version: 1, nodes: {}, edges: {} });
+        }
+        setLoading(false);
+        // Auto-center after layout is loaded
+        setTimeout(centerView, 100);
+    }, [activeProfileId, centerView]);
+
+    const performZoom = useCallback((change: number, center?: { x: number, y: number }) => {
+        if (!containerRef.current) return;
+
+        setViewTransform(curr => {
+            const rect = containerRef.current!.getBoundingClientRect();
+
+            // If no center provided (e.g. buttons), use center of viewport
+            const viewportX = center ? center.x : rect.width / 2;
+            const viewportY = center ? center.y : rect.height / 2;
+
+            // Calculate point in "Content Space" before zoom
+            const contentX = (viewportX - curr.offset.x) / curr.scale;
+            const contentY = (viewportY - curr.offset.y) / curr.scale;
+
+            // Calculate New Scale
+            const newScale = Math.min(Math.max(curr.scale + change, 0.1), 3);
+            if (newScale === curr.scale) return curr;
+
+            // Calculate New Offset to preserve content point at viewport point
+            const newOffsetX = viewportX - (contentX * newScale);
+            const newOffsetY = viewportY - (contentY * newScale);
+
+            return {
+                scale: newScale,
+                offset: { x: newOffsetX, y: newOffsetY }
+            };
+        });
+    }, []);
+
+    const saveLayout = async () => {
+        await saveFlowchartLayout(activeProfileId, layout);
+        setIsDirty(false);
+        feedback.toast.success(t('common.saved', 'Saved'));
+    };
+
+    const handleClose = () => {
+        if (isDirty) {
+            setShowUnsavedChangesModal(true);
+        } else {
+            onClose();
+        }
+    };
+
     // Load Layout
     useEffect(() => {
         if (isOpen) {
             loadLayout();
         }
-    }, [isOpen, activeProfileId]);
+    }, [isOpen, loadLayout]);
 
     // Keyboard Listeners
     useEffect(() => {
@@ -150,7 +245,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
 
         const handleKeyDown = (e: KeyboardEvent) => {
             // 1. Space for Pan Mode
-            if (e.code === 'Space' && !isSpacePressed && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'SELECT') {
+            if (e.code === 'Space' && !isSpacePressedRef.current && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'SELECT') {
                 e.preventDefault();
                 setIsSpacePressed(true);
             }
@@ -175,8 +270,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
             }
             if ((e.ctrlKey || e.metaKey) && e.key === '0') {
                 e.preventDefault();
-                setScale(1);
-                setOffset({ x: 0, y: 0 });
+                setViewTransform({ scale: 1, offset: { x: 0, y: 0 } });
             }
         };
 
@@ -192,59 +286,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('keyup', handleKeyUp);
         };
-    }, [isOpen, isSpacePressed, scale, offset]);
-
-    const loadLayout = async () => {
-        setLoading(true);
-        const saved = await loadFlowchartLayout(activeProfileId);
-        if (saved) {
-            setLayout(saved);
-        } else {
-            setLayout({ version: 1, nodes: {}, edges: {} });
-        }
-        setLoading(false);
-        // Auto-center after layout is loaded
-        setTimeout(centerView, 100);
-    };
-
-    const centerView = () => {
-        if (!containerRef.current) return;
-        const nodePositions = Object.values(layout.nodes);
-        if (nodePositions.length === 0) {
-            setOffset({ x: 0, y: 0 });
-            return;
-        }
-
-        const minX = Math.min(...nodePositions.map(n => n.gridX * CELL_WIDTH + NODE_OFFSET_X));
-        const maxX = Math.max(...nodePositions.map(n => n.gridX * CELL_WIDTH + NODE_OFFSET_X + NODE_WIDTH));
-        const minY = Math.min(...nodePositions.map(n => n.gridY * CELL_HEIGHT + NODE_OFFSET_Y));
-        const maxY = Math.max(...nodePositions.map(n => n.gridY * CELL_HEIGHT + NODE_OFFSET_Y + NODE_HEIGHT));
-
-        const centerX = (minX + maxX) / 2;
-        const centerY = (minY + maxY) / 2;
-
-        const containerWidth = containerRef.current.clientWidth;
-        const containerHeight = containerRef.current.clientHeight;
-
-        setOffset({
-            x: (containerWidth / 2) - (centerX * scale),
-            y: (containerHeight / 2) - (centerY * scale)
-        });
-    };
-
-    const saveLayout = async () => {
-        await saveFlowchartLayout(activeProfileId, layout);
-        setIsDirty(false);
-        feedback.toast.success(t('common.saved', 'Saved'));
-    };
-
-    const handleClose = () => {
-        if (isDirty) {
-            setShowUnsavedChangesModal(true);
-        } else {
-            onClose();
-        }
-    };
+    }, [isOpen, performZoom]);
 
     const handleSaveAndExit = async () => {
         await saveLayout();
@@ -811,34 +853,6 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
         setHoveredPort(null);
     };
 
-    // --- Zoom Logic ---
-    const performZoom = (change: number, center?: { x: number, y: number }) => {
-        if (!containerRef.current) return;
-
-        const rect = containerRef.current.getBoundingClientRect();
-
-        // If no center provided (e.g. buttons), use center of viewport
-        const viewportX = center ? center.x : rect.width / 2;
-        const viewportY = center ? center.y : rect.height / 2;
-
-        // Calculate point in "Content Space" before zoom
-        // ContentX = (ViewportX - OffsetX) / Scale
-        const contentX = (viewportX - offset.x) / scale;
-        const contentY = (viewportY - offset.y) / scale;
-
-        // Calculate New Scale
-        const newScale = Math.min(Math.max(scale + change, 0.1), 3);
-        if (newScale === scale) return;
-
-        // Calculate New Offset to preserve content point at viewport point
-        // ViewportX = ContentX * NewScale + NewOffsetX
-        // NewOffsetX = ViewportX - ContentX * NewScale
-        const newOffsetX = viewportX - (contentX * newScale);
-        const newOffsetY = viewportY - (contentY * newScale);
-
-        setScale(newScale);
-        setOffset({ x: newOffsetX, y: newOffsetY });
-    };
 
     const handleWheel = (e: React.WheelEvent) => {
         e.stopPropagation();
