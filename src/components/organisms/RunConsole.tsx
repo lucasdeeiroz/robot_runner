@@ -501,14 +501,14 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
                         <div className="p-2 pl-6 bg-surface/50 text-xs border-t border-outline-variant/30 text-on-surface-variant/80">
                             {node.documentation && (
                                 <div className="text-on-surface-variant/80 italic mb-2 border-b border-outline-variant/30 pb-1 text-xs">
-                                    Documentation: {node.documentation}
+                                    {t('run_tab.console.documentation')}{node.documentation}
                                 </div>
                             )}
                             {node.logs.map((line, i) => <LinkRenderer key={i} content={line} />)}
                             {isRunning && (
                                 <div className="text-primary mt-2 flex items-center gap-2 text-xs italic opacity-70">
                                     <div className="w-1.5 h-1.5 bg-primary rounded-2xl animate-pulse" />
-                                    Processing...
+                                    {t('run_tab.console.processing')}
                                 </div>
                             )}
                         </div>
@@ -574,7 +574,7 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
                 <button
                     onClick={() => setIsRawMode(!isRawMode)}
                     className="p-1 hover:bg-surface-variant/30 rounded transition-colors text-on-surface-variant/80 hover:text-warning"
-                    title={isRawMode ? "Enable Fancy Mode" : "Enable Raw Mode"}
+                    title={isRawMode ? t('run_tab.console.fancy_mode') : t('run_tab.console.raw_mode')}
                 >
                     <Star size={14} fill={!isRawMode ? "currentColor" : "none"} className={clsx(!isRawMode && "text-warning-container/40")} />
                 </button>
@@ -597,7 +597,7 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
                         {isRunning && (
                             <div className="text-primary mt-4 flex items-center gap-2 text-sm italic opacity-70 animate-pulse ml-2">
                                 <ExpressiveLoading size="sm" variant="circular" />
-                                {t('run_tab.console.processing', "Processando...")}
+                                {t('run_tab.console.processing', "Processing...")}
                             </div>
                         )}
                     </div>

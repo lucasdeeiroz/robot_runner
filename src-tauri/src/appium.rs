@@ -87,7 +87,17 @@ pub fn start_appium_server(
     // Add Host and Port
     command.arg("--address").arg(&host);
     command.arg("--port").arg(&port.to_string());
-    command.arg("--base-path").arg(&base_path);
+    
+    // Robust base path handling
+    let trimmed_base = base_path.trim();
+    if !trimmed_base.is_empty() && trimmed_base != "/" {
+        let final_base = if trimmed_base.starts_with('/') {
+            trimmed_base.to_string()
+        } else {
+            format!("/{}", trimmed_base)
+        };
+        command.arg("--base-path").arg(final_base);
+    }
 
     // Add extra args
     if !args.trim().is_empty() {
@@ -144,7 +154,7 @@ pub fn start_appium_server(
 
             Ok("Appium started".to_string())
         }
-        Err(e) => Err(format!("Failed to start appium: {}", e)),
+        Err(e) => Err(format!("Failed to spawn Appium process: {}. Ensure Appium is installed and available in PATH.", e)),
     }
 }
 

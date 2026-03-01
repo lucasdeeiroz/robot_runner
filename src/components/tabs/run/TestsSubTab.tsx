@@ -84,8 +84,8 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     setLaunchStatus(t('tests.status.starting'));
                     await invoke('start_appium_server', {
                         host: settings.appiumHost,
-                        port: settings.appiumPort,
-                        base_path: settings.appiumBasePath,
+                        port: Number(settings.appiumPort),
+                        basePath: settings.appiumBasePath,
                         args: settings.tools.appiumArgs
                     });
 
@@ -137,6 +137,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                             await new Promise(r => setTimeout(r, 500));
                         }
 
+                        setLaunchStatus(t('tests.status.waiting_server_rest'));
                         if (!isRestReady) {
                             console.warn("Appium process is running but REST API did not respond in time.");
                             // We continue anyway as a fallback, but the warning helps debugging.

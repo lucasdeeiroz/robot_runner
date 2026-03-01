@@ -149,8 +149,8 @@ export function SettingsPage() {
             } else {
                 await invoke('start_appium_server', {
                     host: settings.appiumHost,
-                    port: settings.appiumPort,
-                    base_path: settings.appiumBasePath,
+                    port: Number(settings.appiumPort),
+                    basePath: settings.appiumBasePath,
                     args: settings.tools.appiumArgs
                 });
                 setShowAppiumLogs(true);
