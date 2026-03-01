@@ -1,7 +1,9 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Plus, ChevronsUpDown } from 'lucide-react';
+import { X, Plus } from 'lucide-react';
 import clsx from 'clsx';
+import { Button } from './Button';
+import { Input } from './Input';
 
 interface TagInputProps {
     label?: string;
@@ -68,24 +70,24 @@ export function TagInput({
                 </label>
             )}
 
-            <div className="flex flex-wrap gap-1.5 p-1.5 min-h-[40px] bg-surface-variant/10 border border-outline-variant/30 rounded-lg focus-within:border-primary transition-colors relative">
+            <div className="flex flex-wrap gap-1.5 p-0.5 min-h-[40px] bg-surface-variant/10 border border-outline-variant/30 rounded-lg focus-within:border-primary transition-colors relative">
                 {tags.map(tag => (
                     <span
                         key={tag}
-                        className="flex items-center gap-1 px-2 py-0.5 bg-primary/10 text-primary text-xs font-medium rounded-full animate-in fade-in zoom-in duration-200"
+                        className="flex items-center gap-1 px-2 py-0 bg-primary/10 text-primary text-xs font-medium rounded-lg animate-in fade-in zoom-in duration-200"
                     >
                         {tag}
-                        <button
+                        <Button
                             onClick={() => removeTag(tag)}
-                            className="hover:text-primary-dark transition-colors"
+                            className="hover:bg-transparent hover:text-error transition-colors p-1 bg-transparent border-none shadow-none"
                         >
                             <X size={12} />
-                        </button>
+                        </Button>
                     </span>
                 ))}
 
-                <div className="relative flex-1 min-w-[80px]">
-                    <input
+                <div className="relative flex-1 p-1">
+                    <Input
                         type="text"
                         value={inputValue}
                         onChange={(e) => {
@@ -95,30 +97,26 @@ export function TagInput({
                         onKeyDown={handleKeyDown}
                         onFocus={() => setIsOpen(true)}
                         placeholder={tags.length === 0 ? placeholder : ''}
-                        className="w-full bg-transparent border-none outline-none text-sm p-0.5 text-on-surface"
+                        className="w-full bg-transparent border-none outline-none text-sm p-1 text-on-surface"
                     />
 
                     {isOpen && filteredSuggestions.length > 0 && (
-                        <div className="absolute z-50 left-0 top-full mt-2 w-48 bg-surface border border-outline-variant/30 rounded-xl shadow-xl overflow-hidden py-1 animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div className="absolute z-50 left-0 top-full mt-0 w-48 bg-transparent overflow-hidden py-1 animate-in fade-in slide-in-from-top-2 duration-200">
                             {filteredSuggestions.map(suggestion => (
-                                <button
+                                <Button
                                     key={suggestion}
                                     onClick={() => {
                                         addTag(suggestion);
                                         setIsOpen(false);
                                     }}
-                                    className="w-full text-left px-3 py-1.5 text-xs hover:bg-surface-variant/10 text-on-surface/80 transition-colors flex items-center justify-between group"
+                                    className="w-full py-1 px-2 text-left my-1 text-xs rounded-lg bg-surface-variant hover:bg-surface-variant text-on-surface transition-colors flex items-center justify-between group"
                                 >
                                     {suggestion}
-                                    <Plus size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-                                </button>
+                                    <Plus size={10} className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-success" />
+                                </Button>
                             ))}
                         </div>
                     )}
-                </div>
-
-                <div className="absolute right-2 top-2.5 text-on-surface-variant/30 pointer-events-none">
-                    <ChevronsUpDown size={14} />
                 </div>
             </div>
         </div>
