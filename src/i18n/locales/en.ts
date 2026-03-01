@@ -609,9 +609,13 @@ export const en = {
                 open_toolbox: "Open Toolbox"
             },
             console: {
+                documentation: "Documentation: ",
+                fancy_mode: "Enable Fancy Mode",
+                raw_mode: "Enable Raw Mode",
                 running: "RUNNING",
                 pass: "PASS",
                 fail: "FAIL",
+                processing: "Processing...",
                 test_summary: "{{total}} TESTS: {{passed}} PASSED, {{failed}} FAILED",
                 waiting: "Waiting for logs..."
             }

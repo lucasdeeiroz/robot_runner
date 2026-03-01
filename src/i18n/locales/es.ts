@@ -609,9 +609,13 @@ export const es = {
                 open_toolbox: "Abrir Caja de Herramientas"
             },
             console: {
+                documentation: "Documentación: ",
+                fancy_mode: "Habilitar Modo Decorado",
+                raw_mode: "Habilitar Modo Crudo",
                 running: "EJECUTANDO",
                 pass: "ÉXITO",
                 fail: "FALLO",
+                processing: "Procesando...",
                 test_summary: "{{total}} PRUEBAS: {{passed}} ÉXITOS, {{failed}} FALLOS",
                 waiting: "Esperando registros..."
             }

@@ -692,17 +692,6 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                         options={savedMaps.map(m => m.name)}
                                         placeholder={t('mapper.placeholder.screen_name')}
                                     />
-                                    <div className="w-32">
-                                        <Select
-                                            label={t('mapper.screen_type')}
-                                            value={screenType}
-                                            onChange={(e) => setScreenType(e.target.value as any)}
-                                            options={['screen', 'modal', 'tab', 'drawer'].map(type => ({
-                                                label: t(`mapper.screen_types.${type}`),
-                                                value: type
-                                            }))}
-                                        />
-                                    </div>
                                     <div className="w-48">
                                         <TagInput
                                             label={t('mapper.screen_tags')}
@@ -710,6 +699,19 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                             onChange={setScreenTags}
                                             suggestions={[...new Set(savedMaps.flatMap(m => m.tags || []))]}
                                             placeholder={t('mapper.placeholder.screen_tags')}
+                                        />
+                                    </div>
+                                    <div className="w-32">
+                                        <div className="text-xs font-medium text-on-surface-variant/80 ml-1 mb-1">
+                                            {t('mapper.screen_type')}
+                                        </div>
+                                        <Select
+                                            value={screenType}
+                                            onChange={(e) => setScreenType(e.target.value as any)}
+                                            options={['screen', 'modal', 'tab', 'drawer'].map(type => ({
+                                                label: t(`mapper.screen_types.${type}`),
+                                                value: type
+                                            }))}
                                         />
                                     </div>
                                 </div>

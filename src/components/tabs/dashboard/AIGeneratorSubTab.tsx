@@ -155,7 +155,7 @@ export function AIGeneratorSubTab() {
                                     'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out'
                                 )}
                             >
-                                <span className="sr-only">Use Mapping</span>
+                                <span className="sr-only">{t('dashboard.generator.use_mapping', "Use App Mapping")}</span>
                                 <span
                                     aria-hidden="true"
                                     className={clsx(
