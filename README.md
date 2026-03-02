@@ -94,7 +94,7 @@ Go to **Settings > Paths** and configure:
 1.  Go to the **Run** tab.
 2.  Select your target **Device**.
 3.  Choose your mode (**File**, **Folder**, or **Args**).
-97. Click **Run**.
+4.  Click **Run**.
 
 ### 4. Reserved Variables (Robot Framework)
 Robot Runner automatically injects device metadata into your Robot Framework sessions. You can access these variables without declaring them:
