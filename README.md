@@ -99,6 +99,15 @@ Go to **Settings > Paths** and configure:
 3.  Choose your mode (**File**, **Folder**, or **Args**).
 4.  Click **Run**.
 
+### 4. Reserved Variables (Robot Framework)
+Robot Runner automatically injects device metadata into your Robot Framework sessions. You can access these variables without declaring them:
+*   `${udid}`: The unique identifier (Serial Number) of the target device.
+*   `${device_name}`: The human-readable model name (e.g., Pixel 7, Samsung Galaxy S23).
+*   `${os_version}`: The Android version currently running on the device.
+
+> [!IMPORTANT]
+> Do not use these names for your own variables in project suites if you wish to use the values provided by the Runner's device selection.
+
 ---
 
 ## 📄 License

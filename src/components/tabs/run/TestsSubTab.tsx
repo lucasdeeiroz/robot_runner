@@ -234,6 +234,8 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                         device: deviceUdid === 'Start local Server' ? null : deviceUdid,
                         argumentsFile: argFileArg,
                         timestampOutputs: dontOverwrite,
+                        deviceModel: devModel,
+                        androidVersion: devVer,
                         workingDir
                     }).catch(e => {
                         feedback.toast.error("tests.launch_failed", e);
