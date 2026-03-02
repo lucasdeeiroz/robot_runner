@@ -15,7 +15,7 @@ This is the first test case
     [Tags]    chrome
     Sleep    5s
     Capture Page Screenshot
-    Log    This is the first test case
+    Log To Console    \nThis is the first test case running on {${device_name}}(${udid}) with Android {${os_version}}
 
 This is the second test case
     [Documentation]    This is the second test case
@@ -24,4 +24,4 @@ This is the second test case
     Capture Page Screenshot
     Log To Console    \nThe test done something here
     Log To Console    \nAnd something else here
-    Log    This is the second test case
+    Log    This is the second test case running on {${device_name}}(${udid}) with Android {${os_version}}

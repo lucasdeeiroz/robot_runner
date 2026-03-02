@@ -137,6 +137,20 @@ pub fn run_robot_test(
         args.push(&device_arg);
     }
 
+    let model_arg;
+    if let Some(m) = &device_model {
+        model_arg = format!("device_name:{}", m);
+        args.push("-v");
+        args.push(&model_arg);
+    }
+
+    let version_arg;
+    if let Some(v) = &android_version {
+        version_arg = format!("os_version:{}", v);
+        args.push("-v");
+        args.push(&version_arg);
+    }
+
     if let Some(arg_file) = &arguments_file {
         args.push("-A");
         args.push(arg_file);
