@@ -218,8 +218,7 @@ export function ImageEditor() {
             y1: startPos.y,
             x2: pos.x,
             y2: pos.y,
-            color: currentTool === 'arrow' ? '#ef4444' : currentTool === 'rect' ? '#3b82f6' : '#22c55e',
-            lineWidth: 3
+            color: currentTool === 'arrow' ? '#ff0000' : currentTool === 'rect' ? '#0088ff' : '#4ade80',
         };
 
         drawElement(ctx, previewElement);
@@ -240,8 +239,7 @@ export function ImageEditor() {
             y1: startPos.y,
             x2: pos.x,
             y2: pos.y,
-            color: currentTool === 'arrow' ? '#ef4444' : currentTool === 'rect' ? '#3b82f6' : '#22c55e',
-            lineWidth: 3
+            color: currentTool === 'arrow' ? '#ff0000' : currentTool === 'rect' ? '#0088ff' : '#4ade80',
         };
 
         setElements(prev => [...prev, newElement]);
