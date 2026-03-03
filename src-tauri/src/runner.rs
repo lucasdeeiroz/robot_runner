@@ -219,8 +219,6 @@ pub fn run_robot_test(
     cmd.arg("-m").arg("robot");
     cmd.args(&args);
 
-    println!("Executing Robot command: python -m robot {}", args.join(" "));
-    
     spawn_and_monitor(app, state, run_id, cmd, working_dir)
 }
 
