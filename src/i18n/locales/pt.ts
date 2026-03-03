@@ -794,13 +794,7 @@ export const pt = {
                 project: "Projeto",
                 args: "Arquivo de Args"
             },
-            target: "Alvo",
-            no_selection: "Nenhuma seleção válida",
-            run_all: "Executar Todos",
-            run_selected: "Executar Selecionado",
-            tips: {
-                appium_maven: "Observação: Para Appium/Java, o projeto todo será executado via Maven."
-            },
+            select_tests: "Selecionar Testes",
             selector: {
                 title: "Seleção de Casos de Teste",
                 all: "Selecionar Todos",
@@ -810,6 +804,13 @@ export const pt = {
                 loading: "Lendo arquivo...",
                 selected: "{{count}} testes selecionados",
                 load_error: "Falha ao carregar os casos de teste do arquivo"
+            },
+            target: "Alvo",
+            no_selection: "Nenhuma seleção válida",
+            run_all: "Executar Todos",
+            run_selected: "Executar Selecionado",
+            tips: {
+                appium_maven: "Observação: Para Appium/Java, o projeto todo será executado via Maven."
             },
             status: {
                 checking: "Verificando Appium...",

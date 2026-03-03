@@ -800,6 +800,17 @@ export const es = {
                 project: "Proyecto",
                 args: "Archivo de Args"
             },
+            select_tests: "Seleccionar Testes",
+            selector: {
+                title: "Selección de Casos de Prueba",
+                all: "Seleccionar Todo",
+                none: "Limpar Todo",
+                close: "Confirmar Selección",
+                empty: "No se encontraron casos de prueba en este archivo.",
+                loading: "Leyendo archivo...",
+                selected: "{{count}} pruebas seleccionadas",
+                load_error: "Error al cargar los casos de prueba del archivo"
+            },
             target: "Objetivo",
             no_selection: "Sin selección válida",
             run_all: "Ejecutar Todas",
@@ -907,11 +918,11 @@ export const es = {
             description: "Vamos a configurar tu perfil para optimizar tu experiencia. Solo tomará un momento.",
             step1_title: "Selecciona tu Idioma",
             step2_title: "Elige tu Modo de Uso",
-            error_no_mode: "Por favor, selecciona un modo de uso para continuar.",
+            error_no_mode: "Por favor, seleccione un modo de uso para continuar.",
             mode: {
                 explorer: {
                     title: "Explorador",
-                    description: "Herramientas cotidianas para depuración y pruebas manuales (ADB, Scrcpy, etc.). Sin configuración."
+                    description: "Herramientas cotidianas para depuración y pruebas manuales (ADB, Scrcpy, etc.). No requiere configuración."
                 },
                 automator: {
                     title: "Automator",

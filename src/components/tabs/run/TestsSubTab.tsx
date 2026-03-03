@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
-import { Play, FolderOpen, FileText, FileCode, History } from "lucide-react";
+import { Play, FolderOpen, FileText, FileCode, History, ChartNoAxesGantt } from "lucide-react";
 import { useSettings } from "@/lib/settings";
 import { useTestSessions } from "@/lib/testSessionStore";
 import { Device } from "@/lib/types";
@@ -401,7 +401,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                                             )}
                                             title={t('tests.select_tests')}
                                         >
-                                            <History size={14} className="group-hover/btn:scale-110 transition-transform" />
+                                            <ChartNoAxesGantt size={14} className="group-hover/btn:scale-110 transition-transform" />
                                         </Button>
                                     </div>
                                 );
