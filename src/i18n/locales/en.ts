@@ -362,6 +362,7 @@ export const en = {
             },
             modal: {
                 edit_xpath: "Edit XPath",
+                edit_uiselector: "Edit UIAutomator Selector",
                 edit_selector: "Edit Selector",
                 match_type: "Match Type",
                 match_type_equals: "Equals",
@@ -394,6 +395,7 @@ export const en = {
                 xpath: "XPath",
                 resource_id: "Resource ID",
                 access_id: "Accessibility ID",
+                uiselector: "UIAutomator",
                 class: "Class",
                 identifiers: "Identifiers",
                 hierarchy: "Hierarchy"

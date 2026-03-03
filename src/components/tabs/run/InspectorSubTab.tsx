@@ -57,7 +57,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
 
     // Locator Editing State
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [editingAttr, setEditingAttr] = useState<'resource-id' | 'content-desc' | 'xpath' | null>(null);
+    const [editingAttr, setEditingAttr] = useState<'resource-id' | 'content-desc' | 'xpath' | 'uiselector' | null>(null);
     const [editOptions, setEditOptions] = useState({
         type: 'equals' as 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'matches',
         useUiSelectorWrapper: true,
@@ -273,17 +273,17 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
         };
     };
 
-    const handleOpenEditModal = (attr: 'resource-id' | 'content-desc' | 'xpath') => {
+    const handleOpenEditModal = (attr: 'resource-id' | 'content-desc' | 'xpath' | 'uiselector') => {
         setEditingAttr(attr);
         setIsEditModalOpen(true);
         if (selectedNode) {
             let initialAttr = editOptions.xpathAttr;
-            if (attr === 'xpath') {
+            if (attr === 'xpath' || attr === 'uiselector') {
                 const attrs = selectedNode.attributes;
                 if (!attrs[initialAttr]) {
                     if (attrs['resource-id']) initialAttr = 'resource-id';
-                    else if (attrs['text']) initialAttr = 'text';
                     else if (attrs['content-desc']) initialAttr = 'content-desc';
+                    else if (attrs['text']) initialAttr = 'text';
                     else if (attrs['class']) initialAttr = 'class';
                 }
             } else {
@@ -299,6 +299,13 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
 
             if (attr === 'xpath') {
                 setCustomLocator(generateXPath(selectedNode, initialAttr, editOptions.type, []));
+            } else if (attr === 'uiselector') {
+                setCustomLocator(generateUiSelector(selectedNode, {
+                    attr: initialAttr as any,
+                    type: editOptions.type,
+                    useUiSelectorWrapper: editOptions.useUiSelectorWrapper,
+                    addons: []
+                }));
             } else {
                 setCustomLocator(generateUiSelector(selectedNode, {
                     attr: attr as any,
@@ -314,6 +321,13 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
         if (!selectedNode || !editingAttr) return;
         if (editingAttr === 'xpath') {
             setCustomLocator(generateXPath(selectedNode, options.xpathAttr, options.type, options.selectedAddons));
+        } else if (editingAttr === 'uiselector') {
+            setCustomLocator(generateUiSelector(selectedNode, {
+                attr: options.xpathAttr as any,
+                type: options.type,
+                useUiSelectorWrapper: options.useUiSelectorWrapper,
+                addons: options.selectedAddons
+            }));
         } else {
             setCustomLocator(generateUiSelector(selectedNode, {
                 attr: editingAttr as any,
@@ -524,10 +538,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
                             <div className="p-4 space-y-6">
                                 <div className="space-y-4">
                                     <h3 className="text-xs font-semibold text-on-surface-variant/80 uppercase tracking-wider">{t('inspector.attributes.identifiers')}</h3>
-                                    <div className={clsx(
-                                        "grid grid-cols-1 gap-2",
-                                        selectedNode.attributes['content-desc'] && selectedNode.attributes['resource-id'] ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 md:grid-cols-1"
-                                    )}>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                         <CopyButton
                                             label={t('inspector.attributes.access_id')}
                                             value={selectedNode.attributes['content-desc']}
@@ -544,6 +555,15 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
                                         />
                                     </div>
                                     <div className="grid grid-cols-1 gap-2">
+                                        {!selectedNode.attributes['content-desc'] && !selectedNode.attributes['resource-id'] && (
+                                            <CopyButton
+                                                label={t('inspector.attributes.uiselector', 'UIAutomator')}
+                                                value={generateUiSelector(selectedNode, { type: 'equals', useUiSelectorWrapper: true, attr: 'auto' })}
+                                                onCopy={(v) => copyToClipboard(v, 'uis')}
+                                                onEdit={() => handleOpenEditModal('uiselector')}
+                                                active={copied === 'uis'}
+                                            />
+                                        )}
                                         <CopyButton
                                             label={t('inspector.attributes.xpath')}
                                             value={generateXPath(selectedNode)}
@@ -584,7 +604,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
             <Modal
                 isOpen={isEditModalOpen}
                 onClose={() => setIsEditModalOpen(false)}
-                title={editingAttr === 'xpath' ? t('inspector.modal.edit_xpath') : t('inspector.modal.edit_selector')}
+                title={editingAttr === 'xpath' ? t('inspector.modal.edit_xpath') : (editingAttr === 'uiselector' ? t('inspector.modal.edit_uiselector', 'Edit UIAutomator Selector') : t('inspector.modal.edit_selector'))}
                 className="max-w-md"
             >
                 <div className="space-y-4">
@@ -608,7 +628,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
                         />
                     </div>
 
-                    {editingAttr !== 'xpath' ? (
+                    {editingAttr !== 'xpath' && editingAttr !== 'uiselector' ? (
                         <div className="flex items-center gap-2 pt-2">
                             <input
                                 type="checkbox"

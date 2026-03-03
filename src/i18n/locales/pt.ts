@@ -362,6 +362,7 @@ export const pt = {
             },
             modal: {
                 edit_xpath: "Editar XPath",
+                edit_uiselector: "Editar Seletor UIAutomator",
                 edit_selector: "Editar Seletor",
                 match_type: "Tipo de Correspondência",
                 match_type_equals: "Igual",
@@ -394,6 +395,7 @@ export const pt = {
                 xpath: "XPath",
                 resource_id: "Resource ID",
                 access_id: "Accessibility ID",
+                uiselector: "UIAutomator",
                 class: "Classe",
                 identifiers: "Identificadores",
                 hierarchy: "Hierarquia"
