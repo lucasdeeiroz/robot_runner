@@ -23,6 +23,14 @@ interface TestsSubTabProps {
 
 type SelectionMode = 'file' | 'folder' | 'args';
 
+function isValidTestFile(path: string, automationFramework?: string): boolean {
+    const lower = path.toLowerCase();
+    if (automationFramework === 'maestro') {
+        return lower.endsWith('.yaml') || lower.endsWith('.yml');
+    }
+    return lower.endsWith('.robot');
+}
+
 export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTabProps) {
     const { t } = useTranslation();
     const [mode, setMode] = useState<SelectionMode>('file');
@@ -445,7 +453,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                                 disabled={
                                     !selectedEntry ||
                                     isLaunching ||
-                                    (mode === 'file' && (selectedEntry.is_dir || !selectedEntry.path.toLowerCase().endsWith('.robot'))) ||
+                                    (mode === 'file' && (selectedEntry.is_dir || !isValidTestFile(selectedEntry.path, settings.automationFramework))) ||
                                     (mode === 'folder' && !selectedEntry.is_dir) ||
                                     (mode === 'args' && (selectedEntry.is_dir || (!selectedEntry.path.toLowerCase().endsWith('.args') && !selectedEntry.path.toLowerCase().endsWith('.txt'))))
                                 }
@@ -457,7 +465,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                                     <span>
                                         {isLaunching ? launchStatus : (
                                             (!selectedEntry || (
-                                                (mode === 'file' && (selectedEntry.is_dir || !selectedEntry.path.toLowerCase().endsWith('.robot'))) ||
+                                                (mode === 'file' && (selectedEntry.is_dir || !isValidTestFile(selectedEntry.path, settings.automationFramework))) ||
                                                 (mode === 'folder' && !selectedEntry.is_dir) ||
                                                 (mode === 'args' && (selectedEntry.is_dir || (!selectedEntry.path.toLowerCase().endsWith('.args') && !selectedEntry.path.toLowerCase().endsWith('.txt'))))
                                             )) ? t('tests.no_selection') : (mode === 'folder' ? t('tests.run_all') : t('tests.run_selected'))
