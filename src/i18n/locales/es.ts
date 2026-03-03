@@ -800,11 +800,11 @@ export const es = {
                 project: "Proyecto",
                 args: "Archivo de Args"
             },
-            select_tests: "Seleccionar Testes",
+            select_tests: "Seleccionar pruebas",
             selector: {
                 title: "Selección de Casos de Prueba",
                 all: "Seleccionar Todo",
-                none: "Limpar Todo",
+                none: "Limpiar todo",
                 close: "Confirmar Selección",
                 empty: "No se encontraron casos de prueba en este archivo.",
                 loading: "Leyendo archivo...",
