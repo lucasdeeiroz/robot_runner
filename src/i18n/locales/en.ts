@@ -788,16 +788,27 @@ export const en = {
         tests: {
             mode: {
                 file: "Test File",
-                folder: "Test Folder",
+                folder: "Folder",
                 project: "Project",
-                args: "Argument File"
+                args: "Arguments"
+            },
+            select_tests: "Select Tests",
+            selector: {
+                title: "Test Case Selection",
+                all: "Select All",
+                none: "Clear All",
+                close: "Confirm Selection",
+                empty: "No test cases found in this file.",
+                loading: "Reading file...",
+                selected: "{{count}} tests selected",
+                load_error: "Failed to load test cases from file"
             },
             target: "Target",
             no_selection: "No valid selection",
             run_all: "Run All Tests",
             run_selected: "Run Selected Test",
             tips: {
-                appium_maven: "Select the Maven project root (where pom.xml is located)."
+                appium_maven: "Note: For Appium/Java, the whole project will be executed via Maven."
             },
             status: {
                 checking: "Checking Appium...",

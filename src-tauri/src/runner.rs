@@ -98,7 +98,8 @@ pub fn run_robot_test(
     device_model: Option<String>,
     android_version: Option<String>,
     working_dir: Option<String>,
-    rerun_failed_from: Option<String>, // Added this
+    rerun_failed_from: Option<String>,
+    selected_tests: Option<Vec<String>>,
 ) -> Result<String, String> {
     // Resolve absolute path for output_dir to ensure clean logs
     let abs_output_dir = std::fs::canonicalize(&output_dir)
@@ -156,6 +157,21 @@ pub fn run_robot_test(
         args.push(arg_file);
     }
 
+    // Add selected tests if any
+    let test_specific_args: Vec<String>;
+    if let Some(tests) = &selected_tests {
+        test_specific_args = tests.iter()
+            .map(|t| {
+                // Robot uses glob patterns for --test, escape [ and ]
+                let escaped = t.replace("[", "[[]").replace("]", "[]]");
+                format!("--test={}", escaped)
+            })
+            .collect();
+        for arg in &test_specific_args {
+            args.push(arg);
+        }
+    }
+
 
 
     // Only add test_path if it is provided
@@ -202,6 +218,8 @@ pub fn run_robot_test(
     cmd.env("PYTHONUTF8", "1");
     cmd.arg("-m").arg("robot");
     cmd.args(&args);
+
+    println!("Executing Robot command: python -m robot {}", args.join(" "));
     
     spawn_and_monitor(app, state, run_id, cmd, working_dir)
 }
@@ -487,4 +505,34 @@ fn spawn_and_monitor(
     });
 
     Ok("Started".to_string())
+}
+
+#[tauri::command]
+pub async fn get_robot_test_cases(path: String) -> Result<Vec<String>, String> {
+    use std::fs::File;
+    use std::io::{BufRead, BufReader};
+
+    let file = File::open(&path).map_err(|e| e.to_string())?;
+    let reader = BufReader::new(file);
+    let mut tests = Vec::new();
+    let mut in_test_cases = false;
+
+    for line in reader.lines() {
+        let line = line.map_err(|e| e.to_string())?;
+        let trimmed = line.trim();
+
+        if trimmed.starts_with("*** Test Cases ***") || trimmed.starts_with("*** Tasks ***") {
+            in_test_cases = true;
+            continue;
+        } else if trimmed.starts_with("***") {
+            in_test_cases = false;
+            continue;
+        }
+
+        if in_test_cases && !line.is_empty() && !line.starts_with(" ") && !line.starts_with("\t") && !trimmed.starts_with("#") {
+            tests.push(trimmed.to_string());
+        }
+    }
+
+    Ok(tests)
 }

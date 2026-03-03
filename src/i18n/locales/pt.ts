@@ -797,7 +797,17 @@ export const pt = {
             run_all: "Executar Todos",
             run_selected: "Executar Selecionado",
             tips: {
-                appium_maven: "Selecione a raiz do projeto Maven (onde está o pom.xml)."
+                appium_maven: "Observação: Para Appium/Java, o projeto todo será executado via Maven."
+            },
+            selector: {
+                title: "Seleção de Casos de Teste",
+                all: "Selecionar Todos",
+                none: "Limpar Seleção",
+                close: "Confirmar Seleção",
+                empty: "Nenhum caso de teste encontrado neste arquivo.",
+                loading: "Lendo arquivo...",
+                selected: "{{count}} testes selecionados",
+                load_error: "Falha ao carregar os casos de teste do arquivo"
             },
             status: {
                 checking: "Verificando Appium...",
