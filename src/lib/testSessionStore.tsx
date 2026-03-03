@@ -21,6 +21,7 @@ export interface TestSession {
     lastActiveTool?: string; // Persist active tool across mounts
     framework: 'robot' | 'maestro' | 'appium'; // New field
     timestampOutputs?: boolean; // New field
+    selectedTests?: string[]; // New
 }
 
 interface TestOutputPayload {
@@ -35,7 +36,7 @@ interface TestFinishedPayload {
 
 interface TestSessionContextType {
     sessions: TestSession[];
-    addSession: (runId: string, deviceUdid: string, deviceName: string, testPath: string, framework: 'robot' | 'maestro' | 'appium', timestampOutputs: boolean, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string) => void;
+    addSession: (runId: string, deviceUdid: string, deviceName: string, testPath: string, framework: 'robot' | 'maestro' | 'appium', timestampOutputs: boolean, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string, selectedTests?: string[]) => void;
     addToolboxSession: (deviceUdid: string, deviceName: string, deviceModel?: string, androidVersion?: string) => void; // New action
     rerunSession: (runId: string, rerunFailedFrom?: string) => Promise<void>;
     stopSession: (runId: string) => Promise<void>;
@@ -94,7 +95,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
 
     const { settings } = useSettings();
 
-    const addSession = useCallback((runId: string, deviceUdid: string, deviceName: string, testPath: string, framework: 'robot' | 'maestro' | 'appium', timestampOutputs: boolean, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string) => {
+    const addSession = useCallback((runId: string, deviceUdid: string, deviceName: string, testPath: string, framework: 'robot' | 'maestro' | 'appium', timestampOutputs: boolean, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string, selectedTests?: string[]) => {
         setSessions(prev => {
             // Check for recycling
             if (settings.recycleDeviceViews) {
@@ -123,6 +124,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                         androidVersion,
                         framework,
                         timestampOutputs,
+                        selectedTests,
                         exitCode: undefined // clear previous exit code
                     };
 
@@ -147,7 +149,8 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     status: 'running',
                     argumentsFile: argumentsFile,
                     deviceModel,
-                    androidVersion
+                    androidVersion,
+                    selectedTests
                 }
             ];
         });
@@ -265,7 +268,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
         }
 
         // Add new session immediately
-        addSession(newRunId, session.deviceUdid, session.deviceName, session.testPath, session.framework, session.timestampOutputs || false, session.argumentsFile, session.deviceModel, session.androidVersion);
+        addSession(newRunId, session.deviceUdid, session.deviceName, session.testPath, session.framework, session.timestampOutputs || false, session.argumentsFile, session.deviceModel, session.androidVersion, session.selectedTests);
 
         try {
             // Check Appium (Skip for Maestro)
@@ -294,7 +297,8 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     deviceModel: session.deviceModel,
                     androidVersion: session.androidVersion,
                     workingDir: settings.paths.automationRoot,
-                    rerunFailedFrom: rerunFailedFrom
+                    rerunFailedFrom: rerunFailedFrom,
+                    selectedTests: session.selectedTests
                 });
             } else if (fw === 'maestro') {
                 await invoke("run_maestro_test", {

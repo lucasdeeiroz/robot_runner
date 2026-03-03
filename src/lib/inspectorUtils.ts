@@ -443,18 +443,24 @@ export function generateXPath(node: InspectorNode, attr?: string, type: 'equals'
  * Generates a UiAutomator selector string.
  */
 export function generateUiSelector(node: InspectorNode, options: {
-    attr: 'resource-id' | 'content-desc' | 'text',
+    attr?: 'resource-id' | 'content-desc' | 'text' | 'class' | 'auto',
     type: 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'matches',
     useUiSelectorWrapper: boolean,
     addons?: string[]
 }): string {
-    const value = node.attributes[options.attr] || "";
-    let method = "";
+    const attributes = node.attributes;
+    const preferredAttr = (options.attr === 'auto' || !options.attr)
+        ? (attributes['resource-id'] ? 'resource-id' : attributes['content-desc'] ? 'content-desc' : attributes['text'] ? 'text' : 'class')
+        : options.attr;
+    const value = attributes[preferredAttr] || "";
 
-    switch (options.attr) {
+    let method = "";
+    switch (preferredAttr) {
         case 'resource-id': method = "resourceId"; break;
         case 'content-desc': method = "description"; break;
         case 'text': method = "text"; break;
+        case 'class': method = "className"; break;
+        default: method = "text"; break;
     }
 
     let op = "";

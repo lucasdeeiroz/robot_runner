@@ -362,6 +362,7 @@ export const pt = {
             },
             modal: {
                 edit_xpath: "Editar XPath",
+                edit_uiselector: "Editar Seletor UIAutomator",
                 edit_selector: "Editar Seletor",
                 match_type: "Tipo de Correspondência",
                 match_type_equals: "Igual",
@@ -394,6 +395,7 @@ export const pt = {
                 xpath: "XPath",
                 resource_id: "Resource ID",
                 access_id: "Accessibility ID",
+                uiselector: "UIAutomator",
                 class: "Classe",
                 identifiers: "Identificadores",
                 hierarchy: "Hierarquia"
@@ -792,12 +794,23 @@ export const pt = {
                 project: "Projeto",
                 args: "Arquivo de Args"
             },
+            select_tests: "Selecionar Testes",
+            selector: {
+                title: "Seleção de Casos de Teste",
+                all: "Selecionar Todos",
+                none: "Limpar Seleção",
+                close: "Confirmar Seleção",
+                empty: "Nenhum caso de teste encontrado neste arquivo.",
+                loading: "Lendo arquivo...",
+                selected: "{{count}} testes selecionados",
+                load_error: "Falha ao carregar os casos de teste do arquivo"
+            },
             target: "Alvo",
             no_selection: "Nenhuma seleção válida",
             run_all: "Executar Todos",
             run_selected: "Executar Selecionado",
             tips: {
-                appium_maven: "Selecione a raiz do projeto Maven (onde está o pom.xml)."
+                appium_maven: "Observação: Para Appium/Java, o projeto todo será executado via Maven."
             },
             status: {
                 checking: "Verificando Appium...",

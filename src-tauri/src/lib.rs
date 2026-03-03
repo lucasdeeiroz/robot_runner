@@ -89,7 +89,8 @@ pub fn run() {
             adb::packages::enable_package,
             adb::packages::disable_package,
             adb::packages::clear_package,
-            adb::packages::install_package
+            adb::packages::install_package,
+            runner::get_robot_test_cases
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

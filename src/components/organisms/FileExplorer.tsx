@@ -4,7 +4,7 @@ import { Folder, File, ChevronRight, CornerLeftUp } from "lucide-react";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 import clsx from "clsx";
 
-interface FileEntry {
+export interface FileEntry {
     name: string;
     path: string;
     is_dir: boolean;
@@ -18,13 +18,14 @@ interface FileExplorerProps {
     title?: string;
     onSelectionChange?: (entry: FileEntry | null) => void;
     allowHideFooter?: boolean;
+    renderEntryExtra?: (entry: FileEntry) => React.ReactNode;
 }
 
 import { useTranslation } from "react-i18next";
 import { WarningModal } from "@/components/organisms/WarningModal";
 import { feedback } from "@/lib/feedback";
 
-export function FileExplorer({ initialPath = ".", onSelect, onCancel, selectionMode = 'file', title: _title, onSelectionChange, allowHideFooter = false }: FileExplorerProps) {
+export function FileExplorer({ initialPath = ".", onSelect, onCancel, selectionMode = 'file', title: _title, onSelectionChange, allowHideFooter = false, renderEntryExtra }: FileExplorerProps) {
     const { t } = useTranslation();
     const [currentPath, setCurrentPath] = useState(initialPath);
     const [entries, setEntries] = useState<FileEntry[]>([]);
@@ -183,6 +184,7 @@ export function FileExplorer({ initialPath = ".", onSelect, onCancel, selectionM
                                         <File size={18} className="text-on-surface/80 shrink-0" />
                                     )}
                                     <span className="truncate flex-1">{entry.name}</span>
+                                    {renderEntryExtra && renderEntryExtra(entry)}
                                     {entry.is_dir && <ChevronRight size={14} className="text-on-surface/80 opacity-50" />}
                                 </div>
                             );
