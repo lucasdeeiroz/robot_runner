@@ -506,7 +506,7 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
                             )}
                             {node.logs.map((line, i) => <LinkRenderer key={i} content={line} />)}
                             {isRunning && (
-                                <div className="text-primary mt-2 flex items-center gap-2 text-xs italic opacity-70">
+                                <div className="text-primary dark:text-primary/80 mt-2 flex items-center gap-2 text-xs italic opacity-70">
                                     <div className="w-1.5 h-1.5 bg-primary rounded-2xl animate-pulse" />
                                     {t('run_tab.console.processing')}
                                 </div>
@@ -595,7 +595,7 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
                     <div className="relative z-10 w-full mb-8">
                         {tree.map(node => renderNode(node))}
                         {isRunning && (
-                            <div className="text-primary mt-4 flex items-center gap-2 text-sm italic opacity-70 animate-pulse ml-2">
+                            <div className="text-primary dark:text-primary/80 mt-4 flex items-center gap-2 text-sm italic opacity-70 animate-pulse ml-2">
                                 <ExpressiveLoading size="sm" variant="circular" />
                                 {t('run_tab.console.processing', "Processing...")}
                             </div>

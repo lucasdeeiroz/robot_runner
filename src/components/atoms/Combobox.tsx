@@ -108,7 +108,7 @@ export function Combobox({
                             className={clsx(
                                 "w-full text-left px-3 py-2 text-sm transition-colors flex items-center justify-between group",
                                 option === value
-                                    ? "bg-primary/10 text-primary"
+                                    ? "bg-primary/10 text-primary dark:text-primary/80"
                                     : "text-on-surface/80 hover:bg-surface-variant/10"
                             )}
                         >

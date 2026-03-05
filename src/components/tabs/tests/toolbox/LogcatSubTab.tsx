@@ -297,7 +297,7 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
                             <div className="on-primaryspace-pre-wrap hover:bg-surface-variant/30 px-2 py-0.5 break-all transition-colors">
                                 {log.startsWith(t('feedback.saved_to_prefix')) ? (
                                     <span
-                                        className="text-primary underline cursor-pointer hover:opacity-80"
+                                        className="text-primary dark:text-primary/80 underline cursor-pointer hover:opacity-80"
                                         onClick={() => invoke('open_path', { path: log.replace(t('feedback.saved_to_prefix') + ' ', '') })}
                                         title={t('logcat.open_file', 'Click to open file')}
                                     >

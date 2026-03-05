@@ -25,7 +25,7 @@ export function LinkRenderer({ content }: LinkRendererProps) {
                 <span className="text-on-surface-variant/80">{label}: </span>
                 <span
                     onClick={() => openLink(path)}
-                    className="text-primary hover:underline cursor-pointer"
+                    className="text-primary dark:text-primary/80 hover:underline cursor-pointer"
                     title="Open File"
                 >
                     {path}
@@ -38,7 +38,7 @@ export function LinkRenderer({ content }: LinkRendererProps) {
         <div className={clsx(
             "on-primaryspace-pre-wrap break-all leading-tight mb-0.5",
             content.includes("[Error]") || content.includes("STDERR") ? "text-error" :
-                content.includes("[System]") ? "text-primary font-semibold" :
+                content.includes("[System]") ? "text-primary dark:text-primary/80 font-semibold" :
                     "text-on-surface/80"
         )}>
             {content}

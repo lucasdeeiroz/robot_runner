@@ -124,11 +124,11 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                                 )}
                             >
                                 {selectedMode === 'explorer' && (
-                                    <div className="absolute top-4 right-4 text-primary">
+                                    <div className="absolute top-4 right-4 text-primary dark:text-primary/80">
                                         <CheckCircle2 size={24} />
                                     </div>
                                 )}
-                                <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary mb-4">
+                                <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary dark:text-primary/80 mb-4">
                                     <Compass size={24} />
                                 </div>
                                 <h3 className="text-lg font-bold text-on-surface mb-2">{t('onboarding.mode.explorer.title')}</h3>
@@ -148,11 +148,11 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                                 )}
                             >
                                 {selectedMode === 'automator' && (
-                                    <div className="absolute top-4 right-4 text-primary">
+                                    <div className="absolute top-4 right-4 text-primary dark:text-primary/80">
                                         <CheckCircle2 size={24} />
                                     </div>
                                 )}
-                                <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary mb-4">
+                                <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary dark:text-primary/80 mb-4">
                                     <Bot size={24} />
                                 </div>
                                 <h3 className="text-lg font-bold text-on-surface mb-2">{t('onboarding.mode.automator.title')}</h3>
@@ -203,7 +203,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                                         : "bg-surface border-outline-variant/30 hover:bg-surface-variant/30"
                                 )}
                             >
-                                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary flex-shrink-0">
+                                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary dark:text-primary/80 flex-shrink-0">
                                     <Bot size={24} />
                                 </div>
                                 <div className="flex-1">
@@ -229,7 +229,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                                         : "bg-surface border-outline-variant/30 hover:bg-surface-variant/30"
                                 )}
                             >
-                                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary flex-shrink-0">
+                                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary dark:text-primary/80 flex-shrink-0">
                                     <Terminal size={24} />
                                 </div>
                                 <div className="flex-1">
@@ -255,7 +255,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                                         : "bg-surface border-outline-variant/30 hover:bg-surface-variant/30"
                                 )}
                             >
-                                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary flex-shrink-0">
+                                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary dark:text-primary/80 flex-shrink-0">
                                     <Zap size={24} />
                                 </div>
                                 <div className="flex-1">

@@ -396,7 +396,7 @@ export function SettingsPage() {
                                         onClick={() => setShowAppiumLogs(!showAppiumLogs)}
                                         size="icon"
                                         variant="ghost"
-                                        className={clsx(showAppiumLogs ? "bg-primary/10 text-primary" : "text-on-surface/80")}
+                                        className={clsx(showAppiumLogs ? "bg-primary/10 text-primary dark:text-primary/80" : "text-on-surface/80")}
                                         title={t('settings.appium.logs')}
                                         disabled={!appiumStatus.running && systemCheckStatus?.missingAppium?.length > 0}
                                     >
@@ -655,7 +655,7 @@ export function SettingsPage() {
                                     href="https://aistudio.google.com/app/apikey"
                                     target="_blank"
                                     rel="noreferrer"
-                                    className="text-primary hover:underline"
+                                    className="text-primary dark:text-primary/80 hover:underline"
                                 >
                                     Google AI Studio
                                 </a>
@@ -742,7 +742,7 @@ export function SettingsPage() {
                             className={
                                 clsx(
                                     "rounded-2xl hover:bg-surface-variant/30",
-                                    systemCheckStatus.loading ? "text-primary bg-primary/10" : "text-on-surface-variant/80 hover:text-primary"
+                                    systemCheckStatus.loading ? "text-primary dark:text-primary/80 bg-primary/10" : "text-on-surface-variant/80 hover:text-primary"
                                 )
                             }
                             title={t('common.loading')}

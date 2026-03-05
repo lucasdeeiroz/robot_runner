@@ -223,7 +223,7 @@ export function CommandsSubTab({ selectedDevice, isTestRunning = false, allowAct
                 )}
                 {history.map((line, i) => (
                     <div key={i} className="text-on-surface/80 on-primaryspace-pre-wrap break-all">
-                        {line.startsWith('>') ? <span className="text-primary font-bold">{line}</span> : line}
+                        {line.startsWith('>') ? <span className="text-primary dark:text-primary/80 font-bold">{line}</span> : line}
                     </div>
                 ))}
             </div>

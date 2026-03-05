@@ -237,7 +237,7 @@ export function TestsPage() {
                                 className={clsx(
                                     "rounded-2xl border transition-all shrink-0",
                                     isGridView
-                                        ? "bg-primary/10 border-none text-primary"
+                                        ? "bg-primary/10 border-none text-primary dark:text-primary/80"
                                         : "bg-transparent border-none text-on-surface-variant/80 hover:text-on-surface-variant/80 hover:bg-surface-variant/30"
                                 )}
                                 title={isGridView ? t('toolbox.actions.switch_to_tabs') : t('toolbox.actions.switch_to_grid')}
@@ -268,7 +268,7 @@ export function TestsPage() {
                                 className={clsx(
                                     "rounded-2xl border transition-all shrink-0 h-8 w-8",
                                     isSettingsOpen
-                                        ? "bg-primary/10 border-none text-primary"
+                                        ? "bg-primary/10 border-none text-primary dark:text-primary/80"
                                         : "bg-transparent border-none text-on-surface-variant/80 hover:text-on-surface-variant/80 hover:bg-surface-variant/30"
                                 )}
                                 title={t('settings.title')}

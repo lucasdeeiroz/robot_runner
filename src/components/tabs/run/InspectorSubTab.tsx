@@ -513,7 +513,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
                                         onClick={() => setSelectedNode(node)}
                                         className={clsx(
                                             "px-4 py-3 text-sm font-medium border-b-2 transition-colors space-nowrap",
-                                            selectedNode === node ? "border-primary text-primary bg-surface-variant/30" : "border-transparent text-on-surface-variant/80 hover:bg-surface-variant/30"
+                                            selectedNode === node ? "border-primary text-primary dark:text-primary/80 bg-surface-variant/30" : "border-transparent text-on-surface-variant/80 hover:bg-surface-variant/30"
                                         )}
                                     >
                                         {node.tagName}
@@ -639,7 +639,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
                                     setEditOptions(newOpts);
                                     updateCustomLocator(newOpts);
                                 }}
-                                className="rounded border-outline-variant/30 text-primary focus:ring-primary/20"
+                                className="rounded border-outline-variant/30 text-primary dark:text-primary/80 focus:ring-primary/20"
                             />
                             <label htmlFor="useWrapper" className="text-xs font-medium text-on-surface-variant/80">
                                 {t('inspector.modal.use_wrapper', 'Use new UiSelector() wrapper')}
@@ -699,7 +699,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
                                             setEditOptions(newOpts);
                                             updateCustomLocator(newOpts);
                                         }}
-                                        className="rounded border-outline-variant/30 text-primary focus:ring-primary/20 h-3.5 w-3.5"
+                                        className="rounded border-outline-variant/30 text-primary dark:text-primary/80 focus:ring-primary/20 h-3.5 w-3.5"
                                     />
                                     <label htmlFor={`addon-${opt.value}`} className="text-xs text-on-surface-variant/80 cursor-pointer truncate" title={opt.label}>
                                         {opt.label}
@@ -712,7 +712,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
                     <div className="space-y-1 pt-4 border-t border-outline-variant/30">
                         <label className="text-xs font-medium text-on-surface-variant/80">{t('inspector.modal.result')}</label>
                         <div className="flex bg-surface-variant/20 p-3 rounded-2xl border border-outline-variant/30">
-                            <code className="text-xs break-all flex-1 text-primary font-mono">{customLocator}</code>
+                            <code className="text-xs break-all flex-1 text-primary dark:text-primary/80 font-mono">{customLocator}</code>
                             <button onClick={() => copyToClipboard(customLocator, 'modal_copy')} className="ml-2 p-1 text-on-surface-variant/80 hover:text-primary transition-colors">
                                 {copied === 'modal_copy' ? <Check size={16} className="text-success" /> : <Copy size={16} />}
                             </button>
@@ -769,7 +769,7 @@ function NodeBreadcrumbs({ node, onSelect, onHover }: { node: InspectorNode, onS
                             title={generateXPath(n)}
                         >
                             {cleanTag(n.tagName)}
-                            {n.attributes['resource-id'] && <span className="ml-1 text-primary">resource-id="{n.attributes['resource-id'].split('/').pop()}"</span>}
+                            {n.attributes['resource-id'] && <span className="ml-1 text-primary dark:text-primary/80">resource-id="{n.attributes['resource-id'].split('/').pop()}"</span>}
                             {!n.attributes['resource-id'] && n.attributes['content-desc'] && <span className="ml-1 text-on-success-container/10">content-desc="{n.attributes['content-desc'].substring(0, 15)}..."</span>}
                         </button>
                     </div>

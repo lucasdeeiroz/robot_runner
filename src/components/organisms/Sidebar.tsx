@@ -97,7 +97,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                         className={cn(
                             "w-full flex items-center p-2 rounded-2xl transition-all duration-200 active:scale-95 relative",
                             activePage === item.id
-                                ? "bg-primary/10 text-primary shadow-primary/20"
+                                ? "bg-primary/10 text-primary dark:text-primary/80 shadow-primary/20"
                                 : "text-on-surface-variant/80/80 hover:bg-surface-variant/50 hover:text-on-surface/80",
                             collapsed ? "justify-center" : "gap-3"
                         )}

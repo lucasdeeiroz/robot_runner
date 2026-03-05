@@ -319,7 +319,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                                         }
                                     }).catch(() => setStatusMsg({ text: t('connect.status.clipboard_error'), type: 'error' }));
                                 }}
-                                className="text-[10px] text-primary hover:underline cursor-pointer"
+                                className="text-[10px] text-primary dark:text-primary/80 hover:underline cursor-pointer"
                                 title="Paste host:port or ngrok url"
                             >
                                 {t('connect.actions.paste_url') || "Paste URL"}
@@ -338,7 +338,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                             {selectedDevice && (
                                 <button
                                     onClick={handleEnableTcpIp}
-                                    className="text-[10px] text-primary hover:underline cursor-pointer"
+                                    className="text-[10px] text-primary dark:text-primary/80 hover:underline cursor-pointer"
                                     disabled={loading}
                                     title={t('connect.actions.enable_tcpip_tooltip', "Run 'adb tcpip 5555'")}
                                 >

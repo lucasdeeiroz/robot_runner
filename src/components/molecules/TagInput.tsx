@@ -84,7 +84,7 @@ export function TagInput({
                         <button
                             type="button"
                             onClick={handleAdd}
-                            className="text-primary hover:text-primary transition-colors p-1"
+                            className="text-primary dark:text-primary/80 hover:text-primary transition-colors p-1"
                         >
                             <Plus size={16} />
                         </button>

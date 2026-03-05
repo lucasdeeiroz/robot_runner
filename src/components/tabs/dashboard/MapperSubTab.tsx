@@ -776,7 +776,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                 </div>
                             </div>
                             <div className="flex items-center justify-between border-t border-b border-outline-variant/30 p-4">
-                                <h3 className="text-sm font-semibold text-primary uppercase tracking-wider flex items-center gap-2">
+                                <h3 className="text-sm font-semibold text-primary dark:text-primary/80 uppercase tracking-wider flex items-center gap-2">
                                     <SearchCode size={14} /> {t('mapper.screen_mapper')}
                                 </h3>
                                 <div className="flex gap-2">
@@ -785,7 +785,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                             variant="ghost"
                                             size="icon"
                                             onClick={() => setShowElementsMenu(!showElementsMenu)}
-                                            className={clsx(showElementsMenu ? "text-primary bg-primary/10" : "text-on-surface-variant/80")}
+                                            className={clsx(showElementsMenu ? "text-primary dark:text-primary/80 bg-primary/10" : "text-on-surface-variant/80")}
                                             title={t('mapper.saved_elements', 'Saved Elements')}
                                         >
                                             <FileClock size={16} />
@@ -860,7 +860,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                 className={clsx(
                                                     "px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
                                                     selectedNode === node
-                                                        ? "border-primary text-primary bg-surface-variant/30"
+                                                        ? "border-primary text-primary dark:text-primary/80 bg-surface-variant/30"
                                                         : "border-transparent text-on-surface-variant/80 hover:text-on-surface-variant/80 hover:bg-surface-variant/30"
                                                 )}
                                             >
@@ -1060,7 +1060,7 @@ function NodeBreadcrumbs({ node, onSelect, onHover }: { node: InspectorNode | nu
                             title={generateXPath(n)}
                         >
                             {cleanTag(n.tagName)}
-                            {n.attributes['resource-id'] && <span className="ml-1 text-primary">resource-id="{n.attributes['resource-id'].split('/').pop()}"</span>}
+                            {n.attributes['resource-id'] && <span className="ml-1 text-primary dark:text-primary/80">resource-id="{n.attributes['resource-id'].split('/').pop()}"</span>}
                             {!n.attributes['resource-id'] && n.attributes['content-desc'] && <span className="ml-1 text-on-success-container/10">content-desc="{n.attributes['content-desc'].substring(0, 15)}..."</span>}
                         </button>
                     </div>

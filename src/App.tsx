@@ -177,7 +177,7 @@ function App() {
   // Prevent rendering (and thus flash) until settings are loaded
   if (settings_loading) {
     return (
-      <div className="w-screen h-screen flex flex-col items-center justify-center bg-surface text-primary">
+      <div className="w-screen h-screen flex flex-col items-center justify-center bg-surface text-primary dark:text-primary/80">
         <ExpressiveLoading variant="circular" size="lg" />
       </div>
     );

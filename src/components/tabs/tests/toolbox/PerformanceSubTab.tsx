@@ -125,7 +125,7 @@ export function PerformanceSubTab({
                             size="sm"
                             className={clsx(
                                 "text-xs px-2 py-1 rounded border transition-all active:scale-95 h-auto",
-                                autoRefresh ? "bg-primary/10 text-primary border-primary/20" : "bg-surface/50 text-on-surface-variant/80 border-outline-variant"
+                                autoRefresh ? "bg-primary/10 text-primary dark:text-primary/80 border-primary/20" : "bg-surface/50 text-on-surface-variant/80 border-outline-variant"
                             )}
                         >
                             {t('performance.auto', "Auto")}
@@ -240,7 +240,7 @@ export function PerformanceSubTab({
                         {selectedPackage && stats.app_stats && (
                             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                 <h3 className="text-xs font-semibold text-on-surface-variant/80 uppercase tracking-wider mb-3 ml-1 flex items-center gap-2">
-                                    {t('performance.app_stats', 'App Performance')}: <span className="normal-case text-primary font-mono">{selectedPackage}</span>
+                                    {t('performance.app_stats', 'App Performance')}: <span className="normal-case text-primary dark:text-primary/80 font-mono">{selectedPackage}</span>
                                 </h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {/* App CPU */}

@@ -301,7 +301,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                             className={clsx(
                                 "p-1.5 rounded-2xl transition-all flex items-center justify-center border border-transparent h-8 w-8",
                                 isGridView
-                                    ? "bg-primary/10 text-primary border-none"
+                                    ? "bg-primary/10 text-primary dark:text-primary/80 border-none"
                                     : "text-on-surface/80 hover:text-on-surface/80 hover:bg-surface-variant/30"
                             )}
                             title={isGridView ? t('toolbox.actions.switch_to_tabs') : t('toolbox.actions.switch_to_grid')}

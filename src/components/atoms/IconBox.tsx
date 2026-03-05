@@ -24,7 +24,7 @@ export const IconBox = ({ icon: Icon, size = 'md', variant = 'primary', classNam
     };
 
     const variants = {
-        primary: 'bg-primary/10 text-primary',
+        primary: 'bg-primary/10 text-primary dark:text-primary/80',
         success: 'bg-success/10 text-success',
         warning: 'bg-warning/10 text-warning',
         error: 'bg-error/10 text-error',

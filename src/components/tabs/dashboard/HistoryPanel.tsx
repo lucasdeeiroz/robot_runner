@@ -85,7 +85,7 @@ export function HistoryPanel() {
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => handleDownload(item)}
-                                    className="h-6 w-6 p-0 text-primary"
+                                    className="h-6 w-6 p-0 text-primary dark:text-primary/80"
                                     title={t('common.download')}
                                 >
                                     <Download size={14} />
