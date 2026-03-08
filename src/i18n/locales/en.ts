@@ -750,6 +750,11 @@ export const en = {
                 screenshots: "Screenshots Directory",
                 recordings: "Recordings Directory",
                 automationRoot: "Automation Root (Working Dir)"
+            },
+            tool_options: {
+                title: "Tool Options",
+                allow_actions_during_test: "Allow actions during test",
+                allow_actions_during_test_desc: "Enable Logcat, Performance Monitoring, and other tools even while a test is running"
             }
         },
         sidebar: {

@@ -283,7 +283,7 @@ export function TestsPage() {
                                         onClick={(e: React.MouseEvent) => e.stopPropagation()}
                                     >
                                         <div className="text-xs font-bold uppercase tracking-wider text-on-surface-variant/60 px-1">
-                                            {t('settings.tool_options', 'Tool Options')}
+                                            {t('settings.tool_options.title', 'Tool Options')}
                                         </div>
 
                                         <StaggerItem className="flex items-center justify-between gap-4">
@@ -304,10 +304,10 @@ export function TestsPage() {
                                         <StaggerItem className="flex items-center justify-between gap-4">
                                             <div className="flex-1 min-w-0">
                                                 <div className="text-sm font-medium text-on-surface/80">
-                                                    {t('settings.allow_actions_during_test', 'Allow Actions During Test')}
+                                                    {t('settings.tool_options.allow_actions_during_test')}
                                                 </div>
                                                 <div className="text-[10px] text-on-surface-variant/60 leading-tight mt-0.5">
-                                                    {t('settings.allow_actions_during_test_desc', 'Enable Inspector, Mapper and other tools even while a test is running')}
+                                                    {t('settings.tool_options.allow_actions_during_test_desc')}
                                                 </div>
                                             </div>
                                             <Switch

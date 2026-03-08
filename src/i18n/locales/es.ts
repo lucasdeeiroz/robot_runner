@@ -756,6 +756,11 @@ export const es = {
                 screenshots: "Directorio de Capturas de Pantalla",
                 recordings: "Directorio de Grabaciones",
                 automationRoot: "Raíz de Automatización (Working Dir)"
+            },
+            tool_options: {
+                title: "Opciones de Herramientas",
+                allow_actions_during_test: "Permitir acciones durante la prueba",
+                allow_actions_during_test_desc: "Habilita Logcat, Monitor de Performance y otras herramientas incluso mientras se ejecuta una prueba"
             }
         },
         sidebar: {
