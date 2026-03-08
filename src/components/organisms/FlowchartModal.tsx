@@ -9,8 +9,10 @@ import { feedback } from '@/lib/feedback';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
 import { toPng } from 'html-to-image';
-import { Button } from '../atoms/Button';
-import { Select } from '../atoms/Select';
+import { Button } from '@/components/atoms/Button';
+import { Select } from '@/components/atoms/Select';
+import { GroupedScreenSelect } from '@/components/molecules/GroupedScreenSelect';
+import { GroupedElementSelect } from '@/components/molecules/GroupedElementSelect';
 
 interface FlowchartModalProps {
     isOpen: boolean;
@@ -1550,28 +1552,28 @@ function QuickConnectDialog({ maps, sourceNodeId, onClose, onConfirm }: {
 
                 <div className="space-y-4">
                     <div className="space-y-1">
-                        <label className="text-xs font-medium text-on-surface-variant uppercase">{t('mapper.flowchart.source_element', 'Source Element')}</label>
-                        <Select
-                            className="w-full p-2 rounded-lg bg-surface-variant/10 border border-outline-variant/30 text-sm focus:border-primary outline-none text-on-surface"
+                        <GroupedElementSelect
+                            label={t('mapper.flowchart.source_element', 'Source Element')}
                             value={selectedElement}
-                            onChange={e => setSelectedElement(e.target.value)}
-                            options={availableElements.map(el => ({ value: el.name, label: el.name }))}
-                        >
-                        </Select>
+                            onChange={setSelectedElement}
+                            elements={availableElements.map(el => ({
+                                ...el,
+                                // Map to expected shape if needed, but it already uses UIElementMap type
+                            }))}
+                            disabled={availableElements.length === 0}
+                        />
                         {availableElements.length === 0 && (
                             <p className="text-xs text-error">{t('mapper.flowchart.no_elements', 'No unmapped elements available.')}</p>
                         )}
                     </div>
 
                     <div className="space-y-1">
-                        <label className="text-xs font-medium text-on-surface-variant uppercase">{t('mapper.flowchart.target_screen', 'Target Screen')}</label>
-                        <Select
-                            className="w-full p-2 rounded-lg bg-surface-variant/10 border border-outline-variant/30 text-sm focus:border-primary outline-none text-on-surface"
+                        <GroupedScreenSelect
+                            label={t('mapper.flowchart.target_screen', 'Target Screen')}
                             value={selectedTarget}
-                            onChange={e => setSelectedTarget(e.target.value)}
-                            options={availableTargets.map(name => ({ value: name, label: name }))}
-                        >
-                        </Select>
+                            onChange={setSelectedTarget}
+                            maps={availableTargets.map(name => maps.find(m => m.name === name)!)}
+                        />
                     </div>
 
                     <div className="flex justify-end gap-2 mt-6">

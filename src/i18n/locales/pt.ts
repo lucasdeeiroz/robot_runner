@@ -135,6 +135,7 @@ export const pt = {
             ok: "OK",
             search: "Buscar...",
             loading: "Carregando...",
+            select: "Selecione...",
             minimize: "Minimizar",
             maximize: "Maximizar",
             close: "Fechar",
@@ -430,6 +431,13 @@ export const pt = {
             title: "Mapeador",
             empty: "Selecione um dispositivo para iniciar o mapeamento",
             refresh: "Atualizar Fonte",
+            grouping: {
+                all_screens: "Todas as telas",
+                by_tags: "Por tags",
+                all_elements: "Todos os elementos",
+                by_type: "Por tipo de elemento",
+                no_tags: "Sem tags"
+            },
             flowchart: {
                 open: "Abrir Fluxograma",
                 export: "Exportar Fluxo",
