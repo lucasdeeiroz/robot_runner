@@ -26,6 +26,20 @@ import { Button } from '@/components/atoms/Button';
 import { SegmentedControl } from '@/components/molecules/SegmentedControl';
 import { GroupedScreenSelect } from '@/components/molecules/GroupedScreenSelect';
 
+function groupElementsByType<T extends { type: string }>(
+    elements: T[],
+    translate: (key: string) => string
+): Record<string, T[]> {
+    return elements.reduce((acc, el) => {
+        const typeName = translate(`mapper.types.${el.type}`);
+        if (!acc[typeName]) {
+            acc[typeName] = [];
+        }
+        acc[typeName].push(el);
+        return acc;
+    }, {} as Record<string, T[]>);
+}
+
 interface MapperSubTabProps {
     isActive: boolean;
     selectedDeviceId: string | null;
@@ -938,13 +952,8 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                     ) : (
                                                         // Group by Type
                                                         (() => {
-                                                            const grouped = mappedElements.reduce((acc, el) => {
-                                                                const typeName = t(`mapper.types.${el.type}`);
-                                                                if (!acc[typeName]) acc[typeName] = [];
-                                                                acc[typeName].push(el);
-                                                                return acc;
-                                                            }, {} as Record<string, typeof mappedElements>);
-                                                            
+                                                            const grouped = groupElementsByType(mappedElements, (key) => t(key));
+
                                                             return Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([type, elements]) => {
                                                                 const isExpanded = expandedElementTypes.includes(type);
                                                                 return (
