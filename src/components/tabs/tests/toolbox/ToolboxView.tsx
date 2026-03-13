@@ -301,7 +301,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                             className={clsx(
                                 "p-1.5 rounded-2xl transition-all flex items-center justify-center border border-transparent h-8 w-8",
                                 isGridView
-                                    ? "bg-primary/10 text-primary border-none"
+                                    ? "bg-primary/10 text-primary dark:text-primary/80 border-none"
                                     : "text-on-surface/80 hover:text-on-surface/80 hover:bg-surface-variant/30"
                             )}
                             title={isGridView ? t('toolbox.actions.switch_to_tabs') : t('toolbox.actions.switch_to_grid')}
@@ -378,12 +378,9 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                                                 icon: <RefreshCcw size={16} />
                                             }}
                                             secondaryActions={[
-                                                {
+                                                ...(session.status === 'finished' && session.exitCode && !session.exitCode.toLowerCase().includes("exit code: 0") && session.logs.some(l => l.includes("Output:  ") && l.endsWith(".xml")) ? [{
                                                     label: t('connect.actions.rerun_failed'),
                                                     icon: <RefreshCcw size={14} className="text-error" />,
-                                                    // Check if finished with error (exit code != 0) AND we can find Output xml in logs
-                                                    disabled: !(session.status === 'finished' && session.exitCode && !session.exitCode.includes("Exit Code: 0")) ||
-                                                        !session.logs.some(l => l.includes("Output:  ") && l.endsWith(".xml")),
                                                     onClick: () => {
                                                         // Find XML path
                                                         const outputLine = session.logs.find(l => l.includes("Output:  ") && l.endsWith(".xml"));
@@ -395,7 +392,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                                                             }
                                                         }
                                                     }
-                                                }
+                                                }] : [])
                                             ]}
                                         />
                                     </div>

@@ -135,6 +135,7 @@ export const en = {
             ok: "OK",
             search: "Search...",
             loading: "Loading...",
+            select: "Select...",
             minimize: "Minimize",
             maximize: "Maximize",
             close: "Close",
@@ -430,6 +431,13 @@ export const en = {
             title: "Mapper",
             empty: "Select a device to start mapping",
             refresh: "Refresh Source",
+            grouping: {
+                all_screens: "All Screens",
+                by_tags: "By Tags",
+                all_elements: "All Elements",
+                by_type: "By Type",
+                no_tags: "No Tags"
+            },
             flowchart: {
                 open: "Open Flowchart",
                 export: "Export Flow",
@@ -750,6 +758,11 @@ export const en = {
                 screenshots: "Screenshots Directory",
                 recordings: "Recordings Directory",
                 automationRoot: "Automation Root (Working Dir)"
+            },
+            tool_options: {
+                title: "Tool Options",
+                allow_actions_during_test: "Allow actions during test",
+                allow_actions_during_test_desc: "Enable Logcat, Performance Monitoring, and other tools even while a test is running"
             }
         },
         sidebar: {

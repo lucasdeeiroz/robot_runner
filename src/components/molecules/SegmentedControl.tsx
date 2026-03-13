@@ -40,7 +40,7 @@ export function SegmentedControl<T extends string | number>({
                             className={twMerge(
                                 "flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-2xl text-sm font-medium transition-all duration-200",
                                 isSelected
-                                    ? "bg-on-primary text-primary shadow-sm"
+                                    ? "bg-on-primary text-primary dark:text-primary/80 shadow-sm"
                                     : "text-on-surface-variant/80 hover:text-on-surface/80 hover:bg-outline-variant/50"
                             )}
                             title={option.label}

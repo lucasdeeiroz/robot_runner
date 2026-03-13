@@ -116,6 +116,28 @@ pub fn run_robot_test(
 
     let mut args = vec!["-d", &abs_output_dir, "--console", "verbose"];
 
+    // Inject LiveConsoleListener to force real-time stdout updates for test names
+    let listener_path = std::path::Path::new(&abs_output_dir).join("LiveConsoleListener.py");
+    let listener_code = r#"
+import sys
+
+ROBOT_LISTENER_API_VERSION = 2
+
+def start_test(name, attrs):
+    sys.stdout.write(f"\n[RobotRunner-Test-Start] {name}\n")
+    sys.stdout.flush()
+"#;
+    // Ensure dir exists before writing and fail clearly if we cannot set up the listener
+    std::fs::create_dir_all(&abs_output_dir)
+        .map_err(|e| format!("Failed to create output directory '{}': {}", abs_output_dir, e))?;
+    std::fs::write(&listener_path, listener_code)
+        .map_err(|e| format!("Failed to write listener file '{}': {}", listener_path.display(), e))?;
+
+    args.push("--listener");
+    let listener_str = listener_path
+        .to_str()
+        .ok_or_else(|| format!("Listener path '{}' is not valid UTF-8", listener_path.display()))?;
+    args.push(listener_str);
 
     // Rerunning logic: Must appear before any Datasource (which might come from -A)
     if let Some(xml_path) = &rerun_failed_from {
@@ -209,8 +231,7 @@ pub fn run_robot_test(
         meta_version.replace("\\", "\\\\").replace("\"", "\\\"")
     );
 
-    // Create dir if not exists
-    let _ = std::fs::create_dir_all(&abs_output_dir);
+    // Create dir if not exists (already created above for listener, but safe to repeat or omit)
     let _ = std::fs::write(metadata_path, metadata_json);
 
     let mut cmd = Command::new("python");

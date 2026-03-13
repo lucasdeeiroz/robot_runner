@@ -79,7 +79,7 @@ export function SystemCheckOverlay({ status, onCriticalExit, onTestingRedirect, 
                                     href={TOOL_LINKS.adb}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-xs text-primary hover:underline flex items-center gap-1 font-medium"
+                                    className="text-xs text-primary dark:text-primary/80 hover:underline flex items-center gap-1 font-medium"
                                 >
                                     Download ADB Platform Tools
                                 </a>
@@ -148,7 +148,7 @@ export function SystemCheckOverlay({ status, onCriticalExit, onTestingRedirect, 
             >
                 <div className="space-y-6">
                     <div className="flex flex-col items-center text-center space-y-2">
-                        <div className="p-3 bg-info-container rounded-2xl text-primary">
+                        <div className="p-3 bg-info-container rounded-2xl text-primary dark:text-primary/80">
                             <MonitorX size={32} />
                         </div>
                         <p className="text-sm text-on-surface-variant/80">{t('startup.mirroring.description')}</p>

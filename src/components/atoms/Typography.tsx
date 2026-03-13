@@ -26,7 +26,7 @@ export const Heading = ({
 
     const variants = {
         default: 'text-on-surface-variant/80',
-        primary: 'text-primary',
+        primary: 'text-primary dark:text-primary/80',
         muted: 'text-on-surface-variant/80/70',
         gradient: 'bg-gradient-to-r from-primary to-indigo-600 bg-clip-text text-transparent',
     };
@@ -74,7 +74,7 @@ export const Text = ({
 
     const variants = {
         default: 'text-on-surface-variant/80',
-        primary: 'text-primary',
+        primary: 'text-primary dark:text-primary/80',
         muted: 'text-on-surface-variant/80/70',
         success: 'text-success',
         error: 'text-error',

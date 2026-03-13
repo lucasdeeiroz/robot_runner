@@ -328,7 +328,7 @@ export function HistorySubTab() {
                         className={clsx(
                             "px-3 py-1.5 rounded-2xl flex items-center gap-2 text-sm font-medium transition-colors h-auto",
                             showCharts
-                                ? "bg-primary/10 text-primary"
+                                ? "bg-primary/10 text-primary dark:text-primary/80"
                                 : "bg-surface-variant/30 text-on-surface-variant/80 hover:bg-outline-variant"
                         )}
                         title={showCharts ? t('tests_page.charts.hide') : t('tests_page.charts.show')}

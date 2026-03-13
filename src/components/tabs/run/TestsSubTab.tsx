@@ -576,7 +576,7 @@ function TestSelectorModal({ isOpen, onClose, tests, selected, onToggle, onSelec
                                         className={clsx(
                                             "flex items-center gap-3 px-3 py-2.5 rounded-2xl cursor-pointer transition-all select-none",
                                             isChecked
-                                                ? "bg-primary/10 text-primary ring-1 ring-primary/20"
+                                                ? "bg-primary/10 text-primary dark:text-primary/80 ring-1 ring-primary/20"
                                                 : "hover:bg-surface-variant/30 text-on-surface-variant"
                                         )}
                                     >
@@ -598,7 +598,7 @@ function TestSelectorModal({ isOpen, onClose, tests, selected, onToggle, onSelec
                     <div className="flex items-center gap-2">
                         <button
                             onClick={onSelectAll}
-                            className="text-[11px] font-bold text-primary hover:underline"
+                            className="text-[11px] font-bold text-primary dark:text-primary/80 hover:underline"
                         >
                             {t('tests.selector.all')}
                         </button>

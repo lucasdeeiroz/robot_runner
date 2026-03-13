@@ -135,6 +135,7 @@ export const pt = {
             ok: "OK",
             search: "Buscar...",
             loading: "Carregando...",
+            select: "Selecione...",
             minimize: "Minimizar",
             maximize: "Maximizar",
             close: "Fechar",
@@ -430,6 +431,13 @@ export const pt = {
             title: "Mapeador",
             empty: "Selecione um dispositivo para iniciar o mapeamento",
             refresh: "Atualizar Fonte",
+            grouping: {
+                all_screens: "Todas as telas",
+                by_tags: "Por tags",
+                all_elements: "Todos os elementos",
+                by_type: "Por tipo de elemento",
+                no_tags: "Sem tags"
+            },
             flowchart: {
                 open: "Abrir Fluxograma",
                 export: "Exportar Fluxo",
@@ -750,6 +758,11 @@ export const pt = {
                 screenshots: "Diretório de Capturas de Tela",
                 recordings: "Diretório de Gravações",
                 automationRoot: "Raiz da Automação (Working Dir)"
+            },
+            tool_options: {
+                title: "Opções de Ferramentas",
+                allow_actions_during_test: "Permitir ações durante a execução do teste",
+                allow_actions_during_test_desc: "Habilita Logcat, Monitor de Performance e outras ferramentas mesmo enquanto um teste está sendo executado"
             }
         },
         sidebar: {

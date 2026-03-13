@@ -9,8 +9,10 @@ import { feedback } from '@/lib/feedback';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
 import { toPng } from 'html-to-image';
-import { Button } from '../atoms/Button';
-import { Select } from '../atoms/Select';
+import { Button } from '@/components/atoms/Button';
+import { Select } from '@/components/atoms/Select';
+import { GroupedScreenSelect } from '@/components/molecules/GroupedScreenSelect';
+import { GroupedElementSelect } from '@/components/molecules/GroupedElementSelect';
 
 interface FlowchartModalProps {
     isOpen: boolean;
@@ -1115,7 +1117,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                             >
                                 <div className={clsx(
                                     "text-on-surface text-[10px] px-2 py-0.5 rounded-full text-center truncate border shadow-sm pointer-events-auto select-none transition-colors cursor-move",
-                                    hoveredEdge === edgeId ? "bg-surface border-primary text-primary ring-1 ring-primary" : "bg-surface/90 border-outline-variant/50 hover:border-primary hover:text-primary"
+                                    hoveredEdge === edgeId ? "bg-surface border-primary text-primary dark:text-primary/80 ring-1 ring-primary" : "bg-surface/90 border-outline-variant/50 hover:border-primary hover:text-primary"
                                 )}
                                     onMouseDown={(e) => {
                                         if (isSpacePressed || e.button === 1) return;
@@ -1173,26 +1175,26 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                     <div className="flex items-center gap-2">
                         <Button
                             onClick={handleImport}
-                            className="p-2 hover:bg-primary/10 text-primary rounded-full"
+                            className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full"
                             title={t('mapper.flowchart.import', 'Import Flow')}>
                             <Download size={16} />
                         </Button>
                         <Button
                             onClick={handleExport}
-                            className="p-2 hover:bg-primary/10 text-primary rounded-full"
+                            className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full"
                             title={t('mapper.flowchart.export', 'Export Flow')}>
                             <Upload size={16} />
                         </Button>
                         <Button
                             onClick={saveLayout}
-                            className="p-2 hover:bg-primary/10 text-primary rounded-full"
+                            className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full"
                             title={t('common.save')}>
                             <Save size={16} />
                         </Button>
                         <div className="h-4 w-px bg-outline-variant/30 mx-2" />
                         <Button
                             onClick={handleExportImage}
-                            className="p-2 hover:bg-primary/10 text-primary rounded-full transition-colors"
+                            className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full transition-colors"
                             title={t('mapper.flowchart.export_image', 'Export Image')}>
                             <Camera size={16} />
                         </Button>
@@ -1200,7 +1202,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                         <div className="flex items-center gap-2 px-2 py-1 bg-surface-variant/10 rounded-lg border border-outline-variant/20 ml-2">
                             <span className="text-[10px] uppercase font-bold text-on-surface-variant/70 whitespace-nowrap">{t('mapper.flowchart.filter_by_tag', 'Filter')}</span>
                             <Select
-                                className="bg-transparent border-none text-xs font-semibold text-primary outline-none cursor-pointer py-0 h-6 min-w-[100px]"
+                                className="bg-transparent border-none text-xs font-semibold text-primary dark:text-primary/80 outline-none cursor-pointer py-0 h-6 min-w-[100px]"
                                 value={filterTag || ""}
                                 onChange={(e) => setFilterTag(e.target.value || null)}
                                 options={[
@@ -1211,7 +1213,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                         </div>
                         <Button
                             onClick={centerView}
-                            className="p-2 hover:bg-primary/10 text-primary rounded-full"
+                            className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full"
                             title={t('mapper.flowchart.center_view', 'Center View')}>
                             <Maximize size={16} />
                         </Button>
@@ -1550,28 +1552,30 @@ function QuickConnectDialog({ maps, sourceNodeId, onClose, onConfirm }: {
 
                 <div className="space-y-4">
                     <div className="space-y-1">
-                        <label className="text-xs font-medium text-on-surface-variant uppercase">{t('mapper.flowchart.source_element', 'Source Element')}</label>
-                        <Select
-                            className="w-full p-2 rounded-lg bg-surface-variant/10 border border-outline-variant/30 text-sm focus:border-primary outline-none text-on-surface"
+                        <GroupedElementSelect
+                            label={t('mapper.flowchart.source_element', 'Source Element')}
                             value={selectedElement}
-                            onChange={e => setSelectedElement(e.target.value)}
-                            options={availableElements.map(el => ({ value: el.name, label: el.name }))}
-                        >
-                        </Select>
+                            onChange={setSelectedElement}
+                            elements={availableElements.map(el => ({
+                                ...el,
+                                // Map to expected shape if needed, but it already uses UIElementMap type
+                            }))}
+                            disabled={availableElements.length === 0}
+                        />
                         {availableElements.length === 0 && (
                             <p className="text-xs text-error">{t('mapper.flowchart.no_elements', 'No unmapped elements available.')}</p>
                         )}
                     </div>
 
                     <div className="space-y-1">
-                        <label className="text-xs font-medium text-on-surface-variant uppercase">{t('mapper.flowchart.target_screen', 'Target Screen')}</label>
-                        <Select
-                            className="w-full p-2 rounded-lg bg-surface-variant/10 border border-outline-variant/30 text-sm focus:border-primary outline-none text-on-surface"
+                        <GroupedScreenSelect
+                            label={t('mapper.flowchart.target_screen', 'Target Screen')}
                             value={selectedTarget}
-                            onChange={e => setSelectedTarget(e.target.value)}
-                            options={availableTargets.map(name => ({ value: name, label: name }))}
-                        >
-                        </Select>
+                            onChange={setSelectedTarget}
+                            maps={availableTargets
+                                .map(name => maps.find(m => m.name === name))
+                                .filter((m): m is ScreenMap => m !== undefined)}
+                        />
                     </div>
 
                     <div className="flex justify-end gap-2 mt-6">

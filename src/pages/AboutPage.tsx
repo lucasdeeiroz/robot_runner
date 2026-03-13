@@ -63,7 +63,7 @@ export function AboutPage() {
                     <h2 className="text-2xl font-bold text-on-surface/80 mb-2">
                         Robot Runner
                     </h2>
-                    <div className="inline-flex items-center gap-2 pl-3 pr-1.5 py-1 rounded-2xl bg-primary/10 border border-primary/20 text-primary text-sm font-medium">
+                    <div className="inline-flex items-center gap-2 pl-3 pr-1.5 py-1 rounded-2xl bg-primary/10 border border-primary/20 text-primary dark:text-primary/80 text-sm font-medium">
                         <span>v{appVersion}</span>
                         <div className="w-px h-3 bg-primary/20 mx-0.5" />
                         <Button
@@ -72,7 +72,7 @@ export function AboutPage() {
                             onClick={handleCheckUpdate}
                             disabled={isChecking}
                             title={isChecking ? t('about.checking') : t('about.update_check')}
-                            className="p-1 h-auto rounded-2xl hover:bg-primary/10 text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="p-1 h-auto rounded-2xl hover:bg-primary/10 text-primary dark:text-primary/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {isChecking ? (
                                 <ExpressiveLoading size="xsm" variant="circular" />

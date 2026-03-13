@@ -135,6 +135,7 @@ export const es = {
             ok: "Aceptar",
             search: "Buscar...",
             loading: "Cargando...",
+            select: "Seleccione...",
             minimize: "Minimizar",
             maximize: "Maximizar",
             close: "Cerrar",
@@ -436,6 +437,13 @@ export const es = {
             title: "Mapeador",
             empty: "Seleccione un dispositivo para iniciar el mapeo",
             refresh: "Actualizar Fuente",
+            grouping: {
+                all_screens: "Todas las pantallas",
+                by_tags: "Por etiquetas",
+                all_elements: "Todos los elementos",
+                by_type: "Por tipo de elemento",
+                no_tags: "Sin etiquetas"
+            },
             flowchart: {
                 open: "Abrir Diagrama de Flujo",
                 export: "Exportar Flujo",
@@ -756,6 +764,11 @@ export const es = {
                 screenshots: "Directorio de Capturas de Pantalla",
                 recordings: "Directorio de Grabaciones",
                 automationRoot: "Raíz de Automatización (Working Dir)"
+            },
+            tool_options: {
+                title: "Opciones de Herramientas",
+                allow_actions_during_test: "Permitir acciones durante la prueba",
+                allow_actions_during_test_desc: "Habilita Logcat, Monitor de Performance y otras herramientas incluso mientras se ejecuta una prueba"
             }
         },
         sidebar: {

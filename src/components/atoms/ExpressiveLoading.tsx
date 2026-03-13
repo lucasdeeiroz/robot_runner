@@ -34,7 +34,7 @@ export const ExpressiveLoading = ({ size = "md", className, variant = "linear" }
         d += " Z";
 
         return (
-            <div className={`flex items-center justify-center ${sizePx[size]} ${className || ''} text-primary`}>
+            <div className={`flex items-center justify-center ${sizePx[size]} ${className || ''} text-primary dark:text-primary/80`}>
                 <motion.svg
                     viewBox="0 0 48 48"
                     className="w-full h-full overflow-visible"
@@ -99,7 +99,7 @@ export const ExpressiveLoading = ({ size = "md", className, variant = "linear" }
     };
 
     return (
-        <div className={`flex items-center justify-center ${heightMap[size]} ${className || ''} text-primary`}>
+        <div className={`flex items-center justify-center ${heightMap[size]} ${className || ''} text-primary dark:text-primary/80`}>
             <svg
                 viewBox="0 0 100 20"
                 className="w-full h-full overflow-visible"
