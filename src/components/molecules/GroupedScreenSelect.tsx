@@ -3,6 +3,7 @@ import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronRight, X, ChevronsUpDown } from 'lucide-react';
 import { ScreenMap } from '@/lib/types';
+import { groupScreensByTags } from '@/lib/utils';
 import { SegmentedControl } from '@/components/molecules/SegmentedControl';
 import { Button, Input } from '@headlessui/react';
 
@@ -148,21 +149,9 @@ export function GroupedScreenSelect({
                         ) : (
                             // Group by Tags
                             (() => {
-                                const grouped = maps.reduce((acc, map) => {
-                                    const tags = map.tags && map.tags.length > 0 ? map.tags : [t('mapper.grouping.no_tags', 'No Tags')];
-                                    tags.forEach(tag => {
-                                        if (!acc[tag]) acc[tag] = [];
-                                        acc[tag].push(map);
-                                    });
-                                    return acc;
-                                }, {} as Record<string, typeof maps>);
+                                const groupedEntries = groupScreensByTags(maps, t('mapper.grouping.no_tags', 'No Tags'));
 
-                                return Object.entries(grouped).sort(([a], [b]) => {
-                                    const noTags = t('mapper.grouping.no_tags', 'No Tags');
-                                    if (a === noTags) return 1;
-                                    if (b === noTags) return -1;
-                                    return a.localeCompare(b);
-                                }).map(([tag, groupMaps]) => {
+                                return groupedEntries.map(([tag, groupMaps]) => {
                                     const isExpanded = expandedTags.includes(tag);
                                     return (
                                         <div key={tag} className="border-b border-outline-variant/5 last:border-0">

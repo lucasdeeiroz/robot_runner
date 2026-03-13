@@ -25,6 +25,7 @@ import { FlowchartModal } from '@/components/organisms/FlowchartModal';
 import { Button } from '@/components/atoms/Button';
 import { SegmentedControl } from '@/components/molecules/SegmentedControl';
 import { GroupedScreenSelect } from '@/components/molecules/GroupedScreenSelect';
+import { groupScreensByTags } from '@/lib/utils';
 
 function groupElementsByType<T extends { type: string }>(
     elements: T[],
@@ -799,21 +800,9 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                     ) : (
                                                         // Group by Tags
                                                         (() => {
-                                                            const grouped = savedMaps.reduce((acc, map) => {
-                                                                const tags = map.tags && map.tags.length > 0 ? map.tags : [t('mapper.grouping.no_tags', 'No Tags')];
-                                                                tags.forEach(tag => {
-                                                                    if (!acc[tag]) acc[tag] = [];
-                                                                    acc[tag].push(map);
-                                                                });
-                                                                return acc;
-                                                            }, {} as Record<string, typeof savedMaps>);
+                                                            const groupedEntries = groupScreensByTags(savedMaps, t('mapper.grouping.no_tags', 'No Tags'));
                                                             
-                                                            return Object.entries(grouped).sort(([a], [b]) => {
-                                                                const noTags = t('mapper.grouping.no_tags', 'No Tags');
-                                                                if (a === noTags) return 1;
-                                                                if (b === noTags) return -1;
-                                                                return a.localeCompare(b);
-                                                            }).map(([tag, maps]) => {
+                                                            return groupedEntries.map(([tag, maps]) => {
                                                                 const isExpanded = expandedScreenTags.includes(tag);
                                                                 return (
                                                                     <div key={tag} className="border-b border-outline-variant/5 last:border-0">
