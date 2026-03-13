@@ -378,12 +378,9 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                                                 icon: <RefreshCcw size={16} />
                                             }}
                                             secondaryActions={[
-                                                {
+                                                ...(session.status === 'finished' && session.exitCode && !session.exitCode.toLowerCase().includes("exit code: 0") && session.logs.some(l => l.includes("Output:  ") && l.endsWith(".xml")) ? [{
                                                     label: t('connect.actions.rerun_failed'),
                                                     icon: <RefreshCcw size={14} className="text-error" />,
-                                                    // Check if finished with error (exit code != 0) AND we can find Output xml in logs
-                                                    disabled: !(session.status === 'finished' && session.exitCode && !session.exitCode.includes("Exit Code: 0")) ||
-                                                        !session.logs.some(l => l.includes("Output:  ") && l.endsWith(".xml")),
                                                     onClick: () => {
                                                         // Find XML path
                                                         const outputLine = session.logs.find(l => l.includes("Output:  ") && l.endsWith(".xml"));
@@ -395,7 +392,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                                                             }
                                                         }
                                                     }
-                                                }
+                                                }] : [])
                                             ]}
                                         />
                                     </div>
