@@ -169,7 +169,7 @@ export function GroupedScreenSelect({
                                                 className="flex items-center justify-between p-2 hover:bg-surface-variant/10 cursor-pointer text-xs font-semibold text-on-surface-variant/80 bg-surface-variant/5"
                                                 onClick={() => {
                                                     setExpandedTags(prev =>
-                                                        prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+                                                        prev.includes(tag) ? prev.filter(prevTag => prevTag !== tag) : [...prev, tag]
                                                     );
                                                 }}
                                             >
