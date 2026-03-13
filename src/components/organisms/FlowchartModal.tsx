@@ -1572,7 +1572,9 @@ function QuickConnectDialog({ maps, sourceNodeId, onClose, onConfirm }: {
                             label={t('mapper.flowchart.target_screen', 'Target Screen')}
                             value={selectedTarget}
                             onChange={setSelectedTarget}
-                            maps={availableTargets.map(name => maps.find(m => m.name === name)!)}
+                            maps={availableTargets
+                                .map(name => maps.find(m => m.name === name))
+                                .filter((m): m is ScreenMap => m !== undefined)}
                         />
                     </div>
 
