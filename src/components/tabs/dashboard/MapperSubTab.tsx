@@ -806,8 +806,8 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                                         <div 
                                                                             className="flex items-center justify-between p-2 hover:bg-surface-variant/10 cursor-pointer text-xs font-semibold text-on-surface-variant/80 bg-surface-variant/5"
                                                                             onClick={() => {
-                                                                                setExpandedScreenTags(prev => 
-                                                                                    prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+                                                                                setExpandedScreenTags(prev =>
+                                                                                    prev.includes(tag) ? prev.filter(item => item !== tag) : [...prev, tag]
                                                                                 );
                                                                             }}
                                                                         >
