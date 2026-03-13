@@ -127,12 +127,17 @@ def start_test(name, attrs):
     sys.stdout.write(f"\n[RobotRunner-Test-Start] {name}\n")
     sys.stdout.flush()
 "#;
-    // Ensure dir exists before writing
-    let _ = std::fs::create_dir_all(&abs_output_dir);
-    let _ = std::fs::write(&listener_path, listener_code);
+    // Ensure dir exists before writing and fail clearly if we cannot set up the listener
+    std::fs::create_dir_all(&abs_output_dir)
+        .map_err(|e| format!("Failed to create output directory '{}': {}", abs_output_dir, e))?;
+    std::fs::write(&listener_path, listener_code)
+        .map_err(|e| format!("Failed to write listener file '{}': {}", listener_path.display(), e))?;
 
     args.push("--listener");
-    args.push(listener_path.to_str().unwrap());
+    let listener_str = listener_path
+        .to_str()
+        .ok_or_else(|| format!("Listener path '{}' is not valid UTF-8", listener_path.display()))?;
+    args.push(listener_str);
 
     // Rerunning logic: Must appear before any Datasource (which might come from -A)
     if let Some(xml_path) = &rerun_failed_from {
