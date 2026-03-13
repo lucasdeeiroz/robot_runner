@@ -953,7 +953,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                                             className="flex items-center justify-between p-2 hover:bg-surface-variant/10 cursor-pointer text-xs font-semibold text-on-surface-variant/80 bg-surface-variant/5"
                                                                             onClick={() => {
                                                                                 setExpandedElementTypes(prev => 
-                                                                                    prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
+                                                                                    prev.includes(type) ? prev.filter(item => item !== type) : [...prev, type]
                                                                                 );
                                                                             }}
                                                                         >
