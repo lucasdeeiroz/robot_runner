@@ -138,6 +138,7 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
         const IS_MAESTRO_TEST_END = (l: string) => /^\[(Passed|Failed)\]\s+.*\(\d+s\)/.test(l.trim());
         const IS_MAVEN_TEST_START = (l: string) => l.startsWith("[INFO] Running ");
         const IS_MAVEN_TEST_END = (l: string) => l.includes("Tests run: ") && l.includes("Failures: ");
+        const IS_ROBOT_RUNNER_TEST_START = (l: string) => l.startsWith("[RobotRunner-Test-Start]");
 
         if (currentCount > processedCount) {
             const newLogs = logs.slice(processedCount);
@@ -400,28 +401,25 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
                         }
                     } else {
                         if (currentTest) {
-                            currentTest.logs.push(line);
+                            // Suppress the test name lines and markers from inside the test's own log section
+                            // to avoid duplicating the name inside the collapsible UI section
+                            const isMarker = IS_ROBOT_RUNNER_TEST_START(line);
+                            const nameOnly = line.trim().split(' :: ')[0].trim();
+                            const isTestNameLine = nameOnly === currentTest.name || line.match(/^(.*?)\s*\|\s+(PASS|FAIL)\s+\|\s*$/)?.[1].trim() === currentTest.name;
+
+                            if (!isMarker && !isTestNameLine) {
+                                currentTest.logs.push(line);
+                            }
                         } else {
-                            // Heuristic: New Test Start
-                            // If we are in a Maestro suite, we ONLY start tests via IS_MAESTRO_TEST_START (handled above)
-                            const isMaestroSuite = activeSuite()?.name.includes('Maestro');
-
-                            if (line.trim().length > 0 && !isMaestroSuite) {
-                                let name = line.trim();
-                                if (name.includes(' :: ')) name = name.split(' :: ')[0].trim();
-
-                                // Check if name line includes status (e.g. "Test Name | PASS |")
-                                const statusMatch = name.match(/^(.*?)\s*\|\s+(PASS|FAIL)\s+\|\s*$/);
-                                if (statusMatch) {
-                                    name = statusMatch[1].trim();
-                                }
-
+                            // Intercept forced Real-Time Test Start (via Python Listener)
+                            if (IS_ROBOT_RUNNER_TEST_START(line)) {
+                                const name = line.replace("[RobotRunner-Test-Start]", "").trim();
                                 const newTest: TestNode = {
                                     type: 'test',
                                     name: name,
                                     status: 'RUNNING',
-                                    logs: [line],
-                                    id: `test-${nodeId}`
+                                    logs: [], // Exclude marker itself from user logs
+                                    id: `test-started-${nodeId}`
                                 };
 
                                 if (activeSuite()) {
@@ -431,7 +429,37 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
                                 }
                                 currentTest = newTest;
                             } else {
-                                addToCurrentContext({ type: 'text', content: line, id: nodeId });
+                                // Fallback Heuristic: New Test Start
+                                // If we are in a Maestro suite, we ONLY start tests via IS_MAESTRO_TEST_START (handled above)
+                                const isMaestroSuite = activeSuite()?.name.includes('Maestro');
+
+                                if (line.trim().length > 0 && !isMaestroSuite && !line.includes('[RobotRunner-Test-Start]')) {
+                                    let name = line.trim();
+                                    if (name.includes(' :: ')) name = name.split(' :: ')[0].trim();
+
+                                    // Check if name line includes status (e.g. "Test Name | PASS |")
+                                    const statusMatch = name.match(/^(.*?)\s*\|\s+(PASS|FAIL)\s+\|\s*$/);
+                                    if (statusMatch) {
+                                        name = statusMatch[1].trim();
+                                    }
+
+                                    const newTest: TestNode = {
+                                        type: 'test',
+                                        name: name,
+                                        status: 'RUNNING',
+                                        logs: [line],
+                                        id: `test-${nodeId}`
+                                    };
+
+                                    if (activeSuite()) {
+                                        activeSuite()!.children.push(newTest);
+                                    } else {
+                                        root.push(newTest);
+                                    }
+                                    currentTest = newTest;
+                                } else {
+                                    addToCurrentContext({ type: 'text', content: line, id: nodeId });
+                                }
                             }
                         }
                     }
@@ -471,7 +499,7 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
 
             const borderColor = isRunning ? 'border-primary/50' : (isFailed ? 'border-error' : 'border-success');
             const bgColor = isRunning ? 'bg-primary/5' : (isFailed ? 'bg-error/10' : 'bg-success/10');
-            const textColor = isRunning ? 'text-info-container/80' : (isFailed ? 'text-red-400' : 'text-success');
+            const textColor = isRunning ? 'text-on-surface-variant/80' : (isFailed ? 'text-red-400' : 'text-success');
 
             return (
                 <div key={node.id} className={clsx("mb-2 mt-1 border rounded-2xl overflow-hidden border-outline-variant", isRunning && "animate-pulse-subtle")}>
@@ -485,7 +513,7 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
                     >
                         <div className="flex items-center gap-2 max-w-[80%]">
                             {isOpen ? <ChevronDown size={14} className="text-on-surface-variant/80 shrink-0" /> : <ChevronRight size={14} className="text-on-surface-variant/80 shrink-0" />}
-                            <span className={clsx("font-semibold truncate", isRunning ? "text-primary" : (isFailed ? "text-error" : "text-success"))}>
+                            <span className={clsx("font-semibold truncate", isRunning ? "text-on-surface-variant/80" : (isFailed ? "text-error" : "text-success"))}>
                                 {node.name}
                             </span>
                         </div>
