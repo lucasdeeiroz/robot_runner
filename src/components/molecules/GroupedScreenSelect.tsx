@@ -83,6 +83,7 @@ export function GroupedScreenSelect({
                     type="text"
                     value={value}
                     onChange={(e) => onChange(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
                     placeholder={placeholder || t('common.select', 'Select...')}
                     disabled={disabled}
                     className="flex-1 bg-transparent border-none outline-none text-on-surface truncate min-w-0"
