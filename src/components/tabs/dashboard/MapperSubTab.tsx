@@ -26,6 +26,7 @@ import { Button } from '@/components/atoms/Button';
 import { SegmentedControl } from '@/components/molecules/SegmentedControl';
 import { GroupedScreenSelect } from '@/components/molecules/GroupedScreenSelect';
 import { groupScreensByTags } from '@/lib/utils';
+import { GestureOverlay } from '@/components/molecules/GestureOverlay';
 
 function groupElementsByType<T extends { type: string }>(
     elements: T[],
@@ -646,10 +647,10 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                     </Section>
 
                     <div className="flex-1 grid grid-cols-[auto_1fr] gap-4 min-h-0 overflow-hidden">
-                        {/* Device Screen */}
                         <div className="flex flex-col items-center justify-center overflow-hidden relative max-w-[30vw] bg-surface-variant/5 border border-outline-variant/20 rounded-2xl p-4">
                             {screenshot ? (
                                 <div className="relative inline-block shadow-2xl rounded-lg border border-outline-variant/30 flex-shrink-0 mb-4">
+                                    {loading && <GestureOverlay />}
                                     <img
                                         ref={imgRef}
                                         src={`data:image/png;base64,${screenshot}`}

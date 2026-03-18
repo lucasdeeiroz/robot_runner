@@ -13,6 +13,7 @@ import { Button } from "@/components/atoms/Button";
 import { Input } from "@/components/atoms/Input";
 import { Select } from "@/components/atoms/Select";
 import { Modal } from "@/components/organisms/Modal";
+import { GestureOverlay } from "@/components/molecules/GestureOverlay";
 
 interface InspectorSubTabProps {
     selectedDevice: string;
@@ -446,6 +447,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
                 <div className="flex flex-col items-center justify-center overflow-hidden relative max-w-[30vw] bg-surface-variant/5 border border-outline-variant/20 rounded-2xl p-4">
                     {screenshot ? (
                         <div className="relative inline-block shadow-2xl rounded-lg border border-outline-variant/30 flex-shrink-0 mb-4">
+                            {loading && <GestureOverlay />}
                             <img
                                 ref={imgRef}
                                 src={`data:image/png;base64,${screenshot}`}

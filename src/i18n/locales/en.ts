@@ -333,6 +333,25 @@ export const en = {
             select_generic: "Select"
         },
         inspector: {
+            overlay: {
+                title: "Available Actions",
+                hover: {
+                    title: "Hover",
+                    desc: "Move pointer to highlight"
+                },
+                select: {
+                    title: "Select",
+                    desc: "Click to select element"
+                },
+                tap: {
+                    title: "Tap",
+                    desc: "Double click to interact"
+                },
+                swipe: {
+                    title: "Swipe",
+                    desc: "Drag to swipe"
+                }
+            },
             title: "Inspector",
             update_error: "Failed to update inspector",
             input_error: "Failed to send input",

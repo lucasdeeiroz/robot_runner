@@ -333,6 +333,25 @@ export const pt = {
             select_generic: "Selecionar"
         },
         inspector: {
+            overlay: {
+                title: "Ações Disponíveis",
+                hover: {
+                    title: "Hover",
+                    desc: "Mova o ponteiro para destacar"
+                },
+                select: {
+                    title: "Selecionar",
+                    desc: "Clique para selecionar o elemento"
+                },
+                tap: {
+                    title: "Tocar",
+                    desc: "Clique duplo para interagir"
+                },
+                swipe: {
+                    title: "Deslizar",
+                    desc: "Arraste para deslizar"
+                }
+            },
             title: "Inspetor",
             update_error: "Falha ao atualizar inspetor",
             input_error: "Falha ao enviar input",
