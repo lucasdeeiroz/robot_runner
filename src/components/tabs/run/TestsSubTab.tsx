@@ -451,6 +451,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                                 variant="primary"
                                 onClick={() => handleRun()}
                                 disabled={
+                                    selectedDevices.length === 0 ||
                                     !selectedEntry ||
                                     isLaunching ||
                                     (mode === 'file' && (selectedEntry.is_dir || !isValidTestFile(selectedEntry.path, settings.automationFramework))) ||
