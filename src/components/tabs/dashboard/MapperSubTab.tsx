@@ -306,6 +306,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
     // Interaction State
     const [swipeStart, setSwipeStart] = useState<{ x: number, y: number } | null>(null);
+    const [swipeStartTime, setSwipeStartTime] = useState<number | null>(null);
     const [isDragging, setIsDragging] = useState(false);
 
     const imgRef = useRef<HTMLImageElement>(null);
@@ -423,6 +424,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         const coords = getCoords(e);
         if (coords) {
             setSwipeStart(coords);
+            setSwipeStartTime(Date.now());
             setIsDragging(false);
         }
     };
@@ -432,7 +434,8 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             const end = getCoords(e);
             if (end && isDragging) {
                 // Dragged -> Swipe
-                sendAdbInput(`swipe ${swipeStart.x} ${swipeStart.y} ${end.x} ${end.y} 500`);
+                const duration = swipeStartTime ? Math.max(100, Math.min(3000, Date.now() - swipeStartTime)) : 500;
+                sendAdbInput(`swipe ${swipeStart.x} ${swipeStart.y} ${end.x} ${end.y} ${Math.floor(duration)}`);
                 addSwipeAnimation(swipeStart.x, swipeStart.y, end.x, end.y);
             } else if (end && !isDragging) {
                 // Not dragged -> Select
@@ -440,6 +443,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             }
         }
         setSwipeStart(null);
+        setSwipeStartTime(null);
         setIsDragging(false);
     };
 

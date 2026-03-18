@@ -51,6 +51,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
 
     // Interaction State
     const [swipeStart, setSwipeStart] = useState<{ x: number, y: number } | null>(null);
+    const [swipeStartTime, setSwipeStartTime] = useState<number | null>(null);
     const [isDragging, setIsDragging] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [searchResults, setSearchResults] = useState<InspectorNode[]>([]);
@@ -196,6 +197,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
         const coords = getCoords(e);
         if (coords) {
             setSwipeStart(coords);
+            setSwipeStartTime(Date.now());
             setIsDragging(false);
         }
     };
@@ -204,7 +206,8 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
         if (swipeStart) {
             const end = getCoords(e);
             if (end && isDragging) {
-                sendAdbInput(`swipe ${swipeStart.x} ${swipeStart.y} ${end.x} ${end.y} 500`);
+                const duration = swipeStartTime ? Math.max(100, Math.min(3000, Date.now() - swipeStartTime)) : 500;
+                sendAdbInput(`swipe ${swipeStart.x} ${swipeStart.y} ${end.x} ${end.y} ${Math.floor(duration)}`);
                 addSwipeAnimation(swipeStart.x, swipeStart.y, end.x, end.y);
             } else if (end && !isDragging) {
                 processMouseInteraction(e, false);
@@ -212,6 +215,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
             }
         }
         setSwipeStart(null);
+        setSwipeStartTime(null);
         setIsDragging(false);
     };
 
