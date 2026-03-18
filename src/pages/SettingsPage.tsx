@@ -23,6 +23,7 @@ import { PageHeader } from "@/components/organisms/PageHeader";
 
 // New Components
 import { Select } from "@/components/atoms/Select";
+import { SplitButton } from "@/components/molecules/SplitButton";
 import { PathInput } from "@/components/molecules/PathInput";
 import { TagInput } from "@/components/molecules/TagInput";
 import { SegmentedControl } from "@/components/molecules/SegmentedControl";
@@ -134,10 +135,39 @@ export function SettingsPage() {
 
     const checkAppiumStatus = async () => {
         try {
-            const status = await invoke<{ running: boolean, pid?: number }>('get_appium_status');
+            const status = await invoke<{ running: boolean, pid?: number }>('get_appium_status', {
+                host: settings.appiumHost,
+                port: Number(settings.appiumPort)
+            });
             setAppiumStatus(status);
         } catch (e) {
             feedback.toast.error("settings.appium.status_error", e);
+        }
+    };
+
+    const startAppiumNewWindow = async () => {
+        try {
+            await invoke('start_appium_in_terminal', {
+                host: settings.appiumHost,
+                port: Number(settings.appiumPort),
+                basePath: settings.appiumBasePath,
+                args: settings.tools.appiumArgs
+            });
+            feedback.toast.success(t('settings.appium.started_new_window'));
+            // Start checking status more frequently
+            checkAppiumStatus();
+        } catch (e: any) {
+            let errStr = String(e).replace(/^Error:/, '').trim();
+            feedback.toast.error('common.error_occurred', { error: errStr });
+        }
+    };
+
+    const openAppiumLogTerminal = async () => {
+        try {
+            await invoke('open_appium_log_terminal');
+        } catch (e: any) {
+            let errStr = String(e).replace(/^Error:/, '').trim();
+            feedback.toast.error('common.error_occurred', { error: errStr });
         }
     };
 
@@ -390,28 +420,50 @@ export function SettingsPage() {
                                     {appiumStatus.running ? t('settings.appium.running', { pid: appiumStatus.pid }) : t('settings.appium.stopped')}
                                 </div>
                             }
-                            actions={
+                             actions={
                                 <>
-                                    <Button
-                                        onClick={() => setShowAppiumLogs(!showAppiumLogs)}
-                                        size="icon"
-                                        variant="ghost"
-                                        className={clsx(showAppiumLogs ? "bg-primary/10 text-primary dark:text-primary/80" : "text-on-surface/80")}
-                                        title={t('settings.appium.logs')}
-                                        disabled={!appiumStatus.running && systemCheckStatus?.missingAppium?.length > 0}
-                                    >
-                                        <Terminal size={18} />
-                                    </Button>
+                                    {appiumStatus.running && (
+                                        <Button
+                                            onClick={() => setShowAppiumLogs(!showAppiumLogs)}
+                                            size="icon"
+                                            variant="ghost"
+                                            className={clsx(showAppiumLogs ? "bg-primary/10 text-primary dark:text-primary/80" : "text-on-surface/80")}
+                                            title={t('settings.appium.logs')}
+                                            disabled={systemCheckStatus?.missingAppium?.length > 0}
+                                        >
+                                            <Terminal size={18} />
+                                        </Button>
+                                    )}
 
-                                    <Button
-                                        onClick={toggleAppium}
-                                        variant={appiumStatus.running ? "danger" : "primary"}
-                                        className="shadow-lg hover:shadow-xl transition-all"
-                                        disabled={!appiumStatus.running && systemCheckStatus?.missingAppium?.length > 0}
-                                        leftIcon={appiumStatus.running ? <Square size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
-                                    >
-                                        {!isNarrow && (appiumStatus.running ? t('settings.appium.stop') : t('settings.appium.start'))}
-                                    </Button>
+                                    {appiumStatus.running ? (
+                                        <Button
+                                            onClick={toggleAppium}
+                                            variant="danger"
+                                            className="shadow-lg hover:shadow-xl transition-all"
+                                            disabled={systemCheckStatus?.missingAppium?.length > 0}
+                                            leftIcon={<Square size={16} fill="currentColor" />}
+                                        >
+                                            {!isNarrow && t('settings.appium.stop')}
+                                        </Button>
+                                    ) : (
+                                        <SplitButton
+                                            primaryAction={{
+                                                label: t('settings.appium.start'),
+                                                onClick: toggleAppium,
+                                                icon: <Play size={16} fill="currentColor" />
+                                            }}
+                                            secondaryActions={[
+                                                {
+                                                    label: t('settings.appium.start_new_window'),
+                                                    onClick: startAppiumNewWindow,
+                                                    icon: <Terminal size={16} />
+                                                }
+                                            ]}
+                                            disabled={systemCheckStatus?.missingAppium?.length > 0}
+                                            variant="primary"
+                                            className="shadow-lg hover:shadow-xl transition-all"
+                                        />
+                                    )}
                                 </>
                             }
                         >
@@ -460,15 +512,26 @@ export function SettingsPage() {
                             </div>
 
                             {/* Logs Output */}
-                            {showAppiumLogs && (
-                                <div
-                                    ref={logsContainerRef}
-                                    className="mt-4 bg-surface/50 border border-outline-variant/30 rounded-2xl p-3 font-mono text-xs h-64 overflow-auto custom-scrollbar shadow-inner"
-                                >
-                                    {appiumLogs.length === 0 && <span className="text-on-surface-variant/80 italic">{t('settings.appium.waiting')}</span>}
-                                    {appiumLogs.map((log, i) => (
-                                        <div key={i} className="text-on-surface-variant/80 space-pre-wrap border-b border-outline-variant/30 pb-0.5 mb-0.5">{log}</div>
-                                    ))}
+                            {showAppiumLogs && appiumStatus.running && (
+                                <div className="mt-4 relative animate-in fade-in duration-300">
+                                    <div
+                                        ref={logsContainerRef}
+                                        className="bg-surface/50 border border-outline-variant/30 rounded-2xl p-3 font-mono text-xs h-64 overflow-auto custom-scrollbar shadow-inner"
+                                    >
+                                        {appiumLogs.length === 0 && <span className="text-on-surface-variant/80 italic">{t('settings.appium.waiting')}</span>}
+                                        {appiumLogs.map((log, i) => (
+                                            <div key={i} className="text-on-surface-variant/80 space-pre-wrap border-b border-outline-variant/30 pb-0.5 mb-0.5">{log}</div>
+                                        ))}
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={openAppiumLogTerminal}
+                                        className="absolute top-2 right-2 m-1 bg-surface-variant/80 hover:bg-surface-variant backdrop-blur-sm shadow-sm"
+                                        title={t('settings.appium.open_log_terminal')}
+                                    >
+                                        <Monitor size={16} />
+                                    </Button>
                                 </div>
                             )}
                         </Section>

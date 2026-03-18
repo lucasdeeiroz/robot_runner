@@ -653,8 +653,10 @@ export const pt = {
                 running: "Rodando (PID: {{pid}})",
                 stopped: "Parado",
                 start: "Iniciar Servidor",
+                start_new_window: "Iniciar em Nova Janela",
+                started_new_window: "Servidor Appium iniciado em nova janela",
                 stop: "Parar Servidor",
-                logs: "Ver Logs",
+                open_log_terminal: "Abrir terminal de logs externos",
                 waiting: "Aguardando logs...",
                 host: "Host",
                 port: "Port"

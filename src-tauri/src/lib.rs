@@ -62,6 +62,8 @@ pub fn run() {
             appium::start_appium_server,
             appium::stop_appium_server,
             appium::get_appium_status,
+            appium::open_appium_log_terminal,
+            appium::start_appium_in_terminal,
             ngrok::start_ngrok,
             ngrok::stop_ngrok,
             // Logcat
