@@ -490,7 +490,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
                                 </div>
                             )}
                             {searchResults.map((node) => (
-                                <div key={node.id} className="absolute border-2 border-success pointer-events-none z-10" style={getHighlighterStyle(node, '#22c55e')} />
+                                <div key={node.id} className="absolute border-2 border-success pointer-events-none z-30" style={getHighlighterStyle(node, '#22c55e')} />
                             ))}
                             <div className="absolute border-2 border-info-container/80 pointer-events-none transition-all duration-75 z-10" style={{ ...getHighlighterStyle(hoveredNode, '#60a5fa'), display: hoveredNode ? 'block' : 'none' }} />
                             <div className="absolute border-2 border-error pointer-events-none z-20" style={{ ...getHighlighterStyle(selectedNode, '#ef4444'), display: selectedNode ? 'block' : 'none' }} />
