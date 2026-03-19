@@ -84,6 +84,7 @@ pub fn run() {
             files::list_directory,
             files::save_file,
             files::read_file,
+            files::read_image_base64,
             files::save_image,
             // Packages
             adb::packages::get_installed_packages,

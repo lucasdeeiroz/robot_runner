@@ -82,6 +82,14 @@ pub fn read_file(path: String) -> Result<String, String> {
 }
 
 #[command]
+pub fn read_image_base64(path: String) -> Result<String, String> {
+    use base64::{Engine as _, engine::general_purpose};
+    let bytes = fs::read(&path).map_err(|e| e.to_string())?;
+    let b64 = general_purpose::STANDARD.encode(bytes);
+    Ok(b64)
+}
+
+#[command]
 pub fn save_image(path: String, content: Vec<u8>) -> Result<(), String> {
     use std::io::Write;
     let mut file = fs::File::create(&path).map_err(|e| e.to_string())?;

@@ -645,13 +645,19 @@ export const es = {
             },
             console: {
                 documentation: "Documentación: ",
-                fancy_mode: "Habilitar Modo Decorado",
-                raw_mode: "Habilitar Modo Crudo",
-                running: "EJECUTANDO",
+                error_message: "Mensaje de Error",
+                screenshot: "Captura de Pantalla",
+                artifacts: "Artefactos",
+                open_log: "Abrir Log HTML",
+                open_report: "Abrir Reporte",
                 pass: "ÉXITO",
                 fail: "FALLO",
+                not_run: "NO EJECUTADO",
+                fancy_mode: "Modo Decorado",
+                raw_mode: "Modo Texto (Raw)",
+                running: "EJECUTANDO",
                 processing: "Procesando...",
-                test_summary: "{{total}} PRUEBAS: {{passed}} ÉXITOS, {{failed}} FALLOS",
+                test_summary: "{{total}} PRUEBAS: {{passed}} CON ÉXITO, {{failed}} CON FALLO",
                 waiting: "Esperando registros..."
             }
         },
