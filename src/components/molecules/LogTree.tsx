@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
+import { createPortal } from "react-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import {
     ChevronRight, ChevronDown, CheckCircle2, XCircle, MinusCircle,
     Layers, BugPlay, CirclePlay, Repeat, IterationCcw, Workflow,
-    Infinity, Split, StepForward, CalendarCog
+    Infinity, Split, StepForward, CalendarCog, Maximize2
 } from "lucide-react";
 import { LogNode, TestNode, KeywordNode } from "@/lib/robotParser";
 import { LinkRenderer } from "../molecules/LinkRenderer";
@@ -19,6 +21,7 @@ interface LogTreeProps {
 export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen = false }) => {
     const { t } = useTranslation();
     const [isOpen, setIsOpen] = useState(initiallyOpen || depth < 2);
+    const [previewImage, setPreviewImage] = useState<string | null>(null);
 
     if (node.type === 'text') {
         if (node.content.match(/^[-=]+$/)) return null;
@@ -136,22 +139,27 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
             {isOpen && (
                 <div className="flex flex-col gap-1 p-2 pl-4 border-t border-on-surface/5">
                     {node.type === 'test' && (node as TestNode).failureDetail && (
-                        <div className="mb-2 p-3 bg-error/10 border border-error/20 rounded-xl text-error text-xs animate-in fade-in slide-in-from-top-1">
-                            <div className="font-bold mb-1 uppercase tracking-wider opacity-70 flex items-center gap-1.5">
-                                <XCircle size={12} />
-                                {t('run_tab.console.failure_detail')}
+                        <div className="mb-2 p-3 bg-error/10 border border-error/20 rounded-xl text-error text-xs animate-in fade-in slide-in-from-top-1 flex justify-between gap-4 items-center">
+                            <div className="flex flex-col gap-1 min-w-0">
+                                <div className="font-bold uppercase tracking-wider opacity-70 flex items-center gap-1.5">
+                                    <XCircle size={12} />
+                                    {t('run_tab.console.failure_detail')}
+                                </div>
+                                <div className="font-mono whitespace-pre-wrap leading-relaxed overflow-auto max-h-40">{(node as TestNode).failureDetail!.message}</div>
                             </div>
-                            <div className="font-mono whitespace-pre-wrap leading-relaxed">{(node as TestNode).failureDetail!.message}</div>
                             {(node as TestNode).failureDetail!.screenshot && (
-                                <div className="mt-2 group relative cursor-zoom-in overflow-hidden rounded-lg border border-error/20 shadow-lg">
+                                <div
+                                    className="shrink-0 group relative cursor-zoom-in overflow-hidden self-start rounded-lg border border-error/20 shadow-sm"
+                                    onClick={(e) => { e.stopPropagation(); setPreviewImage((node as TestNode).failureDetail!.screenshot!); }}
+                                >
                                     <img
                                         src={(node as TestNode).failureDetail!.screenshot}
                                         alt={t('run_tab.console.failure_screenshot')}
-                                        className="max-w-full h-auto"
+                                        className="h-28 object-cover"
                                     />
-                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                                        <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 text-white px-3 py-1.5 rounded-full text-[10px] font-bold">
-                                            {t('run_tab.console.view_fullscreen')}
+                                    <div className="absolute inset-0 bg-black/0 flex items-center justify-center">
+                                        <div className="opacity-0 group-hover:opacity-100 transition-all transform scale-90 group-hover:scale-100 bg-black/60 text-white p-2.5 rounded-full shadow-lg backdrop-blur-sm">
+                                            <Maximize2 size={16} />
                                         </div>
                                     </div>
                                 </div>
@@ -160,17 +168,25 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
                     )}
 
                     {node.type === 'keyword' && (node as KeywordNode).screenshot && (
-                        <div className="mb-2 p-3 bg-surface-variant/30 border border-outline-variant/30 rounded-xl text-on-surface-variant text-xs animate-in fade-in slide-in-from-top-1">
+                        <div className="mb-2 p-3 text-on-surface-variant text-xs animate-in fade-in slide-in-from-top-1 flex justify-between gap-2">
                             <div className="font-bold mb-1 uppercase tracking-wider opacity-70 flex items-center gap-1.5">
                                 <BugPlay size={12} />
                                 {t('run_tab.console.step_screenshot')}
                             </div>
-                            <div className="group relative cursor-zoom-in overflow-hidden rounded-lg border border-outline-variant/30 shadow-md">
+                            <div
+                                className="group relative cursor-zoom-in overflow-hidden rounded-lg"
+                                onClick={(e) => { e.stopPropagation(); setPreviewImage((node as KeywordNode).screenshot!); }}
+                            >
                                 <img
                                     src={(node as KeywordNode).screenshot}
                                     alt={t('run_tab.console.keyword_screenshot')}
-                                    className="max-w-full h-auto"
+                                    className="h-28 object-cover"
                                 />
+                                <div className="absolute inset-0 bg-black/0 flex items-center justify-center">
+                                    <div className="opacity-0 group-hover:opacity-100 transition-all transform scale-90 group-hover:scale-100 bg-black/60 text-white p-2.5 rounded-full shadow-lg backdrop-blur-sm">
+                                        <Maximize2 size={18} />
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -179,6 +195,41 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
                         <LogTree key={child.id} node={child} depth={depth + 1} />
                     ))}
                 </div>
+            )}
+
+            {/* Fullscreen Preview Portal */}
+            {previewImage && createPortal(
+                <AnimatePresence>
+                    <div
+                        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md cursor-zoom-out"
+                        onClick={() => setPreviewImage(null)}
+                    >
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                            className="relative max-w-full max-h-full flex flex-col items-center gap-4"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <img
+                                src={previewImage}
+                                alt="Full size preview"
+                                className="max-w-full max-h-[85vh] rounded-xl shadow-2xl border border-white/10"
+                            />
+                            <div className="flex items-center gap-4">
+                                <button
+                                    className="px-6 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-all font-medium border border-white/10 flex items-center gap-2 group"
+                                    onClick={() => setPreviewImage(null)}
+                                >
+                                    <XCircle size={18} className="text-white/70 group-hover:text-white transition-colors" />
+                                    {t('common.close') || 'Close'}
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                </AnimatePresence>,
+                document.body
             )}
         </div>
     );

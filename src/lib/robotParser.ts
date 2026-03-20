@@ -144,6 +144,42 @@ const directScreenshotSrc = (obj: any): string | undefined => {
     return undefined;
 };
 
+const deepScreenshotSrc = (obj: any): string | undefined => {
+    if (!obj || typeof obj !== 'object') return undefined;
+
+    // 1. Direct check in this node's messages
+    const direct = directScreenshotSrc(obj);
+    if (direct) return direct;
+
+    // 2. Recursive check in children, prioritizing failed ones
+    const childFields = ['kw', 'test', 'suite', 'setup', 'teardown', 'for', 'if', 'while', 'iter', 'branch'];
+    for (const field of childFields) {
+        const val = obj[field];
+        if (!val) continue;
+
+        if (Array.isArray(val)) {
+            // Priority 1: Failed children
+            for (const item of val) {
+                const status = typeof item.status === 'object' ? (item.status.status || item.status["status"]) : undefined;
+                if (status === 'FAIL') {
+                    const found = deepScreenshotSrc(item);
+                    if (found) return found;
+                }
+            }
+            // Priority 2: Any children (fallback)
+            for (const item of val) {
+                const found = deepScreenshotSrc(item);
+                if (found) return found;
+            }
+        } else {
+            const found = deepScreenshotSrc(val);
+            if (found) return found;
+        }
+    }
+
+    return undefined;
+};
+
 const parseArgs = (obj: any): string[] => {
     const args: string[] = [];
     
@@ -288,7 +324,7 @@ export const mapXmlNode = async (
         const failures: Record<string, { message: string, screenshot?: string, name: string }> = {};
         if (statusStr === 'FAIL') {
             const msg = typeof obj.status === 'object' && obj.status["#text"] ? obj.status["#text"] : "";
-            failures[id] = { message: msg, name, screenshot: await resolveScreenshot(directScreenshotSrc(obj), outputXmlPath, readImageBase64) };
+            failures[id] = { message: msg, name, screenshot: await resolveScreenshot(deepScreenshotSrc(obj), outputXmlPath, readImageBase64) };
         }
 
         return {
