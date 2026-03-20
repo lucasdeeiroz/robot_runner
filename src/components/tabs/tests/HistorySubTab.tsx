@@ -184,7 +184,7 @@ export function HistorySubTab() {
                     <div className="space-y-3 pl-1">
                         {logs.map((log, i) => (
                             <div 
-                                key={i} 
+                                key={log.xml_path} 
                                 onClick={() => handleLogClick(log)}
                                 role="button"
                                 tabIndex={0}
