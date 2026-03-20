@@ -97,13 +97,13 @@ function App() {
 
     // Primary Color Logic
     const colors: Record<string, string> = {
-      blue: '#2563eb',
-      red: '#dc2626',
-      green: '#16a34a',
-      purple: '#9333ea',
-      orange: '#ea580c',
-      cyan: '#0891b2',
-      pink: '#db2777',
+      blue: '#4338ca',
+      red: '#e11d48',
+      green: '#059669',
+      purple: '#7c3aed',
+      orange: '#d97706',
+      cyan: '#0d9488',
+      pink: '#be123c',
     };
 
     const colorHex = colors[settings.primaryColor] || colors.blue;
@@ -136,9 +136,9 @@ function App() {
       // Light: Color=40, On=100, Container=90, OnContainer=10
       // Dark:  Color=80, On=20,  Container=30, OnContainer=90
       const customColors = {
-        success: '#22c55e', // success
-        warning: '#eab308', // warning
-        info: '#0ea5e9',    // sky-500
+        success: '#10b981',
+        warning: '#f59e0b',
+        info: '#3b82f6',
       };
 
       for (const [name, hex] of Object.entries(customColors)) {
