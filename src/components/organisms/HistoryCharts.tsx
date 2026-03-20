@@ -14,6 +14,8 @@ interface TestLog {
     android_version?: string | null;
     timestamp: string;
     duration: string;
+    pass_count: number;
+    fail_count: number;
 }
 
 interface HistoryChartsProps {
