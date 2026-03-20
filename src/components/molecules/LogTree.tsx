@@ -18,10 +18,19 @@ interface LogTreeProps {
     initiallyOpen?: boolean;
 }
 
-export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen = false }) => {
+export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen }) => {
     const { t } = useTranslation();
-    const [isOpen, setIsOpen] = useState(initiallyOpen || depth < 2);
+    const [isOpen, setIsOpen] = useState(initiallyOpen ?? (
+        node.type !== 'text' && node.type !== 'suite-start' && (node as any).status !== 'PASS' && (node as any).status !== 'NOT_RUN'
+    ));
     const [previewImage, setPreviewImage] = useState<string | null>(null);
+
+    // Auto-expand when status changes from PASS/NOT_RUN/undefined to RUNNING/FAIL
+    React.useEffect(() => {
+        if (initiallyOpen === undefined && node.type !== 'text' && (node as any).status && (node as any).status !== 'PASS' && (node as any).status !== 'NOT_RUN') {
+            setIsOpen(true);
+        }
+    }, [(node as any).status, initiallyOpen, node.type]);
 
     if (node.type === 'text') {
         if (node.content.match(/^[-=]+$/)) return null;
