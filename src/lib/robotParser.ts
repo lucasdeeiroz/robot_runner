@@ -243,13 +243,26 @@ const parseArgs = (obj: any): string[] => {
     return args.filter(a => a !== "" && a !== "undefined");
 };
 
+const hashString = (input: string): string => {
+    let hash = 0;
+    for (let i = 0; i < input.length; i++) {
+        hash = ((hash << 5) - hash) + input.charCodeAt(i);
+        hash |= 0; // Convert to 32bit integer
+    }
+    return Math.abs(hash).toString(36);
+};
+
 const parseMsgChildren = (obj: any): LogNode[] => {
     const msgs = Array.isArray(obj.msg) ? obj.msg : (obj.msg ? [obj.msg] : []);
     return msgs
         .map((m: any) => typeof m === 'object' ? (m["#text"] || "") : String(m ?? ""))
         .map((txt: string) => txt.replace(/<\?xml(?:[^>]*)?>\s*<hierarchy[\s\S]*?<\/hierarchy>/gi, '').trim())
         .filter((txt: string) => txt && !txt.includes("src="))
-        .map((txt: string) => ({ type: 'text' as const, content: txt, id: `msg-${Math.random()}` }));
+        .map((txt: string, index: number) => ({
+            type: 'text' as const,
+            content: txt,
+            id: `msg-${index}-${hashString(txt)}`
+        }));
 };
 
 export const mapXmlNode = async (
