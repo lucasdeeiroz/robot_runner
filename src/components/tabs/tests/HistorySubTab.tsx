@@ -186,6 +186,14 @@ export function HistorySubTab() {
                             <div 
                                 key={i} 
                                 onClick={() => handleLogClick(log)}
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        handleLogClick(log);
+                                    }
+                                }}
                                 className="flex flex-row items-center gap-4 p-4 bg-surface/50 border border-outline-variant/30 rounded-2xl hover:border-primary/40 hover:bg-surface-variant/10 cursor-pointer transition-all shadow-sm group"
                             >
                                 <div className="flex gap-4 items-start min-w-0 flex-1">
