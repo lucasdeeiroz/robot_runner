@@ -689,6 +689,7 @@ export const pt = {
                 started_new_window: "Servidor Appium iniciado em nova janela",
                 stop: "Parar Servidor",
                 open_log_terminal: "Abrir terminal de logs externos",
+                logs: "Alternar logs",
                 waiting: "Aguardando logs...",
                 host: "Host",
                 port: "Port"
