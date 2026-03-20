@@ -108,7 +108,6 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
             processedCountRef.current = 0;
             bufferRef.current = [];
             pendingSuiteStartRef.current = false;
-            pendingSuiteStartRef.current = false;
             setArtifactPaths({});
             setTree([]);
             return; // Exit and wait for next tick with reset state
