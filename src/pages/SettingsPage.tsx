@@ -153,7 +153,7 @@ export function SettingsPage() {
                 basePath: settings.appiumBasePath,
                 args: settings.tools.appiumArgs
             });
-            feedback.toast.success(t('settings.appium.started_new_window'));
+            feedback.toast.success('settings.appium.started_new_window');
             // Start checking status more frequently
             checkAppiumStatus();
         } catch (e: any) {
