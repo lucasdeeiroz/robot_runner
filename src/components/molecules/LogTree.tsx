@@ -8,7 +8,7 @@ import {
     Layers, BugPlay, CirclePlay, Repeat, IterationCcw, Workflow,
     Infinity, Split, StepForward, CalendarCog, Maximize2
 } from "lucide-react";
-import { LogNode, TestNode, KeywordNode } from "@/lib/robotParser";
+import { LogNode, TestNode, KeywordNode, SuiteNode } from "@/lib/robotParser";
 import { LinkRenderer } from "../molecules/LinkRenderer";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 
@@ -124,8 +124,15 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
                     bgColor, summaryColor
                 )}>
                     {node.duration && (
-                        <span className="px-2 font-mono opacity-80 text-on-surface-variant border-none">
+                        <span className="px-2 font-mono opacity-80 text-on-surface-variant border-none flex items-center gap-2">
                             {node.duration}
+                            {node.type === 'suite' && (node as SuiteNode).stats && (
+                                <span className="flex items-center gap-1.5 ml-2 border-l border-on-surface/10 pl-2">
+                                    <span className="text-success">{(node as SuiteNode).stats?.passed}P</span>
+                                    <span className="text-error">{(node as SuiteNode).stats?.failed}F</span>
+                                    <span className="text-on-surface-variant/40">{(node as SuiteNode).stats?.skipped}S</span>
+                                </span>
+                            )}
                         </span>
                     )}
                     {isRunning
@@ -199,6 +206,10 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
                             </div>
                         </div>
                     )}
+
+                    {node.type === 'test' && (node as TestNode).logs && (node as TestNode).logs.map((log, i) => (
+                        <LinkRenderer key={`log-${i}-${node.id}`} content={log} />
+                    ))}
 
                     {node.children && node.children.map((child: LogNode) => (
                         <LogTree key={child.id} node={child} depth={depth + 1} />

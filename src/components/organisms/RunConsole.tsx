@@ -243,7 +243,13 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
                 for (let j = logs.length - 1; j >= 0; j--) {
                     const match = logs[j].match(/\|\s+(PASS|FAIL)\s+\|/);
                     if (match) {
-                        currentTest.status = match[1] as 'PASS' | 'FAIL';
+                        const finalStatus = match[1] as 'PASS' | 'FAIL';
+                        currentTest.status = finalStatus;
+                        const suite = activeSuite();
+                        if (suite && suite.stats) {
+                            if (finalStatus === 'PASS') suite.stats.passed++;
+                            else if (finalStatus === 'FAIL') suite.stats.failed++;
+                        }
                         break;
                     }
                 }
@@ -264,7 +270,8 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
                     name: node.name,
                     status: 'RUNNING', // Instant Running Status
                     summary: '',
-                    children: []
+                    children: [],
+                    stats: { passed: 0, failed: 0, skipped: 0 }
                 };
 
                 if (activeSuite()) {
@@ -330,6 +337,11 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
                     if (currentTest) {
                         currentTest.status = status;
                         currentTest.logs.push(line);
+                        const suite = activeSuite();
+                        if (suite && suite.stats) {
+                            if (status === 'PASS') suite.stats.passed++;
+                            else if (status === 'FAIL') suite.stats.failed++;
+                        }
                         currentTest = null;
                     } else {
                         // Non-verbose mode: Instant test result
@@ -341,6 +353,11 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
                             logs: [line],
                             id: `m-instant-${processedCountRef.current + idx}`
                         };
+                        const suite = activeSuite();
+                        if (suite && suite.stats) {
+                            if (status === 'PASS') suite.stats.passed++;
+                            else if (status === 'FAIL') suite.stats.failed++;
+                        }
                         if (activeSuite()) activeSuite()!.children.push(instantTest);
                         else root.push(instantTest);
                     }
@@ -381,6 +398,11 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
 
                                 if (currentTest.status === 'RUNNING') {
                                     currentTest.status = finalStatus;
+                                    const suite = suiteStack[suiteStack.length - 1];
+                                    if (suite && suite.stats) {
+                                        if (finalStatus === 'PASS') suite.stats.passed++;
+                                        else if (finalStatus === 'FAIL') suite.stats.failed++;
+                                    }
                                 }
                                 currentTest = null;
 
