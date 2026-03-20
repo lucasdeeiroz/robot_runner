@@ -13,6 +13,7 @@ import { Button } from "@/components/atoms/Button";
 import { Input } from "@/components/atoms/Input";
 import { Select } from "@/components/atoms/Select";
 import { Modal } from "@/components/organisms/Modal";
+import { GestureOverlay } from "@/components/molecules/GestureOverlay";
 
 interface InspectorSubTabProps {
     selectedDevice: string;
@@ -51,6 +52,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
 
     // Interaction State
     const [swipeStart, setSwipeStart] = useState<{ x: number, y: number } | null>(null);
+    const [swipeStartTime, setSwipeStartTime] = useState<number | null>(null);
     const [isDragging, setIsDragging] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [searchResults, setSearchResults] = useState<InspectorNode[]>([]);
@@ -196,6 +198,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
         const coords = getCoords(e);
         if (coords) {
             setSwipeStart(coords);
+            setSwipeStartTime(Date.now());
             setIsDragging(false);
         }
     };
@@ -204,7 +207,8 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
         if (swipeStart) {
             const end = getCoords(e);
             if (end && isDragging) {
-                sendAdbInput(`swipe ${swipeStart.x} ${swipeStart.y} ${end.x} ${end.y} 500`);
+                const duration = swipeStartTime ? Math.max(100, Math.min(3000, Date.now() - swipeStartTime)) : 500;
+                sendAdbInput(`swipe ${swipeStart.x} ${swipeStart.y} ${end.x} ${end.y} ${Math.floor(duration)}`);
                 addSwipeAnimation(swipeStart.x, swipeStart.y, end.x, end.y);
             } else if (end && !isDragging) {
                 processMouseInteraction(e, false);
@@ -212,6 +216,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
             }
         }
         setSwipeStart(null);
+        setSwipeStartTime(null);
         setIsDragging(false);
     };
 
@@ -442,6 +447,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
                 <div className="flex flex-col items-center justify-center overflow-hidden relative max-w-[30vw] bg-surface-variant/5 border border-outline-variant/20 rounded-2xl p-4">
                     {screenshot ? (
                         <div className="relative inline-block shadow-2xl rounded-lg border border-outline-variant/30 flex-shrink-0 mb-4">
+                            {loading && <GestureOverlay />}
                             <img
                                 ref={imgRef}
                                 src={`data:image/png;base64,${screenshot}`}
@@ -490,7 +496,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
                                 </div>
                             )}
                             {searchResults.map((node) => (
-                                <div key={node.id} className="absolute border-2 border-success pointer-events-none z-10" style={getHighlighterStyle(node, '#22c55e')} />
+                                <div key={node.id} className="absolute border-2 border-success pointer-events-none z-30" style={getHighlighterStyle(node, '#22c55e')} />
                             ))}
                             <div className="absolute border-2 border-info-container/80 pointer-events-none transition-all duration-75 z-10" style={{ ...getHighlighterStyle(hoveredNode, '#60a5fa'), display: hoveredNode ? 'block' : 'none' }} />
                             <div className="absolute border-2 border-error pointer-events-none z-20" style={{ ...getHighlighterStyle(selectedNode, '#ef4444'), display: selectedNode ? 'block' : 'none' }} />

@@ -62,6 +62,8 @@ pub fn run() {
             appium::start_appium_server,
             appium::stop_appium_server,
             appium::get_appium_status,
+            appium::open_appium_log_terminal,
+            appium::start_appium_in_terminal,
             ngrok::start_ngrok,
             ngrok::stop_ngrok,
             // Logcat
@@ -82,6 +84,7 @@ pub fn run() {
             files::list_directory,
             files::save_file,
             files::read_file,
+            files::read_image_base64,
             files::save_image,
             // Packages
             adb::packages::get_installed_packages,

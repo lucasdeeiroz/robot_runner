@@ -26,6 +26,7 @@ import { Button } from '@/components/atoms/Button';
 import { SegmentedControl } from '@/components/molecules/SegmentedControl';
 import { GroupedScreenSelect } from '@/components/molecules/GroupedScreenSelect';
 import { groupScreensByTags } from '@/lib/utils';
+import { GestureOverlay } from '@/components/molecules/GestureOverlay';
 
 function groupElementsByType<T extends { type: string }>(
     elements: T[],
@@ -306,6 +307,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
     // Interaction State
     const [swipeStart, setSwipeStart] = useState<{ x: number, y: number } | null>(null);
+    const [swipeStartTime, setSwipeStartTime] = useState<number | null>(null);
     const [isDragging, setIsDragging] = useState(false);
 
     const imgRef = useRef<HTMLImageElement>(null);
@@ -423,6 +425,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         const coords = getCoords(e);
         if (coords) {
             setSwipeStart(coords);
+            setSwipeStartTime(Date.now());
             setIsDragging(false);
         }
     };
@@ -432,7 +435,8 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             const end = getCoords(e);
             if (end && isDragging) {
                 // Dragged -> Swipe
-                sendAdbInput(`swipe ${swipeStart.x} ${swipeStart.y} ${end.x} ${end.y} 500`);
+                const duration = swipeStartTime ? Math.max(100, Math.min(3000, Date.now() - swipeStartTime)) : 500;
+                sendAdbInput(`swipe ${swipeStart.x} ${swipeStart.y} ${end.x} ${end.y} ${Math.floor(duration)}`);
                 addSwipeAnimation(swipeStart.x, swipeStart.y, end.x, end.y);
             } else if (end && !isDragging) {
                 // Not dragged -> Select
@@ -440,6 +444,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             }
         }
         setSwipeStart(null);
+        setSwipeStartTime(null);
         setIsDragging(false);
     };
 
@@ -642,10 +647,10 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                     </Section>
 
                     <div className="flex-1 grid grid-cols-[auto_1fr] gap-4 min-h-0 overflow-hidden">
-                        {/* Device Screen */}
                         <div className="flex flex-col items-center justify-center overflow-hidden relative max-w-[30vw] bg-surface-variant/5 border border-outline-variant/20 rounded-2xl p-4">
                             {screenshot ? (
                                 <div className="relative inline-block shadow-2xl rounded-lg border border-outline-variant/30 flex-shrink-0 mb-4">
+                                    {loading && <GestureOverlay />}
                                     <img
                                         ref={imgRef}
                                         src={`data:image/png;base64,${screenshot}`}

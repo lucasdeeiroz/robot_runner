@@ -143,7 +143,8 @@ export const en = {
             attention: "Attention",
             errors: {
                 open_file_failed: "Failed to open file or folder",
-                open_link_failed: "Failed to open link"
+                open_link_failed: "Failed to open link",
+                parse_failed: "Failed to parse data"
             }
         },
         components: {
@@ -333,6 +334,25 @@ export const en = {
             select_generic: "Select"
         },
         inspector: {
+            overlay: {
+                title: "Available Actions",
+                hover: {
+                    title: "Hover",
+                    desc: "Move pointer to highlight"
+                },
+                select: {
+                    title: "Select",
+                    desc: "Click to select element"
+                },
+                tap: {
+                    title: "Tap",
+                    desc: "Double click to interact"
+                },
+                swipe: {
+                    title: "Swipe",
+                    desc: "Drag to swipe"
+                }
+            },
             title: "Inspector",
             update_error: "Failed to update inspector",
             input_error: "Failed to send input",
@@ -620,14 +640,26 @@ export const en = {
             },
             console: {
                 documentation: "Documentation: ",
-                fancy_mode: "Enable Fancy Mode",
-                raw_mode: "Enable Raw Mode",
-                running: "RUNNING",
+                error_message: "Error Message",
+                screenshot: "Screenshot",
+                artifacts: "Artifacts",
+                open_log: "Open HTML Log",
+                open_report: "Open Report",
                 pass: "PASS",
                 fail: "FAIL",
+                not_run: "NOT RUN",
+                fancy_mode: "Fancy Mode",
+                raw_mode: "Raw Mode",
+                running: "RUNNING",
                 processing: "Processing...",
                 test_summary: "{{total}} TESTS: {{passed}} PASSED, {{failed}} FAILED",
-                waiting: "Waiting for logs..."
+                waiting: "Waiting for logs...",
+                loading_xml: "Loading execution data...",
+                failure_detail: "Failure Detail",
+                step_screenshot: "Step Screenshot",
+                view_fullscreen: "VIEW FULLSCREEN",
+                failure_screenshot: "Failure Screenshot",
+                keyword_screenshot: "Keyword Screenshot"
             }
         },
         scrcpy: {
@@ -653,7 +685,10 @@ export const en = {
                 running: "Running (PID: {{pid}})",
                 stopped: "Stopped",
                 start: "Start Server",
+                start_new_window: "Start in New Window",
+                started_new_window: "Appium Server started in new window",
                 stop: "Stop Server",
+                open_log_terminal: "Open logs in external terminal",
                 logs: "Toggle Logs",
                 waiting: "Waiting for logs...",
                 host: "Host",

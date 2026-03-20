@@ -130,7 +130,10 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
         try {
             // 1. Check/Start Appium (Skip for Maestro)
             if (fw !== 'maestro') {
-                const status = await invoke<{ running: boolean }>('get_appium_status');
+                const status = await invoke<{ running: boolean }>('get_appium_status', {
+                    host: settings.appiumHost,
+                    port: Number(settings.appiumPort)
+                });
                 if (!status.running) {
                     setLaunchStatus(t('tests.status.starting'));
                     await invoke('start_appium_server', {
@@ -145,7 +148,10 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     setLaunchStatus(t('tests.status.waiting_server'));
                     let isReady = false;
                     for (let i = 0; i < 20; i++) {
-                        const s = await invoke<{ running: boolean }>('get_appium_status');
+                        const s = await invoke<{ running: boolean }>('get_appium_status', {
+                            host: settings.appiumHost,
+                            port: Number(settings.appiumPort)
+                        });
                         if (s.running) {
                             isReady = true;
                             break;
@@ -451,6 +457,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                                 variant="primary"
                                 onClick={() => handleRun()}
                                 disabled={
+                                    selectedDevices.length === 0 ||
                                     !selectedEntry ||
                                     isLaunching ||
                                     (mode === 'file' && (selectedEntry.is_dir || !isValidTestFile(selectedEntry.path, settings.automationFramework))) ||

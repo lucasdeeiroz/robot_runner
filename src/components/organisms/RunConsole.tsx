@@ -1,88 +1,37 @@
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
-import { ChevronRight, ChevronDown, CheckCircle2, XCircle, Layers, Star } from "lucide-react";
+import { Star, ExternalLink, XCircle, FileOutput } from "lucide-react";
+import { openPath } from "@tauri-apps/plugin-opener";
+import { XMLParser } from "fast-xml-parser";
+import { invoke } from "@tauri-apps/api/core";
+import { Button } from "@/components/atoms/Button";
+import { 
+    LogNode, mapXmlNode, 
+    LinearNode, SuiteNode, TestNode, TextNode
+} from "@/lib/robotParser";
+import { LogTree } from "@/components/molecules/LogTree";
+import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 
 interface RunConsoleProps {
     logs: string[];
-    isRunning?: boolean;
+    isSessionRunning?: boolean;
     testPath?: string;
 }
 
-interface TextNode {
-    type: 'text';
-    content: string;
-    isSystem?: boolean;
-    id: string;
-}
-
-interface SuiteStartNode {
-    type: 'suite-start';
-    name: string;
-    originalLine: string;
-    id: string;
-}
-
-interface TestNode {
-    type: 'test';
-    name: string;
-    documentation?: string;
-    status: 'PASS' | 'FAIL' | 'RUNNING';
-    logs: string[];
-    id: string;
-}
-
-interface SuiteEndNode {
-    type: 'suite-end';
-    name: string;
-    documentation?: string;
-    status: 'PASS' | 'FAIL';
-    summary: string;
-    id: string;
-}
-
-interface SuiteNode {
-    type: 'suite';
-    id: string;
-    name: string;
-    documentation?: string;
-    status: 'PASS' | 'FAIL' | 'RUNNING';
-    summary: string;
-    children: LogNode[];
-}
-
-type LogNode = TextNode | SuiteStartNode | TestNode | SuiteNode | SuiteEndNode;
-type LinearNode = TextNode | SuiteStartNode | SuiteEndNode;
-
-
-import { LinkRenderer } from "../molecules/LinkRenderer";
-import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
-
-export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
+export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunConsoleProps) {
     const { t } = useTranslation();
     const [isRawMode, setIsRawMode] = useState(false);
 
-    const translateSummary = (summary: string) => {
-        if (!summary) return summary;
-        // Match "X tests, Y passed, Z failed"
-        const match = summary.match(/(\d+) tests?, (\d+) passed, (\d+) failed/);
-        if (match) {
-            return t('run_tab.console.test_summary', {
-                total: match[1],
-                passed: match[2],
-                failed: match[3]
-            });
-        }
-        return summary;
-    };
 
-
-    // State for toggles (Set of IDs)
-    const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
     const containerRef = useRef<HTMLDivElement>(null);
 
     // Incremental Parsing State
     const [tree, setTree] = useState<LogNode[]>([]);
+    const [artifactPaths, setArtifactPaths] = useState<{ log?: string, report?: string, output?: string }>({});
+
+    const [debugInfo, setDebugInfo] = useState<any>(null);
+    const [systemLogs, setSystemLogs] = useState<string[]>([]);
 
     // Auto-scroll on new logs with stick-to-bottom logic
     useEffect(() => {
@@ -109,21 +58,60 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
     // Track if we are tentatively expecting a Suite Start sequence
     const pendingSuiteStartRef = useRef<boolean>(false);
 
-    // Reset state if logs are cleared
+
+
+    // Parse output.xml when artifacts are detected or session finishes
     useEffect(() => {
-        if (logs.length < processedCountRef.current) {
-            parsedNodesRef.current = [];
-            processedCountRef.current = 0;
-            bufferRef.current = [];
-            pendingSuiteStartRef.current = false;
-            setTree([]);
-        }
-    }, [logs.length]);
+        if (isRunning || !artifactPaths.output) return;
+
+        const parseOutputXml = async () => {
+            // Add a small delay to ensure Robot Framework has finished flushing the file to disk
+            await new Promise(resolve => setTimeout(resolve, 800));
+            try {
+                // Use backend read_file to bypass frontend FS scope restrictions
+                const xmlContent = await invoke<string>("read_file", { path: artifactPaths.output! });
+                const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "" });
+                const jsonObj = parser.parse(xmlContent);
+
+                const readImageBase64 = async (path: string) => {
+                    return await invoke<string>("read_image_base64", { path });
+                };
+
+                const robotObj = jsonObj.robot;
+                if (robotObj && robotObj.suite) {
+                    const rootNode = await mapXmlNode(robotObj.suite, artifactPaths.output!, readImageBase64, 'suite');
+                    if (rootNode) setTree([rootNode]);
+                }
+
+                setDebugInfo({
+                    xmlLength: xmlContent.length,
+                    status: 'Parsed'
+                });
+            } catch (e: any) {
+                console.error("Failed to parse output.xml:", e);
+                setSystemLogs(prev => [...prev, `XML Error: ${e.message || String(e)}`]);
+                setDebugInfo({ error: e.message || String(e) });
+            }
+        };
+
+        parseOutputXml();
+    }, [isRunning, artifactPaths.output]);
 
     // Parse incremental logs
     useEffect(() => {
         const currentCount = logs.length;
         const processedCount = processedCountRef.current;
+
+        // Reset state if logs are cleared or significantly reduced (new session)
+        if (currentCount < processedCount || currentCount === 0) {
+            parsedNodesRef.current = [];
+            processedCountRef.current = 0;
+            bufferRef.current = [];
+            pendingSuiteStartRef.current = false;
+            setArtifactPaths({});
+            setTree([]);
+            return; // Exit and wait for next tick with reset state
+        }
 
         // Constants
         const IS_DOUBLE = (l: string) => /^={10,}$/.test(l.trim());
@@ -146,7 +134,20 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
 
             for (let i = 0; i < newLogs.length; i++) {
                 let line = newLogs[i];
+                // Strip ANSI codes and non-printable characters for cleaner matching
+                const cleanLine = line.replace(/\x1b\[[0-9;]*m/g, '').replace(/[\x00-\x1f\x7f-\x9f]/g, '').trim();
                 const isSystem = IS_SYSTEM(line);
+
+                // Robust Artifact Extraction from clean line
+                // Handle optional quotes and multiple spaces
+                const outputMatch = cleanLine.match(/Output:\s+["']?(.*\.xml)["']?/i);
+                if (outputMatch) setArtifactPaths(prev => ({ ...prev, output: outputMatch[1].trim() }));
+
+                const logMatch = cleanLine.match(/Log:\s+["']?(.*\.html)["']?/i);
+                if (logMatch) setArtifactPaths(prev => ({ ...prev, log: logMatch[1].trim() }));
+
+                const reportMatch = cleanLine.match(/Report:\s+["']?(.*\.html)["']?/i);
+                if (reportMatch) setArtifactPaths(prev => ({ ...prev, report: reportMatch[1].trim() }));
 
                 // Clean Maestro verbose noise
                 if (IS_MAESTRO_VERBOSE(line)) {
@@ -473,127 +474,6 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
     }, [logs]);
 
 
-    // Toggle logic
-    const toggleNode = (id: string) => {
-        setCollapsedIds(prev => {
-            const next = new Set(prev);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
-            return next;
-        });
-    };
-
-    // Recursive Render
-    const renderNode = (node: LogNode, parentName?: string) => {
-        if (node.type === 'text') {
-            if (node.content.match(/^[-=]+$/)) return null; // Hide separators
-            return <LinkRenderer key={node.id} content={node.content} />;
-        }
-
-        if (node.type === 'test') {
-            const isRunning = node.status === 'RUNNING';
-            const isFailed = node.status === 'FAIL';
-            const isUserToggled = collapsedIds.has(node.id); // If in set, it is TOGGLED (inverted)
-
-            const isOpen = isRunning ? !isUserToggled : (isFailed ? !isUserToggled : isUserToggled);
-
-            const borderColor = isRunning ? 'border-primary/50' : (isFailed ? 'border-error' : 'border-success');
-            const bgColor = isRunning ? 'bg-primary/5' : (isFailed ? 'bg-error/10' : 'bg-success/10');
-            const textColor = isRunning ? 'text-on-surface-variant/80' : (isFailed ? 'text-red-400' : 'text-success');
-
-            return (
-                <div key={node.id} className={clsx("mb-2 mt-1 border rounded-2xl overflow-hidden border-outline-variant", isRunning && "animate-pulse-subtle")}>
-                    <div
-                        role="button"
-                        onClick={(e) => { e.stopPropagation(); toggleNode(node.id); }}
-                        className={clsx(
-                            "w-full flex items-center justify-between px-3 py-1.5 hover:bg-surface-variant/30 transition-colors text-left relative z-10 cursor-pointer select-none",
-                            `border-l-4 ${borderColor.replace('/50', '')}`
-                        )}
-                    >
-                        <div className="flex items-center gap-2 max-w-[80%]">
-                            {isOpen ? <ChevronDown size={14} className="text-on-surface-variant/80 shrink-0" /> : <ChevronRight size={14} className="text-on-surface-variant/80 shrink-0" />}
-                            <span className={clsx("font-semibold truncate", isRunning ? "text-on-surface-variant/80" : (isFailed ? "text-error" : "text-success"))}>
-                                {node.name}
-                            </span>
-                        </div>
-                        <div className={clsx(
-                            "text-[10px] px-2 py-0.5 rounded font-bold uppercase flex items-center gap-1 shrink-0",
-                            bgColor, textColor
-                        )}>
-                            {isRunning ? <ExpressiveLoading size="xsm" variant="circular" /> : (isFailed ? <XCircle size={12} /> : <CheckCircle2 size={12} />)}
-                            {t(isRunning ? 'run_tab.console.running' : (isFailed ? 'run_tab.console.fail' : 'run_tab.console.pass'))}
-                        </div>
-                    </div>
-                    {isOpen && (
-                        <div className="p-2 pl-6 bg-surface/50 text-xs border-t border-outline-variant/30 text-on-surface-variant/80">
-                            {node.documentation && (
-                                <div className="text-on-surface-variant/80 italic mb-2 border-b border-outline-variant/30 pb-1 text-xs">
-                                    {t('run_tab.console.documentation')}{node.documentation}
-                                </div>
-                            )}
-                            {node.logs.map((line, i) => <LinkRenderer key={i} content={line} />)}
-                            {isRunning && (
-                                <div className="text-primary dark:text-primary/80 mt-2 flex items-center gap-2 text-xs italic opacity-70">
-                                    <div className="w-1.5 h-1.5 bg-primary rounded-2xl animate-pulse" />
-                                    {t('run_tab.console.processing')}
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-            );
-        }
-
-        if (node.type === 'suite') {
-            const isRunning = node.status === 'RUNNING';
-            const isFailed = node.status === 'FAIL';
-            const isToggled = collapsedIds.has(node.id);
-            const isOpen = !isToggled; // Suites default Open
-
-            const borderColor = isRunning ? 'border-outline-variant/30' : (isFailed ? 'border-error/50' : 'border-success/50');
-            const summaryColor = isRunning ? 'text-on-surface-variant/80' : (isFailed ? 'text-error' : 'text-success');
-            const badgeBg = isRunning ? 'bg-surface-variant/30' : (isFailed ? 'bg-error/10' : 'bg-success/10');
-
-            return (
-                <div key={node.id} className="mb-3 mt-2 pl-2 ml-1">
-                    <div
-                        role="button"
-                        onClick={(e) => { e.stopPropagation(); toggleNode(node.id); }}
-                        className={clsx(
-                            "flex items-center gap-2 text-sm font-bold text-on-surface-variant/80 hover:text-on-surface mb-2 group w-full text-left relative z-10 cursor-pointer select-none rounded p-1 hover:bg-surface-variant/30 transition-colors",
-                            `border-l-4 ${borderColor}`
-                        )}
-                    >
-                        {isOpen ? <ChevronDown size={16} className="text-on-surface-variant/80 transition-colors" /> : <ChevronRight size={16} className="text-on-surface-variant/80 transition-colors" />}
-                        <Layers size={14} className={clsx("opacity-70", isRunning && "animate-pulse")} />
-
-                        <span className="truncate flex-1">
-                            {parentName && node.name.startsWith(parentName + '.') ? node.name.substring(parentName.length + 1) : node.name}
-                        </span>
-
-                        {/* Status Badge for Suite */}
-                        <span className={clsx("text-[10px] ml-2 px-1.5 py-0.5 rounded border flex items-center gap-1", borderColor, summaryColor, badgeBg)}>
-                            {isRunning && <ExpressiveLoading size="xsm" variant="circular" />}
-                            {isRunning ? t('run_tab.console.running') : translateSummary(node.summary) || t(node.status === 'FAIL' ? 'run_tab.console.fail' : 'run_tab.console.pass')}
-                        </span>
-                    </div>
-
-                    {isOpen && (
-                        <div className="pl-2 space-y-1 block border-l border-outline-variant/30 ml-2">
-                            {node.documentation && (
-                                <div className="text-on-surface-variant/80 italic px-2 py-1 text-xs border-b border-outline-variant/30 mb-1">
-                                    {node.documentation}
-                                </div>
-                            )}
-                            {node.children.map(child => renderNode(child, node.name))}
-                        </div>
-                    )}
-                </div>
-            );
-        }
-        return null;
-    };
 
     return (
         <div className="h-full flex-1 min-h-0 flex flex-col bg-surface rounded-2xl font-mono text-sm border border-outline-variant/30 shadow-inner pointer-events-auto relative z-0 isolate overflow-hidden">
@@ -608,6 +488,38 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
                 </button>
             </div>
 
+            {/* Artifacts Toolbar */}
+            {!isRunning && (artifactPaths.log || artifactPaths.report) && (
+                <div className="px-4 py-2 border-b border-outline-variant/30 bg-surface-variant/10 flex items-center gap-3 shrink-0">
+                    <span className="text-[10px] font-bold uppercase text-on-surface-variant/60 tracking-wider flex items-center gap-1 mr-2">
+                        <FileOutput size={12} />
+                        {t('run_tab.console.artifacts', 'Artifacts')}
+                    </span>
+                    {artifactPaths.log && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openPath(artifactPaths.log!)}
+                            leftIcon={<ExternalLink size={14} />}
+                            className="h-7 text-xs bg-surface border border-outline-variant/30 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-all rounded-lg px-3"
+                        >
+                            {t('run_tab.console.open_log', 'Open HTML Log')}
+                        </Button>
+                    )}
+                    {artifactPaths.report && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openPath(artifactPaths.report!)}
+                            leftIcon={<ExternalLink size={14} />}
+                            className="h-7 text-xs bg-surface border border-outline-variant/30 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-all rounded-lg px-3"
+                        >
+                            {t('run_tab.console.open_report', 'Open Report')}
+                        </Button>
+                    )}
+                </div>
+            )}
+
             <div ref={containerRef} className="h-full flex-1 min-h-0 flex flex-col bg-surface overflow-y-auto p-4 font-mono text-xs custom-scrollbar relative">
                 {logs.length === 0 && (
                     <div className="text-on-surface-variant/80 italic opacity-50 select-none pb-4">{t('run_tab.console.waiting')}</div>
@@ -621,7 +533,7 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
                     </div>
                 ) : (
                     <div className="relative z-10 w-full mb-8">
-                        {tree.map(node => renderNode(node))}
+                        {tree.map(node => <LogTree key={node.id} node={node} />)}
                         {isRunning && (
                             <div className="text-primary dark:text-primary/80 mt-4 flex items-center gap-2 text-sm italic opacity-70 animate-pulse ml-2">
                                 <ExpressiveLoading size="sm" variant="circular" />
@@ -631,6 +543,34 @@ export function RunConsole({ logs, isRunning, testPath }: RunConsoleProps) {
                     </div>
                 )}
             </div>
+
+            {/* System Logs Overlay for Debugging */}
+            {systemLogs.length > 0 && (
+                <div className="fixed bottom-4 right-4 z-[100] max-w-sm bg-black/95 border border-error/50 rounded-xl p-4 shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-5 ring-1 ring-white/10">
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-error flex items-center gap-1.5">
+                            <XCircle size={12} /> System Debug
+                        </span>
+                        <button onClick={() => setSystemLogs([])} className="text-white/40 hover:text-white transition-colors p-1 hover:bg-white/5 rounded">
+                            <XCircle size={14} />
+                        </button>
+                    </div>
+                    <div className="max-h-40 overflow-y-auto space-y-2 pr-2 thin-scrollbar">
+                        {debugInfo && (
+                            <div className="text-[9px] font-mono text-primary/80 bg-primary/5 p-2 rounded border border-primary/20 mb-3">
+                                <div>XML Size: {debugInfo.xmlLength || 0} bytes</div>
+                                <div>Failures: {debugInfo.failuresFound || 0}</div>
+                                {debugInfo.error && <div className="text-error">Error: {debugInfo.error}</div>}
+                            </div>
+                        )}
+                        {systemLogs.map((log, i) => (
+                            <div key={i} className="text-[10px] font-mono text-white/80 leading-relaxed border-b border-white/5 pb-2 last:border-0">{log}</div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
+
+export default RunConsole;

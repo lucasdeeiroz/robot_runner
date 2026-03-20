@@ -445,7 +445,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                                     maximizeLabel={t('common.maximize')}
                                 >
                                     {tool === 'console' && (
-                                        <RunConsole logs={session.logs} isRunning={session.status === 'running'} testPath={session.testPath} />
+                                        <RunConsole logs={session.logs} isSessionRunning={session.status === 'running'} testPath={session.testPath} />
                                     )}
                                     {tool === 'logcat' && <LogcatSubTab key={session.deviceUdid} selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
                                     {tool === 'commands' && <CommandsSubTab selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
@@ -467,7 +467,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
             ) : (
                 <div className="h-full flex-1 min-h-0 bg-surface border border-outline-variant/30 rounded-2xl overflow-hidden relative">
                     <div className={clsx("h-full flex-1 min-h-0 flex flex-col overflow-hidden", activeTool === 'console' && session.type === 'test' ? "flex" : "hidden")}>
-                        <RunConsole logs={session.logs} isRunning={session.status === 'running'} testPath={session.testPath} />
+                        <RunConsole logs={session.logs} isSessionRunning={session.status === 'running'} testPath={session.testPath} />
                     </div>
 
                     <div className={clsx("h-full flex-1 min-h-0 flex flex-col", activeTool === 'logcat' ? "flex" : "hidden")}>

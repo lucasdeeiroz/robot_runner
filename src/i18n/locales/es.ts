@@ -143,7 +143,8 @@ export const es = {
             attention: "Atención",
             errors: {
                 open_file_failed: "Error al abrir archivo o carpeta",
-                open_link_failed: "Error al abrir enlace"
+                open_link_failed: "Error al abrir enlace",
+                parse_failed: "Error al procesar los datos"
             }
         },
         components: {
@@ -333,6 +334,25 @@ export const es = {
             select_generic: "Seleccionar"
         },
         inspector: {
+            overlay: {
+                title: "Acciones Disponibles",
+                hover: {
+                    title: "Hover",
+                    desc: "Mover el puntero para resaltar"
+                },
+                select: {
+                    title: "Seleccionar",
+                    desc: "Clic para seleccionar elemento"
+                },
+                tap: {
+                    title: "Tocar",
+                    desc: "Doble clic para interactuar"
+                },
+                swipe: {
+                    title: "Deslizar",
+                    desc: "Arrastrar para deslizar"
+                }
+            },
             title: "Inspector",
             update_error: "Error al actualizar inspector",
             input_error: "Error al enviar entrada",
@@ -626,14 +646,26 @@ export const es = {
             },
             console: {
                 documentation: "Documentación: ",
-                fancy_mode: "Habilitar Modo Decorado",
-                raw_mode: "Habilitar Modo Crudo",
-                running: "EJECUTANDO",
+                error_message: "Mensaje de Error",
+                screenshot: "Captura de Pantalla",
+                artifacts: "Artefactos",
+                open_log: "Abrir Log HTML",
+                open_report: "Abrir Reporte",
                 pass: "ÉXITO",
                 fail: "FALLO",
+                not_run: "NO EJECUTADO",
+                fancy_mode: "Modo Decorado",
+                raw_mode: "Modo Texto (Raw)",
+                running: "EJECUTANDO",
                 processing: "Procesando...",
-                test_summary: "{{total}} PRUEBAS: {{passed}} ÉXITOS, {{failed}} FALLOS",
-                waiting: "Esperando registros..."
+                test_summary: "{{total}} PRUEBAS: {{passed}} CON ÉXITO, {{failed}} CON FALLO",
+                waiting: "Esperando registros...",
+                loading_xml: "Cargando datos de ejecución...",
+                failure_detail: "Detalle de la Falla",
+                step_screenshot: "Captura de Pantalla del Paso",
+                view_fullscreen: "VER EN PANTALLA COMPLETA",
+                failure_screenshot: "Captura de Pantalla del Fallo",
+                keyword_screenshot: "Captura de Pantalla del Paso (Keyword)"
             }
         },
         scrcpy: {
@@ -659,7 +691,10 @@ export const es = {
                 running: "Corriendo (PID: {{pid}})",
                 stopped: "Detenido",
                 start: "Iniciar Servidor",
+                start_new_window: "Iniciar en Nueva Ventana",
+                started_new_window: "Servidor Appium iniciado en nueva ventana",
                 stop: "Detener Servidor",
+                open_log_terminal: "Abrir registros en terminal externa",
                 logs: "Ver Logs",
                 waiting: "Esperando logs...",
                 host: "Host",

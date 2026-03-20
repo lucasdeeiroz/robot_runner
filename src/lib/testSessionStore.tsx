@@ -274,7 +274,10 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
             // Check Appium (Skip for Maestro)
             const fw = session.framework;
             if (fw !== 'maestro') {
-                const status = await invoke<{ running: boolean }>('get_appium_status');
+                const status = await invoke<{ running: boolean }>('get_appium_status', {
+                    host: settings.appiumHost,
+                    port: Number(settings.appiumPort)
+                });
                 if (!status.running) {
                     await invoke('start_appium_server', {
                         host: settings.appiumHost,
