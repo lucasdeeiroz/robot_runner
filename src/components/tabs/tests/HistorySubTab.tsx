@@ -182,7 +182,7 @@ export function HistorySubTab() {
 
                 {isExpanded && (
                     <div className="space-y-3 pl-1">
-                        {logs.map((log, i) => (
+                        {logs.map((log) => (
                             <div 
                                 key={log.xml_path} 
                                 onClick={() => handleLogClick(log)}
