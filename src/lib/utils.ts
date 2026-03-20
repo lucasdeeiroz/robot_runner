@@ -22,3 +22,12 @@ export function groupScreensByTags(maps: ScreenMap[], noTagsLabel: string): [str
         return a.localeCompare(b);
     });
 }
+export function decodeHtml(text: string): string {
+    try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(text, 'text/html');
+        return doc.documentElement.textContent || text;
+    } catch (e) {
+        return text;
+    }
+}

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { useSettings } from "@/lib/settings";
 import { HistoryCharts } from "@/components/organisms/HistoryCharts";
-import { XCircle, FileText, Folder, Calendar, ChevronDown, ChevronRight, CheckCircle, Clock, PieChart, Search, RefreshCw } from 'lucide-react';
+import { XCircle, Calendar, ChevronDown, ChevronRight, CheckCircle, Clock, PieChart, Search, RefreshCw } from 'lucide-react';
 import clsx from 'clsx';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from "react-i18next";
@@ -13,6 +13,8 @@ import { AndroidVersionPill } from "@/components/atoms/AndroidVersionPill";
 import { Input } from "@/components/atoms/Input";
 import { Select } from "@/components/atoms/Select";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
+import { decodeHtml } from '@/lib/utils';
+import { HistoryDetailModal } from '@/components/organisms/HistoryDetailModal';
 
 interface TestLog {
     path: string;
@@ -43,15 +45,6 @@ const formatDate = (dateStr: string) => {
     }
 };
 
-const decodeHtml = (text: string) => {
-    try {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(text, 'text/html');
-        return doc.documentElement.textContent || text;
-    } catch (e) {
-        return text;
-    }
-};
 
 export function HistorySubTab() {
     const { t } = useTranslation();
@@ -63,6 +56,8 @@ export function HistorySubTab() {
     const [showCharts, setShowCharts] = useState(false);
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+    const [selectedLog, setSelectedLog] = useState<TestLog | null>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
 
     const historyContainerRef = useRef<HTMLDivElement>(null);
     const [isHistoryNarrow, setIsHistoryNarrow] = useState(false);
@@ -149,19 +144,17 @@ export function HistorySubTab() {
         return groups;
     };
 
-    const openLog = async (path: string) => {
-        try {
-            await invoke('open_log_folder', { path });
-        } catch (e) {
-            feedback.toast.error("common.errors.open_file_failed", e);
-        }
-    };
 
     const toggleGroup = (group: string) => {
         setCollapsedGroups(prev => ({
             ...prev,
             [group]: !prev[group]
         }));
+    };
+
+    const handleLogClick = (log: TestLog) => {
+        setSelectedLog(log);
+        setIsModalOpen(true);
     };
 
     const renderGroup = (group: string, logs: TestLog[]) => {
@@ -190,10 +183,14 @@ export function HistorySubTab() {
                 {isExpanded && (
                     <div className="space-y-3 pl-1">
                         {logs.map((log, i) => (
-                            <div key={i} className="flex flex-row items-center gap-4 p-4 bg-surface/50 border border-outline-variant/30 rounded-2xl hover:border-primary/20 transition-colors shadow-sm">
+                            <div 
+                                key={i} 
+                                onClick={() => handleLogClick(log)}
+                                className="flex flex-row items-center gap-4 p-4 bg-surface/50 border border-outline-variant/30 rounded-2xl hover:border-primary/40 hover:bg-surface-variant/10 cursor-pointer transition-all shadow-sm group"
+                            >
                                 <div className="flex gap-4 items-start min-w-0 flex-1">
                                     <div className={clsx(
-                                        "w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 mt-1",
+                                        "w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 mt-1 transition-transform group-hover:scale-110",
                                         log.status === 'PASS'
                                             ? "bg-success/10 text-on-success-container"
                                             : "bg-error/10 text-on-error-container"
@@ -202,7 +199,7 @@ export function HistorySubTab() {
                                     </div>
                                     <div className="min-w-0 flex-1">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <span className="font-semibold text-on-surface/80 truncate" title={decodeHtml(log.suite_name)}>
+                                            <span className="font-semibold text-on-surface/80 truncate group-hover:text-primary transition-colors" title={decodeHtml(log.suite_name)}>
                                                 {decodeHtml(log.suite_name)}
                                             </span>
                                         </div>
@@ -233,27 +230,9 @@ export function HistorySubTab() {
                                     )}>
                                         {log.status}
                                     </span>
-                                    <div className="border border-outline-variant/30 py-2">
+                                    <div className="text-on-surface-variant/30 group-hover:text-primary/50 transition-colors">
+                                        <ChevronRight size={18} />
                                     </div>
-                                    <Button
-                                        onClick={() => openLog(log.log_html_path)}
-                                        variant="ghost"
-                                        size="sm"
-                                        className="flex items-center gap-2 px-3 py-1.5 bg-surface-variant/30 hover:bg-primary/10 text-on-surface-variant/80 hover:text-primary rounded-2xl text-xs font-medium transition-colors h-auto"
-                                        title={isHistoryNarrow ? t('tests_page.report') : log.log_html_path}
-                                        leftIcon={<FileText size={14} />}
-                                    >
-                                        {!isHistoryNarrow && t('tests_page.report')}
-                                    </Button>
-                                    <Button
-                                        onClick={() => openLog(log.path)}
-                                        variant="ghost"
-                                        size="icon"
-                                        className="p-1.5 bg-surface-variant/30 hover:bg-outline-variant text-on-surface-variant/80 rounded-2xl transition-colors h-auto w-auto"
-                                        title={t('tests_page.open_folder')}
-                                    >
-                                        <Folder size={14} />
-                                    </Button>
                                 </div>
                             </div>
                         ))}
@@ -363,6 +342,12 @@ export function HistorySubTab() {
                     ))}
                 </div>
             </div>
+
+            <HistoryDetailModal 
+                isOpen={isModalOpen} 
+                onClose={() => setIsModalOpen(false)} 
+                log={selectedLog} 
+            />
         </div>
     );
 }

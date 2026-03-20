@@ -143,7 +143,8 @@ export const en = {
             attention: "Attention",
             errors: {
                 open_file_failed: "Failed to open file or folder",
-                open_link_failed: "Failed to open link"
+                open_link_failed: "Failed to open link",
+                parse_failed: "Failed to parse data"
             }
         },
         components: {
@@ -652,7 +653,13 @@ export const en = {
                 running: "RUNNING",
                 processing: "Processing...",
                 test_summary: "{{total}} TESTS: {{passed}} PASSED, {{failed}} FAILED",
-                waiting: "Waiting for logs..."
+                waiting: "Waiting for logs...",
+                loading_xml: "Loading execution data...",
+                failure_detail: "Failure Detail",
+                step_screenshot: "Step Screenshot",
+                view_fullscreen: "VIEW FULLSCREEN",
+                failure_screenshot: "Failure Screenshot",
+                keyword_screenshot: "Keyword Screenshot"
             }
         },
         scrcpy: {

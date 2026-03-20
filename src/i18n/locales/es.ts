@@ -143,7 +143,8 @@ export const es = {
             attention: "Atención",
             errors: {
                 open_file_failed: "Error al abrir archivo o carpeta",
-                open_link_failed: "Error al abrir enlace"
+                open_link_failed: "Error al abrir enlace",
+                parse_failed: "Error al procesar los datos"
             }
         },
         components: {
@@ -658,7 +659,13 @@ export const es = {
                 running: "EJECUTANDO",
                 processing: "Procesando...",
                 test_summary: "{{total}} PRUEBAS: {{passed}} CON ÉXITO, {{failed}} CON FALLO",
-                waiting: "Esperando registros..."
+                waiting: "Esperando registros...",
+                loading_xml: "Cargando datos de ejecución...",
+                failure_detail: "Detalle de la Falla",
+                step_screenshot: "Captura de Pantalla del Paso",
+                view_fullscreen: "VER EN PANTALLA COMPLETA",
+                failure_screenshot: "Captura de Pantalla del Fallo",
+                keyword_screenshot: "Captura de Pantalla del Paso (Keyword)"
             }
         },
         scrcpy: {

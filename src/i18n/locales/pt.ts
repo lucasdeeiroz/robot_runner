@@ -143,7 +143,8 @@ export const pt = {
             attention: "Atenção",
             errors: {
                 open_file_failed: "Falha ao abrir arquivo ou pasta",
-                open_link_failed: "Falha ao abrir link"
+                open_link_failed: "Falha ao abrir link",
+                parse_failed: "Falha ao processar os dados"
             }
         },
         components: {
@@ -652,7 +653,13 @@ export const pt = {
                 running: "EXECUTANDO",
                 processing: "Processando...",
                 test_summary: "{{total}} TESTES: {{passed}} COM SUCESSO, {{failed}} COM FALHA",
-                waiting: "Aguardando logs..."
+                waiting: "Aguardando logs...",
+                loading_xml: "Carregando dados de execução...",
+                failure_detail: "Detalhes da Falha",
+                step_screenshot: "Captura de Tela do Passo",
+                view_fullscreen: "VER EM TELA CHEIA",
+                failure_screenshot: "Captura de Tela da Falha",
+                keyword_screenshot: "Captura de Tela do Passo (Keyword)"
             }
         },
         scrcpy: {
