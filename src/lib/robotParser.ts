@@ -321,14 +321,19 @@ export const mapXmlNode = async (
         for (const w of whiles) { const n = await mapXmlNode(w, outputXmlPath, readImageBase64, 'while'); if (n) children.push(n); }
         if (obj.teardown) { const n = await mapXmlNode(obj.teardown, outputXmlPath, readImageBase64, 'teardown'); if (n) children.push(n); }
 
+        const normalizedStatus: 'PASS' | 'FAIL' | 'RUNNING' =
+            statusStr === 'PASS' || statusStr === 'FAIL' || statusStr === 'RUNNING'
+                ? statusStr
+                : 'FAIL';
+
         const failures: Record<string, { message: string, screenshot?: string, name: string }> = {};
-        if (statusStr === 'FAIL') {
+        if (normalizedStatus === 'FAIL') {
             const msg = typeof obj.status === 'object' && obj.status["#text"] ? obj.status["#text"] : "";
             failures[id] = { message: msg, name, screenshot: await resolveScreenshot(deepScreenshotSrc(obj), outputXmlPath, readImageBase64) };
         }
 
         return {
-            type: 'test', id, name, status: statusStr as 'PASS' | 'FAIL', duration, children,
+            type: 'test', id, name, status: normalizedStatus, duration, children,
             logs: [],
             failureDetail: failures[id] ? { message: failures[id].message, screenshot: failures[id].screenshot } : undefined
         };
