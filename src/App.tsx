@@ -17,6 +17,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";
 import { argbFromHex, themeFromSourceColor, TonalPalette } from "@material/material-color-utilities";
 import { DeviceProvider } from "./lib/deviceStore";
+import { SelectionProvider } from "./lib/selectionStore";
 import { ExpressiveLoading } from "./components/atoms/ExpressiveLoading";
 
 function App() {
@@ -186,7 +187,8 @@ function App() {
   return (
     <TestSessionProvider>
       <DeviceProvider>
-        <Toaster richColors position="bottom-right" theme={settings.theme === 'dark' ? 'dark' : 'light'} />
+        <SelectionProvider>
+          <Toaster richColors position="bottom-right" theme={settings.theme === 'dark' ? 'dark' : 'light'} />
         <AnimatePresence>
           {!settings.usageMode && (
             <Onboarding key="onboarding-flow" onComplete={() => {
@@ -249,6 +251,7 @@ function App() {
             </AnimatePresence>
           </div>
         </Layout>
+        </SelectionProvider>
       </DeviceProvider>
     </TestSessionProvider>
   );

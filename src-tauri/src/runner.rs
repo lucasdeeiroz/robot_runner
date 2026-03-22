@@ -174,11 +174,6 @@ def start_test(name, attrs):
         args.push(&version_arg);
     }
 
-    if let Some(arg_file) = &arguments_file {
-        args.push("-A");
-        args.push(arg_file);
-    }
-
     // Add selected tests if any
     let test_specific_args: Vec<String>;
     if let Some(tests) = &selected_tests {
@@ -194,7 +189,10 @@ def start_test(name, attrs):
         }
     }
 
-
+    if let Some(arg_file) = &arguments_file {
+        args.push("-A");
+        args.push(arg_file);
+    }
 
     // Only add test_path if it is provided
     if let Some(tp) = &test_path {

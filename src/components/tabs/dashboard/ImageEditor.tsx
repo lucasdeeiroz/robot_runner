@@ -358,7 +358,7 @@ export function ImageEditor() {
                 variant="primary"
                 onClick={handleCopyCanvas}
                 leftIcon={<Copy size={16} />}
-                className="w-full justify-center shadow-lg shadow-primary/20"
+                className="w-full justify-center shadow-lg shadow-primary/20 hover:bg-secondary-container"
             >
                 {t('dashboard.image.copy', "Copy Image")}
             </Button>

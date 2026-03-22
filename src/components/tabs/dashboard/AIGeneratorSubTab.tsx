@@ -177,7 +177,7 @@ export function AIGeneratorSubTab() {
                                 onClick={handleGenerate}
                                 disabled={!requirements.trim() || isGenerating}
                                 leftIcon={isGenerating ? undefined : <BrainCircuit size={16} />}
-                                className="w-full justify-center shadow-lg shadow-primary/20 h-11 text-base font-semibold"
+                                className="w-full justify-center shadow-lg shadow-primary/20 h-11 text-base font-semibold hover:bg-secondary-container"
                             >
                                 {isGenerating ? t('dashboard.generator.generating', "Generating...") : t('dashboard.generator.generate_button', "Generate with AI")}
                             </Button>

@@ -397,6 +397,7 @@ export function SettingsPage() {
                             type="submit"
                             disabled={!newProfileName.trim()}
                             variant="primary"
+                            className="hover:bg-secondary-container"
                         >
                             {t('common.save')}
                         </Button>
@@ -420,7 +421,7 @@ export function SettingsPage() {
                                     {appiumStatus.running ? t('settings.appium.running', { pid: appiumStatus.pid }) : t('settings.appium.stopped')}
                                 </div>
                             }
-                             actions={
+                            actions={
                                 <>
                                     {appiumStatus.running && (
                                         <Button

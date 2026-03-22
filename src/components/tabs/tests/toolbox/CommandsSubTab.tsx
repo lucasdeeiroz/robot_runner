@@ -319,6 +319,7 @@ export function CommandsSubTab({ selectedDevice, isTestRunning = false, allowAct
                         onClick={handleSend}
                         disabled={!command.trim() || (isTestRunning && !allowActionsDuringTest)}
                         variant="primary"
+                        className="hover:bg-secondary-container"
                     >
                         <Send size={18} />
                     </Button>
@@ -364,6 +365,7 @@ export function CommandsSubTab({ selectedDevice, isTestRunning = false, allowAct
                             onClick={confirmSaveCommand}
                             disabled={!saveLabel.trim()}
                             variant="primary"
+                            className="hover:bg-secondary-container"
                         >
                             {t('commands.modal.save')}
                         </Button>

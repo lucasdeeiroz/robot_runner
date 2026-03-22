@@ -744,7 +744,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                     </div>
                                 </div>
                                 <div className="flex gap-2">
-                                    <Button onClick={() => { handleSaveScreen(); refreshAll(); }} variant="primary">
+                                    <Button onClick={() => { handleSaveScreen(); refreshAll(); }} variant="primary" className="hover:bg-secondary-container">
                                         <Save size={16} className="mr-2" /> {t('mapper.action.save_screen')}
                                     </Button>
                                     <Button
@@ -806,12 +806,12 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                         // Group by Tags
                                                         (() => {
                                                             const groupedEntries = groupScreensByTags(savedMaps, t('mapper.grouping.no_tags', 'No Tags'));
-                                                            
+
                                                             return groupedEntries.map(([tag, maps]) => {
                                                                 const isExpanded = expandedScreenTags.includes(tag);
                                                                 return (
                                                                     <div key={tag} className="border-b border-outline-variant/5 last:border-0">
-                                                                        <div 
+                                                                        <div
                                                                             className="flex items-center justify-between p-2 hover:bg-surface-variant/10 cursor-pointer text-xs font-semibold text-on-surface-variant/80 bg-surface-variant/5"
                                                                             onClick={() => {
                                                                                 setExpandedScreenTags(prev =>
@@ -952,10 +952,10 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                                 const isExpanded = expandedElementTypes.includes(type);
                                                                 return (
                                                                     <div key={type} className="border-b border-outline-variant/5 last:border-0">
-                                                                        <div 
+                                                                        <div
                                                                             className="flex items-center justify-between p-2 hover:bg-surface-variant/10 cursor-pointer text-xs font-semibold text-on-surface-variant/80 bg-surface-variant/5"
                                                                             onClick={() => {
-                                                                                setExpandedElementTypes(prev => 
+                                                                                setExpandedElementTypes(prev =>
                                                                                     prev.includes(type) ? prev.filter(item => item !== type) : [...prev, type]
                                                                                 );
                                                                             }}
@@ -1023,7 +1023,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                             </div>
                                         )}
                                     </div>
-                                    <Button onClick={saveElementMapping} variant="primary" size="sm"><FileInput size={16} className="mr-2" />{mappedElements.find(e => e.id === currentElement.id) ? t('mapper.action.update') : t('mapper.action.add')}</Button>
+                                    <Button onClick={saveElementMapping} variant="primary" size="sm" className="hover:bg-secondary-container"><FileInput size={16} className="mr-2" />{mappedElements.find(e => e.id === currentElement.id) ? t('mapper.action.update') : t('mapper.action.add')}</Button>
                                 </div>
                             </div>
                             <div className="flex items-center justify-between border-b border-outline-variant/30 shrink-0 bg-surface/50 pr-2">

@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
-import { Star, ExternalLink, XCircle, FileOutput } from "lucide-react";
+import { Star, ExternalLink, FileOutput } from "lucide-react";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { XMLParser } from "fast-xml-parser";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/atoms/Button";
-import { 
-    LogNode, mapXmlNode, 
+import {
+    LogNode, mapXmlNode,
     LinearNode, SuiteNode, TestNode, TextNode
 } from "@/lib/robotParser";
 import { LogTree } from "@/components/molecules/LogTree";
@@ -30,8 +30,7 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
     const [tree, setTree] = useState<LogNode[]>([]);
     const [artifactPaths, setArtifactPaths] = useState<{ log?: string, report?: string, output?: string }>({});
 
-    const [debugInfo, setDebugInfo] = useState<any>(null);
-    const [systemLogs, setSystemLogs] = useState<string[]>([]);
+
 
     // Auto-scroll on new logs with stick-to-bottom logic
     useEffect(() => {
@@ -83,14 +82,8 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
                     if (rootNode) setTree([rootNode]);
                 }
 
-                setDebugInfo({
-                    xmlLength: xmlContent.length,
-                    status: 'Parsed'
-                });
             } catch (e: any) {
                 console.error("Failed to parse output.xml:", e);
-                setSystemLogs(prev => [...prev, `XML Error: ${e.message || String(e)}`]);
-                setDebugInfo({ error: e.message || String(e) });
             }
         };
 
@@ -116,7 +109,8 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
         // Constants
         const IS_DOUBLE = (l: string) => /^={10,}$/.test(l.trim());
         const IS_SINGLE = (l: string) => /^-{10,}$/.test(l.trim());
-        const IS_STATUS = (l: string) => / \|\s+(PASS|FAIL)\s+\|/.test(l); // Loose match for table status
+        const cleanAnsi = (l: string) => l.replace(/\x1b\[[0-9;]*m/g, '').replace(/[\x00-\x1f\x7f-\x9f]/g, '');
+        const IS_STATUS = (l: string) => / \|\s+(PASS|FAIL)\s+\|/.test(cleanAnsi(l)); // Loose match for table status (ANSI-aware)
         const IS_SUMMARY = (l: string) => /^\d+ tests?, \d+ passed, \d+ failed/.test(l.trim());
         const IS_MAESTRO_VERBOSE = (l: string) => /disableAnsi=false/.test(l) || /\(\[\s*(INFO|DEBUG|ERROR|WARN|TRACE)\s*\]\)/.test(l);
         const IS_SYSTEM = (l: string) => l.trim().startsWith('[System]') || l.trim().startsWith('[Error]') || /^\s*(Output|Log|Report|STDERR|STDOUT):/.test(l) || IS_MAESTRO_VERBOSE(l);
@@ -127,6 +121,7 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
         const IS_MAVEN_TEST_START = (l: string) => l.startsWith("[INFO] Running ");
         const IS_MAVEN_TEST_END = (l: string) => l.includes("Tests run: ") && l.includes("Failures: ");
         const IS_ROBOT_RUNNER_TEST_START = (l: string) => l.startsWith("[RobotRunner-Test-Start]");
+        const IS_REDUNDANT_SYSTEM = (l: string) => l.trim().startsWith('[System]') || /^\s*(Output|Log|Report):/.test(l) || IS_STATUS(l);
 
         if (currentCount > processedCount) {
             const newLogs = logs.slice(processedCount);
@@ -241,7 +236,8 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
             if (currentTest) {
                 const logs = currentTest.logs;
                 for (let j = logs.length - 1; j >= 0; j--) {
-                    const match = logs[j].match(/\|\s+(PASS|FAIL)\s+\|/);
+                    const cleanLog = cleanAnsi(logs[j]);
+                    const match = cleanLog.match(/\|\s+(PASS|FAIL)\s+\|/);
                     if (match) {
                         const finalStatus = match[1] as 'PASS' | 'FAIL';
                         currentTest.status = finalStatus;
@@ -389,7 +385,9 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
                     const isSys = node.isSystem;
                     if (isSys) {
                         if (currentTest) {
-                            currentTest.logs.push(line);
+                            if (!IS_REDUNDANT_SYSTEM(line)) {
+                                currentTest.logs.push(line);
+                            }
 
                             // Heuristic: If system says we stopped/finished, identify if we need to force-fail the current test/suite
                             if (line.includes('[System] Finished:') || line.includes('[System] Stopping...') || line.includes('[System] Toolbox session stopped')) {
@@ -412,7 +410,9 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
                                 });
                             }
                         } else {
-                            addToCurrentContext({ type: 'text', content: line, id: nodeId });
+                            if (!IS_REDUNDANT_SYSTEM(line)) {
+                                addToCurrentContext({ type: 'text', content: line, id: nodeId });
+                            }
                             // Also check for suites if we are at root level (e.g. suite setup failure or global stop)
                             if (line.includes('[System] Finished:') || line.includes('[System] Stopping...') || line.includes('[System] Toolbox session stopped')) {
                                 const isSuccess = line.toLowerCase().includes('exit code: 0');
@@ -427,10 +427,11 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
                             // Suppress the test name lines and markers from inside the test's own log section
                             // to avoid duplicating the name inside the collapsible UI section
                             const isMarker = IS_ROBOT_RUNNER_TEST_START(line);
-                            const nameOnly = line.trim().split(' :: ')[0].trim();
-                            const isTestNameLine = nameOnly === currentTest.name || line.match(/^(.*?)\s*\|\s+(PASS|FAIL)\s+\|\s*$/)?.[1].trim() === currentTest.name;
+                            const cleanLine = cleanAnsi(line);
+                            const nameOnly = cleanLine.trim().split(' :: ')[0].trim();
+                            const isTestNameLine = nameOnly === currentTest.name || cleanLine.match(/^(.*?)\s*\|\s+(PASS|FAIL)\s+\|\s*$/)?.[1].trim() === currentTest.name;
 
-                            if (!isMarker && !isTestNameLine) {
+                            if (!isMarker && !isTestNameLine && !IS_STATUS(line)) {
                                 currentTest.logs.push(line);
                             }
                         } else {
@@ -456,7 +457,7 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
                                 // If we are in a Maestro suite, we ONLY start tests via IS_MAESTRO_TEST_START (handled above)
                                 const isMaestroSuite = activeSuite()?.name.includes('Maestro');
 
-                                if (line.trim().length > 0 && !isMaestroSuite && !line.includes('[RobotRunner-Test-Start]')) {
+                                if (line.trim().length > 0 && !isMaestroSuite && !line.includes('[RobotRunner-Test-Start]') && !IS_STATUS(line)) {
                                     let name = line.trim();
                                     if (name.includes(' :: ')) name = name.split(' :: ')[0].trim();
 
@@ -481,7 +482,9 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
                                     }
                                     currentTest = newTest;
                                 } else {
-                                    addToCurrentContext({ type: 'text', content: line, id: nodeId });
+                                    if (!IS_REDUNDANT_SYSTEM(line)) {
+                                        addToCurrentContext({ type: 'text', content: line, id: nodeId });
+                                    }
                                 }
                             }
                         }
@@ -565,32 +568,6 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
                     </div>
                 )}
             </div>
-
-            {/* System Logs Overlay for Debugging */}
-            {systemLogs.length > 0 && (
-                <div className="fixed bottom-4 right-4 z-[100] max-w-sm bg-black/95 border border-error/50 rounded-xl p-4 shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-5 ring-1 ring-white/10">
-                    <div className="flex items-center justify-between mb-3">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-error flex items-center gap-1.5">
-                            <XCircle size={12} /> System Debug
-                        </span>
-                        <button onClick={() => setSystemLogs([])} className="text-white/40 hover:text-white transition-colors p-1 hover:bg-white/5 rounded">
-                            <XCircle size={14} />
-                        </button>
-                    </div>
-                    <div className="max-h-40 overflow-y-auto space-y-2 pr-2 thin-scrollbar">
-                        {debugInfo && (
-                            <div className="text-[9px] font-mono text-primary/80 bg-primary/5 p-2 rounded border border-primary/20 mb-3">
-                                <div>XML Size: {debugInfo.xmlLength || 0} bytes</div>
-                                <div>Failures: {debugInfo.failuresFound || 0}</div>
-                                {debugInfo.error && <div className="text-error">Error: {debugInfo.error}</div>}
-                            </div>
-                        )}
-                        {systemLogs.map((log, i) => (
-                            <div key={i} className="text-[10px] font-mono text-white/80 leading-relaxed border-b border-white/5 pb-2 last:border-0">{log}</div>
-                        ))}
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

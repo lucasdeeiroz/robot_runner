@@ -102,13 +102,16 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
                     {node.type === 'keyword' && subType === 'setup' && <CalendarCog size={14} className="opacity-70 shrink-0" />}
                     {node.type === 'keyword' && subType === 'teardown' && <CalendarCog size={14} className="opacity-70 shrink-0" />}
 
-                    <span className={clsx(
-                        "truncate",
-                        node.type === 'suite' ? "font-bold text-sm" : "text-xs font-medium",
-                        isRunning ? "text-on-surface-variant/80" : isNotRun ? "text-on-surface-variant/50" : (isFailed ? "text-error" : "text-success")
-                    )}>
+                    <span 
+                        className={clsx(
+                            "truncate",
+                            node.type === 'suite' ? "font-bold text-sm" : "text-xs font-medium",
+                            isRunning ? "text-on-surface-variant/80" : isNotRun ? "text-on-surface-variant/50" : (isFailed ? "text-error" : "text-success")
+                        )}
+                        title={node.name}
+                    >
                         <span className={clsx("text-[9px] mr-1.5 uppercase font-bold tracking-tighter", pillColor)}>{pill}</span>
-                        {node.name}
+                        {node.name.includes('.') ? node.name.split('.').pop() : node.name}
 
                         {node.type === 'keyword' && (node as KeywordNode).args && (node as KeywordNode).args!.length > 0 && (
                             <span className="ml-2 opacity-50 font-normal italic overflow-hidden text-ellipsis">
