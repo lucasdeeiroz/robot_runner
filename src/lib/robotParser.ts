@@ -45,6 +45,11 @@ export interface SuiteNode {
     summary: string;
     duration?: string;
     children: LogNode[];
+    stats?: {
+        passed: number;
+        failed: number;
+        skipped: number;
+    };
 }
 
 export type KeywordSubType = 'keyword' | 'setup' | 'teardown' | 'for' | 'iteration' | 'if' | 'else-if' | 'else' | 'break' | 'continue' | 'while';
@@ -298,7 +303,34 @@ export const mapXmlNode = async (
         for (const s of suites) { const n = await mapXmlNode(s, outputXmlPath, readImageBase64, 'suite'); if (n) children.push(n); }
         const tests = Array.isArray(obj.test) ? obj.test : (obj.test ? [obj.test] : []);
         for (const t of tests) { const n = await mapXmlNode(t, outputXmlPath, readImageBase64, 'test'); if (n) children.push(n); }
-        return { type: 'suite', id, name, status: statusStr as 'PASS' | 'FAIL', summary: '', duration, children };
+        
+        // Extract stats from <statistics> if available, or compute from children
+        let passed = 0, failed = 0, skipped = 0;
+        if (obj.statistics && obj.statistics.stat) {
+            const stats = Array.isArray(obj.statistics.stat) ? obj.statistics.stat : [obj.statistics.stat];
+            const suiteStat = stats[0]; // Usually the first one is for the suite itself
+            passed = parseInt(suiteStat.pass || '0');
+            failed = parseInt(suiteStat.fail || '0');
+            skipped = parseInt(suiteStat.skip || '0');
+        } else {
+            // Fallback: count from direct matching children
+            children.forEach(c => {
+                if (c.type === 'test') {
+                    if (c.status === 'PASS') passed++;
+                    else if (c.status === 'FAIL') failed++;
+                } else if (c.type === 'suite' && c.stats) {
+                    passed += c.stats.passed;
+                    failed += c.stats.failed;
+                    skipped += c.stats.skipped;
+                }
+            });
+        }
+
+        return { 
+            type: 'suite', id, name, status: statusStr as 'PASS' | 'FAIL', 
+            summary: '', duration, children,
+            stats: { passed, failed, skipped }
+        };
     }
 
     if (nodeType === 'test') {
@@ -344,6 +376,8 @@ export const mapXmlNode = async (
             const msg = typeof obj.status === 'object' && obj.status["#text"] ? obj.status["#text"] : "";
             failures[id] = { message: msg, name, screenshot: await resolveScreenshot(deepScreenshotSrc(obj), outputXmlPath, readImageBase64) };
         }
+
+        children.push(...parseMsgChildren(obj));
 
         return {
             type: 'test', id, name, status: normalizedStatus, duration, children,

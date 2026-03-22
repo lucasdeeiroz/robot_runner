@@ -843,15 +843,34 @@ export const en = {
                 args: "Arguments"
             },
             select_tests: "Select Tests",
+            select_args: "Select Arguments",
             selector: {
                 title: "Test Case Selection",
+                args_title: "Select Arguments",
                 all: "Select All",
                 none: "Clear All",
-                close: "Confirm Selection",
-                empty: "No test cases found in this file.",
+                close: "Apply",
+                empty: "No items found in this file.",
                 loading: "Reading file...",
-                selected: "{{count}} tests selected",
-                load_error: "Failed to load test cases from file"
+                selected: "{{count}} items selected",
+                info: "Note: If no tests are selected, the entire suite will be executed.",
+                suite_info: "If no tests are selected, the entire file will be executed.",
+                load_error: "Failed to load items from file"
+            },
+            selection: {
+                title: "Selection",
+                items_one: "{{count}} item",
+                items_other: "{{count}} items",
+                files_one: "{{count}} file",
+                files_other: "{{count}} files",
+                tests_one: "{{count}} test",
+                tests_other: "{{count}} tests",
+                folders_one: "{{count}} folder",
+                folders_other: "{{count}} folders",
+                args_one: "{{count}} arg file",
+                args_other: "{{count}} arg files",
+                clear_all: "Clear All",
+                remove: "Remove"
             },
             target: "Target",
             no_selection: "No valid selection",

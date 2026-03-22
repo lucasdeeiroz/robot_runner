@@ -15,6 +15,8 @@ pub struct TestLog {
     android_version: Option<String>,
     timestamp: String,
     duration: String,
+    pass_count: i32,
+    fail_count: i32,
     xml_path: String,
     log_html_path: String,
 }
@@ -236,6 +238,10 @@ fn parse_log_entry(folder_path: &Path, xml_path: &Path) -> Option<TestLog> {
             (0, 0)
         };
 
+        if pass == 0 && fail == 0 {
+            return None;
+        }
+
         let status = if fail > 0 { "FAIL" } else { "PASS" }.to_string();
 
         // Timestamp logic: Prefer metadata, fall back to XML
@@ -249,6 +255,38 @@ fn parse_log_entry(folder_path: &Path, xml_path: &Path) -> Option<TestLog> {
                 .unwrap_or("")
                 .to_string()
         };
+
+        // Extract duration from root suite status (usually in the tail)
+        let mut duration_str = "Unknown".to_string();
+        
+        // Try v5/v6 'elapsed' attribute first
+        let re_elapsed = Regex::new(r#"<status\s+[^>]*elapsed="([^"]+)""#).ok();
+        let mut last_elapsed = None;
+        if let Some(re) = re_elapsed {
+            for caps in re.captures_iter(&content) {
+                last_elapsed = Some(caps[1].to_string());
+            }
+        }
+
+        if let Some(elapsed_secs) = last_elapsed {
+            if let Ok(secs) = elapsed_secs.parse::<f64>() {
+                duration_str = format_seconds(secs);
+            }
+        } else {
+            // Fallback to v3/v4 'starttime'/'endtime'
+            let re_status = Regex::new(r#"<status\s+[^>]*starttime="([^"]+)"\s+endtime="([^"]+)""#).ok();
+            if let Some(re) = re_status {
+                let mut last_s = None;
+                let mut last_e = None;
+                for caps in re.captures_iter(&content) {
+                    last_s = Some(caps[1].to_string());
+                    last_e = Some(caps[2].to_string());
+                }
+                if let (Some(s), Some(e)) = (last_s, last_e) {
+                    duration_str = format_duration(&s, &e);
+                }
+            }
+        }
 
         let log_html_path = abs_folder_path
             .join("log.html")
@@ -264,7 +302,9 @@ fn parse_log_entry(folder_path: &Path, xml_path: &Path) -> Option<TestLog> {
             device_model,
             android_version,
             timestamp,
-            duration: format!("{} P / {} F", pass, fail),
+            duration: duration_str,
+            pass_count: pass,
+            fail_count: fail,
             log_html_path,
         });
     }
@@ -312,20 +352,64 @@ fn parse_log_entry(folder_path: &Path, xml_path: &Path) -> Option<TestLog> {
                  (content.contains("errors=\"") && !content.contains("errors=\"0\"")) ||
                  content.contains("status=\"FAILED\"");
 
-    let status = if is_fail { "FAIL".to_string() } else { "PASS".to_string() };
+    let status_str = if is_fail { "FAIL" } else { "PASS" };
+    let pass_count = if !is_fail { 1 } else { 0 };
+    let fail_count = if is_fail { 1 } else { 0 };
 
     Some(TestLog {
         path: abs_folder_path.to_string_lossy().to_string(),
         xml_path: xml_path.to_string_lossy().to_string(),
         suite_name: format!("[{}] {}", framework.to_uppercase(), suite_name),
-        status,
+        status: status_str.to_string(),
         device_udid,
         device_model,
         android_version,
         timestamp,
         duration: xml_duration.unwrap_or_else(|| "Framework Managed".to_string()),
+        pass_count,
+        fail_count,
         log_html_path: xml_path.to_string_lossy().to_string(), // Maestro report is the XML
     })
+}
+
+fn format_seconds(seconds: f64) -> String {
+    let seconds = seconds.round() as u64;
+    let minutes = seconds / 60;
+    let hours = minutes / 60;
+    
+    if hours > 0 {
+        format!("{}h {}m {}s", hours, minutes % 60, seconds % 60)
+    } else if minutes > 0 {
+        format!("{}m {}s", minutes, seconds % 60)
+    } else {
+        format!("{}s", seconds)
+    }
+}
+
+fn format_duration(start: &str, end: &str) -> String {
+    let fmt = "%Y%m%d %H:%M:%S%.3f";
+    let start_dt = chrono::NaiveDateTime::parse_from_str(start, fmt);
+    let end_dt = chrono::NaiveDateTime::parse_from_str(end, fmt);
+    
+    if let (Ok(s), Ok(e)) = (start_dt, end_dt) {
+        let duration = e.signed_duration_since(s);
+        let ms = duration.num_milliseconds();
+        if ms < 0 { return "0s".to_string(); }
+        
+        let seconds = ms / 1000;
+        let minutes = seconds / 60;
+        let hours = minutes / 60;
+        
+        if hours > 0 {
+            format!("{}h {}m {}s", hours, minutes % 60, seconds % 60)
+        } else if minutes > 0 {
+            format!("{}m {}s", minutes, seconds % 60)
+        } else {
+            format!("{}s", seconds)
+        }
+    } else {
+        "0s".to_string()
+    }
 }
 
 fn read_optimized_log(path: &Path) -> std::io::Result<String> {

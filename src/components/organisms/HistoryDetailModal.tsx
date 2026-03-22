@@ -25,6 +25,8 @@ interface TestLog {
     android_version?: string | null;
     timestamp: string;
     duration: string;
+    pass_count: number;
+    fail_count: number;
     xml_path: string;
     log_html_path: string;
 }
@@ -120,7 +122,12 @@ export function HistoryDetailModal({ isOpen, onClose, log }: HistoryDetailModalP
                         </div>
 
                         <div className="flex items-center gap-2 text-xs text-on-surface-variant/80">
-                            <Clock size={14} /> {log.duration}
+                            <Clock size={14} /> 
+                            <span>{log.duration}</span>
+                            <span className="mx-1 opacity-20 h-2 w-[1px] bg-current" />
+                            <span className="text-success font-medium">{log.pass_count}P</span>
+                            <span className="opacity-30">/</span>
+                            <span className={clsx("font-medium", log.fail_count > 0 ? "text-error" : "opacity-40")}>{log.fail_count}F</span>
                         </div>
 
                         {(log.device_model || log.device_udid) && (

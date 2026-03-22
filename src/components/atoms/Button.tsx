@@ -27,7 +27,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
     ...props
 }, ref) => {
     const variants = {
-        primary: 'bg-primary/10 hover:bg-primary-container/80 text-primary dark:text-primary/80 shadow-sm border border-transparent',
+        primary: 'bg-primary/10 hover:bg-secondary-container text-primary dark:text-primary/80 shadow-sm border border-transparent',
         secondary: 'bg-surface text-on-surface/80 border border-outline-variant/30 hover:bg-surface-variant/50 shadow-sm',
         outline: 'bg-transparent border border-outline-variant/30 text-on-surface/80 hover:bg-surface-variant/30',
         ghost: 'bg-transparent text-on-surface-variant/80 hover:bg-surface-variant/30 hover:text-on-surface/80',

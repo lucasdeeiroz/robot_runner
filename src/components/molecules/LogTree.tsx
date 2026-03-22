@@ -8,7 +8,7 @@ import {
     Layers, BugPlay, CirclePlay, Repeat, IterationCcw, Workflow,
     Infinity, Split, StepForward, CalendarCog, Maximize2
 } from "lucide-react";
-import { LogNode, TestNode, KeywordNode } from "@/lib/robotParser";
+import { LogNode, TestNode, KeywordNode, SuiteNode } from "@/lib/robotParser";
 import { LinkRenderer } from "../molecules/LinkRenderer";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 
@@ -18,10 +18,19 @@ interface LogTreeProps {
     initiallyOpen?: boolean;
 }
 
-export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen = false }) => {
+export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen }) => {
     const { t } = useTranslation();
-    const [isOpen, setIsOpen] = useState(initiallyOpen || depth < 2);
+    const [isOpen, setIsOpen] = useState(initiallyOpen ?? (
+        node.type !== 'text' && node.type !== 'suite-start' && (node as any).status !== 'PASS' && (node as any).status !== 'NOT_RUN'
+    ));
     const [previewImage, setPreviewImage] = useState<string | null>(null);
+
+    // Auto-expand when status changes from PASS/NOT_RUN/undefined to RUNNING/FAIL
+    React.useEffect(() => {
+        if (initiallyOpen === undefined && node.type !== 'text' && (node as any).status && (node as any).status !== 'PASS' && (node as any).status !== 'NOT_RUN') {
+            setIsOpen(true);
+        }
+    }, [(node as any).status, initiallyOpen, node.type]);
 
     if (node.type === 'text') {
         if (node.content.match(/^[-=]+$/)) return null;
@@ -93,13 +102,16 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
                     {node.type === 'keyword' && subType === 'setup' && <CalendarCog size={14} className="opacity-70 shrink-0" />}
                     {node.type === 'keyword' && subType === 'teardown' && <CalendarCog size={14} className="opacity-70 shrink-0" />}
 
-                    <span className={clsx(
-                        "truncate",
-                        node.type === 'suite' ? "font-bold text-sm" : "text-xs font-medium",
-                        isRunning ? "text-on-surface-variant/80" : isNotRun ? "text-on-surface-variant/50" : (isFailed ? "text-error" : "text-success")
-                    )}>
+                    <span 
+                        className={clsx(
+                            "truncate",
+                            node.type === 'suite' ? "font-bold text-sm" : "text-xs font-medium",
+                            isRunning ? "text-on-surface-variant/80" : isNotRun ? "text-on-surface-variant/50" : (isFailed ? "text-error" : "text-success")
+                        )}
+                        title={node.name}
+                    >
                         <span className={clsx("text-[9px] mr-1.5 uppercase font-bold tracking-tighter", pillColor)}>{pill}</span>
-                        {node.name}
+                        {node.name.includes('.') ? node.name.split('.').pop() : node.name}
 
                         {node.type === 'keyword' && (node as KeywordNode).args && (node as KeywordNode).args!.length > 0 && (
                             <span className="ml-2 opacity-50 font-normal italic overflow-hidden text-ellipsis">
@@ -115,8 +127,15 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
                     bgColor, summaryColor
                 )}>
                     {node.duration && (
-                        <span className="px-2 font-mono opacity-80 text-on-surface-variant border-none">
+                        <span className="px-2 font-mono opacity-80 text-on-surface-variant border-none flex items-center gap-2">
                             {node.duration}
+                            {node.type === 'suite' && (node as SuiteNode).stats && (
+                                <span className="flex items-center gap-1.5 ml-2 border-l border-on-surface/10 pl-2">
+                                    <span className="text-success">{(node as SuiteNode).stats?.passed}P</span>
+                                    <span className="text-error">{(node as SuiteNode).stats?.failed}F</span>
+                                    <span className="text-on-surface-variant/40">{(node as SuiteNode).stats?.skipped}S</span>
+                                </span>
+                            )}
                         </span>
                     )}
                     {isRunning
@@ -190,6 +209,10 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
                             </div>
                         </div>
                     )}
+
+                    {node.type === 'test' && (node as TestNode).logs && (node as TestNode).logs.map((log, i) => (
+                        <LinkRenderer key={`log-${i}-${node.id}`} content={log} />
+                    ))}
 
                     {node.children && node.children.map((child: LogNode) => (
                         <LogTree key={child.id} node={child} depth={depth + 1} />

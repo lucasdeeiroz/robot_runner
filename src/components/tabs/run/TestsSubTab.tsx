@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
-import { Play, FolderOpen, FileText, FileCode, History, ChartNoAxesGantt, X } from "lucide-react";
+import { Play, FolderOpen, FileText, FileCode, History, ChartNoAxesGantt, X, Settings2, Info } from "lucide-react";
 import { useSettings } from "@/lib/settings";
 import { useTestSessions } from "@/lib/testSessionStore";
 import { Device } from "@/lib/types";
@@ -14,22 +14,16 @@ import { WarningModal } from "@/components/organisms/WarningModal";
 import { feedback } from "@/lib/feedback";
 import { Button } from "@/components/atoms/Button";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
+import { useSelection, SelectionItem } from "@/lib/selectionStore";
+import { SelectionCounter } from "@/components/molecules/SelectionCounter";
 
 interface TestsSubTabProps {
     selectedDevices: string[];
-    devices: Device[]; // New prop
+    devices: Device[];
     onNavigate?: (page: string) => void;
 }
 
 type SelectionMode = 'file' | 'folder' | 'args';
-
-function isValidTestFile(path: string, automationFramework?: string): boolean {
-    const lower = path.toLowerCase();
-    if (automationFramework === 'maestro') {
-        return lower.endsWith('.yaml') || lower.endsWith('.yml');
-    }
-    return lower.endsWith('.robot');
-}
 
 export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTabProps) {
     const { t } = useTranslation();
@@ -40,39 +34,34 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
     const [dontOverwrite, setDontOverwrite] = useState(false);
     const [warningModal, setWarningModal] = useState<{ isOpen: boolean, message: string }>({ isOpen: false, message: '' });
     const [selectedEntry, setSelectedEntry] = useState<FileEntry | null>(null);
+    const { items, setTests, setArgs, clearSelection } = useSelection();
 
-    // Test selection state
-    const [selectedTestsByPath, setSelectedTestsByPath] = useState<Record<string, string[]>>({});
+    // Selector state
     const [selectorState, setSelectorState] = useState<{
         isOpen: boolean,
         availableTests: string[],
         selectedTests: string[],
         activePath: string,
-        isLoading: boolean
+        isLoading: boolean,
+        type: 'test' | 'arg'
     }>({
         isOpen: false,
         availableTests: [],
         selectedTests: [],
         activePath: '',
-        isLoading: false
+        isLoading: false,
+        type: 'test'
     });
 
     const handleOpenTestSelector = async (path: string) => {
-        setSelectorState(prev => ({
-            ...prev,
+        const existingItem = items.find(i => i.path === path);
+        setSelectorState({
             isOpen: true,
             isLoading: true,
             activePath: path,
             availableTests: [],
-            selectedTests: selectedTestsByPath[path] || []
-        }));
-
-        // UX: Auto-select the path when opening selector
-        setSelectedPath(path);
-        setSelectedEntry({
-            path,
-            name: path.split(/[\\/]/).pop() || "",
-            is_dir: false
+            selectedTests: existingItem?.tests || [],
+            type: 'test'
         });
 
         try {
@@ -84,6 +73,34 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
             }));
         } catch (e) {
             feedback.toast.error("tests.selector.load_error", e);
+            setSelectorState(prev => ({ ...prev, isOpen: false, isLoading: false }));
+        }
+    };
+
+    const handleOpenArgSelector = async (path: string) => {
+        const existingItem = items.find(i => i.path === path);
+        setSelectorState({
+            isOpen: true,
+            isLoading: true,
+            activePath: path,
+            availableTests: [],
+            selectedTests: existingItem?.args || [],
+            type: 'arg'
+        });
+
+        try {
+            const content = await invoke<string>("read_file", { path });
+            const lines = content.split('\n')
+                .map(l => l.trim())
+                .filter(l => l && !l.startsWith('#'));
+
+            setSelectorState(prev => ({
+                ...prev,
+                availableTests: lines,
+                isLoading: false
+            }));
+        } catch (e) {
+            feedback.toast.error("common.error", e);
             setSelectorState(prev => ({ ...prev, isOpen: false, isLoading: false }));
         }
     };
@@ -106,9 +123,8 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
     const { settings } = useSettings();
     const { addSession, sessions } = useTestSessions();
 
-    const handleRun = async (pathOverride?: string) => {
-        const targetPath = typeof pathOverride === 'string' ? pathOverride : selectedPath;
-        if (!targetPath) return;
+    const handleRun = async () => {
+        if (items.length === 0 && !selectedPath) return;
 
         // Check for busy devices
         const busyDeviceIds = sessions.filter(s => s.status === 'running' && s.type === 'test').map(s => s.deviceUdid);
@@ -143,8 +159,6 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                         args: settings.tools.appiumArgs
                     });
 
-
-                    // Allow process to initialize (Backend Check + Delay)
                     setLaunchStatus(t('tests.status.waiting_server'));
                     let isReady = false;
                     for (let i = 0; i < 20; i++) {
@@ -159,153 +173,174 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                         await new Promise(r => setTimeout(r, 500));
                     }
 
-                    // Check if Appium is ready
                     if (!isReady) {
-                        // Appium did not report as running within the timeout
                         setLaunchStatus(t('tests.status.server_not_ready'));
-                        setWarningModal({
-                            isOpen: true,
-                            message: t('tests.alerts.server_not_ready'),
-                        });
+                        setWarningModal({ isOpen: true, message: t('tests.alerts.server_not_ready') });
                         setIsLaunching(false);
                         return;
-                    }
-
-                    // Stabilization delay to ensure port binding
-                    if (isReady) {
-                        // Ensure no double slashes in URL
-                        const cleanBasePath = settings.appiumBasePath.startsWith('/')
-                            ? settings.appiumBasePath
-                            : `/${settings.appiumBasePath}`;
-                        const statusUrl = `http://${settings.appiumHost}:${settings.appiumPort}${cleanBasePath.endsWith('/') ? cleanBasePath : cleanBasePath + '/'}status`.replace(/([^:]\/)\/+/g, "$1");
-                        let isRestReady = false;
-
-                        // Poll REST API for up to 15 seconds
-                        for (let j = 0; j < 30; j++) {
-                            try {
-                                const response = await fetch(statusUrl);
-                                if (response.ok) {
-                                    isRestReady = true;
-                                    break;
-                                }
-                            } catch (e) {
-                                // Connection refused or other network error
-                            }
-                            await new Promise(r => setTimeout(r, 500));
-                        }
-
-                        setLaunchStatus(t('tests.status.waiting_server_rest'));
-                        if (!isRestReady) {
-                            console.warn("Appium process is running but REST API did not respond in time.");
-                            // We continue anyway as a fallback, but the warning helps debugging.
-                        }
-
-                        // Final short breath
-                        await new Promise(r => setTimeout(r, 1000));
                     }
                 }
             }
 
             setLaunchStatus(t('tests.status.launching'));
 
-            // 2. Launch Tests
-            const targets = selectedDevices.length > 0 ? selectedDevices : [null];
-            // const { devices } = useDeviceStore.getState(); // Removed
+            // 187: Prepare selection items
+            let selections: SelectionItem[] = [...items];
+            if (selections.length === 0 && selectedPath) {
+                selections.push({
+                    id: uuidv4(),
+                    path: selectedPath,
+                    name: selectedPath.split(/[\\/]/).pop() || "",
+                    type: mode === 'folder' ? 'folder' : mode === 'args' ? 'args' : 'file',
+                    tests: [],
+                    args: []
+                });
+            }
 
+            const targets = selectedDevices.length > 0 ? selectedDevices : [null];
+            const workingDir = settings.paths.automationRoot || "";
 
             for (const deviceUdid of targets) {
                 const runId = uuidv4();
-
-                // Find device info
                 const deviceObj = devices.find((d: Device) => d.udid === deviceUdid);
                 const devModel = deviceObj ? deviceObj.model.replace(/\s+/g, '') : "UnknownModel";
                 const devVer = deviceObj ? deviceObj.android_version || "0" : "0";
 
-                // Avoid duplicate UDID if model already contains it
                 let devName = deviceObj?.model || "Device";
                 if (deviceUdid && deviceUdid !== 'local') {
-                    const ver = deviceObj?.android_version ? `Android ${deviceObj.android_version}` : deviceUdid;
-                    devName = `${devName} (${ver})`;
+                    devName = `${devName} (${deviceObj?.android_version ? `Android ${deviceObj.android_version}` : deviceUdid})`;
                 } else {
                     devName = "Local/Web";
                 }
 
-                // Prepare Args
-                let testPathArg: string | null = null;
-                let argFileArg: string | null = null;
+                // If multiple items, create a temporary argument file
+                let finalTestPath: string | null = null;
+                let finalArgsFile: string | null = null;
+                let finalTests: string[] | null = null;
 
-                if (mode === 'file' || mode === 'folder') {
-                    testPathArg = targetPath;
-                } else if (mode === 'args') {
-                    argFileArg = targetPath;
+                if (selections.length === 1 && (selections[0].tests?.length || 0) === 0 && (selections[0].args?.length || 0) === 0) {
+                    // Simple case: single path
+                    if (selections[0].type === 'args') finalArgsFile = selections[0].path;
+                    else finalTestPath = selections[0].path;
+                } else {
+                    // Complex case: generate temp .args file
+                    const tempArgsPath = `${settings.paths.logs || '../temp'}/run_${runId}.args`.replace(/\\/g, '/');
+                    let content = "";
+                    const isWindows = navigator.platform.toLowerCase().includes('win');
+                    const lineEnding = isWindows ? "\r\n" : "\n";
+
+
+                    const allTests: string[] = [];
+                    const hasAnySpecificTest = selections.some(s => (s.tests?.length || 0) > 0);
+
+                    for (const item of selections) {
+                        const basename = item.path.split(/[\\/]/).pop() || "";
+                        const name = basename.replace(/\.(robot|args|txt)$/i, "");
+
+                        if (item.type === 'file' || item.type === 'folder') {
+                            if (item.tests && item.tests.length > 0) {
+                                for (const test of item.tests) {
+                                    allTests.push(`*.${name}.${test}`);
+                                }
+                            } else {
+                                allTests.push(`*.${name}.*`);
+                            }
+
+                            // Add the file or folder as a POSITIONAL data source in the .args file
+                            const normalizedPath = item.path.replace(/\\/g, '/');
+                            content += `${normalizedPath}${lineEnding}`;
+
+                        } else if (item.type === 'args') {
+                            // Add a broad pattern for the argument file to ensure its tests are included if filtering is active
+                            allTests.push(`*.${name}.*`);
+
+                            // FLATTEN argument files: read them and append their content cleanly
+                            try {
+                                const fileContent = await invoke<string>("read_file", { path: item.path });
+                                const lines = fileContent.split(/\r?\n/);
+
+                                for (let line of lines) {
+                                    line = line.trim();
+                                    if (!line || line.startsWith('#') || line.startsWith('--doc')) continue;
+
+                                    // Handle multi-word flags correctly for Robot (.args format)
+                                    // If a line starts with a flag (e.g., --include) and has a space, 
+                                    // split it into two lines: the flag and its value.
+                                    if (line.startsWith('--') && line.includes(' ')) {
+                                        const firstSpaceIndex = line.indexOf(' ');
+                                        const flag = line.substring(0, firstSpaceIndex).trim();
+                                        const value = line.substring(firstSpaceIndex + 1).trim();
+                                        content += `${flag}${lineEnding}${value}${lineEnding}`;
+                                        continue;
+                                    }
+
+                                    // Fall-through: Write the line as is
+                                    content += `${line}${lineEnding}`;
+                                }
+                            } catch (e) {
+                                console.error("Failed to read selection args file", item.path, e);
+                                const normalizedPath = item.path.replace(/\\/g, '/');
+                                content += `-A${lineEnding}${normalizedPath}${lineEnding}`;
+                            }
+                        }
+                    }
+
+                    if (hasAnySpecificTest && allTests.length > 0) {
+                        finalTests = allTests;
+                    }
+
+                    finalArgsFile = tempArgsPath;
+
+                    try {
+                        await invoke("save_file", { path: tempArgsPath, content, append: false });
+                    } catch (e) {
+                        feedback.toast.error("common.error", e);
+                        setIsLaunching(false);
+                        return;
+                    }
                 }
-
-                const fw = settings.automationFramework || 'robot';
-
-                // Get selected tests for this path
-                const selectedTests = selectedTestsByPath[targetPath] || [];
 
                 addSession(
                     runId,
                     deviceUdid || "local",
                     devName,
-                    testPathArg || argFileArg || "Unknown",
+                    finalTestPath || finalArgsFile || "MultiSelection",
                     fw as 'robot' | 'maestro' | 'appium',
                     dontOverwrite,
-                    argFileArg,
+                    finalArgsFile,
                     devModel,
                     devVer,
-                    selectedTests.length > 0 ? selectedTests : undefined
+                    finalTests || undefined
                 );
 
-                // Extract Suite Name from path
-                let suiteName = "UnknownSuite";
-                if (testPathArg) {
-                    // C:/Users/xyz/Tests/MySuite.robot -> MySuite
-                    const parts = testPathArg.split(/[\\/]/);
-                    const file = parts[parts.length - 1];
-                    suiteName = file.split('.')[0];
-                } else if (argFileArg) {
-                    const parts = argFileArg.split(/[\\/]/);
-                    suiteName = parts[parts.length - 1].split('.')[0];
-                }
-
-                // Clean strings
+                const suiteName = selections.length === 1 ? selections[0].name.split('.')[0] : "MultiSelection";
                 const cleanModel = devModel.replace(/[^a-zA-Z0-9]/g, "");
                 const cleanVer = devVer.replace(/[^0-9.]/g, "");
-                const cleanUdid = deviceUdid ? deviceUdid.replace(/[^a-zA-Z0-9]/g, "") : "Local";
+                const cleanUdid = (deviceUdid || "Local").replace(/[^a-zA-Z0-9]/g, "");
                 const cleanSuite = suiteName.replace(/[^a-zA-Z0-9_-]/g, "");
 
                 const legacyFolder = `A${cleanVer}_${cleanModel}_${cleanUdid}/${cleanSuite}`;
-
                 const logDir = settings.paths.logs
                     ? `${settings.paths.logs}/${legacyFolder}`
                     : `../test_results/${legacyFolder}`;
 
-                let workingDir = null;
-                if (mode === 'args' && settings.paths.automationRoot) {
-                    workingDir = settings.paths.automationRoot;
-                }
-
                 if (fw === 'robot') {
                     invoke("run_robot_test", {
-                        runId: runId,
-                        testPath: testPathArg,
+                        runId,
+                        testPath: finalTestPath,
                         outputDir: logDir,
-                        device: deviceUdid === 'Start local Server' ? null : deviceUdid,
-                        argumentsFile: argFileArg,
+                        device: deviceUdid === 'local' ? null : deviceUdid,
+                        argumentsFile: finalArgsFile,
                         timestampOutputs: dontOverwrite,
                         deviceModel: devModel,
                         androidVersion: devVer,
-                        workingDir: workingDir,
-                        selectedTests: selectedTests.length > 0 ? selectedTests : undefined
-                    }).catch(e => {
-                        feedback.toast.error("tests.launch_failed", e);
-                    });
+                        workingDir,
+                        selectedTests: finalTests
+                    }).catch(e => feedback.toast.error("tests.launch_failed", e));
                 } else if (fw === 'maestro') {
                     invoke("run_maestro_test", {
                         runId,
-                        testPath: targetPath,
+                        testPath: finalTestPath,
                         outputDir: logDir,
                         device: deviceUdid === 'local' ? null : deviceUdid,
                         maestroArgs: settings.tools.maestroArgs,
@@ -317,7 +352,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                 } else if (fw === 'appium') {
                     invoke("run_appium_test", {
                         runId,
-                        projectPath: targetPath,
+                        projectPath: finalTestPath,
                         outputDir: logDir,
                         appiumJavaArgs: settings.tools.appiumJavaArgs
                     }).catch(e => {
@@ -326,19 +361,16 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                 }
             }
 
-            // 3. Redirect
             setLaunchStatus(t('tests.status.redirecting'));
             setTimeout(() => {
                 if (onNavigate) onNavigate('tests');
                 setIsLaunching(false);
                 setLaunchStatus("");
+                clearSelection();
             }, 500);
 
         } catch (e: any) {
             feedback.toast.error("tests.status.failed", e);
-            let errStr = String(e);
-            if (errStr.includes("Error:")) errStr = errStr.replace("Error:", "").trim();
-            setLaunchStatus(`${t('tests.status.failed')}: ${errStr}`);
             setIsLaunching(false);
         }
     };
@@ -358,17 +390,22 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
         { id: 'args', label: !isNarrow ? t('tests.mode.args') : '', icon: FileText, disabled: settings.automationFramework && settings.automationFramework !== 'robot' },
     ].filter(tab => {
         if (tab.id === 'args' && settings.automationFramework && settings.automationFramework !== 'robot') return false;
-        if (tab.id === 'file' && settings.automationFramework === 'appium') return false; // Appium Java usually runs the whole project
+        if (tab.id === 'file' && settings.automationFramework === 'appium') return false;
         return true;
     });
 
     useEffect(() => {
-        // Validation: If current mode is disabled/filtered out, switch to first available
         const currentTab = tabs.find(t => t.id === mode);
         if (!currentTab && tabs.length > 0) {
             setMode(tabs[0].id as SelectionMode);
         }
     }, [settings.automationFramework, mode, tabs]);
+
+    const handleTabChange = useCallback((id: string) => {
+        setMode(id as SelectionMode);
+        setSelectedPath("");
+        setSelectedEntry(null);
+    }, []);
 
     return (
         <div ref={containerRef} className="h-full flex flex-col w-full overflow-hidden">
@@ -380,7 +417,6 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
             />
 
             <div className="flex-1 min-h-0 flex gap-4">
-                {/* Embedded File Explorer */}
                 <div className="flex-1 overflow-hidden bg-transparent relative">
                     <FileExplorer
                         key={mode}
@@ -392,11 +428,11 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                             setSelectedPath(entry?.path || "");
                             setSelectedEntry(entry);
                         }}
-                        allowHideFooter
-                        renderEntryExtra={(entry) => {
+                        allowHideFooter={true}
+                        renderEntryExtra={(entry, isSelected) => {
                             if (mode === 'file' && entry.name.endsWith('.robot')) {
-                                const isSelected = selectedPath === entry.path;
-                                const selection = selectedTestsByPath[entry.path] || [];
+                                const item = items.find(i => i.path === entry.path);
+                                const selection = item?.tests || [];
                                 return (
                                     <div className="flex items-center gap-1">
                                         {selection.length > 0 && (
@@ -415,7 +451,33 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                                             )}
                                             title={t('tests.select_tests')}
                                         >
-                                            <ChartNoAxesGantt size={14} className="group-hover/btn:scale-110 transition-transform" />
+                                            <ChartNoAxesGantt size={14} />
+                                        </Button>
+                                    </div>
+                                );
+                            }
+                            if (mode === 'args' && (entry.name.endsWith('.args') || entry.name.endsWith('.txt'))) {
+                                const item = items.find(i => i.path === entry.path);
+                                const selection = item?.args || [];
+                                return (
+                                    <div className="flex items-center gap-1">
+                                        {selection.length > 0 && (
+                                            <span className="text-[10px] bg-primary text-on-primary px-1.5 py-0.5 rounded-full font-bold">
+                                                {selection.length}
+                                            </span>
+                                        )}
+                                        <Button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleOpenArgSelector(entry.path);
+                                            }}
+                                            className={clsx(
+                                                "p-1.5 bg-transparent shadow-none hover:bg-transparent rounded-full transition-all group/btn",
+                                                isSelected ? "text-primary" : "text-on-surface-variant/40 hover:text-primary"
+                                            )}
+                                            title={t('tests.select_args')}
+                                        >
+                                            <Settings2 size={14} />
                                         </Button>
                                     </div>
                                 );
@@ -429,55 +491,32 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     layoutId="tests-sub-tab"
                     tabs={tabs}
                     activeId={mode}
-                    onChange={(id) => { setMode(id as SelectionMode); setSelectedPath(""); setSelectedEntry(null); }}
+                    onChange={handleTabChange}
                     variant="pills"
                     orientation="vertical"
-                    className={clsx(
-                        "shrink-0 gap-6 justify-between",
-                        isNarrow ? "w-fit" : "w-[200px]"
-                    )}
+                    className={clsx("shrink-0 gap-6 justify-between", isNarrow ? "w-fit" : "w-[200px]")}
                     actions={
                         <>
                             <Button
                                 variant="secondary"
                                 onClick={() => setDontOverwrite(!dontOverwrite)}
-                                className={clsx(
-                                    "w-full justify-start py-6",
-                                    dontOverwrite
-                                        ? "bg-warning-container text-on-warning-container/50 border-warning-container/20 hover:bg-warning-container/80"
-                                        : ""
-                                )}
-                                leftIcon={<History size={18} className={clsx(dontOverwrite ? "text-on-surface/80" : "text-on-surface/80")} />}
-                                title={t('tests.options.dont_overwrite', "Não sobrescrever logs")}
+                                className={clsx("w-full justify-start py-6", dontOverwrite && "bg-warning-container text-on-warning-container/50")}
+                                leftIcon={<History size={18} />}
+                                title={t('tests.options.dont_overwrite')}
                             >
-                                {!isNarrow && <span>{t('tests.options.dont_overwrite', "Não sobrescrever logs")}</span>}
+                                {!isNarrow && <span>{t('tests.options.dont_overwrite')}</span>}
                             </Button>
 
                             <Button
                                 variant="primary"
                                 onClick={() => handleRun()}
-                                disabled={
-                                    selectedDevices.length === 0 ||
-                                    !selectedEntry ||
-                                    isLaunching ||
-                                    (mode === 'file' && (selectedEntry.is_dir || !isValidTestFile(selectedEntry.path, settings.automationFramework))) ||
-                                    (mode === 'folder' && !selectedEntry.is_dir) ||
-                                    (mode === 'args' && (selectedEntry.is_dir || (!selectedEntry.path.toLowerCase().endsWith('.args') && !selectedEntry.path.toLowerCase().endsWith('.txt'))))
-                                }
-                                title={mode === 'folder' ? t('tests.run_all') : t('tests.run_selected')}
-                                className="w-full py-6 font-bold shadow-primary/20"
+                                disabled={selectedDevices.length === 0 || (items.length === 0 && !selectedEntry) || isLaunching}
+                                title={t('tests.run_selected')}
+                                className="w-full py-6 font-bold hover:bg-secondary-container"
                                 leftIcon={!isLaunching ? <Play size={18} fill="currentColor" /> : <ExpressiveLoading size="sm" variant="circular" />}
                             >
                                 {!isNarrow && (
-                                    <span>
-                                        {isLaunching ? launchStatus : (
-                                            (!selectedEntry || (
-                                                (mode === 'file' && (selectedEntry.is_dir || !isValidTestFile(selectedEntry.path, settings.automationFramework))) ||
-                                                (mode === 'folder' && !selectedEntry.is_dir) ||
-                                                (mode === 'args' && (selectedEntry.is_dir || (!selectedEntry.path.toLowerCase().endsWith('.args') && !selectedEntry.path.toLowerCase().endsWith('.txt'))))
-                                            )) ? t('tests.no_selection') : (mode === 'folder' ? t('tests.run_all') : t('tests.run_selected'))
-                                        )}
-                                    </span>
+                                    <span>{isLaunching ? launchStatus : ((items.length === 0 && !selectedEntry) ? t('tests.no_selection') : t('tests.run_selected'))}</span>
                                 )}
                             </Button>
                         </>
@@ -485,39 +524,34 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                 />
             </div>
 
-            {/* Framework specific tips */}
-            {settings.automationFramework === 'appium' && mode === 'folder' && (
-                <div className="absolute bottom-4 left-4 right-4 animate-in fade-in slide-in-from-bottom-2 duration-300 pointer-events-none">
-                    <div className="bg-surface-container/80 backdrop-blur-md border border-outline/10 text-on-surface-variant text-[11px] px-3 py-2 rounded-lg shadow-lg flex items-center gap-2 max-w-fit">
-                        <FileText size={14} className="text-primary" />
-                        <span>{t('tests.tips.appium_maven')}</span>
-                    </div>
-                </div>
-            )}
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
+                <SelectionCounter />
+            </div>
 
-            {/* Test Selector Modal */}
             {selectorState.isOpen && createPortal(
                 <TestSelectorModal
                     isOpen={selectorState.isOpen}
                     onClose={() => setSelectorState(prev => ({ ...prev, isOpen: false }))}
                     tests={selectorState.availableTests}
                     selected={selectorState.selectedTests}
-                    onToggle={(test) => {
+                    type={selectorState.type}
+                    onToggle={(id) => {
                         setSelectorState(prev => {
                             const next = [...prev.selectedTests];
-                            const idx = next.indexOf(test);
+                            const idx = next.indexOf(id);
                             if (idx !== -1) next.splice(idx, 1);
-                            else next.push(test);
+                            else next.push(id);
                             return { ...prev, selectedTests: next };
                         });
                     }}
                     onSelectAll={() => setSelectorState(prev => ({ ...prev, selectedTests: [...prev.availableTests] }))}
                     onClearAll={() => setSelectorState(prev => ({ ...prev, selectedTests: [] }))}
                     onConfirm={() => {
-                        setSelectedTestsByPath(prev => ({
-                            ...prev,
-                            [selectorState.activePath]: selectorState.selectedTests
-                        }));
+                        if (selectorState.type === 'arg') {
+                            setArgs(selectorState.activePath, selectorState.selectedTests, selectorState.activePath.split(/[\\/]/).pop() || "");
+                        } else {
+                            setTests(selectorState.activePath, selectorState.selectedTests, selectorState.activePath.split(/[\\/]/).pop() || "");
+                        }
                         setSelectorState(prev => ({ ...prev, isOpen: false }));
                     }}
                     isLoading={selectorState.isLoading}
@@ -528,17 +562,17 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
     );
 }
 
-// Sub-component for Test Selector
-function TestSelectorModal({ isOpen, onClose, tests, selected, onToggle, onSelectAll, onClearAll, onConfirm, isLoading }: {
+function TestSelectorModal({ isOpen, onClose, tests, selected, onToggle, onSelectAll, onClearAll, onConfirm, isLoading, type }: {
     isOpen: boolean;
     onClose: () => void;
     tests: string[];
     selected: string[];
-    onToggle: (test: string) => void;
+    onToggle: (id: string) => void;
     onSelectAll: () => void;
     onClearAll: () => void;
     onConfirm: () => void;
     isLoading: boolean;
+    type: 'test' | 'arg';
 }) {
     const { t } = useTranslation();
     if (!isOpen) return null;
@@ -549,17 +583,17 @@ function TestSelectorModal({ isOpen, onClose, tests, selected, onToggle, onSelec
             <div className="bg-surface border border-outline-variant/30 rounded-3xl shadow-2xl w-full max-w-md overflow-hidden relative animate-in fade-in zoom-in-95 duration-200">
                 <div className="flex items-center justify-between p-4 border-b border-outline-variant/10 bg-surface-variant/20">
                     <h3 className="text-sm font-bold flex items-center gap-2">
-                        <FileCode size={18} className="text-primary" />
-                        {t('tests.selector.title')}
+                        {type === 'test' ? <FileCode size={18} className="text-primary" /> : <Settings2 size={18} className="text-primary" />}
+                        {type === 'test' ? t('tests.selector.title') : t('tests.selector.args_title', "Selecione Argumentos")}
                     </h3>
-                    <button onClick={onClose} className="p-1 hover:bg-surface-variant/50 rounded-lg transition-colors">
-                        <X size={18} />
-                    </button>
+                    <button onClick={onClose} className="p-1 hover:bg-surface-variant/50 rounded-lg transition-colors"><X size={18} /></button>
                 </div>
-                {selected.length > 0 && (
-                    <span className="px-4 text-[10px] text-on-surface-variant/80 font-medium">
-                        {t('tests.selector.selected', { count: selected.length })}
-                    </span>
+
+                {type === 'test' && (
+                    <div className="px-4 py-2 bg-primary/5 flex items-center gap-2 text-[11px] text-primary/80 border-b border-primary/10">
+                        <Info size={14} />
+                        <span>{t('tests.selector.suite_info')}</span>
+                    </div>
                 )}
 
                 <div className="p-4 max-h-[400px] overflow-y-auto custom-scrollbar">
@@ -569,31 +603,24 @@ function TestSelectorModal({ isOpen, onClose, tests, selected, onToggle, onSelec
                             <span className="text-xs animate-pulse">{t('tests.selector.loading')}</span>
                         </div>
                     ) : tests.length === 0 ? (
-                        <div className="py-12 text-center text-on-surface-variant italic text-sm">
-                            {t('tests.selector.empty')}
-                        </div>
+                        <div className="py-12 text-center text-on-surface-variant italic text-sm">{t('tests.selector.empty')}</div>
                     ) : (
                         <div className="space-y-1">
-                            {tests.map(test => {
-                                const isChecked = selected.includes(test);
+                            {tests.map(id => {
+                                const isChecked = selected.includes(id);
                                 return (
                                     <div
-                                        key={test}
-                                        onClick={() => onToggle(test)}
+                                        key={id}
+                                        onClick={() => onToggle(id)}
                                         className={clsx(
                                             "flex items-center gap-3 px-3 py-2.5 rounded-2xl cursor-pointer transition-all select-none",
-                                            isChecked
-                                                ? "bg-primary/10 text-primary dark:text-primary/80 ring-1 ring-primary/20"
-                                                : "hover:bg-surface-variant/30 text-on-surface-variant"
+                                            isChecked ? "bg-primary/10 text-primary ring-1 ring-primary/20" : "hover:bg-surface-variant/30 text-on-surface-variant"
                                         )}
                                     >
-                                        <div className={clsx(
-                                            "w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all",
-                                            isChecked ? "bg-primary border-primary" : "border-outline-variant"
-                                        )}>
+                                        <div className={clsx("w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all", isChecked ? "bg-primary border-primary" : "border-outline-variant")}>
                                             {isChecked && <div className="w-2 h-2 bg-on-primary rounded-sm" />}
                                         </div>
-                                        <span className="text-xs font-mono font-medium truncate flex-1">{test}</span>
+                                        <span className="text-xs font-mono font-medium truncate flex-1">{id}</span>
                                     </div>
                                 );
                             })}
@@ -603,32 +630,11 @@ function TestSelectorModal({ isOpen, onClose, tests, selected, onToggle, onSelec
 
                 <div className="p-4 border-t border-outline-variant/10 flex items-center justify-between bg-surface-variant/10">
                     <div className="flex items-center gap-2">
-                        <button
-                            onClick={onSelectAll}
-                            className="text-[11px] font-bold text-primary dark:text-primary/80 hover:underline"
-                        >
-                            {t('tests.selector.all')}
-                        </button>
+                        <button onClick={onSelectAll} className="text-[11px] font-bold text-primary hover:underline">{t('tests.selector.all')}</button>
                         <div className="w-1 h-1 bg-outline-variant rounded-full" />
-                        <button
-                            onClick={onClearAll}
-                            className="text-[11px] font-bold text-on-surface-variant/60 hover:text-error"
-                        >
-                            {t('tests.selector.none')}
-                        </button>
+                        <button onClick={onClearAll} className="text-[11px] font-bold text-on-surface-variant/60 hover:text-error">{t('tests.selector.none')}</button>
                     </div>
-
-                    <div className="flex items-center gap-3">
-                        <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={onConfirm}
-                            disabled={isLoading}
-                            className="rounded-xl px-6"
-                        >
-                            {t('tests.selector.close')}
-                        </Button>
-                    </div>
+                    <Button variant="primary" size="sm" onClick={onConfirm} disabled={isLoading} className="rounded-xl px-6 hover:bg-secondary-container">{t('tests.selector.close')}</Button>
                 </div>
             </div>
         </div>

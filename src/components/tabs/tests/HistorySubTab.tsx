@@ -25,6 +25,8 @@ interface TestLog {
     android_version?: string | null;
     timestamp: string;
     duration: string;
+    pass_count: number;
+    fail_count: number;
     xml_path: string;
     log_html_path: string;
 }
@@ -216,8 +218,13 @@ export function HistorySubTab() {
                                             <div className="flex items-center gap-1">
                                                 <Calendar size={12} /> {formatDate(log.timestamp)}
                                             </div>
-                                            <div className="flex items-center gap-1">
-                                                <Clock size={12} /> {log.duration}
+                                             <div className="flex items-center gap-1 bg-surface-variant/30 px-1.5 py-0.5 rounded text-[10px] font-medium border border-outline-variant/10">
+                                                <Clock size={10} className="shrink-0" /> 
+                                                <span>{log.duration}</span>
+                                                <span className="mx-1 opacity-20 h-2 w-[1px] bg-current" />
+                                                <span className="text-success">{log.pass_count}P</span>
+                                                <span className="opacity-30">/</span>
+                                                <span className={clsx(log.fail_count > 0 ? "text-error" : "opacity-40")}>{log.fail_count}F</span>
                                             </div>
                                             {(log.device_model || log.device_udid) && (
                                                 <div className="flex items-center gap-1 text-on-surface/80">

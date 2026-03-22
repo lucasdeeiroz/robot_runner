@@ -1,8 +1,13 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Folder, File, ChevronRight, CornerLeftUp } from "lucide-react";
+import { Folder, File as FileIcon, ChevronRight, CornerLeftUp, FileText, FileCode } from "lucide-react";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 import clsx from "clsx";
+import { useTranslation } from "react-i18next";
+import { WarningModal } from "@/components/organisms/WarningModal";
+import { feedback } from "@/lib/feedback";
+import { useSelection } from "@/lib/selectionStore";
+import { useSettings } from "@/lib/settings";
 
 export interface FileEntry {
     name: string;
@@ -12,21 +17,31 @@ export interface FileEntry {
 
 interface FileExplorerProps {
     initialPath?: string;
-    onSelect: (path: string) => void;
-    onCancel: () => void;
+    onSelect?: (path: string) => void;
+    onCancel?: () => void;
     selectionMode?: 'file' | 'directory';
     title?: string;
     onSelectionChange?: (entry: FileEntry | null) => void;
     allowHideFooter?: boolean;
-    renderEntryExtra?: (entry: FileEntry) => React.ReactNode;
+    renderEntryExtra?: (entry: FileEntry, isSelected: boolean) => React.ReactNode;
+    isMultiSelect?: boolean;
 }
 
-import { useTranslation } from "react-i18next";
-import { WarningModal } from "@/components/organisms/WarningModal";
-import { feedback } from "@/lib/feedback";
-
-export function FileExplorer({ initialPath = ".", onSelect, onCancel, selectionMode = 'file', title: _title, onSelectionChange, allowHideFooter = false, renderEntryExtra }: FileExplorerProps) {
+export function FileExplorer({ 
+    initialPath = ".", 
+    onSelect, 
+    onCancel, 
+    selectionMode = 'file', 
+    title: _title, 
+    onSelectionChange, 
+    allowHideFooter = false, 
+    renderEntryExtra,
+    isMultiSelect = true
+}: FileExplorerProps) {
     const { t } = useTranslation();
+    const { toggleItem, isSelected: checkIsSelected } = useSelection();
+    const { settings } = useSettings();
+    const rootPath = settings.paths.automationRoot;
     const [currentPath, setCurrentPath] = useState(initialPath);
     const [entries, setEntries] = useState<FileEntry[]>([]);
     const [loading, setLoading] = useState(false);
@@ -68,7 +83,7 @@ export function FileExplorer({ initialPath = ".", onSelect, onCancel, selectionM
         const isWindows = currentPath.includes('\\');
         const separator = isWindows ? '\\' : '/';
 
-        if (currentPath === '.' || currentPath === '/' || currentPath.endsWith(':\\')) {
+        if (currentPath === '.' || currentPath === '/' || currentPath.endsWith(':\\') || currentPath === rootPath) {
             return;
         }
 
@@ -88,24 +103,41 @@ export function FileExplorer({ initialPath = ".", onSelect, onCancel, selectionM
             } else {
                 setSelectedEntry(entry);
                 if (onSelectionChange) onSelectionChange(entry);
+                
+                if (isMultiSelect && selectionMode === 'directory' && !entry.is_dir === false) {
+                    toggleItem({
+                        path: entry.path,
+                        name: entry.name,
+                        type: 'folder'
+                    });
+                }
             }
         } else {
             setSelectedEntry(entry);
             if (onSelectionChange) onSelectionChange(entry);
+
+            if (isMultiSelect && selectionMode === 'file') {
+                const type = entry.name.endsWith('.args') || entry.name.endsWith('.txt') ? 'args' : 'file';
+                toggleItem({
+                    path: entry.path,
+                    name: entry.name,
+                    type: type
+                });
+            }
         }
     };
 
     const handleConfirm = () => {
         if (!selectedEntry) {
             if (selectionMode === 'directory') {
-                onSelect(currentPath);
+                onSelect?.(currentPath);
             }
             return;
         }
 
         if (selectionMode === 'directory') {
             if (selectedEntry.is_dir) {
-                onSelect(selectedEntry.path);
+                onSelect?.(selectedEntry.path);
             } else {
                 setWarningModal({
                     isOpen: true,
@@ -115,7 +147,7 @@ export function FileExplorer({ initialPath = ".", onSelect, onCancel, selectionM
         } else {
             // File mode
             if (!selectedEntry.is_dir) {
-                onSelect(selectedEntry.path);
+                onSelect?.(selectedEntry.path);
             } else {
                 handleNavigate(selectedEntry.path);
             }
@@ -134,13 +166,16 @@ export function FileExplorer({ initialPath = ".", onSelect, onCancel, selectionM
             <div className="flex items-center gap-2 mb-2 p-2 bg-transparent backdrop-blur-md rounded-2xl border border-outline-variant/30 shrink-0">
                 <button
                     onClick={handleUp}
-                    className="p-1 hover:bg-surface-variant/50 rounded transition-colors text-on-surface-variant/80"
+                    disabled={currentPath === rootPath}
+                    className="p-1 hover:bg-surface-variant/50 rounded transition-colors text-on-surface-variant/80 disabled:opacity-30 disabled:cursor-not-allowed"
                     title={t('file_explorer.up')}
                 >
                     <CornerLeftUp size={18} />
                 </button>
                 <div className="flex-1 font-mono text-sm truncate px-2 text-on-surface/80">
-                    {currentPath}
+                    {rootPath && currentPath.startsWith(rootPath) 
+                        ? (currentPath === rootPath ? './' : currentPath.replace(rootPath, '').replace(/^[\\/]/, ''))
+                        : currentPath}
                 </div>
             </div>
 
@@ -165,26 +200,40 @@ export function FileExplorer({ initialPath = ".", onSelect, onCancel, selectionM
                 {!loading && !error && (
                     <div className="flex flex-col gap-0.5">
                         {entries.map(entry => {
-                            const isSelected = selectedEntry?.path === entry.path;
+                            const isSelected = checkIsSelected(entry.path);
+                            const isActive = selectedEntry?.path === entry.path;
                             return (
                                 <div
                                     key={entry.path}
                                     onClick={() => handleEntryClick(entry)}
-                                    onDoubleClick={() => entry.is_dir ? handleNavigate(entry.path) : onSelect(entry.path)}
+                                    onDoubleClick={() => entry.is_dir ? handleNavigate(entry.path) : (onSelect && onSelect(entry.path))}
                                     className={clsx(
-                                        "flex items-center gap-3 px-3 py-2 rounded-2xl cursor-pointer text-sm select-none transition-colors",
-                                        isSelected
-                                            ? "bg-secondary-container text-on-secondary-container ring-1 ring-secondary/20"
-                                            : "hover:bg-surface-variant/30 text-on-surface/80"
+                                        "flex items-center gap-3 px-3 py-2 rounded-2xl cursor-pointer text-sm select-none transition-all",
+                                        isSelected 
+                                            ? "bg-secondary-container/50 text-on-secondary-container ring-1 ring-primary/30"
+                                            : isActive
+                                                ? "bg-secondary-container/30 text-on-secondary-container"
+                                                : "hover:bg-surface-variant/30 text-on-surface/80"
                                     )}
                                 >
                                     {entry.is_dir ? (
-                                        <Folder size={18} className="text-warning-container fill-warning-container/50 shrink-0" />
+                                        <Folder size={18} className={clsx(
+                                            "shrink-0",
+                                            isSelected ? "text-primary fill-primary/20" : "text-warning-container fill-warning-container/50"
+                                        )} />
                                     ) : (
-                                        <File size={18} className="text-on-surface/80 shrink-0" />
+                                        (() => {
+                                            const Icon = entry.name.endsWith('.robot') ? FileCode : (entry.name.endsWith('.args') || entry.name.endsWith('.txt')) ? FileText : FileIcon;
+                                            return <Icon size={18} className={clsx(
+                                                "shrink-0",
+                                                isSelected ? "text-primary" : "text-on-surface/80"
+                                            )} />;
+                                        })()
                                     )}
-                                    <span className="truncate flex-1">{entry.name}</span>
-                                    {renderEntryExtra && renderEntryExtra(entry)}
+                                    <span className={clsx("truncate flex-1", isSelected && "text-primary font-medium")}>
+                                        {entry.name}
+                                    </span>
+                                    {renderEntryExtra && renderEntryExtra(entry, isSelected)}
                                     {entry.is_dir && <ChevronRight size={14} className="text-on-surface/80 opacity-50" />}
                                 </div>
                             );
@@ -205,7 +254,7 @@ export function FileExplorer({ initialPath = ".", onSelect, onCancel, selectionM
                         {selectedEntry ? selectedEntry.name : selectionMode === 'directory' ? t('file_explorer.current') : t('file_explorer.no_selection')}
                     </div>
                     <button
-                        onClick={onCancel}
+                        onClick={() => onCancel?.()}
                         className="px-4 py-2 rounded-2xl text-sm font-medium text-on-surface-variant/80 hover:bg-surface-variant/30 transition-colors"
                     >
                         {t('file_explorer.cancel')}

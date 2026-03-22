@@ -849,15 +849,34 @@ export const es = {
                 args: "Archivo de Args"
             },
             select_tests: "Seleccionar pruebas",
+            select_args: "Seleccionar Argumentos",
             selector: {
                 title: "Selección de Casos de Prueba",
+                args_title: "Seleccionar Argumentos",
                 all: "Seleccionar Todo",
                 none: "Limpiar todo",
-                close: "Confirmar Selección",
-                empty: "No se encontraron casos de prueba en este archivo.",
+                close: "Aplicar",
+                empty: "No se han encontrado elementos en este archivo.",
                 loading: "Leyendo archivo...",
-                selected: "{{count}} pruebas seleccionadas",
-                load_error: "Error al cargar los casos de prueba del archivo"
+                selected: "{{count}} elementos seleccionados",
+                info: "Nota: Si no se selecciona ninguna prueba, el archivo entero será ejecutado.",
+                suite_info: "Si no se selecciona ninguna prueba, se ejecutará el archivo completo.",
+                load_error: "Error al cargar los elementos del archivo"
+            },
+            selection: {
+                title: "Selección",
+                items_one: "{{count}} ítem",
+                items_other: "{{count}} ítems",
+                files_one: "{{count}} archivo",
+                files_other: "{{count}} archivos",
+                tests_one: "{{count}} prueba",
+                tests_other: "{{count}} pruebas",
+                folders_one: "{{count}} carpeta",
+                folders_other: "{{count}} carpetas",
+                args_one: "{{count}} archivo de args",
+                args_other: "{{count}} archivos de args",
+                clear_all: "Limpiar Todo",
+                remove: "Remover"
             },
             target: "Objetivo",
             no_selection: "Sin selección válida",
