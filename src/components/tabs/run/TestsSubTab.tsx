@@ -245,11 +245,11 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                             } else {
                                 allTests.push(`*.${name}.*`);
                             }
-                            
+
                             // Add the file or folder as a POSITIONAL data source in the .args file
                             const normalizedPath = item.path.replace(/\\/g, '/');
                             content += `${normalizedPath}${lineEnding}`;
-                            
+
                         } else if (item.type === 'args') {
                             // Add a broad pattern for the argument file to ensure its tests are included if filtering is active
                             allTests.push(`*.${name}.*`);
@@ -258,25 +258,25 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                             try {
                                 const fileContent = await invoke<string>("read_file", { path: item.path });
                                 const lines = fileContent.split(/\r?\n/);
-                                
-                                    for (let line of lines) {
-                                        line = line.trim();
-                                        if (!line || line.startsWith('#') || line.startsWith('--doc')) continue;
 
-                                        // Handle multi-word flags correctly for Robot (.args format)
-                                        // If a line starts with a flag (e.g., --include) and has a space, 
-                                        // split it into two lines: the flag and its value.
-                                        if (line.startsWith('--') && line.includes(' ')) {
-                                            const firstSpaceIndex = line.indexOf(' ');
-                                            const flag = line.substring(0, firstSpaceIndex).trim();
-                                            const value = line.substring(firstSpaceIndex + 1).trim();
-                                            content += `${flag}${lineEnding}${value}${lineEnding}`;
-                                            continue;
-                                        }
+                                for (let line of lines) {
+                                    line = line.trim();
+                                    if (!line || line.startsWith('#') || line.startsWith('--doc')) continue;
 
-                                        // Fall-through: Write the line as is
-                                        content += `${line}${lineEnding}`;
+                                    // Handle multi-word flags correctly for Robot (.args format)
+                                    // If a line starts with a flag (e.g., --include) and has a space, 
+                                    // split it into two lines: the flag and its value.
+                                    if (line.startsWith('--') && line.includes(' ')) {
+                                        const firstSpaceIndex = line.indexOf(' ');
+                                        const flag = line.substring(0, firstSpaceIndex).trim();
+                                        const value = line.substring(firstSpaceIndex + 1).trim();
+                                        content += `${flag}${lineEnding}${value}${lineEnding}`;
+                                        continue;
                                     }
+
+                                    // Fall-through: Write the line as is
+                                    content += `${line}${lineEnding}`;
+                                }
                             } catch (e) {
                                 console.error("Failed to read selection args file", item.path, e);
                                 const normalizedPath = item.path.replace(/\\/g, '/');
@@ -288,7 +288,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     if (hasAnySpecificTest && allTests.length > 0) {
                         finalTests = allTests;
                     }
-                    
+
                     finalArgsFile = tempArgsPath;
 
                     try {
@@ -337,6 +337,27 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                         workingDir,
                         selectedTests: finalTests
                     }).catch(e => feedback.toast.error("tests.launch_failed", e));
+                } else if (fw === 'maestro') {
+                    invoke("run_maestro_test", {
+                        runId,
+                        testPath: finalTestPath,
+                        outputDir: logDir,
+                        device: deviceUdid === 'local' ? null : deviceUdid,
+                        maestroArgs: settings.tools.maestroArgs,
+                        working_dir: settings.paths.automationRoot,
+                        timestampOutputs: dontOverwrite
+                    }).catch(e => {
+                        feedback.toast.error("tests.launch_failed", e);
+                    });
+                } else if (fw === 'appium') {
+                    invoke("run_appium_test", {
+                        runId,
+                        projectPath: finalTestPath,
+                        outputDir: logDir,
+                        appiumJavaArgs: settings.tools.appiumJavaArgs
+                    }).catch(e => {
+                        feedback.toast.error("tests.launch_failed", e);
+                    });
                 }
             }
 

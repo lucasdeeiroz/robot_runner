@@ -431,7 +431,7 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
                             const nameOnly = cleanLine.trim().split(' :: ')[0].trim();
                             const isTestNameLine = nameOnly === currentTest.name || cleanLine.match(/^(.*?)\s*\|\s+(PASS|FAIL)\s+\|\s*$/)?.[1].trim() === currentTest.name;
 
-                            if (!isMarker && !isTestNameLine && !IS_STATUS(line)) {
+                            if (!isMarker && !isTestNameLine) {
                                 currentTest.logs.push(line);
                             }
                         } else {
