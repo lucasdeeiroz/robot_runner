@@ -21,7 +21,7 @@ interface RunConsoleProps {
 export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunConsoleProps) {
     const { t } = useTranslation();
     const [isRawMode, setIsRawMode] = useState(false);
-
+    const [stickToBottom, setStickToBottom] = useState(true);
 
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -33,19 +33,29 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
 
     // Auto-scroll on new logs with stick-to-bottom logic
     useEffect(() => {
+        // Reset scroll lock if a new session starts
+        if (logs.length < 5 && !stickToBottom) setStickToBottom(true);
+        
+        if (!stickToBottom) return;
+
         const el = containerRef.current;
         if (!el || el.clientHeight === 0) return;
 
-        const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+        // Small timeout to allow the latest tree nodes to render
+        const timer = setTimeout(() => {
+            el.scrollTop = el.scrollHeight;
+        }, 120);
+        return () => clearTimeout(timer);
+    }, [logs, tree, isRunning, isRawMode, stickToBottom]);
 
-        if (isAtBottom || logs.length < 5) {
-            // Small timeout to allow the latest tree nodes to render
-            const timer = setTimeout(() => {
-                el.scrollTop = el.scrollHeight;
-            }, 60);
-            return () => clearTimeout(timer);
+    const onScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const el = e.currentTarget;
+        // If user scrolls up more than 150px from bottom, stop auto-scrolling
+        const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
+        if (isNearBottom !== stickToBottom) {
+            setStickToBottom(isNearBottom);
         }
-    }, [logs, tree, isRunning, isRawMode]);
+    };
 
     // Persistent Parsing Context
     const parsedNodesRef = useRef<LinearNode[]>([]);
@@ -532,7 +542,11 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
                 </div>
             )}
 
-            <div ref={containerRef} className="h-full flex-1 min-h-0 flex flex-col bg-surface overflow-y-auto p-4 font-mono text-xs custom-scrollbar relative">
+            <div 
+                ref={containerRef} 
+                onScroll={onScroll}
+                className="h-full flex-1 min-h-0 flex flex-col bg-surface overflow-y-auto p-4 font-mono text-xs custom-scrollbar relative"
+            >
                 {logs.length === 0 && (
                     <div className="text-on-surface-variant/80 italic opacity-50 select-none pb-4">{t('run_tab.console.waiting')}</div>
                 )}
