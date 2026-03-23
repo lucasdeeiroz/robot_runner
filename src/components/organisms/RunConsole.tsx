@@ -3,11 +3,10 @@ import clsx from "clsx";
 import { useTranslation } from "react-i18next";
 import { Star, ExternalLink, FileOutput } from "lucide-react";
 import { openPath } from "@tauri-apps/plugin-opener";
-import { XMLParser } from "fast-xml-parser";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/atoms/Button";
 import {
-    LogNode, mapXmlNode,
+    LogNode,
     LinearNode, SuiteNode, TestNode, TextNode
 } from "@/lib/robotParser";
 import { LogTree } from "@/components/molecules/LogTree";
@@ -65,25 +64,13 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
 
         const parseOutputXml = async () => {
             // Add a small delay to ensure Robot Framework has finished flushing the file to disk
-            await new Promise(resolve => setTimeout(resolve, 800));
+            await new Promise(resolve => setTimeout(resolve, 1000));
             try {
-                // Use backend read_file to bypass frontend FS scope restrictions
-                const xmlContent = await invoke<string>("read_file", { path: artifactPaths.output! });
-                const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "" });
-                const jsonObj = parser.parse(xmlContent);
-
-                const readImageBase64 = async (path: string) => {
-                    return await invoke<string>("read_image_base64", { path });
-                };
-
-                const robotObj = jsonObj.robot;
-                if (robotObj && robotObj.suite) {
-                    const rootNode = await mapXmlNode(robotObj.suite, artifactPaths.output!, readImageBase64, 'suite');
-                    if (rootNode) setTree([rootNode]);
-                }
-
+                // Offload heavy parsing to Rust backend to prevent UI freezes
+                const rootNode = await invoke<LogNode>("parse_robot_xml", { xmlPath: artifactPaths.output! });
+                if (rootNode) setTree([rootNode]);
             } catch (e: any) {
-                console.error("Failed to parse output.xml:", e);
+                console.error("Failed to parse output.xml via backend:", e);
             }
         };
 

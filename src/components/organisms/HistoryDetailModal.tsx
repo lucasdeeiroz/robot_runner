@@ -5,11 +5,10 @@ import {
     FileText, Folder
 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
-import { XMLParser } from "fast-xml-parser";
 import { Modal } from '@/components/organisms/Modal';
 import { Button } from '@/components/atoms/Button';
 import { LogTree } from '@/components/molecules/LogTree';
-import { LogNode, mapXmlNode } from '@/lib/robotParser';
+import { LogNode } from '@/lib/robotParser';
 import { feedback } from '@/lib/feedback';
 import { AndroidVersionPill } from '@/components/atoms/AndroidVersionPill';
 import { ExpressiveLoading } from '@/components/atoms/ExpressiveLoading';
@@ -53,21 +52,11 @@ export function HistoryDetailModal({ isOpen, onClose, log }: HistoryDetailModalP
     const loadXml = async () => {
         setLoading(true);
         try {
-            const xmlContent = await invoke<string>("read_file", { path: log!.xml_path });
-            const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "" });
-            const jsonObj = parser.parse(xmlContent);
-
-            const readImageBase64 = async (path: string) => {
-                return await invoke<string>("read_image_base64", { path });
-            };
-
-            const robotObj = jsonObj.robot;
-            if (robotObj && robotObj.suite) {
-                const rootNode = await mapXmlNode(robotObj.suite, log!.xml_path, readImageBase64, 'suite');
-                if (rootNode) setTree([rootNode]);
-            }
+            // Offload heavy parsing to Rust backend
+            const rootNode = await invoke<LogNode>("parse_robot_xml", { xmlPath: log!.xml_path });
+            if (rootNode) setTree([rootNode]);
         } catch (e) {
-            console.error("Failed to parse history XML:", e);
+            console.error("Failed to parse history XML via backend:", e);
             feedback.toast.error("common.errors.parse_failed");
         } finally {
             setLoading(false);

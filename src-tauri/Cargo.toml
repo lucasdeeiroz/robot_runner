@@ -31,3 +31,5 @@ chrono = { version = "0.4", features = ["serde"] }
 tauri-plugin-fs = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-http = "2.5.5"
+roxmltree = "0.20"
+rand = "0.8"

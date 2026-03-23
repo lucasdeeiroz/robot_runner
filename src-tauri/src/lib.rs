@@ -5,6 +5,7 @@ mod logs;
 mod ngrok;
 mod runner;
 mod system;
+mod xml_parser;
 
 use tauri::Manager;
 
@@ -93,7 +94,9 @@ pub fn run() {
             adb::packages::disable_package,
             adb::packages::clear_package,
             adb::packages::install_package,
-            runner::get_robot_test_cases
+            adb::packages::install_package,
+            runner::get_robot_test_cases,
+            xml_parser::parse_robot_xml
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
