@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
-import { Star, ExternalLink, FileOutput } from "lucide-react";
+import { Star, ExternalLink, FileOutput, Eye, EyeOff } from "lucide-react";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/atoms/Button";
@@ -21,6 +21,7 @@ interface RunConsoleProps {
 export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunConsoleProps) {
     const { t } = useTranslation();
     const [isRawMode, setIsRawMode] = useState(false);
+    const [isKeepAwake, setIsKeepAwake] = useState(false);
     const [stickToBottom, setStickToBottom] = useState(true);
 
     const containerRef = useRef<HTMLDivElement>(null);
@@ -47,6 +48,44 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
         }, 120);
         return () => clearTimeout(timer);
     }, [logs, tree, isRunning, isRawMode, stickToBottom]);
+
+    // Keep Screen Awake Lifecycle
+    useEffect(() => {
+        const handleWakeLock = async (enable: boolean) => {
+            try {
+                await invoke('toggle_wakelock', { enabled: enable });
+            } catch (err) {
+                console.error('WakeLock error:', err);
+            }
+        };
+
+        const onVisibilityChange = () => {
+            if (document.hidden) {
+                handleWakeLock(false);
+            } else if (isKeepAwake) {
+                handleWakeLock(true);
+            }
+        };
+
+        const onBlur = () => handleWakeLock(false);
+        const onFocus = () => isKeepAwake && handleWakeLock(true);
+
+        if (isKeepAwake) {
+            handleWakeLock(true);
+            document.addEventListener('visibilitychange', onVisibilityChange);
+            window.addEventListener('blur', onBlur);
+            window.addEventListener('focus', onFocus);
+        } else {
+            handleWakeLock(false);
+        }
+
+        return () => {
+            handleWakeLock(false);
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+            window.removeEventListener('blur', onBlur);
+            window.removeEventListener('focus', onFocus);
+        };
+    }, [isKeepAwake]);
 
     const onScroll = (e: React.UIEvent<HTMLDivElement>) => {
         const el = e.currentTarget;
@@ -501,13 +540,25 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
         <div className="h-full flex-1 min-h-0 flex flex-col bg-surface rounded-2xl font-mono text-sm border border-outline-variant/30 shadow-inner pointer-events-auto relative z-0 isolate overflow-hidden">
             <div className="flex items-center justify-between p-2 border-b border-outline-variant/30 bg-surface/80 backdrop-blur shrink-0 z-20">
                 <span className="text-xs text-on-surface-variant/80 font-mono truncate px-2" title={testPath}>{testPath}</span>
-                <button
-                    onClick={() => setIsRawMode(!isRawMode)}
-                    className="p-1 hover:bg-surface-variant/30 rounded transition-colors text-on-surface-variant/80 hover:text-warning"
-                    title={isRawMode ? t('run_tab.console.fancy_mode') : t('run_tab.console.raw_mode')}
-                >
-                    <Star size={14} fill={!isRawMode ? "currentColor" : "none"} className={clsx(!isRawMode && "text-warning-container/40")} />
-                </button>
+                <div className="flex items-center gap-1">
+                    <button
+                        onClick={() => setIsRawMode(!isRawMode)}
+                        className="p-1 hover:bg-surface-variant/30 rounded transition-colors text-on-surface-variant/80 hover:text-warning"
+                        title={isRawMode ? t('run_tab.console.fancy_mode') : t('run_tab.console.raw_mode')}
+                    >
+                        <Star size={14} fill={!isRawMode ? "currentColor" : "none"} className={clsx(!isRawMode && "text-warning-container/40")} />
+                    </button>
+                    <button
+                        onClick={() => setIsKeepAwake(!isKeepAwake)}
+                        className={clsx(
+                            "p-1 hover:bg-surface-variant/30 rounded transition-colors",
+                            isKeepAwake ? "text-primary" : "text-on-surface-variant/80 hover:text-primary"
+                        )}
+                        title={t('run_tab.console.keep_awake')}
+                    >
+                        {isKeepAwake ? <Eye size={14} /> : <EyeOff size={14} />}
+                    </button>
+                </div>
             </div>
 
             {/* Artifacts Toolbar */}

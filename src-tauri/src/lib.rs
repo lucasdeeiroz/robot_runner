@@ -34,6 +34,7 @@ pub fn run() {
         .manage(adb::logcat::LogcatState(std::sync::Mutex::new(
             std::collections::HashMap::new(),
         )))
+        .manage(system::WakelockState(std::sync::Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
             greet,
             adb::shell::get_adb_version,
@@ -96,7 +97,8 @@ pub fn run() {
             adb::packages::install_package,
             adb::packages::install_package,
             runner::get_robot_test_cases,
-            xml_parser::parse_robot_xml
+            xml_parser::parse_robot_xml,
+            system::toggle_wakelock
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

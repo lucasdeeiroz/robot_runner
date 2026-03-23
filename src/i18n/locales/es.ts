@@ -665,7 +665,8 @@ export const es = {
                 step_screenshot: "Captura de Pantalla del Paso",
                 view_fullscreen: "VER EN PANTALLA COMPLETA",
                 failure_screenshot: "Captura de Pantalla del Fallo",
-                keyword_screenshot: "Captura de Pantalla del Paso (Keyword)"
+                keyword_screenshot: "Captura de Pantalla del Paso (Keyword)",
+                keep_awake: "Mantener Pantalla Activa"
             }
         },
         scrcpy: {

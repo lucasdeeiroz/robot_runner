@@ -4,7 +4,9 @@ use serde_json::Value;
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 use std::process::Command;
-use tauri::command;
+use tauri::{command, State};
+use std::sync::Mutex;
+use nosleep::{NoSleep, NoSleepType};
 
 // CREATE_NO_WINDOW constant for Windows
 const CREATE_NO_WINDOW: u32 = 0x08000000;
@@ -23,6 +25,26 @@ pub struct SystemVersions {
     pub maven: String,
     pub maestro: String,
     pub ngrok: String,
+}
+
+pub struct WakelockState(pub Mutex<Option<NoSleep>>);
+
+#[command]
+pub async fn toggle_wakelock(enabled: bool, state: State<'_, WakelockState>) -> Result<(), String> {
+    let mut lock_guard = state.0.lock().map_err(|e| e.to_string())?;
+    
+    if enabled {
+        if lock_guard.is_none() {
+            let mut nosleep = NoSleep::new().map_err(|e| e.to_string())?;
+            nosleep.start(NoSleepType::PreventUserIdleDisplaySleep).map_err(|e| e.to_string())?;
+            *lock_guard = Some(nosleep);
+        }
+    } else {
+        if let Some(mut nosleep) = lock_guard.take() {
+            let _ = nosleep.stop();
+        }
+    }
+    Ok(())
 }
 
 #[command]
