@@ -95,7 +95,6 @@ pub fn run() {
             adb::packages::disable_package,
             adb::packages::clear_package,
             adb::packages::install_package,
-            adb::packages::install_package,
             runner::get_robot_test_cases,
             xml_parser::parse_robot_xml,
             system::toggle_wakelock
