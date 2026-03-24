@@ -211,8 +211,10 @@ fn map_keyword(node: Node, xml_path: &str) -> Result<KeywordNode, String> {
     }.to_string();
 
     let status_node = node.children().find(|n| n.tag_name().name() == "status").ok_or("No status node")?;
-    let status = status_node.attribute("status").unwrap_or("PASS").to_string();
-    
+    let mut status = status_node.attribute("status").unwrap_or("PASS").to_string();
+    if status == "NOT RUN" {
+        status = "NOT_RUN".to_string();
+    }
     let start = status_node.attribute("starttime").or_else(|| status_node.attribute("start")).unwrap_or("");
     let end = status_node.attribute("endtime").or_else(|| status_node.attribute("end")).unwrap_or("");
     let duration = format_duration(&status_node, start, end);
