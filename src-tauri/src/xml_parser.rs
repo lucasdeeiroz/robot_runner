@@ -1,9 +1,9 @@
 use roxmltree::Node;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum LogNode {
     Suite(SuiteNode),
@@ -12,7 +12,7 @@ pub enum LogNode {
     Text(TextNode),
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SuiteNode {
     pub id: String,
@@ -23,7 +23,7 @@ pub struct SuiteNode {
     pub stats: Option<SuiteStats>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SuiteStats {
     pub passed: i32,
@@ -31,7 +31,7 @@ pub struct SuiteStats {
     pub skipped: i32,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TestNode {
     pub id: String,
@@ -43,14 +43,14 @@ pub struct TestNode {
     pub logs: Vec<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FailureDetail {
     pub message: String,
     pub screenshot_path: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct KeywordNode {
     pub id: String,
@@ -63,7 +63,7 @@ pub struct KeywordNode {
     pub children: Vec<LogNode>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TextNode {
     pub id: String,
@@ -73,6 +73,18 @@ pub struct TextNode {
 
 #[tauri::command]
 pub async fn parse_robot_xml(xml_path: String) -> Result<LogNode, String> {
+    let cache_path = Path::new(&xml_path).with_file_name("parsed_log.json");
+    
+    // 1. Check if cache exists and is valid
+    if cache_path.exists() {
+        if let Ok(content) = fs::read_to_string(&cache_path) {
+            if let Ok(node) = serde_json::from_str::<LogNode>(&content) {
+                return Ok(node);
+            }
+        }
+    }
+
+    // 2. Parse XML if no cache
     let content = fs::read_to_string(&xml_path).map_err(|e| e.to_string())?;
     let doc = roxmltree::Document::parse(&content).map_err(|e| e.to_string())?;
     
@@ -85,7 +97,14 @@ pub async fn parse_robot_xml(xml_path: String) -> Result<LogNode, String> {
         .find(|n| n.tag_name().name() == "suite")
         .ok_or("No suite found in XML")?;
 
-    map_node(suite_node, &xml_path)
+    let suite = map_node(suite_node, &xml_path)?;
+    
+    // 3. Save cache for future loads
+    if let Ok(json) = serde_json::to_string(&suite) {
+        let _ = fs::write(&cache_path, json);
+    }
+    
+    Ok(suite)
 }
 
 fn map_node(node: Node, xml_path: &str) -> Result<LogNode, String> {
