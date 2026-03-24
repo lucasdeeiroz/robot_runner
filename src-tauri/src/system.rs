@@ -40,7 +40,7 @@ pub async fn toggle_wakelock(enabled: bool, state: State<'_, WakelockState>) -> 
             *lock_guard = Some(nosleep);
         }
     } else {
-        if let Some(mut nosleep) = lock_guard.take() {
+        if let Some(nosleep) = lock_guard.take() {
             let _ = nosleep.stop();
         }
     }
