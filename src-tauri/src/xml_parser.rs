@@ -73,10 +73,20 @@ pub struct TextNode {
 
 #[tauri::command]
 pub async fn parse_robot_xml(xml_path: String) -> Result<LogNode, String> {
-    let cache_path = Path::new(&xml_path).with_file_name("parsed_log_v2.json");
+    let xml_file_name = Path::new(&xml_path).file_name().and_then(|n| n.to_str()).unwrap_or("unknown");
+    let cache_file_name = format!("{}_parsed_log_v2.json", xml_file_name);
+    let cache_path = Path::new(&xml_path).with_file_name(cache_file_name);
     
-    // 1. Check if cache exists and is valid
-    if cache_path.exists() {
+    // 1. Check if cache exists and is valid (cache mtime >= xml mtime)
+    let xml_mtime = fs::metadata(&xml_path).and_then(|m| m.modified()).ok();
+    let cache_mtime = fs::metadata(&cache_path).and_then(|m| m.modified()).ok();
+    
+    let is_cache_valid = match (xml_mtime, cache_mtime) {
+        (Some(xm), Some(cm)) => cm >= xm,
+        _ => false,
+    };
+
+    if is_cache_valid && cache_path.exists() {
         if let Ok(content) = fs::read_to_string(&cache_path) {
             if let Ok(node) = serde_json::from_str::<LogNode>(&content) {
                 return Ok(node);
