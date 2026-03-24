@@ -255,13 +255,18 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
 
                             // FLATTEN argument files: read them and append their content cleanly
                             try {
-                                let absolutePath = item.path;
-                                if (!absolutePath.startsWith("/") && !absolutePath.match(/^[a-zA-Z]:/)) {
-                                    absolutePath = `${settings.paths.automationRoot}/${item.path}`.replace(/\\/g, '/');
+                                let linesToProcess: string[] = [];
+
+                                if (item.args && item.args.length > 0) {
+                                    linesToProcess = item.args;
+                                } else {
+                                    let absolutePath = item.path;
+                                    if (!absolutePath.startsWith("/") && !absolutePath.match(/^[a-zA-Z]:/)) {
+                                        absolutePath = `${settings.paths.automationRoot}/${item.path}`.replace(/\\/g, '/');
+                                    }
+                                    const fileContent = await invoke<string>("read_file", { path: absolutePath });
+                                    linesToProcess = fileContent.split(/\r?\n/);
                                 }
-                                const fileContent = await invoke<string>("read_file", { path: absolutePath });
-                                const fileLines = fileContent.split(/\r?\n/);
-                                const linesToProcess = item.args && item.args.length > 0 ? item.args : fileLines;
 
                                 for (let line of linesToProcess) {
                                     line = line.trim();
