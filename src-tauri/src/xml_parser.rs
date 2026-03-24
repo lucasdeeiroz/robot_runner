@@ -262,22 +262,40 @@ fn map_keyword(node: Node, xml_path: &str) -> Result<KeywordNode, String> {
     })
 }
 
-fn format_duration(status_node: &Node, _start: &str, _end: &str) -> String {
+fn format_duration(status_node: &Node, start: &str, end: &str) -> String {
+    // 1. Try "elapsed" attribute (most efficient)
     if let Some(elapsed) = status_node.attribute("elapsed") {
         if let Ok(total) = elapsed.parse::<f64>() {
-            let ms = (total * 1000.0).round() as i64 % 1000;
-            let secs = (total as i64) % 60;
-            let mins = (total as i64 / 60) % 60;
-            let hours = total as i64 / 3600;
+            return format_formatted_seconds(total);
+        }
+    }
 
-            if hours > 0 {
-                return format!("{:02}:{:02}:{:02}.{:03}", hours, mins, secs, ms);
-            } else {
-                return format!("{:02}:{:02}.{:03}", mins, secs, ms);
-            }
+    // 2. Fallback to start/end timestamps if elapsed is missing
+    if !start.is_empty() && !end.is_empty() {
+        let fmt = "%Y%m%d %H:%M:%S%.3f";
+        if let (Ok(s), Ok(e)) = (
+            chrono::NaiveDateTime::parse_from_str(start, fmt),
+            chrono::NaiveDateTime::parse_from_str(end, fmt)
+        ) {
+            let duration = e.signed_duration_since(s);
+            let total_secs = duration.num_milliseconds() as f64 / 1000.0;
+            return format_formatted_seconds(total_secs);
         }
     }
     "".to_string()
+}
+
+fn format_formatted_seconds(total: f64) -> String {
+    let ms = (total * 1000.0).round() as i64 % 1000;
+    let secs = (total as i64) % 60;
+    let mins = (total as i64 / 60) % 60;
+    let hours = total as i64 / 3600;
+
+    if hours > 0 {
+        format!("{:02}:{:02}:{:02}.{:03}", hours, mins, secs, ms)
+    } else {
+        format!("{:02}:{:02}.{:03}", mins, secs, ms)
+    }
 }
 
 fn resolve_screenshot(node: &Node, xml_path: &str) -> Option<String> {
