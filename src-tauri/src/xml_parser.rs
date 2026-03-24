@@ -199,16 +199,23 @@ fn map_test(node: Node, xml_path: &str) -> Result<TestNode, String> {
 fn map_keyword(node: Node, xml_path: &str) -> Result<KeywordNode, String> {
     let name = node.attribute("name").unwrap_or("").to_string();
     let tag = node.tag_name().name();
-    let sub_type = match tag {
-        "setup" => "setup",
-        "teardown" => "teardown",
-        "for" => "for",
-        "while" => "while",
-        "if" => "if",
-        "iter" => "iteration",
-        "branch" => "if",
-        _ => "keyword",
-    }.to_string();
+    let sub_type = if tag == "branch" {
+        match node.attribute("type").unwrap_or("IF") {
+            t if t.eq_ignore_ascii_case("ELSE IF") => "else-if",
+            t if t.eq_ignore_ascii_case("ELSE") => "else",
+            _ => "if",
+        }.to_string()
+    } else {
+        match tag {
+            "setup" => "setup",
+            "teardown" => "teardown",
+            "for" => "for",
+            "while" => "while",
+            "if" => "if",
+            "iter" => "iteration",
+            _ => "keyword",
+        }.to_string()
+    };
 
     let status_node = node.children().find(|n| n.tag_name().name() == "status").ok_or("No status node")?;
     let mut status = status_node.attribute("status").unwrap_or("PASS").to_string();
