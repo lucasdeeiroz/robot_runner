@@ -2,7 +2,6 @@ use roxmltree::Node;
 use serde::Serialize;
 use std::fs;
 use std::path::Path;
-use base64::{Engine as _, engine::general_purpose};
 
 #[derive(Serialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
@@ -48,7 +47,7 @@ pub struct TestNode {
 #[serde(rename_all = "camelCase")]
 pub struct FailureDetail {
     pub message: String,
-    pub screenshot: Option<String>,
+    pub screenshot_path: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -60,7 +59,7 @@ pub struct KeywordNode {
     pub status: String,
     pub duration: String,
     pub args: Vec<String>,
-    pub screenshot: Option<String>,
+    pub screenshot_path: Option<String>,
     pub children: Vec<LogNode>,
 }
 
@@ -95,7 +94,7 @@ fn map_node(node: Node, xml_path: &str) -> Result<LogNode, String> {
     match tag {
         "suite" => Ok(LogNode::Suite(map_suite(node, xml_path)?)),
         "test" => Ok(LogNode::Test(map_test(node, xml_path)?)),
-        "kw" | "setup" | "teardown" | "for" | "while" | "if" | "iter" | "branch" => {
+        "kw" | "setup" | "teardown" | "for" | "while" | "if" | "iter" | "branch" | "break" | "continue" => {
             Ok(LogNode::Keyword(map_keyword(node, xml_path)?))
         },
         _ => Err(format!("Unknown tag: {}", tag)),
@@ -115,16 +114,24 @@ fn map_suite(node: Node, xml_path: &str) -> Result<SuiteNode, String> {
     for child in node.children() {
         if child.is_element() {
             let ctag = child.tag_name().name();
-            if ctag == "suite" || ctag == "test" || ctag == "kw" || ctag == "setup" || ctag == "teardown" {
+            if ctag == "if" {
+                // Hoist branches
+                for branch in child.children().filter(|n| n.tag_name().name() == "branch") {
+                    if let Ok(mapped) = map_node(branch, xml_path) {
+                        children.push(mapped);
+                    }
+                }
+            } else if ctag == "suite" || ctag == "test" || ctag == "kw" || ctag == "setup" || ctag == "teardown" || ctag == "break" || ctag == "continue" {
                 if let Ok(mapped) = map_node(child, xml_path) {
                     children.push(mapped);
                 }
             } else if ctag == "msg" {
                 if let Some(txt) = child.text() {
-                    if !txt.is_empty() && !txt.contains("src=") {
+                    let cleaned = clean_message(txt);
+                    if !cleaned.is_empty() && !txt.contains("src=") {
                         children.push(LogNode::Text(TextNode {
                             id: format!("msg-{}", rand::random::<u32>()),
-                            content: txt.to_string(),
+                            content: cleaned,
                             is_system: false,
                         }));
                     }
@@ -168,16 +175,24 @@ fn map_test(node: Node, xml_path: &str) -> Result<TestNode, String> {
     for child in node.children() {
         if child.is_element() {
             let ctag = child.tag_name().name();
-            if ctag == "kw" || ctag == "setup" || ctag == "teardown" || ctag == "for" || ctag == "while" || ctag == "if" {
+            if ctag == "if" {
+                // Hoist branches
+                for branch in child.children().filter(|n| n.tag_name().name() == "branch") {
+                    if let Ok(mapped) = map_node(branch, xml_path) {
+                        children.push(mapped);
+                    }
+                }
+            } else if ctag == "kw" || ctag == "setup" || ctag == "teardown" || ctag == "for" || ctag == "while" || ctag == "break" || ctag == "continue" {
                 if let Ok(mapped) = map_node(child, xml_path) {
                     children.push(mapped);
                 }
             } else if ctag == "msg" {
                 if let Some(txt) = child.text() {
-                    if !txt.is_empty() && !txt.contains("src=") {
+                    let cleaned = clean_message(txt);
+                    if !cleaned.is_empty() && !txt.contains("src=") {
                         children.push(LogNode::Text(TextNode {
                             id: format!("msg-{}", rand::random::<u32>()),
-                            content: txt.to_string(),
+                            content: cleaned,
                             is_system: false,
                         }));
                     }
@@ -191,7 +206,7 @@ fn map_test(node: Node, xml_path: &str) -> Result<TestNode, String> {
         let message = status_node.text().unwrap_or("").to_string();
         failure_detail = Some(FailureDetail {
             message,
-            screenshot: resolve_screenshot(&node, xml_path),
+            screenshot_path: resolve_screenshot(&node, xml_path, true),
         });
     }
 
@@ -223,6 +238,8 @@ fn map_keyword(node: Node, xml_path: &str) -> Result<KeywordNode, String> {
             "while" => "while",
             "if" => "if",
             "iter" => "iteration",
+            "break" => "break",
+            "continue" => "continue",
             _ => "keyword",
         }.to_string()
     };
@@ -237,6 +254,44 @@ fn map_keyword(node: Node, xml_path: &str) -> Result<KeywordNode, String> {
     let duration = format_duration(&status_node, start, end);
 
     let mut args = Vec::new();
+    
+    // 1. Condition for BRANCH/WHILE
+    if let Some(cond) = node.attribute("condition") {
+        args.push(cond.to_string());
+    }
+
+    // 2. FOR flavors and iterate variables
+    let mut vars = Vec::new();
+    for child in node.children().filter(|n| n.tag_name().name() == "var") {
+        if let Some(txt) = child.text() {
+            vars.push(txt.to_string());
+        }
+    }
+
+    let mut values = Vec::new();
+    for child in node.children().filter(|n| n.tag_name().name() == "value") {
+        if let Some(txt) = child.text() {
+            values.push(txt.to_string());
+        }
+    }
+
+    let flavor = node.attribute("flavor").unwrap_or("IN");
+
+    if !vars.is_empty() {
+        if !values.is_empty() {
+            if vars.len() == 1 && values.len() == 1 && flavor == "IN" && node.tag_name().name() == "iter" {
+                args.push(format!("{} = {}", vars[0], values[0]));
+            } else {
+                args.push(format!("{} {} {}", vars.join(", "), flavor, values.join(", ")));
+            }
+        } else {
+            args.push(vars.join(", "));
+        }
+    } else if !values.is_empty() && node.attribute("condition").is_none() {
+        args.push(values.join(", "));
+    }
+
+    // 3. Standard <arg> elements
     for child in node.children().filter(|n| n.tag_name().name() == "arg") {
         if let Some(txt) = child.text() {
             args.push(txt.to_string());
@@ -248,17 +303,26 @@ fn map_keyword(node: Node, xml_path: &str) -> Result<KeywordNode, String> {
         if child.is_element() {
             let ctag = child.tag_name().name();
             match ctag {
-                "kw" | "setup" | "teardown" | "for" | "while" | "if" | "iter" | "branch" => {
+                "if" => {
+                    // Hoist branches
+                    for branch in child.children().filter(|n| n.tag_name().name() == "branch") {
+                        if let Ok(mapped) = map_node(branch, xml_path) {
+                            children.push(mapped);
+                        }
+                    }
+                },
+                "kw" | "setup" | "teardown" | "for" | "while" | "iter" | "branch" | "break" | "continue" => {
                     if let Ok(mapped) = map_node(child, xml_path) {
                         children.push(mapped);
                     }
                 },
                 "msg" => {
                     if let Some(txt) = child.text() {
-                        if !txt.is_empty() && !txt.contains("src=") {
+                        let cleaned = clean_message(txt);
+                        if !cleaned.is_empty() && !txt.contains("src=") {
                             children.push(LogNode::Text(TextNode {
                                 id: format!("msg-{}", rand::random::<u32>()),
-                                content: txt.to_string(),
+                                content: cleaned,
                                 is_system: false,
                             }));
                         }
@@ -276,7 +340,7 @@ fn map_keyword(node: Node, xml_path: &str) -> Result<KeywordNode, String> {
         status,
         duration,
         args,
-        screenshot: resolve_screenshot(&node, xml_path),
+        screenshot_path: resolve_screenshot(&node, xml_path, false),
         children,
     })
 }
@@ -317,42 +381,54 @@ fn format_formatted_seconds(total: f64) -> String {
     }
 }
 
-fn resolve_screenshot(node: &Node, xml_path: &str) -> Option<String> {
+fn resolve_screenshot(node: &Node, xml_path: &str, recursive: bool) -> Option<String> {
     // Find <msg> with src="..." recursively
-    let src = find_screenshot_src(node)?;
+    let src = find_screenshot_src(node, recursive)?;
     
-    // Resolve relative path
+    // If it's already an embedded base64 image (appium or embedded screenshot), return directly
+    if src.starts_with("data:image") {
+        return Some(src);
+    }
+    
+    // Resolve absolute path
     let base_dir = Path::new(xml_path).parent()?;
     let img_path = base_dir.join(&src);
     
-    if let Ok(data) = fs::read(img_path) {
-        let b64 = general_purpose::STANDARD.encode(data);
-        let ext = src.split('.').last().unwrap_or("png").to_lowercase();
-        let mime = if ext == "jpg" || ext == "jpeg" { "image/jpeg" } else { "image/png" };
-        return Some(format!("data:{};base64,{}", mime, b64));
-    }
-    None
+    // Return the path directly without checking .exists() during parsing, 
+    // as the path normalization might differ or file might be on a network drive. 
+    // The frontend read_image_base64 will handle actual access later.
+    Some(img_path.to_string_lossy().to_string())
 }
 
-fn find_screenshot_src(node: &Node) -> Option<String> {
+fn find_screenshot_src(node: &Node, recursive: bool) -> Option<String> {
+    let mut last_found = None;
     for child in node.children() {
         if child.tag_name().name() == "msg" {
             if let Some(txt) = child.text() {
-                if txt.contains("src=") {
-                    let parts: Vec<&str> = txt.split("src=\"").collect();
-                    if parts.len() > 1 {
-                        let inner = parts[1].split("\"").next()?;
-                        return Some(inner.to_string());
+                if let Some(idx) = txt.find("src=") {
+                    let rest = &txt[idx + 4..];
+                    if let Some(quote) = rest.chars().next() {
+                        if quote == '"' || quote == '\'' {
+                            if let Some(inner) = rest[1..].split(quote).next() {
+                                last_found = Some(inner.to_string());
+                            }
+                        }
                     }
                 }
             }
         }
         // Use recursive check for descendants if not found in immediate msg
-        if child.is_element() {
-            if let Some(found) = find_screenshot_src(&child) {
-                return Some(found);
+        if recursive && child.is_element() {
+            if let Some(found) = find_screenshot_src(&child, recursive) {
+                last_found = Some(found);
             }
         }
     }
-    None
+    last_found
+}
+
+fn clean_message(txt: &str) -> String {
+    // Strip <?xml...><hierarchy...</hierarchy>
+    let re = regex::Regex::new(r"(?i)<\?xml(?:[^>]*)?>\s*<hierarchy[\s\S]*?</hierarchy>").unwrap();
+    re.replace_all(txt, "").trim().to_string()
 }

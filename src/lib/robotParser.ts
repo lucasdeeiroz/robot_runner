@@ -22,7 +22,7 @@ export interface TestNode {
     duration?: string;
     failureDetail?: {
         message: string;
-        screenshot?: string;
+        screenshotPath?: string;
     };
     id: string;
 }
@@ -63,7 +63,7 @@ export interface KeywordNode {
     status: 'PASS' | 'FAIL' | 'NOT_RUN' | 'RUNNING';
     duration?: string;
     args?: string[];
-    screenshot?: string;
+    screenshotPath?: string;
     children: LogNode[];
 }
 
@@ -382,7 +382,7 @@ export const mapXmlNode = async (
         return {
             type: 'test', id, name, status: normalizedStatus, duration, children,
             logs: [],
-            failureDetail: failures[id] ? { message: failures[id].message, screenshot: failures[id].screenshot } : undefined
+            failureDetail: failures[id] ? { message: failures[id].message, screenshotPath: failures[id].screenshot } : undefined
         };
     }
 
@@ -441,7 +441,7 @@ export const mapXmlNode = async (
     const screenshot = await resolveScreenshot(directScreenshotSrc(obj), outputXmlPath, readImageBase64);
 
     return {
-        type: 'keyword', subType: subType || 'keyword', id, name, status: kwStatus, screenshot, duration,
+        type: 'keyword', subType: subType || 'keyword', id, name, status: kwStatus, screenshotPath: screenshot, duration,
         args: parseArgs(obj), children
     };
 };

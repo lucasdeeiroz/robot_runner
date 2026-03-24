@@ -3,6 +3,7 @@ import clsx from "clsx";
 import { useTranslation } from "react-i18next";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { invoke } from "@tauri-apps/api/core";
 import {
     ChevronRight, ChevronDown, CheckCircle2, XCircle, MinusCircle,
     Layers, BugPlay, CirclePlay, Repeat, IterationCcw, Workflow,
@@ -24,6 +25,8 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
         node.type !== 'text' && node.type !== 'suite-start' && (node as any).status !== 'PASS' && (node as any).status !== 'NOT_RUN'
     ));
     const [previewImage, setPreviewImage] = useState<string | null>(null);
+    const [screenshotData, setScreenshotData] = useState<string | null>(null);
+    const [failureScreenshotData, setFailureScreenshotData] = useState<string | null>(null);
 
     // Auto-expand when status changes from PASS/NOT_RUN/undefined to RUNNING/FAIL
     React.useEffect(() => {
@@ -31,6 +34,34 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
             setIsOpen(true);
         }
     }, [(node as any).status, initiallyOpen, node.type]);
+
+    // Lazy-load screenshots when expanded
+    React.useEffect(() => {
+        const fetchScreenshot = async (path: string, setter: (val: string) => void) => {
+            if (path.startsWith("data:image")) {
+                setter(path);
+                return;
+            }
+            try {
+                const b64 = await invoke<string>('read_image_base64', { path });
+                const ext = path.split('.').pop()?.toLowerCase() || 'png';
+                const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 'image/png';
+                setter(`data:${mime};base64,${b64}`);
+            } catch (err) {
+                console.error("Failed to lazy-load screenshot:", err, "Path:", path);
+                setter(`ERROR: ${err} | Path: ${path}`);
+            }
+        };
+
+        if (isOpen) {
+            if (node.type === 'keyword' && (node as KeywordNode).screenshotPath && !screenshotData) {
+                fetchScreenshot((node as KeywordNode).screenshotPath!, setScreenshotData);
+            }
+            if (node.type === 'test' && (node as TestNode).failureDetail?.screenshotPath && !failureScreenshotData) {
+                fetchScreenshot((node as TestNode).failureDetail!.screenshotPath!, setFailureScreenshotData);
+            }
+        }
+    }, [isOpen, node, screenshotData, failureScreenshotData]);
 
     if (node.type === 'text') {
         if (node.content.match(/^[-=]+$/)) return null;
@@ -171,46 +202,76 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
                                 </div>
                                 <div className="font-mono whitespace-pre-wrap leading-relaxed overflow-auto max-h-40">{(node as TestNode).failureDetail!.message}</div>
                             </div>
-                            {(node as TestNode).failureDetail!.screenshot && (
+                            {(node as TestNode).failureDetail!.screenshotPath && (
                                 <div
-                                    className="shrink-0 group relative cursor-zoom-in overflow-hidden self-start rounded-lg border border-error/20 shadow-sm"
-                                    onClick={(e) => { e.stopPropagation(); setPreviewImage((node as TestNode).failureDetail!.screenshot!); }}
+                                    className="shrink-0 group relative cursor-zoom-in overflow-hidden self-start rounded-lg border border-error/20 shadow-sm min-w-[100px] min-h-[60px] bg-black/5 flex items-center justify-center"
+                                    onClick={(e) => { e.stopPropagation(); if (failureScreenshotData) setPreviewImage(failureScreenshotData); }}
                                 >
-                                    <img
-                                        src={(node as TestNode).failureDetail!.screenshot}
-                                        alt={t('run_tab.console.failure_screenshot')}
-                                        className="h-28 object-cover"
-                                    />
-                                    <div className="absolute inset-0 bg-black/0 flex items-center justify-center">
-                                        <div className="opacity-0 group-hover:opacity-100 transition-all transform scale-90 group-hover:scale-100 bg-black/60 text-white p-2.5 rounded-full shadow-lg backdrop-blur-sm">
-                                            <Maximize2 size={16} />
+                                    {failureScreenshotData ? (
+                                        failureScreenshotData.startsWith("ERROR") ? (
+                                            <div className="flex flex-col items-center gap-2 px-4 py-2 text-error text-xs text-center max-w-[250px]">
+                                                <XCircle size={20} className="text-error" />
+                                                <span className="break-all">{failureScreenshotData.replace("ERROR: ", "")}</span>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <img
+                                                    src={failureScreenshotData}
+                                                    alt={t('run_tab.console.failure_screenshot')}
+                                                    className="h-28 object-cover"
+                                                />
+                                                <div className="absolute inset-0 bg-black/0 flex items-center justify-center">
+                                                    <div className="opacity-0 group-hover:opacity-100 transition-all transform scale-90 group-hover:scale-100 bg-black/60 text-white p-2.5 rounded-full shadow-lg backdrop-blur-sm">
+                                                        <Maximize2 size={16} />
+                                                    </div>
+                                                </div>
+                                            </>
+                                        )
+                                    ) : (
+                                        <div className="flex flex-col items-center gap-2 px-4 py-2 opacity-50">
+                                            <ExpressiveLoading size="sm" variant="circular" />
                                         </div>
-                                    </div>
+                                    )}
                                 </div>
                             )}
                         </div>
                     )}
 
-                    {node.type === 'keyword' && (node as KeywordNode).screenshot && (
+                    {node.type === 'keyword' && (node as KeywordNode).screenshotPath && (
                         <div className="mb-2 p-3 text-on-surface-variant text-xs animate-in fade-in slide-in-from-top-1 flex justify-between gap-2">
                             <div className="font-bold mb-1 uppercase tracking-wider opacity-70 flex items-center gap-1.5">
                                 <BugPlay size={12} />
                                 {t('run_tab.console.step_screenshot')}
                             </div>
                             <div
-                                className="group relative cursor-zoom-in overflow-hidden rounded-lg"
-                                onClick={(e) => { e.stopPropagation(); setPreviewImage((node as KeywordNode).screenshot!); }}
+                                className="group relative cursor-zoom-in overflow-hidden rounded-lg min-w-[100px] min-h-[60px] bg-black/5 flex items-center justify-center"
+                                onClick={(e) => { e.stopPropagation(); if (screenshotData) setPreviewImage(screenshotData); }}
                             >
-                                <img
-                                    src={(node as KeywordNode).screenshot}
-                                    alt={t('run_tab.console.keyword_screenshot')}
-                                    className="h-28 object-cover"
-                                />
-                                <div className="absolute inset-0 bg-black/0 flex items-center justify-center">
-                                    <div className="opacity-0 group-hover:opacity-100 transition-all transform scale-90 group-hover:scale-100 bg-black/60 text-white p-2.5 rounded-full shadow-lg backdrop-blur-sm">
-                                        <Maximize2 size={18} />
+                                {screenshotData ? (
+                                    screenshotData.startsWith("ERROR") ? (
+                                        <div className="flex flex-col items-center gap-2 px-4 py-2 text-error text-xs text-center max-w-[250px]">
+                                            <XCircle size={20} className="text-error" />
+                                            <span className="break-all">{screenshotData.replace("ERROR: ", "")}</span>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <img
+                                                src={screenshotData}
+                                                alt={t('run_tab.console.keyword_screenshot')}
+                                                className="h-28 object-cover"
+                                            />
+                                            <div className="absolute inset-0 bg-black/0 flex items-center justify-center">
+                                                <div className="opacity-0 group-hover:opacity-100 transition-all transform scale-90 group-hover:scale-100 bg-black/60 text-white p-2.5 rounded-full shadow-lg backdrop-blur-sm">
+                                                    <Maximize2 size={18} />
+                                                </div>
+                                            </div>
+                                        </>
+                                    )
+                                ) : (
+                                    <div className="flex flex-col items-center gap-2 px-4 py-2 opacity-50">
+                                        <ExpressiveLoading size="sm" variant="circular" />
                                     </div>
-                                </div>
+                                )}
                             </div>
                         </div>
                     )}
