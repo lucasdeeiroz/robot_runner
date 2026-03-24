@@ -146,7 +146,7 @@ fn map_suite(node: Node, xml_path: &str) -> Result<SuiteNode, String> {
     };
 
     Ok(SuiteNode {
-        id: format!("suite-{}", name),
+        id: node.attribute("id").map(|s| s.to_string()).unwrap_or_else(|| format!("suite-{}", name)),
         name,
         status,
         duration,
@@ -196,7 +196,7 @@ fn map_test(node: Node, xml_path: &str) -> Result<TestNode, String> {
     }
 
     Ok(TestNode {
-        id: format!("test-{}", name),
+        id: node.attribute("id").map(|s| s.to_string()).unwrap_or_else(|| format!("test-{}", name)),
         name,
         status,
         duration,
@@ -270,7 +270,7 @@ fn map_keyword(node: Node, xml_path: &str) -> Result<KeywordNode, String> {
     }
 
     Ok(KeywordNode {
-        id: format!("kw-{}", name),
+        id: node.attribute("id").map(|s| s.to_string()).unwrap_or_else(|| format!("kw-{}", name)),
         name,
         sub_type,
         status,
