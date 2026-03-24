@@ -118,7 +118,7 @@ export const normalizeTs = (ts: string): string => {
 };
 
 // Moved helper functions outside to be accessible by mapXmlNode
-const resolveScreenshot = async (src: string | undefined, outputXmlPath: string, readImageBase64: (path: string) => Promise<string>): Promise<string | undefined> => {
+const resolveScreenshot = async (src: string | undefined, outputXmlPath: string, _readImageBase64: (path: string) => Promise<string>): Promise<string | undefined> => {
     if (!src) return undefined;
     if (src.startsWith('data:')) return src;
     try {
@@ -129,9 +129,8 @@ const resolveScreenshot = async (src: string | undefined, outputXmlPath: string,
         const baseDir = (outputXmlPath || "").slice(0, lastSlash + 1);
         const fullPath = src.includes(':') || src.startsWith('/') || src.startsWith('\\')
             ? src : baseDir + src;
-        const b64 = await readImageBase64(fullPath);
-        const ext = src.split('.').pop()?.toLowerCase() || 'png';
-        return `data:${ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 'image/png'};base64,${b64}`;
+        
+        return fullPath;
     } catch {
         return undefined;
     }
@@ -273,7 +272,7 @@ const parseMsgChildren = (obj: any): LogNode[] => {
 export const mapXmlNode = async (
     obj: any,
     outputXmlPath: string,
-    readImageBase64: (path: string) => Promise<string>,
+    _readImageBase64: (path: string) => Promise<string>,
     nodeType?: string
 ): Promise<LogNode | null> => {
     if (!obj || typeof obj !== "object") return null;
@@ -300,9 +299,9 @@ export const mapXmlNode = async (
     if (nodeType === 'suite') {
         const children: LogNode[] = [];
         const suites = Array.isArray(obj.suite) ? obj.suite : (obj.suite ? [obj.suite] : []);
-        for (const s of suites) { const n = await mapXmlNode(s, outputXmlPath, readImageBase64, 'suite'); if (n) children.push(n); }
+        for (const s of suites) { const n = await mapXmlNode(s, outputXmlPath, _readImageBase64, 'suite'); if (n) children.push(n); }
         const tests = Array.isArray(obj.test) ? obj.test : (obj.test ? [obj.test] : []);
-        for (const t of tests) { const n = await mapXmlNode(t, outputXmlPath, readImageBase64, 'test'); if (n) children.push(n); }
+        for (const t of tests) { const n = await mapXmlNode(t, outputXmlPath, _readImageBase64, 'test'); if (n) children.push(n); }
         
         // Extract stats from <statistics> if available, or compute from children
         let passed = 0, failed = 0, skipped = 0;
@@ -335,18 +334,18 @@ export const mapXmlNode = async (
 
     if (nodeType === 'test') {
         const children: LogNode[] = [];
-        if (obj.setup) { const n = await mapXmlNode(obj.setup, outputXmlPath, readImageBase64, 'setup'); if (n) children.push(n); }
+        if (obj.setup) { const n = await mapXmlNode(obj.setup, outputXmlPath, _readImageBase64, 'setup'); if (n) children.push(n); }
         const kws = Array.isArray(obj.kw) ? obj.kw : (obj.kw ? [obj.kw] : []);
         for (const kw of kws) {
             const kwAttrType = typeof kw.type === 'string' ? kw.type.toLowerCase() : 'kw';
             const mappedType = kwAttrType === 'setup' ? 'setup' : 
                                kwAttrType === 'teardown' ? 'teardown' : 
                                kwAttrType === 'foritem' ? 'iteration' : 'kw';
-            const n = await mapXmlNode(kw, outputXmlPath, readImageBase64, mappedType);
+            const n = await mapXmlNode(kw, outputXmlPath, _readImageBase64, mappedType);
             if (n) children.push(n);
         }
         const fors = Array.isArray(obj.for) ? obj.for : (obj.for ? [obj.for] : []);
-        for (const f of fors) { const n = await mapXmlNode(f, outputXmlPath, readImageBase64, 'for'); if (n) children.push(n); }
+        for (const f of fors) { const n = await mapXmlNode(f, outputXmlPath, _readImageBase64, 'for'); if (n) children.push(n); }
         const ifs = Array.isArray(obj.if) ? obj.if : (obj.if ? [obj.if] : []);
         for (const ifNode of ifs) {
             if (ifNode.branch) {
@@ -354,27 +353,27 @@ export const mapXmlNode = async (
                 for (const b of branchItems) {
                     const branchType = (b.type || "").toLowerCase();
                     const mappedBranchType = branchType === 'else if' ? 'else-if' : (branchType === 'else' ? 'else' : 'if');
-                    const n = await mapXmlNode(b, outputXmlPath, readImageBase64, mappedBranchType);
+                    const n = await mapXmlNode(b, outputXmlPath, _readImageBase64, mappedBranchType);
                     if (n) children.push(n);
                 }
             } else {
-                const n = await mapXmlNode(ifNode, outputXmlPath, readImageBase64, 'if');
+                const n = await mapXmlNode(ifNode, outputXmlPath, _readImageBase64, 'if');
                 if (n) children.push(n);
             }
         }
         const whiles = Array.isArray(obj.while) ? obj.while : (obj.while ? [obj.while] : []);
-        for (const w of whiles) { const n = await mapXmlNode(w, outputXmlPath, readImageBase64, 'while'); if (n) children.push(n); }
-        if (obj.teardown) { const n = await mapXmlNode(obj.teardown, outputXmlPath, readImageBase64, 'teardown'); if (n) children.push(n); }
+        for (const w of whiles) { const n = await mapXmlNode(w, outputXmlPath, _readImageBase64, 'while'); if (n) children.push(n); }
+        if (obj.teardown) { const n = await mapXmlNode(obj.teardown, outputXmlPath, _readImageBase64, 'teardown'); if (n) children.push(n); }
 
         const normalizedStatus: 'PASS' | 'FAIL' | 'RUNNING' =
             statusStr === 'PASS' || statusStr === 'FAIL' || statusStr === 'RUNNING'
                 ? statusStr
                 : 'FAIL';
 
-        const failures: Record<string, { message: string, screenshot?: string, name: string }> = {};
+        const failures: Record<string, { message: string, screenshotPath?: string, name: string }> = {};
         if (normalizedStatus === 'FAIL') {
             const msg = typeof obj.status === 'object' && obj.status["#text"] ? obj.status["#text"] : "";
-            failures[id] = { message: msg, name, screenshot: await resolveScreenshot(deepScreenshotSrc(obj), outputXmlPath, readImageBase64) };
+            failures[id] = { message: msg, name, screenshotPath: await resolveScreenshot(deepScreenshotSrc(obj), outputXmlPath, _readImageBase64) };
         }
 
         children.push(...parseMsgChildren(obj));
@@ -382,24 +381,24 @@ export const mapXmlNode = async (
         return {
             type: 'test', id, name, status: normalizedStatus, duration, children,
             logs: [],
-            failureDetail: failures[id] ? { message: failures[id].message, screenshotPath: failures[id].screenshot } : undefined
+            failureDetail: failures[id] ? { message: failures[id].message, screenshotPath: failures[id].screenshotPath } : undefined
         };
     }
 
     const children: LogNode[] = [];
 
-    if (obj.setup) { const n = await mapXmlNode(obj.setup, outputXmlPath, readImageBase64, 'setup'); if (n) children.push(n); }
+    if (obj.setup) { const n = await mapXmlNode(obj.setup, outputXmlPath, _readImageBase64, 'setup'); if (n) children.push(n); }
     const kwItems = Array.isArray(obj.kw) ? obj.kw : (obj.kw ? [obj.kw] : []);
     for (const item of kwItems) {
         const kwAttrType = typeof item.type === 'string' ? item.type.toLowerCase() : 'kw';
         const mappedType = kwAttrType === 'setup' ? 'setup' : 
                            kwAttrType === 'teardown' ? 'teardown' : 
                            kwAttrType === 'foritem' ? 'iteration' : 'kw';
-        const n = await mapXmlNode(item, outputXmlPath, readImageBase64, mappedType);
+        const n = await mapXmlNode(item, outputXmlPath, _readImageBase64, mappedType);
         if (n) children.push(n);
     }
     const forItems = Array.isArray(obj.for) ? obj.for : (obj.for ? [obj.for] : []);
-    for (const f of forItems) { const n = await mapXmlNode(f, outputXmlPath, readImageBase64, 'for'); if (n) children.push(n); }
+    for (const f of forItems) { const n = await mapXmlNode(f, outputXmlPath, _readImageBase64, 'for'); if (n) children.push(n); }
     const ifItems = Array.isArray(obj.if) ? obj.if : (obj.if ? [obj.if] : []);
     for (const ifItem of ifItems) {
         if (ifItem.branch) {
@@ -407,11 +406,11 @@ export const mapXmlNode = async (
             for (const b of branchItems) {
                 const branchType = (b.type || "").toLowerCase();
                 const mappedBranchType = branchType === 'else if' ? 'else-if' : (branchType === 'else' ? 'else' : 'if');
-                const n = await mapXmlNode(b, outputXmlPath, readImageBase64, mappedBranchType);
+                const n = await mapXmlNode(b, outputXmlPath, _readImageBase64, mappedBranchType);
                 if (n) children.push(n);
             }
         } else {
-            const n = await mapXmlNode(ifItem, outputXmlPath, readImageBase64, 'if');
+            const n = await mapXmlNode(ifItem, outputXmlPath, _readImageBase64, 'if');
             if (n) children.push(n);
         }
     }
@@ -422,26 +421,26 @@ export const mapXmlNode = async (
         const bStatusObj = typeof b.status === 'object' ? b.status : {};
         const bStatusStr = bStatusObj.status || 'PASS';
         const bKwStatus = bStatusStr === 'NOT RUN' ? 'NOT_RUN' : (bStatusStr === 'FAIL' ? 'FAIL' : 'PASS');
-        const n = await mapXmlNode(b, outputXmlPath, readImageBase64, mappedBranchType);
+        const n = await mapXmlNode(b, outputXmlPath, _readImageBase64, mappedBranchType);
         if (n) { (n as KeywordNode).status = bKwStatus; children.push(n); }
     }
     const iterItems = Array.isArray(obj.iter) ? obj.iter : (obj.iter ? [obj.iter] : []);
-    for (const iter of iterItems) { const n = await mapXmlNode(iter, outputXmlPath, readImageBase64, 'iteration'); if (n) children.push(n); }
+    for (const iter of iterItems) { const n = await mapXmlNode(iter, outputXmlPath, _readImageBase64, 'iteration'); if (n) children.push(n); }
     const whileItems = Array.isArray(obj.while) ? obj.while : (obj.while ? [obj.while] : []);
-    for (const w of whileItems) { const n = await mapXmlNode(w, outputXmlPath, readImageBase64, 'while'); if (n) children.push(n); }
+    for (const w of whileItems) { const n = await mapXmlNode(w, outputXmlPath, _readImageBase64, 'while'); if (n) children.push(n); }
     const breakItems = Array.isArray(obj.break) ? obj.break : (obj.break ? [obj.break] : []);
-    for (const brk of breakItems) { const n = await mapXmlNode(brk, outputXmlPath, readImageBase64, 'break'); if (n) children.push(n); }
+    for (const brk of breakItems) { const n = await mapXmlNode(brk, outputXmlPath, _readImageBase64, 'break'); if (n) children.push(n); }
     const contItems = Array.isArray(obj.continue) ? obj.continue : (obj.continue ? [obj.continue] : []);
-    for (const c of contItems) { const n = await mapXmlNode(c, outputXmlPath, readImageBase64, 'continue'); if (n) children.push(n); }
-    if (obj.teardown) { const n = await mapXmlNode(obj.teardown, outputXmlPath, readImageBase64, 'teardown'); if (n) children.push(n); }
+    for (const c of contItems) { const n = await mapXmlNode(c, outputXmlPath, _readImageBase64, 'continue'); if (n) children.push(n); }
+    if (obj.teardown) { const n = await mapXmlNode(obj.teardown, outputXmlPath, _readImageBase64, 'teardown'); if (n) children.push(n); }
 
     children.push(...parseMsgChildren(obj));
 
     const kwStatus = statusStr === 'NOT RUN' ? 'NOT_RUN' : (statusStr === 'FAIL' ? 'FAIL' : 'PASS');
-    const screenshot = await resolveScreenshot(directScreenshotSrc(obj), outputXmlPath, readImageBase64);
+    const screenshotPath = await resolveScreenshot(directScreenshotSrc(obj), outputXmlPath, _readImageBase64);
 
     return {
-        type: 'keyword', subType: subType || 'keyword', id, name, status: kwStatus, screenshotPath: screenshot, duration,
+        type: 'keyword', subType: subType || 'keyword', id, name, status: kwStatus, screenshotPath, duration,
         args: parseArgs(obj), children
     };
 };

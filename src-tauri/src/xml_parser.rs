@@ -73,7 +73,7 @@ pub struct TextNode {
 
 #[tauri::command]
 pub async fn parse_robot_xml(xml_path: String) -> Result<LogNode, String> {
-    let cache_path = Path::new(&xml_path).with_file_name("parsed_log.json");
+    let cache_path = Path::new(&xml_path).with_file_name("parsed_log_v2.json");
     
     // 1. Check if cache exists and is valid
     if cache_path.exists() {

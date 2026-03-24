@@ -225,11 +225,10 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                 } else {
                     // Complex case: generate temp .args file
                     const tempArgsPath = `${settings.paths.logs || '../temp'}/run_${runId}.args`.replace(/\\/g, '/');
-                    let content = "";
+                    let optionsContent = "";
+                    let posContent = "";
                     const isWindows = navigator.platform.toLowerCase().includes('win');
                     const lineEnding = isWindows ? "\r\n" : "\n";
-
-
                     const allTests: string[] = [];
                     const hasAnySpecificTest = selections.some(s => (s.tests?.length || 0) > 0);
 
@@ -240,15 +239,15 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                         if (item.type === 'file' || item.type === 'folder') {
                             if (item.tests && item.tests.length > 0) {
                                 for (const test of item.tests) {
-                                    allTests.push(`*.${name}.${test}`);
+                                    allTests.push(`*${name}*.${test}`);
                                 }
                             } else {
-                                allTests.push(`*.${name}.*`);
+                                allTests.push(`*${name}*.*`);
                             }
 
                             // Add the file or folder as a POSITIONAL data source in the .args file
                             const normalizedPath = item.path.replace(/\\/g, '/');
-                            content += `${normalizedPath}${lineEnding}`;
+                            posContent += `${normalizedPath}${lineEnding}`;
 
                         } else if (item.type === 'args') {
                             // Add a broad pattern for the argument file to ensure its tests are included if filtering is active
@@ -256,31 +255,39 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
 
                             // FLATTEN argument files: read them and append their content cleanly
                             try {
-                                const fileContent = await invoke<string>("read_file", { path: item.path });
-                                const lines = fileContent.split(/\r?\n/);
+                                let absolutePath = item.path;
+                                if (!absolutePath.startsWith("/") && !absolutePath.match(/^[a-zA-Z]:/)) {
+                                    absolutePath = `${settings.paths.automationRoot}/${item.path}`.replace(/\\/g, '/');
+                                }
+                                const fileContent = await invoke<string>("read_file", { path: absolutePath });
+                                const fileLines = fileContent.split(/\r?\n/);
+                                const linesToProcess = item.args && item.args.length > 0 ? item.args : fileLines;
 
-                                for (let line of lines) {
+                                for (let line of linesToProcess) {
                                     line = line.trim();
                                     if (!line || line.startsWith('#') || line.startsWith('--doc')) continue;
 
                                     // Handle multi-word flags correctly for Robot (.args format)
                                     // If a line starts with a flag (e.g., --include) and has a space, 
                                     // split it into two lines: the flag and its value.
-                                    if (line.startsWith('--') && line.includes(' ')) {
-                                        const firstSpaceIndex = line.indexOf(' ');
-                                        const flag = line.substring(0, firstSpaceIndex).trim();
-                                        const value = line.substring(firstSpaceIndex + 1).trim();
-                                        content += `${flag}${lineEnding}${value}${lineEnding}`;
-                                        continue;
+                                    if (line.startsWith('-')) {
+                                        if (line.startsWith('--') && line.includes(' ')) {
+                                            const firstSpaceIndex = line.indexOf(' ');
+                                            const flag = line.substring(0, firstSpaceIndex).trim();
+                                            const value = line.substring(firstSpaceIndex + 1).trim();
+                                            optionsContent += `${flag}${lineEnding}${value}${lineEnding}`;
+                                            continue;
+                                        }
+                                        optionsContent += `${line}${lineEnding}`;
+                                    } else {
+                                        // Fall-through: Write the line as is
+                                        posContent += `${line}${lineEnding}`;
                                     }
-
-                                    // Fall-through: Write the line as is
-                                    content += `${line}${lineEnding}`;
                                 }
                             } catch (e) {
                                 console.error("Failed to read selection args file", item.path, e);
                                 const normalizedPath = item.path.replace(/\\/g, '/');
-                                content += `-A${lineEnding}${normalizedPath}${lineEnding}`;
+                                optionsContent += `-A${lineEnding}${normalizedPath}${lineEnding}`;
                             }
                         }
                     }
@@ -292,7 +299,8 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     finalArgsFile = tempArgsPath;
 
                     try {
-                        await invoke("save_file", { path: tempArgsPath, content, append: false });
+                        const finalContent = optionsContent + posContent;
+                        await invoke("save_file", { path: tempArgsPath, content: finalContent, append: false });
                     } catch (e) {
                         feedback.toast.error("common.error", e);
                         setIsLaunching(false);
