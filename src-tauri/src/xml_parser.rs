@@ -119,6 +119,16 @@ fn map_suite(node: Node, xml_path: &str) -> Result<SuiteNode, String> {
                 if let Ok(mapped) = map_node(child, xml_path) {
                     children.push(mapped);
                 }
+            } else if ctag == "msg" {
+                if let Some(txt) = child.text() {
+                    if !txt.is_empty() && !txt.contains("src=") {
+                        children.push(LogNode::Text(TextNode {
+                            id: format!("msg-{}", rand::random::<u32>()),
+                            content: txt.to_string(),
+                            is_system: false,
+                        }));
+                    }
+                }
             }
         }
     }
