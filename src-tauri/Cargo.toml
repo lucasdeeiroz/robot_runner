@@ -1,6 +1,6 @@
 [package]
 name = "robot_runner"
-version = "2.1.100"
+version = "2.1.101"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -31,3 +31,6 @@ chrono = { version = "0.4", features = ["serde"] }
 tauri-plugin-fs = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-http = "2.5.5"
+roxmltree = "0.20"
+rand = "0.8"
+nosleep = "0.2"

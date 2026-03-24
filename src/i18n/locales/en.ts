@@ -659,7 +659,8 @@ export const en = {
                 step_screenshot: "Step Screenshot",
                 view_fullscreen: "VIEW FULLSCREEN",
                 failure_screenshot: "Failure Screenshot",
-                keyword_screenshot: "Keyword Screenshot"
+                keyword_screenshot: "Keyword Screenshot",
+                keep_awake: "Keep Screen Awake"
             }
         },
         scrcpy: {

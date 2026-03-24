@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
-import { Star, ExternalLink, FileOutput } from "lucide-react";
+import { Star, ExternalLink, FileOutput, Eye, EyeOff } from "lucide-react";
 import { openPath } from "@tauri-apps/plugin-opener";
-import { XMLParser } from "fast-xml-parser";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/atoms/Button";
 import {
-    LogNode, mapXmlNode,
+    LogNode,
     LinearNode, SuiteNode, TestNode, TextNode
 } from "@/lib/robotParser";
 import { LogTree } from "@/components/molecules/LogTree";
@@ -22,7 +21,8 @@ interface RunConsoleProps {
 export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunConsoleProps) {
     const { t } = useTranslation();
     const [isRawMode, setIsRawMode] = useState(false);
-
+    const [isKeepAwake, setIsKeepAwake] = useState(false);
+    const [stickToBottom, setStickToBottom] = useState(true);
 
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -34,19 +34,67 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
 
     // Auto-scroll on new logs with stick-to-bottom logic
     useEffect(() => {
+        // Reset scroll lock if a new session starts
+        if (logs.length < 5 && !stickToBottom) setStickToBottom(true);
+        
+        if (!stickToBottom) return;
+
         const el = containerRef.current;
         if (!el || el.clientHeight === 0) return;
 
-        const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+        // Small timeout to allow the latest tree nodes to render
+        const timer = setTimeout(() => {
+            el.scrollTop = el.scrollHeight;
+        }, 120);
+        return () => clearTimeout(timer);
+    }, [logs, tree, isRunning, isRawMode, stickToBottom]);
 
-        if (isAtBottom || logs.length < 5) {
-            // Small timeout to allow the latest tree nodes to render
-            const timer = setTimeout(() => {
-                el.scrollTop = el.scrollHeight;
-            }, 60);
-            return () => clearTimeout(timer);
+    // Keep Screen Awake Lifecycle
+    useEffect(() => {
+        const handleWakeLock = async (enable: boolean) => {
+            try {
+                await invoke('toggle_wakelock', { enabled: enable });
+            } catch (err) {
+                console.error('WakeLock error:', err);
+            }
+        };
+
+        const onVisibilityChange = () => {
+            if (document.hidden) {
+                handleWakeLock(false);
+            } else if (isKeepAwake) {
+                handleWakeLock(true);
+            }
+        };
+
+        const onBlur = () => handleWakeLock(false);
+        const onFocus = () => isKeepAwake && handleWakeLock(true);
+
+        if (isKeepAwake) {
+            handleWakeLock(true);
+            document.addEventListener('visibilitychange', onVisibilityChange);
+            window.addEventListener('blur', onBlur);
+            window.addEventListener('focus', onFocus);
+        } else {
+            handleWakeLock(false);
         }
-    }, [logs, tree, isRunning, isRawMode]);
+
+        return () => {
+            handleWakeLock(false);
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+            window.removeEventListener('blur', onBlur);
+            window.removeEventListener('focus', onFocus);
+        };
+    }, [isKeepAwake]);
+
+    const onScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const el = e.currentTarget;
+        // If user scrolls up more than 150px from bottom, stop auto-scrolling
+        const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
+        if (isNearBottom !== stickToBottom) {
+            setStickToBottom(isNearBottom);
+        }
+    };
 
     // Persistent Parsing Context
     const parsedNodesRef = useRef<LinearNode[]>([]);
@@ -65,25 +113,13 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
 
         const parseOutputXml = async () => {
             // Add a small delay to ensure Robot Framework has finished flushing the file to disk
-            await new Promise(resolve => setTimeout(resolve, 800));
+            await new Promise(resolve => setTimeout(resolve, 1000));
             try {
-                // Use backend read_file to bypass frontend FS scope restrictions
-                const xmlContent = await invoke<string>("read_file", { path: artifactPaths.output! });
-                const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "" });
-                const jsonObj = parser.parse(xmlContent);
-
-                const readImageBase64 = async (path: string) => {
-                    return await invoke<string>("read_image_base64", { path });
-                };
-
-                const robotObj = jsonObj.robot;
-                if (robotObj && robotObj.suite) {
-                    const rootNode = await mapXmlNode(robotObj.suite, artifactPaths.output!, readImageBase64, 'suite');
-                    if (rootNode) setTree([rootNode]);
-                }
-
+                // Offload heavy parsing to Rust backend to prevent UI freezes
+                const rootNode = await invoke<LogNode>("parse_robot_xml", { xmlPath: artifactPaths.output! });
+                if (rootNode) setTree([rootNode]);
             } catch (e: any) {
-                console.error("Failed to parse output.xml:", e);
+                console.error("Failed to parse output.xml via backend:", e);
             }
         };
 
@@ -504,13 +540,25 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
         <div className="h-full flex-1 min-h-0 flex flex-col bg-surface rounded-2xl font-mono text-sm border border-outline-variant/30 shadow-inner pointer-events-auto relative z-0 isolate overflow-hidden">
             <div className="flex items-center justify-between p-2 border-b border-outline-variant/30 bg-surface/80 backdrop-blur shrink-0 z-20">
                 <span className="text-xs text-on-surface-variant/80 font-mono truncate px-2" title={testPath}>{testPath}</span>
-                <button
-                    onClick={() => setIsRawMode(!isRawMode)}
-                    className="p-1 hover:bg-surface-variant/30 rounded transition-colors text-on-surface-variant/80 hover:text-warning"
-                    title={isRawMode ? t('run_tab.console.fancy_mode') : t('run_tab.console.raw_mode')}
-                >
-                    <Star size={14} fill={!isRawMode ? "currentColor" : "none"} className={clsx(!isRawMode && "text-warning-container/40")} />
-                </button>
+                <div className="flex items-center gap-1">
+                    <button
+                        onClick={() => setIsRawMode(!isRawMode)}
+                        className="p-1 hover:bg-surface-variant/30 rounded transition-colors text-on-surface-variant/80 hover:text-warning"
+                        title={isRawMode ? t('run_tab.console.fancy_mode') : t('run_tab.console.raw_mode')}
+                    >
+                        <Star size={14} fill={!isRawMode ? "currentColor" : "none"} className={clsx(!isRawMode && "text-warning-container/40")} />
+                    </button>
+                    <button
+                        onClick={() => setIsKeepAwake(!isKeepAwake)}
+                        className={clsx(
+                            "p-1 hover:bg-surface-variant/30 rounded transition-colors",
+                            isKeepAwake ? "text-primary" : "text-on-surface-variant/80 hover:text-primary"
+                        )}
+                        title={t('run_tab.console.keep_awake')}
+                    >
+                        {isKeepAwake ? <Eye size={14} /> : <EyeOff size={14} />}
+                    </button>
+                </div>
             </div>
 
             {/* Artifacts Toolbar */}
@@ -545,7 +593,11 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
                 </div>
             )}
 
-            <div ref={containerRef} className="h-full flex-1 min-h-0 flex flex-col bg-surface overflow-y-auto p-4 font-mono text-xs custom-scrollbar relative">
+            <div 
+                ref={containerRef} 
+                onScroll={onScroll}
+                className="h-full flex-1 min-h-0 flex flex-col bg-surface overflow-y-auto p-4 font-mono text-xs custom-scrollbar relative"
+            >
                 {logs.length === 0 && (
                     <div className="text-on-surface-variant/80 italic opacity-50 select-none pb-4">{t('run_tab.console.waiting')}</div>
                 )}

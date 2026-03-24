@@ -102,7 +102,7 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
                     {node.type === 'keyword' && subType === 'setup' && <CalendarCog size={14} className="opacity-70 shrink-0" />}
                     {node.type === 'keyword' && subType === 'teardown' && <CalendarCog size={14} className="opacity-70 shrink-0" />}
 
-                    <span 
+                    <span
                         className={clsx(
                             "truncate",
                             node.type === 'suite' ? "font-bold text-sm" : "text-xs font-medium",
@@ -111,7 +111,12 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
                         title={node.name}
                     >
                         <span className={clsx("text-[9px] mr-1.5 uppercase font-bold tracking-tighter", pillColor)}>{pill}</span>
-                        {node.name.includes('.') ? node.name.split('.').pop() : node.name}
+                        {(() => {
+                            const name = node.name;
+                            const base = name.replace(/\.+$/, '');
+                            const dots = name.substring(base.length);
+                            return base.includes('.') ? base.split('.').pop() + dots : name;
+                        })()}
 
                         {node.type === 'keyword' && (node as KeywordNode).args && (node as KeywordNode).args!.length > 0 && (
                             <span className="ml-2 opacity-50 font-normal italic overflow-hidden text-ellipsis">
@@ -123,7 +128,7 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
                     </span>
                 </div>
                 <div className={clsx(
-                    "text-[10px] px-1.5 py-0.5 rounded font-bold uppercase flex items-center gap-1 shrink-0",
+                    "text-[12px] px-1.5 py-0.5 rounded font-bold uppercase flex items-center gap-1 shrink-0",
                     bgColor, summaryColor
                 )}>
                     {node.duration && (
