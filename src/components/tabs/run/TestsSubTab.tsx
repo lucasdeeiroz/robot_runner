@@ -148,7 +148,8 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
             if (fw !== 'maestro') {
                 const status = await invoke<{ running: boolean }>('get_appium_status', {
                     host: settings.appiumHost,
-                    port: Number(settings.appiumPort)
+                    port: Number(settings.appiumPort),
+                    base_path: settings.appiumBasePath
                 });
                 if (!status.running) {
                     setLaunchStatus(t('tests.status.starting'));
@@ -164,7 +165,8 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     for (let i = 0; i < 20; i++) {
                         const s = await invoke<{ running: boolean }>('get_appium_status', {
                             host: settings.appiumHost,
-                            port: Number(settings.appiumPort)
+                            port: Number(settings.appiumPort),
+                            base_path: settings.appiumBasePath
                         });
                         if (s.running) {
                             isReady = true;

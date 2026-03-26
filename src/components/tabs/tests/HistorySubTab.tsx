@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { useSettings } from "@/lib/settings";
 import { HistoryCharts } from "@/components/organisms/HistoryCharts";
@@ -29,6 +29,7 @@ interface TestLog {
     fail_count: number;
     xml_path: string;
     log_html_path: string;
+    mtime: number;
 }
 
 const formatDate = (dateStr: string) => {
@@ -63,6 +64,7 @@ export function HistorySubTab() {
 
     const historyContainerRef = useRef<HTMLDivElement>(null);
     const [isHistoryNarrow, setIsHistoryNarrow] = useState(false);
+    const isFirstRun = useRef(true);
 
     useEffect(() => {
         if (!historyContainerRef.current) return;
@@ -76,9 +78,11 @@ export function HistorySubTab() {
     }, []);
 
     useEffect(() => {
-        // Delay initial load slightly to allow tab transition animation to finish
+        if (history.length > 0 && !isFirstRun.current) return;
+        
         const timer = setTimeout(() => {
             loadHistory();
+            isFirstRun.current = false;
         }, 350);
         return () => clearTimeout(timer);
     }, [settings.paths.logs]);
@@ -109,14 +113,16 @@ export function HistorySubTab() {
         return true;
     };
 
-    const filteredHistory = history.filter(log => {
-        const decodedName = decodeHtml(log.suite_name);
-        const matchesText = decodedName.toLowerCase().includes(filterText.toLowerCase());
-        const matchesPeriod = isDateInPeriod(log.timestamp, filterPeriod);
-        return matchesText && matchesPeriod;
-    });
+    const filteredHistory = useMemo(() => {
+        return history.filter(log => {
+            const decodedName = decodeHtml(log.suite_name);
+            const matchesText = decodedName.toLowerCase().includes(filterText.toLowerCase());
+            const matchesPeriod = isDateInPeriod(log.timestamp, filterPeriod);
+            return matchesText && matchesPeriod;
+        });
+    }, [history, filterText, filterPeriod]);
 
-    const groupedHistory = () => {
+    const groupedHistory = useMemo(() => {
         if (groupBy === 'none') return { 'All': filteredHistory };
 
         const groups: Record<string, TestLog[]> = {};
@@ -144,7 +150,7 @@ export function HistorySubTab() {
             });
         }
         return groups;
-    };
+    }, [filteredHistory, groupBy, t]);
 
 
     const toggleGroup = (group: string) => {
@@ -352,7 +358,7 @@ export function HistorySubTab() {
                 )}
 
                 <div className="space-y-6">
-                    {Object.entries(groupedHistory()).map(([group, logs]) => (
+                    {Object.entries(groupedHistory).map(([group, logs]) => (
                         logs.length > 0 && renderGroup(group, logs)
                     ))}
                 </div>

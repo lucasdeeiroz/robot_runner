@@ -87,16 +87,17 @@ pub async fn parse_robot_xml(xml_path: String) -> Result<LogNode, String> {
     };
 
     if is_cache_valid && cache_path.exists() {
-        if let Ok(content) = fs::read_to_string(&cache_path) {
-            if let Ok(node) = serde_json::from_str::<LogNode>(&content) {
-                return Ok(node);
-            }
-        }
+        println!("[XML Parser] Loading from cache: {:?}", cache_path);
+        let json = fs::read_to_string(&cache_path).map_err(|e| e.to_string())?;
+        let suite: LogNode = serde_json::from_str(&json).map_err(|e| e.to_string())?;
+        return Ok(suite);
     }
 
     // 2. Parse XML if no cache
+    println!("[XML Parser] Parsing XML: {:?}", xml_path);
     let content = fs::read_to_string(&xml_path).map_err(|e| e.to_string())?;
     let doc = roxmltree::Document::parse(&content).map_err(|e| e.to_string())?;
+    println!("[XML Parser] XML parsed successfully");
     
     let root = doc.root_element();
     if root.tag_name().name() != "robot" {
@@ -107,30 +108,47 @@ pub async fn parse_robot_xml(xml_path: String) -> Result<LogNode, String> {
         .find(|n| n.tag_name().name() == "suite")
         .ok_or("No suite found in XML")?;
 
-    let suite = map_node(suite_node, &xml_path)?;
+    println!("[XML Parser] Mapping suite structure...");
+    
+    // Pre-calculate base_dir and compile regexes once
+    let base_dir = Path::new(&xml_path).parent().unwrap_or(Path::new("."));
+    let re_src = regex::Regex::new(r#"src=["']([^"']+)["']"#).unwrap();
+    let re_hierarchy = regex::Regex::new(r"(?i)<\?xml(?:[^>]*)?>\s*<hierarchy[\s\S]*?</hierarchy>").unwrap();
+
+    let suite = map_node(suite_node, base_dir, &re_src, &re_hierarchy)?;
+    println!("[XML Parser] Mapping complete");
     
     // 3. Save cache for future loads
-    if let Ok(json) = serde_json::to_string(&suite) {
-        let _ = fs::write(&cache_path, json);
+    println!("[XML Parser] Saving cache to: {:?}", cache_path);
+    
+    // Use buffered writer to handle large files efficiently
+    let file = fs::File::create(&cache_path).map_err(|e| e.to_string())?;
+    let writer = std::io::BufWriter::new(file);
+    serde_json::to_writer(writer, &suite).map_err(|e| format!("Serialization error: {}", e))?;
+    
+    if let Ok(meta) = fs::metadata(&cache_path) {
+        println!("[XML Parser] Cache saved successfully: {} bytes", meta.len());
+    } else {
+        println!("[XML Parser] Cache saved successfully (size unknown)");
     }
     
     Ok(suite)
 }
 
-fn map_node(node: Node, xml_path: &str) -> Result<LogNode, String> {
+fn map_node(node: Node, base_dir: &Path, re_src: &regex::Regex, re_hierarchy: &regex::Regex) -> Result<LogNode, String> {
     let tag = node.tag_name().name();
     
     match tag {
-        "suite" => Ok(LogNode::Suite(map_suite(node, xml_path)?)),
-        "test" => Ok(LogNode::Test(map_test(node, xml_path)?)),
+        "suite" => Ok(LogNode::Suite(map_suite(node, base_dir, re_src, re_hierarchy)?)),
+        "test" => Ok(LogNode::Test(map_test(node, base_dir, re_src, re_hierarchy)?)),
         "kw" | "setup" | "teardown" | "for" | "while" | "if" | "iter" | "branch" | "break" | "continue" => {
-            Ok(LogNode::Keyword(map_keyword(node, xml_path)?))
+            Ok(LogNode::Keyword(map_keyword(node, base_dir, re_src, re_hierarchy)?))
         },
         _ => Err(format!("Unknown tag: {}", tag)),
     }
 }
 
-fn map_suite(node: Node, xml_path: &str) -> Result<SuiteNode, String> {
+fn map_suite(node: Node, base_dir: &Path, re_src: &regex::Regex, re_hierarchy: &regex::Regex) -> Result<SuiteNode, String> {
     let name = node.attribute("name").unwrap_or("").to_string();
     let status_node = node.children().find(|n| n.tag_name().name() == "status").ok_or("No status node")?;
     let status = status_node.attribute("status").unwrap_or("PASS").to_string();
@@ -146,17 +164,17 @@ fn map_suite(node: Node, xml_path: &str) -> Result<SuiteNode, String> {
             if ctag == "if" {
                 // Hoist branches
                 for branch in child.children().filter(|n| n.tag_name().name() == "branch") {
-                    if let Ok(mapped) = map_node(branch, xml_path) {
+                    if let Ok(mapped) = map_node(branch, base_dir, re_src, re_hierarchy) {
                         children.push(mapped);
                     }
                 }
             } else if ctag == "suite" || ctag == "test" || ctag == "kw" || ctag == "setup" || ctag == "teardown" || ctag == "break" || ctag == "continue" {
-                if let Ok(mapped) = map_node(child, xml_path) {
+                if let Ok(mapped) = map_node(child, base_dir, re_src, re_hierarchy) {
                     children.push(mapped);
                 }
             } else if ctag == "msg" {
                 if let Some(txt) = child.text() {
-                    let cleaned = clean_message(txt);
+                    let cleaned = clean_message(txt, re_hierarchy);
                     if !cleaned.is_empty() && !txt.contains("src=") {
                         children.push(LogNode::Text(TextNode {
                             id: format!("msg-{}", rand::random::<u32>()),
@@ -191,7 +209,7 @@ fn map_suite(node: Node, xml_path: &str) -> Result<SuiteNode, String> {
     })
 }
 
-fn map_test(node: Node, xml_path: &str) -> Result<TestNode, String> {
+fn map_test(node: Node, base_dir: &Path, re_src: &regex::Regex, re_hierarchy: &regex::Regex) -> Result<TestNode, String> {
     let name = node.attribute("name").unwrap_or("").to_string();
     let status_node = node.children().find(|n| n.tag_name().name() == "status").ok_or("No status node")?;
     let status = status_node.attribute("status").unwrap_or("PASS").to_string();
@@ -207,17 +225,17 @@ fn map_test(node: Node, xml_path: &str) -> Result<TestNode, String> {
             if ctag == "if" {
                 // Hoist branches
                 for branch in child.children().filter(|n| n.tag_name().name() == "branch") {
-                    if let Ok(mapped) = map_node(branch, xml_path) {
+                    if let Ok(mapped) = map_node(branch, base_dir, re_src, re_hierarchy) {
                         children.push(mapped);
                     }
                 }
             } else if ctag == "kw" || ctag == "setup" || ctag == "teardown" || ctag == "for" || ctag == "while" || ctag == "break" || ctag == "continue" {
-                if let Ok(mapped) = map_node(child, xml_path) {
+                if let Ok(mapped) = map_node(child, base_dir, re_src, re_hierarchy) {
                     children.push(mapped);
                 }
             } else if ctag == "msg" {
                 if let Some(txt) = child.text() {
-                    let cleaned = clean_message(txt);
+                    let cleaned = clean_message(txt, re_hierarchy);
                     if !cleaned.is_empty() && !txt.contains("src=") {
                         children.push(LogNode::Text(TextNode {
                             id: format!("msg-{}", rand::random::<u32>()),
@@ -235,7 +253,7 @@ fn map_test(node: Node, xml_path: &str) -> Result<TestNode, String> {
         let message = status_node.text().unwrap_or("").to_string();
         failure_detail = Some(FailureDetail {
             message,
-            screenshot_path: resolve_screenshot(&node, xml_path, true),
+            screenshot_path: resolve_screenshot(&node, base_dir, re_src, true),
         });
     }
 
@@ -250,7 +268,7 @@ fn map_test(node: Node, xml_path: &str) -> Result<TestNode, String> {
     })
 }
 
-fn map_keyword(node: Node, xml_path: &str) -> Result<KeywordNode, String> {
+fn map_keyword(node: Node, base_dir: &Path, re_src: &regex::Regex, re_hierarchy: &regex::Regex) -> Result<KeywordNode, String> {
     let name = node.attribute("name").unwrap_or("").to_string();
     let tag = node.tag_name().name();
     let sub_type = if tag == "branch" {
@@ -335,19 +353,19 @@ fn map_keyword(node: Node, xml_path: &str) -> Result<KeywordNode, String> {
                 "if" => {
                     // Hoist branches
                     for branch in child.children().filter(|n| n.tag_name().name() == "branch") {
-                        if let Ok(mapped) = map_node(branch, xml_path) {
+                        if let Ok(mapped) = map_node(branch, base_dir, re_src, re_hierarchy) {
                             children.push(mapped);
                         }
                     }
                 },
                 "kw" | "setup" | "teardown" | "for" | "while" | "iter" | "branch" | "break" | "continue" => {
-                    if let Ok(mapped) = map_node(child, xml_path) {
+                    if let Ok(mapped) = map_node(child, base_dir, re_src, re_hierarchy) {
                         children.push(mapped);
                     }
                 },
                 "msg" => {
                     if let Some(txt) = child.text() {
-                        let cleaned = clean_message(txt);
+                        let cleaned = clean_message(txt, re_hierarchy);
                         if !cleaned.is_empty() && !txt.contains("src=") {
                             children.push(LogNode::Text(TextNode {
                                 id: format!("msg-{}", rand::random::<u32>()),
@@ -369,7 +387,7 @@ fn map_keyword(node: Node, xml_path: &str) -> Result<KeywordNode, String> {
         status,
         duration,
         args,
-        screenshot_path: resolve_screenshot(&node, xml_path, false),
+        screenshot_path: resolve_screenshot(&node, base_dir, re_src, false),
         children,
     })
 }
@@ -410,45 +428,46 @@ fn format_formatted_seconds(total: f64) -> String {
     }
 }
 
-fn resolve_screenshot(node: &Node, xml_path: &str, recursive: bool) -> Option<String> {
+fn resolve_screenshot(node: &Node, base_dir: &Path, re_src: &regex::Regex, recursive: bool) -> Option<String> {
     // Find <msg> with src="..." recursively
-    let src = find_screenshot_src(node, recursive)?;
+    let src = find_screenshot_src(node, re_src, recursive)?;
     
     // If it's already an embedded base64 image (appium or embedded screenshot), return directly
     if src.starts_with("data:image") {
         return Some(src);
     }
     
-    // Resolve absolute path
-    let base_dir = Path::new(xml_path).parent()?;
-    let img_path = base_dir.join(&src);
+    // Clean src path (remove leading ./ if present)
+    let clean_src = if src.starts_with("./") { &src[2..] } else { &src };
     
-    // Return the path directly without checking .exists() during parsing, 
-    // as the path normalization might differ or file might be on a network drive. 
-    // The frontend read_image_base64 will handle actual access later.
-    Some(img_path.to_string_lossy().to_string())
+    // Handle both / and \ in src paths for cross-platform compatibility
+    let clean_src = clean_src.replace('\\', "/");
+    
+    let img_path = base_dir.join(&clean_src);
+    
+    let resolved = img_path.to_string_lossy().to_string();
+    // println!("[XML Parser] Resolved screenshot: {} -> {}", src, resolved);
+    
+    Some(resolved)
 }
 
-fn find_screenshot_src(node: &Node, recursive: bool) -> Option<String> {
+fn find_screenshot_src(node: &Node, re_src: &regex::Regex, recursive: bool) -> Option<String> {
     let mut last_found = None;
+    
     for child in node.children() {
         if child.tag_name().name() == "msg" {
+            // Fast path: only run regex if it contains src= and is small or starts with <img
             if let Some(txt) = child.text() {
-                if let Some(idx) = txt.find("src=") {
-                    let rest = &txt[idx + 4..];
-                    if let Some(quote) = rest.chars().next() {
-                        if quote == '"' || quote == '\'' {
-                            if let Some(inner) = rest[1..].split(quote).next() {
-                                last_found = Some(inner.to_string());
-                            }
-                        }
+                if txt.contains("src=") {
+                    if let Some(caps) = re_src.captures(txt) {
+                        last_found = Some(caps[1].to_string());
                     }
                 }
             }
         }
         // Use recursive check for descendants if not found in immediate msg
         if recursive && child.is_element() {
-            if let Some(found) = find_screenshot_src(&child, recursive) {
+            if let Some(found) = find_screenshot_src(&child, re_src, recursive) {
                 last_found = Some(found);
             }
         }
@@ -456,8 +475,11 @@ fn find_screenshot_src(node: &Node, recursive: bool) -> Option<String> {
     last_found
 }
 
-fn clean_message(txt: &str) -> String {
-    // Strip <?xml...><hierarchy...</hierarchy>
-    let re = regex::Regex::new(r"(?i)<\?xml(?:[^>]*)?>\s*<hierarchy[\s\S]*?</hierarchy>").unwrap();
-    re.replace_all(txt, "").trim().to_string()
+fn clean_message(txt: &str, re_hierarchy: &regex::Regex) -> String {
+    // Fast path: only run regex if it looks like an XML hierarchy
+    if txt.len() > 10 && txt.contains("<?xml") && txt.contains("<hierarchy") {
+        re_hierarchy.replace_all(txt, "").trim().to_string()
+    } else {
+        txt.trim().to_string()
+    }
 }
