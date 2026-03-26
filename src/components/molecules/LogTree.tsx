@@ -38,6 +38,7 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
     // Lazy-load screenshots when expanded
     React.useEffect(() => {
         const fetchScreenshot = async (path: string, setter: (val: string) => void) => {
+            console.log("[LogTree] Fetching screenshot:", path);
             if (path.startsWith("data:image")) {
                 setter(path);
                 return;
@@ -45,10 +46,14 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
             try {
                 const b64 = await invoke<string>('read_image_base64', { path });
                 const ext = path.split('.').pop()?.toLowerCase() || 'png';
-                const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 'image/png';
-                setter(`data:${mime};base64,${b64}`);
+                const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 
+                             ext === 'gif' ? 'image/gif' :
+                             ext === 'webp' ? 'image/webp' : 'image/png';
+                const dataUrl = `data:${mime};base64,${b64}`;
+                console.log("[LogTree] Screenshot loaded successfully:", path.substring(path.length - 20));
+                setter(dataUrl);
             } catch (err) {
-                console.error("Failed to lazy-load screenshot:", err, "Path:", path);
+                console.error("[LogTree] Failed to lazy-load screenshot:", err, "Path:", path);
                 setter(`ERROR: ${err} | Path: ${path}`);
             }
         };

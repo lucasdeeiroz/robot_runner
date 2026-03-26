@@ -19,6 +19,7 @@ pub struct TestLog {
     fail_count: i32,
     xml_path: String,
     log_html_path: String,
+    mtime: u64, // Unix timestamp of output.xml
 }
 
 #[command]
@@ -49,25 +50,16 @@ pub fn get_test_history(
     // Cache State
     let mut cache_map: std::collections::HashMap<String, TestLog> =
         std::collections::HashMap::new();
-    let mut cache_mtime = std::time::SystemTime::UNIX_EPOCH;
 
     if let Some(ref cache_path) = cache_file {
         if cache_path.exists() {
-            if let Ok(metadata) = fs::metadata(cache_path) {
-                if let Ok(modified) = metadata.modified() {
-                    cache_mtime = modified;
-                }
-            }
-
-            // println!("Loading logs from cache: {:?}", cache_path);
-            if let Ok(content) = fs::read_to_string(cache_path) {
-                if let Ok(cached_logs) = serde_json::from_str::<Vec<TestLog>>(&content) {
+            if let Ok(file) = fs::File::open(cache_path) {
+                let reader = std::io::BufReader::new(file);
+                if let Ok(cached_logs) = serde_json::from_reader::<_, Vec<TestLog>>(reader) {
                     for log in cached_logs {
                         // Use xml_path as unique key
                         cache_map.insert(log.xml_path.clone(), log);
                     }
-                } else {
-                    // println!("Failed to parse cache, falling back to full scan.");
                 }
             }
         }
@@ -76,11 +68,11 @@ pub fn get_test_history(
     if force_refresh {
     }
 
-    let mut logs = Vec::new();
-    let mut seen_paths = std::collections::HashSet::new(); // Avoid duplicates if configured path is same as default
+    let mut seen_paths = std::collections::HashSet::new();
+
+    let mut xml_files = Vec::new();
 
     for base_path in candidates {
-        // Resolve absolute path
         let abs_base = base_path.canonicalize().unwrap_or(base_path.clone());
         let abs_path_str = abs_base.to_string_lossy().to_string();
 
@@ -89,45 +81,66 @@ pub fn get_test_history(
         }
         seen_paths.insert(abs_path_str);
 
-        // println!("Scanning logs in: {:?}", abs_base);
-
         if base_path.exists() && base_path.is_dir() {
-            // Walkdir manual recursive
             let walker = walkdir::WalkDir::new(&base_path)
                 .min_depth(1)
                 .max_depth(5)
                 .follow_links(true);
+            
             for entry in walker.into_iter().filter_map(|e| e.ok()) {
                 let fname = entry.file_name().to_string_lossy();
                 if fname.starts_with("output") && fname.ends_with(".xml") {
-                    let xml_path = entry.path();
-                    let xml_path_str = xml_path.to_string_lossy().to_string();
-                    let parent = xml_path.parent().unwrap_or(Path::new(""));
+                    xml_files.push(entry.path().to_path_buf());
+                }
+            }
+        }
+    }
 
-                    // Check mtime
-                    let mut use_cache = false;
-                    if let Some(cached_log) = cache_map.get(&xml_path_str) {
-                        if let Ok(meta) = fs::metadata(xml_path) {
-                            if let Ok(modified) = meta.modified() {
-                                // If XML file is OLDER than cache file, assume it hasn't changed since cache was written.
-                                // Adding a small buffer or just strict comparison.
-                                // If modified <= cache_mtime: reuse
-                                if modified <= cache_mtime {
-                                    use_cache = true;
-                                    logs.push(cached_log.clone());
-                                }
-                            }
-                        }
-                    }
+    use rayon::prelude::*;
 
-                    if !use_cache {
-                        // Parse
-                        // println!("Parsing new/modified log: {:?}", xml_path);
-                        if let Some(log) = parse_log_entry(&parent, &xml_path) {
-                            logs.push(log);
-                        }
+    // Parallel processing with Rayon
+    let processed_logs: Vec<TestLog> = xml_files
+        .into_par_iter()
+        .filter_map(|xml_path| {
+            let xml_path_str = xml_path.to_string_lossy().to_string();
+            let parent = xml_path.parent().unwrap_or(Path::new(""));
+
+            // Get current mtime
+            let current_mtime = fs::metadata(&xml_path)
+                .and_then(|m| m.modified())
+                .map(|m| m.duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs())
+                .unwrap_or(0);
+
+            // Check cache by XML path and EXACT mtime
+            if !force_refresh {
+                if let Some(cached_log) = cache_map.get(&xml_path_str) {
+                    if cached_log.mtime == current_mtime {
+                        return Some(cached_log.clone());
                     }
                 }
+            }
+
+            // Parse if not in cache or changed
+            parse_log_entry(parent, &xml_path, current_mtime)
+        })
+        .collect();
+
+    let mut logs: Vec<TestLog> = processed_logs;
+
+    // Check if anything changed compared to cache to avoid redundant writes
+    let mut changed = false;
+    if logs.len() != cache_map.len() {
+        changed = true;
+    } else {
+        for log in &logs {
+            if let Some(cached) = cache_map.get(&log.xml_path) {
+                if cached.mtime != log.mtime {
+                    changed = true;
+                    break;
+                }
+            } else {
+                changed = true;
+                break;
             }
         }
     }
@@ -135,18 +148,20 @@ pub fn get_test_history(
     // Sort by timestamp desc
     logs.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
 
-    // 2. Save new cache (Atomically if possible, but standard write is fine)
-    if let Some(ref cache_path) = cache_file {
-        if let Ok(json) = serde_json::to_string_pretty(&logs) {
-            let _ = fs::write(cache_path, json);
-            // println!("Saved logs cache to: {:?}", cache_path);
+    // Save cache only if changed
+    if changed {
+        if let Some(ref cache_path) = cache_file {
+            if let Ok(file) = fs::File::create(cache_path) {
+                let writer = std::io::BufWriter::new(file);
+                let _ = serde_json::to_writer(writer, &logs);
+            }
         }
     }
 
     Ok(logs)
 }
 
-fn parse_log_entry(folder_path: &Path, xml_path: &Path) -> Option<TestLog> {
+fn parse_log_entry(folder_path: &Path, xml_path: &Path, mtime: u64) -> Option<TestLog> {
     let content = read_optimized_log(xml_path).ok()?;
     let abs_folder_path = folder_path
         .canonicalize()
@@ -306,6 +321,7 @@ fn parse_log_entry(folder_path: &Path, xml_path: &Path) -> Option<TestLog> {
             pass_count: pass,
             fail_count: fail,
             log_html_path,
+            mtime,
         });
     }
 
@@ -369,6 +385,7 @@ fn parse_log_entry(folder_path: &Path, xml_path: &Path) -> Option<TestLog> {
         pass_count,
         fail_count,
         log_html_path: xml_path.to_string_lossy().to_string(), // Maestro report is the XML
+        mtime,
     })
 }
 
