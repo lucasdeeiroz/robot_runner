@@ -16,12 +16,11 @@ pub fn get_appium_status(
     state: State<'_, AppiumState>,
     host: Option<String>,
     port: Option<u32>,
+    base_path: Option<String>,
 ) -> AppiumStatus {
     let mut child_guard = match state.0.lock() {
         Ok(guard) => guard,
         Err(_) => {
-            // If poisoned, we assume it's not running or in bad state.
-            // Ideally we should log this.
             return AppiumStatus {
                 running: false,
                 pid: None,
@@ -29,17 +28,12 @@ pub fn get_appium_status(
         }
     };
     let (internal_running, internal_pid) = if let Some(child) = &mut *child_guard {
-        // limit: try_wait() returns Ok(Some(_)) if exited, Ok(None) if running
         match child.try_wait() {
             Ok(Some(_)) => {
-                // It has exited
                 *child_guard = None; // Clean up
                 (false, None)
             }
-            Ok(None) => {
-                // Still running
-                (true, Some(child.id()))
-            }
+            Ok(None) => (true, Some(child.id())),
             Err(_) => {
                 *child_guard = None;
                 (false, None)
@@ -49,21 +43,13 @@ pub fn get_appium_status(
         (false, None)
     };
 
-    let port_open = if let (Some(h), Some(p)) = (host, port) {
-        let check_host = if h == "0.0.0.0" { "127.0.0.1" } else { &h };
-        let addr = format!("{}:{}", check_host, p);
-        if let Ok(addrs) = std::net::ToSocketAddrs::to_socket_addrs(&addr) {
-            addrs.into_iter().any(|a| {
-                std::net::TcpStream::connect_timeout(&a, std::time::Duration::from_millis(500)).is_ok()
-            })
-        } else {
-            false
-        }
+    let is_ready = if let (Some(h), Some(p)) = (host, port) {
+        check_appium_ready(&h, p, base_path.as_deref().unwrap_or(""))
     } else {
         false
     };
 
-    if port_open {
+    if is_ready {
         AppiumStatus {
             running: true,
             pid: internal_pid,
@@ -74,6 +60,47 @@ pub fn get_appium_status(
             pid: internal_pid,
         }
     }
+}
+
+fn check_appium_ready(host: &str, port: u32, base_path: &str) -> bool {
+    let check_host = if host == "0.0.0.0" { "127.0.0.1" } else { host };
+    let addr = format!("{}:{}", check_host, port);
+    
+    // 1. Resolve address
+    if let Ok(addrs) = std::net::ToSocketAddrs::to_socket_addrs(&addr) {
+        for a in addrs {
+            // 2. TCP Check
+            if let Ok(mut stream) = std::net::TcpStream::connect_timeout(&a, std::time::Duration::from_millis(500)) {
+                // 3. HTTP Check
+                let _ = stream.set_read_timeout(Some(std::time::Duration::from_millis(500)));
+                let _ = stream.set_write_timeout(Some(std::time::Duration::from_millis(500)));
+                
+                // Normalize path
+                let mut path = base_path.trim().to_string();
+                if !path.starts_with('/') && !path.is_empty() {
+                     path = format!("/{}", path);
+                }
+                if path.ends_with('/') {
+                    path.pop();
+                }
+                
+                let request = format!(
+                    "GET {}/status HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n",
+                    path, addr
+                );
+                
+                use std::io::{Read, Write};
+                if stream.write_all(request.as_bytes()).is_ok() {
+                    let mut response = Vec::new();
+                    if stream.read_to_end(&mut response).is_ok() {
+                        let resp_str = String::from_utf8_lossy(&response);
+                        return resp_str.contains("HTTP/1.1 200") && (resp_str.contains("\"ready\":true") || resp_str.contains("Appium"));
+                    }
+                }
+            }
+        }
+    }
+    false
 }
 
 #[tauri::command]
