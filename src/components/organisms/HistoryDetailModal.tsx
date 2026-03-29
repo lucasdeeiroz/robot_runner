@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useTranslation } from "react-i18next";
 import {
     XCircle, CheckCircle2, Calendar, Clock, Smartphone,
     FileText, Folder
 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
+import { listen, UnlistenFn } from '@tauri-apps/api/event';
+import { getCachedTree, parseXmlBackground, onParseComplete } from '@/lib/xmlParseCache';
 import { Modal } from '@/components/organisms/Modal';
 import { Button } from '@/components/atoms/Button';
 import { LogTree } from '@/components/molecules/LogTree';
@@ -30,6 +32,18 @@ interface TestLog {
     log_html_path: string;
 }
 
+interface ParseProgress {
+    stage: string;
+    percent: number;
+}
+
+const STAGE_KEYS: Record<string, string> = {
+    parsing_xml: 'run_tab.console.progress_parsing_xml',
+    mapping_structure: 'run_tab.console.progress_mapping_structure',
+    compressing_cache: 'run_tab.console.progress_compressing_cache',
+    loading_tree: 'run_tab.console.progress_loading_tree',
+};
+
 interface HistoryDetailModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -40,26 +54,83 @@ export function HistoryDetailModal({ isOpen, onClose, log }: HistoryDetailModalP
     const { t } = useTranslation();
     const [tree, setTree] = useState<LogNode[]>([]);
     const [loading, setLoading] = useState(false);
+    const [progress, setProgress] = useState<ParseProgress | null>(null);
+    const unlistenRef = useRef<UnlistenFn | null>(null);
+    const currentPathRef = useRef<string | null>(null);
+
+    // Cleanup event listener
+    const cleanupListener = useCallback(() => {
+        if (unlistenRef.current) {
+            unlistenRef.current();
+            unlistenRef.current = null;
+        }
+    }, []);
 
     useEffect(() => {
         if (isOpen && log && log.xml_path) {
-            loadXml();
-        } else {
+            loadXml(log.xml_path);
+        } else if (!isOpen) {
+            // When closing, DO NOT cancel the parse — it continues in the cache.
+            // Only reset local UI state.
             setTree([]);
+            setProgress(null);
+            cleanupListener();
+            currentPathRef.current = null;
         }
+        return cleanupListener;
     }, [isOpen, log]);
 
-    const loadXml = async () => {
-        setLoading(true);
-        try {
-            // Offload heavy parsing to Rust backend
-            const rootNode = await invoke<LogNode>("parse_robot_xml", { xmlPath: log!.xml_path });
-            if (rootNode) setTree([rootNode]);
-        } catch (e) {
-            console.error("Failed to parse history XML via backend:", e);
-            feedback.toast.error("common.errors.parse_failed");
-        } finally {
+    // Subscribe to parse completions so re-opening picks up cached results
+    useEffect(() => {
+        const unsubscribe = onParseComplete((xmlPath, result) => {
+            if (xmlPath === currentPathRef.current && result) {
+                setTree([result]);
+                setLoading(false);
+                setProgress(null);
+                cleanupListener();
+            }
+        });
+        return unsubscribe;
+    }, []);
+
+    const loadXml = async (xmlPath: string) => {
+        currentPathRef.current = xmlPath;
+
+        // 1. Check global cache for instant display
+        const cached = getCachedTree(xmlPath);
+        if (cached) {
+            setTree([cached]);
             setLoading(false);
+            return;
+        }
+
+        // 2. Start loading with progress
+        setLoading(true);
+        setProgress(null);
+
+        cleanupListener();
+        unlistenRef.current = await listen<ParseProgress>('xml-parse-progress', (event) => {
+            setProgress(event.payload);
+        });
+
+        try {
+            // parseXmlBackground deduplicates and caches globally
+            const rootNode = await parseXmlBackground(xmlPath);
+            // Only update if still viewing the same path (not closed or changed)
+            if (currentPathRef.current === xmlPath) {
+                setTree([rootNode]);
+            }
+        } catch (e) {
+            if (currentPathRef.current === xmlPath) {
+                console.error("Failed to parse history XML via backend:", e);
+                feedback.toast.error("common.errors.parse_failed");
+            }
+        } finally {
+            if (currentPathRef.current === xmlPath) {
+                setLoading(false);
+                setProgress(null);
+                cleanupListener();
+            }
         }
     };
 
@@ -155,9 +226,26 @@ export function HistoryDetailModal({ isOpen, onClose, log }: HistoryDetailModalP
                     {/* Content / Tree */}
                     <div className="flex-1 overflow-y-auto px-1">
                         {loading ? (
-                            <div className="h-full flex flex-col items-center justify-center gap-4 opacity-50">
+                            <div className="h-full flex flex-col items-center justify-center gap-4 opacity-80">
                                 <ExpressiveLoading size="md" variant="circular" />
-                                <span className="text-sm font-medium animate-pulse">{t('run_tab.console.loading_xml')}</span>
+                                <div className="flex flex-col items-center gap-2 w-64">
+                                    <span className="text-sm font-medium animate-pulse">
+                                        {progress && STAGE_KEYS[progress.stage]
+                                            ? t(STAGE_KEYS[progress.stage])
+                                            : t('run_tab.console.loading_xml')}
+                                    </span>
+                                    {progress && (
+                                        <div className="w-full flex flex-col items-center gap-1.5">
+                                            <div className="w-full h-1.5 bg-surface-variant/40 rounded-full overflow-hidden">
+                                                <div
+                                                    className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
+                                                    style={{ width: `${progress.percent}%` }}
+                                                />
+                                            </div>
+                                            <span className="text-[10px] font-mono text-on-surface-variant/60">{progress.percent}%</span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         ) : tree.length > 0 ? (
                             <div className="space-y-2 pb-4">

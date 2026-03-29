@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Star, ExternalLink, FileOutput, Eye, EyeOff } from "lucide-react";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { invoke } from "@tauri-apps/api/core";
+import { parseXmlBackground } from "@/lib/xmlParseCache";
 import { Button } from "@/components/atoms/Button";
 import {
     LogNode,
@@ -107,23 +108,32 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
 
 
 
+    // Track if post-test re-parse is in progress
+    const [reparseLoading, setReparseLoading] = useState(false);
+
     // Parse output.xml when artifacts are detected or session finishes
     useEffect(() => {
         if (isRunning || !artifactPaths.output) return;
+        let cancelled = false;
 
         const parseOutputXml = async () => {
-            // Add a small delay to ensure Robot Framework has finished flushing the file to disk
+            // Delay to ensure Robot Framework has flushed file to disk
             await new Promise(resolve => setTimeout(resolve, 1000));
+
+            setReparseLoading(true);
             try {
-                // Offload heavy parsing to Rust backend to prevent UI freezes
-                const rootNode = await invoke<LogNode>("parse_robot_xml", { xmlPath: artifactPaths.output! });
-                if (rootNode) setTree([rootNode]);
+                // Use global cache: deduplicates, caches, and runs in background
+                const rootNode = await parseXmlBackground(artifactPaths.output!);
+                if (!cancelled && rootNode) setTree([rootNode]);
             } catch (e: any) {
                 console.error("Failed to parse output.xml via backend:", e);
+            } finally {
+                if (!cancelled) setReparseLoading(false);
             }
         };
 
         parseOutputXml();
+        return () => { cancelled = true; };
     }, [isRunning, artifactPaths.output]);
 
     // Parse incremental logs
@@ -615,6 +625,12 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
                             <div className="text-primary dark:text-primary/80 mt-4 flex items-center gap-2 text-sm italic opacity-70 animate-pulse ml-2">
                                 <ExpressiveLoading size="sm" variant="circular" />
                                 {t('run_tab.console.processing', "Processing...")}
+                            </div>
+                        )}
+                        {!isRunning && reparseLoading && (
+                            <div className="text-primary/60 mt-4 flex items-center gap-2 text-xs italic opacity-60 animate-pulse ml-2">
+                                <ExpressiveLoading size="sm" variant="circular" />
+                                {t('run_tab.console.loading_xml')}
                             </div>
                         )}
                     </div>
