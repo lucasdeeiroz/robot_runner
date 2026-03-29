@@ -64,43 +64,45 @@ pub fn get_appium_status(
 
 fn check_appium_ready(host: &str, port: u32, base_path: &str) -> bool {
     let check_host = if host == "0.0.0.0" { "127.0.0.1" } else { host };
-    let addr = format!("{}:{}", check_host, port);
-    
-    // 1. Resolve address
-    if let Ok(addrs) = std::net::ToSocketAddrs::to_socket_addrs(&addr) {
-        for a in addrs {
-            // 2. TCP Check
-            if let Ok(mut stream) = std::net::TcpStream::connect_timeout(&a, std::time::Duration::from_millis(500)) {
-                // 3. HTTP Check
-                let _ = stream.set_read_timeout(Some(std::time::Duration::from_millis(500)));
-                let _ = stream.set_write_timeout(Some(std::time::Duration::from_millis(500)));
-                
-                // Normalize path
-                let mut path = base_path.trim().to_string();
-                if !path.starts_with('/') && !path.is_empty() {
-                     path = format!("/{}", path);
+
+    // Normalize base path for URL construction
+    let mut path = base_path.trim().to_string();
+    if !path.starts_with('/') && !path.is_empty() {
+        path = format!("/{}", path);
+    }
+    if path.ends_with('/') {
+        path.pop();
+    }
+
+    let url = format!("http://{}:{}{}/status", check_host, port, path);
+
+    let client = match reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(2))
+        .connect_timeout(std::time::Duration::from_secs(1))
+        .build()
+    {
+        Ok(c) => c,
+        Err(_) => return false,
+    };
+
+    match client.get(&url).send() {
+        Ok(resp) => {
+            if !resp.status().is_success() {
+                return false;
+            }
+            // Parse JSON to verify { "value": { "ready": true } }
+            match resp.json::<serde_json::Value>() {
+                Ok(json) => {
+                    json.get("value")
+                        .and_then(|v| v.get("ready"))
+                        .and_then(|r| r.as_bool())
+                        .unwrap_or(false)
                 }
-                if path.ends_with('/') {
-                    path.pop();
-                }
-                
-                let request = format!(
-                    "GET {}/status HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n",
-                    path, addr
-                );
-                
-                use std::io::{Read, Write};
-                if stream.write_all(request.as_bytes()).is_ok() {
-                    let mut response = Vec::new();
-                    if stream.read_to_end(&mut response).is_ok() {
-                        let resp_str = String::from_utf8_lossy(&response);
-                        return resp_str.contains("HTTP/1.1 200") && (resp_str.contains("\"ready\":true") || resp_str.contains("Appium"));
-                    }
-                }
+                Err(_) => false,
             }
         }
+        Err(_) => false,
     }
-    false
 }
 
 #[tauri::command]

@@ -655,12 +655,18 @@ export const pt = {
                 test_summary: "{{total}} TESTES: {{passed}} COM SUCESSO, {{failed}} COM FALHA",
                 waiting: "Aguardando logs...",
                 loading_xml: "Carregando dados de execução...",
+                progress_parsing_xml: "Analisando XML...",
+                progress_mapping_structure: "Mapeando estrutura da suíte...",
+                progress_compressing_cache: "Comprimindo cache...",
+                progress_loading_tree: "Carregando Log Tree...",
                 failure_detail: "Detalhes da Falha",
                 step_screenshot: "Captura de Tela do Passo",
                 view_fullscreen: "VER EM TELA CHEIA",
                 failure_screenshot: "Captura de Tela da Falha",
                 keyword_screenshot: "Captura de Tela do Passo (Keyword)",
-                keep_awake: "Manter Tela Acordada"
+                keep_awake: "Manter Tela Acordada",
+                debug_on: "Ver Logs de Depuração",
+                debug_off: "Ocultar Logs de Depuração"
             }
         },
         scrcpy: {

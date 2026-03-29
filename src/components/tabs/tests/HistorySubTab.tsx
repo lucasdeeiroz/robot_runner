@@ -15,22 +15,7 @@ import { Select } from "@/components/atoms/Select";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 import { decodeHtml } from '@/lib/utils';
 import { HistoryDetailModal } from '@/components/organisms/HistoryDetailModal';
-
-interface TestLog {
-    path: string;
-    suite_name: string;
-    status: 'PASS' | 'FAIL';
-    device_udid?: string | null;
-    device_model?: string | null;
-    android_version?: string | null;
-    timestamp: string;
-    duration: string;
-    pass_count: number;
-    fail_count: number;
-    xml_path: string;
-    log_html_path: string;
-    mtime: number;
-}
+import { getCachedHistory, setCachedHistory, TestLog } from '@/lib/historyCache';
 
 const formatDate = (dateStr: string) => {
     try {
@@ -52,7 +37,7 @@ const formatDate = (dateStr: string) => {
 export function HistorySubTab() {
     const { t } = useTranslation();
     const { settings } = useSettings();
-    const [history, setHistory] = useState<TestLog[]>([]);
+    const [history, setHistory] = useState<TestLog[]>(getCachedHistory());
     const [filterText, setFilterText] = useState("");
     const [filterPeriod, setFilterPeriod] = useState("all_time");
     const [groupBy, setGroupBy] = useState("none");
@@ -78,12 +63,12 @@ export function HistorySubTab() {
     }, []);
 
     useEffect(() => {
-        if (history.length > 0 && !isFirstRun.current) return;
-        
+        // Always load on mount if it's the first render of this instance
+        // But the cache provides immediate content
         const timer = setTimeout(() => {
             loadHistory();
             isFirstRun.current = false;
-        }, 350);
+        }, 150); // Reduced delay for smoother feel
         return () => clearTimeout(timer);
     }, [settings.paths.logs]);
 
@@ -95,6 +80,7 @@ export function HistorySubTab() {
                 refresh: refresh
             });
             setHistory(logs);
+            setCachedHistory(logs);
         } catch (e) {
             feedback.toast.error("tests_page.load_error", e);
         } finally {
@@ -338,26 +324,37 @@ export function HistorySubTab() {
                 }
             />
 
-            <div className="flex-1 overflow-y-auto pr-2">
+            <div className="flex-1 overflow-y-auto pr-2 relative">
                 <AnimatePresence>
                     {showCharts && (
                         <HistoryCharts logs={filteredHistory} groupBy={groupBy} />
                     )}
                 </AnimatePresence>
 
-                {loadingHistory && (
-                    <div className="flex justify-center p-4">
-                        <ExpressiveLoading size="md" variant="circular" />
+                {/* Background Loading Indicator (Subtle Linear) */}
+                {loadingHistory && history.length > 0 && (
+                    <div className="sticky top-0 left-0 right-0 z-20 h-1 overflow-hidden">
+                        <ExpressiveLoading variant="linear" size="xsm" className="w-full h-full opacity-60" />
                     </div>
                 )}
 
+                {/* Initial Loading Spinner (Large Centered) */}
+                {loadingHistory && history.length === 0 && (
+                    <div className="flex flex-col items-center justify-center h-64 p-4 text-on-surface-variant/60">
+                        <ExpressiveLoading size="md" variant="circular" className="mb-4" />
+                        <p className="text-sm font-medium animate-pulse">{t('tests_page.loading_history', "Loading execution history...")}</p>
+                    </div>
+                )}
+
+                {/* Empty State */}
                 {!loadingHistory && filteredHistory.length === 0 && (
-                    <div className="h-full flex flex-col items-center justify-center text-on-surface/80">
-                        <p>{t('tests_page.no_logs')}</p>
+                    <div className="h-64 flex flex-col items-center justify-center text-on-surface/80 border-2 border-dashed border-outline-variant/30 rounded-2xl m-4">
+                        <Calendar className="mb-4 opacity-20" size={48} />
+                        <p className="font-medium opacity-60">{t('tests_page.no_logs')}</p>
                     </div>
                 )}
 
-                <div className="space-y-6">
+                <div className={clsx("space-y-6 transition-opacity", loadingHistory && history.length === 0 ? "opacity-0" : "opacity-100")}>
                     {Object.entries(groupedHistory).map(([group, logs]) => (
                         logs.length > 0 && renderGroup(group, logs)
                     ))}

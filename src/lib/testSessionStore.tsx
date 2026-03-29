@@ -7,21 +7,22 @@ import { feedback } from './feedback';
 
 export interface TestSession {
     runId: string;
-    activeRunId?: string; // New: For tracking recycled sessions
-    type: 'test' | 'toolbox'; // New field
+    activeRunId?: string; // For tracking recycled sessions
+    type: 'test' | 'toolbox';
     deviceName: string;
     deviceUdid: string;
-    testPath: string; // For toolbox, this might be "Toolbox" or empty
+    testPath: string;
     logs: string[];
     status: 'running' | 'finished' | 'stopped' | 'error' | 'stopping';
     exitCode?: string;
     argumentsFile?: string | null;
-    deviceModel?: string; // New
-    androidVersion?: string; // New
+    deviceModel?: string;
+    androidVersion?: string;
     lastActiveTool?: string; // Persist active tool across mounts
-    framework: 'robot' | 'maestro' | 'appium'; // New field
-    timestampOutputs?: boolean; // New field
-    selectedTests?: string[]; // New
+    framework: 'robot' | 'maestro' | 'appium';
+    timestampOutputs?: boolean;
+    selectedTests?: string[];
+    sessionEpoch: number; // Incremented on recycle to force RunConsole remount
 }
 
 interface TestOutputPayload {
@@ -68,8 +69,12 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
             const { run_id, status } = event.payload;
             setSessions(prev => prev.map(s => {
                 if (s.runId === run_id || s.activeRunId === run_id) {
+                    // Guard: if session was recycled and is already running a NEW test, skip stale event
+                    if (s.activeRunId && s.activeRunId !== run_id && s.status === 'running') {
+                        return s;
+                    }
+
                     // Feedback
-                    // Backend sends "Exit Code: 0" for success
                     if (status.includes('Exit Code: 0') || status.includes('exit code: 0')) {
                         feedback.notify('feedback.test_passed', 'feedback.details.device', { device: s.deviceName });
                     } else {
@@ -80,6 +85,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                         ...s,
                         status: 'finished',
                         exitCode: status,
+                        activeRunId: undefined, // Clean up: clear activeRunId after test finishes
                         logs: [...s.logs, `\n[System] Finished: ${status}`]
                     };
                 }
@@ -111,12 +117,9 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
 
                     updatedSessions[existingIndex] = {
                         ...existing,
-                        activeRunId: runId, // Track the new test run ID
-                        type: 'test',       // Switch to test view/mode (handled by ToolBox if we update it, but here we just set type)
-                        // Ideally ToolBoxView should know if it's running a test to show console.
-                        // The types field helps `TestsPage` show status icons.
+                        activeRunId: runId,
+                        type: 'test',
                         testPath,
-                        // Reset logs for new test
                         logs: [`[System] Starting test session: ${runId}`, `[System] Device: ${deviceName}`, `[System] Suite: ${testPath}`, '----------------------------------------'],
                         status: 'running',
                         argumentsFile,
@@ -125,7 +128,8 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                         framework,
                         timestampOutputs,
                         selectedTests,
-                        exitCode: undefined // clear previous exit code
+                        exitCode: undefined,
+                        sessionEpoch: (existing.sessionEpoch || 0) + 1 // Force RunConsole remount
                     };
 
                     setTimeout(() => setActiveSessionId(existing.runId), 0); // Focus it
@@ -150,7 +154,8 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     argumentsFile: argumentsFile,
                     deviceModel,
                     androidVersion,
-                    selectedTests
+                    selectedTests,
+                    sessionEpoch: 0
                 }
             ];
         });
@@ -190,8 +195,9 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     status: 'stopped',
                     deviceModel,
                     androidVersion,
-                    framework: 'robot', // Default but not really used for toolbox
-                    timestampOutputs: false
+                    framework: 'robot',
+                    timestampOutputs: false,
+                    sessionEpoch: 0
                 }
             ];
         });

@@ -655,12 +655,18 @@ export const en = {
                 test_summary: "{{total}} TESTS: {{passed}} PASSED, {{failed}} FAILED",
                 waiting: "Waiting for logs...",
                 loading_xml: "Loading execution data...",
+                progress_parsing_xml: "Parsing XML...",
+                progress_mapping_structure: "Mapping suite structure...",
+                progress_compressing_cache: "Compressing cache...",
+                progress_loading_tree: "Loading Log Tree...",
                 failure_detail: "Failure Detail",
                 step_screenshot: "Step Screenshot",
                 view_fullscreen: "VIEW FULLSCREEN",
                 failure_screenshot: "Failure Screenshot",
                 keyword_screenshot: "Keyword Screenshot",
-                keep_awake: "Keep Screen Awake"
+                keep_awake: "Keep Screen Awake",
+                debug_on: "Show Debug Logs",
+                debug_off: "Hide Debug Logs"
             }
         },
         scrcpy: {
