@@ -9,7 +9,7 @@ use tauri::Emitter;
 static RE_SRC: Lazy<regex::Regex> =
     Lazy::new(|| regex::Regex::new(r#"src=["']([^"']+)["']"#).unwrap());
 static RE_HIERARCHY: Lazy<regex::Regex> = Lazy::new(|| {
-    regex::Regex::new(r"(?i)<\?xml(?:[^>]*)?>\\s*<hierarchy[\\s\\S]*?</hierarchy>").unwrap()
+    regex::Regex::new(r"(?i)<\?xml(?:[^>]*)?>\s*<hierarchy[\s\S]*?</hierarchy>").unwrap()
 });
 
 #[derive(Serialize, Deserialize)]
