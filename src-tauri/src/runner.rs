@@ -128,7 +128,7 @@ def start_suite(name, attrs):
     sys.stdout.flush()
 
 def end_suite(name, attrs):
-    sys.stdout.write(f"\n[RR-SUITE-END] {name}\n")
+    sys.stdout.write(f"\n[RR-SUITE-END] {name} | {attrs['status']}\n")
     sys.stdout.flush()
 
 def start_test(name, attrs):
