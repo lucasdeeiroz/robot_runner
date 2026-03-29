@@ -82,6 +82,7 @@ pub struct TextNode {
 
 #[derive(Clone, serde::Serialize)]
 struct ParseProgress {
+    xml_path: String,
     stage: String,
     percent: u8,
 }
@@ -97,10 +98,11 @@ pub async fn parse_robot_xml(
         .map_err(|e| format!("Task join error: {}", e))?
 }
 
-fn emit_progress(app: &tauri::AppHandle, stage: &str, percent: u8) {
+fn emit_progress(app: &tauri::AppHandle, xml_path: &str, stage: &str, percent: u8) {
     let _ = app.emit(
         "xml-parse-progress",
         ParseProgress {
+            xml_path: xml_path.to_string(),
             stage: stage.to_string(),
             percent,
         },
@@ -132,7 +134,7 @@ fn parse_robot_xml_blocking(app: &tauri::AppHandle, xml_path: &str) -> Result<Lo
 
     if is_cache_valid && cache_path.exists() {
         println!("[XML Parser] Loading from compressed cache: {:?}", cache_path);
-        emit_progress(app, "loading_tree", 90);
+        emit_progress(app, xml_path, "loading_tree", 90);
         match load_from_zstd_cache(&cache_path) {
             Ok(suite) => return Ok(suite),
             Err(e) => {
@@ -143,7 +145,7 @@ fn parse_robot_xml_blocking(app: &tauri::AppHandle, xml_path: &str) -> Result<Lo
     }
 
     // 2. Parse XML (heavy operation)
-    emit_progress(app, "parsing_xml", 10);
+    emit_progress(app, xml_path, "parsing_xml", 10);
     println!("[XML Parser] Parsing XML: {:?}", xml_path);
     let content = fs::read_to_string(xml_path).map_err(|e| e.to_string())?;
     let doc = roxmltree::Document::parse(&content).map_err(|e| e.to_string())?;
@@ -159,7 +161,7 @@ fn parse_robot_xml_blocking(app: &tauri::AppHandle, xml_path: &str) -> Result<Lo
         .find(|n| n.tag_name().name() == "suite")
         .ok_or("No suite found in XML")?;
 
-    emit_progress(app, "mapping_structure", 35);
+    emit_progress(app, xml_path, "mapping_structure", 35);
     println!("[XML Parser] Mapping suite structure...");
 
     let base_dir = Path::new(xml_path).parent().unwrap_or(Path::new("."));
@@ -168,11 +170,12 @@ fn parse_robot_xml_blocking(app: &tauri::AppHandle, xml_path: &str) -> Result<Lo
     println!("[XML Parser] Mapping complete");
 
     // 3. Save compressed cache in background (fire-and-forget)
-    emit_progress(app, "compressing_cache", 65);
+    emit_progress(app, xml_path, "compressing_cache", 65);
 
     let cache_path_owned = cache_path.to_path_buf();
     let legacy_cache_owned = legacy_cache.to_path_buf();
     let app_clone = app.clone();
+    let xml_path_owned = xml_path.to_string();
 
     // Serialize to bytes first (on this thread to borrow `suite`)
     match serde_json::to_vec(&suite) {
@@ -204,7 +207,7 @@ fn parse_robot_xml_blocking(app: &tauri::AppHandle, xml_path: &str) -> Result<Lo
                 if legacy_cache_owned.exists() {
                     let _ = fs::remove_file(&legacy_cache_owned);
                 }
-                emit_progress(&app_clone, "loading_tree", 90);
+                emit_progress(&app_clone, &xml_path_owned, "loading_tree", 90);
             });
         }
         Err(e) => {

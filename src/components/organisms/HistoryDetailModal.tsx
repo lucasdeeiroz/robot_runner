@@ -33,6 +33,7 @@ interface TestLog {
 }
 
 interface ParseProgress {
+    xml_path: string;
     stage: string;
     percent: number;
 }
@@ -110,7 +111,9 @@ export function HistoryDetailModal({ isOpen, onClose, log }: HistoryDetailModalP
 
         cleanupListener();
         unlistenRef.current = await listen<ParseProgress>('xml-parse-progress', (event) => {
-            setProgress(event.payload);
+            if (event.payload.xml_path === currentPathRef.current) {
+                setProgress(event.payload);
+            }
         });
 
         try {
