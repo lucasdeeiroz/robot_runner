@@ -670,7 +670,9 @@ export const es = {
                 view_fullscreen: "VER EN PANTALLA COMPLETA",
                 failure_screenshot: "Captura de Pantalla del Fallo",
                 keyword_screenshot: "Captura de Pantalla del Paso (Keyword)",
-                keep_awake: "Mantener Pantalla Activa"
+                keep_awake: "Mantener Pantalla Activa",
+                debug_on: "Ver Logs de Depuración",
+                debug_off: "Ocultar Logs de Depuración"
             }
         },
         scrcpy: {

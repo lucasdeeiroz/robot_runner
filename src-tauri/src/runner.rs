@@ -123,8 +123,20 @@ import sys
 
 ROBOT_LISTENER_API_VERSION = 2
 
+def start_suite(name, attrs):
+    sys.stdout.write(f"\n[RR-SUITE-START] {name}\n")
+    sys.stdout.flush()
+
+def end_suite(name, attrs):
+    sys.stdout.write(f"\n[RR-SUITE-END] {name}\n")
+    sys.stdout.flush()
+
 def start_test(name, attrs):
-    sys.stdout.write(f"\n[RobotRunner-Test-Start] {name}\n")
+    sys.stdout.write(f"\n[RR-TEST-START] {name}\n")
+    sys.stdout.flush()
+
+def end_test(name, attrs):
+    sys.stdout.write(f"\n[RR-TEST-END] {name} | {attrs['status']}\n")
     sys.stdout.flush()
 "#;
     // Ensure dir exists before writing and fail clearly if we cannot set up the listener

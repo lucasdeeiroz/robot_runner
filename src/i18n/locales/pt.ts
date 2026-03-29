@@ -664,7 +664,9 @@ export const pt = {
                 view_fullscreen: "VER EM TELA CHEIA",
                 failure_screenshot: "Captura de Tela da Falha",
                 keyword_screenshot: "Captura de Tela do Passo (Keyword)",
-                keep_awake: "Manter Tela Acordada"
+                keep_awake: "Manter Tela Acordada",
+                debug_on: "Ver Logs de Depuração",
+                debug_off: "Ocultar Logs de Depuração"
             }
         },
         scrcpy: {

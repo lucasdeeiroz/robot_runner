@@ -664,7 +664,9 @@ export const en = {
                 view_fullscreen: "VIEW FULLSCREEN",
                 failure_screenshot: "Failure Screenshot",
                 keyword_screenshot: "Keyword Screenshot",
-                keep_awake: "Keep Screen Awake"
+                keep_awake: "Keep Screen Awake",
+                debug_on: "Show Debug Logs",
+                debug_off: "Hide Debug Logs"
             }
         },
         scrcpy: {
