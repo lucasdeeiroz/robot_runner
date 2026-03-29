@@ -35,10 +35,17 @@ function notifyListeners(xmlPath: string, tree: LogNode | null, error: string | 
  */
 export function getCachedTree(xmlPath: string): LogNode | null {
     const entry = cache.get(xmlPath);
-    if (entry && Date.now() - entry.timestamp < CACHE_TTL_MS) {
-        return entry.tree;
+    if (!entry) {
+        return null;
     }
-    return null;
+
+    if (Date.now() - entry.timestamp >= CACHE_TTL_MS) {
+        // Remove expired entry to prevent unbounded cache growth.
+        cache.delete(xmlPath);
+        return null;
+    }
+
+    return entry.tree;
 }
 
 /**
