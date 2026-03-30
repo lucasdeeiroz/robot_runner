@@ -46,9 +46,9 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
             try {
                 const b64 = await invoke<string>('read_image_base64', { path });
                 const ext = path.split('.').pop()?.toLowerCase() || 'png';
-                const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 
-                             ext === 'gif' ? 'image/gif' :
-                             ext === 'webp' ? 'image/webp' : 'image/png';
+                const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' :
+                    ext === 'gif' ? 'image/gif' :
+                        ext === 'webp' ? 'image/webp' : 'image/png';
                 const dataUrl = `data:${mime};base64,${b64}`;
                 console.log("[LogTree] Screenshot loaded successfully:", path.substring(path.length - 20));
                 setter(dataUrl);
@@ -167,16 +167,18 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
                     "text-[12px] px-1.5 py-0.5 rounded font-bold uppercase flex items-center gap-1 shrink-0",
                     bgColor, summaryColor
                 )}>
-                    {node.duration && (
+                    {(node.duration || (node.type === 'suite' && (node as SuiteNode).stats)) && (
                         <span className="px-2 font-mono opacity-80 text-on-surface-variant border-none flex items-center gap-2">
-                            {node.duration}
                             {node.type === 'suite' && (node as SuiteNode).stats && (
-                                <span className="flex items-center gap-1.5 ml-2 border-l border-on-surface/10 pl-2">
+                                <span className="flex items-center gap-1 mr-2 border-r border-on-surface/10 pr-2 shrink-0 opacity-80">
                                     <span className="text-success">{(node as SuiteNode).stats?.passed}P</span>
+                                    <span className="text-on-surface-variant/30">|</span>
                                     <span className="text-error">{(node as SuiteNode).stats?.failed}F</span>
+                                    <span className="text-on-surface-variant/30">|</span>
                                     <span className="text-on-surface-variant/40">{(node as SuiteNode).stats?.skipped}S</span>
                                 </span>
                             )}
+                            {node.duration}
                         </span>
                     )}
                     {isRunning
