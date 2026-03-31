@@ -260,12 +260,27 @@ fn map_suite(node: Node, base_dir: &Path) -> Result<SuiteNode, String> {
     let duration = format_duration(&status_node, start, end);
 
     let mut children = Vec::new();
+    let mut passed = 0;
+    let mut failed = 0;
+    let mut skipped = 0;
+
     for child in node.children() {
         if child.is_element() {
             let ctag = child.tag_name().name();
             if ctag == "if" {
                 for branch in child.children().filter(|n| n.tag_name().name() == "branch") {
                     if let Ok(mapped) = map_node(branch, base_dir) {
+                        match &mapped {
+                            LogNode::Test(t) => {
+                                if t.status == "PASS" { passed += 1; }
+                                else if t.status == "FAIL" { failed += 1; }
+                                else { skipped += 1; }
+                            },
+                             LogNode::Suite(s) => if let Some(st) = &s.stats {
+                                passed += st.passed; failed += st.failed; skipped += st.skipped;
+                            },
+                            _ => {}
+                        }
                         children.push(mapped);
                     }
                 }
@@ -278,6 +293,17 @@ fn map_suite(node: Node, base_dir: &Path) -> Result<SuiteNode, String> {
                 || ctag == "continue"
             {
                 if let Ok(mapped) = map_node(child, base_dir) {
+                    match &mapped {
+                        LogNode::Test(t) => {
+                            if t.status == "PASS" { passed += 1; }
+                            else if t.status == "FAIL" { failed += 1; }
+                            else { skipped += 1; }
+                        },
+                         LogNode::Suite(s) => if let Some(st) = &s.stats {
+                            passed += st.passed; failed += st.failed; skipped += st.skipped;
+                        },
+                        _ => {}
+                    }
                     children.push(mapped);
                 }
             } else if ctag == "msg" {
@@ -295,22 +321,7 @@ fn map_suite(node: Node, base_dir: &Path) -> Result<SuiteNode, String> {
         }
     }
 
-    // Stats
-    let stats = if let Some(stats_node) = node
-        .children()
-        .find(|n| n.tag_name().name() == "statistics")
-    {
-        let first_stat = stats_node
-            .children()
-            .find(|n| n.tag_name().name() == "stat");
-        first_stat.map(|s| SuiteStats {
-            passed: s.attribute("pass").unwrap_or("0").parse().unwrap_or(0),
-            failed: s.attribute("fail").unwrap_or("0").parse().unwrap_or(0),
-            skipped: s.attribute("skip").unwrap_or("0").parse().unwrap_or(0),
-        })
-    } else {
-        None
-    };
+    let stats = Some(SuiteStats { passed, failed, skipped });
 
     Ok(SuiteNode {
         id: node
@@ -406,7 +417,8 @@ fn map_test(node: Node, base_dir: &Path) -> Result<TestNode, String> {
 }
 
 fn map_keyword(node: Node, base_dir: &Path) -> Result<KeywordNode, String> {
-    let name = node.attribute("name").unwrap_or("").to_string();
+    let name = node.attribute("name").unwrap_or("").trim().to_string();
+    let _library = node.attribute("library").map(|s| s.to_string());
     let tag = node.tag_name().name();
     let sub_type = if tag == "branch" {
         match node.attribute("type").unwrap_or("IF") {
@@ -540,6 +552,42 @@ fn map_keyword(node: Node, base_dir: &Path) -> Result<KeywordNode, String> {
         }
     }
 
+    // Resolve variables from "Arguments: [ ... ]" message if available
+    let mut resolved_args = args.clone();
+    for child in &children {
+        if let LogNode::Text(txt) = child {
+            if txt.content.starts_with("Arguments: [") {
+                let msg_text = &txt.content;
+                if let (Some(open), Some(close)) = (msg_text.find('['), msg_text.rfind(']')) {
+                    let inner = &msg_text[open + 1..close].trim();
+                    let parts = inner.split(" | ");
+                    let mut resolved_map = std::collections::HashMap::new();
+                    for p in parts {
+                        if let Some(eq_idx) = p.find('=') {
+                            let kv_name = p[0..eq_idx].trim();
+                            let kv_val = p[eq_idx + 1..].trim();
+                            resolved_map.insert(kv_name, kv_val);
+                        }
+                    }
+
+                    for arg in resolved_args.iter_mut() {
+                        if let Some(val) = resolved_map.get(arg.as_str()) {
+                            let mut clean_val = val.to_string();
+                            if (clean_val.starts_with('\'') && clean_val.ends_with('\''))
+                                || (clean_val.starts_with('\"') && clean_val.ends_with('\"'))
+                            {
+                                if clean_val.len() >= 2 {
+                                    clean_val = clean_val[1..clean_val.len() - 1].to_string();
+                                }
+                            }
+                            *arg = format!("{} = {}", arg, clean_val);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     Ok(KeywordNode {
         id: node
             .attribute("id")
@@ -549,7 +597,7 @@ fn map_keyword(node: Node, base_dir: &Path) -> Result<KeywordNode, String> {
         sub_type,
         status,
         duration,
-        args,
+        args: resolved_args,
         screenshot_path: resolve_screenshot(&node, base_dir, false),
         children,
     })

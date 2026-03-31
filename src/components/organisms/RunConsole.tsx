@@ -12,15 +12,20 @@ import {
 } from "@/lib/robotParser";
 import { LogTree } from "@/components/molecules/LogTree";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
+import { useTestSessions } from "@/lib/testSessionStore";
 
 interface RunConsoleProps {
+    runId: string;
     logs: string[];
     isSessionRunning?: boolean;
     testPath?: string;
 }
 
-export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunConsoleProps) {
+export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath }: RunConsoleProps) {
     const { t } = useTranslation();
+    const { sessions, setSessionTree, updateSessionArtifacts } = useTestSessions();
+    const session = sessions.find(s => s.runId === runId);
+
     const [isRawMode, setIsRawMode] = useState(false);
     const [isKeepAwake, setIsKeepAwake] = useState(false);
     const [showDebugConsole, setShowDebugConsole] = useState(false);
@@ -30,8 +35,19 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
     const debugContainerRef = useRef<HTMLDivElement>(null);
 
     // Incremental Parsing State
-    const [tree, setTree] = useState<LogNode[]>([]);
-    const [artifactPaths, setArtifactPaths] = useState<{ log?: string, report?: string, output?: string }>({});
+    // Incremental Parsing State initialized from session store
+    const [tree, setTree] = useState<LogNode[]>(() => session?.repopulatedTree ? [session.repopulatedTree] : []);
+    const [artifactPaths, setArtifactPaths] = useState(() => session?.artifactPaths || {});
+
+    // Sync state with session store when background updates happen (e.g. artifacts detected)
+    useEffect(() => {
+        if (session?.repopulatedTree && tree.length === 0) {
+            setTree([session.repopulatedTree]);
+        }
+        if (session?.artifactPaths && JSON.stringify(session.artifactPaths) !== JSON.stringify(artifactPaths)) {
+            setArtifactPaths(session.artifactPaths);
+        }
+    }, [session?.repopulatedTree, session?.artifactPaths]);
 
     // Auto-scroll on new logs with stick-to-bottom logic
     useEffect(() => {
@@ -106,17 +122,20 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
     // Track if post-test re-parse is in progress
     const [reparseLoading, setReparseLoading] = useState(false);
 
-    // Parse output.xml when artifacts are detected or session finishes
     useEffect(() => {
-        if (isRunning || !artifactPaths.output) return;
+        // Skip if running, or no output path, or tree is already officially repopulated
+        if (isRunning || !artifactPaths.output || !!session?.repopulatedTree) return;
+
         let cancelled = false;
 
         const parseOutputXml = async () => {
-            await new Promise(resolve => setTimeout(resolve, 1000));
             setReparseLoading(true);
             try {
                 const rootNode = await parseXmlBackground(artifactPaths.output!);
-                if (!cancelled && rootNode) setTree([rootNode]);
+                if (!cancelled && rootNode) {
+                    setTree([rootNode]);
+                    setSessionTree(runId, rootNode);
+                }
             } catch (e: any) {
                 console.error("Failed to parse output.xml via backend:", e);
             } finally {
@@ -126,14 +145,21 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
 
         parseOutputXml();
         return () => { cancelled = true; };
-    }, [isRunning, artifactPaths.output]);
+    }, [isRunning, artifactPaths.output, session?.repopulatedTree]);
 
     // Parse incremental logs
     useEffect(() => {
+        // Skip log parsing if we already have a repopped tree and the test is finished
+        if (!isRunning && tree.length > 0 && (session?.repopulatedTree || artifactPaths.output)) {
+             processedCountRef.current = logs.length; // Mark all as processed
+             return;
+        }
+
         const currentCount = logs.length;
         const processedCount = processedCountRef.current;
 
-        if (currentCount < processedCount || currentCount === 0) {
+        // Only clear if it's a fresh run or a reset, not just because component mounted with empty logs while not running
+        if (currentCount < processedCount || (isRunning && currentCount === 0)) {
             parsedNodesRef.current = [];
             processedCountRef.current = 0;
             bufferRef.current = [];
@@ -142,6 +168,9 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
             setTree([]);
             return;
         }
+
+        // If nothing new, exit early
+        if (currentCount === processedCount) return;
 
         // Constants
         const IS_DOUBLE = (l: string) => /^={10,}$/.test(l.trim());
@@ -173,13 +202,31 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
                 const isSystem = IS_SYSTEM(line);
 
                 const outputMatch = cleanLine.match(/Output:\s+["']?(.*\.xml)["']?/i);
-                if (outputMatch) setArtifactPaths(prev => ({ ...prev, output: outputMatch[1].trim() }));
+                if (outputMatch) {
+                    setArtifactPaths(prev => {
+                        const next = { ...prev, output: outputMatch[1].trim() };
+                        updateSessionArtifacts(runId, next);
+                        return next;
+                    });
+                }
 
                 const logMatch = cleanLine.match(/Log:\s+["']?(.*\.html)["']?/i);
-                if (logMatch) setArtifactPaths(prev => ({ ...prev, log: logMatch[1].trim() }));
+                if (logMatch) {
+                    setArtifactPaths(prev => {
+                        const next = { ...prev, log: logMatch[1].trim() };
+                        updateSessionArtifacts(runId, next);
+                        return next;
+                    });
+                }
 
                 const reportMatch = cleanLine.match(/Report:\s+["']?(.*\.html)["']?/i);
-                if (reportMatch) setArtifactPaths(prev => ({ ...prev, report: reportMatch[1].trim() }));
+                if (reportMatch) {
+                    setArtifactPaths(prev => {
+                        const next = { ...prev, report: reportMatch[1].trim() };
+                        updateSessionArtifacts(runId, next);
+                        return next;
+                    });
+                }
 
                 if (IS_MAESTRO_VERBOSE(line)) {
                     line = line.replace(/.*disableAnsi=false.*?\]\)\s*/, '').trim();
@@ -290,7 +337,11 @@ export function RunConsole({ logs, isSessionRunning: isRunning, testPath }: RunC
                         const suite = activeSuite();
                         if (suite && suite.stats) {
                             if (finalStatus === 'PASS') suite.stats.passed++;
-                            else if (finalStatus === 'FAIL') suite.stats.failed++;
+                            else if (finalStatus === 'FAIL') {
+                                suite.stats.failed++;
+                                // Propagate FAIL to all parents in the stack
+                                suiteStack.forEach(s => s.status = 'FAIL');
+                            }
                         }
                         break;
                     }

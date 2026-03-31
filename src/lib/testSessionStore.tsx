@@ -23,6 +23,8 @@ export interface TestSession {
     timestampOutputs?: boolean;
     selectedTests?: string[];
     sessionEpoch: number; // Incremented on recycle to force RunConsole remount
+    repopulatedTree?: any; // To avoid circular imports or complex types, using any for LogNode
+    artifactPaths?: { log?: string, report?: string, output?: string };
 }
 
 interface TestOutputPayload {
@@ -45,6 +47,8 @@ interface TestSessionContextType {
     activeSessionId: string | 'dashboard';
     setActiveSessionId: (id: string | 'dashboard') => void;
     setSessionActiveTool: (runId: string, tool: string) => void;
+    setSessionTree: (runId: string, tree: any) => void;
+    updateSessionArtifacts: (runId: string, paths: Partial<NonNullable<TestSession['artifactPaths']>>) => void;
 }
 
 const TestSessionContext = createContext<TestSessionContextType | undefined>(undefined);
@@ -129,6 +133,8 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                         timestampOutputs,
                         selectedTests,
                         exitCode: undefined,
+                        repopulatedTree: undefined,
+                        artifactPaths: {},
                         sessionEpoch: (existing.sessionEpoch || 0) + 1 // Force RunConsole remount
                     };
 
@@ -371,8 +377,32 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
         }));
     }, []);
 
+    const setSessionTree = useCallback((runId: string, tree: any) => {
+        setSessions(prev => prev.map(s => {
+            if (s.runId === runId) {
+                return { ...s, repopulatedTree: tree };
+            }
+            return s;
+        }));
+    }, []);
+
+    const updateSessionArtifacts = useCallback((runId: string, paths: Partial<NonNullable<TestSession['artifactPaths']>>) => {
+        setSessions(prev => prev.map(s => {
+            if (s.runId === runId) {
+                return { 
+                    ...s, 
+                    artifactPaths: { ...(s.artifactPaths || {}), ...paths }
+                };
+            }
+            return s;
+        }));
+    }, []);
+
     return (
-        <TestSessionContext.Provider value={{ sessions, addSession, addToolboxSession, stopSession, rerunSession, clearSession, activeSessionId, setActiveSessionId, setSessionActiveTool }}>
+        <TestSessionContext.Provider value={{ 
+            sessions, addSession, addToolboxSession, stopSession, rerunSession, clearSession, 
+            activeSessionId, setActiveSessionId, setSessionActiveTool, setSessionTree, updateSessionArtifacts 
+        }}>
             {children}
         </TestSessionContext.Provider>
     );

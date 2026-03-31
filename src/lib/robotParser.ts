@@ -439,8 +439,44 @@ export const mapXmlNode = async (
     const kwStatus = statusStr === 'NOT RUN' ? 'NOT_RUN' : (statusStr === 'FAIL' ? 'FAIL' : 'PASS');
     const screenshotPath = await resolveScreenshot(directScreenshotSrc(obj), outputXmlPath, _readImageBase64);
 
+    let args = parseArgs(obj);
+
+    // Resolve variables from "Arguments: [ ... ]" message if available
+    // Standard Robot message: Arguments: [ ${arg1}='val' | ${arg2}=123 ]
+    const argMsg = children.find(c => c.type === 'text' && (c as TextNode).content.startsWith('Arguments: ['));
+    if (argMsg) {
+        const msgText = (argMsg as TextNode).content;
+        const openBracket = msgText.indexOf('[');
+        const closeBracket = msgText.lastIndexOf(']');
+        if (openBracket !== -1 && closeBracket !== -1) {
+            const inner = msgText.substring(openBracket + 1, closeBracket).trim();
+            const parts = inner.split(' | ');
+            const resolvedMap: Record<string, string> = {};
+            for (const p of parts) {
+                const eqIdx = p.indexOf('=');
+                if (eqIdx !== -1) {
+                    const kvName = p.substring(0, eqIdx).trim();
+                    const kvVal = p.substring(eqIdx + 1).trim();
+                    resolvedMap[kvName] = kvVal;
+                }
+            }
+            
+            args = args.map(arg => {
+                if (resolvedMap[arg]) {
+                    // Try to clean quotes if it's a string from the log
+                    let val = resolvedMap[arg];
+                    if ((val.startsWith("'") && val.endsWith("'")) || (val.startsWith("\"") && val.endsWith("\""))) {
+                        val = val.substring(1, val.length - 1);
+                    }
+                    return `${arg} = ${val}`;
+                }
+                return arg;
+            });
+        }
+    }
+
     return {
         type: 'keyword', subType: subType || 'keyword', id, name, status: kwStatus, screenshotPath, duration,
-        args: parseArgs(obj), children
+        args, children
     };
 };
