@@ -133,6 +133,8 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                         timestampOutputs,
                         selectedTests,
                         exitCode: undefined,
+                        repopulatedTree: undefined,
+                        artifactPaths: {},
                         sessionEpoch: (existing.sessionEpoch || 0) + 1 // Force RunConsole remount
                     };
 

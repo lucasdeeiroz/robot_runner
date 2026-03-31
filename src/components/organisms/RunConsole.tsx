@@ -122,10 +122,9 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
     // Track if post-test re-parse is in progress
     const [reparseLoading, setReparseLoading] = useState(false);
 
-    // Parse output.xml when artifacts are detected or session finishes
     useEffect(() => {
-        // Skip if running, or no output path, or tree is already populated
-        if (isRunning || !artifactPaths.output || tree.length > 0) return;
+        // Skip if running, or no output path, or tree is already officially repopulated
+        if (isRunning || !artifactPaths.output || !!session?.repopulatedTree) return;
 
         let cancelled = false;
 
@@ -146,7 +145,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
 
         parseOutputXml();
         return () => { cancelled = true; };
-    }, [isRunning, artifactPaths.output]);
+    }, [isRunning, artifactPaths.output, session?.repopulatedTree]);
 
     // Parse incremental logs
     useEffect(() => {
