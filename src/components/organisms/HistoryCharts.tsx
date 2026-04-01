@@ -68,18 +68,33 @@ export function HistoryCharts({ logs, groupBy, countMethod }: HistoryChartsProps
     };
 
     const parseDurationToSeconds = (durationStr: string) => {
-        if (!durationStr) return 0;
-        const parts = durationStr.split(':');
+        if (!durationStr || durationStr === 'Framework Managed') return 0;
+        
         let secs = 0;
+        
+        // Tenta matching estilo "1h 30m 15s" ou "1.234s"
+        const hoursMatch = durationStr.match(/(\d+)h/);
+        const minsMatch = durationStr.match(/(\d+)m/);
+        const secsMatch = durationStr.match(/([\d.]+)s/);
+        
+        if (hoursMatch || minsMatch || secsMatch) {
+            if (hoursMatch) secs += parseInt(hoursMatch[1], 10) * 3600;
+            if (minsMatch) secs += parseInt(minsMatch[1], 10) * 60;
+            if (secsMatch) secs += parseFloat(secsMatch[1]);
+            return secs;
+        }
+
+        // Fallback estilo "01:05:22"
+        const parts = durationStr.split(':');
         if (parts.length === 3) {
             secs += parseInt(parts[0], 10) * 3600;
             secs += parseInt(parts[1], 10) * 60;
-            secs += parseInt(parts[2], 10);
+            secs += parseFloat(parts[2]);
         } else if (parts.length === 2) {
             secs += parseInt(parts[0], 10) * 60;
-            secs += parseInt(parts[1], 10);
+            secs += parseFloat(parts[1]);
         } else {
-            secs += parseInt(parts[0], 10) || 0;
+            secs += parseFloat(parts[0]) || 0;
         }
         return secs;
     };
