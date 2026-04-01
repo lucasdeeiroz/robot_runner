@@ -577,15 +577,22 @@ impl LogNode {
 }
 
 fn append_child_stats(parent: &mut LogNode, child: &LogNode) {
-    let mut is_pass = false;
-    let mut is_fail = false;
-    let mut is_skipped = false;
+    let mut pass_inc = 0;
+    let mut fail_inc = 0;
+    let mut skip_inc = 0;
 
     match child {
         LogNode::Test(t) => {
-            if t.status == "PASS" { is_pass = true; }
-            else if t.status == "FAIL" { is_fail = true; }
-            else { is_skipped = true; }
+            if t.status == "PASS" { pass_inc = 1; }
+            else if t.status == "FAIL" { fail_inc = 1; }
+            else { skip_inc = 1; }
+        },
+        LogNode::Suite(s) => {
+            if let Some(stats) = &s.stats {
+                pass_inc = stats.passed;
+                fail_inc = stats.failed;
+                skip_inc = stats.skipped;
+            }
         },
         _ => {}
     }
@@ -593,11 +600,10 @@ fn append_child_stats(parent: &mut LogNode, child: &LogNode) {
     match parent {
         LogNode::Suite(s) => { 
             s.has_children = true;
-            // Removed s.children.push, managed statically
             if let Some(stats) = &mut s.stats {
-                if is_pass { stats.passed += 1; }
-                if is_fail { stats.failed += 1; }
-                if is_skipped { stats.skipped += 1; }
+                stats.passed += pass_inc;
+                stats.failed += fail_inc;
+                stats.skipped += skip_inc;
             }
         },
         LogNode::Test(t) => { t.has_children = true; },
