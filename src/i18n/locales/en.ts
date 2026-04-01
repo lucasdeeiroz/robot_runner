@@ -944,7 +944,10 @@ export const en = {
                 today: "Today",
                 last_7_days: "Last 7 Days",
                 last_30_days: "Last 30 Days",
-                os_version: "OS Version"
+                os_version: "OS Version",
+                all_devices: "All Devices",
+                all_os: "All OS",
+                all_status: "All Status"
             },
             actions: {
                 refresh: "Refresh List",
@@ -959,7 +962,11 @@ export const en = {
                 group_performance: "Performance by {{group}}",
                 select_group: "Select a 'Group By' option to view performance breakdown",
                 show: "Show Charts",
-                hide: "Hide Charts"
+                hide: "Hide Charts",
+                count_by: "Count by",
+                count_by_suites: "Suites (Executions)",
+                count_by_tests: "Tests (Volume)",
+                duration_avg: "Average Duration"
             }
         },
         toolbox: {

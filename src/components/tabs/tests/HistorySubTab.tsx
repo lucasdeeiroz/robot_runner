@@ -42,6 +42,14 @@ export function HistorySubTab() {
     const [filterText, setFilterText] = useState("");
     const [filterPeriod, setFilterPeriod] = useState("all_time");
     const [groupBy, setGroupBy] = useState("none");
+    
+    // Novas variáveis de filtro
+    const [filterDevice, setFilterDevice] = useState("all");
+    const [filterOS, setFilterOS] = useState("all");
+    const [filterStatus, setFilterStatus] = useState("all");
+    
+    const [countMethod, setCountMethod] = useState<'suites' | 'tests'>('suites');
+
     const [showCharts, setShowCharts] = useState(false);
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
@@ -101,14 +109,37 @@ export function HistorySubTab() {
         return true;
     };
 
+    const { devices, osVersions, statuses } = useMemo(() => {
+        const devs = new Set<string>();
+        const os = new Set<string>();
+        const stats = new Set<string>();
+
+        history.forEach(log => {
+            if (log.device_model) devs.add(log.device_model);
+            if (log.android_version) os.add(log.android_version);
+            if (log.status) stats.add(log.status);
+        });
+
+        return {
+            devices: Array.from(devs).sort(),
+            osVersions: Array.from(os).sort(),
+            statuses: Array.from(stats).sort()
+        };
+    }, [history]);
+
     const filteredHistory = useMemo(() => {
         return history.filter(log => {
             const decodedName = decodeHtml(log.suite_name);
             const matchesText = decodedName.toLowerCase().includes(filterText.toLowerCase());
             const matchesPeriod = isDateInPeriod(log.timestamp, filterPeriod);
-            return matchesText && matchesPeriod;
+            
+            const matchesDevice = filterDevice === "all" || log.device_model === filterDevice;
+            const matchesOS = filterOS === "all" || log.android_version === filterOS;
+            const matchesStatus = filterStatus === "all" || log.status === filterStatus;
+
+            return matchesText && matchesPeriod && matchesDevice && matchesOS && matchesStatus;
         });
-    }, [history, filterText, filterPeriod]);
+    }, [history, filterText, filterPeriod, filterDevice, filterOS, filterStatus]);
 
     const groupedHistory = useMemo(() => {
         if (groupBy === 'none') return { 'All': filteredHistory };
@@ -201,42 +232,14 @@ export function HistorySubTab() {
                     >
                         {loadingHistory ? <ExpressiveLoading size="xsm" variant="circular" /> : <RefreshCw size={16} />}
                     </Button>
-                }
-                menus={!isHistoryNarrow ? (
-                    <div className="flex flex-wrap gap-2">
-                        <div className="flex-1 min-w-[200px]">
-                            <Input
-                                placeholder={t('tests_page.filter.search')}
-                                value={filterText}
-                                onChange={(e) => setFilterText(e.target.value)}
-                                leftIcon={<Search size={16} />}
-                                className="bg-surface/50"
-                            />
-                        </div>
-                        <Select
-                            value={filterPeriod}
-                            onChange={(e) => setFilterPeriod(e.target.value)}
-                            options={[
-                                { value: "all_time", label: t('tests_page.filter.all_time') },
-                                { value: "today", label: t('tests_page.filter.today') },
-                                { value: "last_7_days", label: t('tests_page.filter.last_7_days') },
-                                { value: "last_30_days", label: t('tests_page.filter.last_30_days') }
-                            ]}
+                }                menus={!isHistoryNarrow ? (
+                    <div className="flex-1 min-w-[200px] max-w-sm">
+                        <Input
+                            placeholder={t('tests_page.filter.search')}
+                            value={filterText}
+                            onChange={(e) => setFilterText(e.target.value)}
+                            leftIcon={<Search size={16} />}
                             className="bg-surface/50"
-                            containerClassName="w-auto min-w-[150px]"
-                        />
-                        <Select
-                            value={groupBy}
-                            onChange={(e) => setGroupBy(e.target.value)}
-                            options={[
-                                { value: "none", label: `${t('tests_page.filter.group_by')}: ${t('tests_page.filter.none')}` },
-                                { value: "status", label: t('tests_page.filter.status') },
-                                { value: "device", label: t('tests_page.filter.device') },
-                                { value: "suite", label: t('tests_page.filter.suite') },
-                                { value: "os_version", label: t('tests_page.filter.os_version') }
-                            ]}
-                            className="bg-surface/50"
-                            containerClassName="w-auto min-w-[200px]"
                         />
                     </div>
                 ) : null
@@ -248,21 +251,100 @@ export function HistorySubTab() {
                         size="sm"
                         className={clsx(
                             "px-3 py-1.5 rounded-2xl flex items-center gap-2 text-sm font-medium transition-colors h-auto",
-                            showCharts
-                                ? "bg-primary/10 text-primary dark:text-primary/80"
-                                : "bg-surface-variant/30 text-on-surface-variant/80 hover:bg-outline-variant"
+                            showCharts 
+                                ? "bg-primary/20 text-primary hover:bg-primary/30" 
+                                : "text-on-surface-variant hover:bg-surface-variant/30"
                         )}
-                        title={showCharts ? t('tests_page.charts.hide') : t('tests_page.charts.show')}
-                        leftIcon={<PieChart size={16} />}
                     >
+                        <PieChart size={16} />
+                        {!isHistoryNarrow && (showCharts ? t('tests_page.charts.hide') : t('tests_page.charts.show'))}
                     </Button>
                 }
             />
 
+            {!isHistoryNarrow && (
+                <div className="flex flex-wrap items-center gap-2 mb-4 justify-between w-full">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Select
+                            value={filterPeriod}
+                            onChange={(e) => setFilterPeriod(e.target.value)}
+                            options={[
+                                { value: "all_time", label: t('tests_page.filter.all_time') },
+                                { value: "today", label: t('tests_page.filter.today') },
+                                { value: "last_7_days", label: t('tests_page.filter.last_7_days') },
+                                { value: "last_30_days", label: t('tests_page.filter.last_30_days') }
+                            ]}
+                            className="bg-surface/50 py-1.5 text-sm"
+                            containerClassName="w-auto min-w-[130px]"
+                        />
+                        <Select
+                            value={groupBy}
+                            onChange={(e) => setGroupBy(e.target.value)}
+                            options={[
+                                { value: "none", label: `${t('tests_page.filter.group_by')}: ${t('tests_page.filter.none')}` },
+                                { value: "status", label: t('tests_page.filter.status') },
+                                { value: "device", label: t('tests_page.filter.device') },
+                                { value: "suite", label: t('tests_page.filter.suite') },
+                                { value: "os_version", label: t('tests_page.filter.os_version') }
+                            ]}
+                            className="bg-surface/50 py-1.5 text-sm"
+                            containerClassName="w-auto min-w-[150px]"
+                        />
+                        <Select 
+                            value={filterStatus}
+                            onChange={(e) => setFilterStatus(e.target.value)}
+                            options={[
+                                { value: "all", label: t('tests_page.filter.all_status') },
+                                ...statuses.map(s => ({ value: s, label: s }))
+                            ]}
+                            className="bg-surface/50 py-1.5 text-sm"
+                            containerClassName="w-auto min-w-[120px]"
+                        />
+                        <Select 
+                            value={filterDevice}
+                            onChange={(e) => setFilterDevice(e.target.value)}
+                            options={[
+                                { value: "all", label: t('tests_page.filter.all_devices') },
+                                ...devices.map(d => ({ value: d, label: d }))
+                            ]}
+                            className="bg-surface/50 py-1.5 text-sm"
+                            containerClassName="w-auto min-w-[150px]"
+                        />
+                        <Select 
+                            value={filterOS}
+                            onChange={(e) => setFilterOS(e.target.value)}
+                            options={[
+                                { value: "all", label: t('tests_page.filter.all_os') },
+                                ...osVersions.map(o => ({ value: o, label: `Android ${o}` }))
+                            ]}
+                            className="bg-surface/50 py-1.5 text-sm"
+                            containerClassName="w-auto min-w-[120px]"
+                        />
+                    </div>
+                    
+                    {showCharts && (
+                        <div className="flex items-center bg-surface/50 border border-outline-variant/30 rounded-lg p-1">
+                            <button
+                                onClick={() => setCountMethod('suites')}
+                                className={clsx("px-3 py-1.5 text-xs font-medium rounded-md transition-colors", countMethod === 'suites' ? "bg-primary/20 text-primary" : "text-on-surface-variant hover:bg-on-surface/5")}
+                            >
+                                {t('tests_page.charts.count_by_suites')}
+                            </button>
+                            <button
+                                onClick={() => setCountMethod('tests')}
+                                className={clsx("px-3 py-1.5 text-xs font-medium rounded-md transition-colors", countMethod === 'tests' ? "bg-primary/20 text-primary" : "text-on-surface-variant hover:bg-on-surface/5")}
+                            >
+                                {t('tests_page.charts.count_by_tests')}
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+
             <div ref={parentRef} className="flex-1 overflow-y-auto pr-2 relative">
                 <AnimatePresence>
                     {showCharts && (
-                        <HistoryCharts logs={filteredHistory} groupBy={groupBy} />
+                        <HistoryCharts logs={filteredHistory} groupBy={groupBy} countMethod={countMethod} />
                     )}
                 </AnimatePresence>
 
