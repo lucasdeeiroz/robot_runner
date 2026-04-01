@@ -19,6 +19,7 @@ export interface TestNode {
     status: 'PASS' | 'FAIL' | 'RUNNING';
     logs: string[];
     children?: LogNode[];
+    hasChildren?: boolean;
     duration?: string;
     failureDetail?: {
         message: string;
@@ -45,6 +46,7 @@ export interface SuiteNode {
     summary: string;
     duration?: string;
     children: LogNode[];
+    hasChildren?: boolean;
     stats?: {
         passed: number;
         failed: number;
@@ -65,6 +67,7 @@ export interface KeywordNode {
     args?: string[];
     screenshotPath?: string;
     children: LogNode[];
+    hasChildren?: boolean;
 }
 
 export type LogNode = TextNode | SuiteStartNode | TestNode | SuiteNode | SuiteEndNode | KeywordNode;

@@ -24,6 +24,7 @@ export interface TestSession {
     selectedTests?: string[];
     sessionEpoch: number; // Incremented on recycle to force RunConsole remount
     repopulatedTree?: any; // To avoid circular imports or complex types, using any for LogNode
+    parsedDbPath?: string;
     artifactPaths?: { log?: string, report?: string, output?: string };
 }
 
@@ -47,7 +48,7 @@ interface TestSessionContextType {
     activeSessionId: string | 'dashboard';
     setActiveSessionId: (id: string | 'dashboard') => void;
     setSessionActiveTool: (runId: string, tool: string) => void;
-    setSessionTree: (runId: string, tree: any) => void;
+    setSessionTree: (runId: string, tree: any, dbPath: string) => void;
     updateSessionArtifacts: (runId: string, paths: Partial<NonNullable<TestSession['artifactPaths']>>) => void;
 }
 
@@ -369,21 +370,11 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
     }, [activeSessionId]);
 
     const setSessionActiveTool = useCallback((runId: string, tool: string) => {
-        setSessions(prev => prev.map(s => {
-            if (s.runId === runId) {
-                return { ...s, lastActiveTool: tool };
-            }
-            return s;
-        }));
+        setSessions(prev => prev.map(s => s.runId === runId ? { ...s, lastActiveTool: tool } : s));
     }, []);
 
-    const setSessionTree = useCallback((runId: string, tree: any) => {
-        setSessions(prev => prev.map(s => {
-            if (s.runId === runId) {
-                return { ...s, repopulatedTree: tree };
-            }
-            return s;
-        }));
+    const setSessionTree = useCallback((runId: string, tree: any, dbPath: string) => {
+        setSessions(prev => prev.map(s => s.runId === runId ? { ...s, repopulatedTree: tree, parsedDbPath: dbPath } : s));
     }, []);
 
     const updateSessionArtifacts = useCallback((runId: string, paths: Partial<NonNullable<TestSession['artifactPaths']>>) => {

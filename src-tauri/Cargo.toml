@@ -1,6 +1,6 @@
 [package]
 name = "robot_runner"
-version = "2.1.105"
+version = "2.1.200"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -39,3 +39,5 @@ reqwest = { version = "0.12", default-features = false, features = ["blocking", 
 once_cell = "1.20"
 zstd = "0.13"
 tokio = { version = "1", features = ["rt"] }
+quick-xml = { version = "0.39.2", features = ["serialize"] }
+rusqlite = { version = "0.39.0", features = ["bundled"] }

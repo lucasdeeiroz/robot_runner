@@ -1,16 +1,21 @@
 import { invoke } from '@tauri-apps/api/core';
 import { LogNode } from '@/lib/robotParser';
 
+export interface ParseResult {
+    dbPath: string;
+    rootSuite: LogNode;
+}
+
 type CacheEntry = {
-    tree: LogNode;
+    result: ParseResult;
     timestamp: number;
 };
 
-type ParseListener = (xmlPath: string, tree: LogNode | null, error: string | null) => void;
+type ParseListener = (xmlPath: string, result: ParseResult | null, error: string | null) => void;
 
 // Module-level singleton cache (survives component unmounts)
 const cache = new Map<string, CacheEntry>();
-const inFlightPaths = new Map<string, Promise<LogNode>>();
+const inFlightPaths = new Map<string, Promise<ParseResult>>();
 const listeners = new Set<ParseListener>();
 
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -24,16 +29,16 @@ export function onParseComplete(listener: ParseListener): () => void {
     return () => listeners.delete(listener);
 }
 
-function notifyListeners(xmlPath: string, tree: LogNode | null, error: string | null) {
+function notifyListeners(xmlPath: string, result: ParseResult | null, error: string | null) {
     listeners.forEach(fn => {
-        try { fn(xmlPath, tree, error); } catch { /* noop */ }
+        try { fn(xmlPath, result, error); } catch { /* noop */ }
     });
 }
 
 /**
- * Get cached tree, or return null if not cached / expired.
+ * Get cached result, or return null if not cached / expired.
  */
-export function getCachedTree(xmlPath: string): LogNode | null {
+export function getCachedResult(xmlPath: string): ParseResult | null {
     const entry = cache.get(xmlPath);
     if (!entry) {
         return null;
@@ -45,17 +50,17 @@ export function getCachedTree(xmlPath: string): LogNode | null {
         return null;
     }
 
-    return entry.tree;
+    return entry.result;
 }
 
 /**
  * Parse XML in background. Result is cached globally.
  * If same path is already being parsed, deduplicates the request.
- * Returns the parsed LogNode.
+ * Returns the parsed ParseResult.
  */
-export async function parseXmlBackground(xmlPath: string): Promise<LogNode> {
+export async function parseXmlBackground(xmlPath: string): Promise<ParseResult> {
     // Check cache
-    const cached = getCachedTree(xmlPath);
+    const cached = getCachedResult(xmlPath);
     if (cached) return cached;
 
     // Deduplicate concurrent requests for same path
@@ -64,10 +69,10 @@ export async function parseXmlBackground(xmlPath: string): Promise<LogNode> {
 
     const promise = (async () => {
         try {
-            const rootNode = await invoke<LogNode>('parse_robot_xml', { xmlPath });
-            cache.set(xmlPath, { tree: rootNode, timestamp: Date.now() });
-            notifyListeners(xmlPath, rootNode, null);
-            return rootNode;
+            const result = await invoke<ParseResult>('parse_robot_xml', { xmlPath });
+            cache.set(xmlPath, { result, timestamp: Date.now() });
+            notifyListeners(xmlPath, result, null);
+            return result;
         } catch (e: any) {
             const errMsg = typeof e === 'string' ? e : e?.message || 'Parse failed';
             notifyListeners(xmlPath, null, errMsg);

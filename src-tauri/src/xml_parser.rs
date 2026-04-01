@@ -1,18 +1,20 @@
 use once_cell::sync::Lazy;
-use roxmltree::Node;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 use tauri::Emitter;
+use quick_xml::events::Event;
+use quick_xml::reader::Reader;
+use std::io::BufReader;
+use crate::db::LogDb;
 
-// Pre-compiled regexes (compiled once for the entire app lifecycle)
 static RE_SRC: Lazy<regex::Regex> =
     Lazy::new(|| regex::Regex::new(r#"src=["']([^"']+)["']"#).unwrap());
 static RE_HIERARCHY: Lazy<regex::Regex> = Lazy::new(|| {
-    regex::Regex::new(r"(?i)<\?xml(?:[^>]*)?>\s*<hierarchy[\s\S]*?</hierarchy>").unwrap()
+    regex::Regex::new(r"(?i)<?\?xml[\s\S]*/hierarchy>?").unwrap()
 });
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum LogNode {
     Suite(SuiteNode),
@@ -21,7 +23,18 @@ pub enum LogNode {
     Text(TextNode),
 }
 
-#[derive(Serialize, Deserialize)]
+impl LogNode {
+    pub fn id(&self) -> &str {
+        match self {
+            LogNode::Suite(s) => &s.id,
+            LogNode::Test(t) => &t.id,
+            LogNode::Keyword(k) => &k.id,
+            LogNode::Text(t) => &t.id,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct SuiteNode {
     pub id: String,
@@ -29,10 +42,12 @@ pub struct SuiteNode {
     pub status: String,
     pub duration: String,
     pub children: Vec<LogNode>,
+    #[serde(default)]
+    pub has_children: bool,
     pub stats: Option<SuiteStats>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct SuiteStats {
     pub passed: i32,
@@ -40,7 +55,7 @@ pub struct SuiteStats {
     pub skipped: i32,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct TestNode {
     pub id: String,
@@ -48,18 +63,20 @@ pub struct TestNode {
     pub status: String,
     pub duration: String,
     pub children: Vec<LogNode>,
+    #[serde(default)]
+    pub has_children: bool,
     pub failure_detail: Option<FailureDetail>,
     pub logs: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct FailureDetail {
     pub message: String,
     pub screenshot_path: Option<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct KeywordNode {
     pub id: String,
@@ -70,9 +87,11 @@ pub struct KeywordNode {
     pub args: Vec<String>,
     pub screenshot_path: Option<String>,
     pub children: Vec<LogNode>,
+    #[serde(default)]
+    pub has_children: bool,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct TextNode {
     pub id: String,
@@ -87,17 +106,6 @@ struct ParseProgress {
     percent: u8,
 }
 
-#[tauri::command]
-pub async fn parse_robot_xml(
-    app: tauri::AppHandle,
-    xml_path: String,
-) -> Result<LogNode, String> {
-    // Offload all heavy work to a blocking thread pool to avoid blocking the IPC thread
-    tokio::task::spawn_blocking(move || parse_robot_xml_blocking(&app, &xml_path))
-        .await
-        .map_err(|e| format!("Task join error: {}", e))?
-}
-
 fn emit_progress(app: &tauri::AppHandle, xml_path: &str, stage: &str, percent: u8) {
     let _ = app.emit(
         "xml-parse-progress",
@@ -109,21 +117,58 @@ fn emit_progress(app: &tauri::AppHandle, xml_path: &str, stage: &str, percent: u
     );
 }
 
-fn parse_robot_xml_blocking(app: &tauri::AppHandle, xml_path: &str) -> Result<LogNode, String> {
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ParseResult {
+    pub db_path: String,
+    pub root_suite: LogNode,
+}
+
+#[tauri::command]
+pub async fn parse_robot_xml(
+    app: tauri::AppHandle,
+    xml_path: String,
+) -> Result<ParseResult, String> {
+    tokio::task::spawn_blocking(move || parse_robot_xml_blocking(&app, &xml_path))
+        .await
+        .map_err(|e| format!("Task join error: {}", e))?
+}
+
+#[tauri::command]
+pub async fn get_node_children(
+    db_path: String,
+    parent_id: String,
+) -> Result<Vec<LogNode>, String> {
+    tokio::task::spawn_blocking(move || {
+        let db = LogDb::new(&db_path).map_err(|e| format!("Failed to open DB: {}", e))?;
+        let children_json = db.get_children(&parent_id).map_err(|e| format!("Query error: {}", e))?;
+        
+        let mut nodes = Vec::new();
+        println!("[XML Parser] get_node_children called for parent_id: '{}', db path: {}", parent_id, db_path);
+        for (i, json) in children_json.iter().enumerate() {
+            match serde_json::from_str::<LogNode>(json) {
+                Ok(node) => nodes.push(node),
+                Err(e) => println!("[XML Parser] Error deserializing child {} of {}: {}", i, parent_id, e),
+            }
+        }
+        println!("[XML Parser] get_node_children for parent_id '{}' returning {} nodes.", parent_id, nodes.len());
+        Ok(nodes)
+    })
+    .await
+    .map_err(|e| format!("Task join error: {}", e))?
+}
+
+
+// We drop the legacy load logic for `.zst` chunks, we completely use DB cache!
+fn parse_robot_xml_blocking(app: &tauri::AppHandle, xml_path: &str) -> Result<ParseResult, String> {
     let xml_file_name = Path::new(xml_path)
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("unknown");
 
-    // v3: zstd-compressed cache
-    let cache_file_name = format!("{}_parsed_log_v3.json.zst", xml_file_name);
-    let cache_path = Path::new(xml_path).with_file_name(&cache_file_name);
+    let db_cache_name = format!("{}_v4.db", xml_file_name);
+    let cache_path = Path::new(xml_path).with_file_name(&db_cache_name);
 
-    // Also check for legacy v2 cache to clean up
-    let legacy_cache =
-        Path::new(xml_path).with_file_name(format!("{}_parsed_log_v2.json", xml_file_name));
-
-    // 1. Check if compressed cache exists and is valid
     let xml_mtime = fs::metadata(xml_path).and_then(|m| m.modified()).ok();
     let cache_mtime = fs::metadata(&cache_path).and_then(|m| m.modified()).ok();
 
@@ -133,428 +178,437 @@ fn parse_robot_xml_blocking(app: &tauri::AppHandle, xml_path: &str) -> Result<Lo
     };
 
     if is_cache_valid && cache_path.exists() {
-        println!("[XML Parser] Loading from compressed cache: {:?}", cache_path);
+        println!("[XML Parser] Loading from DB cache: {:?}", cache_path);
         emit_progress(app, xml_path, "loading_tree", 90);
-        match load_from_zstd_cache(&cache_path) {
-            Ok(suite) => return Ok(suite),
-            Err(e) => {
-                println!("[XML Parser] Cache read failed, re-parsing: {}", e);
-                let _ = fs::remove_file(&cache_path);
+        
+        let db = LogDb::new(&cache_path).map_err(|e| e.to_string())?;
+        if let Ok(root_json) = db.get_root_suite() {
+            if let Ok(root_suite) = serde_json::from_str::<LogNode>(&root_json) {
+                return Ok(ParseResult {
+                    db_path: cache_path.to_string_lossy().to_string(),
+                    root_suite,
+                });
             }
         }
+        
+        println!("[XML Parser] DB cache read failed, re-parsing");
+        let _ = fs::remove_file(&cache_path);
     }
 
-    // 2. Parse XML (heavy operation)
     emit_progress(app, xml_path, "parsing_xml", 10);
-    println!("[XML Parser] Parsing XML: {:?}", xml_path);
-    let content = fs::read_to_string(xml_path).map_err(|e| e.to_string())?;
-    let doc = roxmltree::Document::parse(&content).map_err(|e| e.to_string())?;
-    println!("[XML Parser] XML parsed successfully");
+    println!("[XML Parser] Stream Parsing XML to SQLite: {:?}", xml_path);
 
-    let root = doc.root_element();
-    if root.tag_name().name() != "robot" {
-        return Err("Not a Robot Framework output file".to_string());
-    }
+    let base_dir = Path::new(xml_path).parent().unwrap_or(Path::new(".")).to_path_buf();
+    
+    // Perform parsing & stream insert!
+    let root_suite = parse_robot_xml_sax_internal(app, xml_path, &cache_path, &base_dir)?;
+    
+    emit_progress(app, xml_path, "done", 100);
+    println!("[XML Parser] XML Stream Parse complete");
 
-    let suite_node = root
-        .children()
-        .find(|n| n.tag_name().name() == "suite")
-        .ok_or("No suite found in XML")?;
+    Ok(ParseResult {
+        db_path: cache_path.to_string_lossy().to_string(),
+        root_suite,
+    })
+}
 
-    emit_progress(app, xml_path, "mapping_structure", 35);
-    println!("[XML Parser] Mapping suite structure...");
+struct KwState {
+    args: Vec<String>,
+    vars: Vec<String>,
+    values: Vec<String>,
+    flavor: String,
+    condition: String,
+}
 
-    let base_dir = Path::new(xml_path).parent().unwrap_or(Path::new("."));
+fn parse_robot_xml_sax_internal(app: &tauri::AppHandle, xml_path: &str, db_path: &Path, base_dir: &Path) -> Result<LogNode, String> {
+    let mut db = LogDb::new(db_path).map_err(|e| e.to_string())?;
+    
+    let file = fs::File::open(xml_path).map_err(|e| e.to_string())?;
+    let mut reader = Reader::from_reader(BufReader::new(file));
+    reader.config_mut().trim_text(true);
 
-    let suite = map_node(suite_node, base_dir)?;
-    println!("[XML Parser] Mapping complete");
+    let mut buf = Vec::new();
+    let mut stack: Vec<LogNode> = Vec::new();
+    let mut root_suite: Option<SuiteNode> = None;
+    
+    let mut text_buffer = String::new();
+    let mut kw_states: Vec<KwState> = vec![KwState { args: vec![], vars: vec![], values: vec![], flavor: "IN".into(), condition: "".into() }];
+    
+    let mut order_counter = 0;
+    let mut node_counter = 0;
+    let total_bytes = fs::metadata(xml_path).map(|m| m.len()).unwrap_or(1);
+    let mut last_percent_reported = 10;
+    
+    let tx = db.begin_transaction().map_err(|e| e.to_string())?;
 
-    // 3. Save compressed cache in background (fire-and-forget)
-    emit_progress(app, xml_path, "compressing_cache", 65);
-
-    let cache_path_owned = cache_path.to_path_buf();
-    let legacy_cache_owned = legacy_cache.to_path_buf();
-    let app_clone = app.clone();
-    let xml_path_owned = xml_path.to_string();
-
-    // Serialize to bytes first (on this thread to borrow `suite`)
-    match serde_json::to_vec(&suite) {
-        Ok(json_bytes) => {
-            std::thread::spawn(move || {
-                // Write zstd-compressed cache
-                if let Ok(file) = fs::File::create(&cache_path_owned) {
-                    let encoder = zstd::Encoder::new(file, 3); // compression level 3 (fast)
-                    if let Ok(mut encoder) = encoder {
-                        use std::io::Write;
-                        let _ = encoder.write_all(&json_bytes);
-                        let _ = encoder.finish();
-                        if let Ok(meta) = fs::metadata(&cache_path_owned) {
-                            let ratio = if !json_bytes.is_empty() {
-                                (meta.len() as f64 / json_bytes.len() as f64 * 100.0).round()
-                            } else {
-                                0.0
-                            };
-                            println!(
-                                "[XML Parser] Compressed cache saved: {} bytes ({}% of original {})",
-                                meta.len(),
-                                ratio,
-                                json_bytes.len()
-                            );
-                        }
-                    }
-                }
-                // Clean up legacy uncompressed cache
-                if legacy_cache_owned.exists() {
-                    let _ = fs::remove_file(&legacy_cache_owned);
-                }
-                emit_progress(&app_clone, &xml_path_owned, "loading_tree", 90);
-            });
+    loop {
+        let current_pos = reader.buffer_position() as u64;
+        let percent = 10 + ((current_pos * 80) / total_bytes) as u8; // Reserve 10 for init, 10 for completion
+        if percent > last_percent_reported && percent <= 90 {
+            emit_progress(app, xml_path, "mapping_structure", percent);
+            last_percent_reported = percent;
         }
-        Err(e) => {
-            println!("[XML Parser] Serialization failed, skipping cache: {}", e);
-        }
-    }
 
-    Ok(suite)
-}
+        match reader.read_event_into(&mut buf) {
+            Err(e) => return Err(format!("Error at {} : {}", reader.buffer_position(), e)),
+            Ok(Event::Eof) => break,
 
-/// Load a LogNode from a zstd-compressed JSON cache file
-fn load_from_zstd_cache(path: &Path) -> Result<LogNode, String> {
-    let file = fs::File::open(path).map_err(|e| e.to_string())?;
-    let decoder = zstd::Decoder::new(file).map_err(|e| e.to_string())?;
-    let reader = std::io::BufReader::new(decoder);
-    serde_json::from_reader(reader).map_err(|e| e.to_string())
-}
+            Ok(event @ Event::Start(_)) | Ok(event @ Event::Empty(_)) => {
+                let is_empty = matches!(event, Event::Empty(_));
+                let e = match &event {
+                    Event::Start(e) | Event::Empty(e) => e,
+                    _ => unreachable!(),
+                };
+                let tag_name = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                text_buffer.clear();
 
-fn map_node(node: Node, base_dir: &Path) -> Result<LogNode, String> {
-    let tag = node.tag_name().name();
-
-    match tag {
-        "suite" => Ok(LogNode::Suite(map_suite(node, base_dir)?)),
-        "test" => Ok(LogNode::Test(map_test(node, base_dir)?)),
-        "kw" | "setup" | "teardown" | "for" | "while" | "if" | "iter" | "branch" | "break"
-        | "continue" => Ok(LogNode::Keyword(map_keyword(node, base_dir)?)),
-        _ => Err(format!("Unknown tag: {}", tag)),
-    }
-}
-
-fn map_suite(node: Node, base_dir: &Path) -> Result<SuiteNode, String> {
-    let name = node.attribute("name").unwrap_or("").to_string();
-    let status_node = node
-        .children()
-        .find(|n| n.tag_name().name() == "status")
-        .ok_or("No status node")?;
-    let status = status_node
-        .attribute("status")
-        .unwrap_or("PASS")
-        .to_string();
-
-    let start = status_node
-        .attribute("starttime")
-        .or_else(|| status_node.attribute("start"))
-        .unwrap_or("");
-    let end = status_node
-        .attribute("endtime")
-        .or_else(|| status_node.attribute("end"))
-        .unwrap_or("");
-    let duration = format_duration(&status_node, start, end);
-
-    let mut children = Vec::new();
-    let mut passed = 0;
-    let mut failed = 0;
-    let mut skipped = 0;
-
-    for child in node.children() {
-        if child.is_element() {
-            let ctag = child.tag_name().name();
-            if ctag == "if" {
-                for branch in child.children().filter(|n| n.tag_name().name() == "branch") {
-                    if let Ok(mapped) = map_node(branch, base_dir) {
-                        match &mapped {
-                            LogNode::Test(t) => {
-                                if t.status == "PASS" { passed += 1; }
-                                else if t.status == "FAIL" { failed += 1; }
-                                else { skipped += 1; }
-                            },
-                             LogNode::Suite(s) => if let Some(st) = &s.stats {
-                                passed += st.passed; failed += st.failed; skipped += st.skipped;
-                            },
-                            _ => {}
+                match tag_name.as_str() {
+                    "suite" | "test" | "kw" | "setup" | "teardown" | "for" | "while" | "if" | "iter" | "branch" | "break" | "continue" => {
+                        if let Some(parent) = stack.last_mut() {
+                            match parent {
+                                LogNode::Suite(s) => s.has_children = true,
+                                LogNode::Test(t) => t.has_children = true,
+                                LogNode::Keyword(k) => k.has_children = true,
+                                _ => {}
+                            }
                         }
-                        children.push(mapped);
-                    }
+                    },
+                    _ => {}
                 }
-            } else if ctag == "suite"
-                || ctag == "test"
-                || ctag == "kw"
-                || ctag == "setup"
-                || ctag == "teardown"
-                || ctag == "break"
-                || ctag == "continue"
-            {
-                if let Ok(mapped) = map_node(child, base_dir) {
-                    match &mapped {
-                        LogNode::Test(t) => {
-                            if t.status == "PASS" { passed += 1; }
-                            else if t.status == "FAIL" { failed += 1; }
-                            else { skipped += 1; }
-                        },
-                         LogNode::Suite(s) => if let Some(st) = &s.stats {
-                            passed += st.passed; failed += st.failed; skipped += st.skipped;
+
+                match tag_name.as_str() {
+                    "suite" => {
+                        let mut name = String::new();
+                        let mut id = String::new();
+                        for attr in e.attributes().flatten() {
+                            if attr.key.as_ref() == b"name" { name = String::from_utf8_lossy(&attr.value).into_owned(); }
+                            else if attr.key.as_ref() == b"id" { id = String::from_utf8_lossy(&attr.value).into_owned(); }
+                        }
+                        node_counter += 1;
+                        if id.is_empty() { id = format!("suite-{}-{}", name, node_counter); }
+                        else { id = format!("{}-{}", id, node_counter); }
+                        
+                        let suite = SuiteNode {
+                            id, name, status: "PASS".to_string(), duration: "".to_string(),
+                            children: Vec::new(), has_children: false, stats: Some(SuiteStats { passed: 0, failed: 0, skipped: 0 })
+                        };
+                        stack.push(LogNode::Suite(suite));
+                    },
+                    "test" => {
+                        let mut name = String::new();
+                        let mut id = String::new();
+                        for attr in e.attributes().flatten() {
+                            if attr.key.as_ref() == b"name" { name = String::from_utf8_lossy(&attr.value).into_owned(); }
+                            else if attr.key.as_ref() == b"id" { id = String::from_utf8_lossy(&attr.value).into_owned(); }
+                        }
+                        node_counter += 1;
+                        if id.is_empty() { id = format!("test-{}-{}", name, node_counter); }
+                        else { id = format!("{}-{}", id, node_counter); }
+                        
+                        let test = TestNode {
+                            id, name, status: "PASS".to_string(), duration: "".to_string(),
+                            children: Vec::new(), has_children: false, failure_detail: None, logs: Vec::new()
+                        };
+                        stack.push(LogNode::Test(test));
+                    },
+                    "kw" | "setup" | "teardown" | "for" | "while" | "if" | "iter" | "branch" | "break" | "continue" => {
+                        let mut name = String::new();
+                        let mut id = String::new();
+                        let mut kw_type = "keyword".to_string();
+                        let mut st_flavor = String::from("IN");
+                        let mut st_condition = String::new();
+
+                        for attr in e.attributes().flatten() {
+                             if attr.key.as_ref() == b"name" { name = String::from_utf8_lossy(&attr.value).into_owned(); }
+                             else if attr.key.as_ref() == b"id" { id = String::from_utf8_lossy(&attr.value).into_owned(); }
+                             else if attr.key.as_ref() == b"type" { kw_type = String::from_utf8_lossy(&attr.value).into_owned(); }
+                             else if attr.key.as_ref() == b"flavor" { st_flavor = String::from_utf8_lossy(&attr.value).into_owned(); }
+                             else if attr.key.as_ref() == b"condition" { st_condition = String::from_utf8_lossy(&attr.value).into_owned(); }
+                        }
+                        node_counter += 1;
+                        if id.is_empty() { id = format!("kw-{}-{}", name, node_counter); }
+                        else { id = format!("{}-{}", id, node_counter); }
+                        
+                        let sub_type = if tag_name == "branch" {
+                            match kw_type.as_str() {
+                                t if t.eq_ignore_ascii_case("ELSE IF") => "else-if",
+                                t if t.eq_ignore_ascii_case("ELSE") => "else",
+                                _ => "if",
+                            }.to_string()
+                        } else {
+                            match tag_name.as_str() {
+                                "setup" => "setup", "teardown" => "teardown", "for" => "for",
+                                "while" => "while", "if" => "if", "iter" => "iteration",
+                                "break" => "break", "continue" => "continue", _ => "keyword"
+                            }.to_string()
+                        };
+
+                        kw_states.push(KwState { args: vec![], vars: vec![], values: vec![], flavor: st_flavor, condition: st_condition });
+
+                        let kw = KeywordNode {
+                            id, name, sub_type, status: "PASS".to_string(), duration: "".to_string(),
+                            args: Vec::new(), screenshot_path: None, children: Vec::new(), has_children: false
+                        };
+                        stack.push(LogNode::Keyword(kw));
+                    },
+                    "status" => {
+                        let mut status_val = String::from("PASS");
+                        let mut start = String::new();
+                        let mut end = String::new();
+                        let mut elapsed_attr = String::new();
+                        for attr in e.attributes().flatten() {
+                             if attr.key.as_ref() == b"status" { status_val = String::from_utf8_lossy(&attr.value).into_owned(); }
+                             else if attr.key.as_ref() == b"starttime" || attr.key.as_ref() == b"start" { start = String::from_utf8_lossy(&attr.value).into_owned(); }
+                             else if attr.key.as_ref() == b"endtime" || attr.key.as_ref() == b"end" { end = String::from_utf8_lossy(&attr.value).into_owned(); }
+                             else if attr.key.as_ref() == b"elapsed" { elapsed_attr = String::from_utf8_lossy(&attr.value).into_owned(); }
+                        }
+                        if status_val == "NOT RUN" { status_val = "NOT_RUN".to_string(); }
+                        
+                        let duration = format_duration(&elapsed_attr, &start, &end);
+
+                        if let Some(top) = stack.last_mut() {
+                            match top {
+                                LogNode::Suite(s) => { s.status = status_val.clone(); s.duration = duration; },
+                                LogNode::Test(t) => { t.status = status_val.clone(); t.duration = duration; },
+                                LogNode::Keyword(k) => { k.status = status_val.clone(); k.duration = duration; },
+                                _ => {}
+                            }
+                        }
+                    },
+                    _ => {}
+                }
+
+                if is_empty {
+                    match tag_name.as_str() {
+                        "status" | "arg" | "var" | "value" | "msg" => {}, 
+                        "suite" | "test" | "kw" | "setup" | "teardown" | "for" | "while" | "if" | "iter" | "branch" | "break" | "continue" => {
+                            if tag_name != "suite" && tag_name != "test" {
+                                kw_states.pop();
+                            }
+                            if let Some(popped) = stack.pop() {
+                                order_counter += 1;
+                                let parent_id = stack.last().map(|p| p.id().to_string()).unwrap_or_default();
+                                
+                                let id = popped.id().to_string();
+                                let node_type = match &popped { LogNode::Suite(_) => "suite", LogNode::Test(_) => "test", LogNode::Keyword(_) => "keyword", LogNode::Text(_) => "text" };
+                                let json_payload = serde_json::to_string(&popped).unwrap();
+                                
+                                LogDb::insert_node(&tx, &id, &parent_id, node_type, &json_payload, order_counter).unwrap();
+
+                                if let Some(parent) = stack.last_mut() {
+                                    append_child_stats(parent, &popped);
+                                } else if let LogNode::Suite(s) = popped {
+                                    root_suite = Some(s);
+                                }
+                            }
                         },
                         _ => {}
                     }
-                    children.push(mapped);
                 }
-            } else if ctag == "msg" {
-                if let Some(txt) = child.text() {
-                    let cleaned = clean_message(txt);
-                    if !cleaned.is_empty() && !txt.contains("src=") {
-                        children.push(LogNode::Text(TextNode {
-                            id: format!("msg-{}", rand::random::<u32>()),
-                            content: cleaned,
-                            is_system: false,
-                        }));
-                    }
+            },
+
+            Ok(Event::Text(e)) => {
+                let text_str = String::from_utf8_lossy(e.as_ref());
+                if let Ok(unescaped) = quick_xml::escape::unescape(&text_str) {
+                    text_buffer.push_str(unescaped.as_ref());
+                } else {
+                    text_buffer.push_str(&text_str);
                 }
-            }
+            },
+            
+            Ok(Event::End(e)) => {
+                let tag_name = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                
+                match tag_name.as_str() {
+                    "suite" | "test" | "kw" | "setup" | "teardown" | "for" | "while" | "if" | "iter" | "branch" | "break" | "continue" => {
+                        let mut state = None;
+                        if tag_name != "suite" && tag_name != "test" {
+                            state = kw_states.pop();
+                        }
+
+                        if let Some(mut popped) = stack.pop() {
+                             if let LogNode::Keyword(k) = &mut popped {
+                                 if let Some(st) = state {
+                                     let mut args = st.args;
+                                     let condition_empty = st.condition.is_empty();
+                                     if !condition_empty {
+                                        args.push(st.condition);
+                                     } 
+                                     if !st.vars.is_empty() {
+                                         if k.sub_type == "for" {
+                                             if !st.values.is_empty() {
+                                                 args.push(format!("{} {} {}", st.vars.join(", "), st.flavor, st.values.join(", ")));
+                                             }
+                                         } else {
+                                             args.push(st.vars.join(", "));
+                                         }
+                                     } else if !st.values.is_empty() && condition_empty {
+                                         args.push(st.values.join(", "));
+                                     }
+                                     k.args = process_resolved_args(&k.children, args);
+                                 }
+                             }
+
+                             // Since we store children dynamically, empty it before saving!
+                             popped.clear_children();
+
+                             order_counter += 1;
+                             let parent_id = stack.last().map(|p| p.id().to_string()).unwrap_or_default();
+                             let id = popped.id().to_string();
+                             let node_type = match &popped { LogNode::Suite(_) => "suite", LogNode::Test(_) => "test", LogNode::Keyword(_) => "keyword", LogNode::Text(_) => "text" };
+                             
+                             let json_payload = serde_json::to_string(&popped).unwrap();
+                             LogDb::insert_node(&tx, &id, &parent_id, node_type, &json_payload, order_counter).unwrap();
+
+                             if let Some(parent) = stack.last_mut() {
+                                 append_child_stats(parent, &popped);
+                             } else if let LogNode::Suite(s) = popped {
+                                 if root_suite.is_none() {
+                                     root_suite = Some(s);
+                                 }
+                             }
+                        }
+                    },
+                    "status" => {
+                         let msg = clean_message(text_buffer.trim());
+                         if !msg.is_empty() {
+                             for node in stack.iter_mut().rev() {
+                                 if let LogNode::Test(t) = node {
+                                     if t.status == "FAIL" {
+                                         if let Some(fail) = &mut t.failure_detail {
+                                             fail.message = msg.clone();
+                                         } else {
+                                             t.failure_detail = Some(FailureDetail { message: msg.clone(), screenshot_path: None });
+                                         }
+                                     }
+                                     break;
+                                 }
+                             }
+                         }
+                    },
+                    "msg" => {
+                        let text = clean_message(text_buffer.trim());
+                        if !text.is_empty() {
+                            let mut screenshot = None;
+                            if text.contains("src=") {
+                                if let Some(caps) = RE_SRC.captures(&text) {
+                                    screenshot = Some(caps[1].to_string());
+                                }
+                            }
+
+                            if let Some(src) = screenshot {
+                                let abs_src = resolve_screenshot_path(&src, &base_dir);
+                                let mut assigned_kw = false;
+                                for node in stack.iter_mut().rev() {
+                                    match node {
+                                        LogNode::Keyword(k) => { 
+                                            // Assign only to the innermost keyword
+                                            if !assigned_kw {
+                                                k.screenshot_path = Some(abs_src.clone()); 
+                                                assigned_kw = true;
+                                            }
+                                        },
+                                        LogNode::Test(t) => {
+                                            if let Some(fail) = &mut t.failure_detail {
+                                                fail.screenshot_path = Some(abs_src.clone());
+                                            } else {
+                                                t.failure_detail = Some(FailureDetail { message: "".to_string(), screenshot_path: Some(abs_src.clone()) });
+                                            }
+                                            break; 
+                                        },
+                                        _ => {}
+                                    }
+                                }
+                            }
+
+                            if !text.contains("src=") {
+                                if let Some(parent) = stack.last_mut() {
+                                    let c = TextNode { id: format!("msg-{}", rand::random::<u32>()), content: text, is_system: false };
+                                    
+                                    order_counter += 1;
+                                    let node_enum = LogNode::Text(c);
+                                    let json_payload = serde_json::to_string(&node_enum).unwrap();
+                                    LogDb::insert_node(&tx, node_enum.id(), parent.id(), "text", &json_payload, order_counter).unwrap();
+
+                                    append_child_stats(parent, &node_enum);
+                                }
+                            }
+                        }
+                    },
+                    "arg" => { if let Some(st) = kw_states.last_mut() { st.args.push(text_buffer.clone()); } },
+                    "var" => { if let Some(st) = kw_states.last_mut() { st.vars.push(text_buffer.clone()); } },
+                    "value" => { if let Some(st) = kw_states.last_mut() { st.values.push(text_buffer.clone()); } },
+                    _ => {}
+                }
+                text_buffer.clear();
+            },
+            Ok(_) => {}
         }
+        buf.clear();
     }
+    
+    tx.commit().map_err(|e| e.to_string())?;
 
-    let stats = Some(SuiteStats { passed, failed, skipped });
-
-    Ok(SuiteNode {
-        id: node
-            .attribute("id")
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| format!("suite-{}", name)),
-        name,
-        status,
-        duration,
-        children,
-        stats,
-    })
+    match root_suite {
+        Some(s) => Ok(LogNode::Suite(s)),
+        None => Err("No valid suite found in XML".to_string())
+    }
 }
 
-fn map_test(node: Node, base_dir: &Path) -> Result<TestNode, String> {
-    let name = node.attribute("name").unwrap_or("").to_string();
-    let status_node = node
-        .children()
-        .find(|n| n.tag_name().name() == "status")
-        .ok_or("No status node")?;
-    let status = status_node
-        .attribute("status")
-        .unwrap_or("PASS")
-        .to_string();
-
-    let start = status_node
-        .attribute("starttime")
-        .or_else(|| status_node.attribute("start"))
-        .unwrap_or("");
-    let end = status_node
-        .attribute("endtime")
-        .or_else(|| status_node.attribute("end"))
-        .unwrap_or("");
-    let duration = format_duration(&status_node, start, end);
-
-    let mut children = Vec::new();
-    for child in node.children() {
-        if child.is_element() {
-            let ctag = child.tag_name().name();
-            if ctag == "if" {
-                for branch in child.children().filter(|n| n.tag_name().name() == "branch") {
-                    if let Ok(mapped) = map_node(branch, base_dir) {
-                        children.push(mapped);
-                    }
-                }
-            } else if ctag == "kw"
-                || ctag == "setup"
-                || ctag == "teardown"
-                || ctag == "for"
-                || ctag == "while"
-                || ctag == "break"
-                || ctag == "continue"
-            {
-                if let Ok(mapped) = map_node(child, base_dir) {
-                    children.push(mapped);
-                }
-            } else if ctag == "msg" {
-                if let Some(txt) = child.text() {
-                    let cleaned = clean_message(txt);
-                    if !cleaned.is_empty() && !txt.contains("src=") {
-                        children.push(LogNode::Text(TextNode {
-                            id: format!("msg-{}", rand::random::<u32>()),
-                            content: cleaned,
-                            is_system: false,
-                        }));
-                    }
-                }
-            }
-        }
+#[allow(dead_code)]
+fn get_node_status(node: &LogNode) -> String {
+    match node {
+        LogNode::Suite(s) => s.status.clone(),
+        LogNode::Test(t) => t.status.clone(),
+        LogNode::Keyword(k) => k.status.clone(),
+        LogNode::Text(_) => "PASS".to_string(),
     }
-
-    let mut failure_detail = None;
-    if status == "FAIL" {
-        let message = status_node.text().unwrap_or("").to_string();
-        failure_detail = Some(FailureDetail {
-            message,
-            screenshot_path: resolve_screenshot(&node, base_dir, true),
-        });
-    }
-
-    Ok(TestNode {
-        id: node
-            .attribute("id")
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| format!("test-{}", name)),
-        name,
-        status,
-        duration,
-        children,
-        failure_detail,
-        logs: Vec::new(),
-    })
 }
 
-fn map_keyword(node: Node, base_dir: &Path) -> Result<KeywordNode, String> {
-    let name = node.attribute("name").unwrap_or("").trim().to_string();
-    let _library = node.attribute("library").map(|s| s.to_string());
-    let tag = node.tag_name().name();
-    let sub_type = if tag == "branch" {
-        match node.attribute("type").unwrap_or("IF") {
-            t if t.eq_ignore_ascii_case("ELSE IF") => "else-if",
-            t if t.eq_ignore_ascii_case("ELSE") => "else",
-            _ => "if",
-        }
-        .to_string()
-    } else {
-        match tag {
-            "setup" => "setup",
-            "teardown" => "teardown",
-            "for" => "for",
-            "while" => "while",
-            "if" => "if",
-            "iter" => "iteration",
-            "break" => "break",
-            "continue" => "continue",
-            _ => "keyword",
-        }
-        .to_string()
-    };
-
-    let status_node = node
-        .children()
-        .find(|n| n.tag_name().name() == "status")
-        .ok_or("No status node")?;
-    let mut status = status_node
-        .attribute("status")
-        .unwrap_or("PASS")
-        .to_string();
-    if status == "NOT RUN" {
-        status = "NOT_RUN".to_string();
-    }
-    let start = status_node
-        .attribute("starttime")
-        .or_else(|| status_node.attribute("start"))
-        .unwrap_or("");
-    let end = status_node
-        .attribute("endtime")
-        .or_else(|| status_node.attribute("end"))
-        .unwrap_or("");
-    let duration = format_duration(&status_node, start, end);
-
-    let mut args = Vec::new();
-
-    // 1. Condition for BRANCH/WHILE
-    if let Some(cond) = node.attribute("condition") {
-        args.push(cond.to_string());
-    }
-
-    // 2. FOR flavors and iterate variables
-    let mut vars = Vec::new();
-    for child in node.children().filter(|n| n.tag_name().name() == "var") {
-        if let Some(txt) = child.text() {
-            vars.push(txt.to_string());
+impl LogNode {
+    fn clear_children(&mut self) {
+        match self {
+            LogNode::Suite(s) => { s.children.clear(); },
+            LogNode::Test(t) => { t.children.clear(); },
+            LogNode::Keyword(k) => { k.children.clear(); },
+            _ => {}
         }
     }
+}
 
-    let mut values = Vec::new();
-    for child in node.children().filter(|n| n.tag_name().name() == "value") {
-        if let Some(txt) = child.text() {
-            values.push(txt.to_string());
-        }
+fn append_child_stats(parent: &mut LogNode, child: &LogNode) {
+    let mut is_pass = false;
+    let mut is_fail = false;
+    let mut is_skipped = false;
+
+    match child {
+        LogNode::Test(t) => {
+            if t.status == "PASS" { is_pass = true; }
+            else if t.status == "FAIL" { is_fail = true; }
+            else { is_skipped = true; }
+        },
+        _ => {}
     }
 
-    let flavor = node.attribute("flavor").unwrap_or("IN");
-
-    if !vars.is_empty() {
-        if !values.is_empty() {
-            if vars.len() == 1
-                && values.len() == 1
-                && flavor == "IN"
-                && node.tag_name().name() == "iter"
-            {
-                args.push(format!("{} = {}", vars[0], values[0]));
-            } else {
-                args.push(format!(
-                    "{} {} {}",
-                    vars.join(", "),
-                    flavor,
-                    values.join(", ")
-                ));
+    match parent {
+        LogNode::Suite(s) => { 
+            s.has_children = true;
+            // Removed s.children.push, managed statically
+            if let Some(stats) = &mut s.stats {
+                if is_pass { stats.passed += 1; }
+                if is_fail { stats.failed += 1; }
+                if is_skipped { stats.skipped += 1; }
             }
-        } else {
-            args.push(vars.join(", "));
-        }
-    } else if !values.is_empty() && node.attribute("condition").is_none() {
-        args.push(values.join(", "));
+        },
+        LogNode::Test(t) => { t.has_children = true; },
+        LogNode::Keyword(k) => { k.has_children = true; },
+        _ => {}
     }
+}
 
-    // 3. Standard <arg> elements
-    for child in node.children().filter(|n| n.tag_name().name() == "arg") {
-        if let Some(txt) = child.text() {
-            args.push(txt.to_string());
-        }
-    }
-
-    let mut children = Vec::new();
-    for child in node.children() {
-        if child.is_element() {
-            let ctag = child.tag_name().name();
-            match ctag {
-                "if" => {
-                    for branch in child.children().filter(|n| n.tag_name().name() == "branch") {
-                        if let Ok(mapped) = map_node(branch, base_dir) {
-                            children.push(mapped);
-                        }
-                    }
-                }
-                "kw" | "setup" | "teardown" | "for" | "while" | "iter" | "branch" | "break"
-                | "continue" => {
-                    if let Ok(mapped) = map_node(child, base_dir) {
-                        children.push(mapped);
-                    }
-                }
-                "msg" => {
-                    if let Some(txt) = child.text() {
-                        let cleaned = clean_message(txt);
-                        if !cleaned.is_empty() && !txt.contains("src=") {
-                            children.push(LogNode::Text(TextNode {
-                                id: format!("msg-{}", rand::random::<u32>()),
-                                content: cleaned,
-                                is_system: false,
-                            }));
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
-
-    // Resolve variables from "Arguments: [ ... ]" message if available
+fn process_resolved_args(children: &[LogNode], args: Vec<String>) -> Vec<String> {
     let mut resolved_args = args.clone();
-    for child in &children {
+    for child in children {
         if let LogNode::Text(txt) = child {
             if txt.content.starts_with("Arguments: [") {
                 let msg_text = &txt.content;
@@ -587,31 +641,15 @@ fn map_keyword(node: Node, base_dir: &Path) -> Result<KeywordNode, String> {
             }
         }
     }
-
-    Ok(KeywordNode {
-        id: node
-            .attribute("id")
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| format!("kw-{}", name)),
-        name,
-        sub_type,
-        status,
-        duration,
-        args: resolved_args,
-        screenshot_path: resolve_screenshot(&node, base_dir, false),
-        children,
-    })
+    resolved_args
 }
 
-fn format_duration(status_node: &Node, start: &str, end: &str) -> String {
-    // 1. Try "elapsed" attribute
-    if let Some(elapsed) = status_node.attribute("elapsed") {
+fn format_duration(elapsed: &str, start: &str, end: &str) -> String {
+    if !elapsed.is_empty() {
         if let Ok(total) = elapsed.parse::<f64>() {
             return format_formatted_seconds(total);
         }
     }
-
-    // 2. Fallback to start/end timestamps
     if !start.is_empty() && !end.is_empty() {
         let fmt = "%Y%m%d %H:%M:%S%.3f";
         if let (Ok(s), Ok(e)) = (
@@ -639,52 +677,17 @@ fn format_formatted_seconds(total: f64) -> String {
     }
 }
 
-fn resolve_screenshot(node: &Node, base_dir: &Path, recursive: bool) -> Option<String> {
-    let src = find_screenshot_src(node, recursive)?;
-
-    // Embedded base64 image — return directly
+fn resolve_screenshot_path(src: &str, base_dir: &Path) -> String {
     if src.starts_with("data:image") {
-        return Some(src);
+        return src.to_string();
     }
-
-    // Clean src path
-    let clean_src = if src.starts_with("./") {
-        &src[2..]
-    } else {
-        &src
-    };
+    let clean_src = if src.starts_with("./") { &src[2..] } else { &src };
     let clean_src = clean_src.replace('\\', "/");
-
-    let img_path = base_dir.join(&clean_src);
-    Some(img_path.to_string_lossy().to_string())
-}
-
-fn find_screenshot_src(node: &Node, recursive: bool) -> Option<String> {
-    let mut last_found = None;
-
-    for child in node.children() {
-        if child.tag_name().name() == "msg" {
-            // Fast path: only run regex if text contains src=
-            if let Some(txt) = child.text() {
-                if txt.contains("src=") {
-                    if let Some(caps) = RE_SRC.captures(txt) {
-                        last_found = Some(caps[1].to_string());
-                    }
-                }
-            }
-        }
-        if recursive && child.is_element() {
-            if let Some(found) = find_screenshot_src(&child, recursive) {
-                last_found = Some(found);
-            }
-        }
-    }
-    last_found
+    base_dir.join(&clean_src).to_string_lossy().to_string()
 }
 
 fn clean_message(txt: &str) -> String {
-    // Fast path: only run regex if it looks like an XML hierarchy dump
-    if txt.len() > 10 && txt.contains("<?xml") && txt.contains("<hierarchy") {
+    if txt.len() > 10 && txt.to_lowercase().contains("xml") && txt.to_lowercase().contains("hierarchy") {
         RE_HIERARCHY.replace_all(txt, "").trim().to_string()
     } else {
         txt.trim().to_string()

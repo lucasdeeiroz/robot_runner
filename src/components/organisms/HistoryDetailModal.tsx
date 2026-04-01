@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
-import { getCachedTree, parseXmlBackground, onParseComplete } from '@/lib/xmlParseCache';
+import { getCachedResult, parseXmlBackground, onParseComplete, ParseResult } from '@/lib/xmlParseCache';
 import { Modal } from '@/components/organisms/Modal';
 import { Button } from '@/components/atoms/Button';
 import { LogTree } from '@/components/molecules/LogTree';
@@ -54,6 +54,7 @@ interface HistoryDetailModalProps {
 export function HistoryDetailModal({ isOpen, onClose, log }: HistoryDetailModalProps) {
     const { t } = useTranslation();
     const [tree, setTree] = useState<LogNode[]>([]);
+    const [dbPath, setDbPath] = useState<string | undefined>();
     const [loading, setLoading] = useState(false);
     const [progress, setProgress] = useState<ParseProgress | null>(null);
     const unlistenRef = useRef<UnlistenFn | null>(null);
@@ -74,6 +75,7 @@ export function HistoryDetailModal({ isOpen, onClose, log }: HistoryDetailModalP
             // When closing, DO NOT cancel the parse — it continues in the cache.
             // Only reset local UI state.
             setTree([]);
+            setDbPath(undefined);
             setProgress(null);
             cleanupListener();
             currentPathRef.current = null;
@@ -83,9 +85,10 @@ export function HistoryDetailModal({ isOpen, onClose, log }: HistoryDetailModalP
 
     // Subscribe to parse completions so re-opening picks up cached results
     useEffect(() => {
-        const unsubscribe = onParseComplete((xmlPath, result) => {
+        const unsubscribe = onParseComplete((xmlPath, result: ParseResult | null) => {
             if (xmlPath === currentPathRef.current && result) {
-                setTree([result]);
+                setTree([result.rootSuite]);
+                setDbPath(result.dbPath);
                 setLoading(false);
                 setProgress(null);
                 cleanupListener();
@@ -98,9 +101,10 @@ export function HistoryDetailModal({ isOpen, onClose, log }: HistoryDetailModalP
         currentPathRef.current = xmlPath;
 
         // 1. Check global cache for instant display
-        const cached = getCachedTree(xmlPath);
+        const cached = getCachedResult(xmlPath);
         if (cached) {
-            setTree([cached]);
+            setTree([cached.rootSuite]);
+            setDbPath(cached.dbPath);
             setLoading(false);
             return;
         }
@@ -118,10 +122,11 @@ export function HistoryDetailModal({ isOpen, onClose, log }: HistoryDetailModalP
 
         try {
             // parseXmlBackground deduplicates and caches globally
-            const rootNode = await parseXmlBackground(xmlPath);
+            const result = await parseXmlBackground(xmlPath);
             // Only update if still viewing the same path (not closed or changed)
             if (currentPathRef.current === xmlPath) {
-                setTree([rootNode]);
+                setTree([result.rootSuite]);
+                setDbPath(result.dbPath);
             }
         } catch (e) {
             if (currentPathRef.current === xmlPath) {
@@ -253,7 +258,7 @@ export function HistoryDetailModal({ isOpen, onClose, log }: HistoryDetailModalP
                         ) : tree.length > 0 ? (
                             <div className="space-y-2 pb-4">
                                 {tree.map(node => (
-                                    <LogTree key={node.id} node={node} initiallyOpen={true} />
+                                    <LogTree key={node.id} node={node} initiallyOpen={true} dbPath={dbPath} />
                                 ))}
                             </div>
                         ) : (

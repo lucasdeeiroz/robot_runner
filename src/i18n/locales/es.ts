@@ -670,6 +670,22 @@ export const es = {
                 view_fullscreen: "VER EN PANTALLA COMPLETA",
                 failure_screenshot: "Captura de Pantalla del Fallo",
                 keyword_screenshot: "Captura de Pantalla del Paso (Keyword)",
+                loading_children: "Cargando detalles...",
+                node_types: {
+                    suite: "SUITE",
+                    test: "PRUEBA",
+                    keyword: "KW",
+                    setup: "SETUP",
+                    teardown: "TEARDOWN",
+                    "for": "FOR",
+                    iteration: "ITER",
+                    "if": "IF",
+                    "else-if": "ELSE IF",
+                    "else": "ELSE",
+                    "while": "WHILE",
+                    "break": "BREAK",
+                    "continue": "CONTINUE"
+                },
                 keep_awake: "Mantener Pantalla Activa",
                 debug_on: "Ver Logs de Depuración",
                 debug_off: "Ocultar Logs de Depuración"
@@ -915,8 +931,9 @@ export const es = {
             toolbox: "Caja de Herramientas",
             history: "Historial",
             loading: "Cargando historial...",
-            no_logs: "No se encontraron registros de ejecución.",
-            report: "Informe",
+            loading_history: "Cargando historial de ejecuciones...",
+            no_logs: "No se encontraron logs de ejecución.",
+            report: "Reporte",
             open_folder: "Abrir Carpeta",
             session_not_found: "Sesión no encontrada.",
             close_tab: "Cerrar Pestaña",
@@ -929,10 +946,11 @@ export const es = {
                 device: "Dispositivo",
                 suite: "Suite",
                 all_time: "Todo el tiempo",
+                none: "Ninguno",
                 today: "Hoy",
                 last_7_days: "Últimos 7 días",
                 last_30_days: "Últimos 30 días",
-                os_version: "Versión del SO"
+                os_version: "Versión SO"
             },
             actions: {
                 refresh: "Actualizar Lista",
