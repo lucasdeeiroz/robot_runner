@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { AnimatePresence } from 'framer-motion';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { useSettings } from "@/lib/settings";
 import { HistoryCharts } from "@/components/organisms/HistoryCharts";
 import { XCircle, Calendar, ChevronDown, ChevronRight, CheckCircle, Clock, PieChart, Search, RefreshCw } from 'lucide-react';
@@ -47,6 +48,7 @@ export function HistorySubTab() {
     const [selectedLog, setSelectedLog] = useState<TestLog | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
+    const parentRef = useRef<HTMLDivElement>(null);
     const historyContainerRef = useRef<HTMLDivElement>(null);
     const [isHistoryNarrow, setIsHistoryNarrow] = useState(false);
     const isFirstRun = useRef(true);
@@ -151,103 +153,36 @@ export function HistorySubTab() {
         setIsModalOpen(true);
     };
 
-    const renderGroup = (group: string, logs: TestLog[]) => {
-        const isCollapsed = collapsedGroups[group] === true;
-        const isExpanded = !isCollapsed;
+    // Flatten the grouped history for virtualization
+    type VirtualItem = 
+        | { type: 'header'; id: string; groupName: string; count: number }
+        | { type: 'log'; id: string; log: TestLog; groupName: string };
 
-        return (
-            <div key={group} className="space-y-2">
-                {groupBy !== 'none' && (
-                    <Button
-                        onClick={() => toggleGroup(group)}
-                        variant="ghost"
-                        className="flex items-center gap-2 w-full justify-start bg-surface-variant/30 px-3 py-2 rounded-2xl hover:bg-outline-variant transition-colors sticky top-0 backdrop-blur-sm z-10 h-auto"
-                    >
-                        {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                        <span className="font-semibold text-sm text-on-surface-variant/80 flex-1 text-left">
-                            {group === 'PASS' ? <span className="text-on-success-container/10">{group}</span> :
-                                group === 'FAIL' ? <span className="text-error-container/80">{group}</span> : group}
-                        </span>
-                        <span className="text-xs text-on-surface-variant/80 bg-outline-variant px-1.5 py-0.5 rounded-2xl">
-                            {logs.length}
-                        </span>
-                    </Button>
-                )}
+    const flatItems = useMemo(() => {
+        const items: VirtualItem[] = [];
+        Object.entries(groupedHistory).forEach(([groupName, logs]) => {
+            if (logs.length === 0) return;
 
-                {isExpanded && (
-                    <div className="space-y-3 pl-1">
-                        {logs.map((log) => (
-                            <div 
-                                key={log.xml_path} 
-                                onClick={() => handleLogClick(log)}
-                                role="button"
-                                tabIndex={0}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                        e.preventDefault();
-                                        handleLogClick(log);
-                                    }
-                                }}
-                                className="flex flex-row items-center gap-4 p-4 bg-surface/50 border border-outline-variant/30 rounded-2xl hover:border-primary/40 hover:bg-surface-variant/10 cursor-pointer transition-all shadow-sm group"
-                            >
-                                <div className="flex gap-4 items-start min-w-0 flex-1">
-                                    <div className={clsx(
-                                        "w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 mt-1 transition-transform group-hover:scale-110",
-                                        log.status === 'PASS'
-                                            ? "bg-success/10 text-on-success-container"
-                                            : "bg-error/10 text-on-error-container"
-                                    )}>
-                                        {log.status === 'PASS' ? <CheckCircle size={20} /> : <XCircle size={20} />}
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className="font-semibold text-on-surface/80 truncate group-hover:text-primary transition-colors" title={decodeHtml(log.suite_name)}>
-                                                {decodeHtml(log.suite_name)}
-                                            </span>
-                                        </div>
+            if (groupBy !== 'none') {
+                items.push({ type: 'header', id: `header-${groupName}`, groupName, count: logs.length });
+            }
 
-                                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-on-surface-variant/80">
-                                            <div className="flex items-center gap-1">
-                                                <Calendar size={12} /> {formatDate(log.timestamp)}
-                                            </div>
-                                             <div className="flex items-center gap-1 bg-surface-variant/30 px-1.5 py-0.5 rounded text-[10px] font-medium border border-outline-variant/10">
-                                                <Clock size={10} className="shrink-0" /> 
-                                                <span>{log.duration}</span>
-                                                <span className="mx-1 opacity-20 h-2 w-[1px] bg-current" />
-                                                <span className="text-success">{log.pass_count}P</span>
-                                                <span className="opacity-30">/</span>
-                                                <span className={clsx(log.fail_count > 0 ? "text-error" : "opacity-40")}>{log.fail_count}F</span>
-                                            </div>
-                                            {(log.device_model || log.device_udid) && (
-                                                <div className="flex items-center gap-1 text-on-surface/80">
-                                                    {log.android_version && <AndroidVersionPill version={log.android_version} className="bg-surface-variant/50" />}
-                                                    {log.device_model || t('tests_page.unknown_model')}
-                                                    {log.device_udid ? ` (${log.device_udid})` : ''}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
+            if (groupBy === 'none' || !collapsedGroups[groupName]) {
+                logs.forEach(log => {
+                    items.push({ type: 'log', id: log.xml_path, log, groupName });
+                });
+            }
+        });
+        return items;
+    }, [groupedHistory, groupBy, collapsedGroups]);
 
-                                <div className="flex items-center gap-2 shrink-0">
-                                    <span className={clsx("text-xs font-bold px-1.5 py-0.5 rounded border",
-                                        log.status === 'PASS'
-                                            ? "bg-success/10 text-on-success-container border-success/20"
-                                            : "bg-error/10 text-on-error-container border-error/20"
-                                    )}>
-                                        {log.status}
-                                    </span>
-                                    <div className="text-on-surface-variant/30 group-hover:text-primary/50 transition-colors">
-                                        <ChevronRight size={18} />
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-        );
-    };
+    // Setup React Virtualizer
+    const rowVirtualizer = useVirtualizer({
+        count: flatItems.length,
+        getScrollElement: () => parentRef.current,
+        estimateSize: (index) => flatItems[index].type === 'header' ? 44 : 96,
+        overscan: 10,
+    });
 
     return (
         <div ref={historyContainerRef} className="flex-1 min-h-0 bg-surface border border-outline-variant/30 rounded-2xl p-4 overflow-hidden relative flex flex-col">
@@ -294,11 +229,11 @@ export function HistorySubTab() {
                             value={groupBy}
                             onChange={(e) => setGroupBy(e.target.value)}
                             options={[
-                                { value: "none", label: `${t('tests_page.filter.group_by')}: ${t('tests_page.filter.all_time').replace('Todo o período', 'Nenhum')}` },
+                                { value: "none", label: `${t('tests_page.filter.group_by')}: ${t('tests_page.filter.none')}` },
                                 { value: "status", label: t('tests_page.filter.status') },
                                 { value: "device", label: t('tests_page.filter.device') },
                                 { value: "suite", label: t('tests_page.filter.suite') },
-                                { value: "os_version", label: t('tests_page.filter.os_version') || "Versão do SO" }
+                                { value: "os_version", label: t('tests_page.filter.os_version') }
                             ]}
                             className="bg-surface/50"
                             containerClassName="w-auto min-w-[200px]"
@@ -324,7 +259,7 @@ export function HistorySubTab() {
                 }
             />
 
-            <div className="flex-1 overflow-y-auto pr-2 relative">
+            <div ref={parentRef} className="flex-1 overflow-y-auto pr-2 relative">
                 <AnimatePresence>
                     {showCharts && (
                         <HistoryCharts logs={filteredHistory} groupBy={groupBy} />
@@ -342,7 +277,7 @@ export function HistorySubTab() {
                 {loadingHistory && history.length === 0 && (
                     <div className="flex flex-col items-center justify-center h-64 p-4 text-on-surface-variant/60">
                         <ExpressiveLoading size="md" variant="circular" className="mb-4" />
-                        <p className="text-sm font-medium animate-pulse">{t('tests_page.loading_history', "Loading execution history...")}</p>
+                        <p className="text-sm font-medium animate-pulse">{t('tests_page.loading_history')}</p>
                     </div>
                 )}
 
@@ -354,10 +289,114 @@ export function HistorySubTab() {
                     </div>
                 )}
 
-                <div className={clsx("space-y-6 transition-opacity", loadingHistory && history.length === 0 ? "opacity-0" : "opacity-100")}>
-                    {Object.entries(groupedHistory).map(([group, logs]) => (
-                        logs.length > 0 && renderGroup(group, logs)
-                    ))}
+                <div className={clsx("w-full transition-opacity pb-8", loadingHistory && history.length === 0 ? "opacity-0" : "opacity-100")}>
+                    <div
+                        style={{
+                            height: `${rowVirtualizer.getTotalSize()}px`,
+                            width: '100%',
+                            position: 'relative',
+                        }}
+                    >
+                        {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                            const item = flatItems[virtualRow.index];
+                            
+                            return (
+                                <div
+                                    key={item.id}
+                                    data-index={virtualRow.index}
+                                    ref={rowVirtualizer.measureElement}
+                                    className="absolute top-0 left-0 w-full"
+                                    style={{
+                                        transform: `translateY(${virtualRow.start}px)`,
+                                        paddingBottom: item.type === 'log' ? '12px' : '4px',
+                                        zIndex: item.type === 'header' ? 10 : 1,
+                                    }}
+                                >
+                                    {item.type === 'header' ? (
+                                        <Button
+                                            onClick={() => toggleGroup(item.groupName)}
+                                            variant="ghost"
+                                            className="flex items-center gap-2 w-full justify-start bg-surface-variant/30 px-3 py-2 rounded-2xl hover:bg-outline-variant transition-colors backdrop-blur-sm z-10 h-auto"
+                                        >
+                                            {!collapsedGroups[item.groupName] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                            <span className="font-semibold text-sm text-on-surface-variant/80 flex-1 text-left">
+                                                {item.groupName === 'PASS' ? <span className="text-on-success-container/10">{item.groupName}</span> :
+                                                    item.groupName === 'FAIL' ? <span className="text-error-container/80">{item.groupName}</span> : item.groupName}
+                                            </span>
+                                            <span className="text-xs text-on-surface-variant/80 bg-outline-variant px-1.5 py-0.5 rounded-2xl">
+                                                {item.count}
+                                            </span>
+                                        </Button>
+                                    ) : (
+                                        <div 
+                                            onClick={() => handleLogClick(item.log)}
+                                            role="button"
+                                            tabIndex={0}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' || e.key === ' ') {
+                                                    e.preventDefault();
+                                                    handleLogClick(item.log);
+                                                }
+                                            }}
+                                            className="flex flex-row items-center gap-4 p-4 bg-surface/50 border border-outline-variant/30 rounded-2xl hover:border-primary/40 hover:bg-surface-variant/10 cursor-pointer transition-all shadow-sm group mx-1"
+                                        >
+                                            <div className="flex gap-4 items-start min-w-0 flex-1">
+                                                <div className={clsx(
+                                                    "w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 mt-1 transition-transform group-hover:scale-110",
+                                                    item.log.status === 'PASS'
+                                                        ? "bg-success/10 text-on-success-container"
+                                                        : "bg-error/10 text-on-error-container"
+                                                )}>
+                                                    {item.log.status === 'PASS' ? <CheckCircle size={20} /> : <XCircle size={20} />}
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <span className="font-semibold text-on-surface/80 truncate group-hover:text-primary transition-colors" title={decodeHtml(item.log.suite_name)}>
+                                                            {decodeHtml(item.log.suite_name)}
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-on-surface-variant/80">
+                                                        <div className="flex items-center gap-1">
+                                                            <Calendar size={12} /> {formatDate(item.log.timestamp)}
+                                                        </div>
+                                                         <div className="flex items-center gap-1 bg-surface-variant/30 px-1.5 py-0.5 rounded text-[10px] font-medium border border-outline-variant/10">
+                                                            <Clock size={10} className="shrink-0" /> 
+                                                            <span>{item.log.duration}</span>
+                                                            <span className="mx-1 opacity-20 h-2 w-[1px] bg-current" />
+                                                            <span className="text-success">{item.log.pass_count}P</span>
+                                                            <span className="opacity-30">/</span>
+                                                            <span className={clsx(item.log.fail_count > 0 ? "text-error" : "opacity-40")}>{item.log.fail_count}F</span>
+                                                        </div>
+                                                        {(item.log.device_model || item.log.device_udid) && (
+                                                            <div className="flex items-center gap-1 text-on-surface/80">
+                                                                {item.log.android_version && <AndroidVersionPill version={item.log.android_version} className="bg-surface-variant/50" />}
+                                                                {item.log.device_model || t('tests_page.unknown_model')}
+                                                                {item.log.device_udid ? ` (${item.log.device_udid})` : ''}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                <span className={clsx("text-xs font-bold px-1.5 py-0.5 rounded border",
+                                                    item.log.status === 'PASS'
+                                                        ? "bg-success/10 text-on-success-container border-success/20"
+                                                        : "bg-error/10 text-on-error-container border-error/20"
+                                                )}>
+                                                    {item.log.status}
+                                                </span>
+                                                <div className="text-on-surface-variant/30 group-hover:text-primary/50 transition-colors">
+                                                    <ChevronRight size={18} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             </div>
 

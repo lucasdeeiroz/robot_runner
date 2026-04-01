@@ -6,6 +6,7 @@ mod ngrok;
 mod runner;
 mod system;
 mod xml_parser;
+mod db;
 
 use tauri::Manager;
 
@@ -97,6 +98,7 @@ pub fn run() {
             adb::packages::install_package,
             runner::get_robot_test_cases,
             xml_parser::parse_robot_xml,
+            xml_parser::get_node_children,
             system::toggle_wakelock
         ])
         .build(tauri::generate_context!())

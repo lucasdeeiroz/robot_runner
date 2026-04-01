@@ -17,9 +17,10 @@ interface LogTreeProps {
     node: LogNode;
     depth?: number;
     initiallyOpen?: boolean;
+    dbPath?: string;
 }
 
-export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen }) => {
+export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen, dbPath }) => {
     const { t } = useTranslation();
     const [isOpen, setIsOpen] = useState(initiallyOpen ?? (
         node.type !== 'text' && node.type !== 'suite-start' && (node as any).status !== 'PASS' && (node as any).status !== 'NOT_RUN'
@@ -28,12 +29,40 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
     const [screenshotData, setScreenshotData] = useState<string | null>(null);
     const [failureScreenshotData, setFailureScreenshotData] = useState<string | null>(null);
 
+    // Lazy load state
+    const [lazyChildren, setLazyChildren] = useState<LogNode[] | null>(null);
+    const [isLoadingChildren, setIsLoadingChildren] = useState(false);
+
     // Auto-expand when status changes from PASS/NOT_RUN/undefined to RUNNING/FAIL
     React.useEffect(() => {
         if (initiallyOpen === undefined && node.type !== 'text' && (node as any).status && (node as any).status !== 'PASS' && (node as any).status !== 'NOT_RUN') {
             setIsOpen(true);
         }
     }, [(node as any).status, initiallyOpen, node.type]);
+
+    // Fetch attempt reference to avoid dependency trigger loop cancellation
+    const fetchAttempted = React.useRef(false);
+
+    // Lazy loading core logic
+    React.useEffect(() => {
+        if (isOpen && dbPath && (node as any).hasChildren && (!(node as any).children || (node as any).children.length === 0) && !lazyChildren && !fetchAttempted.current) {
+            let isMounted = true;
+            fetchAttempted.current = true;
+            setIsLoadingChildren(true);
+            
+            invoke<LogNode[]>('get_node_children', { dbPath, parentId: node.id })
+                .then(children => {
+                    if (isMounted) {
+                        setLazyChildren(children);
+                    }
+                })
+                .catch(err => console.error("Failed to lazy load children for node", node.id, err))
+                .finally(() => {
+                    if (isMounted) setIsLoadingChildren(false);
+                });
+            return () => { isMounted = false; };
+        }
+    }, [isOpen, dbPath, node, lazyChildren]);
 
     // Lazy-load screenshots when expanded
     React.useEffect(() => {
@@ -88,19 +117,19 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
         : (isRunning ? "bg-surface-variant/10" : isNotRun ? "bg-surface-variant/5" : (isFailed ? "bg-error/5" : "bg-success/5"));
 
     const nodeConfig: Record<string, { label: string; color: string }> = {
-        suite: { label: 'SUITE', color: 'text-primary/70' },
-        test: { label: 'TEST', color: 'text-secondary/70' },
-        keyword: { label: 'KW', color: 'text-on-surface/40' },
-        setup: { label: 'SETUP', color: 'text-blue-400/80' },
-        teardown: { label: 'TEARDOWN', color: 'text-purple-400/80' },
-        for: { label: 'FOR', color: 'text-amber-400/80' },
-        iteration: { label: 'ITER', color: 'text-amber-300/70' },
-        if: { label: 'IF', color: 'text-cyan-400/80' },
-        'else-if': { label: 'ELSE IF', color: 'text-cyan-300/70' },
-        else: { label: 'ELSE', color: 'text-cyan-300/70' },
-        while: { label: 'WHILE', color: 'text-orange-400/80' },
-        break: { label: 'BREAK', color: 'text-rose-300/70' },
-        continue: { label: 'CONTINUE', color: 'text-rose-300/70' },
+        suite: { label: t('run_tab.console.node_types.suite', 'SUITE'), color: 'text-primary/70' },
+        test: { label: t('run_tab.console.node_types.test', 'TEST'), color: 'text-secondary/70' },
+        keyword: { label: t('run_tab.console.node_types.keyword', 'KW'), color: 'text-on-surface/40' },
+        setup: { label: t('run_tab.console.node_types.setup', 'SETUP'), color: 'text-blue-400/80' },
+        teardown: { label: t('run_tab.console.node_types.teardown', 'TEARDOWN'), color: 'text-purple-400/80' },
+        for: { label: t('run_tab.console.node_types.for', 'FOR'), color: 'text-amber-400/80' },
+        iteration: { label: t('run_tab.console.node_types.iteration', 'ITER'), color: 'text-amber-300/70' },
+        if: { label: t('run_tab.console.node_types.if', 'IF'), color: 'text-cyan-400/80' },
+        'else-if': { label: t('run_tab.console.node_types.else-if', 'ELSE IF'), color: 'text-cyan-300/70' },
+        else: { label: t('run_tab.console.node_types.else', 'ELSE'), color: 'text-cyan-300/70' },
+        while: { label: t('run_tab.console.node_types.while', 'WHILE'), color: 'text-orange-400/80' },
+        break: { label: t('run_tab.console.node_types.break', 'BREAK'), color: 'text-rose-300/70' },
+        continue: { label: t('run_tab.console.node_types.continue', 'CONTINUE'), color: 'text-rose-300/70' },
     };
 
     const nodeKey = node.type === 'suite' ? 'suite' : node.type === 'test' ? 'test' : (subType as string || 'keyword');
@@ -287,9 +316,18 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
                         <LinkRenderer key={`log-${i}-${node.id}`} content={log} />
                     ))}
 
-                    {node.children && node.children.map((child: LogNode) => (
-                        <LogTree key={child.id} node={child} depth={depth + 1} />
+                    {((node as any).children && !lazyChildren) && (node as any).children.map((child: LogNode) => (
+                        <LogTree key={child.id} node={child} depth={depth + 1} dbPath={dbPath} />
                     ))}
+                    {lazyChildren && lazyChildren.map((child: LogNode) => (
+                        <LogTree key={child.id} node={child} depth={depth + 1} dbPath={dbPath} />
+                    ))}
+                    {isLoadingChildren && (
+                        <div className="flex items-center gap-2 p-3 text-xs opacity-60 ml-4 font-mono text-on-surface-variant">
+                            <ExpressiveLoading size="xsm" variant="circular" />
+                            {t('run_tab.console.loading_children')}
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -319,7 +357,7 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
                                     onClick={() => setPreviewImage(null)}
                                 >
                                     <XCircle size={18} className="text-white/70 group-hover:text-white transition-colors" />
-                                    {t('common.close') || 'Close'}
+                                    {t('common.close')}
                                 </button>
                             </div>
                         </motion.div>

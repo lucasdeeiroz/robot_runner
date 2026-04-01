@@ -131,10 +131,10 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
         const parseOutputXml = async () => {
             setReparseLoading(true);
             try {
-                const rootNode = await parseXmlBackground(artifactPaths.output!);
-                if (!cancelled && rootNode) {
-                    setTree([rootNode]);
-                    setSessionTree(runId, rootNode);
+                const result = await parseXmlBackground(artifactPaths.output!);
+                if (!cancelled && result) {
+                    setTree([result.rootSuite]);
+                    setSessionTree(runId, result.rootSuite, result.dbPath);
                 }
             } catch (e: any) {
                 console.error("Failed to parse output.xml via backend:", e);
@@ -620,9 +620,9 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                             {logs.map((line, i) => <div key={i} className="min-h-[1.2em]">{line}</div>)}
                         </div>
                     ) : (
-                        <div className="relative z-10 w-full mb-8">
-                            {tree.map(node => <LogTree key={node.id} node={node} />)}
-                            {isRunning && (
+        <div className="relative z-10 w-full mb-8">
+            {tree.map(node => <LogTree key={node.id} node={node} dbPath={session?.parsedDbPath} />)}
+            {isRunning && (
                                 <div className="text-primary dark:text-primary/80 mt-4 flex items-center gap-2 text-sm italic opacity-70 animate-pulse ml-2">
                                     <ExpressiveLoading size="sm" variant="circular" />
                                     {t('run_tab.console.processing', "Processing...")}
