@@ -18,7 +18,7 @@ interface LogTreeProps {
     depth?: number;
     initiallyOpen?: boolean;
     dbPath?: string;
-    parentType?: string;
+    parentType?: LogNode['type'];
 }
 
 export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen, dbPath, parentType }) => {
@@ -33,6 +33,10 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
     // Lazy load state
     const [lazyChildren, setLazyChildren] = useState<LogNode[] | null>(null);
     const [isLoadingChildren, setIsLoadingChildren] = useState(false);
+
+    const isRunning = (node as any).status === 'RUNNING';
+    const isFailed = (node as any).status === 'FAIL';
+    const isNotRun = (node as any).status === 'NOT_RUN';
 
     // Auto-expand when status changes from PASS/NOT_RUN/undefined to RUNNING/FAIL
     React.useEffect(() => {
@@ -92,11 +96,11 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
             if (node.type === 'keyword' && (node as KeywordNode).screenshotPath && !screenshotData) {
                 fetchScreenshot((node as KeywordNode).screenshotPath!, setScreenshotData);
             }
-            if (node.type === 'test' && (node as TestNode).failureDetail?.screenshotPath && !failureScreenshotData) {
+            if (node.type === 'test' && isFailed && (node as TestNode).failureDetail?.screenshotPath && !failureScreenshotData) {
                 fetchScreenshot((node as TestNode).failureDetail!.screenshotPath!, setFailureScreenshotData);
             }
         }
-    }, [isOpen, node, screenshotData, failureScreenshotData]);
+    }, [isOpen, node, isFailed, screenshotData, failureScreenshotData]);
 
     if (node.type === 'text') {
         if (node.content.match(/^[-=]+$/)) return null;
@@ -104,10 +108,6 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
     }
 
     if (node.type === 'suite-start' || node.type === 'suite-end') return null;
-
-    const isRunning = (node as any).status === 'RUNNING';
-    const isFailed = (node as any).status === 'FAIL';
-    const isNotRun = (node as any).status === 'NOT_RUN';
 
     const subType = node.type === 'keyword' ? (node as KeywordNode).subType : undefined;
 
