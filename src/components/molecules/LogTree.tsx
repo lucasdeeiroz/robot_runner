@@ -18,9 +18,10 @@ interface LogTreeProps {
     depth?: number;
     initiallyOpen?: boolean;
     dbPath?: string;
+    parentType?: LogNode['type'];
 }
 
-export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen, dbPath }) => {
+export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen, dbPath, parentType }) => {
     const { t } = useTranslation();
     const [isOpen, setIsOpen] = useState(initiallyOpen ?? (
         node.type !== 'text' && node.type !== 'suite-start' && (node as any).status !== 'PASS' && (node as any).status !== 'NOT_RUN'
@@ -32,6 +33,10 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
     // Lazy load state
     const [lazyChildren, setLazyChildren] = useState<LogNode[] | null>(null);
     const [isLoadingChildren, setIsLoadingChildren] = useState(false);
+
+    const isRunning = (node as any).status === 'RUNNING';
+    const isFailed = (node as any).status === 'FAIL';
+    const isNotRun = (node as any).status === 'NOT_RUN';
 
     // Auto-expand when status changes from PASS/NOT_RUN/undefined to RUNNING/FAIL
     React.useEffect(() => {
@@ -91,11 +96,11 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
             if (node.type === 'keyword' && (node as KeywordNode).screenshotPath && !screenshotData) {
                 fetchScreenshot((node as KeywordNode).screenshotPath!, setScreenshotData);
             }
-            if (node.type === 'test' && (node as TestNode).failureDetail?.screenshotPath && !failureScreenshotData) {
+            if (node.type === 'test' && isFailed && (node as TestNode).failureDetail?.screenshotPath && !failureScreenshotData) {
                 fetchScreenshot((node as TestNode).failureDetail!.screenshotPath!, setFailureScreenshotData);
             }
         }
-    }, [isOpen, node, screenshotData, failureScreenshotData]);
+    }, [isOpen, node, isFailed, screenshotData, failureScreenshotData]);
 
     if (node.type === 'text') {
         if (node.content.match(/^[-=]+$/)) return null;
@@ -104,17 +109,14 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
 
     if (node.type === 'suite-start' || node.type === 'suite-end') return null;
 
-    const isRunning = (node as any).status === 'RUNNING';
-    const isFailed = (node as any).status === 'FAIL';
-    const isNotRun = (node as any).status === 'NOT_RUN';
-
     const subType = node.type === 'keyword' ? (node as KeywordNode).subType : undefined;
 
     const borderColor = isRunning ? "border-on-surface-variant/20" : isNotRun ? "border-on-surface-variant/10" : (isFailed ? "border-error/20" : "border-success/20");
     const summaryColor = isRunning ? "text-on-surface-variant/80" : isNotRun ? "text-on-surface-variant/40" : (isFailed ? "text-error" : "text-success");
-    const bgColor = (node.type === 'suite' || node.type === 'test')
-        ? "bg-transparent"
-        : (isRunning ? "bg-surface-variant/10" : isNotRun ? "bg-surface-variant/5" : (isFailed ? "bg-error/5" : "bg-success/5"));
+    const isDirectTestChild = parentType === 'test' && node.type === 'keyword';
+    const bgColor = isDirectTestChild
+        ? (isRunning ? "bg-surface-variant/10" : isNotRun ? "bg-surface-variant/5" : (isFailed ? "bg-error/5" : "bg-success/5"))
+        : "bg-transparent";
 
     const nodeConfig: Record<string, { label: string; color: string }> = {
         suite: { label: t('run_tab.console.node_types.suite', 'SUITE'), color: 'text-primary/70' },
@@ -229,7 +231,7 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
 
             {isOpen && (
                 <div className="flex flex-col gap-1 p-2 pl-4 border-t border-on-surface/5">
-                    {node.type === 'test' && (node as TestNode).failureDetail && (
+                    {node.type === 'test' && isFailed && (node as TestNode).failureDetail && (
                         <div className="mb-2 p-3 bg-error/10 border border-error/20 rounded-xl text-error text-xs animate-in fade-in slide-in-from-top-1 flex justify-between gap-4 items-center">
                             <div className="flex flex-col gap-1 min-w-0">
                                 <div className="font-bold uppercase tracking-wider opacity-70 flex items-center gap-1.5">
@@ -317,10 +319,10 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
                     ))}
 
                     {((node as any).children && !lazyChildren) && (node as any).children.map((child: LogNode) => (
-                        <LogTree key={child.id} node={child} depth={depth + 1} dbPath={dbPath} />
+                        <LogTree key={child.id} node={child} depth={depth + 1} dbPath={dbPath} parentType={node.type} />
                     ))}
                     {lazyChildren && lazyChildren.map((child: LogNode) => (
-                        <LogTree key={child.id} node={child} depth={depth + 1} dbPath={dbPath} />
+                        <LogTree key={child.id} node={child} depth={depth + 1} dbPath={dbPath} parentType={node.type} />
                     ))}
                     {isLoadingChildren && (
                         <div className="flex items-center gap-2 p-3 text-xs opacity-60 ml-4 font-mono text-on-surface-variant">
