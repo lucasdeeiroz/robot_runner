@@ -192,6 +192,10 @@ fn parse_robot_xml_blocking(app: &tauri::AppHandle, xml_path: &str) -> Result<Pa
         }
         
         println!("[XML Parser] DB cache read failed, re-parsing");
+    }
+
+    // Always ensure we start with a clean Slate if we are re-parsing
+    if cache_path.exists() {
         let _ = fs::remove_file(&cache_path);
     }
 
