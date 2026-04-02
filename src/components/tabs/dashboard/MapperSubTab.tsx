@@ -574,7 +574,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                             loadSavedMaps();
                             setIsFlowchartOpen(true);
                         }}
-                        className="flex items-center gap-2 px-3 py-1.5 mt-4 bg-primary text-on-primary rounded-2xl hover:bg-primary/90 transition-colors shadow-sm text-sm font-medium"
+                        className="flex items-center gap-2 px-3 py-1.5 bg-transparent border border-primary text-primary hover:bg-primary/90 hover:text-surface rounded-2xl transition-colors shadow-sm text-sm font-medium"
                         title={t('mapper.flowchart.open', 'Open Flowchart')}
                     >
                         <GitGraph size={16} />
@@ -585,6 +585,19 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 <div className="h-full flex-1 flex flex-col items-center justify-center text-on-surface-variant/80 text-sm">
                     <Scan size={32} className="opacity-20 mb-2" />
                     <p>{t('mapper.status.paused_test', 'Mapper disabled during test')}</p>
+                    <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => {
+                            loadSavedMaps();
+                            setIsFlowchartOpen(true);
+                        }}
+                        className="flex items-center gap-2 mt-4 px-3 py-1.5 bg-transparent border border-primary text-primary hover:bg-primary/90 hover:text-surface rounded-2xl transition-colors shadow-sm text-sm font-medium"
+                        title={t('mapper.flowchart.open', 'Open Flowchart')}
+                    >
+                        <GitGraph size={16} />
+                        <span className={clsx(isNarrow && "hidden")}>{t('mapper.flowchart.open', 'Open Flowchart')}</span>
+                    </Button>
                 </div>
             ) : (
                 <>
@@ -635,7 +648,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                         loadSavedMaps();
                                         setIsFlowchartOpen(true);
                                     }}
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-primary text-on-primary rounded-2xl hover:bg-primary/90 transition-colors shadow-sm text-sm font-medium"
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-transparent border border-primary text-primary hover:bg-primary/90 hover:text-surface rounded-2xl transition-colors shadow-sm text-sm font-medium"
                                     title={t('mapper.flowchart.open', 'Open Flowchart')}
                                 >
                                     <GitGraph size={16} />

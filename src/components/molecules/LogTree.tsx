@@ -7,7 +7,8 @@ import { invoke } from "@tauri-apps/api/core";
 import {
     ChevronRight, ChevronDown, CheckCircle2, XCircle, MinusCircle,
     Layers, BugPlay, CirclePlay, Repeat, IterationCcw, Workflow,
-    Infinity, Split, StepForward, CalendarCog, Maximize2
+    Infinity, Split, StepForward, CalendarCog, Maximize2,
+    ShieldAlert, Anchor
 } from "lucide-react";
 import { LogNode, TestNode, KeywordNode, SuiteNode } from "@/lib/robotParser";
 import { LinkRenderer } from "../molecules/LinkRenderer";
@@ -129,6 +130,9 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
         if: { label: t('run_tab.console.node_types.if', 'IF'), color: 'text-cyan-400/80' },
         'else-if': { label: t('run_tab.console.node_types.else-if', 'ELSE IF'), color: 'text-cyan-300/70' },
         else: { label: t('run_tab.console.node_types.else', 'ELSE'), color: 'text-cyan-300/70' },
+        try: { label: t('run_tab.console.node_types.try', 'TRY'), color: 'text-indigo-400/80' },
+        except: { label: t('run_tab.console.node_types.except', 'EXCEPT'), color: 'text-rose-400/80' },
+        finally: { label: t('run_tab.console.node_types.finally', 'FINALLY'), color: 'text-purple-400/80' },
         while: { label: t('run_tab.console.node_types.while', 'WHILE'), color: 'text-orange-400/80' },
         break: { label: t('run_tab.console.node_types.break', 'BREAK'), color: 'text-rose-300/70' },
         continue: { label: t('run_tab.console.node_types.continue', 'CONTINUE'), color: 'text-rose-300/70' },
@@ -163,6 +167,9 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
                     {node.type === 'keyword' && subType === 'if' && <Workflow size={14} className="opacity-70 shrink-0" />}
                     {node.type === 'keyword' && subType === 'else-if' && <Workflow size={14} className="opacity-70 shrink-0" />}
                     {node.type === 'keyword' && subType === 'else' && <Workflow size={14} className="opacity-70 shrink-0" />}
+                    {node.type === 'keyword' && subType === 'try' && <Workflow size={14} className="opacity-70 shrink-0" />}
+                    {node.type === 'keyword' && subType === 'except' && <ShieldAlert size={14} className="opacity-70 shrink-0" />}
+                    {node.type === 'keyword' && subType === 'finally' && <Anchor size={14} className="opacity-70 shrink-0" />}
                     {node.type === 'keyword' && subType === 'while' && <Infinity size={14} className="opacity-70 shrink-0" />}
                     {node.type === 'keyword' && subType === 'break' && <Split size={14} className="opacity-70 shrink-0" />}
                     {node.type === 'keyword' && subType === 'continue' && <StepForward size={14} className="opacity-70 shrink-0" />}

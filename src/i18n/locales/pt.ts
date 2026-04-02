@@ -944,7 +944,10 @@ export const pt = {
                 today: "Hoje",
                 last_7_days: "Últimos 7 Dias",
                 last_30_days: "Últimos 30 Dias",
-                os_version: "Versão do SO"
+                os_version: "Versão do SO",
+                all_devices: "Todos os Dispositivos",
+                all_os: "Todos os SOs",
+                all_status: "Todos os Status"
             },
             actions: {
                 refresh: "Atualizar Lista",
@@ -959,7 +962,11 @@ export const pt = {
                 group_performance: "Desempenho por {{group}}",
                 select_group: "Selecione uma opção de 'Agrupar por' para ver detalhes",
                 show: "Mostrar Gráficos",
-                hide: "Ocultar Gráficos"
+                hide: "Ocultar Gráficos",
+                count_by: "Contabilizar por",
+                count_by_suites: "Suítes (Rodadas)",
+                count_by_tests: "Testes (Volume)",
+                duration_avg: "Duração Média"
             }
         },
         toolbox: {
