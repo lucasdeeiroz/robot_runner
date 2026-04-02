@@ -267,7 +267,7 @@ fn parse_robot_xml_sax_internal(app: &tauri::AppHandle, xml_path: &str, db_path:
                 text_buffer.clear();
 
                 match tag_name.as_str() {
-                    "suite" | "test" | "kw" | "setup" | "teardown" | "for" | "while" | "if" | "iter" | "branch" | "break" | "continue" => {
+                    "suite" | "test" | "kw" | "setup" | "teardown" | "for" | "while" | "if" | "try" | "iter" | "branch" | "break" | "continue" => {
                         if let Some(parent) = stack.last_mut() {
                             match parent {
                                 LogNode::Suite(s) => s.has_children = true,
@@ -315,7 +315,7 @@ fn parse_robot_xml_sax_internal(app: &tauri::AppHandle, xml_path: &str, db_path:
                         };
                         stack.push(LogNode::Test(test));
                     },
-                    "kw" | "setup" | "teardown" | "for" | "while" | "if" | "iter" | "branch" | "break" | "continue" => {
+                    "kw" | "setup" | "teardown" | "for" | "while" | "iter" | "branch" | "break" | "continue" => {
                         let mut name = String::new();
                         let mut id = String::new();
                         let mut kw_type = "keyword".to_string();
@@ -337,12 +337,15 @@ fn parse_robot_xml_sax_internal(app: &tauri::AppHandle, xml_path: &str, db_path:
                             match kw_type.as_str() {
                                 t if t.eq_ignore_ascii_case("ELSE IF") => "else-if",
                                 t if t.eq_ignore_ascii_case("ELSE") => "else",
+                                t if t.eq_ignore_ascii_case("EXCEPT") => "except",
+                                t if t.eq_ignore_ascii_case("FINALLY") => "finally",
+                                t if t.eq_ignore_ascii_case("TRY") => "try",
                                 _ => "if",
                             }.to_string()
                         } else {
                             match tag_name.as_str() {
                                 "setup" => "setup", "teardown" => "teardown", "for" => "for",
-                                "while" => "while", "if" => "if", "iter" => "iteration",
+                                "while" => "while", "iter" => "iteration",
                                 "break" => "break", "continue" => "continue", _ => "keyword"
                             }.to_string()
                         };
@@ -385,7 +388,7 @@ fn parse_robot_xml_sax_internal(app: &tauri::AppHandle, xml_path: &str, db_path:
                 if is_empty {
                     match tag_name.as_str() {
                         "status" | "arg" | "var" | "value" | "msg" => {}, 
-                        "suite" | "test" | "kw" | "setup" | "teardown" | "for" | "while" | "if" | "iter" | "branch" | "break" | "continue" => {
+                        "suite" | "test" | "kw" | "setup" | "teardown" | "for" | "while" | "iter" | "branch" | "break" | "continue" => {
                             if tag_name != "suite" && tag_name != "test" {
                                 kw_states.pop();
                             }
@@ -424,7 +427,7 @@ fn parse_robot_xml_sax_internal(app: &tauri::AppHandle, xml_path: &str, db_path:
                 let tag_name = String::from_utf8_lossy(e.name().as_ref()).to_string();
                 
                 match tag_name.as_str() {
-                    "suite" | "test" | "kw" | "setup" | "teardown" | "for" | "while" | "if" | "iter" | "branch" | "break" | "continue" => {
+                    "suite" | "test" | "kw" | "setup" | "teardown" | "for" | "while" | "iter" | "branch" | "break" | "continue" => {
                         let mut state = None;
                         if tag_name != "suite" && tag_name != "test" {
                             state = kw_states.pop();

@@ -54,7 +54,7 @@ export interface SuiteNode {
     };
 }
 
-export type KeywordSubType = 'keyword' | 'setup' | 'teardown' | 'for' | 'iteration' | 'if' | 'else-if' | 'else' | 'break' | 'continue' | 'while';
+export type KeywordSubType = 'keyword' | 'setup' | 'teardown' | 'for' | 'iteration' | 'if' | 'else-if' | 'else' | 'break' | 'continue' | 'while' | 'try' | 'except' | 'finally';
 
 export interface KeywordNode {
     type: 'keyword';
