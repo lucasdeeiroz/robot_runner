@@ -11,7 +11,9 @@ import { Select } from '@/components/atoms/Select';
 import { Switch } from '@headlessui/react';
 import { useSettings } from '@/lib/settings';
 import { feedback } from '@/lib/feedback';
-import { generateRefinedTestCases, AIGenerationType } from '@/lib/dashboard/gemini';
+import { generateRefinedTestCases as generateWithGemini, AIGenerationType } from '@/lib/dashboard/gemini';
+import { generateRefinedTestCases as generateWithClaude } from '@/lib/dashboard/claude';
+import { generateRefinedTestCases as generateWithOpenAI } from '@/lib/dashboard/openai';
 import { listScreenMaps } from '@/lib/dashboard/mapperPersistence';
 import { exportToXlsx, exportToDocx } from '@/lib/dashboard/export';
 import { addToHistory } from './HistoryPanel';
@@ -27,7 +29,10 @@ export function AIGeneratorSubTab() {
     const [useMapping, setUseMapping] = useState(true);
     const [isGenerating, setIsGenerating] = useState(false);
 
-    const hasApiKey = !!settings.geminiApiKey;
+    const provider = settings.aiProvider || 'gemini';
+    const apiKey = provider === 'gemini' ? settings.geminiApiKey : provider === 'claude' ? settings.claudeApiKey : settings.openaiApiKey;
+    const model = provider === 'gemini' ? settings.geminiModel : provider === 'claude' ? settings.claudeModel : settings.openaiModel;
+    const hasApiKey = !!apiKey;
 
     const handleGenerate = async () => {
         if (!requirements.trim() || !hasApiKey) return;
@@ -39,20 +44,23 @@ export function AIGeneratorSubTab() {
                 maps = await listScreenMaps(activeProfileId);
             }
 
-            const aiResponse = await generateRefinedTestCases(
-                requirements,
-                settings.geminiApiKey as string,
-                settings.geminiModel,
-                i18n.language,
-                maps,
-                genType
-            );
+            let aiResponse = "";
+            const lang = i18n.language.split('_')[0]; // Use base language (en, pt, es)
+
+            if (provider === 'gemini') {
+                aiResponse = await generateWithGemini(requirements, apiKey as string, model, lang, maps, genType);
+            } else if (provider === 'claude') {
+                aiResponse = await generateWithClaude(requirements, apiKey as string, model, lang, maps, genType);
+            } else if (provider === 'openai') {
+                aiResponse = await generateWithOpenAI(requirements, apiKey as string, model, lang, maps, genType);
+            }
 
             setGeneratedContent(aiResponse);
-            feedback.toast.success(t('dashboard.generator.success', { method: "Gemini AI" }));
+            feedback.toast.success(t('dashboard.generator.success', { method: `${provider.charAt(0).toUpperCase() + provider.slice(1)} AI` }));
         } catch (e: any) {
             console.error("AI generation failed:", e);
-            feedback.toast.error("dashboard.actions.gemini_failed", { error: e.message });
+            const errorMessage = e?.message || (typeof e === 'string' ? e : JSON.stringify(e)) || "Unknown Error";
+            feedback.toast.error("dashboard.actions.ai_failed", { error: errorMessage });
         } finally {
             setIsGenerating(false);
         }
@@ -169,7 +177,7 @@ export function AIGeneratorSubTab() {
                         {!hasApiKey ? (
                             <div className="flex items-center gap-2 p-3 bg-error/10 border border-error/20 rounded-xl text-error text-xs">
                                 <AlertCircle size={14} />
-                                <span>{t('dashboard.generator.key_required', "Gemini API Key required in Settings.")}</span>
+                                <span>{t('dashboard.generator.key_required', { provider: provider.charAt(0).toUpperCase() + provider.slice(1) })}</span>
                             </div>
                         ) : (
                             <Button

@@ -266,7 +266,7 @@ export const en = {
                 type_label: "Generation Type",
                 generate_button: "Generate with AI",
                 generating: "Generating...",
-                key_required: "Gemini API Key required. Please configure it in Settings.",
+                key_required: "{{provider}} API Key required. Please configure it in Settings.",
                 types: {
                     test_case: "Test Cases (BDD)",
                     pbi: "Product Backlog Item (PBI)",
@@ -279,7 +279,7 @@ export const en = {
             actions: {
                 generate: "Generate Scenarios",
                 generated_success: "TEST CASES GENERATED SUCCESSFULLY (via {{method}})",
-                gemini_failed: "Gemini generation failed: {{error}}",
+                ai_failed: "AI generation failed: {{error}}",
                 using_local_generator: "Using local generator. {{message}}",
                 export_xlsx: "Excel (.xlsx)",
                 export_docx: "Word (.docx)"
@@ -763,16 +763,30 @@ export const en = {
                 ngrok_token: "Ngrok Auth Token"
             },
             ai: {
-                title: "AI Integration (Google Gemini)",
+                title: "AI Integration",
+                provider: "AI Provider",
                 key: "API Key",
                 model: "Model ID",
                 check_models: "Check available models",
                 loading_models: "Loading models...",
                 models_fetched: "Models fetched",
                 models_found_desc: "{{count}} models found. Check the dropdown.",
-                no_models_found: "No Gemini models found for this key.",
-                placeholder: "Enter your Gemini API Key",
-                help: "Get your free API Key at"
+                no_models_found: "No models found for this key.",
+                gemini: {
+                    title: "Google Gemini",
+                    placeholder: "Enter Gemini API Key",
+                    help: "Get your free API Key at Google AI Studio"
+                },
+                claude: {
+                    title: "Anthropic Claude",
+                    placeholder: "Enter Claude API Key",
+                    help: "Get your API Key at Anthropic Console"
+                },
+                openai: {
+                    title: "OpenAI ChatGPT",
+                    placeholder: "Enter OpenAI API Key",
+                    help: "Get your API Key at OpenAI Platform"
+                }
             },
             system: {
                 title: "System Versions",

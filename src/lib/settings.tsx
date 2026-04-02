@@ -63,16 +63,26 @@ export interface AppSettings {
     };
 
     // AI
+    aiProvider: 'gemini' | 'claude' | 'openai';
     geminiApiKey?: string;
     geminiModel: string;
+    claudeApiKey?: string;
+    claudeModel: string;
+    openaiApiKey?: string;
+    openaiModel: string;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
     theme: 'dark',
     language: 'en_US',
     primaryColor: 'blue',
+    aiProvider: 'gemini',
     geminiApiKey: '',
     geminiModel: 'gemini-1.5-flash',
+    claudeApiKey: '',
+    claudeModel: 'claude-3-5-sonnet-20240620',
+    openaiApiKey: '',
+    openaiModel: 'gpt-4o',
     recycleDeviceViews: false, // Default to false
     allowActionsDuringTest: false, // Default to false (blocking)
     appiumHost: '127.0.0.1',

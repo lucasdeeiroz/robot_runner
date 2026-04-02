@@ -266,7 +266,7 @@ export const pt = {
                 type_label: "Tipo de Geração",
                 generate_button: "Gerar com IA",
                 generating: "Gerando...",
-                key_required: "Chave API do Gemini necessária. Configure em Definições.",
+                key_required: "Chave API do {{provider}} necessária. Configure em Definições.",
                 types: {
                     test_case: "Casos de Teste (BDD)",
                     pbi: "Item de Backlog (PBI)",
@@ -279,7 +279,7 @@ export const pt = {
             actions: {
                 generate: "Gerar Cenários",
                 generated_success: "CASOS DE TESTE GERADOS COM SUCESSO (via {{method}})",
-                gemini_failed: "Falha na geração via Gemini: {{error}}",
+                ai_failed: "Falha na geração com IA: {{error}}",
                 using_local_generator: "Usando gerador local. {{message}}",
                 export_xlsx: "Excel (.xlsx)",
                 export_docx: "Word (.docx)"
@@ -763,16 +763,30 @@ export const pt = {
                 ngrok_token: "Token Autenticação Ngrok"
             },
             ai: {
-                title: "Integração IA (Google Gemini)",
+                title: "Integração IA",
+                provider: "Provedor de IA",
                 key: "Chave API",
                 model: "ID do Modelo",
                 check_models: "Verificar modelos disponíveis",
                 loading_models: "Carregando modelos...",
                 models_fetched: "Modelos obtidos",
                 models_found_desc: "{{count}} modelos encontrados. Verifique a lista.",
-                no_models_found: "Nenhum modelo Gemini encontrado para esta chave.",
-                placeholder: "Digite sua Chave API Gemini",
-                help: "Obtenha sua Chave API gratuita em"
+                no_models_found: "Nenhum modelo encontrado para esta chave.",
+                gemini: {
+                    title: "Google Gemini",
+                    placeholder: "Digite a Chave API Gemini",
+                    help: "Obtenha sua chave gratuita no Google AI Studio"
+                },
+                claude: {
+                    title: "Anthropic Claude",
+                    placeholder: "Digite a Chave API Claude",
+                    help: "Obtenha sua chave no Anthropic Console"
+                },
+                openai: {
+                    title: "OpenAI ChatGPT",
+                    placeholder: "Digite a Chave API OpenAI",
+                    help: "Obtenha sua chave na OpenAI Platform"
+                }
             },
             system: {
                 title: "Versões do Sistema",
