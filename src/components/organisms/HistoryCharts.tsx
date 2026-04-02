@@ -240,7 +240,7 @@ export function HistoryCharts({ logs, groupBy, countMethod }: HistoryChartsProps
                                             width={100}
                                         />
                                         <Tooltip
-                                            formatter={(value: any) => [`${value}s`, 'Avg Duration']}
+                                            formatter={(value: any) => [`${value}s`, t('tests_page.charts.duration_avg')]}
                                             cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                                             contentStyle={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: 'none', borderRadius: '8px', color: '#fff' }}
                                         />
