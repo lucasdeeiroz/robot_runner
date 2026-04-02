@@ -222,6 +222,8 @@ struct KwState {
     values: Vec<String>,
     flavor: String,
     condition: String,
+    patterns: Vec<String>,
+    variable: String,
 }
 
 fn parse_robot_xml_sax_internal(app: &tauri::AppHandle, xml_path: &str, db_path: &Path, base_dir: &Path) -> Result<LogNode, String> {
@@ -236,7 +238,7 @@ fn parse_robot_xml_sax_internal(app: &tauri::AppHandle, xml_path: &str, db_path:
     let mut root_suite: Option<SuiteNode> = None;
     
     let mut text_buffer = String::new();
-    let mut kw_states: Vec<KwState> = vec![KwState { args: vec![], vars: vec![], values: vec![], flavor: "IN".into(), condition: "".into() }];
+    let mut kw_states: Vec<KwState> = vec![KwState { args: vec![], vars: vec![], values: vec![], flavor: "IN".into(), condition: "".into(), patterns: vec![], variable: "".into() }];
     
     let mut order_counter = 0;
     let mut node_counter = 0;
@@ -321,6 +323,8 @@ fn parse_robot_xml_sax_internal(app: &tauri::AppHandle, xml_path: &str, db_path:
                         let mut kw_type = "keyword".to_string();
                         let mut st_flavor = String::from("IN");
                         let mut st_condition = String::new();
+                        let mut st_variable = String::new();
+                        let mut st_pattern = String::new();
 
                         for attr in e.attributes().flatten() {
                              if attr.key.as_ref() == b"name" { name = String::from_utf8_lossy(&attr.value).into_owned(); }
@@ -328,6 +332,8 @@ fn parse_robot_xml_sax_internal(app: &tauri::AppHandle, xml_path: &str, db_path:
                              else if attr.key.as_ref() == b"type" { kw_type = String::from_utf8_lossy(&attr.value).into_owned(); }
                              else if attr.key.as_ref() == b"flavor" { st_flavor = String::from_utf8_lossy(&attr.value).into_owned(); }
                              else if attr.key.as_ref() == b"condition" { st_condition = String::from_utf8_lossy(&attr.value).into_owned(); }
+                             else if attr.key.as_ref() == b"variable" { st_variable = String::from_utf8_lossy(&attr.value).into_owned(); }
+                             else if attr.key.as_ref() == b"pattern" { st_pattern = String::from_utf8_lossy(&attr.value).into_owned(); }
                         }
                         node_counter += 1;
                         if id.is_empty() { id = format!("kw-{}-{}", name, node_counter); }
@@ -350,7 +356,15 @@ fn parse_robot_xml_sax_internal(app: &tauri::AppHandle, xml_path: &str, db_path:
                             }.to_string()
                         };
 
-                        kw_states.push(KwState { args: vec![], vars: vec![], values: vec![], flavor: st_flavor, condition: st_condition });
+                        kw_states.push(KwState { 
+                            args: vec![], 
+                            vars: vec![], 
+                            values: vec![], 
+                            flavor: st_flavor, 
+                            condition: st_condition,
+                            variable: st_variable,
+                            patterns: if st_pattern.is_empty() { vec![] } else { vec![st_pattern] },
+                        });
 
                         let kw = KeywordNode {
                             id, name, sub_type, status: "PASS".to_string(), duration: "".to_string(),
@@ -387,7 +401,7 @@ fn parse_robot_xml_sax_internal(app: &tauri::AppHandle, xml_path: &str, db_path:
 
                 if is_empty {
                     match tag_name.as_str() {
-                        "status" | "arg" | "var" | "value" | "msg" => {}, 
+                        "status" | "arg" | "var" | "value" | "msg" | "pattern" => {}, 
                         "suite" | "test" | "kw" | "setup" | "teardown" | "for" | "while" | "iter" | "branch" | "break" | "continue" => {
                             if tag_name != "suite" && tag_name != "test" {
                                 kw_states.pop();
@@ -433,6 +447,14 @@ fn parse_robot_xml_sax_internal(app: &tauri::AppHandle, xml_path: &str, db_path:
                             state = kw_states.pop();
                         }
 
+                        match tag_name.as_str() {
+                            "arg" => if let Some(st) = kw_states.last_mut() { st.args.push(text_buffer.clone()); },
+                            "var" => if let Some(st) = kw_states.last_mut() { st.vars.push(text_buffer.clone()); },
+                            "value" => if let Some(st) = kw_states.last_mut() { st.values.push(text_buffer.clone()); },
+                            "pattern" => if let Some(st) = kw_states.last_mut() { st.patterns.push(text_buffer.clone()); },
+                            _ => {}
+                        }
+
                         if let Some(mut popped) = stack.pop() {
                              if let LogNode::Keyword(k) = &mut popped {
                                  if let Some(st) = state {
@@ -441,6 +463,17 @@ fn parse_robot_xml_sax_internal(app: &tauri::AppHandle, xml_path: &str, db_path:
                                      if !condition_empty {
                                         args.push(st.condition);
                                      } 
+                                     
+                                     // ESPECIAL CASE: EXCEPT branch attributes
+                                     if k.sub_type == "except" {
+                                         if !st.patterns.is_empty() {
+                                             args.push(format!("pattern: {}", st.patterns.join(", ")));
+                                         }
+                                         if !st.variable.is_empty() {
+                                             args.push(format!("AS {}", st.variable));
+                                         }
+                                     }
+
                                      if !st.vars.is_empty() {
                                          if k.sub_type == "for" {
                                              if !st.values.is_empty() {
