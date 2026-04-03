@@ -425,6 +425,7 @@ export const en = {
                 suggest_ai_placeholder: "Let AI help you find the most stable selector for this element.",
                 suggested_selector: "Suggested Selector",
                 ai_rationale: "AI Rationale",
+                rationale: "Rationale",
                 ai_error_generic: "AI suggestion failed."
             }
         },
@@ -576,6 +577,9 @@ export const en = {
                 save_screen: "Save Screen",
                 load: "Load",
                 ai_suggest_name: "Suggest Name with AI",
+                ai_suggest_tags: "Suggest Tags with AI",
+                copy_result: "Copy Result",
+                copy_analysis: "Copy Analysis",
                 export_pom: "Export POM",
                 export_project_pom: "Export Project to POM",
                 new: "New",
@@ -698,6 +702,7 @@ export const en = {
                 analyze_failure: "Analyze Failure",
                 analyzing: "Analyzing...",
                 ai_insight: "AI Insight",
+                ai_analysis_header: "Detailed Analysis",
                 ai_analysis_placeholder: "Click to perform a smart root cause analysis using AI.",
                 ai_error_generic: "AI analysis failed.",
                 ai_error_details: "Error Details:",
@@ -986,6 +991,7 @@ export const en = {
                 analyze_history: "Analyze with AI",
                 analyzing: "Analyzing history...",
                 ai_analysis_title: "Intelligent History Analysis",
+                ai_analysis_rationale_header: "Detailed Historical Insight",
                 ai_analysis_error: "Failed to analyze history with AI",
                 refresh: "Refresh List",
                 clear: "Clear",

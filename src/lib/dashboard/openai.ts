@@ -14,8 +14,8 @@ function extractBase64Data(imageBase64: string): { mimeType: string, data: strin
 export async function generateRefinedTestCases(
     requirements: string,
     apiKey: string,
-    model: string = 'gpt-4o',
-    language: string = 'en',
+    model: string,
+    language: string,
     appMapping?: ScreenMap[],
     generationType: AIGenerationType = 'test_case'
 ): Promise<string> {
@@ -171,7 +171,7 @@ ${mappingContext}
 export async function askOpenAI(
     prompt: string,
     apiKey: string,
-    model: string = 'gpt-4o',
+    model: string,
     systemInstruction?: string,
     imageBase64?: string
 ): Promise<string> {
@@ -239,8 +239,8 @@ export async function suggestElementName(
     elementAttr: Record<string, string>,
     screenName: string,
     apiKey: string,
-    model: string = 'gpt-4o-mini',
-    language: string = 'en',
+    model: string,
+    language: string,
     appMapping?: ScreenMap[]
 ): Promise<{ name: string; justification: string }> {
     if (!apiKey) throw new Error("Missing OpenAI API Key");
@@ -328,8 +328,8 @@ export async function suggestScreenTags(
     screenName: string,
     elements: any[],
     apiKey: string,
-    model: string = 'gpt-4o',
-    language: string = 'en',
+    model: string,
+    language: string,
     imageBase64?: string
 ): Promise<string[]> {
     if (!apiKey) throw new Error("Missing OpenAI API Key");
@@ -363,8 +363,8 @@ ${elements.map(el => `- Name: "${el.name}" (Type: ${el.type})`).join('\n')}
 export async function analyzeTestHistory(
     history: any[],
     apiKey: string,
-    model: string = 'gpt-4o',
-    language: string = 'en'
+    model: string,
+    language: string
 ): Promise<string> {
     const systemInstruction = `
 You are a Senior QA Automation Engineer and Data Analyst.
@@ -376,7 +376,7 @@ Analyze the provided test execution history to identify:
 
 Provide a comprehensive analysis in Markdown format.
 Use professional tone and actionable insights.
-Response language: ${language === 'pt' ? 'Portuguese' : language === 'es' ? 'Spanish' : 'English'}.
+Response language: ${language.toLowerCase().startsWith('pt') ? 'Portuguese' : language.toLowerCase().startsWith('es') ? 'Spanish' : 'English'}.
 `.trim();
 
     const historySummary = history

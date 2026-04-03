@@ -425,6 +425,7 @@ export const pt = {
                 suggest_ai_placeholder: "Deixe a IA ajudar você a encontrar o seletor mais estável para este elemento.",
                 suggested_selector: "Seletor Sugerido",
                 ai_rationale: "Justificativa da IA",
+                rationale: "Justificativa",
                 ai_error_generic: "Falha na sugestão de IA."
             }
         },
@@ -576,6 +577,9 @@ export const pt = {
                 save_screen: "Salvar Tela",
                 load: "Carregar",
                 ai_suggest_name: "Sugerir Nome com IA",
+                ai_suggest_tags: "Sugerir Tags com IA",
+                copy_result: "Copiar Resultado",
+                copy_analysis: "Copiar Análise",
                 export_pom: "Exportar POM",
                 export_project_pom: "Exportar Projeto para POM",
                 new: "Novo",
@@ -698,6 +702,7 @@ export const pt = {
                 analyze_failure: "Analisar Falha",
                 analyzing: "Analisando...",
                 ai_insight: "Análise da IA",
+                ai_analysis_header: "Análise Detalhada",
                 ai_analysis_placeholder: "Clique para realizar uma análise inteligente da causa raiz usando IA.",
                 ai_error_generic: "Falha na análise de IA.",
                 ai_error_details: "Detalhes do Erro:",
@@ -999,6 +1004,7 @@ export const pt = {
                 analyze_history: "Analisar com IA",
                 analyzing: "Analisando histórico...",
                 ai_analysis_title: "Análise Inteligente de Histórico",
+                ai_analysis_rationale_header: "Análise Histórica Detalhada",
                 ai_analysis_error: "Falha ao analisar histórico com IA",
                 refresh: "Atualizar Lista",
                 clear: "Limpar",

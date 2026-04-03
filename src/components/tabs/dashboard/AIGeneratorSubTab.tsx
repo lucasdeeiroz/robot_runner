@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     Wand2, Eraser, FileDown, FileText, Copy, Trash2,
-    BrainCircuit, AlertCircle, CheckCircle2
+    AlertCircle, CheckCircle2
 } from 'lucide-react';
 import { Button } from '@/components/atoms/Button';
 import { Textarea } from '@/components/atoms/Textarea';
@@ -11,6 +11,7 @@ import { Select } from '@/components/atoms/Select';
 import { Switch } from '@headlessui/react';
 import { useSettings } from '@/lib/settings';
 import { feedback } from '@/lib/feedback';
+import { AiButton } from "@/components/atoms/AiButton";
 import { generateRefinedTestCases as generateWithGemini, AIGenerationType } from '@/lib/dashboard/gemini';
 import { generateRefinedTestCases as generateWithClaude } from '@/lib/dashboard/claude';
 import { generateRefinedTestCases as generateWithOpenAI } from '@/lib/dashboard/openai';
@@ -30,6 +31,7 @@ export function AIGeneratorSubTab() {
     const [genType, setGenType] = useState<AIGenerationType>('test_case');
     const [useMapping, setUseMapping] = useState(true);
     const [isGenerating, setIsGenerating] = useState(false);
+    const [aiError, setAiError] = useState<string | null>(null);
 
     const provider = settings.aiProvider || 'gemini';
     const apiKey = provider === 'gemini' ? settings.geminiApiKey : provider === 'claude' ? settings.claudeApiKey : settings.openaiApiKey;
@@ -40,6 +42,7 @@ export function AIGeneratorSubTab() {
         if (!requirements.trim() || !hasApiKey) return;
 
         setIsGenerating(true);
+        setAiError(null);
         try {
             let maps = undefined;
             if (useMapping) {
@@ -47,14 +50,14 @@ export function AIGeneratorSubTab() {
             }
 
             let aiResponse = "";
-            const lang = i18n.language.split('_')[0]; // Use base language (en, pt, es)
+            const currentLang = i18n.language === 'pt' ? 'Portuguese' : i18n.language === 'es' ? 'Spanish' : 'English';
 
             if (provider === 'gemini') {
-                aiResponse = await generateWithGemini(requirements, apiKey as string, model, lang, maps, genType);
+                aiResponse = await generateWithGemini(requirements, apiKey as string, model, currentLang, maps, genType);
             } else if (provider === 'claude') {
-                aiResponse = await generateWithClaude(requirements, apiKey as string, model, lang, maps, genType);
+                aiResponse = await generateWithClaude(requirements, apiKey as string, model, currentLang, maps, genType);
             } else if (provider === 'openai') {
-                aiResponse = await generateWithOpenAI(requirements, apiKey as string, model, lang, maps, genType);
+                aiResponse = await generateWithOpenAI(requirements, apiKey as string, model, currentLang, maps, genType);
             }
 
             setGeneratedContent(aiResponse);
@@ -62,7 +65,8 @@ export function AIGeneratorSubTab() {
         } catch (e: any) {
             console.error("AI generation failed:", e);
             const errorMessage = e?.message || (typeof e === 'string' ? e : JSON.stringify(e)) || "Unknown Error";
-            feedback.toast.error("dashboard.actions.ai_failed", { error: errorMessage });
+            setAiError(errorMessage);
+            feedback.toast.error(t("dashboard.actions.ai_failed"));
         } finally {
             setIsGenerating(false);
         }
@@ -205,15 +209,14 @@ export function AIGeneratorSubTab() {
                                 <span>{t('dashboard.generator.key_required', { provider: provider.charAt(0).toUpperCase() + provider.slice(1) })}</span>
                             </div>
                         ) : (
-                            <Button
-                                variant="primary"
+                            <AiButton
                                 onClick={handleGenerate}
+                                isLoading={isGenerating}
                                 disabled={!requirements.trim() || isGenerating}
-                                leftIcon={isGenerating ? undefined : <BrainCircuit size={16} />}
-                                className="w-full justify-center shadow-lg shadow-primary/20 h-11 text-base font-semibold hover:bg-secondary-container"
-                            >
-                                {isGenerating ? t('dashboard.generator.generating', "Generating...") : t('dashboard.generator.generate_button', "Generate with AI")}
-                            </Button>
+                                label={t('dashboard.generator.generate_button', "Generate with AI")}
+                                showTextAlways
+                                className="w-full justify-center shadow-lg shadow-primary/20 h-11 text-base"
+                            />
                         )}
                     </div>
                 </div>
@@ -252,13 +255,13 @@ export function AIGeneratorSubTab() {
 
                 <Textarea
                     value={generatedContent}
-                    onChange={(e) => setGeneratedContent(e.target.value)}
+                    onChange={(e) => { setGeneratedContent(e.target.value), aiError }}
                     placeholder={t('dashboard.generator.empty_state', "Generated content will appear here...")}
                     containerClassName="flex-1 flex flex-col min-h-0"
                     className="flex-1 font-mono custom-scrollbar resize-none whitespace-pre-wrap text-sm p-4 bg-surface"
                 />
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
+                <div className="grid grid-cols-2 gap-3 mt-4">
                     <Button
                         variant="outline"
                         onClick={handleExportXlsx}

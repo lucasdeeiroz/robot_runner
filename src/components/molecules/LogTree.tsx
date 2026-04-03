@@ -8,7 +8,7 @@ import {
     ChevronRight, ChevronDown, CheckCircle2, XCircle, MinusCircle,
     Layers, BugPlay, CirclePlay, Repeat, IterationCcw, Workflow,
     Infinity, Split, StepForward, CalendarCog, Maximize2,
-    ShieldAlert, Anchor, Sparkles, Check, Copy
+    ShieldAlert, Anchor
 } from "lucide-react";
 import { LogNode, TestNode, KeywordNode, SuiteNode } from "@/lib/robotParser";
 import { LinkRenderer } from "../molecules/LinkRenderer";
@@ -18,6 +18,8 @@ import { askGemini } from "@/lib/dashboard/gemini";
 import { askClaude } from "@/lib/dashboard/claude";
 import { askOpenAI } from "@/lib/dashboard/openai";
 import { feedback } from "@/lib/feedback";
+import { AiButton } from "../atoms/AiButton";
+import { AiResponse } from "./AiResponse";
 
 interface LogTreeProps {
     node: LogNode;
@@ -42,12 +44,10 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
 
     // AI Analysis State
     const { settings } = useSettings();
-    const [aiAnalysis, setAiAnalysis] = useState<string|null>(null);
-    const [aiError, setAiError] = useState<string|null>(null);
+    const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
+    const [aiError, setAiError] = useState<string | null>(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [showAiAnalysis, setShowAiAnalysis] = useState(false);
-    const [copiedAi, setCopiedAi] = useState(false);
-    const [copiedAiError, setCopiedAiError] = useState(false);
 
     const isRunning = (node as any).status === 'RUNNING';
     const isFailed = (node as any).status === 'FAIL';
@@ -69,7 +69,7 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
             let isMounted = true;
             fetchAttempted.current = true;
             setIsLoadingChildren(true);
-            
+
             invoke<LogNode[]>('get_node_children', { dbPath, parentId: node.id })
                 .then(children => {
                     if (isMounted) {
@@ -260,21 +260,21 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
                                         <XCircle size={12} />
                                         {t('run_tab.console.failure_detail')}
                                     </div>
-                                    <button
-                                        disabled={isAnalyzing}
+                                    <AiButton
+                                        isLoading={isAnalyzing}
                                         onClick={async (e) => {
                                             e.stopPropagation();
                                             setIsAnalyzing(true);
                                             setShowAiAnalysis(true);
                                             setAiAnalysis(null);
-                                            
-                                            const currentLang = i18n.language === 'pt' ? 'Portuguese' : i18n.language === 'es' ? 'Spanish' : 'English';
+
+                                            const langName = i18n.language === 'pt' ? 'Portuguese' : i18n.language === 'es' ? 'Spanish' : 'English';
                                             const systemInstruction = `
 You are a Senior QA Automation Engineer.
 Analyze the test failure provided (error message + screenshot if available).
 Identify the root cause (e.g., selector issue, synchronization problem, environment error, or actual bug).
 Suggest a technical fix or next steps for the developer.
-Respond in ${currentLang}. Keep it concise and technical.
+Respond in ${langName}. Keep it concise and technical.
 `.trim();
 
                                             const prompt = `
@@ -282,7 +282,7 @@ Test Name: ${node.name}
 Error Message: ${(node as TestNode).failureDetail?.message}
 `.trim();
 
-                                             try {
+                                            try {
                                                 setAiError(null);
                                                 let result = "";
                                                 const provider = settings.aiProvider;
@@ -306,14 +306,13 @@ Error Message: ${(node as TestNode).failureDetail?.message}
                                                 setIsAnalyzing(false);
                                             }
                                         }}
+                                        label={t('run_tab.console.analyze_failure')}
                                         title={t('run_tab.console.analyze_failure')}
-                                        className="p-1 px-2 flex items-center justify-center gap-1.5 hover:bg-error/20 text-error rounded-lg transition-all border border-error/20 bg-error/5 group"
-                                    >
-                                        {isAnalyzing ? <ExpressiveLoading size="xsm" variant="circular" /> : <Sparkles size={12} className="group-hover:scale-110 transition-transform" />}
-                                        <span className="text-[10px] uppercase font-bold tracking-tighter opacity-0 group-hover:opacity-100 transition-opacity w-0 group-hover:w-auto overflow-hidden whitespace-nowrap">
-                                            {t('run_tab.console.analyze_failure')}
-                                        </span>
-                                    </button>
+                                        variant="ghost"
+                                        expandable={true}
+                                        showTextAlways={false}
+                                        className="h-8 p-1 px-2 border-error/20 bg-error/5 text-error hover:bg-error/20 shadow-sm"
+                                    />
                                 </div>
                                 <div className="font-mono whitespace-pre-wrap leading-relaxed overflow-auto max-h-40">{(node as TestNode).failureDetail!.message}</div>
                             </div>
@@ -353,76 +352,18 @@ Error Message: ${(node as TestNode).failureDetail?.message}
                     )}
 
                     {node.type === 'test' && isFailed && (node as TestNode).failureDetail && showAiAnalysis && (
-                        <div className="mb-4 bg-primary/5 border border-primary/20 rounded-2xl p-4 relative overflow-hidden group/ai animate-in fade-in zoom-in duration-300">
-                            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover/ai:opacity-10 transition-opacity">
-                                <Sparkles size={40} className="text-primary" />
-                            </div>
-                            
-                            <div className="relative z-10">
-                                <div className="flex items-center justify-between mb-3">
-                                    <div className="flex items-center gap-2">
-                                        <div className="p-1.5 bg-primary/10 rounded-lg text-primary">
-                                            <Sparkles size={14} />
-                                        </div>
-                                        <h4 className="text-[10px] font-bold text-primary uppercase tracking-wider">
-                                            {t('run_tab.console.ai_insight')}
-                                        </h4>
-                                    </div>
-                                </div>
-
-                                {aiAnalysis ? (
-                                    <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                                        <div className="bg-surface/60 p-3 rounded-xl border border-primary/10 relative group/content">
-                                            <button 
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    navigator.clipboard.writeText(aiAnalysis);
-                                                    setCopiedAi(true);
-                                                    setTimeout(() => setCopiedAi(false), 2000);
-                                                }}
-                                                className="absolute top-2 right-2 p-1.5 hover:bg-primary/10 rounded-lg text-primary/40 hover:text-primary transition-all opacity-0 group-hover/content:opacity-100"
-                                                title="Copy Analysis"
-                                            >
-                                                {copiedAi ? <Check size={14} className="text-success" /> : <Copy size={14} />}
-                                            </button>
-                                            <p className="text-xs text-on-surface/90 leading-relaxed whitespace-pre-wrap font-sans">
-                                                {aiAnalysis}
-                                            </p>
-                                        </div>
-                                    </div>
-                                 ) : aiError ? (
-                                    <div className="p-4 bg-error/5 border border-error/20 rounded-xl animate-in fade-in slide-in-from-top-2 relative group/error">
-                                        <div className="flex items-center gap-2 text-error mb-2">
-                                            <ShieldAlert size={14} />
-                                            <span className="text-[10px] uppercase font-bold tracking-tight">{t('run_tab.console.ai_error_details')}</span>
-                                        </div>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                navigator.clipboard.writeText(aiError);
-                                                setCopiedAiError(true);
-                                                setTimeout(() => setCopiedAiError(false), 2000);
-                                            }}
-                                            className="absolute top-2 right-2 p-1.5 hover:bg-error/10 rounded-lg text-error/40 hover:text-error transition-all opacity-0 group-error:opacity-100 flex items-center gap-1"
-                                            title={t('run_tab.console.ai_error_copy')}
-                                        >
-                                            {copiedAiError ? <Check size={12} className="text-success" /> : <Copy size={12} />}
-                                            <span className="text-[9px] uppercase font-bold">{t('run_tab.console.ai_error_copy')}</span>
-                                        </button>
-                                        <div className="font-mono text-[11px] text-error/80 break-all max-h-32 overflow-y-auto pr-2 custom-scrollbar">
-                                            {aiError}
-                                        </div>
-                                    </div>
-                                ) : (
-                                    isAnalyzing && (
-                                        <div className="flex flex-col items-center gap-3 py-4 text-primary/60">
-                                            <ExpressiveLoading size="sm" variant="circular" />
-                                            <span className="text-[10px] font-medium animate-pulse">{t('run_tab.console.analyzing')}</span>
-                                        </div>
-                                    )
-                                )}
-                            </div>
-                        </div>
+                        <AiResponse
+                            title={t('run_tab.console.ai_insight')}
+                            isLoading={isAnalyzing}
+                            rationale={aiAnalysis}
+                            rationaleHeader={t('run_tab.console.ai_analysis_header')}
+                            error={aiError}
+                            className="mb-4"
+                            onCopy={(text) => {
+                                navigator.clipboard.writeText(text);
+                                feedback.toast.success(t('common.copied'));
+                            }}
+                        />
                     )}
 
                     {node.type === 'keyword' && (node as KeywordNode).screenshotPath && (

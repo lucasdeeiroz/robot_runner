@@ -21,7 +21,7 @@ import HistoryAIAnalysisModal from '@/components/organisms/HistoryAIAnalysisModa
 import { analyzeTestHistory as analyzeGemini } from '@/lib/dashboard/gemini';
 import { analyzeTestHistory as analyzeOpenAI } from '@/lib/dashboard/openai';
 import { analyzeTestHistory as analyzeClaude } from '@/lib/dashboard/claude';
-import { BrainCircuit } from 'lucide-react';
+import { AiButton } from "@/components/atoms/AiButton";
 
 const formatDate = (dateStr: string) => {
     try {
@@ -41,18 +41,18 @@ const formatDate = (dateStr: string) => {
 
 
 export function HistorySubTab() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const { settings } = useSettings();
     const [history, setHistory] = useState<TestLog[]>(getCachedHistory());
     const [filterText, setFilterText] = useState("");
     const [filterPeriod, setFilterPeriod] = useState("all_time");
     const [groupBy, setGroupBy] = useState("none");
-    
+
     // Novas variáveis de filtro
     const [filterDevice, setFilterDevice] = useState("all");
     const [filterOS, setFilterOS] = useState("all");
     const [filterStatus, setFilterStatus] = useState("all");
-    
+
     const [countMethod, setCountMethod] = useState<'suites' | 'tests'>('suites');
 
     const [showCharts, setShowCharts] = useState(false);
@@ -111,7 +111,7 @@ export function HistorySubTab() {
 
     const handleAIAnalysis = async () => {
         if (filteredHistory.length === 0) return;
-        
+
         setIsAnalyzingHistory(true);
         setIsAIModalOpen(true);
         setAiAnalysisError(null);
@@ -120,10 +120,10 @@ export function HistorySubTab() {
         try {
             let result = "";
             const provider = settings.aiProvider;
-            const apiKey = provider === 'gemini' 
-                ? settings.geminiApiKey 
-                : provider === 'claude' 
-                    ? settings.claudeApiKey 
+            const apiKey = provider === 'gemini'
+                ? settings.geminiApiKey
+                : provider === 'claude'
+                    ? settings.claudeApiKey
                     : settings.openaiApiKey;
 
             if (!apiKey) {
@@ -131,12 +131,15 @@ export function HistorySubTab() {
                 return;
             }
 
+            const model = provider === 'gemini' ? settings.geminiModel : provider === 'claude' ? settings.claudeModel : settings.openaiModel;
+            const lang = settings.language || i18n.language || 'en';
+
             if (provider === 'gemini') {
-                result = await analyzeGemini(filteredHistory, apiKey);
+                result = await analyzeGemini(filteredHistory, apiKey, model, lang);
             } else if (provider === 'openai') {
-                result = await analyzeOpenAI(filteredHistory, apiKey);
+                result = await analyzeOpenAI(filteredHistory, apiKey, model, lang);
             } else if (provider === 'claude') {
-                result = await analyzeClaude(filteredHistory, apiKey);
+                result = await analyzeClaude(filteredHistory, apiKey, model, lang);
             }
 
             setAiAnalysisText(result);
@@ -183,7 +186,7 @@ export function HistorySubTab() {
             const decodedName = decodeHtml(log.suite_name);
             const matchesText = decodedName.toLowerCase().includes(filterText.toLowerCase());
             const matchesPeriod = isDateInPeriod(log.timestamp, filterPeriod);
-            
+
             const matchesDevice = filterDevice === "all" || log.device_model === filterDevice;
             const matchesOS = filterOS === "all" || log.android_version === filterOS;
             const matchesStatus = filterStatus === "all" || log.status === filterStatus;
@@ -236,7 +239,7 @@ export function HistorySubTab() {
     };
 
     // Flatten the grouped history for virtualization
-    type VirtualItem = 
+    type VirtualItem =
         | { type: 'header'; id: string; groupName: string; count: number }
         | { type: 'log'; id: string; log: TestLog; groupName: string };
 
@@ -283,7 +286,7 @@ export function HistorySubTab() {
                     >
                         {loadingHistory ? <ExpressiveLoading size="xsm" variant="circular" /> : <RefreshCw size={16} />}
                     </Button>
-                }                menus={!isHistoryNarrow ? (
+                } menus={!isHistoryNarrow ? (
                     <div className="flex-1 min-w-[200px] max-w-sm">
                         <Input
                             placeholder={t('tests_page.filter.search')}
@@ -296,20 +299,30 @@ export function HistorySubTab() {
                 ) : null
                 }
                 actions={
-                    <Button
-                        onClick={() => setShowCharts(!showCharts)}
-                        variant="ghost"
-                        size="sm"
-                        className={clsx(
-                            "px-3 py-1.5 rounded-2xl flex items-center gap-2 text-sm font-medium transition-colors h-auto",
-                            showCharts 
-                                ? "bg-primary/20 text-primary hover:bg-primary/30" 
-                                : "text-on-surface-variant hover:bg-surface-variant/30"
-                        )}
-                    >
-                        <PieChart size={16} />
-                        {!isHistoryNarrow && (showCharts ? t('tests_page.charts.hide') : t('tests_page.charts.show'))}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            onClick={() => setShowCharts(!showCharts)}
+                            variant="ghost"
+                            size="sm"
+                            className={clsx(
+                                "px-3 py-1.5 rounded-2xl flex items-center gap-2 text-sm font-medium transition-colors h-auto",
+                                showCharts
+                                    ? "bg-primary/20 text-primary hover:bg-primary/30"
+                                    : "text-on-surface-variant hover:bg-surface-variant/30"
+                            )}
+                        >
+                            <PieChart size={16} />
+                            {!isHistoryNarrow && (showCharts ? t('tests_page.charts.hide') : t('tests_page.charts.show'))}
+                        </Button>
+                        <AiButton
+                            onClick={handleAIAnalysis}
+                            isLoading={isAnalyzingHistory}
+                            disabled={filteredHistory.length === 0 || isAnalyzingHistory}
+                            label={t('tests_page.actions.analyze_history')}
+                            variant="primary"
+                            className="shadow-lg shadow-primary/10 ml-2 h-8"
+                        />
+                    </div>
                 }
             />
 
@@ -341,7 +354,7 @@ export function HistorySubTab() {
                             className="bg-surface/50 py-1.5 text-sm"
                             containerClassName="w-auto min-w-[150px]"
                         />
-                        <Select 
+                        <Select
                             value={filterStatus}
                             onChange={(e) => setFilterStatus(e.target.value)}
                             options={[
@@ -351,7 +364,7 @@ export function HistorySubTab() {
                             className="bg-surface/50 py-1.5 text-sm"
                             containerClassName="w-auto min-w-[120px]"
                         />
-                        <Select 
+                        <Select
                             value={filterDevice}
                             onChange={(e) => setFilterDevice(e.target.value)}
                             options={[
@@ -361,7 +374,7 @@ export function HistorySubTab() {
                             className="bg-surface/50 py-1.5 text-sm"
                             containerClassName="w-auto min-w-[150px]"
                         />
-                        <Select 
+                        <Select
                             value={filterOS}
                             onChange={(e) => setFilterOS(e.target.value)}
                             options={[
@@ -372,18 +385,9 @@ export function HistorySubTab() {
                             containerClassName="w-auto min-w-[120px]"
                         />
 
-                        <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={handleAIAnalysis}
-                            disabled={filteredHistory.length === 0 || isAnalyzingHistory}
-                            leftIcon={<BrainCircuit size={16} />}
-                            className="shadow-lg shadow-primary/10 ml-2"
-                        >
-                            {t('tests_page.actions.analyze_history')}
-                        </Button>
+
                     </div>
-                    
+
                     {showCharts && (
                         <div className="flex items-center bg-surface/50 border border-outline-variant/30 rounded-lg p-1">
                             <button
@@ -443,7 +447,7 @@ export function HistorySubTab() {
                     >
                         {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                             const item = flatItems[virtualRow.index];
-                            
+
                             return (
                                 <div
                                     key={item.id}
@@ -472,7 +476,7 @@ export function HistorySubTab() {
                                             </span>
                                         </Button>
                                     ) : (
-                                        <div 
+                                        <div
                                             onClick={() => handleLogClick(item.log)}
                                             role="button"
                                             tabIndex={0}
@@ -504,8 +508,8 @@ export function HistorySubTab() {
                                                         <div className="flex items-center gap-1">
                                                             <Calendar size={12} /> {formatDate(item.log.timestamp)}
                                                         </div>
-                                                         <div className="flex items-center gap-1 bg-surface-variant/30 px-1.5 py-0.5 rounded text-[10px] font-medium border border-outline-variant/10">
-                                                            <Clock size={10} className="shrink-0" /> 
+                                                        <div className="flex items-center gap-1 bg-surface-variant/30 px-1.5 py-0.5 rounded text-[10px] font-medium border border-outline-variant/10">
+                                                            <Clock size={10} className="shrink-0" />
                                                             <span>{item.log.duration}</span>
                                                             <span className="mx-1 opacity-20 h-2 w-[1px] bg-current" />
                                                             <span className="text-success">{item.log.pass_count}P</span>
@@ -544,10 +548,10 @@ export function HistorySubTab() {
                 </div>
             </div>
 
-            <HistoryDetailModal 
-                isOpen={isModalOpen} 
-                onClose={() => setIsModalOpen(false)} 
-                log={selectedLog} 
+            <HistoryDetailModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                log={selectedLog}
             />
 
             <HistoryAIAnalysisModal

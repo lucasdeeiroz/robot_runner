@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Maximize, Check, Scan, Home, ArrowLeft, Rows, X, RefreshCw, Search, Pencil, Copy, ChevronDown, ChevronUp, ShieldAlert, Sparkles } from 'lucide-react';
+import { Maximize, Check, Scan, Home, ArrowLeft, Rows, X, RefreshCw, Search, Pencil, Copy, ChevronDown, ChevronUp } from 'lucide-react';
 import { XMLParser } from 'fast-xml-parser';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
@@ -15,9 +15,11 @@ import { Select } from "@/components/atoms/Select";
 import { Modal } from "@/components/organisms/Modal";
 import { GestureOverlay } from "@/components/molecules/GestureOverlay";
 import { useSettings } from "@/lib/settings";
-import { askGemini } from "@/lib/dashboard/gemini";
-import { askClaude } from "@/lib/dashboard/claude";
-import { askOpenAI } from "@/lib/dashboard/openai";
+import * as gemini from "@/lib/dashboard/gemini";
+import * as claude from "@/lib/dashboard/claude";
+import * as openai from "@/lib/dashboard/openai";
+import { AiButton } from "@/components/atoms/AiButton";
+import { AiResponse } from "@/components/molecules/AiResponse";
 
 
 interface InspectorSubTabProps {
@@ -62,7 +64,6 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
     const [aiError, setAiError] = useState<string | null>(null);
     const [isAiLoading, setIsAiLoading] = useState(false);
     const [showAiSection, setShowAiSection] = useState(false);
-    const [copiedAiError, setCopiedAiError] = useState(false);
 
     // Interaction State
     const [swipeStart, setSwipeStart] = useState<{ x: number, y: number } | null>(null);
@@ -394,11 +395,11 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
             const provider = settings.aiProvider;
 
             if (provider === 'gemini') {
-                result = await askGemini(prompt, settings.geminiApiKey || '', settings.geminiModel, systemInstruction);
+                result = await gemini.askGemini(prompt, settings.geminiApiKey || '', settings.geminiModel, systemInstruction);
             } else if (provider === 'claude') {
-                result = await askClaude(prompt, settings.claudeApiKey || '', settings.claudeModel, systemInstruction);
+                result = await claude.askClaude(prompt, settings.claudeApiKey || '', settings.claudeModel, systemInstruction);
             } else if (provider === 'openai') {
-                result = await askOpenAI(prompt, settings.openaiApiKey || '', settings.openaiModel, systemInstruction);
+                result = await openai.askOpenAI(prompt, settings.openaiApiKey || '', settings.openaiModel, systemInstruction);
             } else {
                 throw new Error("No AI provider configured");
             }
@@ -637,98 +638,33 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between mb-2">
                                         <h3 className="text-xs font-semibold text-on-surface-variant/80 uppercase tracking-wider">{t('inspector.attributes.identifiers')}</h3>
-                                        <button
-                                            disabled={isAiLoading}
+                                        <AiButton
+                                            isLoading={isAiLoading}
                                             onClick={handleAiSuggest}
-                                            title={t('inspector.attributes.suggest_with_ai')}
-                                            className="p-1 px-2 flex items-center justify-center gap-1.5 hover:bg-primary/20 text-primary rounded-lg transition-all border border-primary/20 bg-primary/5 group"
-                                        >
-                                            {isAiLoading ? <ExpressiveLoading size="xsm" variant="circular" /> : <Sparkles size={14} className="group-hover:scale-110 transition-transform" />}
-                                        </button>
+                                            label={t('inspector.attributes.suggest_with_ai')}
+                                            variant="primary"
+                                            className="h-7"
+                                        />
                                     </div>
 
                                     {/* AI Suggestion Section */}
                                     {showAiSection && (
-                                        <div className="p-4 bg-primary/5 border border-primary/20 rounded-2xl relative overflow-hidden group animate-in fade-in zoom-in duration-300">
-                                            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                                                <Sparkles size={48} className="text-primary" />
-                                            </div>
-                                            <div className="relative z-10">
-                                                <div className="flex items-center justify-between mb-3 text-primary">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="p-1.5 bg-primary/10 rounded-lg">
-                                                            <Sparkles size={16} />
-                                                        </div>
-                                                        <h4 className="text-xs font-bold uppercase tracking-wider">
-                                                            {t('inspector.attributes.ai_suggest')}
-                                                        </h4>
-                                                    </div>
-                                                </div>
-
-                                                {aiSuggestion ? (
-                                                    <div className="space-y-3">
-                                                        <div className="bg-surface/80 p-3 rounded-xl border border-primary/20 group/suggest">
-                                                            <div className="flex items-center justify-between mb-1">
-                                                                <span className="text-[10px] font-bold text-primary/60 uppercase">
-                                                                    {t('inspector.attributes.suggested_selector')}
-                                                                </span>
-                                                                <button
-                                                                    onClick={() => copyToClipboard(aiSuggestion, 'ai_s')}
-                                                                    className="p-1 hover:bg-primary/10 rounded text-primary transition-colors"
-                                                                >
-                                                                    {copied === 'ai_s' ? <Check size={14} /> : <Copy size={14} />}
-                                                                </button>
-                                                            </div>
-                                                            <code className="text-xs font-mono text-primary break-all block">
-                                                                {aiSuggestion}
-                                                            </code>
-                                                        </div>
-
-                                                        {aiRationale && (
-                                                            <div className="px-3 py-2 bg-primary/5 rounded-xl border border-primary/10">
-                                                                <span className="text-[10px] font-bold text-primary/60 uppercase block mb-1">
-                                                                    {t('inspector.attributes.ai_rationale')}
-                                                                </span>
-                                                                <p className="text-xs text-on-surface/80 leading-relaxed italic">
-                                                                    {aiRationale}
-                                                                </p>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                ) : aiError ? (
-                                                    <div className="p-3 bg-error/10 border border-error/20 rounded-xl relative group/error animate-in fade-in slide-in-from-top-2">
-                                                        <div className="flex items-center gap-2 text-error mb-2">
-                                                            <ShieldAlert size={14} />
-                                                            <span className="text-[10px] font-bold uppercase tracking-tight">
-                                                                {t('run_tab.console.ai_error_details')}
-                                                            </span>
-                                                        </div>
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                navigator.clipboard.writeText(aiError);
-                                                                setCopiedAiError(true);
-                                                                setTimeout(() => setCopiedAiError(false), 2000);
-                                                            }}
-                                                            className="absolute top-2 right-2 p-1.5 hover:bg-error/10 rounded-lg text-error/40 hover:text-error transition-all opacity-0 group-error:opacity-100 flex items-center gap-1"
-                                                            title={t('run_tab.console.ai_error_copy')}
-                                                        >
-                                                            {copiedAiError ? <Check size={12} className="text-success" /> : <Copy size={12} />}
-                                                        </button>
-                                                        <div className="font-mono text-[11px] text-error/80 break-all max-h-32 overflow-y-auto pr-2 custom-scrollbar">
-                                                            {aiError}
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    isAiLoading && (
-                                                        <div className="flex flex-col items-center gap-3 py-4 text-primary/60">
-                                                            <ExpressiveLoading size="md" variant="circular" />
-                                                            <span className="text-xs font-medium animate-pulse">{t('run_tab.console.analyzing')}</span>
-                                                        </div>
-                                                    )
-                                                )}
-                                            </div>
-                                        </div>
+                                        <AiResponse
+                                            title={t('inspector.attributes.ai_suggest')}
+                                            isLoading={isAiLoading}
+                                            responseTitle={t('inspector.attributes.suggested_selector')}
+                                            response={aiSuggestion ? `\`${aiSuggestion}\`` : null}
+                                            rationaleHeader={t('inspector.attributes.rationale')}
+                                            rationale={aiRationale}
+                                            error={aiError}
+                                            onCopy={(_text) => {
+                                                // Extract selector from the Markdown response if needed, 
+                                                // but here text is already just the suggestion if we use onCopy effectively.
+                                                // Actually, AiResponse passes the full 'response' prop to onCopy.
+                                                // We might want to pass just the aiSuggestion to onCopy.
+                                                copyToClipboard(aiSuggestion || '', 'ai_s');
+                                            }}
+                                        />
                                     )}
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
