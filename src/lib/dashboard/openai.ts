@@ -224,3 +224,76 @@ export async function getAvailableModels(_apiKey: string): Promise<string[]> {
         "gpt-3.5-turbo"
     ];
 }
+
+export async function suggestElementName(
+    elementAttr: Record<string, string>,
+    screenName: string,
+    apiKey: string,
+    model: string = 'gpt-4o-mini',
+    language: string = 'en'
+): Promise<{ name: string; justification: string }> {
+    if (!apiKey) throw new Error("Missing OpenAI API Key");
+
+    const prompt = `
+Context: Professional QA Engineering and Test Automation.
+Task: Suggest a descriptive name and a brief justification for this UI element found in the screen "${screenName}".
+
+Element Attributes:
+${Object.entries(elementAttr).filter(([_, v]) => v).map(([k, v]) => `- ${k}: ${v}`).join('\n')}
+
+Rules:
+1. Use "Space Separated" convention for the name (e.g., "Login Button", "Username Input").
+2. Respond in this language: ${language}.
+3. Return ONLY a valid JSON object with the following keys:
+   - "name": The suggested name.
+   - "justification": A brief explanation of why this name was chosen based on the attributes.
+`.trim();
+
+    const url = "https://api.openai.com/v1/chat/completions";
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model,
+                messages: [
+                    { role: 'system', content: "You are a professional QA automation naming assistant. Respond with JSON." },
+                    { role: 'user', content: prompt }
+                ],
+                response_format: { type: "json_object" },
+                temperature: 0.1,
+                max_tokens: 512
+            })
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            const errMsg = errData.error?.message || JSON.stringify(errData);
+            throw new Error(errMsg || `API Error: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content;
+        if (!content) {
+            throw new Error("Empty AI response");
+        }
+
+        try {
+            const parsed = JSON.parse(content);
+            return {
+                name: parsed.name?.replace(/["']/g, '') || "Unknown Element",
+                justification: parsed.justification || ""
+            };
+        } catch (e) {
+            console.error("Failed to parse OpenAI response:", content);
+            throw new Error("Invalid AI response format");
+        }
+    } catch (e: any) {
+        console.error("OpenAI suggestElementName failure:", e);
+        throw e;
+    }
+}

@@ -1,7 +1,10 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Maximize, Check, Scan, Home, ArrowLeft, Rows, X, RefreshCw, Save, GitGraph, Trash2, Upload, Download, Plus, FileClock, FileInput, SearchCode, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
+import { 
+    Maximize, Check, Scan, Home, ArrowLeft, Rows, X, RefreshCw, Save, GitGraph, Trash2, Plus, FileClock, FileInput, SearchCode, ChevronDown, ChevronUp, ChevronRight,
+    Sparkles, BrainCircuit, Info, FileCode, FileStack, FileUp, FileDown
+} from 'lucide-react';
 import { XMLParser } from 'fast-xml-parser';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
@@ -27,6 +30,9 @@ import { SegmentedControl } from '@/components/molecules/SegmentedControl';
 import { GroupedScreenSelect } from '@/components/molecules/GroupedScreenSelect';
 import { groupScreensByTags } from '@/lib/utils';
 import { GestureOverlay } from '@/components/molecules/GestureOverlay';
+import * as gemini from '@/lib/dashboard/gemini';
+import * as claude from '@/lib/dashboard/claude';
+import * as openai from '@/lib/dashboard/openai';
 
 function groupElementsByType<T extends { type: string }>(
     elements: T[],
@@ -48,7 +54,8 @@ interface MapperSubTabProps {
 }
 
 export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) {
-    const { t } = useTranslation();
+    const { settings } = useSettings();
+    const { t, i18n } = useTranslation();
     const { activeProfileId } = useSettings();
     const [screenshot, setScreenshot] = useState<string | null>(null);
     const [rootNode, setRootNode] = useState<InspectorNode | null>(null);
@@ -78,6 +85,12 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [screenToDelete, setScreenToDelete] = useState<string | null>(null);
     const [isFlowchartOpen, setIsFlowchartOpen] = useState(false);
+
+    // AI Suggestion State
+    const [isAISuggesting, setIsAISuggesting] = useState(false);
+    const [aiSuggestedName, setAiSuggestedName] = useState<string | null>(null);
+    const [aiJustification, setAiJustification] = useState<string | null>(null);
+    const [showAISuggestion, setShowAISuggestion] = useState(false);
 
     useOutsideClick(loadMenuRef, () => {
         if (showLoadMenu) setShowLoadMenu(false);
@@ -116,6 +129,10 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         } else {
             setCurrentElement({});
         }
+        // Reset AI Suggestion when selection changes
+        setShowAISuggestion(false);
+        setAiSuggestedName(null);
+        setAiJustification(null);
     }, [selectedNode, mappedElements]);
 
     // Helper to update current element state
@@ -271,6 +288,99 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         } catch (e) {
             console.error(e);
             feedback.toast.error(t('mapper.flowchart.import_error'));
+        }
+    };
+
+    const handleAISuggestName = async () => {
+        if (!selectedNode || !activeProfileId) return;
+
+        const { aiProvider, geminiApiKey, claudeApiKey, openaiApiKey, geminiModel, claudeModel, openaiModel, language } = settings;
+        const apiKey = aiProvider === 'gemini' ? geminiApiKey : aiProvider === 'claude' ? claudeApiKey : openaiApiKey;
+        const model = aiProvider === 'gemini' ? geminiModel : aiProvider === 'claude' ? claudeModel : openaiModel;
+
+        if (!apiKey) {
+            feedback.toast.error(t('dashboard.generator.key_required', { provider: aiProvider.toUpperCase() }));
+            return;
+        }
+
+        setIsAISuggesting(true);
+        setShowAISuggestion(true);
+        setAiSuggestedName(null);
+
+        try {
+            let result: { name: string; justification: string } | null = null;
+            const lang = language || i18n.language || 'en';
+
+            if (aiProvider === 'gemini') {
+                result = await gemini.suggestElementName(selectedNode.attributes, screenName, apiKey, model, lang);
+            } else if (aiProvider === 'openai') {
+                result = await openai.suggestElementName(selectedNode.attributes, screenName, apiKey, model, lang);
+            } else if (aiProvider === 'claude') {
+                result = await claude.suggestElementName(selectedNode.attributes, screenName, apiKey, model, lang);
+            }
+
+            if (result && result.name) {
+                setAiSuggestedName(result.name);
+                setAiJustification(result.justification);
+                feedback.toast.success(t('mapper.feedback.ai_success'));
+            } else {
+                throw new Error("Empty suggestion");
+            }
+        } catch (error) {
+            console.error("AI Suggestion Error:", error);
+            feedback.toast.error(t('mapper.feedback.ai_error'));
+            setAiSuggestedName(null);
+        } finally {
+            setIsAISuggesting(false);
+        }
+    };
+
+    const handleExportPOM = async () => {
+        if (!screenName || mappedElements.length === 0) {
+            feedback.toast.error(t('mapper.error.empty_map'));
+            return;
+        }
+        const { generateRobotResource } = await import('@/lib/dashboard/pomGenerator');
+        const content = generateRobotResource({
+            id: screenName.toLowerCase().replace(/\s+/g, '_'),
+            name: screenName,
+            type: screenType,
+            elements: mappedElements
+        });
+
+        const path = await save({
+            filters: [{ name: 'Robot Framework Resource', extensions: ['robot'] }],
+            defaultPath: `${screenName.toLowerCase().replace(/\s+/g, '_')}.robot`
+        });
+
+        if (path) {
+            await invoke('save_file', { path, content, append: false });
+            feedback.toast.success(t('mapper.feedback.saved'));
+        }
+    };
+
+    const handleExportProjectPOM = async () => {
+        if (savedMaps.length === 0) {
+            feedback.toast.error(t('mapper.feedback.empty_map'));
+            return;
+        }
+        const { generateProjectRobotResources } = await import('@/lib/dashboard/pomGenerator');
+        const resources = generateProjectRobotResources(savedMaps);
+        
+        // Strategy: Open a folder dialog and save all files there.
+        // Tauri's save dialog is for single files usually.
+        // We can ask for a directory instead.
+        const dir = await open({
+            directory: true,
+            multiple: false
+        });
+
+        if (dir && typeof dir === 'string') {
+            for (const [fileName, content] of Object.entries(resources)) {
+                const path = `${dir}/${fileName}`;
+                await invoke('save_file', { path, content, append: false });
+            }
+            feedback.toast.success(t('mapper.feedback.saved'));
         }
     };
 
@@ -624,7 +734,37 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                 </div>
                             </div>
                         }
-                        menus={null}
+                        menus={
+                            <div className="flex items-center gap-1">
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={handleExportProjectPOM}
+                                    className="p-1.5 hover:bg-primary/10 hover:text-primary rounded text-on-surface-variant/80 transition-all"
+                                    title={t('mapper.action.export_project_pom', 'Export Project POM')}
+                                >
+                                    <FileStack size={18} />
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={handleImport}
+                                    className="p-1.5 hover:bg-primary/10 hover:text-primary rounded text-on-surface-variant/80 transition-all"
+                                    title={t('mapper.flowchart.import', 'Import Flow')}
+                                >
+                                    <FileUp size={18} />
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={handleExport}
+                                    className="p-1.5 hover:bg-primary/10 hover:text-primary rounded text-on-surface-variant/80 transition-all"
+                                    title={t('mapper.flowchart.export', 'Export Flow')}
+                                >
+                                    <FileDown size={18} />
+                                </Button>
+                            </div>
+                        }
                         actions={
                             <>
                                 <Button
@@ -874,8 +1014,17 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                         )}
                                     </div>
                                     <div className="flex-1 flex justify-end gap-2">
-                                        <Button onClick={handleImport} variant="ghost" size="icon"><Download size={16} /></Button>
-                                        <Button onClick={handleExport} variant="ghost" size="icon"><Upload size={16} /></Button>
+                                        {screenName && mappedElements.length > 0 && (
+                                            <Button
+                                                onClick={handleExportPOM}
+                                                variant="ghost"
+                                                size="icon"
+                                                title={t('mapper.action.export_pom')}
+                                                className="hover:text-primary hover:bg-primary/10 transition-all"
+                                            >
+                                                <FileCode size={18} />
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -1036,7 +1185,12 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                             </div>
                                         )}
                                     </div>
-                                    <Button onClick={saveElementMapping} variant="primary" size="sm" className="hover:bg-secondary-container"><FileInput size={16} className="mr-2" />{mappedElements.find(e => e.id === currentElement.id) ? t('mapper.action.update') : t('mapper.action.add')}</Button>
+                                    <div className="flex gap-2">
+                                        <Button onClick={saveElementMapping} variant="primary" size="sm" className="hover:bg-secondary-container">
+                                            <FileInput size={16} className="mr-2" />
+                                            {mappedElements.find(e => e.id === currentElement.id) ? t('mapper.action.update') : t('mapper.action.add')}
+                                        </Button>
+                                    </div>
                                 </div>
                             </div>
                             <div className="flex items-center justify-between border-b border-outline-variant/30 shrink-0 bg-surface/50 pr-2">
@@ -1087,9 +1241,21 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                 />
                                             </div>
 
-                                            {/* Identifiers Section */}
                                             <div className="mb-4 space-y-2">
-                                                <h3 className="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest">{t('inspector.attributes.identifiers')}</h3>
+                                                <div className="flex items-center justify-between">
+                                                    <h3 className="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest">{t('inspector.attributes.identifiers')}</h3>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={handleAISuggestName}
+                                                        disabled={isAISuggesting}
+                                                        className="h-6 px-2 text-[10px] gap-1 hover:bg-primary/10 text-primary border border-primary/20 rounded-xl"
+                                                        title={t('mapper.action.ai_suggest_name')}
+                                                    >
+                                                        {isAISuggesting ? <ExpressiveLoading size="xsm" variant="circular" /> : <Sparkles size={12} />}
+                                                        {t('mapper.action.ai_suggest_name')}
+                                                    </Button>
+                                                </div>
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                                     <CopyButton
                                                         label={t('inspector.attributes.access_id')}
@@ -1105,6 +1271,71 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                     />
                                                 </div>
                                             </div>
+
+                                            {showAISuggestion && (
+                                                <div className="mb-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                                                    <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 relative overflow-hidden group/ai">
+                                                        <div className="absolute top-0 right-0 p-2 opacity-10">
+                                                            <BrainCircuit size={48} className="text-primary" />
+                                                        </div>
+                                                        
+                                                        <div className="flex items-center gap-2 mb-3">
+                                                            <div className="p-1.5 bg-primary/10 rounded-lg text-primary">
+                                                                <Sparkles size={14} />
+                                                            </div>
+                                                            <h4 className="text-xs font-bold text-primary uppercase tracking-wider">
+                                                                {t('inspector.attributes.ai_suggest')}
+                                                            </h4>
+                                                        </div>
+
+                                                        {isAISuggesting ? (
+                                                            <div className="flex flex-col items-center py-4 gap-3">
+                                                                <ExpressiveLoading variant="circular" size="sm" />
+                                                                <span className="text-xs text-on-surface-variant/70 animate-pulse italic">
+                                                                    {t('mapper.feedback.ai_suggesting')}
+                                                                </span>
+                                                            </div>
+                                                        ) : aiSuggestedName ? (
+                                                            <div className="space-y-4">
+                                                                <div className="flex items-center justify-between gap-4">
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <div className="text-[10px] text-on-surface-variant/60 uppercase font-bold mb-1 ml-1">
+                                                                            {t('inspector.attributes.suggested_selector')}
+                                                                        </div>
+                                                                        <div className="bg-surface/80 border border-primary/30 rounded-xl px-4 py-3 text-sm font-semibold text-primary shadow-sm hover:border-primary transition-colors cursor-pointer group/name"
+                                                                             onClick={() => updateElement('name', aiSuggestedName)}>
+                                                                            {aiSuggestedName}
+                                                                        </div>
+                                                                    </div>
+                                                                    <Button 
+                                                                        variant="primary" 
+                                                                        size="sm"
+                                                                        className="rounded-xl h-12 px-6 shadow-md hover:shadow-lg transition-all"
+                                                                        onClick={() => {
+                                                                            updateElement('name', aiSuggestedName);
+                                                                            feedback.toast.success(t('feedback.saved'));
+                                                                        }}
+                                                                    >
+                                                                        <Check size={18} />
+                                                                    </Button>
+                                                                </div>
+                                                                <div className="bg-surface/40 rounded-xl p-3 border border-outline-variant/10 flex gap-3">
+                                                                    <Info size={14} className="text-primary shrink-0 mt-0.5" />
+                                                                    <p className="text-[11px] text-on-surface-variant/80 italic leading-relaxed">
+                                                                        {aiJustification || t('inspector.attributes.suggest_ai_placeholder')}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="py-4 text-center">
+                                                                <span className="text-xs text-error/70 italic">
+                                                                    {t('inspector.attributes.ai_error_generic')}
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
 
                                             <div className="grid grid-cols-1 gap-4">
                                                 <Input

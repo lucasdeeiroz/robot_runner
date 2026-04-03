@@ -14,7 +14,7 @@ interface GeminiResponse {
 
 import { ScreenMap } from '@/lib/types';
 
-export type AIGenerationType = 'test_case' | 'pbi' | 'improvement' | 'bug';
+export type AIGenerationType = 'test_case' | 'pbi' | 'improvement' | 'bug' | 'element_name';
 
 function extractBase64Data(imageBase64: string): { mimeType: string, data: string } {
     const trimmed = imageBase64.trim();
@@ -194,9 +194,9 @@ export async function askGemini(
     if (imageBase64) {
         const { mimeType, data } = extractBase64Data(imageBase64);
         parts.push({
-            inlineData: {
-                mimeType,
-                data
+            inline_data: {
+                mime_type: mimeType,
+                data: data
             }
         });
     }
@@ -251,5 +251,73 @@ export async function getAvailableModels(apiKey: string): Promise<string[]> {
     } catch (e) {
         console.error("Failed to fetch Gemini models:", e);
         throw e;
+    }
+}
+
+export async function suggestElementName(
+    elementAttr: Record<string, string>,
+    screenName: string,
+    apiKey: string,
+    model: string = 'gemini-1.5-flash',
+    language: string = 'en'
+): Promise<{ name: string; justification: string }> {
+    if (!apiKey) throw new Error("Missing Gemini API Key");
+
+    const prompt = `
+Context: Professional QA Engineering and Test Automation.
+Task: Suggest a descriptive name and a brief justification for this UI element found in the screen "${screenName}".
+
+Element Attributes:
+${Object.entries(elementAttr).filter(([_, v]) => v).map(([k, v]) => `- ${k}: ${v}`).join('\n')}
+
+Rules:
+1. Use "Space Separated" convention for the name (e.g., "Login Button", "Username Input").
+2. Respond in this language: ${language}.
+3. Return ONLY a valid JSON object with the following keys:
+   - "name": The suggested name.
+   - "justification": A brief explanation of why this name was chosen based on the attributes.
+`.trim();
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    const body = {
+        contents: [{
+            parts: [{ text: prompt }]
+        }],
+        generationConfig: {
+            temperature: 0.1,
+            topK: 1,
+            topP: 1,
+            maxOutputTokens: 512,
+            responseMimeType: "application/json"
+        }
+    };
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    });
+
+    const data: GeminiResponse = await response.json();
+
+    if (data.error) {
+        throw new Error(data.error.message);
+    }
+
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!content) {
+        throw new Error("Empty AI response");
+    }
+
+    try {
+        const parsed = JSON.parse(content);
+        return {
+            name: parsed.name?.replace(/["']/g, '') || "Unknown Element",
+            justification: parsed.justification || ""
+        };
+    } catch (e) {
+        console.error("Failed to parse AI response:", content);
+        throw new Error("Invalid AI response format");
     }
 }
