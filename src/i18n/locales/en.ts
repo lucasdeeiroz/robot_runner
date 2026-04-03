@@ -419,7 +419,13 @@ export const en = {
                 uiselector: "UIAutomator",
                 class: "Class",
                 identifiers: "Identifiers",
-                hierarchy: "Hierarchy"
+                hierarchy: "Hierarchy",
+                ai_suggest: "AI Suggestion",
+                suggest_with_ai: "Suggest with AI",
+                suggest_ai_placeholder: "Let AI help you find the most stable selector for this element.",
+                suggested_selector: "Suggested Selector",
+                ai_rationale: "AI Rationale",
+                ai_error_generic: "AI suggestion failed."
             }
         },
         logcat: {
@@ -682,7 +688,14 @@ export const en = {
                 },
                 keep_awake: "Keep Screen Awake",
                 debug_on: "Show Debug Logs",
-                debug_off: "Hide Debug Logs"
+                debug_off: "Hide Debug Logs",
+                analyze_failure: "Analyze Failure",
+                analyzing: "Analyzing...",
+                ai_insight: "AI Insight",
+                ai_analysis_placeholder: "Click to perform a smart root cause analysis using AI.",
+                ai_error_generic: "AI analysis failed.",
+                ai_error_details: "Error Details:",
+                ai_error_copy: "Copy Error"
             }
         },
         scrcpy: {

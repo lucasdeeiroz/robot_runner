@@ -1,6 +1,16 @@
 import { ScreenMap } from '@/lib/types';
 import { AIGenerationType } from './gemini';
 
+function extractBase64Data(imageBase64: string): { mimeType: string, data: string } {
+    const trimmed = imageBase64.trim();
+    if (trimmed.includes(',')) {
+        const [meta, data] = trimmed.split(',');
+        const mimeType = meta.match(/:(.*?);/)?.[1] || 'image/png';
+        return { mimeType, data: data.trim() };
+    }
+    return { mimeType: 'image/png', data: trimmed };
+}
+
 export async function generateRefinedTestCases(
     requirements: string,
     apiKey: string,
@@ -128,8 +138,9 @@ ${mappingContext}
         });
 
         if (!response.ok) {
-            const errData = await response.json();
-            throw new Error(errData.error?.message || `API Error: ${response.statusText}`);
+            const errData = await response.json().catch(() => ({}));
+            const errMsg = errData.error?.message || (typeof errData === 'string' ? errData : JSON.stringify(errData));
+            throw (new Error(errMsg || `API Error: ${response.statusText}`));
         }
 
         const data = await response.json();
@@ -143,6 +154,70 @@ ${mappingContext}
 
     } catch (error: any) {
         console.error("Claude API Error:", error);
+        throw error;
+    }
+}
+
+/**
+ * Generic AI query for Claude with multi-modal (image) support.
+ */
+export async function askClaude(
+    prompt: string,
+    apiKey: string,
+    model: string = 'claude-3-5-sonnet-20240620',
+    systemInstruction?: string,
+    imageBase64?: string
+): Promise<string> {
+    if (!apiKey) throw new Error("Missing Claude API Key");
+
+    const url = "https://api.anthropic.com/v1/messages";
+
+    const content: any[] = [];
+
+    if (imageBase64) {
+        const { mimeType, data } = extractBase64Data(imageBase64);
+        content.push({
+            type: "image",
+            source: {
+                type: "base64",
+                media_type: mimeType,
+                data
+            }
+        });
+    }
+
+    content.push({ type: "text", text: prompt });
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01'
+            },
+            body: JSON.stringify({
+                model,
+                max_tokens: 4096,
+                system: systemInstruction,
+                messages: [{ role: 'user', content }],
+                temperature: 0.4
+            })
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            const errMsg = errData.error?.message || (typeof errData === 'string' ? errData : JSON.stringify(errData));
+            throw (new Error(errMsg || `API Error: ${response.statusText}`));
+        }
+
+        const data = await response.json();
+        const text = data.content?.[0]?.text;
+        if (!text) throw new Error("Empty response from Claude");
+
+        return text.trim();
+    } catch (error: any) {
+        console.error("Claude API Error (askClaude):", error, content);
         throw error;
     }
 }

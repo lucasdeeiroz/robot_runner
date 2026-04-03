@@ -419,7 +419,13 @@ export const es = {
                 uiselector: "UIAutomator",
                 class: "Clase",
                 identifiers: "Identificadores",
-                hierarchy: "Jerarquía"
+                hierarchy: "Jerarquía",
+                ai_suggest: "Sugerencia de IA",
+                suggest_with_ai: "Sugerir con IA",
+                suggest_ai_placeholder: "Deja que la IA te ayude a encontrar el selector más estable para este elemento.",
+                suggested_selector: "Selector Sugerido",
+                ai_rationale: "Justificación de IA",
+                ai_error_generic: "Fallo en la sugerencia de IA."
             }
         },
         logcat: {
@@ -688,7 +694,14 @@ export const es = {
                 },
                 keep_awake: "Mantener Pantalla Activa",
                 debug_on: "Ver Logs de Depuración",
-                debug_off: "Ocultar Logs de Depuración"
+                debug_off: "Ocultar Logs de Depuración",
+                analyze_failure: "Analizar Fallo",
+                analyzing: "Analizando...",
+                ai_insight: "Análisis de IA",
+                ai_analysis_placeholder: "Haga clic para realizar un análisis inteligente de causa raíz utilizando IA.",
+                ai_error_generic: "Fallo en el análisis de IA.",
+                ai_error_details: "Detalles del error:",
+                ai_error_copy: "Copiar error"
             }
         },
         scrcpy: {

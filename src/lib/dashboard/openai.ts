@@ -1,6 +1,16 @@
 import { ScreenMap } from '@/lib/types';
 import { AIGenerationType } from './gemini';
 
+function extractBase64Data(imageBase64: string): { mimeType: string, data: string } {
+    const trimmed = imageBase64.trim();
+    if (trimmed.includes(',')) {
+        const [meta, data] = trimmed.split(',');
+        const mimeType = meta.match(/:(.*?);/)?.[1] || 'image/png';
+        return { mimeType, data: data.trim() };
+    }
+    return { mimeType: 'image/png', data: trimmed };
+}
+
 export async function generateRefinedTestCases(
     requirements: string,
     apiKey: string,
@@ -125,8 +135,9 @@ ${mappingContext}
         });
 
         if (!response.ok) {
-            const errData = await response.json();
-            throw new Error(errData.error?.message || `API Error: ${response.statusText}`);
+            const errData = await response.json().catch(() => ({}));
+            const errMsg = errData.error?.message || (typeof errData === 'string' ? errData : JSON.stringify(errData));
+            throw (new Error(errMsg || `API Error: ${response.statusText}`));
         }
 
         const data = await response.json();
@@ -140,6 +151,66 @@ ${mappingContext}
 
     } catch (error: any) {
         console.error("OpenAI API Error:", error);
+        throw error;
+    }
+}
+
+/**
+ * Generic AI query for OpenAI with multi-modal (image) support.
+ */
+export async function askOpenAI(
+    prompt: string,
+    apiKey: string,
+    model: string = 'gpt-4o',
+    systemInstruction?: string,
+    imageBase64?: string
+): Promise<string> {
+    if (!apiKey) throw new Error("Missing OpenAI API Key");
+
+    const url = "https://api.openai.com/v1/chat/completions";
+
+    const userContent: any[] = [{ type: "text", text: prompt }];
+
+    if (imageBase64) {
+        const { mimeType, data } = extractBase64Data(imageBase64);
+        userContent.push({
+            type: "image_url",
+            image_url: {
+                url: `data:${mimeType};base64,${data}`
+            }
+        });
+    }
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model,
+                messages: [
+                    systemInstruction ? { role: 'system', content: systemInstruction } : null,
+                    { role: 'user', content: userContent }
+                ].filter(Boolean),
+                temperature: 0.4
+            })
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            const errMsg = errData.error?.message || (typeof errData === 'string' ? errData : JSON.stringify(errData));
+            throw (new Error(errMsg || `API Error: ${response.statusText}`));
+        }
+
+        const data = await response.json();
+        const text = data.choices?.[0]?.message?.content;
+        if (!text) throw new Error("Empty response from OpenAI");
+
+        return text.trim();
+    } catch (error: any) {
+        console.error("OpenAI API Error (askOpenAI):", error);
         throw error;
     }
 }

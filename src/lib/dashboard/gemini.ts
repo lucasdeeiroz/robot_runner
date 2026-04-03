@@ -16,6 +16,16 @@ import { ScreenMap } from '@/lib/types';
 
 export type AIGenerationType = 'test_case' | 'pbi' | 'improvement' | 'bug';
 
+function extractBase64Data(imageBase64: string): { mimeType: string, data: string } {
+    const trimmed = imageBase64.trim();
+    if (trimmed.includes(',')) {
+        const [meta, data] = trimmed.split(',');
+        const mimeType = meta.match(/:(.*?);/)?.[1] || 'image/png';
+        return { mimeType, data: data.trim() };
+    }
+    return { mimeType: 'image/png', data: trimmed };
+}
+
 export async function generateRefinedTestCases(
     requirements: string,
     apiKey: string,
@@ -145,8 +155,9 @@ ${mappingContext}
         });
 
         if (!response.ok) {
-            const errData = await response.json();
-            throw new Error(errData.error?.message || `API Error: ${response.statusText}`);
+            const errData = await response.json().catch(() => ({}));
+            const errMsg = errData.error?.message || (typeof errData === 'string' ? errData : JSON.stringify(errData));
+            throw (new Error(errMsg || `API Error: ${response.statusText}`));
         }
 
         const data: GeminiResponse = await response.json();
@@ -160,6 +171,65 @@ ${mappingContext}
 
     } catch (error: any) {
         console.error("Gemini API Error:", error);
+        throw error;
+    }
+}
+
+/**
+ * Generic AI query for Gemini with multi-modal (image) support.
+ */
+export async function askGemini(
+    prompt: string,
+    apiKey: string,
+    model: string = 'gemini-1.5-flash',
+    systemInstruction?: string,
+    imageBase64?: string // Data URL format
+): Promise<string> {
+    if (!apiKey) throw new Error("Missing Gemini API Key");
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    const parts: any[] = [{ text: prompt }];
+
+    if (imageBase64) {
+        const { mimeType, data } = extractBase64Data(imageBase64);
+        parts.push({
+            inlineData: {
+                mimeType,
+                data
+            }
+        });
+    }
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ role: 'user', parts }],
+                system_instruction: systemInstruction ? {
+                    parts: [{ text: systemInstruction }]
+                } : undefined,
+                generationConfig: {
+                    temperature: 0.4,
+                    maxOutputTokens: 2048,
+                }
+            })
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            const errMsg = errData.error?.message || (typeof errData === 'string' ? errData : JSON.stringify(errData));
+            throw (new Error(errMsg || `API Error: ${response.statusText}`));
+        }
+
+        const data: GeminiResponse = await response.json();
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!text) throw new Error("Empty response from Gemini");
+
+        return text.trim();
+    } catch (error: any) {
+        console.error("Gemini API Error (askGemini):", error);
         throw error;
     }
 }
