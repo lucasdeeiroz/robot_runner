@@ -312,11 +312,11 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             const lang = language || i18n.language || 'en';
 
             if (aiProvider === 'gemini') {
-                result = await gemini.suggestElementName(selectedNode.attributes, screenName, apiKey, model, lang);
+                result = await gemini.suggestElementName(selectedNode.attributes, screenName, apiKey, model, lang, savedMaps);
             } else if (aiProvider === 'openai') {
-                result = await openai.suggestElementName(selectedNode.attributes, screenName, apiKey, model, lang);
+                result = await openai.suggestElementName(selectedNode.attributes, screenName, apiKey, model, lang, savedMaps);
             } else if (aiProvider === 'claude') {
-                result = await claude.suggestElementName(selectedNode.attributes, screenName, apiKey, model, lang);
+                result = await claude.suggestElementName(selectedNode.attributes, screenName, apiKey, model, lang, savedMaps);
             }
 
             if (result && result.name) {

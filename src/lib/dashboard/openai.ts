@@ -230,9 +230,21 @@ export async function suggestElementName(
     screenName: string,
     apiKey: string,
     model: string = 'gpt-4o-mini',
-    language: string = 'en'
+    language: string = 'en',
+    appMapping?: ScreenMap[]
 ): Promise<{ name: string; justification: string }> {
     if (!apiKey) throw new Error("Missing OpenAI API Key");
+
+    let mappingContext = "";
+    if (appMapping && appMapping.length > 0) {
+        mappingContext = "\n\nAPPLICATION MAPPING (Context of other screens for naming consistency):\n";
+        appMapping.forEach(screen => {
+            mappingContext += `- Screen: "${screen.name}"\n`;
+            screen.elements.forEach(el => {
+                mappingContext += `  * Element: "${el.name}" (Type: ${el.type})\n`;
+            });
+        });
+    }
 
     const prompt = `
 Context: Professional QA Engineering and Test Automation.
@@ -240,13 +252,14 @@ Task: Suggest a descriptive name and a brief justification for this UI element f
 
 Element Attributes:
 ${Object.entries(elementAttr).filter(([_, v]) => v).map(([k, v]) => `- ${k}: ${v}`).join('\n')}
+${mappingContext}
 
 Rules:
 1. Use "Space Separated" convention for the name (e.g., "Login Button", "Username Input").
 2. Respond in this language: ${language}.
 3. Return ONLY a valid JSON object with the following keys:
    - "name": The suggested name.
-   - "justification": A brief explanation of why this name was chosen based on the attributes.
+   - "justification": A brief explanation of why this name was chosen based on the attributes and existing context.
 `.trim();
 
     const url = "https://api.openai.com/v1/chat/completions";
