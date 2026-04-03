@@ -982,12 +982,6 @@ export const pt = {
                 all_os: "Todos os SOs",
                 all_status: "Todos os Status"
             },
-            actions: {
-                refresh: "Atualizar Lista",
-                clear: "Limpar",
-                delete: "Excluir Log",
-                open_launcher: "Abrir no Iniciador"
-            },
             unknown_os: "SO Desconhecido",
             unknown_model: "Modelo Desconhecido",
             charts: {
@@ -1000,6 +994,16 @@ export const pt = {
                 count_by_suites: "Suítes (Rodadas)",
                 count_by_tests: "Testes (Volume)",
                 duration_avg: "Duração Média"
+            },
+            actions: {
+                analyze_history: "Analisar com IA",
+                analyzing: "Analisando histórico...",
+                ai_analysis_title: "Análise Inteligente de Histórico",
+                ai_analysis_error: "Falha ao analisar histórico com IA",
+                refresh: "Atualizar Lista",
+                clear: "Limpar",
+                delete: "Excluir Log",
+                open_launcher: "Abrir no Iniciador"
             }
         },
         toolbox: {

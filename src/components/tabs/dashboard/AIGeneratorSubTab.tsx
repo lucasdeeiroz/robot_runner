@@ -17,6 +17,8 @@ import { generateRefinedTestCases as generateWithOpenAI } from '@/lib/dashboard/
 import { listScreenMaps } from '@/lib/dashboard/mapperPersistence';
 import { exportToXlsx, exportToDocx } from '@/lib/dashboard/export';
 import { addToHistory } from './HistoryPanel';
+import { save } from '@tauri-apps/plugin-dialog';
+import { writeTextFile } from '@tauri-apps/plugin-fs';
 import clsx from 'clsx';
 
 export function AIGeneratorSubTab() {
@@ -101,8 +103,31 @@ export function AIGeneratorSubTab() {
         }
     };
 
+    const handleExportRobot = async () => {
+        if (!generatedContent.trim()) return;
+
+        try {
+            const filePath = await save({
+                filters: [{
+                    name: 'Robot Framework Script',
+                    extensions: ['robot']
+                }],
+                defaultPath: `script_${new Date().getTime()}.robot`
+            });
+
+            if (filePath) {
+                await writeTextFile(filePath, generatedContent);
+                feedback.toast.success(t('dashboard.export.success', "Successfully exported!"));
+            }
+        } catch (e) {
+            console.error("Native export failed:", e);
+            feedback.toast.error("dashboard.export.error", e);
+        }
+    };
+
     const typeOptions = [
         { value: 'test_case', label: t('dashboard.generator.types.test_case', "Test Cases (BDD)") },
+        { value: 'robot_script', label: t('dashboard.generator.types.robot_script', "Robot Framework Script") },
         { value: 'pbi', label: t('dashboard.generator.types.pbi', "Product Backlog Item (PBI)") },
         { value: 'improvement', label: t('dashboard.generator.types.improvement', "Functional Improvement") },
         { value: 'bug', label: t('dashboard.generator.types.bug', "Bug Report") },
@@ -233,11 +258,11 @@ export function AIGeneratorSubTab() {
                     className="flex-1 font-mono custom-scrollbar resize-none whitespace-pre-wrap text-sm p-4 bg-surface"
                 />
 
-                <div className="grid grid-cols-2 gap-3 mt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
                     <Button
                         variant="outline"
                         onClick={handleExportXlsx}
-                        disabled={!generatedContent}
+                        disabled={!generatedContent || genType === 'robot_script'}
                         leftIcon={<FileDown size={16} className="text-green-600" />}
                         className="justify-center h-10"
                     >
@@ -246,12 +271,23 @@ export function AIGeneratorSubTab() {
                     <Button
                         variant="outline"
                         onClick={handleExportDocx}
-                        disabled={!generatedContent}
+                        disabled={!generatedContent || genType === 'robot_script'}
                         leftIcon={<FileText size={16} className="text-blue-600" />}
                         className="justify-center h-10"
                     >
                         {t('dashboard.actions.export_docx', "Word (.docx)")}
                     </Button>
+                    {genType === 'robot_script' && (
+                        <Button
+                            variant="primary"
+                            onClick={handleExportRobot}
+                            disabled={!generatedContent}
+                            leftIcon={<FileText size={16} />}
+                            className="justify-center h-10 lg:col-span-1 md:col-span-2"
+                        >
+                            {t('dashboard.actions.export_robot', "Robot Script (.robot)")}
+                        </Button>
+                    )}
                 </div>
             </div>
         </div>

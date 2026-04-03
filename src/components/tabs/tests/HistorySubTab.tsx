@@ -17,6 +17,11 @@ import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 import { decodeHtml } from '@/lib/utils';
 import { HistoryDetailModal } from '@/components/organisms/HistoryDetailModal';
 import { getCachedHistory, setCachedHistory, TestLog } from '@/lib/historyCache';
+import HistoryAIAnalysisModal from '@/components/organisms/HistoryAIAnalysisModal';
+import { analyzeTestHistory as analyzeGemini } from '@/lib/dashboard/gemini';
+import { analyzeTestHistory as analyzeOpenAI } from '@/lib/dashboard/openai';
+import { analyzeTestHistory as analyzeClaude } from '@/lib/dashboard/claude';
+import { BrainCircuit } from 'lucide-react';
 
 const formatDate = (dateStr: string) => {
     try {
@@ -55,6 +60,12 @@ export function HistorySubTab() {
     const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
     const [selectedLog, setSelectedLog] = useState<TestLog | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+
+    // AI Analysis State
+    const [isAIModalOpen, setIsAIModalOpen] = useState(false);
+    const [aiAnalysisText, setAiAnalysisText] = useState("");
+    const [isAnalyzingHistory, setIsAnalyzingHistory] = useState(false);
+    const [aiAnalysisError, setAiAnalysisError] = useState<string | null>(null);
 
     const parentRef = useRef<HTMLDivElement>(null);
     const historyContainerRef = useRef<HTMLDivElement>(null);
@@ -95,6 +106,46 @@ export function HistorySubTab() {
             feedback.toast.error("tests_page.load_error", e);
         } finally {
             setLoadingHistory(false);
+        }
+    };
+
+    const handleAIAnalysis = async () => {
+        if (filteredHistory.length === 0) return;
+        
+        setIsAnalyzingHistory(true);
+        setIsAIModalOpen(true);
+        setAiAnalysisError(null);
+        setAiAnalysisText("");
+
+        try {
+            let result = "";
+            const provider = settings.aiProvider;
+            const apiKey = provider === 'gemini' 
+                ? settings.geminiApiKey 
+                : provider === 'claude' 
+                    ? settings.claudeApiKey 
+                    : settings.openaiApiKey;
+
+            if (!apiKey) {
+                setAiAnalysisError(t('dashboard.generator.key_required', { provider: provider.charAt(0).toUpperCase() + provider.slice(1) }));
+                return;
+            }
+
+            if (provider === 'gemini') {
+                result = await analyzeGemini(filteredHistory, apiKey);
+            } else if (provider === 'openai') {
+                result = await analyzeOpenAI(filteredHistory, apiKey);
+            } else if (provider === 'claude') {
+                result = await analyzeClaude(filteredHistory, apiKey);
+            }
+
+            setAiAnalysisText(result);
+        } catch (err: any) {
+            console.error("AI Analysis Error:", err);
+            const errorMessage = err?.message || String(err);
+            setAiAnalysisError(`${t('tests_page.actions.ai_analysis_error')}: ${errorMessage}`);
+        } finally {
+            setIsAnalyzingHistory(false);
         }
     };
 
@@ -320,6 +371,17 @@ export function HistorySubTab() {
                             className="bg-surface/50 py-1.5 text-sm"
                             containerClassName="w-auto min-w-[120px]"
                         />
+
+                        <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={handleAIAnalysis}
+                            disabled={filteredHistory.length === 0 || isAnalyzingHistory}
+                            leftIcon={<BrainCircuit size={16} />}
+                            className="shadow-lg shadow-primary/10 ml-2"
+                        >
+                            {t('tests_page.actions.analyze_history')}
+                        </Button>
                     </div>
                     
                     {showCharts && (
@@ -486,6 +548,14 @@ export function HistorySubTab() {
                 isOpen={isModalOpen} 
                 onClose={() => setIsModalOpen(false)} 
                 log={selectedLog} 
+            />
+
+            <HistoryAIAnalysisModal
+                isOpen={isAIModalOpen}
+                onClose={() => setIsAIModalOpen(false)}
+                analysis={aiAnalysisText}
+                isAnalyzing={isAnalyzingHistory}
+                error={aiAnalysisError}
             />
         </div>
     );

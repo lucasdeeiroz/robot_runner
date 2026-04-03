@@ -91,6 +91,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     const [aiSuggestedName, setAiSuggestedName] = useState<string | null>(null);
     const [aiJustification, setAiJustification] = useState<string | null>(null);
     const [showAISuggestion, setShowAISuggestion] = useState(false);
+    const [isAISuggestingTags, setIsAISuggestingTags] = useState(false);
 
     useOutsideClick(loadMenuRef, () => {
         if (showLoadMenu) setShowLoadMenu(false);
@@ -332,6 +333,47 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             setAiSuggestedName(null);
         } finally {
             setIsAISuggesting(false);
+        }
+    };
+
+    const handleAISuggestTags = async () => {
+        if (!activeProfileId) return;
+
+        const { aiProvider, geminiApiKey, claudeApiKey, openaiApiKey, geminiModel, claudeModel, openaiModel, language } = settings;
+        const apiKey = aiProvider === 'gemini' ? geminiApiKey : aiProvider === 'claude' ? claudeApiKey : openaiApiKey;
+        const model = aiProvider === 'gemini' ? geminiModel : aiProvider === 'claude' ? claudeModel : openaiModel;
+
+        if (!apiKey) {
+            feedback.toast.error(t('dashboard.generator.key_required', { provider: aiProvider.toUpperCase() }));
+            return;
+        }
+
+        setIsAISuggestingTags(true);
+        try {
+            const lang = language || i18n.language || 'en';
+            let tags: string[] = [];
+
+            // Use mapped elements for context
+            const elementsContext = mappedElements.map(el => ({ name: el.name, type: el.type }));
+
+            if (aiProvider === 'gemini') {
+                tags = await gemini.suggestScreenTags(screenName || "Current Screen", elementsContext, apiKey, model, lang, screenshot || undefined);
+            } else if (aiProvider === 'openai') {
+                tags = await openai.suggestScreenTags(screenName || "Current Screen", elementsContext, apiKey, model, lang, screenshot || undefined);
+            } else if (aiProvider === 'claude') {
+                tags = await claude.suggestScreenTags(screenName || "Current Screen", elementsContext, apiKey, model, lang, screenshot || undefined);
+            }
+
+            if (tags && tags.length > 0) {
+                // Merge with existing tags, ensuring uniqueness
+                setScreenTags(prev => [...new Set([...prev, ...tags])]);
+                feedback.toast.success(t('mapper.feedback.ai_success'));
+            }
+        } catch (error) {
+            console.error("AI Tag Suggestion Error:", error);
+            feedback.toast.error(t('mapper.feedback.ai_error'));
+        } finally {
+            setIsAISuggestingTags(false);
         }
     };
 
@@ -873,14 +915,26 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                         options={savedMaps.map(m => m.name)}
                                         placeholder={t('mapper.placeholder.screen_name')}
                                     />
-                                    <div className="w-48">
-                                        <TagInput
-                                            label={t('mapper.screen_tags')}
-                                            tags={screenTags}
-                                            onChange={setScreenTags}
-                                            suggestions={[...new Set(savedMaps.flatMap(m => m.tags || []))]}
-                                            placeholder={t('mapper.placeholder.screen_tags')}
-                                        />
+                                    <div className="w-56 flex items-end gap-1">
+                                        <div className="flex-1">
+                                            <TagInput
+                                                label={t('mapper.screen_tags')}
+                                                tags={screenTags}
+                                                onChange={setScreenTags}
+                                                suggestions={[...new Set(savedMaps.flatMap(m => m.tags || []))]}
+                                                placeholder={t('mapper.placeholder.screen_tags')}
+                                            />
+                                        </div>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={handleAISuggestTags}
+                                            disabled={isAISuggestingTags}
+                                            className="mb-0.5 h-10 w-10 p-0 text-primary hover:bg-primary/10 border border-outline-variant/30 rounded-xl transition-all"
+                                            title={t('mapper.action.ai_suggest_tags', 'Suggest Tags with AI')}
+                                        >
+                                            {isAISuggestingTags ? <ExpressiveLoading size="xsm" variant="circular" /> : <Sparkles size={16} />}
+                                        </Button>
                                     </div>
                                     <div className="w-32">
                                         <div className="text-xs font-medium text-on-surface-variant/80 ml-1 mb-1">

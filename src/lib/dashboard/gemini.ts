@@ -14,7 +14,7 @@ interface GeminiResponse {
 
 import { ScreenMap } from '@/lib/types';
 
-export type AIGenerationType = 'test_case' | 'pbi' | 'improvement' | 'bug' | 'element_name';
+export type AIGenerationType = 'test_case' | 'pbi' | 'improvement' | 'bug' | 'element_name' | 'robot_script';
 
 function extractBase64Data(imageBase64: string): { mimeType: string, data: string } {
     const trimmed = imageBase64.trim();
@@ -29,7 +29,7 @@ function extractBase64Data(imageBase64: string): { mimeType: string, data: strin
 export async function generateRefinedTestCases(
     requirements: string,
     apiKey: string,
-    model: string = 'gemini-2.5-flash',
+    model: string = 'gemini-3.1-flash-lite-preview',
     language: string = 'en',
     appMapping?: ScreenMap[],
     generationType: AIGenerationType = 'test_case'
@@ -116,6 +116,16 @@ export async function generateRefinedTestCases(
    Notes: [Optional environment details or hints]
 `.trim();
             break;
+        case 'robot_script':
+            mainObjective = "generate a complete, functional Robot Framework (.robot) script block.";
+            typeSpecificRules = `
+1. Use the standard structure: *** Settings ***, *** Variables ***, *** Keywords ***, *** Test Cases ***.
+2. In *** Settings ***, include Library AppiumLibrary.
+3. In *** Keywords ***, create high-level keywords based on the user requirement. Use the provided APPLICATION MAPPING elements for locators.
+4. If an element name from mapping is found, use it as a basis for the keyword action (e.g., if mapped "Login Button", use its XPath/ID).
+5. Ensure the script is valid and follows best practices for mobile automation.
+`.trim();
+            break;
     }
 
     const systemInstruction = `
@@ -181,7 +191,7 @@ ${mappingContext}
 export async function askGemini(
     prompt: string,
     apiKey: string,
-    model: string = 'gemini-1.5-flash',
+    model: string = 'gemini-3.1-flash-lite-preview',
     systemInstruction?: string,
     imageBase64?: string // Data URL format
 ): Promise<string> {
@@ -258,7 +268,7 @@ export async function suggestElementName(
     elementAttr: Record<string, string>,
     screenName: string,
     apiKey: string,
-    model: string = 'gemini-1.5-flash',
+    model: string = 'gemini-3.1-flash-lite-preview',
     language: string = 'en',
     appMapping?: ScreenMap[]
 ): Promise<{ name: string; justification: string }> {
@@ -332,5 +342,88 @@ Rules:
     } catch (e) {
         console.error("Failed to parse AI response:", content);
         throw new Error("Invalid AI response format");
+    }
+}
+
+/**
+ * Suggests dynamic semantic tags for a screen based on its context.
+ */
+export async function suggestScreenTags(
+    screenName: string,
+    elements: any[],
+    apiKey: string,
+    model: string = 'gemini-3.1-flash-lite-preview',
+    language: string = 'en',
+    imageBase64?: string
+): Promise<string[]> {
+    if (!apiKey) throw new Error("Missing Gemini API Key");
+
+    const systemInstruction = `
+You are a QA Architect.
+Analyze the screen components and optionally the provided screenshot to suggest 3 to 5 highly relevant semantic tags.
+Tags should be dynamic, context-aware, and useful for organizing a large test suite.
+Examples: "Authentication", "User Profile", "Social Media", "Shopping Cart", "Form Validation".
+Respond ONLY in a comma-separated list of tags in this language: ${language}.
+`.trim();
+
+    const prompt = `
+Screen Name: ${screenName}
+Visible Elements:
+${elements.map(el => `- Name: "${el.name}" (Type: ${el.type})`).join('\n')}
+`.trim();
+
+    try {
+        const result = await askGemini(prompt, apiKey, model, systemInstruction, imageBase64);
+        return result.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
+    } catch (e) {
+        console.error("Gemini suggestScreenTags failure:", e);
+        throw e;
+    }
+}
+
+/**
+ * Analyzes test history for flakiness and trends.
+ */
+export async function analyzeTestHistory(
+    history: any[],
+    apiKey: string,
+    model: string = 'gemini-3.1-flash-lite-preview',
+    language: string = 'en'
+): Promise<string> {
+    const systemInstruction = `
+You are a Senior QA Automation Engineer and Data Analyst.
+Analyze the provided test execution history to identify:
+1. Flakiness: Tests that fail and pass intermittently under similar conditions.
+2. Device/OS Specific issues: Patterns where failures occur only on certain setups.
+3. Performance Trends: Significant increases in execution duration over time.
+4. Overall suite health and recommendations for improvement.
+
+Provide a comprehensive analysis in Markdown format.
+Use professional tone and actionable insights.
+Response language: ${language === 'pt' ? 'Portuguese' : language === 'es' ? 'Spanish' : 'English'}.
+`.trim();
+
+    const historySummary = history
+        .slice()
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        .slice(0, 60)
+        .map(log => ({
+            suite: log.suite_name,
+            status: log.status,
+            device: log.device_model,
+            os: log.android_version,
+            time: log.timestamp,
+            duration: log.duration,
+            pass: log.pass_count,
+            fail: log.fail_count
+        }));
+
+    const prompt = `History Data (JSON):\n${JSON.stringify(historySummary)}`;
+
+    try {
+        return await askGemini(prompt, apiKey, model, systemInstruction);
+    } catch (e) {
+        console.error("Gemini analyzeTestHistory failure:", e);
+        throw e;
     }
 }

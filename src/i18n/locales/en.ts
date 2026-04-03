@@ -983,6 +983,10 @@ export const en = {
                 all_status: "All Status"
             },
             actions: {
+                analyze_history: "Analyze with AI",
+                analyzing: "Analyzing history...",
+                ai_analysis_title: "Intelligent History Analysis",
+                ai_analysis_error: "Failed to analyze history with AI",
                 refresh: "Refresh List",
                 clear: "Clear",
                 delete: "Delete Log",

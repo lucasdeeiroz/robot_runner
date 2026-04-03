@@ -989,6 +989,10 @@ export const es = {
                 all_status: "Todos los Estados"
             },
             actions: {
+                analyze_history: "Analizar con IA",
+                analyzing: "Analizando historial...",
+                ai_analysis_title: "Análisis Inteligente de Historial",
+                ai_analysis_error: "Error al analizar el historial con IA",
                 refresh: "Actualizar Lista",
                 clear: "Limpiar",
                 delete: "Eliminar Log",
