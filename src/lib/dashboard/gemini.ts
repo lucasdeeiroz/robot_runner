@@ -391,12 +391,12 @@ export async function analyzeTestHistory(
     language: string
 ): Promise<string> {
     const systemInstruction = `
-You are a Senior QA Automation Engineer and Data Analyst.
+You are a Senior QA Automation Engineer and Data Analyst. Do not mention who you are in your responses.
 Analyze the provided test execution history to identify:
-1. Flakiness: Tests that fail and pass intermittently under similar conditions.
-2. Device/OS Specific issues: Patterns where failures occur only on certain setups.
+1. Flakiness: Tests that fail and pass intermittently under similar conditions. Use the "failedTests" list to track individual test stability across runs.
+2. Environment Correlation: Detect patterns where failures (specific tests or whole suites) occur only on certain device models or OS versions.
 3. Performance Trends: Significant increases in execution duration over time.
-4. Overall suite health and recommendations for improvement.
+4. Root Cause Hypothesis: Based on the pattern of failed tests, suggest if the issue is likely environmental, a specific regression, or a flaky locator.
 
 Provide a comprehensive analysis in Markdown format.
 Use professional tone and actionable insights.
@@ -415,7 +415,8 @@ Response language: ${language.toLowerCase().startsWith('pt') ? 'Portuguese' : la
             time: log.timestamp,
             duration: log.duration,
             pass: log.pass_count,
-            fail: log.fail_count
+            fail: log.fail_count,
+            failedTests: log.failed_tests || []
         }));
 
     const prompt = `History Data (JSON):\n${JSON.stringify(historySummary)}`;
@@ -441,13 +442,13 @@ export async function summarizeExecution(
     const cleanAnsi = (l: string) => l.replace(/\x1b\[[0-9;]*m/g, '').replace(/[\x00-\x1f\x7f-\x9f]/g, '');
 
     const failures: string[] = [];
-    
+
     const extractFailures = (nodes: any[]) => {
         nodes.forEach(n => {
             if (n.status === 'FAIL') {
                 let failInfo = `NODE: ${n.name} (${n.type})\n`;
                 if (n.summary) failInfo += `SUMMARY: ${n.summary}\n`;
-                
+
                 const collectedLogs: string[] = [];
                 if (n.failureDetail?.message) collectedLogs.push(`ERROR MESSAGE: ${n.failureDetail.message}`);
                 if (n.logs && n.logs.length > 0) collectedLogs.push(...n.logs.slice(-20).map((l: string) => cleanAnsi(l)));
@@ -490,7 +491,7 @@ export async function summarizeExecution(
     } else {
         calculateStats(tree);
     }
-    
+
     const totalTests = stats.passed + stats.failed;
     const successRate = totalTests > 0 ? ((stats.passed / totalTests) * 100).toFixed(1) : "0";
 
@@ -533,7 +534,7 @@ Rules:
             if (f.logs && f.logs.length > 0) info += `LOGS:\n${f.logs.slice(-10).join('\n')}\n`;
             return info;
         }).join('\n---\n')}`
-        : failures.length > 0 
+        : failures.length > 0
             ? `\n\nFAILURE CONTEXT (Detailed logs for failed tests):\n${failures.join('\n---\n')}`
             : "\n\nNo failures detected in the technical logs.";
 

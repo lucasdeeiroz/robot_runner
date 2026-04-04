@@ -33,6 +33,9 @@ static RE_TIME_XML: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"time="([^"]+)""#).unwrap());
 static RE_TS_XML: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"timestamp="([^"]+)""#).unwrap());
+static RE_TEST_FAIL: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r#"<test\s+[^>]*name="([^"]+)"[^>]*>[\s\S]*?<status\s+[^>]*status="FAIL""#).unwrap()
+});
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TestLog {
@@ -49,7 +52,10 @@ pub struct TestLog {
     xml_path: String,
     log_html_path: String,
     mtime: u64, // Unix timestamp of output.xml
+    #[serde(default)]
     ai_summary: Option<String>,
+    #[serde(default)]
+    failed_tests: Vec<String>,
 }
 
 #[command]
@@ -321,6 +327,15 @@ fn parse_log_entry(folder_path: &Path, xml_path: &Path, mtime: u64) -> Option<Te
             .to_string_lossy()
             .to_string();
 
+        let mut failed_tests = Vec::new();
+        if fail > 0 {
+            for caps in RE_TEST_FAIL.captures_iter(&content) {
+                if let Some(name) = caps.get(1) {
+                    failed_tests.push(name.as_str().to_string());
+                }
+            }
+        }
+
         return Some(TestLog {
             path: abs_folder_path.to_string_lossy().to_string(),
             xml_path: xml_path.to_string_lossy().to_string(),
@@ -336,6 +351,7 @@ fn parse_log_entry(folder_path: &Path, xml_path: &Path, mtime: u64) -> Option<Te
             log_html_path,
             mtime,
             ai_summary: None,
+            failed_tests,
         });
     }
 
@@ -393,6 +409,7 @@ fn parse_log_entry(folder_path: &Path, xml_path: &Path, mtime: u64) -> Option<Te
         log_html_path: xml_path.to_string_lossy().to_string(),
         mtime,
         ai_summary: None,
+        failed_tests: Vec::new(),
     })
 }
 
