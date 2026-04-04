@@ -458,6 +458,8 @@ export const pt = {
             title: "Mapeador",
             empty: "Selecione um dispositivo para iniciar o mapeamento",
             refresh: "Atualizar Fonte",
+            screen_description: "Descrição da Tela",
+            description: "Descrição",
             grouping: {
                 all_screens: "Todas as telas",
                 by_tags: "Por tags",
@@ -470,10 +472,17 @@ export const pt = {
                 export: "Exportar Fluxo",
                 export_image: "Exportar Imagem",
                 import: "Importar Fluxo",
+                migrating: "Migrando dados de layout...",
+                migration_success: "Migração de Layout Concluída",
+                migration_error: "Falha na migração",
+                save_error: "Falha ao salvar layout descentralizado",
+                no_changes: "Nenhuma alteração de layout para salvar",
+                save_connection_error: "Falha ao salvar conexão",
+                port_occupied: "Porta já está ocupada",
                 export_success: "Fluxo exportado com sucesso!",
                 import_success: "Fluxo importado com sucesso!",
-                export_error: "Erro ao exportar fluxo.",
-                import_error: "Erro ao importar fluxo.",
+                export_error: "Falha ao exportar fluxo",
+                import_error: "Falha ao importar fluxo",
                 quick_connect: "Conexão Rápida",
                 source_element: "Elemento de Origem",
                 target_screen: "Tela de Destino",
@@ -486,9 +495,16 @@ export const pt = {
                 center_view: "Centralizar Visualização",
                 filter_by_tag: "Filtrar por Tag",
                 all_tags: "Todas as Tags",
+                pan_mode: "Modo Panorâmico (Segure Espaço)",
+                zoom_in: "Aumentar Zoom",
+                zoom_out: "Diminuir Zoom",
+                center: "Centralizar Visualização",
+                filter_tags: "Filtrar por Etiqueta",
+                select_source_element: "Por favor, selecione um elemento de origem",
+                element_not_found: "Elemento de origem não encontrado",
                 unsaved_changes: {
                     title: "Alterações não salvas",
-                    message: "Você tem alterações não salvas. Deseja salvar antes de sair?",
+                    message: "Você tem alterações de layout não salvas. Deseja salvar antes de sair?",
                     save_and_exit: "Salvar e Sair",
                     exit_without_saving: "Sair sem Salvar",
                     cancel: "Cancelar"
@@ -526,7 +542,18 @@ export const pt = {
                 screen: "Tela",
                 modal: "Modal",
                 tab: "Aba",
-                drawer: "Gaveta"
+                drawer: "Gaveta",
+                dialog: "Diálogo",
+                tab_content: "Conteúdo da Aba",
+                overlay: "Sobreposição"
+            },
+            exploration: {
+                start: "Iniciar Exploração Autônoma",
+                stop: "Parar",
+                active: "IA Explorando...",
+                thinking: "Pensando...",
+                summary: "Exploração Finalizada",
+                stopped: "Exploração interrompida: {{reason}}"
             },
             modes: {
                 inspect: "Modo Inspeção",
@@ -556,6 +583,8 @@ export const pt = {
             input: {
                 element_type: "Tipo de Elemento",
                 element_name: "Nome do Elemento",
+                element_description: "Descrição do Elemento",
+                screen_description: "Descrição da Tela",
                 navigates_to: "Navega Para (Opcional)",
                 menu_options: "Opções de Menu (Separadas por vírgula)",
                 parent_screen: "Tela Pai",
@@ -568,7 +597,9 @@ export const pt = {
                 menu_options: "Opção 1, Opção 2...",
                 parent_screen: "Nome da Tela Pai",
                 screen_name: "Nome da Tela (Único)",
-                screen_tags: "ex: Auth, Perfil"
+                screen_tags: "ex: Auth, Perfil",
+                screen_description: "Descrição para contexto da IA...",
+                element_description: "Descrição do elemento (Apenas IA)"
             },
             action: {
                 add: "Adicionar Elemento",
@@ -585,7 +616,11 @@ export const pt = {
                 new: "Novo",
                 discard: "Descartar",
                 discard_desc: "Descartar Tela",
-                delete: "Excluir"
+                delete: "Excluir",
+                toggle_stay_awake: "Alternar Manter Tela Ligada",
+                export_json: "Exportar JSON",
+                import_json: "Importar JSON",
+                export_image: "Exportar Imagem"
             },
             feedback: {
                 mapped: "Elemento mapeado!",
@@ -598,12 +633,15 @@ export const pt = {
                 ai_success: "Nome sugerido!",
                 ai_error: "Falha ao sugerir nome",
                 new_screen: "Pronto para nova tela",
-                deleted: "Mapa excluído"
+                deleted: "Mapa excluído",
+                stay_on_enabled: "Manter Tela Ligada ativado",
+                stay_on_disabled: "Manter Tela Ligada desativado"
             },
             error: {
                 missing_name: "Por favor, forneça um nome para o elemento",
                 missing_screen_name: "Por favor, forneça um Nome para a Tela",
-                save_failed: "Falha ao salvar mapa da tela"
+                save_failed: "Falha ao salvar mapa da tela",
+                stay_on_failed: "Falha ao alterar estado de Manter Tela Ligada"
             },
             confirm: {
                 delete: "Tem certeza que deseja excluir este mapa?",
@@ -811,9 +849,11 @@ export const pt = {
                 },
                 openai: {
                     title: "OpenAI ChatGPT",
-                    placeholder: "Digite a Chave API OpenAI",
-                    help: "Obtenha sua chave na OpenAI Platform"
-                }
+                    placeholder: "Digite a Chave de API da OpenAI",
+                    help: "Obtenha sua Chave de API na OpenAI Platform"
+                },
+                max_exploration_steps: "Limite de Passos de Exploração",
+                max_exploration_steps_help: "Número máximo de ações autônomas que a IA realizará antes de interromper a exploração."
             },
             system: {
                 title: "Versões do Sistema",

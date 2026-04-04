@@ -3,13 +3,13 @@ import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import {
     Maximize, Check, Scan, Home, ArrowLeft, Rows, X, RefreshCw, Save, GitGraph, Trash2, Plus, FileClock, FileInput, SearchCode, ChevronDown, ChevronUp, ChevronRight,
-    FileCode, FileStack, FileUp, FileDown
+    FileCode, FileStack, FileUp, FileDown, Eye, EyeClosed, Sparkles, Square
 } from 'lucide-react';
 import { XMLParser } from 'fast-xml-parser';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { useOutsideClick } from '@/hooks/useOutsideClick';
-import { InspectorNode, transformXmlToTree, findNodesAtCoords, generateXPath, transformBounds } from '@/lib/inspectorUtils';
+import { InspectorNode, transformXmlToTree, findNodesAtCoords, generateXPath, transformBounds, assignShortIds, findNodeByShortId, generateSimplifiedXml } from '@/lib/inspectorUtils';
 import { feedback } from "@/lib/feedback";
 import { Section } from "@/components/organisms/Section";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
@@ -35,6 +35,7 @@ import { AiResponse } from "@/components/molecules/AiResponse";
 import * as gemini from '@/lib/dashboard/gemini';
 import * as claude from '@/lib/dashboard/claude';
 import * as openai from '@/lib/dashboard/openai';
+import { AutonomousExplorer, ExplorationAction } from '@/lib/dashboard/explorationEngine';
 
 function groupElementsByType<T extends { type: string }>(
     elements: T[],
@@ -68,6 +69,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     // --- Screen Mapper State ---
     const [screenName, setScreenName] = useState("");
     const [screenType, setScreenType] = useState<'screen' | 'modal' | 'tab' | 'drawer'>('screen');
+    const [screenDescription, setScreenDescription] = useState("");
     const [screenTags, setScreenTags] = useState<string[]>([]);
     const [mappedElements, setMappedElements] = useState<UIElementMap[]>([]);
     const [currentElement, setCurrentElement] = useState<Partial<UIElementMap>>({});
@@ -96,6 +98,22 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     const [isAISuggestingTags, setIsAISuggestingTags] = useState(false);
     const [aiError, setAiError] = useState<string | null>(null);
 
+    // --- Autonomous Exploration State ---
+    const [isStayOn, setIsStayOn] = useState(false);
+    const [isExploring, setIsExploring] = useState(false);
+    const isExploringRef = useRef(false);
+    const [explorationLogs, setExplorationLogs] = useState<string[]>([]);
+    const explorerRef = useRef<AutonomousExplorer | null>(null);
+    const explorationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const logScrollRef = useRef<HTMLDivElement>(null);
+
+    // Auto-scroll exploration logs
+    useEffect(() => {
+        if (logScrollRef.current) {
+            logScrollRef.current.scrollTop = logScrollRef.current.scrollHeight;
+        }
+    }, [explorationLogs]);
+
     useOutsideClick(loadMenuRef, () => {
         if (showLoadMenu) setShowLoadMenu(false);
     });
@@ -108,9 +126,23 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         loadSavedMaps();
     }, [activeProfileId]);
 
+    const toggleStayOn = async () => {
+        if (!selectedDevice) return;
+        const newState = !isStayOn;
+        try {
+            await invoke('set_stay_on', { device: selectedDevice, enabled: newState });
+            setIsStayOn(newState);
+            feedback.toast.success(newState ? t('mapper.feedback.stay_on_enabled', 'Stay Awake enabled') : t('mapper.feedback.stay_on_disabled', 'Stay Awake disabled'));
+        } catch (e) {
+            console.error("Failed to toggle stay_on", e);
+            feedback.toast.error(t('mapper.error.stay_on_failed', 'Failed to change Stay Awake state'));
+        }
+    };
+
     const loadSavedMaps = async () => {
         const maps = await listScreenMaps(activeProfileId);
         setSavedMaps(maps);
+        return maps;
     };
 
     // reset current element when selection changes
@@ -207,6 +239,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             id: screenName.toLowerCase().replace(/\s+/g, '_'),
             name: screenName,
             type: screenType,
+            description: screenDescription || undefined,
             tags: screenTags.length > 0 ? screenTags : undefined,
             elements: mappedElements,
             base64_preview: screenshot || undefined
@@ -224,6 +257,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     const handleLoadScreen = (map: ScreenMap) => {
         setScreenName(map.name);
         setScreenType(map.type);
+        setScreenDescription(map.description || "");
         setScreenTags(map.tags || []);
         setMappedElements(map.elements);
         if (map.base64_preview) {
@@ -383,6 +417,249 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             setIsAISuggestingTags(false);
         }
     };
+
+    // --- Autonomous Exploration Logic ---
+
+    const stopExploration = async (reason?: string) => {
+        if (explorationTimeoutRef.current) {
+            clearTimeout(explorationTimeoutRef.current);
+            explorationTimeoutRef.current = null;
+        }
+        setIsExploring(false);
+        isExploringRef.current = false;
+
+        if (reason) {
+            explorerRef.current?.addLog(`Exploration stopped: ${reason}`);
+            setExplorationLogs(explorerRef.current?.getLogs() || []);
+            feedback.toast.info(`${t('mapper.exploration.stopped')}: ${reason}`);
+        }
+    };
+
+    const runExplorationStep = async () => {
+        if (!isExploringRef.current || !selectedDevice || !explorerRef.current) return;
+
+        const explorer = explorerRef.current;
+        explorer.incrementStep();
+
+        // Removed max steps check to allow indefinite exploration
+
+        try {
+            explorer.addLog(`--- Step ${explorer.getState().currentStep} ---`);
+
+            // App Recovery Logic
+            const currentPkg = await invoke<string>('get_focused_package', { device: selectedDevice });
+            if (!isExploringRef.current) return;
+
+            let targetPkg = explorer.getTargetPackage();
+
+            if (explorer.getState().currentStep === 1 && !targetPkg) {
+                targetPkg = currentPkg;
+                explorer.setTargetPackage(targetPkg);
+            }
+
+            if (targetPkg && currentPkg !== targetPkg) {
+                explorer.addLog(`App exit detected (Current: ${currentPkg}, Target: ${targetPkg}). Recovering...`);
+                await invoke('launch_package', { device: selectedDevice, package: targetPkg });
+                if (!isExploringRef.current) return;
+                // Small delay to let app load
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                if (!isExploringRef.current) return;
+            }
+
+            setExplorationLogs([...explorer.getLogs()]);
+
+            // 1. Capture Current State
+            explorer.addLog("Capturing screen...");
+            setExplorationLogs([...explorer.getLogs()]);
+            const b64 = await invoke<string>('get_screenshot', { deviceId: selectedDevice });
+            if (!isExploringRef.current) return;
+            setScreenshot(b64);
+
+            const xml = await invoke<string>('get_xml_dump', { deviceId: selectedDevice });
+            if (!isExploringRef.current) return;
+
+            // Parse for local UI update
+            const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "", textNodeName: "_text" });
+            const jsonObj = parser.parse(xml);
+            const root = jsonObj.hierarchy ? transformXmlToTree(jsonObj.hierarchy) : transformXmlToTree(jsonObj);
+
+            // Prepare for AI with Short IDs
+            assignShortIds(root);
+            const simplifiedXml = generateSimplifiedXml(root);
+            setRootNode(root);
+
+            // 2. AI Analysis
+            const { aiProvider, geminiApiKey, claudeApiKey, openaiApiKey, geminiModel, claudeModel, openaiModel, language } = settings;
+            const apiKey = aiProvider === 'gemini' ? geminiApiKey : aiProvider === 'claude' ? claudeApiKey : openaiApiKey;
+            const model = aiProvider === 'gemini' ? geminiModel : aiProvider === 'claude' ? claudeModel : openaiModel;
+            const lang = language || i18n.language || 'en';
+
+            if (!apiKey) throw new Error("API Key missing");
+
+            explorer.addLog(`Analyzing screen with ${aiProvider}...`);
+            setExplorationLogs([...explorer.getLogs()]);
+
+            let maps = await loadSavedMaps();
+            if (!isExploringRef.current) return;
+
+            let result: any = null;
+
+            if (aiProvider === 'gemini') {
+                result = await gemini.exploreScreen(simplifiedXml, b64, apiKey, model, lang, maps, explorer.getLogs());
+            } else if (aiProvider === 'openai') {
+                result = await openai.exploreScreen(simplifiedXml, b64, apiKey, model, lang, maps, explorer.getLogs());
+            } else if (aiProvider === 'claude') {
+                result = await claude.exploreScreen(simplifiedXml, b64, apiKey, model, lang, maps, explorer.getLogs());
+            }
+
+            if (!isExploringRef.current) return;
+            if (!result) throw new Error("AI returned no exploration result");
+
+            // 3. Auto-Mapping
+            const aiScreen = result.screen;
+            // The AI returns short_id as 'id'. We need to convert it back to XPath for permanent storage
+            const aiElements = (result.elements || []).map((el: any) => {
+                const node = findNodeByShortId(root, el.id);
+                return {
+                    ...el,
+                    id: node ? generateXPath(node) : el.id // Store XPath for stability between app versions
+                };
+            });
+
+            explorer.addLog(`AI mapped: ${aiScreen.name} (${aiScreen.type}) with ${aiElements.length} elements.`);
+            explorer.addLog(`Rationale: ${result.rationale}`);
+
+            if (aiScreen.name) {
+                // Smart Merging: Check for existing map with same name
+                const existingMap = savedMaps.find(m => m.name === aiScreen.name);
+                let mergedElements = aiElements;
+
+                if (existingMap) {
+                    explorer.addLog(`Merging ${aiElements.length} elements into existing screen: ${aiScreen.name}`);
+                    // Union based on ID (XPath)
+                    const existingIds = new Set(existingMap.elements.map(e => e.id));
+                    const newUniqueElements = aiElements.filter((e: any) => !existingIds.has(e.id));
+                    mergedElements = [...existingMap.elements, ...newUniqueElements];
+                }
+
+                const map: ScreenMap = {
+                    id: existingMap?.id || aiScreen.name.toLowerCase().replace(/\s+/g, '_'),
+                    name: aiScreen.name,
+                    type: aiScreen.type || existingMap?.type || 'screen',
+                    description: aiScreen.description || existingMap?.description,
+                    tags: [...new Set([...(existingMap?.tags || []), ...(aiScreen.tags || [])])],
+                    elements: mergedElements,
+                    base64_preview: b64,
+                    // Suggested Layout from AI
+                    layout: aiScreen.layout || existingMap?.layout
+                };
+
+                await saveScreenMap(activeProfileId, map);
+                explorer.markScreenVisited(aiScreen.name);
+
+                // Update UI State if it's the current screen we're looking at
+                setScreenName(aiScreen.name);
+                setScreenType(map.type as any);
+                setScreenDescription(map.description || "");
+                setScreenTags(map.tags || []);
+                setMappedElements(mergedElements);
+
+                // NOTE: Flowchart Layout is now primarily stored within individual ScreenMaps.
+                // The central flowchart_layout.json is only for migration/global settings.
+                if (aiScreen.layout) {
+                    explorer.addLog(`AI suggested layout for ${aiScreen.name}: (${aiScreen.layout.gridX}, ${aiScreen.layout.gridY})`);
+                }
+            }
+
+            // 4. Navigation
+            const next = result.nextAction as ExplorationAction;
+            if (next.type === 'finish') {
+                explorer.addLog("Exploration finished by AI.");
+                stopExploration("Finished");
+                return;
+            } else if (next.type === 'back') {
+                explorer.addLog("Navigating back...");
+                await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'keyevent', '4'] });
+            } else if (next.type === 'click' && next.targetId) {
+                explorer.addLog(`Clicking element: ${next.targetId} (${next.details || 'no details'})`);
+
+                // Use findNodeByShortId to resolve targetId to coordinates
+                const targetNode = findNodeByShortId(root, next.targetId);
+
+                if (targetNode && targetNode.bounds) {
+                    const centerX = Math.round(targetNode.bounds.x + targetNode.bounds.w / 2);
+                    const centerY = Math.round(targetNode.bounds.y + targetNode.bounds.h / 2);
+                    await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'tap', String(centerX), String(centerY)] });
+                    addTapAnimation(centerX, centerY);
+                } else {
+                    explorer.addLog(`Could not find coordinates for element (ShortID: ${next.targetId}). Trying back.`);
+                    await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'keyevent', '4'] });
+                }
+            } else if (next.type === 'swipe' && next.targetId && next.direction) {
+                explorer.addLog(`Swiping ${next.direction} on: ${next.targetId} (${next.details || 'no details'})`);
+                const targetNode = findNodeByShortId(root, next.targetId);
+
+                if (targetNode && targetNode.bounds) {
+                    const { x, y, w, h } = targetNode.bounds;
+                    let startX = x + w / 2;
+                    let startY = y + h / 2;
+                    let endX = startX;
+                    let endY = startY;
+
+                    const offsetHand = 0.4; // Swipe 40% of container size
+                    if (next.direction === 'up') { endY = startY - (h * offsetHand); }
+                    else if (next.direction === 'down') { endY = startY + (h * offsetHand); }
+                    else if (next.direction === 'left') { endX = startX - (w * offsetHand); }
+                    else if (next.direction === 'right') { endX = startX + (w * offsetHand); }
+
+                    await invoke('run_adb_command', {
+                        device: selectedDevice,
+                        args: ['shell', 'input', 'swipe', String(Math.round(startX)), String(Math.round(startY)), String(Math.round(endX)), String(Math.round(endY)), "500"]
+                    });
+                    addSwipeAnimation(startX, startY, endX, endY);
+                } else {
+                    explorer.addLog(`Could not find coordinates for swipe container (ShortID: ${next.targetId}).`);
+                }
+            }
+
+            if (!isExploringRef.current) return;
+            setExplorationLogs([...explorer.getLogs()]);
+
+            // 5. Schedule next step
+            explorationTimeoutRef.current = setTimeout(runExplorationStep, 3000);
+
+        } catch (error: any) {
+            console.error("Exploration error:", error);
+            explorer.addLog(`Error during exploration: ${error.message}`);
+            setExplorationLogs([...explorer.getLogs()]);
+            stopExploration(`Error: ${error.message}`);
+        }
+    };
+
+    const startExploration = async () => {
+        if (!selectedDevice) return;
+        explorerRef.current = new AutonomousExplorer(9999); // Indefinite
+        setExplorationLogs([]);
+        setIsExploring(true);
+        isExploringRef.current = true;
+
+        // Ensure stay on is enabled during exploration if not already
+        if (!isStayOn) {
+            try {
+                await invoke('set_stay_on', { device: selectedDevice, enabled: true });
+                setIsStayOn(true);
+                explorerRef.current.addLog("Device screen set to STAY AWAKE.");
+            } catch (e) {
+                console.error("Failed to set stay_on during start", e);
+            }
+        }
+    };
+
+    useEffect(() => {
+        if (isExploring && explorerRef.current && explorerRef.current.getState().currentStep === 0) {
+            runExplorationStep();
+        }
+    }, [isExploring]);
 
     const handleExportPOM = async () => {
         if (!screenName || mappedElements.length === 0) {
@@ -848,10 +1125,10 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                     >
                     </Section>
 
-                    <div className="flex-1 grid grid-cols-[auto_1fr] gap-4 min-h-0 overflow-hidden">
-                        <div className="flex flex-col items-center justify-center overflow-hidden relative max-w-[30vw] bg-surface-variant/5 border border-outline-variant/20 rounded-2xl p-4">
+                    <div className="flex-1 grid grid-cols-[auto_1fr] min-h-0 overflow-hidden mt-0 mb-0 py-0">
+                        <div className="flex flex-col items-center justify-center overflow-hidden relative max-w-[30vw] bg-surface-variant/5 border border-outline-variant/20 rounded-2xl px-2 py-0 mb-0 mt-0">
                             {screenshot ? (
-                                <div className="relative inline-block shadow-2xl rounded-lg border border-outline-variant/30 flex-shrink-0 mb-4">
+                                <div className="relative inline-block shadow-2xl rounded-lg border border-outline-variant/30 flex-shrink-0 mb-2">
                                     {loading && <GestureOverlay />}
                                     <img
                                         ref={imgRef}
@@ -908,6 +1185,21 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                     <p>{loading ? t('mapper.status.loading') : t('mapper.status.no_screenshot')}</p>
                                 </div>
                             )}
+                            <Button
+                                variant={isExploring ? "danger" : "primary"}
+                                size="sm"
+                                onClick={isExploring ? () => stopExploration("User stopped") : startExploration}
+                                className={clsx(
+                                    "flex items-center gap-2 px-3 py-1.5 rounded-2xl transition-all shadow-sm text-sm font-medium mb-0",
+                                    isExploring ? "bg-error text-surface hover:bg-error/80" : "bg-primary/10 border border-primary text-primary hover:bg-primary hover:text-surface"
+                                )}
+                                title={isExploring ? t('mapper.exploration.stop') : t('mapper.exploration.start')}
+                            >
+                                {isExploring ? <Square size={16} fill="currentColor" /> : <Sparkles size={16} stroke="currentColor" />}
+                                <span className={clsx(isNarrow && "hidden")}>
+                                    {isExploring ? t('mapper.exploration.stop') : t('mapper.exploration.start')}
+                                </span>
+                            </Button>
                         </div>
 
                         {/* Properties Panel */}
@@ -955,6 +1247,15 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                             }))}
                                         />
                                     </div>
+                                </div>
+                                <div className="px-4 pb-2">
+                                    <Textarea
+                                        label={t('mapper.input.screen_description')}
+                                        value={screenDescription}
+                                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setScreenDescription(e.target.value)}
+                                        placeholder={t('mapper.placeholder.screen_description')}
+                                        className="h-16"
+                                    />
                                 </div>
                                 <div className="flex gap-2">
                                     <Button onClick={() => { handleSaveScreen(); refreshAll(); }} variant="primary" className="hover:bg-secondary-container">
@@ -1351,6 +1652,13 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateElement('name', e.target.value)}
                                                     placeholder={t('mapper.placeholder.element_name')}
                                                 />
+                                                <Textarea
+                                                    label={t('mapper.input.element_description')}
+                                                    value={currentElement.description || ''}
+                                                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => updateElement('description', e.target.value)}
+                                                    placeholder={t('mapper.placeholder.element_description', 'Element description (AI only)')}
+                                                    className="h-20"
+                                                />
                                                 <div className="grid grid-cols-2 gap-4">
                                                     <Select
                                                         label={t('mapper.input.element_type')}
@@ -1363,8 +1671,14 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                     />
                                                     <GroupedScreenSelect
                                                         label={t('mapper.input.navigates_to')}
-                                                        value={currentElement.navigates_to || ''}
-                                                        onChange={(val) => updateElement('navigates_to', val)}
+                                                        value={(typeof currentElement.navigates_to === 'object' ? currentElement.navigates_to?.destination : currentElement.navigates_to) || ''}
+                                                        onChange={(val) => {
+                                                            if (typeof currentElement.navigates_to === 'object' && currentElement.navigates_to !== null) {
+                                                                updateElement('navigates_to', { ...currentElement.navigates_to, destination: val });
+                                                            } else {
+                                                                updateElement('navigates_to', val);
+                                                            }
+                                                        }}
                                                         maps={savedMaps}
                                                         placeholder={t('mapper.placeholder.navigates_to')}
                                                     />
@@ -1431,6 +1745,54 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 variant="danger"
                 confirmText={t('mapper.action.delete')}
             />
+
+            {/* AI Exploration Log Panel */}
+            {explorationLogs.length > 0 && (
+                <div className={clsx(
+                    "fixed bottom-6 right-6 w-96 bg-surface p-4 border border-outline-variant/30 rounded-2xl shadow-2xl z-[150] transition-all flex flex-col gap-3",
+                    !isExploring && explorationLogs.length > 0 ? "opacity-90 grayscale-[0.5]" : "opacity-100"
+                )}>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <div className={clsx("w-2 h-2 rounded-full", isExploring ? "bg-success animate-pulse" : "bg-on-surface-variant/30")} />
+                            <h4 className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+                                {isExploring ? t('mapper.exploration.active', 'AI Exploring...') : t('mapper.exploration.summary', 'Exploration Ended')}
+                            </h4>
+                        </div>
+                        <div className="flex gap-1">
+                            {!isExploring && (
+                                <Button variant="ghost" size="icon" onClick={() => setExplorationLogs([])} className="h-6 w-6">
+                                    <X size={14} />
+                                </Button>
+                            )}
+                        </div>
+                        {isExploring && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={toggleStayOn}
+                                className={clsx("flex items-center gap-2 px-3 py-1.5 rounded-2xl transition-all", isStayOn ? "bg-warning/20 text-warning" : "text-on-surface-variant/60 hover:bg-surface-variant/30")}
+                                title={t('mapper.action.toggle_stay_awake', 'Toggle Keep Screen Awake')}
+                            >
+                                {isStayOn ? <Eye size={16} stroke="currentColor" /> : <EyeClosed size={16} stroke="currentColor" />}
+                            </Button>
+                        )}
+                    </div>
+                    <div
+                        ref={logScrollRef}
+                        className="bg-surface-variant/10 rounded-xl p-3 border border-outline-variant/10 overflow-y-auto max-h-60 custom-scrollbar flex flex-col gap-1"
+                    >
+                        {explorationLogs.map((log, i) => (
+                            <div key={i} className="text-[10px] font-mono text-on-surface-variant/80 border-b border-outline-variant/5 pb-1 last:border-0">
+                                {log}
+                            </div>
+                        ))}
+                        {isExploring && <div className="flex items-center gap-2 text-[10px] text-primary animate-pulse mt-1">
+                            <ExpressiveLoading size="xsm" variant="circular" /> {t('mapper.exploration.thinking', 'Thinking...')}
+                        </div>}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

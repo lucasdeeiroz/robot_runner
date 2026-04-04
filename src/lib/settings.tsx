@@ -70,6 +70,7 @@ export interface AppSettings {
     claudeModel: string;
     openaiApiKey?: string;
     openaiModel: string;
+    maxExplorationSteps?: number;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -106,7 +107,8 @@ const DEFAULT_SETTINGS: AppSettings = {
         appiumJavaArgs: 'test',
         appPackage: 'com.android.chrome, com.chrome.beta',
         ngrokToken: ''
-    }
+    },
+    maxExplorationSteps: 30
 };
 
 export interface Profile {

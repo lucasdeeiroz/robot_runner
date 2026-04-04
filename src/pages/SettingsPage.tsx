@@ -912,6 +912,20 @@ export function SettingsPage() {
                                     </div>
                                 </div>
                             )}
+
+                            <div className="pt-4 border-t border-outline-variant/30 mt-4 animate-in fade-in duration-500">
+                                <Input
+                                    label={t('settings.ai.max_exploration_steps')}
+                                    type="number"
+                                    min={1}
+                                    max={500}
+                                    value={settings.maxExplorationSteps || 30}
+                                    onChange={(e) => updateSetting('maxExplorationSteps', Math.max(1, parseInt(e.target.value) || 1))}
+                                />
+                                <p className="text-[10px] text-on-surface-variant/80 mt-1">
+                                    {t('settings.ai.max_exploration_steps_help')}
+                                </p>
+                            </div>
                         </div>
                     </Section>
 

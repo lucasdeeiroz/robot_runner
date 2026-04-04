@@ -1,10 +1,10 @@
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { ScreenMap, FlowchartLayout } from '@/lib/types';
+import { ScreenMap, FlowchartLayout, LayoutNode, LayoutEdge } from '@/lib/types';
 import { X, ZoomIn, ZoomOut, Maximize, Pencil, Save, Upload, Download, Camera, Plus, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
-import { saveFlowchartLayout, loadFlowchartLayout, exportMapperData, importMapperData, saveScreenMap } from '@/lib/dashboard/mapperPersistence';
+import { loadFlowchartLayout, deleteFlowchartLayout, exportMapperData, importMapperData, saveScreenMap } from '@/lib/dashboard/mapperPersistence';
 import { feedback } from '@/lib/feedback';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
@@ -180,16 +180,85 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
 
     const loadLayout = useCallback(async () => {
         setLoading(true);
-        const saved = await loadFlowchartLayout(activeProfileId);
-        if (saved) {
-            setLayout(saved);
-        } else {
-            setLayout({ version: 1, nodes: {}, edges: {} });
+
+        // 1. One-way migration: if central flowchart_layout.json exists, merge into individual ScreenMaps
+        const centralLayout = await loadFlowchartLayout(activeProfileId);
+        if (centralLayout) {
+            feedback.toast.info(t('mapper.flowchart.migrating', 'Migrating layout data...'));
+            for (const [screenName, node] of Object.entries(centralLayout.nodes)) {
+                const map = maps.find(m => m.name === screenName);
+                if (map) {
+                    map.layout = { gridX: node.gridX, gridY: node.gridY };
+                }
+            }
+
+            for (const [edgeId, edge] of Object.entries(centralLayout.edges)) {
+                // Find matching source and element
+                for (const map of maps) {
+                    for (const el of map.elements) {
+                        const targetName = typeof el.navigates_to === 'string' ? el.navigates_to : el.navigates_to?.destination;
+                        if (!targetName) continue;
+
+                        const expectedEdgeId = `${map.name}-${el.name}-${targetName}`;
+                        if (expectedEdgeId === edgeId) {
+                            el.navigates_to = {
+                                destination: targetName,
+                                sourceHandle: edge.sourceHandle,
+                                targetHandle: edge.targetHandle,
+                                vertices: edge.vertices
+                            };
+                        }
+                    }
+                }
+            }
+
+            // Save all migrated maps and delete central file
+            try {
+                for (const map of maps) {
+                    await saveScreenMap(activeProfileId, map);
+                }
+                await deleteFlowchartLayout(activeProfileId);
+                feedback.toast.success(t('mapper.flowchart.migration_success', 'Layout migration complete!'));
+                if (onRefresh) onRefresh();
+            } catch (e) {
+                console.error("Migration failed", e);
+                feedback.toast.error(t('mapper.flowchart.migration_error'));
+            }
         }
+
+        // 2. Reconstruct state from maps (Source of truth is now individual ScreenMaps)
+        const reconstructedNodes: Record<string, LayoutNode> = {};
+        const reconstructedEdges: Record<string, LayoutEdge> = {};
+
+        maps.forEach(map => {
+            if (map.layout) {
+                reconstructedNodes[map.name] = map.layout;
+            }
+
+            map.elements.forEach(el => {
+                if (el.navigates_to) {
+                    const targetName = typeof el.navigates_to === 'string' ? el.navigates_to : el.navigates_to.destination;
+                    const edgeId = `${map.name}-${el.name}-${targetName}`;
+
+                    if (typeof el.navigates_to === 'object') {
+                        reconstructedEdges[edgeId] = {
+                            sourceHandle: el.navigates_to.sourceHandle,
+                            targetHandle: el.navigates_to.targetHandle,
+                            vertices: el.navigates_to.vertices
+                        };
+                    } else {
+                        reconstructedEdges[edgeId] = {};
+                    }
+                }
+            });
+        });
+
+        setLayout({ version: 2, nodes: reconstructedNodes, edges: reconstructedEdges });
         setLoading(false);
+
         // Auto-center after layout is loaded
         setTimeout(centerView, 100);
-    }, [activeProfileId, centerView]);
+    }, [activeProfileId, maps, centerView, onRefresh, t]);
 
     const performZoom = useCallback((change: number, center?: { x: number, y: number }) => {
         if (!containerRef.current) return;
@@ -221,9 +290,61 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
     }, []);
 
     const saveLayout = async () => {
-        await saveFlowchartLayout(activeProfileId, layout);
-        setIsDirty(false);
-        feedback.toast.success(t('common.saved', 'Saved'));
+        // Now persists back to individual ScreenMap files
+        const mapsToSave = [...maps];
+        let hasChanges = false;
+
+        // 1. Update Layout Nodes (gridX, gridY)
+        Object.entries(layout.nodes).forEach(([screenName, nodeLayout]) => {
+            const map = mapsToSave.find(m => m.name === screenName);
+            if (map) {
+                if (JSON.stringify(map.layout) !== JSON.stringify(nodeLayout)) {
+                    map.layout = nodeLayout;
+                    hasChanges = true;
+                }
+            }
+        });
+
+        // 2. Update Layout Edges (handles, vertices)
+        Object.entries(layout.edges).forEach(([edgeId, edgeData]) => {
+            mapsToSave.forEach(m => {
+                m.elements.forEach(el => {
+                    const targetName = typeof el.navigates_to === 'string' ? el.navigates_to : el.navigates_to?.destination;
+                    if (!targetName) return;
+
+                    const currentEdgeId = `${m.name}-${el.name}-${targetName}`;
+                    if (currentEdgeId === edgeId) {
+                        const newNav: any = {
+                            destination: targetName,
+                            sourceHandle: edgeData.sourceHandle,
+                            targetHandle: edgeData.targetHandle,
+                            vertices: edgeData.vertices
+                        };
+                        if (JSON.stringify(el.navigates_to) !== JSON.stringify(newNav)) {
+                            el.navigates_to = newNav;
+                            hasChanges = true;
+                        }
+                    }
+                });
+            });
+        });
+
+        if (hasChanges || isDirty) {
+            try {
+                for (const map of mapsToSave) {
+                    await saveScreenMap(activeProfileId, map);
+                }
+                setIsDirty(false);
+                feedback.toast.success(t('common.saved', 'Saved'));
+                if (onRefresh) onRefresh();
+            } catch (e) {
+                console.error("Failed to save decentralized layout", e);
+                feedback.toast.error(t('mapper.flowchart.save_error'));
+            }
+        } else {
+            feedback.toast.info(t('mapper.flowchart.no_changes'));
+            setIsDirty(false);
+        }
     };
 
     const handleClose = () => {
@@ -389,52 +510,54 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
         const { sourceNodeId, sourcePortId } = quickConnectData;
         const sourceMap = maps.find(m => m.name === sourceNodeId);
 
-        if (!sourceMap) return;
-
-        if (!sourceElementName) {
-            feedback.toast.error("Please select a source element");
+        if (!sourceMap || !sourceElementName) {
+            feedback.toast.error(t('mapper.flowchart.select_source_element'));
             return;
         }
 
         const elementIndex = sourceMap.elements.findIndex(el => el.name === sourceElementName);
         if (elementIndex === -1) {
-            feedback.toast.error("Element not found");
+            feedback.toast.error(t('mapper.flowchart.element_not_found'));
             return;
         }
-
-        const updatedElements = [...sourceMap.elements];
-        updatedElements[elementIndex] = { ...updatedElements[elementIndex], navigates_to: targetScreenName };
-        const updatedMap = { ...sourceMap, elements: updatedElements };
-
-        // 2. Update Layout (Add Edge)
-        const edgeId = `${sourceNodeId}-${sourceElementName}-${targetScreenName}`;
-
-        const updatedLayout = {
-            ...layout,
-            edges: {
-                ...layout.edges,
-                [edgeId]: {
-                    sourceHandle: sourcePortId,
-                    targetHandle: 'left-3',
-                }
-            }
-        };
 
         try {
             setIsQuickConnectOpen(false);
             setQuickConnectData(null);
 
-            await saveScreenMap(activeProfileId, updatedMap);
-            await saveFlowchartLayout(activeProfileId, updatedLayout);
+            // Update ScreenMap element directly with structured NavigationData
+            const targetHandle = 'left-3';
+            const nav: any = {
+                destination: targetScreenName,
+                sourceHandle: sourcePortId,
+                targetHandle: targetHandle
+            };
 
-            // Update Local State
-            setLayout(updatedLayout);
+            const updatedElements = [...sourceMap.elements];
+            updatedElements[elementIndex] = { ...updatedElements[elementIndex], navigates_to: nav };
+            const updatedMap = { ...sourceMap, elements: updatedElements };
+
+            await saveScreenMap(activeProfileId, updatedMap);
+
+            // Local state update for the flowchart view
+            const edgeId = `${sourceNodeId}-${sourceElementName}-${targetScreenName}`;
+            setLayout(prev => ({
+                ...prev,
+                edges: {
+                    ...prev.edges,
+                    [edgeId]: {
+                        sourceHandle: sourcePortId,
+                        targetHandle: targetHandle,
+                    }
+                }
+            }));
+
             setIsDirty(true);
             if (onRefresh) onRefresh();
             feedback.toast.success(t('common.saved', 'Saved'));
         } catch (e) {
             console.error(e);
-            feedback.toast.error("Failed to save connection");
+            feedback.toast.error(t('mapper.flowchart.save_connection_error'));
         }
     };
 
@@ -752,7 +875,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                     }));
                     setIsDirty(true);
                 } else {
-                    feedback.toast.error("Port already occupied");
+                    feedback.toast.error(t('mapper.flowchart.port_occupied'));
                 }
             }
         }
@@ -941,7 +1064,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
             const sourceOrigin = getPixelCoords(sourceLayout.gridX, sourceLayout.gridY);
 
             sourceMap.elements.forEach(el => {
-                const targetName = el.navigates_to;
+                const targetName = typeof el.navigates_to === 'string' ? el.navigates_to : el.navigates_to?.destination;
                 if (!targetName) return;
 
                 const targetMap = maps.find(m => m.name === targetName);
@@ -1392,19 +1515,19 @@ linear-gradient(to right, rgba(0,0,0,0.05) 1px, transparent 1px),
                                 <React.Fragment key={`${name}-ports`}>
                                     {NODE_PORTS.map(p => {
                                         // Correct Layout-Based Occupancy Check
-                                        const isTrulyOccupied = maps.some(m => {
-                                            const sourceLayout = layout.nodes[m.name];
-                                            if (!sourceLayout) return false;
+                                                const isTrulyOccupied = maps.some(m => {
+                                                    const sourceLayout = layout.nodes[m.name];
+                                                    if (!sourceLayout) return false;
 
-                                            return m.elements.some(el => {
-                                                const targetName = el.navigates_to;
-                                                if (!targetName) return false;
+                                                    return m.elements.some(el => {
+                                                        const targetName = typeof el.navigates_to === 'string' ? el.navigates_to : el.navigates_to?.destination;
+                                                        if (!targetName) return false;
 
-                                                const targetLayout = layout.nodes[targetName];
-                                                if (!targetLayout) return false;
+                                                        const targetLayout = layout.nodes[targetName];
+                                                        if (!targetLayout) return false;
 
-                                                const edgeId = `${m.name}-${el.name}-${targetName}`;
-                                                const edgeData = layout.edges[edgeId] || {};
+                                                        const edgeId = `${m.name}-${el.name}-${targetName}`;
+                                                        const edgeData = layout.edges[edgeId] || {};
 
                                                 // Determine used handles (explicit or default)
                                                 let sHandle = edgeData.sourceHandle;
@@ -1623,7 +1746,7 @@ function UnsavedChangesDialog({ onCancel, onSaveAndExit, onExitWithoutSaving }: 
                     <div className="flex flex-col gap-2 w-full">
                         <Button
                             onClick={onSaveAndExit}
-                            className="w-full bg-primary text-on-primary hover:bg-primary/90"
+                            variant="primary"
                         >
                             {t('mapper.flowchart.unsaved_changes.save_and_exit', 'Save and Exit')}
                         </Button>

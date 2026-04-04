@@ -464,6 +464,8 @@ export const es = {
             title: "Mapeador",
             empty: "Seleccione un dispositivo para iniciar el mapeo",
             refresh: "Actualizar Fuente",
+            screen_description: "Descripción de la Pantalla",
+            description: "Descripción",
             grouping: {
                 all_screens: "Todas las pantallas",
                 by_tags: "Por etiquetas",
@@ -476,6 +478,13 @@ export const es = {
                 export: "Exportar Flujo",
                 export_image: "Exportar Imagen",
                 import: "Importar Flujo",
+                migrating: "Migrando datos de diseño...",
+                migration_success: "¡Migración de diseño completada!",
+                migration_error: "Fallo en la migración de diseño",
+                save_error: "Error al guardar el diseño descentralizado",
+                no_changes: "No hay cambios de diseño para guardar",
+                save_connection_error: "Error al guardar la conexión",
+                port_occupied: "El puerto ya está ocupado",
                 export_success: "¡Flujo exportado con éxito!",
                 import_success: "¡Flujo importado con éxito!",
                 export_error: "Error al exportar flujo.",
@@ -492,9 +501,16 @@ export const es = {
                 center_view: "Centrar Vista",
                 filter_by_tag: "Filtrar por Etiqueta",
                 all_tags: "Todas las Etiquetas",
+                pan_mode: "Modo Panorámico (Mantener Espacio)",
+                zoom_in: "Aumentar Zoom",
+                zoom_out: "Disminuir Zoom",
+                center: "Centrar Vista",
+                filter_tags: "Filtrar por Etiqueta",
+                select_source_element: "Por favor, seleccione un elemento de origen",
+                element_not_found: "Elemento de origen no encontrado",
                 unsaved_changes: {
                     title: "Cambios no guardados",
-                    message: "Tienes cambios no guardados. ¿Quieres guardar antes de salir?",
+                    message: "Tienes cambios de diseño sin guardar. ¿Quieres guardar antes de salir?",
                     save_and_exit: "Guardar y Salir",
                     exit_without_saving: "Salir sin Guardar",
                     cancel: "Cancelar"
@@ -532,7 +548,18 @@ export const es = {
                 screen: "Pantalla",
                 modal: "Modal",
                 tab: "Pestaña",
-                drawer: "Cajón"
+                drawer: "Cajón",
+                dialog: "Diálogo",
+                tab_content: "Contenido de Pestaña",
+                overlay: "Superposición"
+            },
+            exploration: {
+                start: "Iniciar Exploración Autónoma",
+                stop: "Detener",
+                active: "IA Explorando...",
+                thinking: "Pensando...",
+                summary: "Exploración Finalizada",
+                stopped: "Exploración detenida: {{reason}}"
             },
             modes: {
                 inspect: "Modo Inspección",
@@ -562,6 +589,8 @@ export const es = {
             input: {
                 element_type: "Tipo de Elemento",
                 element_name: "Nombre del Elemento",
+                element_description: "Descripción del Elemento",
+                screen_description: "Descripción de la Pantalla",
                 navigates_to: "Navega A (Opcional)",
                 menu_options: "Opciones de Menú (Separadas por comas)",
                 parent_screen: "Pantalla Padre",
@@ -574,7 +603,9 @@ export const es = {
                 menu_options: "Opción 1, Opción 2...",
                 parent_screen: "Nombre de la Pantalla Padre",
                 screen_name: "Nombre de la Pantalla (Único)",
-                screen_tags: "ej: Auth, Perfil"
+                screen_tags: "ej: Auth, Perfil",
+                screen_description: "Descripción para el contexto de la IA...",
+                element_description: "Descripción del elemento (Solo IA)"
             },
             action: {
                 add: "Añadir Elemento",
@@ -591,7 +622,11 @@ export const es = {
                 new: "Nuevo",
                 discard: "Descartar",
                 discard_desc: "Descartar Pantalla",
-                delete: "Eliminar"
+                delete: "Eliminar",
+                toggle_stay_awake: "Alternar Mantener Pantalla Encendida",
+                export_json: "Exportar JSON",
+                import_json: "Importar JSON",
+                export_image: "Exportar Imagen"
             },
             feedback: {
                 mapped: "¡Elemento mapeado!",
@@ -604,12 +639,15 @@ export const es = {
                 ai_success: "¡Nombre sugerido!",
                 ai_error: "Fallo al sugerir nombre",
                 new_screen: "Listo para nueva pantalla",
-                deleted: "Mapa eliminado"
+                deleted: "Mapa eliminado",
+                stay_on_enabled: "Mantener Pantalla Encendida activado",
+                stay_on_disabled: "Mantener Pantalla Encendida desactivado"
             },
             error: {
                 missing_name: "Por favor proporcione un nombre para el elemento",
                 missing_screen_name: "Por favor proporcione un Nombre para la Pantalla",
-                save_failed: "Error al guardar mapa de pantalla"
+                save_failed: "Error al guardar mapa de pantalla",
+                stay_on_failed: "Error al cambiar el estado de Mantener Pantalla Encendida"
             },
             confirm: {
                 delete: "¿Está seguro de que desea eliminar este mapa?",
@@ -817,9 +855,11 @@ export const es = {
                 },
                 openai: {
                     title: "OpenAI ChatGPT",
-                    placeholder: "Ingrese su Clave API OpenAI",
+                    placeholder: "Ingrese su Clave API de OpenAI",
                     help: "Obtenga su Clave API en OpenAI Platform"
-                }
+                },
+                max_exploration_steps: "Pasos Máximos de Exploración",
+                max_exploration_steps_help: "Número máximo de acciones autónomas que la IA realizará antes de detener la exploración."
             },
             system: {
                 title: "Versiones del Sistema",

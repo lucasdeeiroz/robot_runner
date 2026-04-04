@@ -446,6 +446,53 @@ export function generateXPath(node: InspectorNode, attr?: string, type: 'equals'
 }
 
 /**
+ * Recursively assigns a positional short ID to each node in the tree.
+ * Format: "0", "0.1", "0.1.2", etc.
+ */
+export function assignShortIds(node: InspectorNode, prefix: string = "0"): void {
+    node.attributes['short_id'] = prefix;
+    if (node.children) {
+        node.children.forEach((child, index) => {
+            assignShortIds(child, `${prefix}.${index}`);
+        });
+    }
+}
+
+/**
+ * Searches for a node by its assigned short_id.
+ */
+export function findNodeByShortId(node: InspectorNode, shortId: string): InspectorNode | null {
+    if (node.attributes['short_id'] === shortId) return node;
+    for (const child of node.children) {
+        const found = findNodeByShortId(child, shortId);
+        if (found) return found;
+    }
+    return null;
+}
+
+/**
+ * Generates a simplified XML string for AI consumption, including the short_id.
+ */
+export function generateSimplifiedXml(node: InspectorNode): string {
+    const attrStr = Object.entries(node.attributes)
+        .filter(([k, v]) => ['short_id', 'text', 'resource-id', 'content-desc', 'class', 'clickable', 'enabled'].includes(k) && v)
+        .map(([k, v]) => `${k}="${v.replace(/"/g, '&quot;')}"`)
+        .join(' ');
+
+    const tagName = node.tagName.split('.').pop() || 'node'; // Use short class name
+    let xml = `<${tagName} ${attrStr}>`;
+
+    if (node.children && node.children.length > 0) {
+        xml += '\n' + node.children.map(c => generateSimplifiedXml(c)).join('\n');
+        xml += `\n</${tagName}>`;
+    } else {
+        xml += `</${tagName}>`;
+    }
+
+    return xml;
+}
+
+/**
  * Generates a UiAutomator selector string.
  */
 export function generateUiSelector(node: InspectorNode, options: {

@@ -12,9 +12,10 @@ interface GeminiResponse {
     };
 }
 
-import { ScreenMap } from '@/lib/types';
+import { ScreenMap, UIElementMap } from '@/lib/types';
+import { DeepAnalysisContext } from "./historyAnalysisUtils";
 
-export type AIGenerationType = 'test_case' | 'pbi' | 'improvement' | 'bug' | 'element_name' | 'robot_script';
+export type AIGenerationType = 'test_case' | 'pbi' | 'improvement' | 'bug' | 'element_name' | 'robot_script' | 'exploration';
 
 function extractBase64Data(imageBase64: string): { mimeType: string, data: string } {
     const trimmed = imageBase64.trim();
@@ -388,7 +389,8 @@ export async function analyzeTestHistory(
     history: any[],
     apiKey: string,
     model: string,
-    language: string
+    language: string,
+    deepContext?: Record<string, DeepAnalysisContext>
 ): Promise<string> {
     const systemInstruction = `
 You are a Senior QA Automation Engineer and Data Analyst. Do not mention who you are in your responses.
@@ -396,7 +398,8 @@ Analyze the provided test execution history to identify:
 1. Flakiness: Tests that fail and pass intermittently under similar conditions. Use the "failedTests" list to track individual test stability across runs.
 2. Environment Correlation: Detect patterns where failures (specific tests or whole suites) occur only on certain device models or OS versions.
 3. Performance Trends: Significant increases in execution duration over time.
-4. Root Cause Hypothesis: Based on the pattern of failed tests, suggest if the issue is likely environmental, a specific regression, or a flaky locator.
+4. Deep Anomaly Analysis: Correlate test failures with high CPU/RAM usage OR critical logcat errors if provided in the "DEEP CONTEXT" section.
+5. Root Cause Hypothesis: Suggest if the issue is likely environmental, a specific regression, or a flaky locator.
 
 Provide a comprehensive analysis in Markdown format.
 Use professional tone and actionable insights.
@@ -419,7 +422,11 @@ Response language: ${language.toLowerCase().startsWith('pt') ? 'Portuguese' : la
             failedTests: log.failed_tests || []
         }));
 
-    const prompt = `History Data (JSON):\n${JSON.stringify(historySummary)}`;
+    const deepContextStr = deepContext && Object.keys(deepContext).length > 0
+        ? `\n\nDEEP CONTEXT (Performance & Detailed Logs):\n${JSON.stringify(deepContext, null, 2)}`
+        : "";
+
+    const prompt = `History Data (JSON):\n${JSON.stringify(historySummary)}${deepContextStr}`;
 
     try {
         return await askGemini(prompt, apiKey, model, systemInstruction);
@@ -546,4 +553,136 @@ Rules:
         console.error("Gemini summarizeExecution failure:", e);
         throw e;
     }
+}
+
+/**
+ * Autonomous Exploration: Analyzes a screen and decides the next action.
+ */
+export async function exploreScreen(
+    xmlDump: string,
+    screenshotBase64: string,
+    apiKey: string,
+    model: string,
+    language: string,
+    existingMaps: ScreenMap[],
+    sessionHistory: string[]
+): Promise<{
+    screen: Partial<ScreenMap>;
+    elements: UIElementMap[];
+    nextAction: { type: 'click' | 'back' | 'swipe' | 'finish'; targetId?: string; direction?: 'up' | 'down' | 'left' | 'right'; details?: string };
+    rationale: string;
+}> {
+    if (!apiKey) throw new Error("Missing Gemini API Key");
+
+    const systemInstruction = `
+You are an Autonomous QA Mobile App Exploration Bot.
+Your mission is to explore and map a mobile application's UI comprehensively.
+
+INPUTS:
+1. XML DUMP: The current screen's UI hierarchy.
+2. SCREENSHOT: Visual context.
+3. EXISTING MAPS: List of screens already mapped in this project.
+4. SESSION HISTORY: Actions already taken in this session.
+
+YOUR TASKS:
+1. IDENTIFY THE SCREEN: Give it a descriptive name (e.g. "Login Screen", "Product Detail"), type (screen, modal, tab, drawer, overlay), and tags.
+2. IDENTIFY SCREEN ELEMENTS: Map ALL interactive elements (buttons, inputs, etc.) from the XML. Assign them a name, type, and if you can infer it, where they navigate to. Perform a swipe if needed to see all elements.
+3. IDENTIFY DESCRIPTIONS: Provide a short, plain-text description for the screen and each element.
+4. DETECT SCROLLABLE AREAS: Look for 'scrollable="true"' or specific classes like 'android.widget.ScrollView', 'android.widget.ListView', 'androidx.recyclerview.widget.RecyclerView'. 
+   - If an element is partially cut off at the bottom, or you see hints of a list, prioritize "swipe" "down" to reveal more content before moving to "click".
+5. FLOWCHART PLACEMENT: Suggest a "layout" { "gridX": number, "gridY": number } for the current screen. 
+   - Use a virtual grid where each slot is 300x300 units.
+   - Initial screen should be at (0, 0).
+   - For new screens, check the "EXISTING MAPS" coordinates and place this new screen in the nearest empty grid slot that follows the flow direction (e.g., to the right or below the source). 
+   - AVOID node overlaps at all costs by choosing unique grid coordinates.
+6. DECIDE NEXT ACTION: Pick ONE action:
+   - "click": Use "short_id" as "targetId".
+   - "swipe": Use "direction" (up|down|left|right) and a "targetId" of a scrollable container.
+   - "back": If the current screen is fully explored and mapped.
+   - "finish": ONLY if the entire application seems mapped and there are no new paths to explore.
+7. IDENTIFY FLOWS START AND END: On Home Screens and Initial Screens (flow start), do not use "back" action. On flows end (screens that do not have any interactive elements), use "back" action to continue exploring other flows.
+
+RULES:
+1. For element names, use "Space Separated" (e.g. "Login Button").
+2. For "type", use: button, input, text, link, toggle, checkbox, image, menu, scroll_view, tab.
+3. The "id" field in "elements" list MUST be the "short_id" from the XML.
+4. Screen Recognition: Check current XML/Screenshot against "EXISTING MAPS". If the current screen matches one already mapped (same layout/title), use its exact name and layout.
+5. If you decide to "swipe", explain why in the "rationale" (e.g., "detecting more list items").
+6. Language: ${language}.
+
+JSON STRUCTURE:
+{
+  "screen": { 
+    "name": "...", 
+    "type": "screen|modal|tab|drawer|overlay", 
+    "description": "...",
+    "tags": ["tag1", ...],
+    "layout": { "gridX": number, "gridY": number } 
+  },
+  "elements": [
+    { 
+      "id": "short_id", 
+      "name": "...", 
+      "type": "...", 
+      "description": "...",
+      "android_id": "...", 
+      "accessibility_id": "...", 
+      "text": "...", 
+      "navigates_to": "Next Screen Name" 
+    }
+  ],
+  "nextAction": { 
+    "type": "click|swipe|back|finish", 
+    "targetId": "short_id", 
+    "direction": "up|down|left|right",
+    "details": "reason" 
+  },
+  "rationale": "..."
+}
+`.trim();
+
+    const prompt = `
+EXISTING MAPS (Mapped screens so far):
+${existingMaps.map(m => `- ${m.name}`).join('\n')}
+
+SESSION HISTORY (Steps taken so far):
+${sessionHistory.slice(-10).join('\n')}
+
+XML DUMP:
+${xmlDump.substring(0, 15000)}
+`.trim();
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    const { mimeType, data } = extractBase64Data(screenshotBase64);
+
+    const body = {
+        contents: [{
+            parts: [
+                { text: prompt },
+                { inline_data: { mime_type: mimeType, data: data } }
+            ]
+        }],
+        system_instruction: {
+            parts: [{ text: systemInstruction }]
+        },
+        generationConfig: {
+            temperature: 0.1,
+            responseMimeType: "application/json"
+        }
+    };
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    });
+
+    const dataRes: GeminiResponse = await response.json();
+    if (dataRes.error) throw new Error(dataRes.error.message);
+
+    const content = dataRes.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!content) throw new Error("Empty AI response");
+
+    return JSON.parse(content);
 }

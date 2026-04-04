@@ -86,19 +86,34 @@ export async function loadFlowchartLayout(profileId: string): Promise<FlowchartL
     }
 }
 
+export async function deleteFlowchartLayout(profileId: string): Promise<void> {
+    try {
+        const fileName = 'flowchart_layout.json';
+        const path = `${getMapsDir(profileId)}/${fileName}`;
+        const layoutExists = await exists(path, { baseDir: BaseDirectory.AppLocalData });
+        if (layoutExists) {
+            await remove(path, { baseDir: BaseDirectory.AppLocalData });
+        }
+    } catch (e) {
+        console.error("Failed to delete flowchart layout", e);
+    }
+}
+
 // --- Export / Import ---
 export interface MapperExportData {
     screens: ScreenMap[];
     layout: FlowchartLayout | null;
+    version?: string; // Add a version for future-proofing
 }
 
 export async function exportMapperData(profileId: string): Promise<string> {
     const screens = await listScreenMaps(profileId);
-    const layout = await loadFlowchartLayout(profileId);
+    const layout = await loadFlowchartLayout(profileId); // Still load it in case migration hasn't happened
 
     const data: MapperExportData = {
         screens,
-        layout
+        layout,
+        version: "2.0" // Decentralized version
     };
 
     return JSON.stringify(data, null, 2);
@@ -112,12 +127,14 @@ export async function importMapperData(profileId: string, jsonContent: string): 
             throw new Error("Invalid import data: 'screens' is not an array");
         }
 
-        // Save all screens
+        // 1. Save all screens
+        // Note: New screens already have 'layout' and 'navigation' (via navigates_to)
         for (const screen of data.screens) {
             await saveScreenMap(profileId, screen);
         }
 
-        // Save layout if present
+        // 2. Save legacy layout if present
+        // This allows older exports to be imported, where FlowchartModal will then trigger migration
         if (data.layout) {
             await saveFlowchartLayout(profileId, data.layout);
         }

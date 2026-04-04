@@ -458,6 +458,7 @@ export const en = {
             title: "Mapper",
             empty: "Select a device to start mapping",
             refresh: "Refresh Source",
+            screen_description: "Screen Description",
             grouping: {
                 all_screens: "All Screens",
                 by_tags: "By Tags",
@@ -470,10 +471,17 @@ export const en = {
                 export: "Export Flow",
                 export_image: "Export Image",
                 import: "Import Flow",
+                migrating: "Migrating layout data...",
+                migration_success: "Layout Migration Complete",
+                migration_error: "Migration failed",
+                save_error: "Failed to save decentralized layout",
+                no_changes: "No layout changes to save",
+                save_connection_error: "Failed to save connection",
+                port_occupied: "Port already occupied",
                 export_success: "Flow exported successfully!",
                 import_success: "Flow imported successfully!",
-                export_error: "Error exporting flow.",
-                import_error: "Error importing flow.",
+                export_error: "Failed to export flow",
+                import_error: "Failed to import flow",
                 quick_connect: "Quick Connect",
                 source_element: "Source Element",
                 target_screen: "Target Screen",
@@ -486,6 +494,13 @@ export const en = {
                 center_view: "Center View",
                 filter_by_tag: "Filter by Tag",
                 all_tags: "All Tags",
+                pan_mode: "Pan Mode (Hold Space)",
+                zoom_in: "Zoom In",
+                zoom_out: "Zoom Out",
+                center: "Center View",
+                filter_tags: "Filter by Tag",
+                select_source_element: "Please select a source element",
+                element_not_found: "Source element not found",
                 unsaved_changes: {
                     title: "Unsaved Changes",
                     message: "You have unsaved changes. Do you want to save before exiting?",
@@ -526,7 +541,18 @@ export const en = {
                 screen: "Screen",
                 modal: "Modal",
                 tab: "Tab",
-                drawer: "Drawer"
+                drawer: "Drawer",
+                dialog: "Dialog",
+                tab_content: "Tab Content",
+                overlay: "Overlay"
+            },
+            exploration: {
+                start: "Start Autonomous Exploration",
+                stop: "Stop",
+                active: "AI Exploring...",
+                thinking: "Thinking...",
+                summary: "Exploration Ended",
+                stopped: "Exploration stopped: {{reason}}"
             },
             modes: {
                 inspect: "Inspect Mode",
@@ -551,11 +577,16 @@ export const en = {
                 resource_id: "Resource ID",
                 access_id: "Accessibility ID",
                 identifiers: "Identifiers",
-                hierarchy: "Hierarchy"
+                hierarchy: "Hierarchy",
+                ai_suggest: "AI Suggestion",
+                suggested_selector: "Suggested Selector",
+                rationale: "Rationale"
             },
             input: {
                 element_type: "Element Type",
                 element_name: "Element Name",
+                element_description: "Element Description",
+                screen_description: "Screen Description",
                 navigates_to: "Navigates To (Optional)",
                 menu_options: "Menu Options (Comma separated)",
                 parent_screen: "Parent Screen",
@@ -568,7 +599,8 @@ export const en = {
                 menu_options: "Option 1, Option 2...",
                 parent_screen: "Parent Screen Name",
                 screen_name: "Screen Name (Unique)",
-                screen_tags: "e.g. Auth, Profile"
+                screen_tags: "e.g. Auth, Profile",
+                screen_description: "Description for AI context..."
             },
             action: {
                 add: "Add Element",
@@ -585,7 +617,11 @@ export const en = {
                 new: "New",
                 discard: "Discard",
                 discard_desc: "Discard Screen",
-                delete: "Delete"
+                delete: "Delete",
+                toggle_stay_awake: "Toggle Keep Screen Awake",
+                export_json: "Export JSON",
+                import_json: "Import JSON",
+                export_image: "Export Image"
             },
             feedback: {
                 mapped: "Element mapped!",
@@ -598,12 +634,15 @@ export const en = {
                 ai_success: "Name suggested!",
                 ai_error: "Failed to suggest name",
                 new_screen: "Ready for new screen",
-                deleted: "Map deleted"
+                deleted: "Map deleted",
+                stay_on_enabled: "Stay Awake enabled",
+                stay_on_disabled: "Stay Awake disabled"
             },
             error: {
                 missing_name: "Please provide a name for the element",
                 missing_screen_name: "Please provide a Screen Name",
-                save_failed: "Failed to save screen map"
+                save_failed: "Failed to save screen map",
+                stay_on_failed: "Failed to change Stay Awake state"
             },
             confirm: {
                 delete: "Are you sure you want to delete this map?",
@@ -813,7 +852,9 @@ export const en = {
                     title: "OpenAI ChatGPT",
                     placeholder: "Enter OpenAI API Key",
                     help: "Get your API Key at OpenAI Platform"
-                }
+                },
+                max_exploration_steps: "Max Exploration Steps",
+                max_exploration_steps_help: "Maximum number of autonomous actions the AI will perform before stopping exploration."
             },
             system: {
                 title: "System Versions",
