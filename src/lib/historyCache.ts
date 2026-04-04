@@ -12,6 +12,7 @@ export interface TestLog {
     xml_path: string;
     log_html_path: string;
     mtime: number;
+    ai_summary?: string | null;
 }
 
 let cachedHistory: TestLog[] = [];

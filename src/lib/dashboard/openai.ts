@@ -403,3 +403,122 @@ Response language: ${language.toLowerCase().startsWith('pt') ? 'Portuguese' : la
         throw e;
     }
 }
+
+/**
+ * Summarizes the current execution suite.
+ */
+export async function summarizeExecution(
+    tree: any[],
+    apiKey: string,
+    model: string,
+    language: string,
+    failureContext?: any[]
+): Promise<string> {
+    const cleanAnsi = (l: string) => l.replace(/\x1b\[[0-9;]*m/g, '').replace(/[\x00-\x1f\x7f-\x9f]/g, '');
+
+    const failures: string[] = [];
+    
+    const extractFailures = (nodes: any[]) => {
+        nodes.forEach(n => {
+            if (n.status === 'FAIL') {
+                let failInfo = `NODE: ${n.name} (${n.type})\n`;
+                if (n.summary) failInfo += `SUMMARY: ${n.summary}\n`;
+                
+                const collectedLogs: string[] = [];
+                if (n.failureDetail?.message) collectedLogs.push(`ERROR MESSAGE: ${n.failureDetail.message}`);
+                if (n.logs && n.logs.length > 0) collectedLogs.push(...n.logs.slice(-20).map((l: string) => cleanAnsi(l)));
+                if (n.children) {
+                    const textChildren = n.children
+                        .filter((c: any) => c.type === 'text')
+                        .map((c: any) => cleanAnsi(c.content));
+                    collectedLogs.push(...textChildren.slice(-20));
+                }
+
+                if (collectedLogs.length > 0) {
+                    failInfo += `TECHNICAL DETAILS:\n${collectedLogs.join('\n')}\n`;
+                }
+                failures.push(failInfo);
+            }
+            if (n.children && n.children.length > 0) extractFailures(n.children);
+        });
+    };
+
+    extractFailures(tree);
+
+    const stats = { passed: 0, failed: 0 };
+    const calculateStats = (nodes: any[]) => {
+        if (!nodes || !Array.isArray(nodes)) return;
+        nodes.forEach(n => {
+            if (n.type === 'test') {
+                if (n.status === 'PASS') stats.passed++;
+                else stats.failed++;
+            }
+            if (n.children && Array.isArray(n.children) && n.children.length > 0) {
+                calculateStats(n.children);
+            }
+        });
+    };
+
+    // Optimization: if the root is a single suite with pre-calculated stats, use them
+    if (tree.length === 1 && tree[0].type === 'suite' && tree[0].stats) {
+        stats.passed = tree[0].stats.passed || 0;
+        stats.failed = tree[0].stats.failed || 0;
+    } else {
+        calculateStats(tree);
+    }
+    
+    const totalTests = stats.passed + stats.failed;
+    const successRate = totalTests > 0 ? ((stats.passed / totalTests) * 100).toFixed(1) : "0";
+
+    const systemInstruction = `
+You are a Senior Lead QA Engineer.
+Analyze the provided test execution tree and failure context to provide a high-level "Executive Summary".
+
+Your primary objective is to identify if multiple failures share a common root cause based on the provided logs.
+
+Focus on:
+1. Overall Success Rate: Use the "OVERALL STATISTICS" section to provide an accurate success percentage.
+2. Critical Failures Analysis: Use the "FAILURE CONTEXT" section below to explain WHY tests failed. Look for error messages, stack traces, or screenshots mentioned in technical details.
+3. Actionable Insights: Suggest what the developer or QA should check first based on the actual logs provided.
+
+Rules:
+- Use Markdown.
+- Be concise but professional.
+- ALWAYS use the provided numbers for success rate. If OVERALL STATISTICS shows ${totalTests} tests, then that is the truth.
+- IF technical details are provided in FAILURE CONTEXT, YOU MUST use them. Do not say they are missing.
+- Response language: ${language.toLowerCase().startsWith('pt') ? 'Portuguese' : language.toLowerCase().startsWith('es') ? 'Spanish' : 'English'}.
+`.trim();
+
+    // Simplify tree for tokens (only structure + stats)
+    const simplify = (nodes: any[]): any[] => {
+        return nodes.map(n => ({
+            name: n.name,
+            status: n.status,
+            type: n.type,
+            stats: n.stats,
+            children: n.children ? simplify(n.children) : undefined
+        }));
+    };
+
+    const overallStats = `\n\nOVERALL STATISTICS:\n- Total Tests: ${totalTests}\n- Passed: ${stats.passed}\n- Failed: ${stats.failed}\n- Success Rate: ${successRate}%\n`;
+
+    const failureContextStr = failureContext && failureContext.length > 0
+        ? `\n\nFAILURE CONTEXT (Detailed logs for failed tests):\n${failureContext.map(f => {
+            let info = `TEST: ${f.name}\n`;
+            if (f.failureDetail?.message) info += `ERROR: ${f.failureDetail.message}\n`;
+            if (f.logs && f.logs.length > 0) info += `LOGS:\n${f.logs.slice(-10).join('\n')}\n`;
+            return info;
+        }).join('\n---\n')}`
+        : failures.length > 0 
+            ? `\n\nFAILURE CONTEXT (Detailed logs for failed tests):\n${failures.join('\n---\n')}`
+            : "\n\nNo failures detected in the technical logs.";
+
+    const prompt = `Execution Tree Structure:\n${JSON.stringify(simplify(tree))}${overallStats}${failureContextStr}`;
+
+    try {
+        return await askOpenAI(prompt, apiKey, model, systemInstruction);
+    } catch (e) {
+        console.error("OpenAI summarizeExecution failure:", e);
+        throw e;
+    }
+}

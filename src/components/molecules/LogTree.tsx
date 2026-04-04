@@ -254,7 +254,7 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
                 <div className="flex flex-col gap-1 p-2 pl-4 border-t border-on-surface/5">
                     {node.type === 'test' && isFailed && (node as TestNode).failureDetail && (
                         <div className="mb-2 p-3 bg-error/10 border border-error/20 rounded-xl text-error text-xs animate-in fade-in slide-in-from-top-1 flex justify-between gap-4 items-center">
-                            <div className="flex flex-col gap-1 min-w-0">
+                            <div className="flex flex-col gap-1 min-w-0 w-full">
                                 <div className="flex items-center justify-between mb-1">
                                     <div className="font-bold uppercase tracking-wider opacity-70 flex items-center gap-1.5">
                                         <XCircle size={12} />

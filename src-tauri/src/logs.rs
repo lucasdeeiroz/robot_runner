@@ -49,6 +49,7 @@ pub struct TestLog {
     xml_path: String,
     log_html_path: String,
     mtime: u64, // Unix timestamp of output.xml
+    ai_summary: Option<String>,
 }
 
 #[command]
@@ -94,7 +95,8 @@ fn get_test_history_blocking(
                 let reader = std::io::BufReader::new(file);
                 if let Ok(cached_logs) = serde_json::from_reader::<_, Vec<TestLog>>(reader) {
                     for log in cached_logs {
-                        cache_map.insert(log.xml_path.clone(), log);
+                        // Use normalized path as key
+                        cache_map.insert(normalize_path_str(&log.xml_path), log);
                     }
                 }
             }
@@ -148,7 +150,8 @@ fn get_test_history_blocking(
 
             // Check cache by XML path and EXACT mtime
             if !force_refresh {
-                if let Some(cached_log) = cache_map.get(&xml_path_str) {
+                let normalized_path = normalize_path_str(&xml_path_str);
+                if let Some(cached_log) = cache_map.get(&normalized_path) {
                     if cached_log.mtime == current_mtime {
                         return Some(cached_log.clone());
                     }
@@ -167,7 +170,7 @@ fn get_test_history_blocking(
         changed = true;
     } else {
         for log in &logs {
-            if let Some(cached) = cache_map.get(&log.xml_path) {
+            if let Some(cached) = cache_map.get(&normalize_path_str(&log.xml_path)) {
                 if cached.mtime != log.mtime {
                     changed = true;
                     break;
@@ -332,6 +335,7 @@ fn parse_log_entry(folder_path: &Path, xml_path: &Path, mtime: u64) -> Option<Te
             fail_count: fail,
             log_html_path,
             mtime,
+            ai_summary: None,
         });
     }
 
@@ -388,7 +392,66 @@ fn parse_log_entry(folder_path: &Path, xml_path: &Path, mtime: u64) -> Option<Te
         fail_count,
         log_html_path: xml_path.to_string_lossy().to_string(),
         mtime,
+        ai_summary: None,
     })
+}
+
+#[command]
+pub async fn save_test_summary(xml_path: String, summary: String, custom_path: Option<String>) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || {
+        let mut candidates = Vec::new();
+
+        if let Some(path) = custom_path {
+            if !path.is_empty() {
+                candidates.push(PathBuf::from(path));
+            }
+        }
+
+        if candidates.is_empty() {
+            candidates.push(PathBuf::from("../test_results"));
+            candidates.push(PathBuf::from("test_results"));
+        }
+
+        // Determine the cache file location based on where historical logs are actually stored
+        let primary_dir = candidates.iter().find(|p| p.exists() && p.is_dir());
+        let cache_path = match primary_dir.map(|p| p.join("history_cache.json")) {
+            Some(p) => p,
+            None => return Err("Could not find test results directory to save cache".to_string()),
+        };
+
+        if !cache_path.exists() {
+            return Err("History cache file does not exist. Please refresh history first.".to_string());
+        }
+
+        let file = fs::File::open(&cache_path).map_err(|e| e.to_string())?;
+        let reader = std::io::BufReader::new(file);
+        let mut logs: Vec<TestLog> = serde_json::from_reader(reader).map_err(|e| e.to_string())?;
+        
+        let mut found = false;
+        
+        // Normalize the targeted xml_path for comparison
+        let normalized_target = normalize_path_str(&xml_path);
+        
+        for log in &mut logs {
+            let normalized_log_path = normalize_path_str(&log.xml_path);
+            if normalized_log_path == normalized_target {
+                log.ai_summary = Some(summary.clone());
+                found = true;
+                break;
+            }
+        }
+
+        if found {
+            let file = fs::File::create(&cache_path).map_err(|e| e.to_string())?;
+            let writer = std::io::BufWriter::new(file);
+            serde_json::to_writer(writer, &logs).map_err(|e| e.to_string())?;
+            Ok(())
+        } else {
+            Err("Could not find matching test record in history cache".to_string())
+        }
+    })
+    .await
+    .map_err(|e| format!("Task join error: {}", e))?
 }
 
 fn format_seconds(seconds: f64) -> String {
@@ -403,6 +466,10 @@ fn format_seconds(seconds: f64) -> String {
     } else {
         format!("{}s", seconds)
     }
+}
+
+fn normalize_path_str(path: &str) -> String {
+    path.replace("\\", "/").to_lowercase()
 }
 
 fn format_duration(start: &str, end: &str) -> String {

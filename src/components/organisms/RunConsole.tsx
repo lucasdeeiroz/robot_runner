@@ -13,6 +13,12 @@ import {
 import { LogTree } from "@/components/molecules/LogTree";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 import { useTestSessions } from "@/lib/testSessionStore";
+import { AiButton } from "@/components/atoms/AiButton";
+import { AiResponse } from "@/components/molecules/AiResponse";
+import { useSettings } from "@/lib/settings";
+import * as gemini from "@/lib/dashboard/gemini";
+import * as openai from "@/lib/dashboard/openai";
+import * as claude from "@/lib/dashboard/claude";
 
 interface RunConsoleProps {
     runId: string;
@@ -22,7 +28,7 @@ interface RunConsoleProps {
 }
 
 export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath }: RunConsoleProps) {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const { sessions, setSessionTree, updateSessionArtifacts } = useTestSessions();
     const session = sessions.find(s => s.runId === runId);
 
@@ -30,6 +36,11 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
     const [isKeepAwake, setIsKeepAwake] = useState(false);
     const [showDebugConsole, setShowDebugConsole] = useState(false);
     const [stickToBottom, setStickToBottom] = useState(true);
+
+    const { settings } = useSettings();
+    const [isSummarizing, setIsSummarizing] = useState(false);
+    const [summary, setSummary] = useState<string | null>(null);
+    const [summaryError, setSummaryError] = useState<string | null>(null);
 
     const containerRef = useRef<HTMLDivElement>(null);
     const debugContainerRef = useRef<HTMLDivElement>(null);
@@ -55,7 +66,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
 
         // Reset scroll lock if a new session starts
         if (logs.length < 5 && !stickToBottom) setStickToBottom(true);
-        
+
         const el = containerRef.current;
         const debugEl = debugContainerRef.current;
 
@@ -147,12 +158,53 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
         return () => { cancelled = true; };
     }, [isRunning, artifactPaths.output, session?.repopulatedTree]);
 
+    const handleSummarize = async () => {
+        if (tree.length === 0 || isSummarizing) return;
+
+        setIsSummarizing(true);
+        setSummaryError(null);
+
+        try {
+            const provider = settings.aiProvider || 'gemini';
+            const language = i18n.language || 'en';
+            let result = "";
+
+            // Fetch failure context from DB if available
+            let failureContext: any[] | undefined = undefined;
+            if (session?.parsedDbPath) {
+                try {
+                    failureContext = await invoke('get_execution_failures', { dbPath: session.parsedDbPath });
+                } catch (dbErr) {
+                    console.warn("Failed to fetch failure context for AI:", dbErr);
+                }
+            }
+
+            if (provider === 'gemini') {
+                if (!settings.geminiApiKey) throw new Error("Missing Gemini API Key");
+                result = await gemini.summarizeExecution(tree, settings.geminiApiKey, settings.geminiModel || '', language, failureContext);
+            } else if (provider === 'openai') {
+                if (!settings.openaiApiKey) throw new Error("Missing OpenAI API Key");
+                result = await openai.summarizeExecution(tree, settings.openaiApiKey, settings.openaiModel || '', language, failureContext);
+            } else if (provider === 'claude') {
+                if (!settings.claudeApiKey) throw new Error("Missing Claude API Key");
+                result = await claude.summarizeExecution(tree, settings.claudeApiKey, settings.claudeModel || '', language, failureContext);
+            }
+
+            setSummary(result);
+        } catch (err: any) {
+            console.error("Summarization failed:", err);
+            setSummaryError(err.message || "Failed to generate summary");
+        } finally {
+            setIsSummarizing(false);
+        }
+    };
+
     // Parse incremental logs
     useEffect(() => {
         // Skip log parsing if we already have a repopped tree and the test is finished
         if (!isRunning && tree.length > 0 && (session?.repopulatedTree || artifactPaths.output)) {
-             processedCountRef.current = logs.length; // Mark all as processed
-             return;
+            processedCountRef.current = logs.length; // Mark all as processed
+            return;
         }
 
         const currentCount = logs.length;
@@ -490,7 +542,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                             if (IS_ROBOT_RUNNER_TEST_START(line)) {
                                 const rawName = line.replace("[RR-TEST-START]", "").replace("[RobotRunner-Test-Start]", "").trim();
                                 const name = rawName.split(' :: ')[0].trim();
-                                
+
                                 // Check if a test was already started by heuristic-matching just before
                                 const suiteChildren = activeSuite()?.children;
                                 const lastAdded = suiteChildren?.[suiteChildren.length - 1];
@@ -572,6 +624,18 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                     >
                         {isKeepAwake ? <Eye size={14} /> : <EyeOff size={14} />}
                     </button>
+                    {!isRunning && tree.length > 0 && (
+                        <div className="h-4 w-px bg-outline-variant/30 mx-1" />
+                    )}
+                    {!isRunning && tree.length > 0 && (
+                        <AiButton
+                            isLoading={isSummarizing}
+                            onClick={handleSummarize}
+                            label={t('run_tab.console.summarize_run')}
+                            variant="primary"
+                            className="h-6"
+                        />
+                    )}
                 </div>
             </div>
 
@@ -607,8 +671,8 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
             )}
 
             <div className="flex-1 min-h-0 flex flex-col relative">
-                <div 
-                    ref={containerRef} 
+                <div
+                    ref={containerRef}
                     onScroll={onScroll}
                     className="h-full flex-1 min-h-0 flex flex-col bg-surface overflow-y-auto p-4 font-mono text-xs custom-scrollbar relative"
                 >
@@ -620,9 +684,21 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                             {logs.map((line, i) => <div key={i} className="min-h-[1.2em]">{line}</div>)}
                         </div>
                     ) : (
-        <div className="relative z-10 w-full mb-8">
-            {tree.map(node => <LogTree key={node.id} node={node} dbPath={session?.parsedDbPath} />)}
-            {isRunning && (
+                        <div className="relative z-10 w-full mb-8">
+                            {(summary || isSummarizing || summaryError) && (
+                                <div className="mt-4 mb-8 border-b border-outline-variant/20 pb-6">
+                                    <AiResponse
+                                        title={t('run_tab.console.summary_title')}
+                                        isLoading={isSummarizing}
+                                        rationaleHeader={t('run_tab.console.summary_rationale')}
+                                        rationale={summary}
+                                        error={summaryError}
+                                        onCopy={() => { }}
+                                    />
+                                </div>
+                            )}
+                            {tree.map(node => <LogTree key={node.id} node={node} dbPath={session?.parsedDbPath} />)}
+                            {isRunning && (
                                 <div className="text-primary dark:text-primary/80 mt-4 flex items-center gap-2 text-sm italic opacity-70 animate-pulse ml-2">
                                     <ExpressiveLoading size="sm" variant="circular" />
                                     {t('run_tab.console.processing', "Processing...")}
@@ -646,7 +722,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                                 <X size={12} />
                             </button>
                         </div>
-                        <div 
+                        <div
                             ref={debugContainerRef}
                             className="flex-1 overflow-y-auto p-2 font-mono text-[10px] text-on-surface-variant/70 leading-tight select-text custom-scrollbar"
                         >

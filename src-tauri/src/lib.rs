@@ -99,6 +99,8 @@ pub fn run() {
             runner::get_robot_test_cases,
             xml_parser::parse_robot_xml,
             xml_parser::get_node_children,
+            xml_parser::get_execution_failures,
+            logs::save_test_summary,
             system::toggle_wakelock
         ])
         .build(tauri::generate_context!())

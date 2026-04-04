@@ -81,4 +81,19 @@ impl LogDb {
         let json: String = stmt.query_row([], |row| row.get(0))?;
         Ok(json)
     }
+
+    pub fn get_failures(&self) -> Result<Vec<String>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT json_payload FROM log_nodes 
+             WHERE node_type = 'test' 
+             AND (json_payload LIKE '%\"status\":\"FAIL\"%' OR json_payload LIKE '%\"status\": \"FAIL\"%')"
+        )?;
+        let rows = stmt.query_map([], |row| row.get(0))?;
+        
+        let mut failures = Vec::new();
+        for row in rows {
+            failures.push(row?);
+        }
+        Ok(failures)
+    }
 }

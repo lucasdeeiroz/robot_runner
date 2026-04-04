@@ -158,6 +158,25 @@ pub async fn get_node_children(
     .map_err(|e| format!("Task join error: {}", e))?
 }
 
+#[tauri::command]
+pub async fn get_execution_failures(db_path: String) -> Result<Vec<serde_json::Value>, String> {
+    tokio::task::spawn_blocking(move || {
+        let db = LogDb::new(&db_path).map_err(|e| e.to_string())?;
+        let failure_jsons = db.get_failures().map_err(|e| e.to_string())?;
+        
+        let mut results = Vec::new();
+        for json_str in failure_jsons {
+            if let Ok(val) = serde_json::from_str(&json_str) {
+                results.push(val);
+            }
+        }
+        
+        Ok(results)
+    })
+    .await
+    .map_err(|e| format!("Task join error: {}", e))?
+}
+
 
 // We drop the legacy load logic for `.zst` chunks, we completely use DB cache!
 fn parse_robot_xml_blocking(app: &tauri::AppHandle, xml_path: &str) -> Result<ParseResult, String> {

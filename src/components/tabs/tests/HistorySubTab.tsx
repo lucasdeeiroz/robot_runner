@@ -238,6 +238,15 @@ export function HistorySubTab() {
         setIsModalOpen(true);
     };
 
+    const updateLog = (updatedLog: TestLog) => {
+        setHistory(prev => prev.map(log => 
+            log.xml_path === updatedLog.xml_path ? { ...log, ...updatedLog } : log
+        ));
+        if (selectedLog?.xml_path === updatedLog.xml_path) {
+            setSelectedLog({ ...selectedLog, ...updatedLog });
+        }
+    };
+
     // Flatten the grouped history for virtualization
     type VirtualItem =
         | { type: 'header'; id: string; groupName: string; count: number }
@@ -552,6 +561,7 @@ export function HistorySubTab() {
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 log={selectedLog}
+                onUpdateLog={updateLog}
             />
 
             <HistoryAIAnalysisModal
