@@ -19,7 +19,7 @@ import { TagInput } from "@/components/atoms/TagInput";
 import { Input } from "@/components/atoms/Input";
 import { Textarea } from "@/components/atoms/Textarea";
 import { useTestSessions } from '@/lib/testSessionStore';
-import { UIElementType, UIElementMap, ScreenMap } from '@/lib/types';
+import { UIElementType, UIElementMap, ScreenMap, NavigationData } from '@/lib/types';
 import { saveScreenMap, listScreenMaps, deleteScreenMap, exportMapperData, importMapperData } from '@/lib/dashboard/mapperPersistence';
 import { useSettings } from '@/lib/settings';
 import { save, open } from '@tauri-apps/plugin-dialog';
@@ -431,7 +431,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         if (reason) {
             explorerRef.current?.addLog(`Exploration stopped: ${reason}`);
             setExplorationLogs(explorerRef.current?.getLogs() || []);
-            feedback.toast.info(`${t('mapper.exploration.stopped')}: ${reason}`);
+            feedback.toast.info(t('mapper.exploration.stopped', { reason }));
         }
     };
 
@@ -579,9 +579,11 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 return;
             } else if (next.type === 'back') {
                 explorer.addLog("Navigating back...");
+                explorer.resetSwipeCount();
                 await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'keyevent', '4'] });
             } else if (next.type === 'click' && next.targetId) {
                 explorer.addLog(`Clicking element: ${next.targetId} (${next.details || 'no details'})`);
+                explorer.resetSwipeCount();
 
                 // Use findNodeByShortId to resolve targetId to coordinates
                 const targetNode = findNodeByShortId(root, next.targetId);
@@ -596,7 +598,42 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                     await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'keyevent', '4'] });
                 }
             } else if (next.type === 'swipe' && next.targetId && next.direction) {
-                explorer.addLog(`Swiping ${next.direction} on: ${next.targetId} (${next.details || 'no details'})`);
+                const currentSwipes = explorer.getConsecutiveSwipes();
+
+                // Compute snapshot of visible elements using node IDs
+                const snapshotIds: string[] = [];
+                const extractIds = (node: any) => {
+                    if (node && node.bounds) snapshotIds.push(node.short_id || node.id || "?");
+                    if (node.children) node.children.forEach(extractIds);
+                };
+                extractIds(root);
+                const currentSnapshot = snapshotIds.join(",");
+
+                if (currentSwipes > 0 && explorer.getPreviousElementsSnapshot() === currentSnapshot) {
+                    explorer.addLog(`Swipe ${next.direction} on ${next.targetId} produced no new elements. Aborting swipe repetiton.`);
+                    explorer.resetSwipeCount();
+                    // Fallback to back action to try to exit stuck page
+                    explorer.addLog("Navigating back to find new elements...");
+                    await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'keyevent', '4'] });
+
+                    if (!isExploringRef.current) return;
+                    setExplorationLogs([...explorer.getLogs()]);
+                    explorationTimeoutRef.current = setTimeout(runExplorationStep, 1000);
+                    return;
+                }
+
+                if (currentSwipes >= 10) {
+                    explorer.addLog(`Max swipe limits reached (10). Forcing navigation back.`);
+                    explorer.resetSwipeCount();
+                    await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'keyevent', '4'] });
+
+                    if (!isExploringRef.current) return;
+                    setExplorationLogs([...explorer.getLogs()]);
+                    explorationTimeoutRef.current = setTimeout(runExplorationStep, 1000);
+                    return;
+                }
+
+                explorer.addLog(`Swiping ${next.direction} on: ${next.targetId} (${next.details || 'no details'}) [Attempt ${currentSwipes + 1}]`);
                 const targetNode = findNodeByShortId(root, next.targetId);
 
                 if (targetNode && targetNode.bounds) {
@@ -617,8 +654,10 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                         args: ['shell', 'input', 'swipe', String(Math.round(startX)), String(Math.round(startY)), String(Math.round(endX)), String(Math.round(endY)), "500"]
                     });
                     addSwipeAnimation(startX, startY, endX, endY);
+                    explorer.registerSwipeAction(currentSnapshot);
                 } else {
                     explorer.addLog(`Could not find coordinates for swipe container (ShortID: ${next.targetId}).`);
+                    explorer.resetSwipeCount(); // Reset if swipe failed
                 }
             }
 
@@ -1126,7 +1165,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                     </Section>
 
                     <div className="flex-1 grid grid-cols-[auto_1fr] min-h-0 overflow-hidden mt-0 mb-0 py-0">
-                        <div className="flex flex-col items-center justify-center overflow-hidden relative max-w-[30vw] bg-surface-variant/5 border border-outline-variant/20 rounded-2xl px-2 py-0 mb-0 mt-0">
+                        <div className="flex flex-col items-center justify-center overflow-hidden relative max-w-[48vw] bg-transparent px-2 py-0 mb-0 mt-0">
                             {screenshot ? (
                                 <div className="relative inline-block shadow-2xl rounded-lg border border-outline-variant/30 flex-shrink-0 mb-2">
                                     {loading && <GestureOverlay />}
@@ -1134,7 +1173,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                         ref={imgRef}
                                         src={`data:image/png;base64,${screenshot}`}
                                         alt="Device Screenshot"
-                                        className="block w-auto h-auto max-w-full max-h-[650px] select-none rounded-lg"
+                                        className="block w-auto h-auto max-w-full max-h-[600px] select-none rounded-lg"
                                         onLoad={(e) => {
                                             const img = e.currentTarget;
                                             setImgLayout({
@@ -1406,7 +1445,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                         </Button>
 
                                         {showElementsMenu && (
-                                            <div className="absolute top-full right-0 mt-2 w-80 bg-surface rounded-xl shadow-xl border border-outline-variant/30 overflow-hidden z-[100] flex flex-col max-h-80">
+                                            <div className="absolute top-full right-0 mt-2 w-80 bg-surface rounded-xl shadow-xl border border-outline-variant/30 overflow-hidden z-[100] flex flex-col max-h-100">
                                                 <div className="p-2 border-b border-outline-variant/30 bg-surface-variant/5 flex flex-col gap-2">
                                                     <div className="px-1 text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest">
                                                         {t('mapper.saved_elements', 'Saved Elements')}
@@ -1671,10 +1710,21 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                     />
                                                     <GroupedScreenSelect
                                                         label={t('mapper.input.navigates_to')}
-                                                        value={(typeof currentElement.navigates_to === 'object' ? currentElement.navigates_to?.destination : currentElement.navigates_to) || ''}
+                                                        value={
+                                                            (typeof currentElement.navigates_to === 'string'
+                                                                ? currentElement.navigates_to
+                                                                : Array.isArray(currentElement.navigates_to)
+                                                                    ? currentElement.navigates_to[0]?.destination
+                                                                    : (currentElement.navigates_to as NavigationData)?.destination) || ''
+                                                        }
                                                         onChange={(val) => {
-                                                            if (typeof currentElement.navigates_to === 'object' && currentElement.navigates_to !== null) {
-                                                                updateElement('navigates_to', { ...currentElement.navigates_to, destination: val });
+                                                            if (Array.isArray(currentElement.navigates_to)) {
+                                                                const newNavs = [...currentElement.navigates_to];
+                                                                if (newNavs.length > 0) newNavs[0] = { ...newNavs[0], destination: val };
+                                                                else newNavs.push({ destination: val });
+                                                                updateElement('navigates_to', newNavs);
+                                                            } else if (typeof currentElement.navigates_to === 'object' && currentElement.navigates_to !== null) {
+                                                                updateElement('navigates_to', { ...(currentElement.navigates_to as NavigationData), destination: val });
                                                             } else {
                                                                 updateElement('navigates_to', val);
                                                             }

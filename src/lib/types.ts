@@ -43,7 +43,7 @@ export interface UIElementMap {
     text?: string;
 
     // Navigation
-    navigates_to?: string | NavigationData | null;
+    navigates_to?: string | NavigationData | NavigationData[] | null;
 
     // Complex Types
     menu_options?: string[]; // For 'menu' type

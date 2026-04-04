@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { ScreenMap, FlowchartLayout, LayoutNode, LayoutEdge } from '@/lib/types';
+import { ScreenMap, FlowchartLayout, LayoutNode, LayoutEdge, NavigationData } from '@/lib/types';
 import { X, ZoomIn, ZoomOut, Maximize, Pencil, Save, Upload, Download, Camera, Plus, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
@@ -196,7 +196,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                 // Find matching source and element
                 for (const map of maps) {
                     for (const el of map.elements) {
-                        const targetName = typeof el.navigates_to === 'string' ? el.navigates_to : el.navigates_to?.destination;
+                        const targetName = typeof el.navigates_to === 'string' ? el.navigates_to : (Array.isArray(el.navigates_to) ? el.navigates_to[0]?.destination : (el.navigates_to as NavigationData)?.destination);
                         if (!targetName) continue;
 
                         const expectedEdgeId = `${map.name}-${el.name}-${targetName}`;
@@ -237,14 +237,14 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
 
             map.elements.forEach(el => {
                 if (el.navigates_to) {
-                    const targetName = typeof el.navigates_to === 'string' ? el.navigates_to : el.navigates_to.destination;
+                    const targetName = typeof el.navigates_to === 'string' ? el.navigates_to : (Array.isArray(el.navigates_to) ? el.navigates_to[0]?.destination : (el.navigates_to as NavigationData)?.destination);
                     const edgeId = `${map.name}-${el.name}-${targetName}`;
 
                     if (typeof el.navigates_to === 'object') {
                         reconstructedEdges[edgeId] = {
-                            sourceHandle: el.navigates_to.sourceHandle,
-                            targetHandle: el.navigates_to.targetHandle,
-                            vertices: el.navigates_to.vertices
+                            sourceHandle: Array.isArray(el.navigates_to) ? el.navigates_to[0]?.sourceHandle : (el.navigates_to as NavigationData)?.sourceHandle,
+                            targetHandle: Array.isArray(el.navigates_to) ? el.navigates_to[0]?.targetHandle : (el.navigates_to as NavigationData)?.targetHandle,
+                            vertices: Array.isArray(el.navigates_to) ? el.navigates_to[0]?.vertices : (el.navigates_to as NavigationData)?.vertices
                         };
                     } else {
                         reconstructedEdges[edgeId] = {};
@@ -309,7 +309,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
         Object.entries(layout.edges).forEach(([edgeId, edgeData]) => {
             mapsToSave.forEach(m => {
                 m.elements.forEach(el => {
-                    const targetName = typeof el.navigates_to === 'string' ? el.navigates_to : el.navigates_to?.destination;
+                    const targetName = typeof el.navigates_to === 'string' ? el.navigates_to : (Array.isArray(el.navigates_to) ? el.navigates_to[0]?.destination : (el.navigates_to as NavigationData)?.destination);
                     if (!targetName) return;
 
                     const currentEdgeId = `${m.name}-${el.name}-${targetName}`;
@@ -1064,7 +1064,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
             const sourceOrigin = getPixelCoords(sourceLayout.gridX, sourceLayout.gridY);
 
             sourceMap.elements.forEach(el => {
-                const targetName = typeof el.navigates_to === 'string' ? el.navigates_to : el.navigates_to?.destination;
+                const targetName = typeof el.navigates_to === 'string' ? el.navigates_to : (Array.isArray(el.navigates_to) ? el.navigates_to[0]?.destination : (el.navigates_to as NavigationData)?.destination);
                 if (!targetName) return;
 
                 const targetMap = maps.find(m => m.name === targetName);
@@ -1520,7 +1520,7 @@ linear-gradient(to right, rgba(0,0,0,0.05) 1px, transparent 1px),
                                                     if (!sourceLayout) return false;
 
                                                     return m.elements.some(el => {
-                                                        const targetName = typeof el.navigates_to === 'string' ? el.navigates_to : el.navigates_to?.destination;
+                                                        const targetName = typeof el.navigates_to === 'string' ? el.navigates_to : (Array.isArray(el.navigates_to) ? el.navigates_to[0]?.destination : (el.navigates_to as NavigationData)?.destination);
                                                         if (!targetName) return false;
 
                                                         const targetLayout = layout.nodes[targetName];

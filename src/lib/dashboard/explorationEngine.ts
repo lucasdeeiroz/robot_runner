@@ -7,6 +7,8 @@ export interface ExplorationState {
     maxSteps: number;
     currentStep: number;
     targetPackage?: string;
+    consecutiveSwipes: number;
+    previousElementsSnapshot?: string;
 }
 
 export interface ExplorationAction {
@@ -34,6 +36,7 @@ export class AutonomousExplorer {
             logs: [],
             maxSteps: initialMaxSteps,
             currentStep: 0,
+            consecutiveSwipes: 0,
         };
     }
 
@@ -62,6 +65,24 @@ export class AutonomousExplorer {
 
     public incrementStep() {
         this.state.currentStep++;
+    }
+
+    public registerSwipeAction(elementsSnapshot: string) {
+        this.state.consecutiveSwipes++;
+        this.state.previousElementsSnapshot = elementsSnapshot;
+    }
+
+    public resetSwipeCount() {
+        this.state.consecutiveSwipes = 0;
+        this.state.previousElementsSnapshot = undefined;
+    }
+
+    public getConsecutiveSwipes(): number {
+        return this.state.consecutiveSwipes;
+    }
+
+    public getPreviousElementsSnapshot(): string | undefined {
+        return this.state.previousElementsSnapshot;
     }
 
     public setTargetPackage(pkg: string) {
