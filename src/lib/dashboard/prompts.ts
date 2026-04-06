@@ -86,12 +86,11 @@ ANTI-LOOP & PERSISTENCE RULES:
 - MANDATORY: If a screen requires text input, use "type_text". Do NOT go "back" and return repeatedly.
 - MANDATORY: NEVER "remove" elements from the elements list if they were present in EXISTING MAPS. If an element was there before, keep it in your output. You are APPENDING knowledge, not replacing it.
 
-NOTES (using descriptions as a learning notebook):
-- READ FIRST: Before deciding your next action, READ the "description" fields from EXISTING MAPS. Previous descriptions may contain tips, warnings, or observations left by you or the user.
-- WRITE ONLY *NEW* OBSERVATIONS: Add value. Do NOT repeat the screen name, visible labels, or information already present in EXISTING MAPS descriptions. If there's nothing new to say, leave the description as it is or provide a very short new insight.
-- Element description: "Opens a date picker modal", "Disabled until all fields are filled", "Navigates back to Home after saving".
-- BE CONCISE: Use bullet points or short sentences. Avoid "The screen shows...". Just state the facts.
-- VALUE OVER NOISE: Do NOT repeat the element's visible text as the description. Add value: behavior, prerequisites, gotchas.
+NOTES (Maintenance of Memory & Context):
+- INCORPORATE & REWRITE: You are responsible for the continuity of descriptions. Read the "description" from EXISTING MAPS, incorporate your new findings into it fluently, and return the COMPLETE new description. 
+- DO NOT REMOVE: Retain all previous context and observations unless they are directly contradicted or proven false by the current screen state.
+- VALUE OVER NOISE: Do NOT repeat the element's visible text or name as the description. Add behavior, state, and findings.
+- IF NO NEWS: If you have no new observations, return the existing description as-is.
 
 GENERAL RULES:
 1. Element names: "Space Separated" (e.g. "Login Button").
@@ -104,7 +103,7 @@ GENERAL RULES:
    - IMAGES: ImageView nodes with content-desc are important context and must be mapped as "image".
    - CONTEXT: Focusable=true or enabled=true nodes provide cues about screen state and should be mapped even if clickable=false.
 7. ELEMENT PERSISTENCE: You must include ALL elements that are currently visible on the screen. If an element was previously mapped elsewhere but is NOT visible now, simply omit it from your 'elements' array (the system will merge it automatically). Do NOT attempt to "delete" elements by sending an empty list.
-8. DESCRIPTION BLOAT: The system will concatenate your new descriptions with existing ones. Therefore, ONLY PROVIDE NEW INFOMATION. If you see "Screen for login", don't write "Login screen". Write "Requires a 6-digit PIN".
+8. DESCRIPTION REWRITE: You must return the FULL, cohesive description for the screen and elements. Incorporate new findings into the existing text provided in "EXISTING MAPS". Do NOT use separators like "|" or "---". Write one single flowing descriptive text.
 9. SCREEN MATCHING: Use EXACT names from the PROVIDED CONTEXT "EXISTING MAPS" for existing screens. Do NOT normalize or change capitalization if it's already there.
 
 JSON STRUCTURE:

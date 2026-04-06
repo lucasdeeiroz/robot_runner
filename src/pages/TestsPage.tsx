@@ -18,7 +18,11 @@ import { AnimatePresence } from 'framer-motion';
 import { StaggerContainer, StaggerItem } from '@/components/motion/MotionPrimitives';
 import { useOutsideClick } from '@/hooks/useOutsideClick';
 
-export function TestsPage() {
+interface TestsPageProps {
+    onNavigate?: (page: string) => void;
+}
+
+export function TestsPage({ onNavigate: _onNavigate }: TestsPageProps) {
     const { t } = useTranslation();
     const { settings, updateSetting } = useSettings();
     const { sessions, activeSessionId, setActiveSessionId, clearSession } = useTestSessions();

@@ -33,7 +33,11 @@ import { InfoCard } from "@/components/molecules/InfoCard";
 import { LogoInput } from "@/components/molecules/LogoInput";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 
-export function SettingsPage() {
+interface SettingsPageProps {
+    onNavigate?: (page: string) => void;
+}
+
+export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
     const { settings, updateSetting, loading, profiles, activeProfileId, createProfile, switchProfile, renameProfile, deleteProfile, systemVersions, checkSystemVersions, systemCheckStatus, isNgrokEnabled } = useSettings();
     const { t } = useTranslation();
 

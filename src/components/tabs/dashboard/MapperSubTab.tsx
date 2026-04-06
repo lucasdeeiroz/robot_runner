@@ -609,25 +609,11 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 let resolvedLayout = existingMap?.layout;
 
                 // Helper for smart description merging (prevents "A | A B" bloat)
-                const smartMerge = (existing: string, incoming: string) => {
-                    if (!incoming) return existing;
-                    if (!existing) return incoming;
-                    const cleanedIncoming = incoming.trim();
-                    const cleanedExisting = existing.trim();
-                    
-                    // If one already contains the other, prefer the longer one or just keep existing
-                    if (cleanedExisting.includes(cleanedIncoming)) return cleanedExisting;
-                    if (cleanedIncoming.includes(cleanedExisting)) return cleanedIncoming;
-                    
-                    // Otherwise append
-                    return `${cleanedExisting} | ${cleanedIncoming}`;
-                };
-
                 if (existingMap) {
                     explorer.addLog(`Merging AI insights into existing screen: "${existingMap.name}" (ID: ${existingMap.id}, ${existingMap.elements.length} elements)`);
                     
-                    // 1. Merge Screen Metadata
-                    mergedDescription = smartMerge(existingMap.description || '', aiScreen.description || '');
+                    // 1. Merge Screen Metadata - Replacement Strategy (AI is responsible for incorporating old info)
+                    mergedDescription = aiScreen.description || existingMap.description || "";
                     
                     // 2. Deep Merge Elements
                     // Start with existing elements and update them if AI saw them again
@@ -638,7 +624,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                         if (!aiEl) return existingEl; // AI didn't see it this time, keep as is
                         
                         // AI saw it! update description and navigates_to
-                        const updatedDesc = smartMerge(existingEl.description || '', aiEl.description || '');
+                        const updatedDesc = aiEl.description || existingEl.description || "";
                         
                         // Merge navigates_to if AI found a new destination
                         let mergedNav = existingEl.navigates_to;
