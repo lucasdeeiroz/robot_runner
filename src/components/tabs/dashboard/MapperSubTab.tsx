@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import {
     Maximize, Check, Scan, Home, ArrowLeft, Rows, X, RefreshCw, Save, GitGraph, Trash2, Plus, FileClock, FileInput, SearchCode, ChevronDown, ChevronUp, ChevronRight,
-    FileCode, FileStack, FileUp, FileDown, Eye, EyeClosed, Sparkles, Square
+    FileCode, FileStack, Upload, Download, Eye, EyeClosed, Sparkles, Square,
 } from 'lucide-react';
 import { XMLParser } from 'fast-xml-parser';
 import clsx from 'clsx';
@@ -106,13 +106,29 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     const explorerRef = useRef<AutonomousExplorer | null>(null);
     const explorationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const logScrollRef = useRef<HTMLDivElement>(null);
+    const [explorationStickToBottom, setExplorationStickToBottom] = useState(true);
 
-    // Auto-scroll exploration logs
+    // Auto-scroll exploration logs with stick-to-bottom logic
     useEffect(() => {
-        if (logScrollRef.current) {
-            logScrollRef.current.scrollTop = logScrollRef.current.scrollHeight;
+        if (!explorationStickToBottom) return;
+
+        // Reset scroll lock if a new session starts
+        if (explorationLogs.length < 3 && !explorationStickToBottom) setExplorationStickToBottom(true);
+
+        const el = logScrollRef.current;
+        const timer = setTimeout(() => {
+            if (el) el.scrollTop = el.scrollHeight;
+        }, 80);
+        return () => clearTimeout(timer);
+    }, [explorationLogs, explorationStickToBottom]);
+
+    const onExplorationScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const el = e.currentTarget;
+        const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+        if (isNearBottom !== explorationStickToBottom) {
+            setExplorationStickToBottom(isNearBottom);
         }
-    }, [explorationLogs]);
+    };
 
     useOutsideClick(loadMenuRef, () => {
         if (showLoadMenu) setShowLoadMenu(false);
@@ -504,12 +520,27 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
             let result: any = null;
 
-            if (aiProvider === 'gemini') {
-                result = await gemini.exploreScreen(simplifiedXml, b64, apiKey, model, lang, maps, explorer.getLogs());
-            } else if (aiProvider === 'openai') {
-                result = await openai.exploreScreen(simplifiedXml, b64, apiKey, model, lang, maps, explorer.getLogs());
-            } else if (aiProvider === 'claude') {
-                result = await claude.exploreScreen(simplifiedXml, b64, apiKey, model, lang, maps, explorer.getLogs());
+            // Attempt AI call with one retry on JSON parse failure
+            for (let attempt = 0; attempt < 2; attempt++) {
+                try {
+                    if (aiProvider === 'gemini') {
+                        result = await gemini.exploreScreen(simplifiedXml, b64, apiKey, model, lang, maps, explorer.getLogs());
+                    } else if (aiProvider === 'openai') {
+                        result = await openai.exploreScreen(simplifiedXml, b64, apiKey, model, lang, maps, explorer.getLogs());
+                    } else if (aiProvider === 'claude') {
+                        result = await claude.exploreScreen(simplifiedXml, b64, apiKey, model, lang, maps, explorer.getLogs());
+                    }
+                    break; // Success
+                } catch (parseError: any) {
+                    if (attempt === 0 && parseError.message?.includes('JSON')) {
+                        explorer.addLog(`AI returned malformed JSON. Retrying... (${parseError.message.substring(0, 80)})`);
+                        setExplorationLogs([...explorer.getLogs()]);
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                        if (!isExploringRef.current) return;
+                        continue;
+                    }
+                    throw parseError;
+                }
             }
 
             if (!isExploringRef.current) return;
@@ -529,29 +560,143 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             explorer.addLog(`AI mapped: ${aiScreen.name} (${aiScreen.type}) with ${aiElements.length} elements.`);
             explorer.addLog(`Rationale: ${result.rationale}`);
 
+            // Step 3: Back-update previous screen's element with navigates_to
+            const prevNav = explorer.getPreviousNavigation();
+            if (prevNav && prevNav.targetId && prevNav.actionType === 'click' && aiScreen.name && aiScreen.name !== prevNav.screenName) {
+                const prevMap = maps.find(m => m.name === prevNav.screenName);
+                if (prevMap) {
+                    // prevNav.targetId is the XPath of the clicked element
+                    let updated = false;
+
+                    const updatedElements = prevMap.elements.map(el => {
+                        if (el.id === prevNav.targetId) {
+                            // Only update if navigates_to is not already set to this destination
+                            const existingDest = typeof el.navigates_to === 'string'
+                                ? el.navigates_to
+                                : Array.isArray(el.navigates_to)
+                                    ? el.navigates_to.map(n => n.destination).join(',')
+                                    : (el.navigates_to as any)?.destination;
+
+                            if (!existingDest?.includes(aiScreen.name)) {
+                                updated = true;
+                                return { ...el, navigates_to: { destination: aiScreen.name } };
+                            }
+                        }
+                        return el;
+                    });
+
+                    if (updated) {
+                        const updatedPrevMap = { ...prevMap, elements: updatedElements };
+                        await saveScreenMap(activeProfileId, updatedPrevMap);
+                        explorer.addLog(`Back-updated "${prevNav.screenName}" → element navigates to "${aiScreen.name}"`);
+                        // Refresh maps so subsequent logic sees the update
+                        maps = await loadSavedMaps();
+                    }
+                }
+            }
+            explorer.clearPreviousNavigation();
+
             if (aiScreen.name) {
                 // Smart Merging: Check for existing map with same name
-                const existingMap = savedMaps.find(m => m.name === aiScreen.name);
-                let mergedElements = aiElements;
+                // Smart Merging: Check for existing map with same name (resilient matching)
+                const aiNameNormalized = aiScreen.name.trim().toLowerCase();
+                const existingMap = maps.find(m => 
+                    m.name.trim().toLowerCase() === aiNameNormalized ||
+                    m.id === aiNameNormalized.replace(/\s+/g, '_')
+                );
+                let mergedDescription = "";
+                let mergedElements: UIElementMap[] = [];
+                let resolvedLayout = existingMap?.layout;
+
+                // Helper for smart description merging (prevents "A | A B" bloat)
+                const smartMerge = (existing: string, incoming: string) => {
+                    if (!incoming) return existing;
+                    if (!existing) return incoming;
+                    const cleanedIncoming = incoming.trim();
+                    const cleanedExisting = existing.trim();
+                    
+                    // If one already contains the other, prefer the longer one or just keep existing
+                    if (cleanedExisting.includes(cleanedIncoming)) return cleanedExisting;
+                    if (cleanedIncoming.includes(cleanedExisting)) return cleanedIncoming;
+                    
+                    // Otherwise append
+                    return `${cleanedExisting} | ${cleanedIncoming}`;
+                };
 
                 if (existingMap) {
-                    explorer.addLog(`Merging ${aiElements.length} elements into existing screen: ${aiScreen.name}`);
-                    // Union based on ID (XPath)
+                    explorer.addLog(`Merging AI insights into existing screen: "${existingMap.name}" (ID: ${existingMap.id}, ${existingMap.elements.length} elements)`);
+                    
+                    // 1. Merge Screen Metadata
+                    mergedDescription = smartMerge(existingMap.description || '', aiScreen.description || '');
+                    
+                    // 2. Deep Merge Elements
+                    // Start with existing elements and update them if AI saw them again
+                    const aiElementsById = new Map<string, UIElementMap>(aiElements.map((el: UIElementMap) => [el.id, el]));
+                    
+                    mergedElements = existingMap.elements.map((existingEl: UIElementMap) => {
+                        const aiEl = aiElementsById.get(existingEl.id);
+                        if (!aiEl) return existingEl; // AI didn't see it this time, keep as is
+                        
+                        // AI saw it! update description and navigates_to
+                        const updatedDesc = smartMerge(existingEl.description || '', aiEl.description || '');
+                        
+                        // Merge navigates_to if AI found a new destination
+                        let mergedNav = existingEl.navigates_to;
+                        if (aiEl.navigates_to && !existingEl.navigates_to) {
+                            mergedNav = aiEl.navigates_to;
+                        }
+                        
+                        return { 
+                            ...existingEl, 
+                            description: updatedDesc,
+                            navigates_to: mergedNav
+                        };
+                    });
+                    
+                    // 3. Add genuinely new elements
                     const existingIds = new Set(existingMap.elements.map(e => e.id));
-                    const newUniqueElements = aiElements.filter((e: any) => !existingIds.has(e.id));
-                    mergedElements = [...existingMap.elements, ...newUniqueElements];
+                    const genuinelyNew = aiElements.filter((el: UIElementMap) => !existingIds.has(el.id));
+                    
+                    if (genuinelyNew.length > 0) {
+                        mergedElements = [...mergedElements, ...genuinelyNew];
+                        explorer.addLog(`Added ${genuinelyNew.length} new elements discoverd by AI. Total: ${mergedElements.length}`);
+                    }
+                } else {
+                    // New Screen: just use AI results
+                    mergedDescription = aiScreen.description || '';
+                    mergedElements = aiElements;
+
+                    // Enforce unique layout positions (left-to-right flow)
+                    const occupiedPositions = new Set<string>();
+                    maps.forEach(m => {
+                        if (m.layout) occupiedPositions.add(`${m.layout.gridX},${m.layout.gridY}`);
+                    });
+
+                    if (aiScreen.layout && !occupiedPositions.has(`${aiScreen.layout.gridX},${aiScreen.layout.gridY}`)) {
+                        resolvedLayout = aiScreen.layout;
+                    } else {
+                        // Find nearest unique position (expand right, then down)
+                        let gx = aiScreen.layout?.gridX ?? 0;
+                        let gy = aiScreen.layout?.gridY ?? 0;
+                        while (occupiedPositions.has(`${gx},${gy}`)) {
+                            gx++;
+                            if (gx > 20) { gx = 0; gy++; }
+                        }
+                        resolvedLayout = { gridX: gx, gridY: gy };
+                        explorer.addLog(`Layout positioning: ${aiScreen.name} placed at (${gx}, ${gy})`);
+                    }
                 }
 
                 const map: ScreenMap = {
                     id: existingMap?.id || aiScreen.name.toLowerCase().replace(/\s+/g, '_'),
                     name: aiScreen.name,
-                    type: aiScreen.type || existingMap?.type || 'screen',
-                    description: aiScreen.description || existingMap?.description,
+                    // Preserve existing metadata: user or previous AI may have added important context
+                    type: existingMap?.type || aiScreen.type || 'screen',
+                    description: mergedDescription || undefined,
                     tags: [...new Set([...(existingMap?.tags || []), ...(aiScreen.tags || [])])],
                     elements: mergedElements,
                     base64_preview: b64,
-                    // Suggested Layout from AI
-                    layout: aiScreen.layout || existingMap?.layout
+                    layout: resolvedLayout
                 };
 
                 await saveScreenMap(activeProfileId, map);
@@ -563,15 +708,30 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 setScreenDescription(map.description || "");
                 setScreenTags(map.tags || []);
                 setMappedElements(mergedElements);
-
-                // NOTE: Flowchart Layout is now primarily stored within individual ScreenMaps.
-                // The central flowchart_layout.json is only for migration/global settings.
+                
                 if (aiScreen.layout) {
                     explorer.addLog(`AI suggested layout for ${aiScreen.name}: (${aiScreen.layout.gridX}, ${aiScreen.layout.gridY})`);
                 }
             }
 
-            // 4. Navigation
+            // 4. Loop Detection — force escape if a screen is visited too many times
+            //    Only triggers when the AI tries a REPEATED action on the same screen
+            if (aiScreen.name) {
+                const next = result.nextAction as ExplorationAction;
+                const actionFingerprint = `${aiScreen.name}:${next.type}:${next.targetId || 'none'}`;
+                const visitCount = explorer.trackScreenVisit(aiScreen.name, actionFingerprint);
+                if (visitCount >= 4) {
+                    explorer.addLog(`Loop detected: screen "${aiScreen.name}" visited ${visitCount} times with repeated actions. Forcing back to escape.`);
+                    await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'keyevent', '4'] });
+
+                    if (!isExploringRef.current) return;
+                    setExplorationLogs([...explorer.getLogs()]);
+                    explorationTimeoutRef.current = setTimeout(runExplorationStep, 1500);
+                    return;
+                }
+            }
+
+            // 5. Navigation
             const next = result.nextAction as ExplorationAction;
             if (next.type === 'finish') {
                 explorer.addLog("Exploration finished by AI.");
@@ -580,6 +740,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             } else if (next.type === 'back') {
                 explorer.addLog("Navigating back...");
                 explorer.resetSwipeCount();
+                explorer.clearPreviousNavigation(); // Back doesn't create a connection
                 await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'keyevent', '4'] });
             } else if (next.type === 'click' && next.targetId) {
                 explorer.addLog(`Clicking element: ${next.targetId} (${next.details || 'no details'})`);
@@ -593,11 +754,15 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                     const centerY = Math.round(targetNode.bounds.y + targetNode.bounds.h / 2);
                     await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'tap', String(centerX), String(centerY)] });
                     addTapAnimation(centerX, centerY);
+                    // Record this click so next step can set navigates_to on this element
+                    const clickedXPath = generateXPath(targetNode);
+                    explorer.setPreviousNavigation(aiScreen.name, clickedXPath, 'click');
                 } else {
                     explorer.addLog(`Could not find coordinates for element (ShortID: ${next.targetId}). Trying back.`);
                     await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'keyevent', '4'] });
                 }
-            } else if (next.type === 'swipe' && next.targetId && next.direction) {
+            } else if (next.type === 'swipe') {
+                const swipeDirection = next.direction || 'down';
                 const currentSwipes = explorer.getConsecutiveSwipes();
 
                 // Compute snapshot of visible elements using node IDs
@@ -610,9 +775,8 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 const currentSnapshot = snapshotIds.join(",");
 
                 if (currentSwipes > 0 && explorer.getPreviousElementsSnapshot() === currentSnapshot) {
-                    explorer.addLog(`Swipe ${next.direction} on ${next.targetId} produced no new elements. Aborting swipe repetiton.`);
+                    explorer.addLog(`Swipe ${swipeDirection} on ${next.targetId || 'screen'} produced no new elements. Aborting swipe repetition.`);
                     explorer.resetSwipeCount();
-                    // Fallback to back action to try to exit stuck page
                     explorer.addLog("Navigating back to find new elements...");
                     await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'keyevent', '4'] });
 
@@ -633,21 +797,38 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                     return;
                 }
 
-                explorer.addLog(`Swiping ${next.direction} on: ${next.targetId} (${next.details || 'no details'}) [Attempt ${currentSwipes + 1}]`);
-                const targetNode = findNodeByShortId(root, next.targetId);
+                explorer.addLog(`Swiping ${swipeDirection} on: ${next.targetId || 'screen'} (${next.details || 'no details'}) [Attempt ${currentSwipes + 1}]`);
 
-                if (targetNode && targetNode.bounds) {
-                    const { x, y, w, h } = targetNode.bounds;
+                // Resolve swipe bounds: use targetId if provided, otherwise use full screen
+                let swipeBounds: { x: number; y: number; w: number; h: number } | null = null;
+
+                if (next.targetId) {
+                    const targetNode = findNodeByShortId(root, next.targetId);
+                    if (targetNode && targetNode.bounds) {
+                        swipeBounds = targetNode.bounds;
+                    }
+                }
+
+                // Fallback: use root node bounds or screen dimensions
+                if (!swipeBounds && root && root.bounds) {
+                    swipeBounds = root.bounds;
+                }
+
+                if (swipeBounds) {
+                    const { x, y, w, h } = swipeBounds;
                     let startX = x + w / 2;
                     let startY = y + h / 2;
                     let endX = startX;
                     let endY = startY;
 
                     const offsetHand = 0.4; // Swipe 40% of container size
-                    if (next.direction === 'up') { endY = startY - (h * offsetHand); }
-                    else if (next.direction === 'down') { endY = startY + (h * offsetHand); }
-                    else if (next.direction === 'left') { endX = startX - (w * offsetHand); }
-                    else if (next.direction === 'right') { endX = startX + (w * offsetHand); }
+                    // ADB swipe = finger movement direction, which is OPPOSITE of scroll direction.
+                    // "scroll down" (see content below) = finger swipes UP (startY > endY)
+                    // "scroll up" (see content above) = finger swipes DOWN (startY < endY)
+                    if (swipeDirection === 'down') { endY = startY - (h * offsetHand); }
+                    else if (swipeDirection === 'up') { endY = startY + (h * offsetHand); }
+                    else if (swipeDirection === 'right') { endX = startX - (w * offsetHand); }
+                    else if (swipeDirection === 'left') { endX = startX + (w * offsetHand); }
 
                     await invoke('run_adb_command', {
                         device: selectedDevice,
@@ -656,8 +837,49 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                     addSwipeAnimation(startX, startY, endX, endY);
                     explorer.registerSwipeAction(currentSnapshot);
                 } else {
-                    explorer.addLog(`Could not find coordinates for swipe container (ShortID: ${next.targetId}).`);
-                    explorer.resetSwipeCount(); // Reset if swipe failed
+                    explorer.addLog(`Could not resolve swipe bounds. Using screen center fallback.`);
+                    // Fallback: hardcoded screen center (1080p resolution). Finger direction is inverted:
+                    // "scroll down" = finger goes UP (1200 → 600), "scroll up" = finger goes DOWN (1200 → 1800)
+                    const fallbackStartY = 1200;
+                    const fallbackEndY = swipeDirection === 'down' ? 600 : 1800;
+                    await invoke('run_adb_command', {
+                        device: selectedDevice,
+                        args: ['shell', 'input', 'swipe', '540', String(fallbackStartY), '540', String(fallbackEndY), "500"]
+                    });
+                    explorer.registerSwipeAction(currentSnapshot);
+                }
+            } else if (next.type === 'type_text' && next.targetId && next.text) {
+                explorer.addLog(`Typing text on: ${next.targetId} -> "${next.text}" (${next.details || 'filling input field'})`);
+                explorer.resetSwipeCount();
+
+                // First tap the input field to focus it
+                const targetNode = findNodeByShortId(root, next.targetId);
+                if (targetNode && targetNode.bounds) {
+                    const centerX = Math.round(targetNode.bounds.x + targetNode.bounds.w / 2);
+                    const centerY = Math.round(targetNode.bounds.y + targetNode.bounds.h / 2);
+                    await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'tap', String(centerX), String(centerY)] });
+                    addTapAnimation(centerX, centerY);
+
+                    // Small delay to let the keyboard appear
+                    await new Promise(resolve => setTimeout(resolve, 500));
+
+                    // Normalize text: strip diacritics and non-ASCII for ADB compatibility
+                    const normalized = next.text
+                        .normalize('NFD')
+                        .replace(/[\u0300-\u036f]/g, '') // Strip diacritics (ã→a, é→e, ç→c)
+                        .replace(/[^\x20-\x7E]/g, '');   // Remove remaining non-ASCII
+                    const escapedText = normalized.replace(/ /g, '%s').replace(/[&|;<>()$`"'\\!]/g, '');
+                    if (escapedText.length === 0) {
+                        explorer.addLog(`Text input skipped: no valid ASCII characters in "${next.text}".`);
+                    } else {
+                        await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'text', escapedText] });
+                    }
+
+                    // Press Enter/Done to dismiss keyboard
+                    await new Promise(resolve => setTimeout(resolve, 300));
+                    await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'keyevent', '66'] });
+                } else {
+                    explorer.addLog(`Could not find input field (ShortID: ${next.targetId}). Skipping text input.`);
                 }
             }
 
@@ -668,10 +890,11 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             explorationTimeoutRef.current = setTimeout(runExplorationStep, 3000);
 
         } catch (error: any) {
+            const errorMsg = error?.message || String(error) || 'Unknown error';
             console.error("Exploration error:", error);
-            explorer.addLog(`Error during exploration: ${error.message}`);
+            explorer.addLog(`Error during exploration: ${errorMsg}`);
             setExplorationLogs([...explorer.getLogs()]);
-            stopExploration(`Error: ${error.message}`);
+            stopExploration(`Error: ${errorMsg}`);
         }
     };
 
@@ -1117,7 +1340,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                     className="p-1.5 hover:bg-primary/10 hover:text-primary rounded text-on-surface-variant/80 transition-all"
                                     title={t('mapper.flowchart.import', 'Import Flow')}
                                 >
-                                    <FileUp size={18} />
+                                    <Download size={18} />
                                 </Button>
                                 <Button
                                     variant="ghost"
@@ -1126,7 +1349,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                     className="p-1.5 hover:bg-primary/10 hover:text-primary rounded text-on-surface-variant/80 transition-all"
                                     title={t('mapper.flowchart.export', 'Export Flow')}
                                 >
-                                    <FileDown size={18} />
+                                    <Upload size={18} />
                                 </Button>
                             </div>
                         }
@@ -1830,6 +2053,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                     </div>
                     <div
                         ref={logScrollRef}
+                        onScroll={onExplorationScroll}
                         className="bg-surface-variant/10 rounded-xl p-3 border border-outline-variant/10 overflow-y-auto max-h-60 custom-scrollbar flex flex-col gap-1"
                     >
                         {explorationLogs.map((log, i) => (

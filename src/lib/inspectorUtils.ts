@@ -405,6 +405,21 @@ export function findNodesByLocator(root: InspectorNode, locator: string): Inspec
  * Generates an optimized XPath for the given node.
  * Priorities: resource-id > text > content-desc > class + index
  */
+/**
+ * Safely escapes an attribute value for use in an XPath string.
+ * XPath 1.0 does not have an escape character, so we use single quotes if the value
+ * contains double quotes, or vice versa. If it contains both, it uses concat().
+ */
+export function escapeXPath(val: string): string {
+    if (!val.includes('"')) return `"${val}"`;
+    if (!val.includes("'")) return `'${val}'`;
+    
+    // Both quotes exist: use XPath concat()
+    const parts = val.split('"');
+    const result = parts.map(p => `"${p}"`).join(', \'"\', ');
+    return `concat(${result})`;
+}
+
 export function generateXPath(node: InspectorNode, attr?: string, type: 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'matches' = 'equals', addons: string[] = []): string {
     if (!node.parent) return '/*';
 
@@ -414,17 +429,21 @@ export function generateXPath(node: InspectorNode, attr?: string, type: 'equals'
 
     if (preferredAttr && attributes[preferredAttr]) {
         const val = attributes[preferredAttr];
+        const escaped = escapeXPath(val);
         let base = "";
         switch (type) {
-            case 'contains': base = `//${className}[contains(@${preferredAttr}, "${val}")]`; break;
-            case 'startsWith': base = `//${className}[starts-with(@${preferredAttr}, "${val}")]`; break;
-            case 'endsWith': base = `//${className}[ends-with(@${preferredAttr}, "${val}")]`; break;
-            case 'matches': base = `//${className}[matches(@${preferredAttr}, "${val}")]`; break;
-            default: base = `//${className}[@${preferredAttr}="${val}"]`;
+            case 'contains': base = `//${className}[contains(@${preferredAttr}, ${escaped})]`; break;
+            case 'startsWith': base = `//${className}[starts-with(@${preferredAttr}, ${escaped})]`; break;
+            case 'endsWith': base = `//${className}[ends-with(@${preferredAttr}, ${escaped})]`; break;
+            case 'matches': base = `//${className}[matches(@${preferredAttr}, ${escaped})]`; break;
+            default: base = `//${className}[@${preferredAttr}=${escaped}]`;
         }
 
         if (addons.length > 0) {
-            const extra = addons.filter(a => attributes[a] !== undefined && attributes[a] !== null && attributes[a] !== '').map(a => `@${a}="${attributes[a]}"`).join(' and ');
+            const extra = addons
+                .filter(a => attributes[a] !== undefined && attributes[a] !== null && attributes[a] !== '')
+                .map(a => `@${a}=${escapeXPath(attributes[a])}`)
+                .join(' and ');
             base = base.replace(/\]$/, ` and ${extra}]`);
         }
         return base;
@@ -475,7 +494,8 @@ export function findNodeByShortId(node: InspectorNode, shortId: string): Inspect
  */
 export function generateSimplifiedXml(node: InspectorNode): string {
     const attrStr = Object.entries(node.attributes)
-        .filter(([k, v]) => ['short_id', 'text', 'resource-id', 'content-desc', 'class', 'clickable', 'enabled'].includes(k) && v)
+        .filter(([k]) => ['short_id', 'text', 'resource-id', 'content-desc', 'class', 'clickable', 'enabled', 'scrollable', 'focusable', 'long-clickable', 'checkable', 'selected'].includes(k))
+        .filter(([k, v]) => v || (['clickable', 'scrollable', 'focusable'].includes(k) && v === "false")) // Include false for crucial QA flags
         .map(([k, v]) => `${k}="${v.replace(/"/g, '&quot;')}"`)
         .join(' ');
 

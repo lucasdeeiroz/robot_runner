@@ -224,9 +224,23 @@ function App() {
               <RunPage onNavigate={setActivePage} initialTab={initialSubTab} />
             </motion.div>
 
+            {/* DashboardPage - Kept mounted to preserve MapperSubTab/exploration state */}
+            <motion.div
+              className={clsx("flex flex-col w-full", activePage === 'dashboard' ? "relative" : "absolute inset-0 pointer-events-none opacity-0")}
+              initial={false}
+              animate={{
+                opacity: activePage === 'dashboard' ? 1 : 0,
+                zIndex: activePage === 'dashboard' ? 10 : 0,
+                scale: activePage === 'dashboard' ? 1 : 0.98
+              }}
+              transition={{ duration: 0.3 }}
+            >
+              <DashboardPage onNavigate={setActivePage} />
+            </motion.div>
+
             {/* Other Pages - Transitions using AnimatePresence */}
             <AnimatePresence mode="wait">
-              {activePage !== 'run' && (
+              {activePage !== 'run' && activePage !== 'dashboard' && (
                 <motion.div
                   key={activePage}
                   className="relative w-full flex flex-col z-20"
@@ -236,12 +250,11 @@ function App() {
                   transition={{ duration: 0.3, ease: [0.2, 0, 0, 1] }}
                 >
                   {activePage === 'tests' && <TestsPage />}
-                  {activePage === 'dashboard' && <DashboardPage onNavigate={setActivePage} />}
                   {activePage === 'settings' && <SettingsPage />}
                   {activePage === 'about' && <AboutPage />}
 
                   {/* Placeholder for other pages */}
-                  {activePage !== 'tests' && activePage !== 'settings' && activePage !== 'about' && activePage !== 'dashboard' && (
+                  {activePage !== 'tests' && activePage !== 'settings' && activePage !== 'about' && (
                     <div className="p-12 text-center border-2 border-dashed border-outline-variant/30 rounded-2xl m-4">
                       <p className="text-on-surface-variant/80">{t('common.coming_soon', { module: activePage })}</p>
                     </div>

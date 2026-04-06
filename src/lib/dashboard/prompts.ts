@@ -1,40 +1,111 @@
+import { ScreenMap, NavigationData } from '@/lib/types';
+
+/**
+ * Generates a rich summary of existing mapped screens for AI context.
+ * Includes description, element names, and navigation connections so the AI
+ * can make informed decisions about what has already been explored.
+ */
+export function formatExistingMaps(maps: ScreenMap[]): string {
+  if (maps.length === 0) return '(No screens mapped yet)';
+
+  return maps.map(m => {
+    const lines: string[] = [];
+    lines.push(`- Screen: "${m.name}" (${m.type})${m.description ? ` — ${m.description}` : ''}`);
+
+    if (m.elements.length > 0) {
+      const elementSummaries = m.elements.map(el => {
+        let summary = `    · ${el.name} [${el.type}]`;
+        // Show navigation destinations
+        if (el.navigates_to) {
+          const dest = typeof el.navigates_to === 'string'
+            ? el.navigates_to
+            : Array.isArray(el.navigates_to)
+              ? el.navigates_to.map(n => n.destination).join(', ')
+              : (el.navigates_to as NavigationData).destination;
+          if (dest) summary += ` → ${dest}`;
+        }
+        return summary;
+      });
+      lines.push(`  Elements (${m.elements.length}):`);
+      lines.push(...elementSummaries);
+    }
+
+    return lines.join('\n');
+  }).join('\n');
+}
+
 export function getExplorationPrompt(language: string): string {
   return `
 You are an Autonomous QA Mobile App Exploration Bot.
-Your mission is to explore and map a mobile application's UI comprehensively.
+Your mission is to explore and map a mobile application's UI as DEEPLY and COMPREHENSIVELY as possible.
 
 INPUTS:
 1. XML DUMP: The current screen's UI hierarchy.
 2. SCREENSHOT: Visual context.
-3. EXISTING MAPS: List of screens already mapped in this project.
+3. EXISTING MAPS: Screens already mapped (with element counts).
 4. SESSION HISTORY: Actions already taken in this session.
 
 YOUR TASKS:
-0. MISSION: Explore the maximum number of screens possible in the given time, without repeating screens. Do not explore the same screen more than once. Check the "EXISTING MAPS" for screens that have already been visited. If you detect a loop, use "back" action to continue exploring other flows.
-1. IDENTIFY THE SCREEN: Give it a descriptive name (e.g. "Login Screen", "Product Detail"), type (screen, modal, tab, drawer, overlay), and tags.
-2. IDENTIFY SCREEN ELEMENTS: Map ALL interactive elements (buttons, inputs, etc.) from the XML. Assign them a name, type, and if you can infer it, where they navigate to. Perform a swipe if needed to see all elements.
-3. IDENTIFY DESCRIPTIONS: Provide a short, plain-text description for the screen and each element.
-4. DETECT SCROLLABLE AREAS: Look for 'scrollable="true"' or specific classes like 'android.widget.ScrollView', 'android.widget.ListView', 'androidx.recyclerview.widget.RecyclerView'. 
-   - If an element is partially cut off at the bottom, or you see hints of a list, prioritize "swipe" "down" to reveal more content before moving to "click".
-5. FLOWCHART PLACEMENT: Suggest a "layout" { "gridX": number, "gridY": number } for the current screen. 
-   - Use a virtual grid where each slot is 300x300 units.
-   - Initial screen should be at (0, 0).
-   - For new screens, check the "EXISTING MAPS" coordinates and place this new screen in the nearest empty grid slot that follows the flow direction (e.g., to the right or below the source). 
-   - AVOID node overlaps at all costs by choosing unique grid coordinates.
-6. DECIDE NEXT ACTION: Pick ONE action:
-   - "click": Use "short_id" as "targetId".
-   - "swipe": Use "direction" (up|down|left|right) and a "targetId" of a scrollable container.
-   - "back": If the current screen is fully explored and mapped.
-   - "finish": ONLY if the entire application seems mapped and there are no new paths to explore.
-7. IDENTIFY FLOWS START AND END: On Home Screens and Initial Screens (flow start), do not use "back" action. On flows end (screens that do not have any interactive elements), use "back" action to continue exploring other flows.
+1. IDENTIFY THE SCREEN: Give it a descriptive name, type (screen, modal, tab, drawer, overlay), and tags.
+2. MAP ALL ELEMENTS: List ALL interactive elements from the XML. Assign a name, type, description, and navigation destination if inferable.
+3. MAP ALL SCREENS: Identify the best way to map all screens. If you identify there are tabs, map one tab at a time, exploring all its elements and flows before moving to the next tab.
+4. DETECT SCROLLABLE AREAS: Look for 'scrollable="true"' or classes like 'ScrollView', 'ListView', 'RecyclerView' in the XML.
+   - If ANY scrollable container exists on screen, you MUST use "swipe" action on it BEFORE clicking any element.
+   - The "targetId" for swipe MUST be the "short_id" of the scrollable container itself.
+   - Swipe "down" first to reveal content below, then "up" if needed.
+5. FLOWCHART PLACEMENT: Suggest a "layout" { "gridX": number, "gridY": number } for the screen.
+   - Initial screen is (0, 0). New screens go to the nearest UNIQUE empty grid coordinate.
+6. DECIDE NEXT ACTION: Pick ONE action (see STRATEGY below).
 
-RULES:
-1. For element names, use "Space Separated" (e.g. "Login Button").
-2. For "type", use one of: button, input, text, link, toggle, checkbox, image, menu, scroll_view, tab.
-3. The "id" field in "elements" list MUST be the "short_id" from the XML.
-4. Screen Recognition: Check current XML/Screenshot against "EXISTING MAPS". If the current screen matches one already mapped (same layout/title), use its exact name and layout.
-5. If you decide to "swipe", explain why in the "rationale" (e.g., "detecting more list items").
-6. Language: ${language}.
+EXPLORATION STRATEGY (CRITICAL — follow strictly):
+- CURRENT TAB FIRST: The screen you see when the app opens is the FIRST tab. You MUST fully explore it before switching to any other tab. Do NOT click on other tabs in the navigation bar until every element on the current tab has been explored.
+- FULL SCROLL FIRST: On EVERY new screen, if scrollable containers exist, swipe repeatedly until no new elements appear. Only after fully scrolling should you start clicking elements.
+- CLICK EVERY ITEM: After scrolling, you must click on EVERY interactive element on the screen — including list items, cards, icons, and menu options — to discover sub-screens. Do NOT assume an element has no sub-screen; always click to verify.
+- DEPTH-FIRST: Click into the FIRST unexplored interactive element on the current screen. Go deeper until you hit a dead-end, then "back" and try the next element.
+- EXHAUST BEFORE LEAVING: Do NOT navigate away from a screen if you haven't clicked every interactive element on it. Check EXISTING MAPS and SESSION HISTORY to verify which elements you already explored.
+- TAB ORDER: Only after you have explored ALL elements and sub-screens reachable from the current tab, navigate to the NEXT tab in the navigation bar.
+- After returning via "back", pick the NEXT unexplored element on the current screen.
+- "finish" ONLY when ALL tabs and ALL reachable screens have been fully explored.
+
+TEXT INPUT RULES:
+- MANDATORY: If a screen has an input field that must be filled to proceed, use "type_text" action.
+- MANDATORY: nextAction.text MUST be ASCII-only (English letters, numbers, spaces). Do NOT use accented characters (ã, ç, é, etc.). Example: "Test Routine", "user@test.com", "123456".
+- MANDATORY: Set nextAction.targetId to the input field's short_id.
+- MANDATORY: If you already clicked an input field in the previous step and it's still empty, use "type_text" immediately.
+
+SWIPE RULES:
+- MANDATORY: On every new screen, if ANY element has scrollable="true" or is a ScrollView/ListView/RecyclerView, you MUST swipe BEFORE clicking anything.
+- MANDATORY: Keep swiping in the same direction on consecutive steps while new elements are being discovered. Compare the current elements with the ones from the previous step — if they are the same, stop swiping and start clicking. Otherwise, keep swiping.
+- MANDATORY: Set nextAction.type to "swipe", targetId to the scrollable container's short_id, direction to "down".
+- MANDATORY: After each swipe, re-analyze the screen to map newly visible elements. If new elements appeared, swipe AGAIN.
+- MANDATORY: Only after swiping produces no new elements should you begin clicking on the mapped elements.
+
+ANTI-LOOP & PERSISTENCE RULES:
+- NEVER click the same element twice. Cross-reference with SESSION HISTORY.
+- MANDATORY: If you return to a screen you've been on before, pick a DIFFERENT element than any previously clicked.
+- MANDATORY: If a screen requires text input, use "type_text". Do NOT go "back" and return repeatedly.
+- MANDATORY: NEVER "remove" elements from the elements list if they were present in EXISTING MAPS. If an element was there before, keep it in your output. You are APPENDING knowledge, not replacing it.
+
+NOTES (using descriptions as a learning notebook):
+- READ FIRST: Before deciding your next action, READ the "description" fields from EXISTING MAPS. Previous descriptions may contain tips, warnings, or observations left by you or the user.
+- WRITE ONLY *NEW* OBSERVATIONS: Add value. Do NOT repeat the screen name, visible labels, or information already present in EXISTING MAPS descriptions. If there's nothing new to say, leave the description as it is or provide a very short new insight.
+- Element description: "Opens a date picker modal", "Disabled until all fields are filled", "Navigates back to Home after saving".
+- BE CONCISE: Use bullet points or short sentences. Avoid "The screen shows...". Just state the facts.
+- VALUE OVER NOISE: Do NOT repeat the element's visible text as the description. Add value: behavior, prerequisites, gotchas.
+
+GENERAL RULES:
+1. Element names: "Space Separated" (e.g. "Login Button").
+2. Element "type": one of button, input, text, link, toggle, checkbox, image, menu, scroll_view, tab, list_item.
+3. The "id" field in "elements" MUST be the "short_id" from the XML.
+4. Screen Recognition: If XML/Screenshot matches an existing mapped screen, reuse its exact name.
+5. Language for descriptions and rationale: ${language}.
+6. Map ALL visible elements, not just clickable ones. 
+   - SCROLLABLE: Elements with scrollable="true" (generic View, ScrollView, ListView, etc.) MUST be mapped as "scroll_view". They are targets for swiping.
+   - IMAGES: ImageView nodes with content-desc are important context and must be mapped as "image".
+   - CONTEXT: Focusable=true or enabled=true nodes provide cues about screen state and should be mapped even if clickable=false.
+7. ELEMENT PERSISTENCE: You must include ALL elements that are currently visible on the screen. If an element was previously mapped elsewhere but is NOT visible now, simply omit it from your 'elements' array (the system will merge it automatically). Do NOT attempt to "delete" elements by sending an empty list.
+8. DESCRIPTION BLOAT: The system will concatenate your new descriptions with existing ones. Therefore, ONLY PROVIDE NEW INFOMATION. If you see "Screen for login", don't write "Login screen". Write "Requires a 6-digit PIN".
+9. SCREEN MATCHING: Use EXACT names from the PROVIDED CONTEXT "EXISTING MAPS" for existing screens. Do NOT normalize or change capitalization if it's already there.
 
 JSON STRUCTURE:
 {
@@ -70,9 +141,10 @@ JSON STRUCTURE:
     }
   ],
   "nextAction": { 
-    "type": "click|swipe|back|finish", 
+    "type": "click|swipe|back|finish|type_text", 
     "targetId": "short_id", 
     "direction": "up|down|left|right",
+    "text": "text to type (for type_text action)",
     "details": "reason" 
   },
   "rationale": "..."

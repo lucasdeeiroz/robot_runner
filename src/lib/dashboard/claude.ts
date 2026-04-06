@@ -1,7 +1,7 @@
 import { ScreenMap, UIElementMap } from '@/lib/types';
 import { AIGenerationType } from './gemini';
 import { DeepAnalysisContext } from "./historyAnalysisUtils";
-import { getExplorationPrompt, getRefinedTestCasesPrompt, getRefinedPBIPrompt, getRefinedImprovementPrompt, getRefinedBugPrompt, getRefinedRobotScriptPrompt } from "./prompts";
+import { getExplorationPrompt, formatExistingMaps, getRefinedTestCasesPrompt, getRefinedPBIPrompt, getRefinedImprovementPrompt, getRefinedBugPrompt, getRefinedRobotScriptPrompt } from "./prompts";
 
 function extractBase64Data(imageBase64: string): { mimeType: string, data: string } {
     const trimmed = imageBase64.trim();
@@ -504,19 +504,32 @@ export async function exploreScreen(
 ): Promise<{
     screen: Partial<ScreenMap>;
     elements: UIElementMap[];
-    nextAction: { type: 'click' | 'back' | 'swipe' | 'finish'; targetId?: string; direction?: 'up' | 'down' | 'left' | 'right'; details?: string };
+    nextAction: { type: 'click' | 'back' | 'swipe' | 'finish' | 'type_text'; targetId?: string; direction?: 'up' | 'down' | 'left' | 'right'; text?: string; details?: string };
     rationale: string;
 }> {
     if (!apiKey) throw new Error("Missing Claude API Key");
 
     const systemInstruction = getExplorationPrompt(language);
 
+    const actionLogs = sessionHistory.filter(log =>
+        log.includes("--- Step") ||
+        log.includes("Clicking element:") ||
+        log.includes("Swiping") ||
+        log.includes("Navigating back") ||
+        log.includes("AI mapped:") ||
+        log.includes("Typing text on:") ||
+        log.includes("Loop detected") ||
+        log.includes("Exploration stopped") ||
+        log.includes("App exit detected") ||
+        log.includes("Exploration finished")
+    );
+
     const prompt = `
 EXISTING MAPS (Mapped screens so far):
-${existingMaps.map(m => `- ${m.name}`).join('\n')}
+${formatExistingMaps(existingMaps)}
 
-SESSION HISTORY (Steps taken so far):
-${sessionHistory.slice(-10).join('\n')}
+SESSION HISTORY (Action logs):
+${actionLogs.slice(-50).join('\n')}
 
 XML DUMP:
 ${xmlDump.substring(0, 15000)}

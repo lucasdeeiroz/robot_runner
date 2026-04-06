@@ -9,12 +9,19 @@ export interface ExplorationState {
     targetPackage?: string;
     consecutiveSwipes: number;
     previousElementsSnapshot?: string;
+    screenVisitCount: Record<string, number>; // Track how many times each screen was visited
+    actionFingerprints: Record<string, number>; // Track repeated screen:action:target combos
+    // Back-update tracking: what was the last navigation that brought us here?
+    previousScreenName?: string;
+    previousActionTargetId?: string; // short_id of the element clicked on the previous screen
+    previousActionType?: string; // type of action (click, etc.)
 }
 
 export interface ExplorationAction {
-    type: 'click' | 'back' | 'swipe' | 'finish' | 'error';
+    type: 'click' | 'back' | 'swipe' | 'finish' | 'error' | 'type_text';
     targetId?: string;
     direction?: 'up' | 'down' | 'left' | 'right';
+    text?: string;
     details?: string;
 }
 
@@ -37,6 +44,8 @@ export class AutonomousExplorer {
             maxSteps: initialMaxSteps,
             currentStep: 0,
             consecutiveSwipes: 0,
+            screenVisitCount: {},
+            actionFingerprints: {},
         };
     }
 
@@ -94,9 +103,29 @@ export class AutonomousExplorer {
         return this.state.targetPackage;
     }
 
+    /**
+     * Tracks a screen visit with an action fingerprint.
+     * Returns how many times the SAME action has been repeated on this screen.
+     * This allows the AI to visit the same screen many times as long as it explores different elements.
+     */
+    public trackScreenVisit(screenName: string, actionFingerprint?: string): number {
+        this.state.screenVisitCount[screenName] = (this.state.screenVisitCount[screenName] || 0) + 1;
+
+        if (actionFingerprint) {
+            const count = (this.state.actionFingerprints[actionFingerprint] || 0) + 1;
+            this.state.actionFingerprints[actionFingerprint] = count;
+            return count;
+        }
+
+        return this.state.screenVisitCount[screenName];
+    }
+
+    /** Returns true if the screen has been visited too many times (stuck loop). */
+    public isScreenLooping(screenName: string, threshold: number = 4): boolean {
+        return (this.state.screenVisitCount[screenName] || 0) >= threshold;
+    }
+
     public shouldStop(): boolean {
-        // Now mostly controlled by AI 'finish' action or manual stop, 
-        // but we keep a safety limit.
         return this.state.currentStep >= this.state.maxSteps;
     }
 
@@ -106,5 +135,35 @@ export class AutonomousExplorer {
 
     public getState(): ExplorationState {
         return { ...this.state };
+    }
+
+    /**
+     * Records the current screen and the action taken, so the next step can
+     * back-update the previous screen's element with navigates_to.
+     */
+    public setPreviousNavigation(screenName: string, actionTargetId?: string, actionType?: string) {
+        this.state.previousScreenName = screenName;
+        this.state.previousActionTargetId = actionTargetId;
+        this.state.previousActionType = actionType;
+    }
+
+    /**
+     * Returns the previous navigation context (screen name + clicked element id).
+     * Returns undefined if no previous navigation is recorded (first step or after back).
+     */
+    public getPreviousNavigation(): { screenName: string; targetId?: string; actionType?: string } | undefined {
+        if (!this.state.previousScreenName) return undefined;
+        return {
+            screenName: this.state.previousScreenName,
+            targetId: this.state.previousActionTargetId,
+            actionType: this.state.previousActionType,
+        };
+    }
+
+    /** Clears previous navigation (e.g., after a back action or swipe). */
+    public clearPreviousNavigation() {
+        this.state.previousScreenName = undefined;
+        this.state.previousActionTargetId = undefined;
+        this.state.previousActionType = undefined;
     }
 }

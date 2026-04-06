@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { ScreenMap, FlowchartLayout, LayoutNode, LayoutEdge, NavigationData } from '@/lib/types';
-import { X, ZoomIn, ZoomOut, Maximize, Pencil, Save, Upload, Download, Camera, Plus, AlertTriangle } from 'lucide-react';
+import { X, ZoomIn, ZoomOut, Maximize, Pencil, Save, Upload, Download, Camera, Plus, AlertTriangle, Wand2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
 import { loadFlowchartLayout, deleteFlowchartLayout, exportMapperData, importMapperData, saveScreenMap } from '@/lib/dashboard/mapperPersistence';
@@ -502,6 +502,86 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
     const handleQuickConnect = (nodeId: string, portId: string) => {
         setQuickConnectData({ sourceNodeId: nodeId, sourcePortId: portId });
         setIsQuickConnectOpen(true);
+    };
+
+    /** BFS-based auto-reorganize: left = closer to root, right = deeper screens. */
+    const autoReorganizeLayout = () => {
+        // Build adjacency from navigates_to connections
+        const adjacency: Record<string, Set<string>> = {};
+        const allScreenNames = new Set(maps.map(m => m.name));
+
+        maps.forEach(map => {
+            if (!adjacency[map.name]) adjacency[map.name] = new Set();
+            map.elements.forEach(el => {
+                const target = typeof el.navigates_to === 'string'
+                    ? el.navigates_to
+                    : (Array.isArray(el.navigates_to)
+                        ? el.navigates_to[0]?.destination
+                        : (el.navigates_to as NavigationData)?.destination);
+                if (target && allScreenNames.has(target)) {
+                    adjacency[map.name].add(target);
+                }
+            });
+        });
+
+        // Find root candidates: screens that no one navigates to, or first screen
+        const hasIncoming = new Set<string>();
+        Object.values(adjacency).forEach(targets => targets.forEach(t => hasIncoming.add(t)));
+        const roots = maps.filter(m => !hasIncoming.has(m.name)).map(m => m.name);
+        if (roots.length === 0 && maps.length > 0) roots.push(maps[0].name);
+
+        // BFS to assign depths
+        const visited = new Set<string>();
+        const depthMap: Record<string, number> = {};
+        const queue: { name: string; depth: number }[] = [];
+
+        roots.forEach(r => {
+            if (!visited.has(r)) {
+                queue.push({ name: r, depth: 0 });
+                visited.add(r);
+            }
+        });
+
+        while (queue.length > 0) {
+            const { name, depth } = queue.shift()!;
+            depthMap[name] = depth;
+
+            const children = adjacency[name] || new Set();
+            children.forEach(child => {
+                if (!visited.has(child)) {
+                    visited.add(child);
+                    queue.push({ name: child, depth: depth + 1 });
+                }
+            });
+        }
+
+        // Add orphaned screens (no connections at all)
+        maps.forEach(m => {
+            if (!visited.has(m.name)) {
+                const maxDepth = Math.max(0, ...Object.values(depthMap));
+                depthMap[m.name] = maxDepth + 1;
+            }
+        });
+
+        // Group screens by depth, then assign Y positions per group
+        const depthGroups: Record<number, string[]> = {};
+        Object.entries(depthMap).forEach(([name, depth]) => {
+            if (!depthGroups[depth]) depthGroups[depth] = [];
+            depthGroups[depth].push(name);
+        });
+
+        const newNodes: Record<string, LayoutNode> = {};
+        Object.entries(depthGroups).forEach(([depthStr, names]) => {
+            const gridX = parseInt(depthStr);
+            names.forEach((name, idx) => {
+                newNodes[name] = { gridX, gridY: idx };
+            });
+        });
+
+        setLayout(prev => ({ ...prev, nodes: newNodes }));
+        setIsDirty(true);
+        feedback.toast.success(t('mapper.flowchart.reorganized', 'Layout reorganized'));
+        setTimeout(centerView, 100);
     };
 
     const confirmQuickConnect = async (targetScreenName: string, sourceElementName?: string) => {
@@ -1320,6 +1400,12 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                             className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full transition-colors"
                             title={t('mapper.flowchart.export_image', 'Export Image')}>
                             <Camera size={16} />
+                        </Button>
+                        <Button
+                            onClick={autoReorganizeLayout}
+                            className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full transition-colors"
+                            title={t('mapper.flowchart.reorganize', 'Auto-Reorganize Layout')}>
+                            <Wand2 size={16} />
                         </Button>
                         <div className="h-4 w-px bg-outline-variant/30 mx-1" />
                         <div className="flex items-center gap-2 px-2 py-1 bg-surface-variant/10 rounded-lg border border-outline-variant/20 ml-2">

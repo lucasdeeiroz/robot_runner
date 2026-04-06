@@ -38,12 +38,32 @@ export async function listScreenMaps(profileId: string): Promise<ScreenMap[]> {
 
         for (const entry of entries) {
             if (entry.isFile && entry.name.endsWith('.json') && entry.name !== 'flowchart_layout.json') {
+                const path = `${dir}/${entry.name}`;
                 try {
-                    const content = await readTextFile(`${dir}/${entry.name}`, { baseDir: BaseDirectory.AppLocalData });
-                    const map = JSON.parse(content) as ScreenMap;
-                    maps.push(map);
-                } catch (e) {
-                    console.warn(`Failed to parse map file: ${entry.name}`, e);
+                    const content = await readTextFile(path, { baseDir: BaseDirectory.AppLocalData });
+                    try {
+                        const map = JSON.parse(content) as ScreenMap;
+                        maps.push(map);
+                    } catch (parseError) {
+                        console.error(`CRITICAL: Failed to parse map file "${entry.name}". The JSON syntax is likely invalid.`, parseError);
+                        // Attempt a naive repair for unescaped quotes in XPath-like strings if it's a simple case
+                        // (This is a safety net for the reported issue)
+                        try {
+                            // This regex tries to find "id": "//...[@attr="val"]" and escape the inner quotes
+                            // It's very restricted to avoid breaking valid JSON.
+                            const repaired = content.replace(/"id":\s*"(\/\/.*?)\[(.*?)\]"/g, (_match, prefix, predicates) => {
+                                const escapedPredicates = predicates.replace(/"/g, '\\"');
+                                return `"id": "${prefix}[${escapedPredicates}]"`;
+                            });
+                            const map = JSON.parse(repaired) as ScreenMap;
+                            maps.push(map);
+                            console.info(`Successfully repaired and loaded "${entry.name}" in memory.`);
+                        } catch (repairError) {
+                            console.error(`Repair failed for "${entry.name}". Please fix the JSON manually.`, repairError);
+                        }
+                    }
+                } catch (readError) {
+                    console.error(`Failed to read file ${entry.name}`, readError);
                 }
             }
         }
