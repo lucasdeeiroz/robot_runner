@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import {
     Maximize, Check, Scan, Home, ArrowLeft, Rows, X, RefreshCw, Save, GitGraph, Trash2, Plus, FileClock, FileInput, SearchCode, ChevronDown, ChevronUp, ChevronRight,
@@ -99,6 +99,13 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     const [aiError, setAiError] = useState<string | null>(null);
 
     // --- Autonomous Exploration State ---
+    const hasApiKey = useMemo(() => {
+        const provider = settings.aiProvider || 'gemini';
+        if (provider === 'gemini') return !!settings.geminiApiKey;
+        if (provider === 'claude') return !!settings.claudeApiKey;
+        if (provider === 'openai') return !!settings.openaiApiKey;
+        return false;
+    }, [settings.aiProvider, settings.geminiApiKey, settings.claudeApiKey, settings.openaiApiKey]);
     const [isStayOn, setIsStayOn] = useState(false);
     const [isExploring, setIsExploring] = useState(false);
     const isExploringRef = useRef(false);
@@ -600,7 +607,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 // Smart Merging: Check for existing map with same name
                 // Smart Merging: Check for existing map with same name (resilient matching)
                 const aiNameNormalized = aiScreen.name.trim().toLowerCase();
-                const existingMap = maps.find(m => 
+                const existingMap = maps.find(m =>
                     m.name.trim().toLowerCase() === aiNameNormalized ||
                     m.id === aiNameNormalized.replace(/\s+/g, '_')
                 );
@@ -611,38 +618,38 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 // Helper for smart description merging (prevents "A | A B" bloat)
                 if (existingMap) {
                     explorer.addLog(`Merging AI insights into existing screen: "${existingMap.name}" (ID: ${existingMap.id}, ${existingMap.elements.length} elements)`);
-                    
+
                     // 1. Merge Screen Metadata - Replacement Strategy (AI is responsible for incorporating old info)
                     mergedDescription = aiScreen.description || existingMap.description || "";
-                    
+
                     // 2. Deep Merge Elements
                     // Start with existing elements and update them if AI saw them again
                     const aiElementsById = new Map<string, UIElementMap>(aiElements.map((el: UIElementMap) => [el.id, el]));
-                    
+
                     mergedElements = existingMap.elements.map((existingEl: UIElementMap) => {
                         const aiEl = aiElementsById.get(existingEl.id);
                         if (!aiEl) return existingEl; // AI didn't see it this time, keep as is
-                        
+
                         // AI saw it! update description and navigates_to
                         const updatedDesc = aiEl.description || existingEl.description || "";
-                        
+
                         // Merge navigates_to if AI found a new destination
                         let mergedNav = existingEl.navigates_to;
                         if (aiEl.navigates_to && !existingEl.navigates_to) {
                             mergedNav = aiEl.navigates_to;
                         }
-                        
-                        return { 
-                            ...existingEl, 
+
+                        return {
+                            ...existingEl,
                             description: updatedDesc,
                             navigates_to: mergedNav
                         };
                     });
-                    
+
                     // 3. Add genuinely new elements
                     const existingIds = new Set(existingMap.elements.map(e => e.id));
                     const genuinelyNew = aiElements.filter((el: UIElementMap) => !existingIds.has(el.id));
-                    
+
                     if (genuinelyNew.length > 0) {
                         mergedElements = [...mergedElements, ...genuinelyNew];
                         explorer.addLog(`Added ${genuinelyNew.length} new elements discoverd by AI. Total: ${mergedElements.length}`);
@@ -694,7 +701,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 setScreenDescription(map.description || "");
                 setScreenTags(map.tags || []);
                 setMappedElements(mergedElements);
-                
+
                 if (aiScreen.layout) {
                     explorer.addLog(`AI suggested layout for ${aiScreen.name}: (${aiScreen.layout.gridX}, ${aiScreen.layout.gridY})`);
                 }
@@ -1430,24 +1437,26 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                             ) : (
                                 <div className="text-on-surface/80 flex flex-col items-center">
                                     {loading ? <ExpressiveLoading size="lg" variant="circular" className="mb-2" /> : <Maximize size={32} className="mb-2 opacity-50" />}
-                                    <p>{loading ? t('mapper.status.loading') : t('mapper.status.no_screenshot')}</p>
+                                    <p className="mb-10">{loading ? t('mapper.status.loading') : t('mapper.status.no_screenshot')}</p>
                                 </div>
                             )}
-                            <Button
-                                variant={isExploring ? "danger" : "primary"}
-                                size="sm"
-                                onClick={isExploring ? () => stopExploration("User stopped") : startExploration}
-                                className={clsx(
-                                    "flex items-center gap-2 px-3 py-1.5 rounded-2xl transition-all shadow-sm text-sm font-medium mb-0",
-                                    isExploring ? "bg-error text-surface hover:bg-error/80" : "bg-primary/10 border border-primary text-primary hover:bg-primary hover:text-surface"
-                                )}
-                                title={isExploring ? t('mapper.exploration.stop') : t('mapper.exploration.start')}
-                            >
-                                {isExploring ? <Square size={16} fill="currentColor" /> : <Sparkles size={16} stroke="currentColor" />}
-                                <span className={clsx(isNarrow && "hidden")}>
-                                    {isExploring ? t('mapper.exploration.stop') : t('mapper.exploration.start')}
-                                </span>
-                            </Button>
+                            {hasApiKey && (
+                                <Button
+                                    variant={isExploring ? "danger" : "primary"}
+                                    size="sm"
+                                    onClick={isExploring ? () => stopExploration("User stopped") : startExploration}
+                                    className={clsx(
+                                        "flex items-center gap-2 px-3 py-1.5 rounded-2xl transition-all shadow-sm text-sm font-medium mb-0",
+                                        isExploring ? "bg-error text-surface hover:bg-error/80" : "bg-primary/10 border border-primary text-primary hover:bg-primary hover:text-surface"
+                                    )}
+                                    title={isExploring ? t('mapper.exploration.stop') : t('mapper.exploration.start')}
+                                >
+                                    {isExploring ? <Square size={16} fill="currentColor" /> : <Sparkles size={16} stroke="currentColor" />}
+                                    <span className={clsx(isNarrow && "hidden")}>
+                                        {isExploring ? t('mapper.exploration.stop') : t('mapper.exploration.start')}
+                                    </span>
+                                </Button>
+                            )}
                         </div>
 
                         {/* Properties Panel */}

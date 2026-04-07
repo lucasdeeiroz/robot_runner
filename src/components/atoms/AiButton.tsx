@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { Sparkles } from 'lucide-react';
+import { useSettings } from '@/lib/settings';
 import { Button, ButtonProps } from './Button';
 import { ExpressiveLoading } from './ExpressiveLoading';
 import clsx from 'clsx';
@@ -20,7 +21,20 @@ export const AiButton: React.FC<AiButtonProps> = ({
     variant = 'primary',
     ...props
 }) => {
-    const [isHovered, setIsHovered] = React.useState(false);
+    const { settings } = useSettings();
+    const [isHovered, setIsHovered] = useState(false);
+
+    // Visibility Check: Only show if an API key for the selected provider is set
+    const hasApiKey = useMemo(() => {
+        const provider = settings.aiProvider || 'gemini';
+        if (provider === 'gemini') return !!settings.geminiApiKey;
+        if (provider === 'claude') return !!settings.claudeApiKey;
+        if (provider === 'openai') return !!settings.openaiApiKey;
+        return false;
+    }, [settings.aiProvider, settings.geminiApiKey, settings.claudeApiKey, settings.openaiApiKey]);
+
+    if (!hasApiKey) return null;
+
     const isTooltipNeeded = !showTextAlways && (!expandable || !isHovered);
 
     return (
