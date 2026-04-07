@@ -216,7 +216,6 @@ transform a bug description into a professional, structured bug report.
    1. [Step 1]
    2. [Step 2]
    ...
-   
    Actual Result: [What currently happens]
    Expected Result: [What should happen]
    
@@ -260,5 +259,113 @@ OUTPUT:
 - Format: { "Screen Name": { "gridX": number, "gridY": number }, ... }
 
 Language for any required internal reasoning (though output must be valid JSON): ${language}.
+`.trim();
+}
+
+/**
+ * Prompt for suggesting a name and justification for a UI element.
+ */
+export function getElementNamingPrompt(
+  screenName: string,
+  elementAttr: Record<string, string>,
+  language: string,
+  mappingContext: string
+): string {
+  const attributes = Object.entries(elementAttr)
+    .filter(([_, v]) => v)
+    .map(([k, v]) => `- ${k}: ${v}`)
+    .join('\n');
+
+  return `
+Context: Professional QA Engineering and Test Automation.
+Task: Suggest a descriptive name and a brief justification for this UI element found in the screen "${screenName}".
+
+Element Attributes:
+${attributes}
+${mappingContext}
+
+Rules:
+1. Use "Space Separated" convention for the name (e.g., "Login Button", "Username Input").
+2. Respond in this language: ${language}.
+3. Return ONLY a valid JSON object with the following keys:
+   - "name": The suggested name.
+   - "justification": A brief explanation of why this name was chosen based on the attributes and existing context.
+`.trim();
+}
+
+/**
+ * System instruction for suggesting semantic tags for a screen.
+ */
+export function getScreenTaggingPrompt(language: string): string {
+  return `
+You are a QA Architect.
+Analyze the screen components and optionally the provided screenshot to suggest 3 to 5 highly relevant semantic tags.
+Tags should be dynamic, context-aware, and useful for organizing a large test suite.
+Examples: "Authentication", "User Profile", "Social Media", "Shopping Cart", "Form Validation".
+Respond ONLY in a comma-separated list of tags in this language: ${language}.
+`.trim();
+}
+
+/**
+ * System instruction for analyzing test history.
+ */
+export function getTestHistoryAnalysisPrompt(language: string): string {
+  const responseLanguage = language.toLowerCase().startsWith('pt') ? 'Portuguese' : language.toLowerCase().startsWith('es') ? 'Spanish' : 'English';
+
+  return `
+You are a Senior QA Automation Engineer and Data Analyst. Do not mention who you are in your responses.
+Analyze the provided test execution history to identify:
+1. Flakiness: Tests that fail and pass intermittently under similar conditions. Use the "failedTests" list to track individual test stability across runs.
+2. Environment Correlation: Detect patterns where failures (specific tests or whole suites) occur only on certain device models or OS versions.
+3. Performance Trends: Significant increases in execution duration over time.
+4. Deep Anomaly Analysis: Correlate test failures with high CPU/RAM usage OR critical logcat errors if provided in the "DEEP CONTEXT" section.
+5. Root Cause Hypothesis: Suggest if the issue is likely environmental, a specific regression, or a flaky locator.
+
+Provide a comprehensive analysis in Markdown format.
+Use professional tone and actionable insights.
+Response language: ${responseLanguage}.
+`.trim();
+}
+
+/**
+ * System instruction for summarizing test execution results.
+ */
+export function getExecutionSummaryPrompt(language: string, totalTests: number): string {
+  const responseLanguage = language.toLowerCase().startsWith('pt') ? 'Portuguese' : language.toLowerCase().startsWith('es') ? 'Spanish' : 'English';
+
+  return `
+You are a Senior Lead QA Engineer.
+Analyze the provided test execution tree and failure context to provide a high-level "Executive Summary".
+
+Your primary objective is to identify if multiple failures share a common root cause based on the provided logs.
+
+Focus on:
+1. Overall Success Rate: Use the "OVERALL STATISTICS" section to provide an accurate success percentage.
+2. Critical Failures Analysis: Use the "FAILURE CONTEXT" section below to explain WHY tests failed. Look for error messages, stack traces, or screenshots mentioned in technical details.
+3. Actionable Insights: Suggest what the developer or QA should check first based on the actual logs provided.
+
+Rules:
+- Use Markdown.
+- Be concise but professional.
+- ALWAYS use the provided numbers for success rate. If OVERALL STATISTICS shows ${totalTests} tests, then that is the truth.
+- IF technical details are provided in FAILURE CONTEXT, YOU MUST use them. Do not say they are missing.
+- Response language: ${responseLanguage}.
+`.trim();
+}
+
+/**
+ * Standardizes the "Senior QA Specialist" wrapper for refined test cases.
+ */
+export function getQAAssistantWrapper(promptString: string, appMapping: boolean, mappingContext: string): string {
+  return `
+You are a Senior QA Specialist and Product Owner assistant.
+
+${promptString}
+
+RULES:
+1. Output ONLY the raw content without markdown code blocks, headers, or introductory text.
+2. Keep the content professional, concise, and technically accurate.
+3. ${appMapping ? "PRIORITIZE using the names and screens provided in the APPLICATION MAPPING context below. If a requirement mentions an action that matches a mapped element, use that element's specific name." : "Use generic but clear terminology."}
+${mappingContext}
 `.trim();
 }

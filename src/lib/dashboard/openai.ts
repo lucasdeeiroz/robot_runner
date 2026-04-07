@@ -1,7 +1,7 @@
 import { ScreenMap, UIElementMap } from '@/lib/types';
 import { AIGenerationType } from './gemini';
 import { DeepAnalysisContext } from "./historyAnalysisUtils";
-import { getExplorationPrompt, formatExistingMaps, getRefinedTestCasesPrompt, getRefinedPBIPrompt, getRefinedImprovementPrompt, getRefinedBugPrompt, getRefinedRobotScriptPrompt, getFlowchartLayoutPrompt } from "./prompts";
+import { getExplorationPrompt, formatExistingMaps, getRefinedTestCasesPrompt, getRefinedPBIPrompt, getRefinedImprovementPrompt, getRefinedBugPrompt, getRefinedRobotScriptPrompt, getFlowchartLayoutPrompt, getElementNamingPrompt, getScreenTaggingPrompt, getTestHistoryAnalysisPrompt, getExecutionSummaryPrompt, getQAAssistantWrapper } from "./prompts";
 
 function extractBase64Data(imageBase64: string): { mimeType: string, data: string } {
     const trimmed = imageBase64.trim();
@@ -45,17 +45,7 @@ export async function generateRefinedTestCases(
         case 'robot_script': promptString = getRefinedRobotScriptPrompt(language); break;
     }
 
-    const systemInstruction = `
-You are a Senior QA Specialist and Product Owner assistant.
-
-${promptString}
-
-RULES:
-1. Output ONLY the raw content without markdown code blocks, headers, or introductory text.
-2. Keep the content professional, concise, and technically accurate.
-3. ${appMapping ? "PRIORITIZE using the names and screens provided in the APPLICATION MAPPING context below. If a requirement mentions an action that matches a mapped element, use that element's specific name." : "Use generic but clear terminology."}
-${mappingContext}
-`.trim();
+    const systemInstruction = getQAAssistantWrapper(promptString, !!appMapping, mappingContext);
 
     const url = "https://api.openai.com/v1/chat/completions";
 
@@ -214,21 +204,7 @@ export async function suggestElementName(
         });
     }
 
-    const prompt = `
-Context: Professional QA Engineering and Test Automation.
-Task: Suggest a descriptive name and a brief justification for this UI element found in the screen "${screenName}".
-
-Element Attributes:
-${Object.entries(elementAttr).filter(([_, v]) => v).map(([k, v]) => `- ${k}: ${v}`).join('\n')}
-${mappingContext}
-
-Rules:
-1. Use "Space Separated" convention for the name (e.g., "Login Button", "Username Input").
-2. Respond in this language: ${language}.
-3. Return ONLY a valid JSON object with the following keys:
-   - "name": The suggested name.
-   - "justification": A brief explanation of why this name was chosen based on the attributes and existing context.
-`.trim();
+    const prompt = getElementNamingPrompt(screenName, elementAttr, language, mappingContext);
 
     const url = "https://api.openai.com/v1/chat/completions";
 
@@ -292,13 +268,7 @@ export async function suggestScreenTags(
 ): Promise<string[]> {
     if (!apiKey) throw new Error("Missing OpenAI API Key");
 
-    const systemInstruction = `
-You are a QA Architect.
-Analyze the screen components and optionally the provided screenshot to suggest 3 to 5 highly relevant semantic tags.
-Tags should be dynamic, context-aware, and useful for organizing a large test suite.
-Examples: "Authentication", "User Profile", "Social Media", "Shopping Cart", "Form Validation".
-Respond ONLY in a comma-separated list of tags in this language: ${language}.
-`.trim();
+    const systemInstruction = getScreenTaggingPrompt(language);
 
     const prompt = `
 Screen Name: ${screenName}
@@ -325,19 +295,7 @@ export async function analyzeTestHistory(
     language: string,
     deepContext?: Record<string, DeepAnalysisContext>
 ): Promise<string> {
-    const systemInstruction = `
-You are a Senior QA Automation Engineer and Data Analyst. Do not mention who you are in your responses.
-Analyze the provided test execution history to identify:
-1. Flakiness: Tests that fail and pass intermittently under similar conditions. Use the "failedTests" list to track individual test stability across runs.
-2. Environment Correlation: Detect patterns where failures (specific tests or whole suites) occur only on certain device models or OS versions.
-3. Performance Trends: Significant increases in execution duration over time.
-4. Deep Anomaly Analysis: Correlate test failures with high CPU/RAM usage OR critical logcat errors if provided in the "DEEP CONTEXT" section.
-5. Root Cause Hypothesis: Suggest if the issue is likely environmental, a specific regression, or a flaky locator.
-
-Provide a comprehensive analysis in Markdown format.
-Use professional tone and actionable insights.
-Response language: ${language.toLowerCase().startsWith('pt') ? 'Portuguese' : language.toLowerCase().startsWith('es') ? 'Spanish' : 'English'}.
-`.trim();
+    const systemInstruction = getTestHistoryAnalysisPrompt(language);
 
     const historySummary = history
         .slice()
@@ -435,24 +393,7 @@ export async function summarizeExecution(
     const totalTests = stats.passed + stats.failed;
     const successRate = totalTests > 0 ? ((stats.passed / totalTests) * 100).toFixed(1) : "0";
 
-    const systemInstruction = `
-You are a Senior Lead QA Engineer.
-Analyze the provided test execution tree and failure context to provide a high-level "Executive Summary".
-
-Your primary objective is to identify if multiple failures share a common root cause based on the provided logs.
-
-Focus on:
-1. Overall Success Rate: Use the "OVERALL STATISTICS" section to provide an accurate success percentage.
-2. Critical Failures Analysis: Use the "FAILURE CONTEXT" section below to explain WHY tests failed. Look for error messages, stack traces, or screenshots mentioned in technical details.
-3. Actionable Insights: Suggest what the developer or QA should check first based on the actual logs provided.
-
-Rules:
-- Use Markdown.
-- Be concise but professional.
-- ALWAYS use the provided numbers for success rate. If OVERALL STATISTICS shows ${totalTests} tests, then that is the truth.
-- IF technical details are provided in FAILURE CONTEXT, YOU MUST use them. Do not say they are missing.
-- Response language: ${language.toLowerCase().startsWith('pt') ? 'Portuguese' : language.toLowerCase().startsWith('es') ? 'Spanish' : 'English'}.
-`.trim();
+    const systemInstruction = getExecutionSummaryPrompt(language, totalTests);
 
     // Simplify tree for tokens (only structure + stats)
     const simplify = (nodes: any[]): any[] => {
