@@ -14,7 +14,7 @@ interface GeminiResponse {
 
 import { ScreenMap, UIElementMap } from '@/lib/types';
 import { DeepAnalysisContext } from "./historyAnalysisUtils";
-import { getExplorationPrompt, formatExistingMaps, getRefinedTestCasesPrompt, getRefinedPBIPrompt, getRefinedImprovementPrompt, getRefinedBugPrompt, getRefinedRobotScriptPrompt } from "./prompts";
+import { getExplorationPrompt, formatExistingMaps, getRefinedTestCasesPrompt, getRefinedPBIPrompt, getRefinedImprovementPrompt, getRefinedBugPrompt, getRefinedRobotScriptPrompt, getFlowchartLayoutPrompt } from "./prompts";
 
 export type AIGenerationType = 'test_case' | 'pbi' | 'improvement' | 'bug' | 'element_name' | 'robot_script' | 'exploration';
 
@@ -563,4 +563,55 @@ ${xmlDump.substring(0, 15000)}
     if (!content) throw new Error("Empty AI response");
 
     return JSON.parse(content);
+}
+
+/**
+ * AI-powered flowchart reorganization.
+ */
+export async function reorganizeFlowchartLayout(
+    maps: ScreenMap[],
+    apiKey: string,
+    model: string,
+    language: string
+): Promise<Record<string, { gridX: number; gridY: number }>> {
+    if (!apiKey) throw new Error("Missing Gemini API Key");
+
+    const systemInstruction = getFlowchartLayoutPrompt(language);
+    const mappingContext = formatExistingMaps(maps);
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{
+                    role: 'user',
+                    parts: [{ text: `Current Application Mapping:\n${mappingContext}` }]
+                }],
+                system_instruction: {
+                    parts: [{ text: systemInstruction }]
+                },
+                generationConfig: {
+                    temperature: 0.1,
+                    response_mime_type: "application/json"
+                }
+            })
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.error?.message || `API Error: ${response.statusText}`);
+        }
+
+        const resData = await response.json();
+        const resText = resData.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!resText) throw new Error("Empty response from Gemini");
+
+        return JSON.parse(resText);
+    } catch (error: any) {
+        console.error("Gemini reorganizeFlowchartLayout Error:", error);
+        throw error;
+    }
 }

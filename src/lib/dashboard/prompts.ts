@@ -55,9 +55,13 @@ YOUR TASKS:
    - Swipe "down" first to reveal content below, then "up" if needed.
 5. FLOWCHART PLACEMENT: Suggest a "layout" { "gridX": number, "gridY": number } for the screen.
    - Initial screen is (0, 0). New screens go to the nearest UNIQUE empty grid coordinate.
+   - Home screen should be placed to the right of Initial Screen and login screens, if there are any.
+   - Place screen following the flow of the app, if there is a tab bar, place the screens in the order of the tabs.
+   - The flows must be from left to right. Branches of a flow must be placed below the screen that originates them.
 6. DECIDE NEXT ACTION: Pick ONE action (see STRATEGY below).
 
 EXPLORATION STRATEGY (CRITICAL — follow strictly):
+- HOME SCREEN PRIORIZATION: The Home Screen is the most crucial screen to explore, you MUST fully explore it before switching to any other tab and click all the elements on the home screen to fully map it.
 - CURRENT TAB FIRST: The screen you see when the app opens is the FIRST tab. You MUST fully explore it before switching to any other tab. Do NOT click on other tabs in the navigation bar until every element on the current tab has been explored.
 - FULL SCROLL FIRST: On EVERY new screen, if scrollable containers exist, swipe repeatedly until no new elements appear. Only after fully scrolling should you start clicking elements.
 - CLICK EVERY ITEM: After scrolling, you must click on EVERY interactive element on the screen — including list items, cards, icons, and menu options — to discover sub-screens. Do NOT assume an element has no sub-screen; always click to verify.
@@ -230,5 +234,31 @@ Generate a complete, functional Robot Framework (.robot) script block.
 4. If an element name from mapping is found, use it as a basis for the keyword action (e.g., if mapped "Login Button", use its XPath/ID).
 5. Ensure the script is valid and follows best practices for mobile automation.
 6. Language: ${language}.
+`.trim();
+}
+
+/**
+ * Prompt specifically for reorganizing the flowchart layout.
+ */
+export function getFlowchartLayoutPrompt(language: string): string {
+  return `
+Analyze the provided mobile application screens and their navigation connections to reorganize the Flowchart layout using a grid-based system (gridX, gridY).
+
+ORGANIZATION RULES:
+1. INITIAL SCREEN: The very first screen of the app (usually Splash, Welcome, or Login) must be placed at the leftmost position (gridX: 0).
+2. AUTHENTICATION: Login and Registration screens should immediately follow the Initial Screen to the right.
+3. HOME SCREEN: The main application dashboard/home screen must be placed to the right of the authentication screens.
+4. MAIN FLOWS: All navigation flows originating from the Home Screen must proceed from left to right (increasing gridX).
+5. BRANCHING: When a screen has multiple destinations (branches), place them one below the other (different gridY values) while maintaining their horizontal progression.
+6. CLARITY: Ensure the overall layout is logical, minimize overlapping paths, and prioritize human readability.
+
+INPUT:
+- A list of screens with their names, descriptions, types, and navigation connections (navigates_to).
+
+OUTPUT:
+- Return ONLY a valid JSON object mapping each screen NAME (the unique ID used in navigation) to its new coordinates.
+- Format: { "Screen Name": { "gridX": number, "gridY": number }, ... }
+
+Language for any required internal reasoning (though output must be valid JSON): ${language}.
 `.trim();
 }

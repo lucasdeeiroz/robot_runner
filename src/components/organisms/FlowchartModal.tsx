@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { ScreenMap, FlowchartLayout, LayoutNode, LayoutEdge, NavigationData } from '@/lib/types';
-import { X, ZoomIn, ZoomOut, Maximize, Pencil, Save, Upload, Download, Camera, Plus, AlertTriangle, Wand2 } from 'lucide-react';
+import { X, ZoomIn, ZoomOut, Maximize, Pencil, Save, Upload, Download, Camera, Plus, AlertTriangle, Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
 import { loadFlowchartLayout, deleteFlowchartLayout, exportMapperData, importMapperData, saveScreenMap } from '@/lib/dashboard/mapperPersistence';
@@ -13,6 +13,11 @@ import { Button } from '@/components/atoms/Button';
 import { Select } from '@/components/atoms/Select';
 import { GroupedScreenSelect } from '@/components/molecules/GroupedScreenSelect';
 import { GroupedElementSelect } from '@/components/molecules/GroupedElementSelect';
+import { useSettings } from '@/lib/settings';
+import { reorganizeFlowchartLayout as reorganizeWithGemini } from '@/lib/dashboard/gemini';
+import { reorganizeFlowchartLayout as reorganizeWithOpenAI } from '@/lib/dashboard/openai';
+import { reorganizeFlowchartLayout as reorganizeWithClaude } from '@/lib/dashboard/claude';
+import { ExpressiveLoading } from '../atoms/ExpressiveLoading';
 
 interface FlowchartModalProps {
     isOpen: boolean;
@@ -83,7 +88,7 @@ const generatePorts = (): Port[] => {
 const NODE_PORTS = generatePorts();
 
 export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh, activeProfileId }: FlowchartModalProps) {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const [viewTransform, setViewTransform] = useState({ scale: 1, offset: { x: 0, y: 0 } });
     const scale = viewTransform.scale;
     const offset = viewTransform.offset;
@@ -98,6 +103,8 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
 
     // Layout State
     const [layout, setLayout] = useState<FlowchartLayout>({ version: 1, nodes: {}, edges: {} });
+    const { settings } = useSettings();
+    const [isReorganizing, setIsReorganizing] = useState(false);
     const layoutRef = useRef(layout);
     useEffect(() => { layoutRef.current = layout; }, [layout]);
     const [loading, setLoading] = useState(true);
@@ -504,8 +511,8 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
         setIsQuickConnectOpen(true);
     };
 
-    /** BFS-based auto-reorganize: left = closer to root, right = deeper screens. */
-    const autoReorganizeLayout = () => {
+    /** BFS-based auto-reorganize fallback */
+    const autoReorganizeLayoutBFS = () => {
         // Build adjacency from navigates_to connections
         const adjacency: Record<string, Set<string>> = {};
         const allScreenNames = new Set(maps.map(m => m.name));
@@ -580,8 +587,60 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
 
         setLayout(prev => ({ ...prev, nodes: newNodes }));
         setIsDirty(true);
-        feedback.toast.success(t('mapper.flowchart.reorganized', 'Layout reorganized'));
+        feedback.toast.success(t('mapper.flowchart.reorganized', 'Layout reorganized (BFS)'));
         setTimeout(centerView, 100);
+    };
+
+    /** AI-powered auto-reorganize with BFS fallback */
+    const autoReorganizeLayout = async () => {
+        const provider = settings.aiProvider;
+        const apiKey = provider === 'openai' ? settings.openaiApiKey : provider === 'claude' ? settings.claudeApiKey : settings.geminiApiKey;
+        const model = provider === 'openai' ? settings.openaiModel : provider === 'claude' ? settings.claudeModel : settings.geminiModel;
+
+        if (!apiKey) {
+            feedback.toast.info(t('mapper.flowchart.ai_key_missing', 'Missing AI API Key. Using standard reorganization...'));
+            autoReorganizeLayoutBFS();
+            return;
+        }
+
+        setIsReorganizing(true);
+        try {
+            let result: Record<string, { gridX: number, gridY: number }> = {};
+            const language = i18n.language || 'en';
+
+            if (provider === 'openai') {
+                result = await reorganizeWithOpenAI(maps, apiKey, model, language);
+            } else if (provider === 'claude') {
+                result = await reorganizeWithClaude(maps, apiKey, model, language);
+            } else {
+                result = await reorganizeWithGemini(maps, apiKey, model, language);
+            }
+
+            if (result && Object.keys(result).length > 0) {
+                // Ensure all mapped screens have a position, even if AI missed them
+                const newNodes: Record<string, LayoutNode> = { ...result } as Record<string, LayoutNode>;
+                maps.forEach(m => {
+                    if (!newNodes[m.name]) {
+                        // Place missed nodes at the end
+                        const maxX = Math.max(0, ...Object.values(newNodes).map(n => n.gridX));
+                        newNodes[m.name] = { gridX: maxX + 1, gridY: 0 };
+                    }
+                });
+
+                setLayout(prev => ({ ...prev, nodes: newNodes }));
+                setIsDirty(true);
+                feedback.toast.success(t('mapper.flowchart.reorganized_ai', 'Layout reorganized by AI'));
+                setTimeout(centerView, 100);
+            } else {
+                throw new Error("Empty AI response");
+            }
+        } catch (error) {
+            console.error("AI Reorganization failed:", error);
+            feedback.toast.error(t('mapper.flowchart.reorganize_ai_error', 'AI Reorganization failed. Falling back to BFS.'));
+            autoReorganizeLayoutBFS();
+        } finally {
+            setIsReorganizing(false);
+        }
     };
 
     const confirmQuickConnect = async (targetScreenName: string, sourceElementName?: string) => {
@@ -1405,7 +1464,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                             onClick={autoReorganizeLayout}
                             className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full transition-colors"
                             title={t('mapper.flowchart.reorganize', 'Auto-Reorganize Layout')}>
-                            <Wand2 size={16} />
+                            {isReorganizing ? <ExpressiveLoading size="sm" variant="circular" /> : <Sparkles size={16} />}
                         </Button>
                         <div className="h-4 w-px bg-outline-variant/30 mx-1" />
                         <div className="flex items-center gap-2 px-2 py-1 bg-surface-variant/10 rounded-lg border border-outline-variant/20 ml-2">
@@ -1601,19 +1660,19 @@ linear-gradient(to right, rgba(0,0,0,0.05) 1px, transparent 1px),
                                 <React.Fragment key={`${name}-ports`}>
                                     {NODE_PORTS.map(p => {
                                         // Correct Layout-Based Occupancy Check
-                                                const isTrulyOccupied = maps.some(m => {
-                                                    const sourceLayout = layout.nodes[m.name];
-                                                    if (!sourceLayout) return false;
+                                        const isTrulyOccupied = maps.some(m => {
+                                            const sourceLayout = layout.nodes[m.name];
+                                            if (!sourceLayout) return false;
 
-                                                    return m.elements.some(el => {
-                                                        const targetName = typeof el.navigates_to === 'string' ? el.navigates_to : (Array.isArray(el.navigates_to) ? el.navigates_to[0]?.destination : (el.navigates_to as NavigationData)?.destination);
-                                                        if (!targetName) return false;
+                                            return m.elements.some(el => {
+                                                const targetName = typeof el.navigates_to === 'string' ? el.navigates_to : (Array.isArray(el.navigates_to) ? el.navigates_to[0]?.destination : (el.navigates_to as NavigationData)?.destination);
+                                                if (!targetName) return false;
 
-                                                        const targetLayout = layout.nodes[targetName];
-                                                        if (!targetLayout) return false;
+                                                const targetLayout = layout.nodes[targetName];
+                                                if (!targetLayout) return false;
 
-                                                        const edgeId = `${m.name}-${el.name}-${targetName}`;
-                                                        const edgeData = layout.edges[edgeId] || {};
+                                                const edgeId = `${m.name}-${el.name}-${targetName}`;
+                                                const edgeData = layout.edges[edgeId] || {};
 
                                                 // Determine used handles (explicit or default)
                                                 let sHandle = edgeData.sourceHandle;

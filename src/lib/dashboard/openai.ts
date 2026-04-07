@@ -1,7 +1,7 @@
 import { ScreenMap, UIElementMap } from '@/lib/types';
 import { AIGenerationType } from './gemini';
 import { DeepAnalysisContext } from "./historyAnalysisUtils";
-import { getExplorationPrompt, formatExistingMaps, getRefinedTestCasesPrompt, getRefinedPBIPrompt, getRefinedImprovementPrompt, getRefinedBugPrompt, getRefinedRobotScriptPrompt } from "./prompts";
+import { getExplorationPrompt, formatExistingMaps, getRefinedTestCasesPrompt, getRefinedPBIPrompt, getRefinedImprovementPrompt, getRefinedBugPrompt, getRefinedRobotScriptPrompt, getFlowchartLayoutPrompt } from "./prompts";
 
 function extractBase64Data(imageBase64: string): { mimeType: string, data: string } {
     const trimmed = imageBase64.trim();
@@ -572,6 +572,56 @@ ${xmlDump.substring(0, 15000)}
         return JSON.parse(content);
     } catch (error: any) {
         console.error("OpenAI exploreScreen Error:", error);
+        throw error;
+    }
+}
+
+/**
+ * AI-powered flowchart reorganization using OpenAI.
+ */
+export async function reorganizeFlowchartLayout(
+    maps: ScreenMap[],
+    apiKey: string,
+    model: string,
+    language: string
+): Promise<Record<string, { gridX: number; gridY: number }>> {
+    if (!apiKey) throw new Error("Missing OpenAI API Key");
+
+    const systemInstruction = getFlowchartLayoutPrompt(language);
+    const mappingContext = formatExistingMaps(maps);
+
+    const url = "https://api.openai.com/v1/chat/completions";
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model,
+                messages: [
+                    { role: 'system', content: systemInstruction },
+                    { role: 'user', content: `Current Application Mapping:\n${mappingContext}` }
+                ],
+                response_format: { type: "json_object" },
+                temperature: 0.1
+            })
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.error?.message || `API Error: ${response.statusText}`);
+        }
+
+        const resData = await response.json();
+        const content = resData.choices?.[0]?.message?.content;
+        if (!content) throw new Error("Empty response from OpenAI");
+
+        return JSON.parse(content);
+    } catch (error: any) {
+        console.error("OpenAI reorganizeFlowchartLayout Error:", error);
         throw error;
     }
 }

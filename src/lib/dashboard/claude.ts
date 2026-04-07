@@ -1,7 +1,7 @@
 import { ScreenMap, UIElementMap } from '@/lib/types';
 import { AIGenerationType } from './gemini';
 import { DeepAnalysisContext } from "./historyAnalysisUtils";
-import { getExplorationPrompt, formatExistingMaps, getRefinedTestCasesPrompt, getRefinedPBIPrompt, getRefinedImprovementPrompt, getRefinedBugPrompt, getRefinedRobotScriptPrompt } from "./prompts";
+import { getExplorationPrompt, formatExistingMaps, getRefinedTestCasesPrompt, getRefinedPBIPrompt, getRefinedImprovementPrompt, getRefinedBugPrompt, getRefinedRobotScriptPrompt, getFlowchartLayoutPrompt } from "./prompts";
 
 function extractBase64Data(imageBase64: string): { mimeType: string, data: string } {
     const trimmed = imageBase64.trim();
@@ -585,6 +585,57 @@ ${xmlDump.substring(0, 15000)}
         return JSON.parse(content);
     } catch (error: any) {
         console.error("Claude exploreScreen Error:", error);
+        throw error;
+    }
+}
+
+/**
+ * AI-powered flowchart reorganization using Claude.
+ */
+export async function reorganizeFlowchartLayout(
+    maps: ScreenMap[],
+    apiKey: string,
+    model: string,
+    language: string
+): Promise<Record<string, { gridX: number; gridY: number }>> {
+    if (!apiKey) throw new Error("Missing Claude API Key");
+
+    const systemInstruction = getFlowchartLayoutPrompt(language);
+    const mappingContext = formatExistingMaps(maps);
+
+    const url = "https://api.anthropic.com/v1/messages";
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01'
+            },
+            body: JSON.stringify({
+                model,
+                max_tokens: 4096,
+                system: systemInstruction,
+                messages: [
+                    { role: 'user', content: `Current Application Mapping:\n${mappingContext}` }
+                ],
+                temperature: 0.1
+            })
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.error?.message || `API Error: ${response.statusText}`);
+        }
+
+        const resData = await response.json();
+        const content = resData.content?.[0]?.text;
+        if (!content) throw new Error("Empty response from Claude");
+
+        return JSON.parse(content);
+    } catch (error: any) {
+        console.error("Claude reorganizeFlowchartLayout Error:", error);
         throw error;
     }
 }
