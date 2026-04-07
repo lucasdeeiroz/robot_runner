@@ -215,6 +215,16 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     devName = "Local/Web";
                 }
 
+                // Determine suite name for UI and execution
+                const suiteName = selections.length === 1 
+                    ? selections[0].name.split('.')[0] 
+                    : (() => {
+                        const baseNames = selections.map(s => (s.name || "Test").split('.')[0]);
+                        const joined = baseNames.join('_');
+                        const truncated = joined.length > 50 ? joined.substring(0, 50) + "..." : joined;
+                        return `Custom_${truncated}`;
+                    })();
+
                 // If multiple items, create a temporary argument file
                 let finalTestPath: string | null = null;
                 let finalArgsFile: string | null = null;
@@ -227,10 +237,12 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                 } else {
                     // Complex case: generate temp .args file
                     const tempArgsPath = `${settings.paths.logs || '../temp'}/run_${runId}.args`.replace(/\\/g, '/');
-                    let optionsContent = "";
-                    let posContent = "";
                     const isWindows = navigator.platform.toLowerCase().includes('win');
                     const lineEnding = isWindows ? "\r\n" : "\n";
+                    
+                    // Explicitly set the suite name provided by Robot Runner
+                    let optionsContent = `--name${lineEnding}${suiteName}${lineEnding}`;
+                    let posContent = "";
                     const allTests: string[] = [];
                     const hasAnySpecificTest = selections.some(s => (s.tests?.length || 0) > 0);
 
@@ -252,9 +264,6 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                             posContent += `${normalizedPath}${lineEnding}`;
 
                         } else if (item.type === 'args') {
-                            // Add a broad pattern for the argument file to ensure its tests are included if filtering is active
-                            allTests.push(`*.${name}.*`);
-
                             // FLATTEN argument files: read them and append their content cleanly
                             try {
                                 let linesToProcess: string[] = [];
@@ -270,14 +279,48 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                                     linesToProcess = fileContent.split(/\r?\n/);
                                 }
 
+                                let skipNext = false;
+                                let skipNextValueForFilter = false;
                                 for (let line of linesToProcess) {
                                     line = line.trim();
+                                    if (skipNext) {
+                                        skipNext = false;
+                                        continue;
+                                    }
+                                    if (skipNextValueForFilter) {
+                                        allTests.push(line);
+                                        optionsContent += `${line}${lineEnding}`;
+                                        skipNextValueForFilter = false;
+                                        continue;
+                                    }
                                     if (!line || line.startsWith('#') || line.startsWith('--doc')) continue;
 
+                                    // Filter out existing --name or -N flags to avoid conflicts
+                                    if (line === '--name' || line === '-N') {
+                                        skipNext = true;
+                                        continue;
+                                    }
+                                    if (line.startsWith('--name ') || line.startsWith('-N ')) {
+                                        continue;
+                                    }
+
                                     // Handle multi-word flags correctly for Robot (.args format)
-                                    // If a line starts with a flag (e.g., --include) and has a space, 
-                                    // split it into two lines: the flag and its value.
                                     if (line.startsWith('-')) {
+                                        // If the user selected a specific test within the args file selection,
+                                        // ensure it's whitelisted in the global filter if active.
+                                        if (line === '--test' || line === '-t') {
+                                            skipNextValueForFilter = true; 
+                                            optionsContent += `${line}${lineEnding}`;
+                                            continue;
+                                        }
+
+                                        if (line.startsWith('--test ') || line.startsWith('-t ')) {
+                                            const pattern = line.split(' ').slice(1).join(' ').trim();
+                                            if (pattern) allTests.push(pattern);
+                                            optionsContent += `${line}${lineEnding}`;
+                                            continue;
+                                        }
+
                                         if (line.startsWith('--') && line.includes(' ')) {
                                             const firstSpaceIndex = line.indexOf(' ');
                                             const flag = line.substring(0, firstSpaceIndex).trim();
@@ -287,7 +330,11 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                                         }
                                         optionsContent += `${line}${lineEnding}`;
                                     } else {
-                                        // Fall-through: Write the line as is
+                                        // Data source: Whitelist this data source's tests if we are in filtering mode
+                                        const lineBasename = line.split(/[\\/]/).pop()?.replace(/\.(robot|args|txt)$/i, "") || "";
+                                        if (lineBasename) {
+                                            allTests.push(`*${lineBasename}*.*`);
+                                        }
                                         posContent += `${line}${lineEnding}`;
                                     }
                                 }
@@ -319,7 +366,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     runId,
                     deviceUdid || "local",
                     devName,
-                    finalTestPath || finalArgsFile || "MultiSelection",
+                    finalTestPath || finalArgsFile || suiteName,
                     fw as 'robot' | 'maestro' | 'appium',
                     dontOverwrite,
                     finalArgsFile,
@@ -328,7 +375,6 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     finalTests || undefined
                 );
 
-                const suiteName = selections.length === 1 ? selections[0].name.split('.')[0] : "MultiSelection";
                 const cleanModel = devModel.replace(/[^a-zA-Z0-9]/g, "");
                 const cleanVer = devVer.replace(/[^0-9.]/g, "");
                 const cleanUdid = (deviceUdid || "Local").replace(/[^a-zA-Z0-9]/g, "");
