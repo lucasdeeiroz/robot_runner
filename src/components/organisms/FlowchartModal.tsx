@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { ScreenMap, FlowchartLayout, LayoutNode, LayoutEdge, NavigationData } from '@/lib/types';
-import { X, ZoomIn, ZoomOut, Maximize, Pencil, Save, Upload, Download, Camera, Plus, AlertTriangle, Sparkles } from 'lucide-react';
+import { X, ZoomIn, ZoomOut, Maximize, Pencil, Save, Upload, Download, Camera, Plus, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
 import { loadFlowchartLayout, deleteFlowchartLayout, exportMapperData, importMapperData, saveScreenMap } from '@/lib/dashboard/mapperPersistence';
@@ -17,7 +17,7 @@ import { useSettings } from '@/lib/settings';
 import { reorganizeFlowchartLayout as reorganizeWithGemini } from '@/lib/dashboard/gemini';
 import { reorganizeFlowchartLayout as reorganizeWithOpenAI } from '@/lib/dashboard/openai';
 import { reorganizeFlowchartLayout as reorganizeWithClaude } from '@/lib/dashboard/claude';
-import { ExpressiveLoading } from '../atoms/ExpressiveLoading';
+import { AiButton } from '../atoms/AiButton';
 
 interface FlowchartModalProps {
     isOpen: boolean;
@@ -1435,16 +1435,22 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                         {t('mapper.flowchart.title', 'Navigation Flow')}
                     </h2>
                     <div className="flex items-center gap-2">
+                        <AiButton
+                            onClick={autoReorganizeLayout}
+                            variant="primary"
+                            label={t('mapper.flowchart.reorganize')}
+                            isLoading={isReorganizing}
+                        />
                         <Button
                             onClick={handleImport}
                             className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full"
-                            title={t('mapper.flowchart.import', 'Import Flow')}>
+                            title={t('mapper.flowchart.import')}>
                             <Download size={16} />
                         </Button>
                         <Button
                             onClick={handleExport}
                             className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full"
-                            title={t('mapper.flowchart.export', 'Export Flow')}>
+                            title={t('mapper.flowchart.export')}>
                             <Upload size={16} />
                         </Button>
                         <Button
@@ -1457,24 +1463,18 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                         <Button
                             onClick={handleExportImage}
                             className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full transition-colors"
-                            title={t('mapper.flowchart.export_image', 'Export Image')}>
+                            title={t('mapper.flowchart.export_image')}>
                             <Camera size={16} />
-                        </Button>
-                        <Button
-                            onClick={autoReorganizeLayout}
-                            className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full transition-colors"
-                            title={t('mapper.flowchart.reorganize', 'Auto-Reorganize Layout')}>
-                            {isReorganizing ? <ExpressiveLoading size="sm" variant="circular" /> : <Sparkles size={16} />}
                         </Button>
                         <div className="h-4 w-px bg-outline-variant/30 mx-1" />
                         <div className="flex items-center gap-2 px-2 py-1 bg-surface-variant/10 rounded-lg border border-outline-variant/20 ml-2">
-                            <span className="text-[10px] uppercase font-bold text-on-surface-variant/70 whitespace-nowrap">{t('mapper.flowchart.filter_by_tag', 'Filter')}</span>
+                            <span className="text-[10px] uppercase font-bold text-on-surface-variant/70 whitespace-nowrap">{t('mapper.flowchart.filter_by_tag')}</span>
                             <Select
                                 className="bg-transparent border-none text-xs font-semibold text-primary dark:text-primary/80 outline-none cursor-pointer py-0 h-6 min-w-[100px]"
                                 value={filterTag || ""}
                                 onChange={(e) => setFilterTag(e.target.value || null)}
                                 options={[
-                                    { value: "", label: t('mapper.flowchart.all_tags', 'All Tags') },
+                                    { value: "", label: t('mapper.flowchart.all_tags') },
                                     ...allTags.map(tag => ({ value: tag, label: tag }))
                                 ]}
                             />
@@ -1482,7 +1482,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                         <Button
                             onClick={centerView}
                             className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full"
-                            title={t('mapper.flowchart.center_view', 'Center View')}>
+                            title={t('mapper.flowchart.center_view')}>
                             <Maximize size={16} />
                         </Button>
                         <div className="h-6 w-px bg-outline-variant/30 mx-2" />
