@@ -266,7 +266,7 @@ export function HistorySubTab() {
     };
 
     const updateLog = (updatedLog: TestLog) => {
-        setHistory(prev => prev.map(log => 
+        setHistory(prev => prev.map(log =>
             log.xml_path === updatedLog.xml_path ? { ...log, ...updatedLog } : log
         ));
         if (selectedLog?.xml_path === updatedLog.xml_path) {
@@ -313,15 +313,25 @@ export function HistorySubTab() {
                 variant="transparent"
                 className="p-0 pb-4 mb-4"
                 status={
-                    <Button
-                        onClick={() => loadHistory(true)}
-                        variant="ghost"
-                        size="sm"
-                        className="p-1.5 text-on-surface-variant/80 hover:bg-surface-variant/30 rounded-2xl transition-colors h-auto"
-                        title={t('tests_page.actions.refresh')}
-                    >
-                        {loadingHistory ? <ExpressiveLoading size="xsm" variant="circular" /> : <RefreshCw size={16} />}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <AiButton
+                            onClick={handleAIAnalysis}
+                            isLoading={isAnalyzingHistory}
+                            disabled={filteredHistory.length === 0 || isAnalyzingHistory}
+                            label={t('tests_page.actions.analyze_history')}
+                            variant="primary"
+                            className="shadow-lg shadow-primary/10 ml-2 h-8"
+                        />
+                        <Button
+                            onClick={() => loadHistory(true)}
+                            variant="ghost"
+                            size="sm"
+                            className="p-1.5 text-on-surface-variant/80 hover:bg-surface-variant/30 rounded-2xl transition-colors h-auto"
+                            title={t('tests_page.actions.refresh')}
+                        >
+                            {loadingHistory ? <ExpressiveLoading size="xsm" variant="circular" /> : <RefreshCw size={16} />}
+                        </Button>
+                    </div>
                 } menus={!isHistoryNarrow ? (
                     <div className="flex-1 min-w-[200px] max-w-sm">
                         <Input
@@ -350,14 +360,6 @@ export function HistorySubTab() {
                             <PieChart size={16} />
                             {!isHistoryNarrow && (showCharts ? t('tests_page.charts.hide') : t('tests_page.charts.show'))}
                         </Button>
-                        <AiButton
-                            onClick={handleAIAnalysis}
-                            isLoading={isAnalyzingHistory}
-                            disabled={filteredHistory.length === 0 || isAnalyzingHistory}
-                            label={t('tests_page.actions.analyze_history')}
-                            variant="primary"
-                            className="shadow-lg shadow-primary/10 ml-2 h-8"
-                        />
                     </div>
                 }
             />
