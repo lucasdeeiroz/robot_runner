@@ -31,7 +31,6 @@ export function AIGeneratorSubTab() {
     const [genType, setGenType] = useState<AIGenerationType>('test_case');
     const [useMapping, setUseMapping] = useState(true);
     const [isGenerating, setIsGenerating] = useState(false);
-    const [aiError, setAiError] = useState<string | null>(null);
 
     const provider = settings.aiProvider || 'gemini';
     const apiKey = provider === 'gemini' ? settings.geminiApiKey : provider === 'claude' ? settings.claudeApiKey : settings.openaiApiKey;
@@ -42,7 +41,6 @@ export function AIGeneratorSubTab() {
         if (!requirements.trim() || !hasApiKey) return;
 
         setIsGenerating(true);
-        setAiError(null);
         try {
             let mapsContext: string | undefined = undefined;
             if (useMapping) {
@@ -68,7 +66,6 @@ export function AIGeneratorSubTab() {
         } catch (e: any) {
             console.error("AI generation failed:", e);
             const errorMessage = e?.message || (typeof e === 'string' ? e : JSON.stringify(e)) || "Unknown Error";
-            setAiError(errorMessage);
             feedback.toast.error(t("dashboard.actions.ai_failed", { error: errorMessage }));
         } finally {
             setIsGenerating(false);
@@ -258,7 +255,7 @@ export function AIGeneratorSubTab() {
 
                 <Textarea
                     value={generatedContent}
-                    onChange={(e) => { setGeneratedContent(e.target.value), aiError }}
+                    onChange={(e) => setGeneratedContent(e.target.value)}
                     placeholder={t('dashboard.generator.empty_state', "Generated content will appear here...")}
                     containerClassName="flex-1 flex flex-col min-h-0"
                     className="flex-1 font-mono custom-scrollbar resize-none whitespace-pre-wrap text-sm p-4 bg-surface"

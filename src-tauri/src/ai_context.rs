@@ -4,6 +4,7 @@ use crate::db::LogDb;
 use crate::files::read_file_tail_internal;
 use std::fs;
 use std::path::Path;
+use tauri::Manager;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
@@ -11,6 +12,7 @@ pub enum AiContextType {
     HistoryAnalysis,
     Exploration,
     ArtifactGeneration,
+    FlowchartLayout,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -32,13 +34,15 @@ pub struct AiContextResponse {
 
 #[tauri::command]
 pub async fn get_ai_context(
+    app_handle: tauri::AppHandle,
     context_type: AiContextType,
     params: AiContextParams,
 ) -> Result<AiContextResponse, String> {
     match context_type {
         AiContextType::HistoryAnalysis => get_history_analysis_context(params),
         AiContextType::Exploration => get_exploration_context(params),
-        AiContextType::ArtifactGeneration => get_artifact_generation_context(params),
+        AiContextType::ArtifactGeneration => get_artifact_generation_context(app_handle, params),
+        AiContextType::FlowchartLayout => get_flowchart_layout_context(app_handle, params),
     }
 }
 
@@ -218,16 +222,172 @@ fn generate_basic_xpath(node: &roxmltree::Node) -> String {
     format!("/{}", path.join("/"))
 }
 
-fn get_artifact_generation_context(params: AiContextParams) -> Result<AiContextResponse, String> {
-    let mut context = String::new();
+fn get_artifact_generation_context(app_handle: tauri::AppHandle, params: AiContextParams) -> Result<AiContextResponse, String> {
+    let profile_id = params.profile_id.ok_or("Missing profile_id")?;
     
+    // Resolve base path for app local data
+    let base_path = app_handle.path().app_local_data_dir().map_err(|e| e.to_string())?;
+    let maps_path = base_path.join("maps").join(&profile_id).join("screens");
+    
+    // Check if directory exists
+    if !maps_path.exists() {
+        return Ok(AiContextResponse {
+            context: "No application mapping found for this profile.".to_string(),
+            metadata: serde_json::json!({ "screen_count": 0, "profile_id": profile_id }),
+        });
+    }
+
+    let mut context = String::new();
     context.push_str("### APPLICATION MAPPING CONTEXT\n\n");
-    // In a real scenario, we'd query the SQLite DB here for all ScreenMaps belonging to the profile_id
-    // For now, we'll keep it as a placeholder for technical completeness
-    context.push_str("Available screens and elements are indexed and ready for reference.");
+
+    let entries = fs::read_dir(maps_path).map_err(|e| e.to_string())?;
+    let mut screen_count = 0;
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("json") {
+            let filename = path.file_name().unwrap_or_default().to_string_lossy();
+            if filename == "flowchart_layout.json" {
+                continue;
+            }
+
+            let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+                screen_count += 1;
+                let screen_name = val.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown Screen");
+                let screen_type = val.get("type").and_then(|v| v.as_str()).unwrap_or("screen");
+                let screen_desc = val.get("description").and_then(|v| v.as_str()).unwrap_or("");
+
+                context.push_str(&format!("- Screen: \"{}\" ({})\n", screen_name, screen_type));
+                if !screen_desc.is_empty() {
+                    context.push_str(&format!("  Description: {}\n", screen_desc));
+                }
+
+                if let Some(elements) = val.get("elements").and_then(|v| v.as_array()) {
+                    let mut found_elements = false;
+                    for el in elements {
+                        let el_name = el.get("name").and_then(|v| v.as_str()).unwrap_or("Unnamed Element");
+                        // Only include potentially meaningful elements for artifact generation
+                        let el_type = el.get("type").and_then(|v| v.as_str()).unwrap_or("unknown");
+                        
+                        if !found_elements {
+                            context.push_str("  Elements:\n");
+                            found_elements = true;
+                        }
+
+                        let mut el_info = format!("    · {} [{}]", el_name, el_type);
+                        
+                        // Check for navigation (simplified)
+                        if let Some(nav) = el.get("navigates_to") {
+                            if let Some(dest) = nav.get("destination").and_then(|v| v.as_str()) {
+                                if !dest.is_empty() {
+                                    el_info.push_str(&format!(" → {}", dest));
+                                }
+                            } else if let Some(arr) = nav.as_array() {
+                                let destinations: Vec<&str> = arr.iter()
+                                    .filter_map(|n| n.get("destination").and_then(|v| v.as_str()))
+                                    .filter(|d| !d.is_empty())
+                                    .collect();
+                                if !destinations.is_empty() {
+                                    el_info.push_str(&format!(" → {}", destinations.join(", ")));
+                                }
+                            }
+                        }
+                        context.push_str(&el_info);
+                        context.push_str("\n");
+                    }
+                }
+                context.push_str("\n");
+            }
+        }
+    }
+
+    if screen_count == 0 {
+        context.push_str("No screens mapped yet for this profile.\n");
+    }
 
     Ok(AiContextResponse {
         context,
-        metadata: serde_json::json!({ "profile_id": params.profile_id }),
+        metadata: serde_json::json!({ "screen_count": screen_count, "profile_id": profile_id }),
+    })
+}
+
+fn get_flowchart_layout_context(app_handle: tauri::AppHandle, params: AiContextParams) -> Result<AiContextResponse, String> {
+    let profile_id = params.profile_id.ok_or("Missing profile_id")?;
+    
+    // Resolve base path for app local data
+    let base_path = app_handle.path().app_local_data_dir().map_err(|e| e.to_string())?;
+    let maps_path = base_path.join("maps").join(&profile_id).join("screens");
+    
+    // Check if directory exists
+    if !maps_path.exists() {
+        return Ok(AiContextResponse {
+            context: "No application mapping found for this profile.".to_string(),
+            metadata: serde_json::json!({ "screen_count": 0, "profile_id": profile_id }),
+        });
+    }
+
+    let mut context = String::new();
+    context.push_str("### APPLICATION NAVIGATION GRAPH\n\n");
+
+    let entries = fs::read_dir(maps_path).map_err(|e| e.to_string())?;
+    let mut screen_count = 0;
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("json") {
+            let filename = path.file_name().unwrap_or_default().to_string_lossy();
+            if filename == "flowchart_layout.json" {
+                continue;
+            }
+
+            let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+                screen_count += 1;
+                let screen_name = val.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown Screen");
+                let screen_type = val.get("type").and_then(|v| v.as_str()).unwrap_or("screen");
+                let screen_desc = val.get("description").and_then(|v| v.as_str()).unwrap_or("");
+
+                context.push_str(&format!("- Screen: \"{}\" ({})\n", screen_name, screen_type));
+                if !screen_desc.is_empty() {
+                    context.push_str(&format!("  Description: {}\n", screen_desc));
+                }
+
+                let mut destinations = Vec::new();
+                if let Some(elements) = val.get("elements").and_then(|v| v.as_array()) {
+                    for el in elements {
+                        if let Some(nav) = el.get("navigates_to") {
+                            if let Some(dest) = nav.get("destination").and_then(|v| v.as_str()) {
+                                if !dest.is_empty() && !destinations.contains(&dest.to_string()) {
+                                    destinations.push(dest.to_string());
+                                }
+                            } else if let Some(arr) = nav.as_array() {
+                                for n in arr {
+                                    if let Some(dest) = n.get("destination").and_then(|v| v.as_str()) {
+                                        if !dest.is_empty() && !destinations.contains(&dest.to_string()) {
+                                            destinations.push(dest.to_string());
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if !destinations.is_empty() {
+                    context.push_str(&format!("  Connections: {}\n", destinations.join(", ")));
+                }
+                context.push_str("\n");
+            }
+        }
+    }
+
+    if screen_count == 0 {
+        context.push_str("No screens mapped yet for this profile.\n");
+    }
+
+    Ok(AiContextResponse {
+        context,
+        metadata: serde_json::json!({ "screen_count": screen_count, "profile_id": profile_id }),
     })
 }

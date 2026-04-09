@@ -98,6 +98,9 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
     useEffect(() => { transformRef.current = viewTransform; }, [viewTransform]);
     const [isDraggingCanvas, setIsDraggingCanvas] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
+
+    const activeProfileIdRef = useRef(activeProfileId);
+    useEffect(() => { activeProfileIdRef.current = activeProfileId; }, [activeProfileId]);
     const contentRef = useRef<HTMLDivElement>(null);
     const dragStart = useRef({ x: 0, y: 0 });
 
@@ -608,12 +611,19 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
             let result: Record<string, { gridX: number, gridY: number }> = {};
             const language = i18n.language || 'en';
 
+            // Use the optimized context from Rust
+            const response = await invoke<{ context: string }>('get_ai_context', {
+                contextType: 'FlowchartLayout',
+                params: { profile_id: activeProfileIdRef.current }
+            });
+            const mappingContext = response.context;
+
             if (provider === 'openai') {
-                result = await reorganizeWithOpenAI(maps, apiKey, model, language, undefined, customPrompt);
+                result = await reorganizeWithOpenAI(mappingContext, apiKey, model, language, undefined, customPrompt);
             } else if (provider === 'claude') {
-                result = await reorganizeWithClaude(maps, apiKey, model, language, undefined, customPrompt);
+                result = await reorganizeWithClaude(mappingContext, apiKey, model, language, undefined, customPrompt);
             } else {
-                result = await reorganizeWithGemini(maps, apiKey, model, language, undefined, customPrompt);
+                result = await reorganizeWithGemini(mappingContext, apiKey, model, language, undefined, customPrompt);
             }
 
             if (result && Object.keys(result).length > 0) {

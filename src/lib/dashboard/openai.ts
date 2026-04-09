@@ -601,7 +601,7 @@ ${xmlDump.substring(0, 15000)}
  * AI-powered flowchart reorganization using OpenAI.
  */
 export async function reorganizeFlowchartLayout(
-    maps: ScreenMap[],
+    maps: ScreenMap[] | string,
     apiKey: string,
     model: string,
     language: string,
@@ -611,7 +611,7 @@ export async function reorganizeFlowchartLayout(
     if (!apiKey) throw new Error("Missing OpenAI API Key");
 
     const systemInstruction = getFlowchartLayoutPrompt(language, customPrompt);
-    const mappingContext = formatExistingMaps(maps);
+    const mappingContext = typeof maps === 'string' ? maps : formatExistingMaps(maps);
 
     const url = "https://api.openai.com/v1/chat/completions";
 

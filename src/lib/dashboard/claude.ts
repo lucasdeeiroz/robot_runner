@@ -609,7 +609,7 @@ ${xmlDump.substring(0, 15000)}
  * AI-powered flowchart reorganization using Claude.
  */
 export async function reorganizeFlowchartLayout(
-    maps: ScreenMap[],
+    maps: ScreenMap[] | string,
     apiKey: string,
     model: string,
     language: string,
@@ -619,7 +619,7 @@ export async function reorganizeFlowchartLayout(
     if (!apiKey) throw new Error("Missing Claude API Key");
 
     const systemInstruction = getFlowchartLayoutPrompt(language, customPrompt);
-    const mappingContext = formatExistingMaps(maps);
+    const mappingContext = typeof maps === 'string' ? maps : formatExistingMaps(maps);
 
     const url = "https://api.anthropic.com/v1/messages";
 

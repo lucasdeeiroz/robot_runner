@@ -586,7 +586,7 @@ ${xmlDump.substring(0, 15000)}
  * AI-powered flowchart reorganization.
  */
 export async function reorganizeFlowchartLayout(
-    maps: ScreenMap[],
+    maps: ScreenMap[] | string,
     apiKey: string,
     model: string,
     language: string,
@@ -596,7 +596,7 @@ export async function reorganizeFlowchartLayout(
     if (!apiKey) throw new Error("Missing Gemini API Key");
 
     const systemInstruction = getFlowchartLayoutPrompt(language, customPrompt);
-    const mappingContext = formatExistingMaps(maps);
+    const mappingContext = typeof maps === 'string' ? maps : formatExistingMaps(maps);
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
