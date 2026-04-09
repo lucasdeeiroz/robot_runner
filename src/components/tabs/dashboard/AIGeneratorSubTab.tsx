@@ -215,7 +215,8 @@ export function AIGeneratorSubTab() {
                                 disabled={!requirements.trim() || isGenerating}
                                 label={t('dashboard.generator.generate_button', "Generate with AI")}
                                 showTextAlways
-                                className="w-full justify-center h-11 text-base shadow-none border-none"
+                                allowCustomPrompt={false}
+                                className="w-full justify-center h-11 text-base shadow-none border-none bg-transparent hover:bg-transparent"
                             />
                         )}
                     </div>

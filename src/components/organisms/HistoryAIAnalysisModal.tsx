@@ -215,6 +215,8 @@ const HistoryAIAnalysisModal: React.FC<HistoryAIAnalysisModalProps> = ({
                             <AiButton
                                 onClick={(_e, customPrompt) => handleStartAnalysis(customPrompt)}
                                 isLoading={isAnalyzing}
+                                expandable={false}
+                                showTextAlways={true}
                                 label={analysisResult ? t('run_tab.console.ai_history.regenerate') : t('run_tab.console.ai_history.start_analysis')}
                                 variant="primary"
                                 className="w-full md:w-auto h-10 px-6 shadow-none"

@@ -102,6 +102,7 @@ export const AiButton: React.FC<AiButtonProps> = ({
 
     const isTooltipNeeded = !showTextAlways && (!expandable || !isHovered);
     const isExpanded = showTextAlways || (expandable && isHovered) || isDropdownOpen;
+    const showSplitLayout = isExpanded && allowCustomPrompt;
 
     const handlePrimaryClick = (e: React.MouseEvent<HTMLButtonElement>) => {
         if (onClick) onClick(e, customPrompt);
@@ -129,12 +130,12 @@ export const AiButton: React.FC<AiButtonProps> = ({
                 ref={containerRef}
                 className={twMerge(
                     "relative inline-flex items-stretch rounded-2xl group transition-all duration-300",
-                    "focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-1",
-                    variant === 'primary' && "bg-primary/10 hover:bg-secondary-container",
-                    variant === 'secondary' && "bg-surface hover:bg-surface-variant/50",
-                    variant === 'danger' && "bg-error hover:bg-error/90",
-                    variant === 'outline' && "bg-transparent hover:bg-surface-variant/30 text-on-surface/80 border border-outline-variant/30",
-                    variant === 'ghost' && "bg-transparent hover:bg-surface-variant/30 text-on-surface-variant/80 border-transparent",
+                    "focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-1 ",
+                    variant === 'primary' && "bg-primary/10 hover:bg-secondary-container shadow-none border-transparent",
+                    variant === 'secondary' && "bg-surface hover:bg-surface-variant/50 shadow-none border-transparent",
+                    variant === 'danger' && "bg-error hover:bg-error/90 shadow-none border-transparent",
+                    variant === 'outline' && "bg-transparent hover:bg-surface-variant/30 text-on-surface/80 border border-outline-variant/30 shadow-none",
+                    variant === 'ghost' && "bg-transparent hover:bg-surface-variant/30 text-on-surface-variant/80 border-transparent shadow-none",
                     heightClass,
                     className
                 )}
@@ -145,17 +146,19 @@ export const AiButton: React.FC<AiButtonProps> = ({
                     variant={variant}
                     title={isTooltipNeeded ? (props.title || label) : props.title}
                     className={clsx(
-                        "relative overflow-hidden transition-all duration-300 flex items-center justify-center text-[10px]",
-                        isExpanded ? "rounded-l-2xl rounded-r-none pr-3" : "rounded-2xl rounded-r-2xl",
+                        "relative overflow-hidden transition-all duration-300 flex items-center justify-center text-[10px] shadow-none border-transparent",
+                        showSplitLayout ? "rounded-l-2xl rounded-r-none pr-3" : "rounded-2xl rounded-r-2xl",
                         expandable && !showTextAlways ? (isExpanded ? "px-4" : "aspect-square px-0") : "",
-                        "focus-visible:ring-0 !border-0 bg-transparent min-w-0 !h-full !min-h-0" // override inner button styling for seamless merge
+                        "focus-visible:ring-0 min-w-0 !h-full !min-h-0",
+                        !showSplitLayout && "shadow-none" // Avoid double shadow
                     )}
-                    style={{ backgroundColor: 'transparent' }} // force inner bg transparent to let outer show
+                    // Only force transparent if we show split layout (shared background)
+                    style={showSplitLayout ? { backgroundColor: 'transparent', border: 'none' } : {}}
                     isLoading={false}
                     onClick={handlePrimaryClick}
                     {...props}
                 >
-                    <div className="flex items-center gap-0 overflow-hidden">
+                    <div className="flex items-center gap-0 overflow-hidden shadow-none border-transparent bg-transparent">
                         <div className="shrink-0 flex items-center justify-center">
                             {isLoading ? (
                                 <ExpressiveLoading size="xsm" variant="circular" />
@@ -187,7 +190,7 @@ export const AiButton: React.FC<AiButtonProps> = ({
                 </Button>
 
                 <AnimatePresence>
-                    {isExpanded && allowCustomPrompt && (
+                    {showSplitLayout && (
                         <motion.div
                             initial={{ width: 0, opacity: 0 }}
                             animate={{ width: 'auto', opacity: 1 }}
@@ -202,7 +205,7 @@ export const AiButton: React.FC<AiButtonProps> = ({
                                 variant={variant}
                                 className={clsx(
                                     "rounded-l-none rounded-r-2xl px-1.5 focus-visible:ring-0 !border-0 bg-transparent",
-                                    "!h-full !min-h-0"
+                                    "!h-full !min-h-0 shadow-none border-transparent"
                                 )}
                                 style={{ backgroundColor: 'transparent' }}
                                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -217,6 +220,7 @@ export const AiButton: React.FC<AiButtonProps> = ({
                     )}
                 </AnimatePresence>
             </div>
+
 
             {/* Dropdown Menu */}
             {isDropdownOpen && createPortal(

@@ -1486,8 +1486,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                     className="flex items-center gap-2 px-3 py-1.5 rounded-2xl transition-all shadow-sm text-sm font-medium"
                                     title={isExploring ? t('mapper.exploration.stop') : t('mapper.exploration.start')}
                                     label={isExploring ? t('mapper.exploration.stop') : t('mapper.exploration.start')}
-                                >
-                                </AiButton>
+                                />
                             )}
                         </div>
 
@@ -1514,7 +1513,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                         onClick={handleAISuggestTags}
                                                         label={t('mapper.action.ai_suggest_tags')}
                                                         variant="ghost"
-                                                        className="mb-0 mr-0 ml-0 h-3 p-0 text-[8px]"
+                                                        className="mb-0 mr-0 ml-0 h-3 p-0 text-[8px] bg-transparent hover:bg-transparent"
                                                     />
                                                 }
                                                 onChange={setScreenTags}
