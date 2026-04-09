@@ -5,7 +5,7 @@ import { Play, FolderOpen, FileText, FileCode, History, ChartNoAxesGantt, X, Set
 import { useSettings } from "@/lib/settings";
 import { useTestSessions } from "@/lib/testSessionStore";
 import { Device } from "@/lib/types";
-import { FileExplorer, FileEntry } from "@/components/organisms/FileExplorer";
+import { FileExplorer } from "@/components/organisms/FileExplorer";
 import { v4 as uuidv4 } from 'uuid';
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
@@ -28,11 +28,9 @@ type SelectionMode = 'file' | 'folder' | 'args';
 export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTabProps) {
     const { t } = useTranslation();
     const [mode, setMode] = useState<SelectionMode>('file');
-    const [selectedPath, setSelectedPath] = useState<string>("");
     const [launchStatus, setLaunchStatus] = useState("");
     const [isLaunching, setIsLaunching] = useState(false);
     const [warningModal, setWarningModal] = useState<{ isOpen: boolean, message: string }>({ isOpen: false, message: '' });
-    const [selectedEntry, setSelectedEntry] = useState<FileEntry | null>(null);
     const { items, setTests, setArgs, clearSelection } = useSelection();
 
     // Selector state
@@ -123,7 +121,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
     const { addSession, sessions } = useTestSessions();
 
     const handleRun = async () => {
-        if (items.length === 0 && !selectedPath) return;
+        if (items.length === 0) return;
 
         // Check for busy devices
         const busyDeviceIds = sessions.filter(s => s.status === 'running' && s.type === 'test').map(s => s.deviceUdid);
@@ -187,16 +185,6 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
 
             // 187: Prepare selection items
             let selections: SelectionItem[] = [...items];
-            if (selections.length === 0 && selectedPath) {
-                selections.push({
-                    id: uuidv4(),
-                    path: selectedPath,
-                    name: selectedPath.split(/[\\/]/).pop() || "",
-                    type: mode === 'folder' ? 'folder' : mode === 'args' ? 'args' : 'file',
-                    tests: [],
-                    args: []
-                });
-            }
 
             const targets = selectedDevices.length > 0 ? selectedDevices : [null];
             const workingDir = settings.paths.automationRoot || "";
@@ -215,8 +203,8 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                 }
 
                 // Determine suite name for UI and execution
-                const suiteName = selections.length === 1 
-                    ? selections[0].name.split('.')[0] 
+                const suiteName = selections.length === 1
+                    ? selections[0].name.split('.')[0]
                     : (() => {
                         const baseNames = selections.map(s => (s.name || "Test").split('.')[0]);
                         const joined = baseNames.join('_');
@@ -238,7 +226,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     const tempArgsPath = `${settings.paths.logs || '../temp'}/run_${runId}.args`.replace(/\\/g, '/');
                     const isWindows = navigator.platform.toLowerCase().includes('win');
                     const lineEnding = isWindows ? "\r\n" : "\n";
-                    
+
                     // Explicitly set the suite name provided by Robot Runner
                     let optionsContent = `--name${lineEnding}${suiteName}${lineEnding}`;
                     let posContent = "";
@@ -308,7 +296,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                                         // If the user selected a specific test within the args file selection,
                                         // ensure it's whitelisted in the global filter if active.
                                         if (line === '--test' || line === '-t') {
-                                            skipNextValueForFilter = true; 
+                                            skipNextValueForFilter = true;
                                             optionsContent += `${line}${lineEnding}`;
                                             continue;
                                         }
@@ -463,8 +451,6 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
 
     const handleTabChange = useCallback((id: string) => {
         setMode(id as SelectionMode);
-        setSelectedPath("");
-        setSelectedEntry(null);
     }, []);
 
     return (
@@ -482,12 +468,6 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                         key={mode}
                         initialPath={getInitialPath()}
                         selectionMode={mode === 'args' || mode === 'file' ? 'file' : 'directory'}
-                        onSelect={setSelectedPath}
-                        onCancel={() => { setSelectedPath(""); setSelectedEntry(null); }}
-                        onSelectionChange={(entry) => {
-                            setSelectedPath(entry?.path || "");
-                            setSelectedEntry(entry);
-                        }}
                         allowHideFooter={true}
                         renderEntryExtra={(entry, isSelected) => {
                             if (mode === 'file' && entry.name.endsWith('.robot')) {
@@ -570,13 +550,13 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                             <Button
                                 variant="primary"
                                 onClick={() => handleRun()}
-                                disabled={selectedDevices.length === 0 || (items.length === 0 && !selectedEntry) || isLaunching}
+                                disabled={selectedDevices.length === 0 || items.length === 0 || isLaunching}
                                 title={t('tests.run_selected')}
                                 className="w-full py-6 font-bold hover:bg-secondary-container"
                                 leftIcon={!isLaunching ? <Play size={18} fill="currentColor" /> : <ExpressiveLoading size="sm" variant="circular" />}
                             >
                                 {!isNarrow && (
-                                    <span>{isLaunching ? launchStatus : ((items.length === 0 && !selectedEntry) ? t('tests.no_selection') : t('tests.run_selected'))}</span>
+                                    <span>{isLaunching ? launchStatus : (items.length === 0 ? t('tests.no_selection') : t('tests.run_selected'))}</span>
                                 )}
                             </Button>
                         </>
