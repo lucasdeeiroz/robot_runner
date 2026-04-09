@@ -3489,7 +3489,7 @@ dependencies = [
 
 [[package]]
 name = "robot_runner"
-version = "2.2.11"
+version = "2.2.22"
 dependencies = [
  "base64 0.22.1",
  "chrono",

@@ -72,6 +72,7 @@ export interface AppSettings {
     openaiApiKey?: string;
     openaiModel: string;
     maxExplorationSteps?: number;
+    presentationEnabled: boolean;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -110,7 +111,8 @@ const DEFAULT_SETTINGS: AppSettings = {
         appPackage: 'com.android.chrome, com.chrome.beta',
         ngrokToken: ''
     },
-    maxExplorationSteps: 30
+    maxExplorationSteps: 30,
+    presentationEnabled: false
 };
 
 export interface Profile {

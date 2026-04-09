@@ -1,5 +1,8 @@
 import { ReactNode } from 'react';
 import { Sidebar } from '../organisms/Sidebar';
+import { PresentationPanel } from '../organisms/presentation/PresentationPanel';
+import { useSettings } from "@/lib/settings";
+import { AnimatePresence, motion } from 'framer-motion';
 
 interface LayoutProps {
     children: ReactNode;
@@ -8,11 +11,26 @@ interface LayoutProps {
 }
 
 export function Layout({ children, activePage, onNavigate }: LayoutProps) {
+    const { settings } = useSettings();
+
     return (
         <div
             className="flex h-screen overflow-hidden transition-colors duration-300 pb-4"
             style={{ backgroundColor: 'var(--bg-app-variant)', color: 'var(--text-app-variant)' }}
         >
+            <AnimatePresence>
+                {settings.presentationEnabled && (
+                    <motion.div
+                        initial={{ width: 0, opacity: 0 }}
+                        animate={{ width: 320, opacity: 1 }}
+                        exit={{ width: 0, opacity: 0 }}
+                        transition={{ duration: 0.5, ease: "easeInOut" }}
+                        className="overflow-hidden h-full flex-shrink-0"
+                    >
+                        <PresentationPanel />
+                    </motion.div>
+                )}
+            </AnimatePresence>
             <Sidebar activePage={activePage} onNavigate={onNavigate} />
             <main
                 className="flex-1 h-full overflow-y-auto transition-colors duration-300 px-6 pt-6 pb-0 custom-scrollbar"

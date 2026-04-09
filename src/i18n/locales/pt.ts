@@ -1,5 +1,77 @@
 export const pt = {
     translation: {
+        presentation: {
+            activated: "Modo Apresentação ativado",
+            deactivated: "Modo Apresentação desativado",
+            next: "Próximo",
+            prev: "Voltar",
+            reset: "Reiniciar",
+            slides: {
+                welcome: {
+                    title: "Robot Runner 2.2",
+                    points: [
+                        "Execução de testes mobile",
+                        "Ferramentas de análise de testes",
+                        "Centralização de ferramentas de QA",
+                        "Inspeção de elementos e Documentação de telas",
+                        "Assistente de IA com contexto do produto"
+                    ]
+                },
+                test_execution: {
+                    title: "Execução de testes mobile",
+                    points: [
+                        "Selecionar dispositivos em menu suspenso",
+                        "Conectar dispositivos via Wi-Fi",
+                        "Selecionar e customizar suítes de testes",
+                        "Manter a tela acesa durante testes longos"
+                    ]
+                },
+                test_analysis: {
+                    title: "Ferramentas de análise de testes",
+                    points: [
+                        "Visualização paralela de execuções em modo grade",
+                        "Geração de evidências: screenshots, vídeos",
+                        "Geração de dados: logcat e dados de performance",
+                        "Visualização de logs em tempo real"
+                    ]
+                },
+                toolbox: {
+                    title: "Centralização de ferramentas de QA",
+                    points: [
+                        "Transmissão de tela em tempo real",
+                        "Inicialização automática do Appium Server",
+                        "Controle autônomo via ADB"
+                    ]
+                },
+                inspector_mapper: {
+                    title: "Inspeção de elementos e Documentação de telas",
+                    points: [
+                        "Inspeção de elementos em tempo real",
+                        "Gerador de locators resilientes",
+                        "Mapeamento e documentação de telas",
+                        "Visualizador de fluxos de navegação"
+                    ]
+                },
+                ai_assistant: {
+                    title: "Assistente IA",
+                    points: [
+                        "Assistente IA com contexto do produto",
+                        "Depuração e relatórios de erros",
+                        "Sugestões e otimizações",
+                        "Geração de artefatos de board"
+                    ]
+                },
+                settings: {
+                    title: "Configurações",
+                    points: [
+                        "Perfis de projetos",
+                        "Configurações do app, de ferramentas e de execução",
+                        "Versões do sistema",
+                        "Configurações do Provedor de IA"
+                    ]
+                }
+            }
+        },
         about: {
             description: "Informações sobre o Robot Runner e seus criadores.",
             long_description: "Uma interface gráfica moderna e multiplataforma para Robot Framework e Appium, projetada para simplificar fluxos de automação de testes.",

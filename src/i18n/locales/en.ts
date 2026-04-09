@@ -1,5 +1,77 @@
 export const en = {
     translation: {
+        presentation: {
+            activated: "Presentation Mode activated",
+            deactivated: "Presentation Mode deactivated",
+            next: "Next",
+            prev: "Back",
+            reset: "Restart",
+            slides: {
+                welcome: {
+                    title: "Robot Runner 2.2",
+                    points: [
+                        "Mobile test execution",
+                        "Test analysis tools",
+                        "QA tools centralization",
+                        "Element inspection and screen documentation",
+                        "AI support with product context"
+                    ]
+                },
+                test_execution: {
+                    title: "Mobile test execution",
+                    points: [
+                        "Select devices from dropdown menu",
+                        "Connect devices via Wi-Fi",
+                        "Select and customize test suites",
+                        "Keep screen on during long tests"
+                    ]
+                },
+                test_analysis: {
+                    title: "Test analysis tools",
+                    points: [
+                        "Parallel execution visualization in grid mode",
+                        "Evidence generation: screenshots, videos",
+                        "Data generation: logcat and performance data",
+                        "Real-time log visualization"
+                    ]
+                },
+                toolbox: {
+                    title: "QA tools centralization",
+                    points: [
+                        "Real-time screen streaming",
+                        "Automatic Appium Server initialization",
+                        "Autonomous control via ADB"
+                    ]
+                },
+                inspector_mapper: {
+                    title: "Element inspection and screen documentation",
+                    points: [
+                        "Real-time element inspection",
+                        "Resilient locator generator",
+                        "Screen mapping and documentation",
+                        "Navigation flow viewer"
+                    ]
+                },
+                ai_assistant: {
+                    title: "AI Assistant",
+                    points: [
+                        "AI assistant with product context",
+                        "Error debugging and reporting",
+                        "Suggestions and optimizations",
+                        "Board artifact generation"
+                    ]
+                },
+                settings: {
+                    title: "Settings",
+                    points: [
+                        "Project profiles",
+                        "App, tools and execution settings",
+                        "System versions",
+                        "AI Provider settings"
+                    ]
+                }
+            }
+        },
         about: {
             description: "Information about Robot Runner and its creators.",
             long_description: "A modern, cross-platform GUI for Robot Framework and Appium, designed to simplify test automation workflows.",
