@@ -212,7 +212,7 @@ function App() {
               {/* RunPage - Kept mounted to preserve state */}
               {/* When active, it is relative to drive the container height. When not, it is absolute/hidden. */}
               <motion.div
-                className={clsx("flex flex-col w-full", activePage === 'run' ? "relative" : "absolute inset-0 pointer-events-none opacity-0")}
+                className={clsx("flex flex-col w-full min-h-full", activePage === 'run' ? "relative" : "absolute inset-0 pointer-events-none opacity-0 overflow-hidden")}
                 initial={false}
                 animate={{
                   opacity: activePage === 'run' ? 1 : 0,
@@ -226,7 +226,7 @@ function App() {
 
               {/* DashboardPage - Kept mounted to preserve MapperSubTab/exploration state */}
               <motion.div
-                className={clsx("flex flex-col w-full", activePage === 'dashboard' ? "relative" : "absolute inset-0 pointer-events-none opacity-0")}
+                className={clsx("flex flex-col w-full min-h-full", activePage === 'dashboard' ? "relative" : "absolute inset-0 pointer-events-none opacity-0 overflow-hidden")}
                 initial={false}
                 animate={{
                   opacity: activePage === 'dashboard' ? 1 : 0,
@@ -240,7 +240,7 @@ function App() {
 
               {/* TestsPage - Kept mounted to preserve MapperSubTab/exploration state */}
               <motion.div
-                className={clsx("flex flex-col w-full", activePage === 'tests' ? "relative" : "absolute inset-0 pointer-events-none opacity-0")}
+                className={clsx("flex flex-col w-full min-h-full", activePage === 'tests' ? "relative" : "absolute inset-0 pointer-events-none opacity-0 overflow-hidden")}
                 initial={false}
                 animate={{
                   opacity: activePage === 'tests' ? 1 : 0,
