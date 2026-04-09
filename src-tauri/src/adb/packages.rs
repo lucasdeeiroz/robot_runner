@@ -77,6 +77,50 @@ pub async fn install_package(device: String, path: String) -> Result<String, Str
     run_adb(device, vec!["install", "-r", &path])
 }
 
+#[command]
+pub fn get_focused_package(device: String) -> Result<String, String> {
+    // Extract package from dumpsys window
+    // Format usually: mCurrentFocus=Window{... com.package.name/com.package.name.Activity}
+    let output = run_adb(device, vec!["shell", "dumpsys", "window"])?;
+    
+    if let Some(pos) = output.find("u0 ") {
+        let rest = &output[pos + 3..];
+        if let Some(slash_pos) = rest.find('/') {
+            return Ok(rest[..slash_pos].trim().to_string());
+        }
+    }
+    
+    // Fallback search if u0 is not present or format differs
+    for line in output.lines() {
+        if line.contains("mCurrentFocus") || line.contains("mFocusedApp") {
+            if let Some(start) = line.find('{') {
+                if let Some(end) = line.find('}') {
+                    let content = &line[start+1..end];
+                    let parts: Vec<&str> = content.split_whitespace().collect();
+                    if let Some(pkg_activity) = parts.last() {
+                        if let Some((pkg, _)) = pkg_activity.split_once('/') {
+                            return Ok(pkg.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Err("Could not detect focused package".to_string())
+}
+
+#[command]
+pub fn launch_package(device: String, package: String) -> Result<String, String> {
+    run_adb(device, vec!["shell", "monkey", "-p", &package, "-c", "android.intent.category.LAUNCHER", "1"])
+}
+
+#[command]
+pub fn set_stay_on(device: String, enabled: bool) -> Result<String, String> {
+    let mode = if enabled { "true" } else { "false" };
+    run_adb(device, vec!["shell", "svc", "power", "stayon", mode])
+}
+
 // Internal Helper
 fn run_adb(device: String, args: Vec<&str>) -> Result<String, String> {
     #[cfg(target_os = "windows")]

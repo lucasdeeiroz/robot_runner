@@ -13,6 +13,13 @@ import {
 import { LogNode, TestNode, KeywordNode, SuiteNode } from "@/lib/robotParser";
 import { LinkRenderer } from "../molecules/LinkRenderer";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
+import { useSettings } from "@/lib/settings";
+import { askGemini } from "@/lib/dashboard/gemini";
+import { askClaude } from "@/lib/dashboard/claude";
+import { askOpenAI } from "@/lib/dashboard/openai";
+import { feedback } from "@/lib/feedback";
+import { AiButton } from "../atoms/AiButton";
+import { AiResponse } from "./AiResponse";
 
 interface LogTreeProps {
     node: LogNode;
@@ -23,7 +30,7 @@ interface LogTreeProps {
 }
 
 export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen, dbPath, parentType }) => {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const [isOpen, setIsOpen] = useState(initiallyOpen ?? (
         node.type !== 'text' && node.type !== 'suite-start' && (node as any).status !== 'PASS' && (node as any).status !== 'NOT_RUN'
     ));
@@ -34,6 +41,13 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
     // Lazy load state
     const [lazyChildren, setLazyChildren] = useState<LogNode[] | null>(null);
     const [isLoadingChildren, setIsLoadingChildren] = useState(false);
+
+    // AI Analysis State
+    const { settings } = useSettings();
+    const [aiAnalysis, setAiAnalysis] = useState<string | null>((node as any).aiAnalysis || null);
+    const [aiError, setAiError] = useState<string | null>(null);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [showAiAnalysis, setShowAiAnalysis] = useState(!!(node as any).aiAnalysis);
 
     const isRunning = (node as any).status === 'RUNNING';
     const isFailed = (node as any).status === 'FAIL';
@@ -55,7 +69,7 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
             let isMounted = true;
             fetchAttempted.current = true;
             setIsLoadingChildren(true);
-            
+
             invoke<LogNode[]>('get_node_children', { dbPath, parentId: node.id })
                 .then(children => {
                     if (isMounted) {
@@ -239,11 +253,81 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
             {isOpen && (
                 <div className="flex flex-col gap-1 p-2 pl-4 border-t border-on-surface/5">
                     {node.type === 'test' && isFailed && (node as TestNode).failureDetail && (
-                        <div className="mb-2 p-3 bg-error/10 border border-error/20 rounded-xl text-error text-xs animate-in fade-in slide-in-from-top-1 flex justify-between gap-4 items-center">
-                            <div className="flex flex-col gap-1 min-w-0">
-                                <div className="font-bold uppercase tracking-wider opacity-70 flex items-center gap-1.5">
-                                    <XCircle size={12} />
-                                    {t('run_tab.console.failure_detail')}
+                        <div className="mb-2 p-3 bg-error/10 border border-error/20 rounded-xl text-error text-xs animate-in fade-in slide-in-from-top-1 flex flex-col gap-4">
+                            <div className="flex justify-between gap-4 items-start w-full">
+                                <div className="flex flex-col gap-1 min-w-0 w-full">
+                                <div className="flex items-center justify-between mb-1">
+                                    <div className="font-bold uppercase tracking-wider opacity-70 flex items-center gap-1.5">
+                                        <XCircle size={12} />
+                                        {t('run_tab.console.failure_detail')}
+                                    </div>
+                                    <AiButton
+                                        isLoading={isAnalyzing}
+                                        onClick={async (e, customPrompt) => {
+                                            e.stopPropagation();
+                                            setIsAnalyzing(true);
+                                            setShowAiAnalysis(true);
+                                            setAiAnalysis(null);
+
+                                            const langName = i18n.language === 'pt' ? 'Portuguese' : i18n.language === 'es' ? 'Spanish' : 'English';
+                                            let systemInstruction = `
+You are a Senior QA Automation Engineer.
+Analyze the test failure provided (error message + screenshot if available).
+Identify the root cause (e.g., selector issue, synchronization problem, environment error, or actual bug).
+Suggest a technical fix or next steps for the developer.
+Respond in ${langName}. Keep it concise and technical.
+`.trim();
+                                            
+                                            if (customPrompt) {
+                                                systemInstruction += `\n\n=== CUSTOM INSTRUCTIONS ===\n${customPrompt}\n\nNote: The custom instructions above must take precedence and OVERRIDE any conflicting rules defined previously.`;
+                                            }
+
+
+                                            const prompt = `
+Test Name: ${node.name}
+Error Message: ${(node as TestNode).failureDetail?.message}
+`.trim();
+
+                                            try {
+                                                setAiError(null);
+                                                let result = "";
+                                                const provider = settings.aiProvider;
+                                                const screenshot = failureScreenshotData && !failureScreenshotData.startsWith("ERROR") ? failureScreenshotData : undefined;
+
+                                                if (provider === 'gemini') {
+                                                    result = await askGemini(prompt, settings.geminiApiKey || '', settings.geminiModel, systemInstruction, screenshot);
+                                                } else if (provider === 'claude') {
+                                                    result = await askClaude(prompt, settings.claudeApiKey || '', settings.claudeModel, systemInstruction, screenshot);
+                                                } else if (provider === 'openai') {
+                                                    result = await askOpenAI(prompt, settings.openaiApiKey || '', settings.openaiModel, systemInstruction, screenshot);
+                                                } else {
+                                                    throw new Error("No AI provider configured");
+                                                }
+                                                setAiAnalysis(result);
+
+                                                // Persist to Database
+                                                if (dbPath) {
+                                                    invoke('save_node_ai_analysis', {
+                                                        dbPath,
+                                                        nodeId: node.id,
+                                                        analysis: result
+                                                    }).catch(err => console.error("Failed to persist node AI analysis:", err));
+                                                }
+                                            } catch (err: any) {
+                                                console.error("AI Analysis Error:", err);
+                                                setAiError(err.message || String(err));
+                                                feedback.toast.error(t('run_tab.console.ai_error_generic'));
+                                            } finally {
+                                                setIsAnalyzing(false);
+                                            }
+                                        }}
+                                        label={t('run_tab.console.analyze_failure')}
+                                        title={t('run_tab.console.analyze_failure')}
+                                        variant="ghost"
+                                        expandable={true}
+                                        showTextAlways={false}
+                                        className="h-8 p-1 px-2 border-error/20 bg-error/5 text-error hover:bg-error/20 shadow-sm"
+                                    />
                                 </div>
                                 <div className="font-mono whitespace-pre-wrap leading-relaxed overflow-auto max-h-40">{(node as TestNode).failureDetail!.message}</div>
                             </div>
@@ -279,8 +363,24 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
                                     )}
                                 </div>
                             )}
+                            </div>
+                            {showAiAnalysis && (
+                                <AiResponse
+                                    title={t('run_tab.console.ai_insight')}
+                                    isLoading={isAnalyzing}
+                                    rationale={aiAnalysis}
+                                    rationaleHeader={t('run_tab.console.ai_analysis_header')}
+                                    error={aiError}
+                                    className="animate-in fade-in slide-in-from-top-1"
+                                    onCopy={(text) => {
+                                        navigator.clipboard.writeText(text);
+                                        feedback.toast.success(t('common.copied'));
+                                    }}
+                                />
+                            )}
                         </div>
                     )}
+
 
                     {node.type === 'keyword' && (node as KeywordNode).screenshotPath && (
                         <div className="mb-2 p-3 text-on-surface-variant text-xs animate-in fade-in slide-in-from-top-1 flex justify-between gap-2">

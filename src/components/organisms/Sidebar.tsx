@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSettings } from "@/lib/settings";
+import { feedback } from '@/lib/feedback';
 
 import { useTranslation } from "react-i18next";
 import packageJson from '../../../package.json';
@@ -21,8 +22,10 @@ interface SidebarProps {
 }
 
 export function Sidebar({ activePage, onNavigate }: SidebarProps) {
-    const { settings, updateInfo } = useSettings();
+    const { settings, updateInfo, updateSetting } = useSettings();
     const [collapsed, setCollapsed] = useState(false);
+    const [clickCount, setClickCount] = useState(0);
+    const [lastClickTime, setLastClickTime] = useState(0);
     const { t } = useTranslation();
 
     const updateAvailable = updateInfo?.available || false;
@@ -63,6 +66,24 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
         { id: 'settings', label: t('sidebar.settings'), icon: Settings },
         { id: 'about', label: t('sidebar.about'), icon: Info },
     ], [t, settings.usageMode]);
+
+    const handleVersionClick = () => {
+        const now = Date.now();
+        if (now - lastClickTime < 500) { // Faster threshold: 500ms
+            const newCount = clickCount + 1;
+            if (newCount === 10) {
+                const newState = !settings.presentationEnabled;
+                updateSetting('presentationEnabled', newState);
+                feedback.toast.info(newState ? 'presentation.activated' : 'presentation.deactivated');
+                setClickCount(0);
+            } else {
+                setClickCount(newCount);
+            }
+        } else {
+            setClickCount(1);
+        }
+        setLastClickTime(now);
+    };
 
     return (
         <div className={cn(
@@ -114,7 +135,12 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
             {/* Footer */}
             <div className="p-4 mb-2.5">
                 {!collapsed && <div className="text-[10px] flex justify-between items-center">
-                    <span className="text-on-surface-variant/80 bg-surface-variant/20 px-1.5 py-0.5 rounded-2xl">v{appVersion}</span>
+                    <span
+                        onClick={handleVersionClick}
+                        className="text-on-surface-variant/80 bg-surface-variant/20 px-1.5 py-0.5 rounded-2xl cursor-pointer hover:bg-surface-variant/40 transition-colors select-none"
+                    >
+                        v{appVersion}
+                    </span>
                     {updateAvailable && (
                         <button
                             onClick={() => onNavigate('about')}
@@ -125,7 +151,12 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                     )}
                 </div>}
                 {collapsed && <div className="text-[10px] flex justify-center items-center">
-                    <span className="text-on-surface-variant/80 bg-surface-variant/20 px-1.5 py-0.5 rounded-2xl">v{appVersion}</span>
+                    <span
+                        onClick={handleVersionClick}
+                        className="text-on-surface-variant/80 bg-surface-variant/20 px-1.5 py-0.5 rounded-2xl cursor-pointer select-none"
+                    >
+                        v{appVersion}
+                    </span>
                 </div>}
             </div>
         </div >

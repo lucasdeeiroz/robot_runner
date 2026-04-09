@@ -14,6 +14,13 @@ import { Input } from "@/components/atoms/Input";
 import { Select } from "@/components/atoms/Select";
 import { Modal } from "@/components/organisms/Modal";
 import { GestureOverlay } from "@/components/molecules/GestureOverlay";
+import { useSettings } from "@/lib/settings";
+import * as gemini from "@/lib/dashboard/gemini";
+import * as claude from "@/lib/dashboard/claude";
+import * as openai from "@/lib/dashboard/openai";
+import { AiButton } from "@/components/atoms/AiButton";
+import { AiResponse } from "@/components/molecules/AiResponse";
+
 
 interface InspectorSubTabProps {
     selectedDevice: string;
@@ -22,7 +29,7 @@ interface InspectorSubTabProps {
 }
 
 export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = false }: InspectorSubTabProps) {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const [screenshot, setScreenshot] = useState<string | null>(null);
     const [rootNode, setRootNode] = useState<InspectorNode | null>(null);
     const [imgLayout, setImgLayout] = useState<{ width: number, height: number, naturalWidth: number, naturalHeight: number } | null>(null);
@@ -49,6 +56,15 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
 
     const [loading, setLoading] = useState(false);
     const [copied, setCopied] = useState<string | null>(null);
+
+    // AI Suggestion State
+    const { settings } = useSettings();
+    const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
+    const [aiRationale, setAiRationale] = useState<string | null>(null);
+    const [aiError, setAiError] = useState<string | null>(null);
+    const [isAiLoading, setIsAiLoading] = useState(false);
+    const [showAiSection, setShowAiSection] = useState(false);
+    const [aiCache, setAiCache] = useState<Record<string, { suggestion: string, rationale: string }>>({});
 
     // Interaction State
     const [swipeStart, setSwipeStart] = useState<{ x: number, y: number } | null>(null);
@@ -343,12 +359,115 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
         }
     };
 
+    /**
+     * Triggers AI-driven selector suggestion based on the selected node's attributes.
+     */
+    const handleAiSuggest = async (customPrompt?: string) => {
+        if (!selectedNode || isAiLoading) return;
+
+        setShowAiSection(true);
+        
+        // Explicit click always triggers a new generation. 
+        // Initial cache load is already handled by the useEffect on selection.
+        setIsAiLoading(true);
+        setAiSuggestion(null);
+        setAiRationale(null);
+
+        const currentLang = i18n.language === 'pt' ? 'Portuguese' : i18n.language === 'es' ? 'Spanish' : 'English';
+
+        let systemInstruction = `
+You are an expert QA Automation Engineer. 
+Your task is to analyze the provided mobile element attributes and suggest the most resilient, stable, and unique selector (XPath or Accessibility ID).
+Rules:
+1. Prefer Accessibility ID (content-desc) if available and meaningful.
+2. Second preference is Resource ID if it's unique.
+3. If using XPath, avoid long absolute paths. Use relative paths with unique attributes.
+4. Provide the suggestion in a clear format: "Selector: [the selector]" followed by "Rationale: [explanation]".
+5. Provide the Rationale in the requested language: ${currentLang}.
+`.trim();
+
+        if (customPrompt) {
+            systemInstruction += `\n\n=== CUSTOM INSTRUCTIONS ===\n${customPrompt}\n\nNote: The custom instructions above must take precedence and OVERRIDE any conflicting rules defined previously.`;
+        }
+
+        const prompt = `
+Element details:
+Tag: ${selectedNode.tagName}
+Attributes: ${JSON.stringify(selectedNode.attributes, null, 2)}
+Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
+`.trim();
+
+        try {
+            setAiError(null);
+            let result = "";
+            const provider = settings.aiProvider;
+
+            if (provider === 'gemini') {
+                result = await gemini.askGemini(prompt, settings.geminiApiKey || '', settings.geminiModel, systemInstruction);
+            } else if (provider === 'claude') {
+                result = await claude.askClaude(prompt, settings.claudeApiKey || '', settings.claudeModel, systemInstruction);
+            } else if (provider === 'openai') {
+                result = await openai.askOpenAI(prompt, settings.openaiApiKey || '', settings.openaiModel, systemInstruction);
+            } else {
+                throw new Error("No AI provider configured");
+            }
+
+            // Simple parsing of "Selector: " and "Rationale: "
+            const selectorMatch = result.match(/Selector:\s*([^\n]*)/i);
+            const rationaleMatch = result.match(/Rationale:\s*([\s\S]*)/i);
+
+            if (selectorMatch) {
+                setAiSuggestion(selectorMatch[1].trim().replace(/`|"/g, ''));
+            } else {
+                // fallback if AI didn't follow format exactly
+                setAiSuggestion(result.split('\n')[0]);
+            }
+
+            if (rationaleMatch) {
+                setAiRationale(rationaleMatch[1].trim());
+            } else {
+                setAiRationale(result);
+            }
+
+            // Save to cache
+            setAiCache(prev => ({
+                ...prev,
+                [selectedNode.id]: {
+                    suggestion: selectorMatch ? selectorMatch[1].trim().replace(/`|"/g, '') : result.split('\n')[0],
+                    rationale: rationaleMatch ? rationaleMatch[1].trim() : result
+                }
+            }));
+            
+        } catch (error: any) {
+            console.error("AI Suggestion Error:", error);
+            setAiError(error.message || String(error));
+            feedback.toast.error(t('inspector.attributes.ai_error_generic'));
+        } finally {
+            setIsAiLoading(false);
+        }
+    };
+
+
+    useEffect(() => {
+        if (selectedNode && aiCache[selectedNode.id]) {
+            setAiSuggestion(aiCache[selectedNode.id].suggestion);
+            setAiRationale(aiCache[selectedNode.id].rationale);
+            setShowAiSection(true);
+            setAiError(null);
+        } else {
+            setAiSuggestion(null);
+            setAiRationale(null);
+            setShowAiSection(false);
+            setAiError(null);
+        }
+    }, [selectedNode, aiCache]);
 
     useEffect(() => {
         if (!selectedDevice) {
             setScreenshot(null);
             setRootNode(null);
             setSelectedNode(null);
+            setAiCache({});
             prevTestRunning.current = isTestRunning;
             return;
         }
@@ -543,7 +662,37 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
                         {selectedNode ? (
                             <div className="p-4 space-y-6">
                                 <div className="space-y-4">
-                                    <h3 className="text-xs font-semibold text-on-surface-variant/80 uppercase tracking-wider">{t('inspector.attributes.identifiers')}</h3>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h3 className="text-xs font-semibold text-on-surface-variant/80 uppercase tracking-wider">{t('inspector.attributes.identifiers')}</h3>
+                                        <AiButton
+                                            isLoading={isAiLoading}
+                                            onClick={(_e, customPrompt) => handleAiSuggest(customPrompt)}
+                                            label={t('inspector.attributes.suggest_with_ai')}
+                                            variant="primary"
+                                            className="h-7"
+                                        />
+                                    </div>
+
+                                    {/* AI Suggestion Section */}
+                                    {showAiSection && (
+                                        <AiResponse
+                                            title={t('inspector.attributes.ai_suggest')}
+                                            isLoading={isAiLoading}
+                                            responseTitle={t('inspector.attributes.suggested_selector')}
+                                            response={aiSuggestion ? `\`${aiSuggestion}\`` : null}
+                                            rationaleHeader={t('inspector.attributes.rationale')}
+                                            rationale={aiRationale}
+                                            error={aiError}
+                                            onCopy={(_text) => {
+                                                // Extract selector from the Markdown response if needed, 
+                                                // but here text is already just the suggestion if we use onCopy effectively.
+                                                // Actually, AiResponse passes the full 'response' prop to onCopy.
+                                                // We might want to pass just the aiSuggestion to onCopy.
+                                                copyToClipboard(aiSuggestion || '', 'ai_s');
+                                            }}
+                                        />
+                                    )}
+
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                         <CopyButton
                                             label={t('inspector.attributes.access_id')}

@@ -26,6 +26,7 @@ export interface TestNode {
         screenshotPath?: string;
     };
     id: string;
+    aiAnalysis?: string;
 }
 
 export interface SuiteEndNode {
@@ -68,6 +69,7 @@ export interface KeywordNode {
     screenshotPath?: string;
     children: LogNode[];
     hasChildren?: boolean;
+    aiAnalysis?: string;
 }
 
 export type LogNode = TextNode | SuiteStartNode | TestNode | SuiteNode | SuiteEndNode | KeywordNode;

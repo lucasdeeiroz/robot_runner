@@ -8,6 +8,7 @@ import { Input } from './Input';
 interface TagInputProps {
     label?: string;
     tags: string[];
+    assistant?: React.ReactNode;
     onChange: (tags: string[]) => void;
     suggestions?: string[];
     placeholder?: string;
@@ -17,6 +18,7 @@ interface TagInputProps {
 export function TagInput({
     label,
     tags,
+    assistant = null,
     onChange,
     suggestions = [],
     placeholder,
@@ -65,9 +67,16 @@ export function TagInput({
     return (
         <div className={clsx("flex flex-col gap-1", className)} ref={containerRef}>
             {label && (
-                <label className="text-xs font-medium text-on-surface-variant/80 ml-1">
-                    {label}
-                </label>
+                <div className="flex items-center justify-between">
+                    <label className="text-xs font-medium text-on-surface-variant/80 ml-1">
+                        {label}
+                    </label>
+                    {assistant && (
+                        <div>
+                            {assistant}
+                        </div>
+                    )}
+                </div>
             )}
 
             <div className="flex flex-wrap gap-1.5 p-0.5 min-h-[40px] bg-surface-variant/10 border border-outline-variant/30 rounded-lg focus-within:border-primary transition-colors relative">

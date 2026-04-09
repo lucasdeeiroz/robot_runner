@@ -81,6 +81,31 @@ pub fn read_file(path: String) -> Result<String, String> {
     fs::read_to_string(&path).map_err(|e| e.to_string())
 }
 
+pub fn read_file_tail_internal(path: &str, max_bytes: u64) -> Result<String, String> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut file = fs::File::open(path).map_err(|e| e.to_string())?;
+    let metadata = file.metadata().map_err(|e| e.to_string())?;
+    let size = metadata.len();
+
+    let start = if size > max_bytes {
+        size - max_bytes
+    } else {
+        0
+    };
+    file.seek(SeekFrom::Start(start)).map_err(|e| e.to_string())?;
+
+    let mut buffer = Vec::with_capacity(std::cmp::min(size, max_bytes) as usize);
+    file.read_to_end(&mut buffer).map_err(|e| e.to_string())?;
+
+    // Safety: use lossy conversion to handle cases where we split a multi-byte character
+    Ok(String::from_utf8_lossy(&buffer).to_string())
+}
+
+#[command]
+pub fn read_file_tail(path: String, max_bytes: u64) -> Result<String, String> {
+    read_file_tail_internal(&path, max_bytes)
+}
+
 #[command]
 pub fn read_image_base64(path: String) -> Result<String, String> {
     use base64::{Engine as _, engine::general_purpose};

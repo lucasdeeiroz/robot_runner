@@ -1,36 +1,25 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useTranslation } from "react-i18next";
-import {
-    XCircle, CheckCircle2, Calendar, Clock, Smartphone,
-    FileText, Folder
-} from 'lucide-react';
+import { XCircle, CheckCircle2, Calendar, Clock, Smartphone } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
-import { getCachedResult, parseXmlBackground, onParseComplete, ParseResult } from '@/lib/xmlParseCache';
+import { getCachedResult, parseXmlBackground, onParseComplete } from '@/lib/xmlParseCache';
 import { Modal } from '@/components/organisms/Modal';
-import { Button } from '@/components/atoms/Button';
 import { LogTree } from '@/components/molecules/LogTree';
 import { LogNode } from '@/lib/robotParser';
 import { feedback } from '@/lib/feedback';
 import { AndroidVersionPill } from '@/components/atoms/AndroidVersionPill';
 import { ExpressiveLoading } from '@/components/atoms/ExpressiveLoading';
 import { decodeHtml } from '@/lib/utils';
+import { AiButton } from '@/components/atoms/AiButton';
+import { AiResponse } from '@/components/molecules/AiResponse';
+import { useSettings } from '@/lib/settings';
+import { TestLog } from '@/lib/historyCache';
+import * as gemini from '@/lib/dashboard/gemini';
+import * as openai from '@/lib/dashboard/openai';
+import * as claude from '@/lib/dashboard/claude';
 import clsx from 'clsx';
 
-interface TestLog {
-    path: string;
-    suite_name: string;
-    status: 'PASS' | 'FAIL';
-    device_udid?: string | null;
-    device_model?: string | null;
-    android_version?: string | null;
-    timestamp: string;
-    duration: string;
-    pass_count: number;
-    fail_count: number;
-    xml_path: string;
-    log_html_path: string;
-}
 
 interface ParseProgress {
     xml_path: string;
@@ -49,16 +38,31 @@ interface HistoryDetailModalProps {
     isOpen: boolean;
     onClose: () => void;
     log: TestLog | null;
+    onUpdateLog: (updatedLog: TestLog) => void;
 }
 
-export function HistoryDetailModal({ isOpen, onClose, log }: HistoryDetailModalProps) {
-    const { t } = useTranslation();
+export function HistoryDetailModal({ isOpen, onClose, log, onUpdateLog }: HistoryDetailModalProps) {
+    const { t, i18n } = useTranslation();
     const [tree, setTree] = useState<LogNode[]>([]);
     const [dbPath, setDbPath] = useState<string | undefined>();
     const [loading, setLoading] = useState(false);
     const [progress, setProgress] = useState<ParseProgress | null>(null);
     const unlistenRef = useRef<UnlistenFn | null>(null);
     const currentPathRef = useRef<string | null>(null);
+    const { settings } = useSettings();
+
+    // AI Summary State
+    const [isSummarizing, setIsSummarizing] = useState(false);
+    const [summary, setSummary] = useState<string | null>(null);
+    const [summaryError, setSummaryError] = useState<string | null>(null);
+
+    // Sync summary when log changes
+    useEffect(() => {
+        if (isOpen && log) {
+            setSummary(log.ai_summary || null);
+            setSummaryError(null);
+        }
+    }, [isOpen, log]);
 
     // Cleanup event listener
     const cleanupListener = useCallback(() => {
@@ -68,36 +72,7 @@ export function HistoryDetailModal({ isOpen, onClose, log }: HistoryDetailModalP
         }
     }, []);
 
-    useEffect(() => {
-        if (isOpen && log && log.xml_path) {
-            loadXml(log.xml_path);
-        } else if (!isOpen) {
-            // When closing, DO NOT cancel the parse — it continues in the cache.
-            // Only reset local UI state.
-            setTree([]);
-            setDbPath(undefined);
-            setProgress(null);
-            cleanupListener();
-            currentPathRef.current = null;
-        }
-        return cleanupListener;
-    }, [isOpen, log]);
-
-    // Subscribe to parse completions so re-opening picks up cached results
-    useEffect(() => {
-        const unsubscribe = onParseComplete((xmlPath, result: ParseResult | null) => {
-            if (xmlPath === currentPathRef.current && result) {
-                setTree([result.rootSuite]);
-                setDbPath(result.dbPath);
-                setLoading(false);
-                setProgress(null);
-                cleanupListener();
-            }
-        });
-        return unsubscribe;
-    }, []);
-
-    const loadXml = async (xmlPath: string) => {
+    const loadXml = useCallback(async (xmlPath: string) => {
         currentPathRef.current = xmlPath;
 
         // 1. Check global cache for instant display
@@ -140,13 +115,115 @@ export function HistoryDetailModal({ isOpen, onClose, log }: HistoryDetailModalP
                 cleanupListener();
             }
         }
-    };
+    }, [cleanupListener]);
+
+    useEffect(() => {
+        if (isOpen && log && log.xml_path) {
+            loadXml(log.xml_path);
+        } else if (!isOpen) {
+            // When closing, DO NOT cancel the parse — it continues in the cache.
+            // Only reset local UI state.
+            setTree([]);
+            setDbPath(undefined);
+            setProgress(null);
+            cleanupListener();
+            currentPathRef.current = null;
+        }
+        return cleanupListener;
+    }, [isOpen, log, cleanupListener, loadXml]);
+
+    // Subscribe to parse completions so re-opening picks up cached results
+    useEffect(() => {
+        const unsubscribe = onParseComplete((xmlPath, result, _error) => {
+            if (xmlPath === currentPathRef.current && result) {
+                setTree([result.rootSuite]);
+                setDbPath(result.dbPath);
+                setLoading(false);
+                setProgress(null);
+                cleanupListener();
+            }
+        });
+        return unsubscribe;
+    }, [cleanupListener]);
 
     const openLog = async (path: string) => {
         try {
             await invoke('open_log_folder', { path });
         } catch (e) {
             feedback.toast.error("common.errors.open_file_failed", e);
+        }
+    };
+
+    const handleSummarize = async (customPrompt?: string) => {
+        if (!log || tree.length === 0 || isSummarizing) return;
+
+        setIsSummarizing(true);
+        setSummaryError(null);
+        setSummary(null);
+
+        try {
+            const provider = settings.aiProvider || 'gemini';
+            let apiKey: string | undefined;
+            let model: string | undefined;
+
+            if (provider === 'openai') {
+                apiKey = settings.openaiApiKey;
+                model = settings.openaiModel;
+            } else if (provider === 'claude') {
+                apiKey = settings.claudeApiKey;
+                model = settings.claudeModel;
+            } else {
+                apiKey = settings.geminiApiKey;
+                model = settings.geminiModel;
+            }
+
+            if (!apiKey) {
+                throw new Error("Missing API Key");
+            }
+
+            let result: string;
+            const language = i18n.language || 'en';
+
+            // Fetch failure context from DB if available
+            let failureContext: any[] | undefined = undefined;
+            if (dbPath) {
+                try {
+                    failureContext = await invoke('get_execution_failures', { dbPath });
+                } catch (dbErr) {
+                    console.warn("Failed to fetch failure context for AI:", dbErr);
+                }
+            }
+
+            if (provider === 'openai') {
+                result = await openai.summarizeExecution(tree, apiKey, model, language, failureContext, undefined, customPrompt);
+            } else if (provider === 'claude') {
+                result = await claude.summarizeExecution(tree, apiKey, model, language, failureContext, undefined, customPrompt);
+            } else {
+                result = await gemini.summarizeExecution(tree, apiKey, model, language, failureContext, undefined, customPrompt);
+            }
+
+            setSummary(result);
+
+            // Persist to history cache e atualiza estado local
+            try {
+                await invoke('save_test_summary', {
+                    xmlPath: log.xml_path,
+                    summary: result,
+                    customPath: settings.paths.logs
+                });
+
+                // Notifica o componente pai sobre a atualização
+                onUpdateLog({ ...log, ai_summary: result });
+            } catch (saveErr) {
+                console.error("Failed to persist AI summary:", saveErr);
+            }
+
+        } catch (err: any) {
+            console.error("AI summarization failed:", err);
+            setSummaryError(err.message || String(err));
+            feedback.toast.error("run_tab.console.ai_analysis_error");
+        } finally {
+            setIsSummarizing(false);
         }
     };
 
@@ -173,66 +250,70 @@ export function HistoryDetailModal({ isOpen, onClose, log }: HistoryDetailModalP
                 <div className="flex flex-col h-full">
                     {/* Header Info */}
                     <div className="flex flex-wrap gap-4 p-4 mb-4 bg-surface-variant/20 rounded-2xl border border-outline-variant/30">
-                        <div className="flex items-center gap-2">
-                            <div className={clsx(
-                                "w-8 h-8 rounded-xl flex items-center justify-center shrink-0",
-                                log.status === 'PASS' ? "bg-success/10 text-success" : "bg-error/10 text-error"
-                            )}>
-                                {log.status === 'PASS' ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
+                        <div className="flex flex-wrap gap-4" onClick={() => openLog(log.path)}>
+                            <div className="flex items-center gap-2">
+                                <div className={clsx(
+                                    "w-8 h-8 rounded-xl flex items-center justify-center shrink-0",
+                                    log.status === 'PASS' ? "bg-success/10 text-success" : "bg-error/10 text-error"
+                                )}>
+                                    {log.status === 'PASS' ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
+                                </div>
+                                <span className={clsx("font-bold text-sm", log.status === 'PASS' ? "text-success" : "text-error")}>
+                                    {t(`run_tab.console.${log.status.toLowerCase()}`)}
+                                </span>
                             </div>
-                            <span className={clsx("font-bold text-sm", log.status === 'PASS' ? "text-success" : "text-error")}>
-                                {t(`run_tab.console.${log.status.toLowerCase()}`)}
-                            </span>
-                        </div>
 
-                        <div className="flex items-center gap-2 text-xs text-on-surface-variant/80">
-                            <Calendar size={14} /> {formatDate(log.timestamp)}
-                        </div>
-
-                        <div className="flex items-center gap-2 text-xs text-on-surface-variant/80">
-                            <Clock size={14} /> 
-                            <span>{log.duration}</span>
-                            <span className="mx-1 opacity-20 h-2 w-[1px] bg-current" />
-                            <span className="text-success font-medium">{log.pass_count}P</span>
-                            <span className="opacity-30">/</span>
-                            <span className={clsx("font-medium", log.fail_count > 0 ? "text-error" : "opacity-40")}>{log.fail_count}F</span>
-                        </div>
-
-                        {(log.device_model || log.device_udid) && (
-                            <div className="flex items-center gap-2 text-xs text-on-surface/80">
-                                <Smartphone size={14} />
-                                {log.android_version && <AndroidVersionPill version={log.android_version} className="bg-surface-variant/50" />}
-                                {log.device_model || t('tests_page.unknown_model')}
-                                {log.device_udid ? ` (${log.device_udid})` : ''}
+                            <div className="flex items-center gap-2 text-xs text-on-surface-variant/80">
+                                <Calendar size={14} /> {formatDate(log.timestamp)}
                             </div>
-                        )}
+
+                            <div className="flex items-center gap-2 text-xs text-on-surface-variant/80">
+                                <Clock size={14} />
+                                <span>{log.duration}</span>
+                                <span className="mx-1 opacity-20 h-2 w-[1px] bg-current" />
+                                <span className="text-success font-medium">{log.pass_count}P</span>
+                                <span className="opacity-30">/</span>
+                                <span className={clsx("font-medium", log.fail_count > 0 ? "text-error" : "opacity-40")}>{log.fail_count}F</span>
+                            </div>
+
+                            {(log.device_model || log.device_udid) && (
+                                <div className="flex items-center gap-2 text-xs text-on-surface/80">
+                                    <Smartphone size={14} />
+                                    {log.android_version && <AndroidVersionPill version={log.android_version} className="bg-surface-variant/50" />}
+                                    {log.device_model || t('tests_page.unknown_model')}
+                                    {log.device_udid ? ` (${log.device_udid})` : ''}
+                                </div>
+                            )}
+                        </div>
 
                         <div className="flex-1" />
 
                         <div className="flex items-center gap-2">
-                            <Button
-                                onClick={() => openLog(log.log_html_path)}
-                                variant="outline"
-                                size="sm"
-                                className="h-8 px-3 rounded-xl text-[10px] font-bold uppercase tracking-wider"
-                                leftIcon={<FileText size={14} />}
-                            >
-                                {t('tests_page.report')}
-                            </Button>
-                            <Button
-                                onClick={() => openLog(log.path)}
-                                variant="outline"
-                                size="sm"
-                                className="h-8 px-3 rounded-xl text-[10px] font-bold uppercase tracking-wider"
-                                leftIcon={<Folder size={14} />}
-                            >
-                                {t('tests_page.open_folder')}
-                            </Button>
+                            <AiButton
+                                isLoading={isSummarizing}
+                                onClick={(_e, customPrompt) => handleSummarize(customPrompt)}
+                                label={t('run_tab.console.summarize_run')}
+                                variant="primary"
+                                disabled={tree.length === 0 || loading}
+                            />
                         </div>
                     </div>
 
                     {/* Content / Tree */}
                     <div className="flex-1 overflow-y-auto px-1">
+                        {(isSummarizing || summary || summaryError) && (
+                            <div className="mb-6 px-3">
+                                <AiResponse
+                                    title={t('run_tab.console.summary_title')}
+                                    isLoading={isSummarizing}
+                                    responseTitle={t('run_tab.console.summary_rationale')}
+                                    response={summary}
+                                    error={summaryError}
+                                    onCopy={() => { }}
+                                />
+                            </div>
+                        )}
+
                         {loading ? (
                             <div className="h-full flex flex-col items-center justify-center gap-4 opacity-80">
                                 <ExpressiveLoading size="md" variant="circular" />
@@ -269,7 +350,8 @@ export function HistoryDetailModal({ isOpen, onClose, log }: HistoryDetailModalP
                         )}
                     </div>
                 </div>
-            )}
-        </Modal>
+            )
+            }
+        </Modal >
     );
 }

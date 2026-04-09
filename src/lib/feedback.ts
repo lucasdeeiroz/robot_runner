@@ -8,13 +8,16 @@ export const feedback = {
         success: (msgKey: string, args?: any) => toast.success(i18next.t(msgKey, args) as string, args),
         error: (msgKey: string, args?: any) => toast.error(i18next.t(msgKey, args) as string, args),
         info: (msgKey: string, args?: any) => toast.info(i18next.t(msgKey, args) as string, args),
-        loading: (msgKey: string, args?: any) => toast.loading(i18next.t(msgKey, args) as string, args),
+        loading: (msgKey: string, args?: any) => {
+            return toast.loading(i18next.t(msgKey, args) as string, args);
+        },
         dismiss: (id?: string | number) => toast.dismiss(id),
         // Raw string support if needed (for dynamic messages not in i18n)
         raw: {
             success: (msg: string) => toast.success(msg),
             error: (msg: string) => toast.error(msg),
             info: (msg: string) => toast.info(msg),
+            loading: (msg: string) => toast.loading(msg),
         }
     },
 

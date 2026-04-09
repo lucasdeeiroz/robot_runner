@@ -189,68 +189,94 @@ function App() {
       <DeviceProvider>
         <SelectionProvider>
           <Toaster richColors position="bottom-right" theme={settings.theme === 'dark' ? 'dark' : 'light'} />
-        <AnimatePresence>
-          {!settings.usageMode && (
-            <Onboarding key="onboarding-flow" onComplete={() => {
-              // Trigger a manual check version after onboarding is complete
-              checkSystemVersions();
-            }} />
-          )}
-          {showOverlay && settings.usageMode && (
-            <SystemCheckOverlay
-              key="system-check-overlay"
-              status={systemCheckStatus}
-              onCriticalExit={handleCriticalExit}
-              onTestingRedirect={handleTestingRedirect}
-              onMirroringContinue={handleMirroringContinue}
-              onDismiss={handleDismiss}
-            />
-          )}
-        </AnimatePresence>
-        <Layout activePage={activePage} onNavigate={setActivePage}>
-          <div className="max-w-7xl mx-auto h-full flex flex-col relative">
-            {/* RunPage - Kept mounted to preserve state */}
-            {/* When active, it is relative to drive the container height. When not, it is absolute/hidden. */}
-            <motion.div
-              className={clsx("flex flex-col w-full", activePage === 'run' ? "relative" : "absolute inset-0 pointer-events-none opacity-0")}
-              initial={false}
-              animate={{
-                opacity: activePage === 'run' ? 1 : 0,
-                zIndex: activePage === 'run' ? 10 : 0,
-                scale: activePage === 'run' ? 1 : 0.98
-              }}
-              transition={{ duration: 0.3 }}
-            >
-              <RunPage onNavigate={setActivePage} initialTab={initialSubTab} />
-            </motion.div>
+          <AnimatePresence>
+            {!settings.usageMode && (
+              <Onboarding key="onboarding-flow" onComplete={() => {
+                // Trigger a manual check version after onboarding is complete
+                checkSystemVersions();
+              }} />
+            )}
+            {showOverlay && settings.usageMode && (
+              <SystemCheckOverlay
+                key="system-check-overlay"
+                status={systemCheckStatus}
+                onCriticalExit={handleCriticalExit}
+                onTestingRedirect={handleTestingRedirect}
+                onMirroringContinue={handleMirroringContinue}
+                onDismiss={handleDismiss}
+              />
+            )}
+          </AnimatePresence>
+          <Layout activePage={activePage} onNavigate={setActivePage}>
+            <div className="max-w-7xl mx-auto h-full flex flex-col relative">
+              {/* RunPage - Kept mounted to preserve state */}
+              {/* When active, it is relative to drive the container height. When not, it is absolute/hidden. */}
+              <motion.div
+                className={clsx("flex flex-col w-full min-h-full", activePage === 'run' ? "relative" : "absolute inset-0 pointer-events-none opacity-0 overflow-hidden")}
+                initial={false}
+                animate={{
+                  opacity: activePage === 'run' ? 1 : 0,
+                  zIndex: activePage === 'run' ? 10 : 0,
+                  scale: activePage === 'run' ? 1 : 0.98
+                }}
+                transition={{ duration: 0.3 }}
+              >
+                <RunPage onNavigate={setActivePage} initialTab={initialSubTab} />
+              </motion.div>
 
-            {/* Other Pages - Transitions using AnimatePresence */}
-            <AnimatePresence mode="wait">
-              {activePage !== 'run' && (
-                <motion.div
-                  key={activePage}
-                  className="relative w-full flex flex-col z-20"
-                  initial={{ opacity: 0, scale: 0.98, x: 20 }}
-                  animate={{ opacity: 1, scale: 1, x: 0 }}
-                  exit={{ opacity: 0, scale: 0.98, x: -20, position: 'absolute' }}
-                  transition={{ duration: 0.3, ease: [0.2, 0, 0, 1] }}
-                >
-                  {activePage === 'tests' && <TestsPage />}
-                  {activePage === 'dashboard' && <DashboardPage onNavigate={setActivePage} />}
-                  {activePage === 'settings' && <SettingsPage />}
-                  {activePage === 'about' && <AboutPage />}
+              {/* DashboardPage - Kept mounted to preserve MapperSubTab/exploration state */}
+              <motion.div
+                className={clsx("flex flex-col w-full min-h-full", activePage === 'dashboard' ? "relative" : "absolute inset-0 pointer-events-none opacity-0 overflow-hidden")}
+                initial={false}
+                animate={{
+                  opacity: activePage === 'dashboard' ? 1 : 0,
+                  zIndex: activePage === 'dashboard' ? 10 : 0,
+                  scale: activePage === 'dashboard' ? 1 : 0.98
+                }}
+                transition={{ duration: 0.3 }}
+              >
+                <DashboardPage onNavigate={setActivePage} />
+              </motion.div>
 
-                  {/* Placeholder for other pages */}
-                  {activePage !== 'tests' && activePage !== 'settings' && activePage !== 'about' && activePage !== 'dashboard' && (
-                    <div className="p-12 text-center border-2 border-dashed border-outline-variant/30 rounded-2xl m-4">
-                      <p className="text-on-surface-variant/80">{t('common.coming_soon', { module: activePage })}</p>
-                    </div>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </Layout>
+              {/* TestsPage - Kept mounted to preserve MapperSubTab/exploration state */}
+              <motion.div
+                className={clsx("flex flex-col w-full min-h-full", activePage === 'tests' ? "relative" : "absolute inset-0 pointer-events-none opacity-0 overflow-hidden")}
+                initial={false}
+                animate={{
+                  opacity: activePage === 'tests' ? 1 : 0,
+                  zIndex: activePage === 'tests' ? 10 : 0,
+                  scale: activePage === 'tests' ? 1 : 0.98
+                }}
+                transition={{ duration: 0.3 }}
+              >
+                <TestsPage onNavigate={setActivePage} />
+              </motion.div>
+
+              {/* Other Pages - Transitions using AnimatePresence */}
+              <AnimatePresence mode="wait">
+                {activePage !== 'run' && activePage !== 'dashboard' && activePage !== 'tests' && (
+                  <motion.div
+                    key={activePage}
+                    className="relative w-full flex flex-col z-20"
+                    initial={{ opacity: 0, scale: 0.98, x: 20 }}
+                    animate={{ opacity: 1, scale: 1, x: 0 }}
+                    exit={{ opacity: 0, scale: 0.98, x: -20, position: 'absolute' }}
+                    transition={{ duration: 0.3, ease: [0.2, 0, 0, 1] }}
+                  >
+                    {activePage === 'settings' && <SettingsPage />}
+                    {activePage === 'about' && <AboutPage />}
+
+                    {/* Placeholder for other pages */}
+                    {activePage !== 'settings' && activePage !== 'about' && (
+                      <div className="p-12 text-center border-2 border-dashed border-outline-variant/30 rounded-2xl m-4">
+                        <p className="text-on-surface-variant/80">{t('common.coming_soon', { module: activePage })}</p>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </Layout>
         </SelectionProvider>
       </DeviceProvider>
     </TestSessionProvider>

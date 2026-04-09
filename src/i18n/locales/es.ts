@@ -1,5 +1,77 @@
 export const es = {
     translation: {
+        presentation: {
+            activated: "Modo Presentación activado",
+            deactivated: "Modo Presentación desactivado",
+            next: "Siguiente",
+            prev: "Volver",
+            reset: "Reiniciar",
+            slides: {
+                welcome: {
+                    title: "Robot Runner 2.2",
+                    points: [
+                        "Ejecución de pruebas mobile",
+                        "Herramientas de análisis de pruebas",
+                        "Centralización de herramientas de QA",
+                        "Inspección de elementos y Documentación de pantallas",
+                        "Apoyo con IA con contexto del producto"
+                    ]
+                },
+                test_execution: {
+                    title: "Ejecución de pruebas mobile",
+                    points: [
+                        "Seleccionar dispositivos en menú desplegable",
+                        "Conectar dispositivos vía Wi-Fi",
+                        "Seleccionar y personalizar suites de pruebas",
+                        "Mantener la pantalla encendida durante pruebas largas"
+                    ]
+                },
+                test_analysis: {
+                    title: "Herramientas de análisis de pruebas",
+                    points: [
+                        "Visualización paralela de ejecuciones en modo grade",
+                        "Generación de evidencias: screenshots, vídeos",
+                        "Generación de datos: logcat y datos de performance",
+                        "Visualización de logs en tiempo real"
+                    ]
+                },
+                toolbox: {
+                    title: "Centralización de herramientas de QA",
+                    points: [
+                        "Transmisión de pantalla en tiempo real",
+                        "Inicialización automática del Appium Server",
+                        "Control autónomo vía ADB"
+                    ]
+                },
+                inspector_mapper: {
+                    title: "Inspección de elementos y Documentación de pantallas",
+                    points: [
+                        "Inspección de elementos en tiempo real",
+                        "Generación de locators resilientes",
+                        "Mapeamento e documentacion de pantallas",
+                        "Visualizacion de flujos de navegación"
+                    ]
+                },
+                ai_assistant: {
+                    title: "Asistente IA",
+                    points: [
+                        "Asistente IA com contexto do producto",
+                        "Depuración e relatórios de errores",
+                        "Sugestões e otimizaciones",
+                        "Generacion de artefatos de board"
+                    ]
+                },
+                settings: {
+                    title: "Configuración",
+                    points: [
+                        "Perfiles de proyectos",
+                        "Configuración de la app, herramientas y ejecución",
+                        "Versiones del sistema",
+                        "Configuración del proveedor de IA"
+                    ]
+                }
+            }
+        },
         about: {
             description: "Información sobre Robot Runner y sus creadores.",
             long_description: "Una interfaz gráfica moderna y multiplataforma para Robot Framework y Appium, diseñada para simplificar los flujos de automatización de pruebas.",
@@ -116,6 +188,8 @@ export const es = {
             cancel: "Cancelar",
             save: "Guardar",
             saved: "Guardado",
+            save_and_run: "Guardar y Ejecutar",
+            run: "Ejecutar",
             undo: "Deshacer",
             redo: "Rehacer",
             next: "Siguiente",
@@ -148,6 +222,14 @@ export const es = {
             }
         },
         components: {
+            ai_button: {
+                customize_prompt: "Personalizar Prompt",
+                custom_rule_active: "Regla personalizada activa",
+                customize_description: "Agrega instrucciones específicas o reglas personalizadas al prompt de IA. Las instrucciones aquí definidas tendrán precedencia (sobrescribirán) sobre el comportamiento predeterminado de la inteligencia artificial para este botón.",
+                customize_placeholder: "Ej: Responda obligatoriamente en este formato específico... o Ignora las pruebas con las etiquetas...",
+                reset_prompt: "Restaurar prompt predeterminado",
+                clear: "Limpiar"
+            },
             logo: {
                 load_error: "Error al cargar logo"
             }
@@ -266,7 +348,7 @@ export const es = {
                 type_label: "Tipo de Generación",
                 generate_button: "Generar con IA",
                 generating: "Generando...",
-                key_required: "Clave API de Gemini requerida. Configure en Ajustes.",
+                key_required: "Clave API de {{provider}} requerida. Configure en Ajustes.",
                 types: {
                     test_case: "Casos de Prueba (BDD)",
                     pbi: "Ítem de Backlog (PBI)",
@@ -279,7 +361,7 @@ export const es = {
             actions: {
                 generate: "Generar Escenarios",
                 generated_success: "CASOS DE PRUEBA GENERADOS CON ÉXITO (vía {{method}})",
-                gemini_failed: "Fallo en la generación vía Gemini: {{error}}",
+                ai_failed: "Fallo en la generación con IA: {{error}}",
                 using_local_generator: "Usando generador local. {{message}}",
                 export_xlsx: "Excel (.xlsx)",
                 export_docx: "Word (.docx)"
@@ -419,7 +501,14 @@ export const es = {
                 uiselector: "UIAutomator",
                 class: "Clase",
                 identifiers: "Identificadores",
-                hierarchy: "Jerarquía"
+                hierarchy: "Jerarquía",
+                ai_suggest: "Sugerencia de IA",
+                suggest_with_ai: "Sugerir con IA",
+                suggest_ai_placeholder: "Deja que la IA te ayude a encontrar el selector más estable para este elemento.",
+                suggested_selector: "Selector Sugerido",
+                ai_rationale: "Justificación de IA",
+                rationale: "Justificación",
+                ai_error_generic: "Fallo en la sugerencia de IA."
             }
         },
         logcat: {
@@ -457,6 +546,8 @@ export const es = {
             title: "Mapeador",
             empty: "Seleccione un dispositivo para iniciar el mapeo",
             refresh: "Actualizar Fuente",
+            screen_description: "Descripción de la Pantalla",
+            description: "Descripción",
             grouping: {
                 all_screens: "Todas las pantallas",
                 by_tags: "Por etiquetas",
@@ -469,10 +560,22 @@ export const es = {
                 export: "Exportar Flujo",
                 export_image: "Exportar Imagen",
                 import: "Importar Flujo",
+                migrating: "Migrando datos de diseño...",
+                migration_success: "¡Migración de diseño completada!",
+                migration_error: "Fallo en la migración de diseño",
+                save_error: "Error al guardar el diseño descentralizado",
+                no_changes: "No hay cambios de diseño para guardar",
+                save_connection_error: "Error al guardar la conexión",
+                port_occupied: "El puerto ya está ocupado",
                 export_success: "¡Flujo exportado con éxito!",
                 import_success: "¡Flujo importado con éxito!",
                 export_error: "Error al exportar flujo.",
                 import_error: "Error al importar flujo.",
+                reorganize: "Auto-Reorganizar Diseño",
+                reorganized: "Diseño reorganizado (BFS)",
+                ai_key_missing: "Falta la clave API de IA. Usando reorganización estándar...",
+                reorganized_ai: "Diseño reorganizado por IA",
+                reorganize_ai_error: "Fallo en la reorganización por IA. Volviendo a BFS.",
                 quick_connect: "Conexión Rápida",
                 source_element: "Elemento de Origen",
                 target_screen: "Pantalla de Destino",
@@ -485,9 +588,16 @@ export const es = {
                 center_view: "Centrar Vista",
                 filter_by_tag: "Filtrar por Etiqueta",
                 all_tags: "Todas las Etiquetas",
+                pan_mode: "Modo Panorámico (Mantener Espacio)",
+                zoom_in: "Aumentar Zoom",
+                zoom_out: "Disminuir Zoom",
+                center: "Centrar Vista",
+                filter_tags: "Filtrar por Etiqueta",
+                select_source_element: "Por favor, seleccione un elemento de origen",
+                element_not_found: "Elemento de origen no encontrado",
                 unsaved_changes: {
                     title: "Cambios no guardados",
-                    message: "Tienes cambios no guardados. ¿Quieres guardar antes de salir?",
+                    message: "Tienes cambios de diseño sin guardar. ¿Quieres guardar antes de salir?",
                     save_and_exit: "Guardar y Salir",
                     exit_without_saving: "Salir sin Guardar",
                     cancel: "Cancelar"
@@ -525,7 +635,18 @@ export const es = {
                 screen: "Pantalla",
                 modal: "Modal",
                 tab: "Pestaña",
-                drawer: "Cajón"
+                drawer: "Cajón",
+                dialog: "Diálogo",
+                tab_content: "Contenido de Pestaña",
+                overlay: "Superposición"
+            },
+            exploration: {
+                start: "Iniciar Exploración Autónoma",
+                stop: "Detener",
+                active: "IA Explorando...",
+                thinking: "Pensando...",
+                summary: "Exploración Finalizada",
+                stopped: "Exploración detenida: {{reason}}"
             },
             modes: {
                 inspect: "Modo Inspección",
@@ -555,6 +676,8 @@ export const es = {
             input: {
                 element_type: "Tipo de Elemento",
                 element_name: "Nombre del Elemento",
+                element_description: "Descripción del Elemento",
+                screen_description: "Descripción de la Pantalla",
                 navigates_to: "Navega A (Opcional)",
                 menu_options: "Opciones de Menú (Separadas por comas)",
                 parent_screen: "Pantalla Padre",
@@ -567,7 +690,9 @@ export const es = {
                 menu_options: "Opción 1, Opción 2...",
                 parent_screen: "Nombre de la Pantalla Padre",
                 screen_name: "Nombre de la Pantalla (Único)",
-                screen_tags: "ej: Auth, Perfil"
+                screen_tags: "ej: Auth, Perfil",
+                screen_description: "Descripción para el contexto de la IA...",
+                element_description: "Descripción del elemento (Solo IA)"
             },
             action: {
                 add: "Añadir Elemento",
@@ -575,10 +700,20 @@ export const es = {
                 remove: "Eliminar Elemento",
                 save_screen: "Guardar Pantalla",
                 load: "Cargar",
+                ai_suggest_name: "Sugerir Nombre con IA",
+                ai_suggest_tags: "Sugerir Etiquetas con IA",
+                copy_result: "Copiar Resultado",
+                copy_analysis: "Copiar Análisis",
+                export_pom: "Exportar POM",
+                export_project_pom: "Exportar Proyecto a POM",
                 new: "Nuevo",
                 discard: "Descartar",
                 discard_desc: "Descartar Pantalla",
-                delete: "Eliminar"
+                delete: "Eliminar",
+                toggle_stay_awake: "Alternar Mantener Pantalla Encendida",
+                export_json: "Exportar JSON",
+                import_json: "Importar JSON",
+                export_image: "Exportar Imagen"
             },
             feedback: {
                 mapped: "¡Elemento mapeado!",
@@ -587,13 +722,19 @@ export const es = {
                 empty_map: "Aún no hay elementos mapeados",
                 saved: "¡Pantalla mapeada con éxito!",
                 loaded: "Mapa de pantalla cargado",
+                ai_suggesting: "Solicitando nombre a la IA...",
+                ai_success: "¡Nombre sugerido!",
+                ai_error: "Fallo al sugerir nombre",
                 new_screen: "Listo para nueva pantalla",
-                deleted: "Mapa eliminado"
+                deleted: "Mapa eliminado",
+                stay_on_enabled: "Mantener Pantalla Encendida activado",
+                stay_on_disabled: "Mantener Pantalla Encendida desactivado"
             },
             error: {
                 missing_name: "Por favor proporcione un nombre para el elemento",
                 missing_screen_name: "Por favor proporcione un Nombre para la Pantalla",
-                save_failed: "Error al guardar mapa de pantalla"
+                save_failed: "Error al guardar mapa de pantalla",
+                stay_on_failed: "Error al cambiar el estado de Mantener Pantalla Encendida"
             },
             confirm: {
                 delete: "¿Está seguro de que desea eliminar este mapa?",
@@ -688,7 +829,32 @@ export const es = {
                 },
                 keep_awake: "Mantener Pantalla Activa",
                 debug_on: "Ver Logs de Depuración",
-                debug_off: "Ocultar Logs de Depuración"
+                debug_off: "Ocultar Logs de Depuración",
+                analyze_failure: "Analizar Fallo",
+                analyzing: "Analizando...",
+                ai_insight: "Análisis de IA",
+                ai_analysis_header: "Análisis Detallado",
+                summarize_run: "Resumir Ejecución",
+                summary_title: "Resumen de la Ejecución",
+                summary_rationale: "Base del Análisis",
+                ai_analysis_placeholder: "Haga clic para realizar un análisis inteligente da causa raíz usando IA.",
+                ai_analysis_error: "Fallo en el análisis de IA",
+                ai_error_generic: "Análisis de IA fallido.",
+                ai_error_details: "Detalles del Error:",
+                ai_error_copy: "Copiar error",
+                ai_history: {
+                    title: "Análisis Inteligente de Historial",
+                    failures_limit: "Fallos a analizar",
+                    token_estimate: "Estimación de consumo",
+                    start_analysis: "Iniciar Análisis de Tendencias",
+                    regenerate: "Rehacer Análisis",
+                    last_analysis_on: "Último análisis realizado el {{date}}",
+                    no_analysis: "Aún no hay análisis previos para este historial.",
+                    tokens: "tokens",
+                    loading_context: "Extrayendo contexto comprimido...",
+                    success: "¡Análisis de tendencias completado!",
+                    persistence_note: "Este análisis se guardará hasta que solicites uno nuevo."
+                }
             }
         },
         scrcpy: {
@@ -769,16 +935,32 @@ export const es = {
                 ngrok_token: "Token de Autenticación Ngrok"
             },
             ai: {
-                title: "Integración IA (Google Gemini)",
+                title: "Integración IA",
+                provider: "Proveedor de IA",
                 key: "Clave API",
                 model: "ID del Modelo",
                 check_models: "Verificar modelos disponibles",
                 loading_models: "Cargando modelos...",
                 models_fetched: "Modelos obtenidos",
                 models_found_desc: "{{count}} modelos encontrados. Verifique la lista.",
-                no_models_found: "No se encontraron modelos Gemini para esta clave.",
-                placeholder: "Ingrese su Clave API Gemini",
-                help: "Obtenga su Clave API gratuita en"
+                no_models_found: "No se encontraron modelos para esta clave.",
+                gemini: {
+                    title: "Google Gemini",
+                    placeholder: "Ingrese su Clave API Gemini",
+                    help: "Obtenga su Clave API gratuita en Google AI Studio"
+                },
+                claude: {
+                    title: "Anthropic Claude",
+                    placeholder: "Ingrese su Clave API Claude",
+                    help: "Obtenga su Clave API en Anthropic Console"
+                },
+                openai: {
+                    title: "OpenAI ChatGPT",
+                    placeholder: "Ingrese su Clave API de OpenAI",
+                    help: "Obtenga su Clave API en OpenAI Platform"
+                },
+                max_exploration_steps: "Pasos Máximos de Exploración",
+                max_exploration_steps_help: "Número máximo de acciones autónomas que la IA realizará antes de detener la exploración."
             },
             system: {
                 title: "Versiones del Sistema",
@@ -956,6 +1138,11 @@ export const es = {
                 all_status: "Todos los Estados"
             },
             actions: {
+                analyze_history: "Analizar con IA",
+                analyzing: "Analizando historial...",
+                ai_analysis_title: "Análisis Inteligente de Historial",
+                ai_analysis_rationale_header: "Análisis Histórico Detallado",
+                ai_analysis_error: "Error al analizar el historial con IA",
                 refresh: "Actualizar Lista",
                 clear: "Limpiar",
                 delete: "Eliminar Log",

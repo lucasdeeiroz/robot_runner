@@ -23,7 +23,11 @@ const TOOLS = [
     { key: 'lucide', url: 'https://lucide.dev' }
 ];
 
-export function AboutPage() {
+interface AboutPageProps {
+    onNavigate?: (page: string) => void;
+}
+
+export function AboutPage({ onNavigate: _onNavigate }: AboutPageProps) {
     const { t } = useTranslation();
     const appVersion = packageJson.version;
     const { checkForAppUpdate, updateInfo } = useSettings();

@@ -6,6 +6,7 @@ mod ngrok;
 mod runner;
 mod system;
 mod xml_parser;
+mod ai_context;
 mod db;
 
 use tauri::Manager;
@@ -87,8 +88,10 @@ pub fn run() {
             files::list_directory,
             files::save_file,
             files::read_file,
+            files::read_file_tail,
             files::read_image_base64,
             files::save_image,
+            ai_context::get_ai_context,
             // Packages
             adb::packages::get_installed_packages,
             adb::packages::uninstall_package,
@@ -96,9 +99,16 @@ pub fn run() {
             adb::packages::disable_package,
             adb::packages::clear_package,
             adb::packages::install_package,
+            adb::packages::get_focused_package,
+            adb::packages::launch_package,
+            adb::packages::set_stay_on,
             runner::get_robot_test_cases,
             xml_parser::parse_robot_xml,
             xml_parser::get_node_children,
+            xml_parser::get_execution_failures,
+            xml_parser::save_node_ai_analysis,
+            xml_parser::get_node_ai_analysis,
+            logs::save_test_summary,
             system::toggle_wakelock
         ])
         .build(tauri::generate_context!())

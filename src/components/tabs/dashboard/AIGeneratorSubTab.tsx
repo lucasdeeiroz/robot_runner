@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     Wand2, Eraser, FileDown, FileText, Copy, Trash2,
-    BrainCircuit, AlertCircle, CheckCircle2
+    AlertCircle, CheckCircle2
 } from 'lucide-react';
 import { Button } from '@/components/atoms/Button';
 import { Textarea } from '@/components/atoms/Textarea';
@@ -11,10 +11,15 @@ import { Select } from '@/components/atoms/Select';
 import { Switch } from '@headlessui/react';
 import { useSettings } from '@/lib/settings';
 import { feedback } from '@/lib/feedback';
-import { generateRefinedTestCases, AIGenerationType } from '@/lib/dashboard/gemini';
-import { listScreenMaps } from '@/lib/dashboard/mapperPersistence';
+import { AiButton } from "@/components/atoms/AiButton";
+import { generateRefinedTestCases as generateWithGemini, AIGenerationType } from '@/lib/dashboard/gemini';
+import { generateRefinedTestCases as generateWithClaude } from '@/lib/dashboard/claude';
+import { generateRefinedTestCases as generateWithOpenAI } from '@/lib/dashboard/openai';
+import { getAiContext } from '@/lib/dashboard/historyAnalysisUtils';
 import { exportToXlsx, exportToDocx } from '@/lib/dashboard/export';
 import { addToHistory } from './HistoryPanel';
+import { save } from '@tauri-apps/plugin-dialog';
+import { writeTextFile } from '@tauri-apps/plugin-fs';
 import clsx from 'clsx';
 
 export function AIGeneratorSubTab() {
@@ -27,32 +32,41 @@ export function AIGeneratorSubTab() {
     const [useMapping, setUseMapping] = useState(true);
     const [isGenerating, setIsGenerating] = useState(false);
 
-    const hasApiKey = !!settings.geminiApiKey;
+    const provider = settings.aiProvider || 'gemini';
+    const apiKey = provider === 'gemini' ? settings.geminiApiKey : provider === 'claude' ? settings.claudeApiKey : settings.openaiApiKey;
+    const model = provider === 'gemini' ? settings.geminiModel : provider === 'claude' ? settings.claudeModel : settings.openaiModel;
+    const hasApiKey = !!apiKey;
 
-    const handleGenerate = async () => {
+    const handleGenerate = async (customPrompt?: string) => {
         if (!requirements.trim() || !hasApiKey) return;
 
         setIsGenerating(true);
         try {
-            let maps = undefined;
+            let mapsContext: string | undefined = undefined;
             if (useMapping) {
-                maps = await listScreenMaps(activeProfileId);
+                const contextResponse = await getAiContext('artifact_generation', {
+                    profile_id: activeProfileId || undefined
+                });
+                mapsContext = contextResponse.context;
             }
 
-            const aiResponse = await generateRefinedTestCases(
-                requirements,
-                settings.geminiApiKey as string,
-                settings.geminiModel,
-                i18n.language,
-                maps,
-                genType
-            );
+            let aiResponse = "";
+            const currentLang = i18n.language === 'pt' ? 'Portuguese' : i18n.language === 'es' ? 'Spanish' : 'English';
+
+            if (provider === 'gemini') {
+                aiResponse = await generateWithGemini(requirements, apiKey as string, model, currentLang, mapsContext as any, genType, undefined, customPrompt);
+            } else if (provider === 'claude') {
+                aiResponse = await generateWithClaude(requirements, apiKey as string, model, currentLang, mapsContext as any, genType, undefined, customPrompt);
+            } else if (provider === 'openai') {
+                aiResponse = await generateWithOpenAI(requirements, apiKey as string, model, currentLang, mapsContext as any, genType, undefined, customPrompt);
+            }
 
             setGeneratedContent(aiResponse);
-            feedback.toast.success(t('dashboard.generator.success', { method: "Gemini AI" }));
+            feedback.toast.success(t('dashboard.generator.success', { method: `${provider.charAt(0).toUpperCase() + provider.slice(1)} AI` }));
         } catch (e: any) {
             console.error("AI generation failed:", e);
-            feedback.toast.error("dashboard.actions.gemini_failed", { error: e.message });
+            const errorMessage = e?.message || (typeof e === 'string' ? e : JSON.stringify(e)) || "Unknown Error";
+            feedback.toast.error(t("dashboard.actions.ai_failed", { error: errorMessage }));
         } finally {
             setIsGenerating(false);
         }
@@ -93,8 +107,31 @@ export function AIGeneratorSubTab() {
         }
     };
 
+    const handleExportRobot = async () => {
+        if (!generatedContent.trim()) return;
+
+        try {
+            const filePath = await save({
+                filters: [{
+                    name: 'Robot Framework Script',
+                    extensions: ['robot']
+                }],
+                defaultPath: `script_${new Date().getTime()}.robot`
+            });
+
+            if (filePath) {
+                await writeTextFile(filePath, generatedContent);
+                feedback.toast.success(t('dashboard.export.success', "Successfully exported!"));
+            }
+        } catch (e) {
+            console.error("Native export failed:", e);
+            feedback.toast.error("dashboard.export.error", e);
+        }
+    };
+
     const typeOptions = [
         { value: 'test_case', label: t('dashboard.generator.types.test_case', "Test Cases (BDD)") },
+        { value: 'robot_script', label: t('dashboard.generator.types.robot_script', "Robot Framework Script") },
         { value: 'pbi', label: t('dashboard.generator.types.pbi', "Product Backlog Item (PBI)") },
         { value: 'improvement', label: t('dashboard.generator.types.improvement', "Functional Improvement") },
         { value: 'bug', label: t('dashboard.generator.types.bug', "Bug Report") },
@@ -169,18 +206,18 @@ export function AIGeneratorSubTab() {
                         {!hasApiKey ? (
                             <div className="flex items-center gap-2 p-3 bg-error/10 border border-error/20 rounded-xl text-error text-xs">
                                 <AlertCircle size={14} />
-                                <span>{t('dashboard.generator.key_required', "Gemini API Key required in Settings.")}</span>
+                                <span>{t('dashboard.generator.key_required', { provider: provider.charAt(0).toUpperCase() + provider.slice(1) })}</span>
                             </div>
                         ) : (
-                            <Button
-                                variant="primary"
-                                onClick={handleGenerate}
+                            <AiButton
+                                onClick={(_e, customPrompt) => handleGenerate(customPrompt)}
+                                isLoading={isGenerating}
                                 disabled={!requirements.trim() || isGenerating}
-                                leftIcon={isGenerating ? undefined : <BrainCircuit size={16} />}
-                                className="w-full justify-center shadow-lg shadow-primary/20 h-11 text-base font-semibold hover:bg-secondary-container"
-                            >
-                                {isGenerating ? t('dashboard.generator.generating', "Generating...") : t('dashboard.generator.generate_button', "Generate with AI")}
-                            </Button>
+                                label={t('dashboard.generator.generate_button', "Generate with AI")}
+                                showTextAlways
+                                allowCustomPrompt={false}
+                                className="w-full justify-center h-11 text-base shadow-none border-none bg-transparent hover:bg-transparent"
+                            />
                         )}
                     </div>
                 </div>
@@ -229,7 +266,7 @@ export function AIGeneratorSubTab() {
                     <Button
                         variant="outline"
                         onClick={handleExportXlsx}
-                        disabled={!generatedContent}
+                        disabled={!generatedContent || genType === 'robot_script'}
                         leftIcon={<FileDown size={16} className="text-green-600" />}
                         className="justify-center h-10"
                     >
@@ -238,12 +275,23 @@ export function AIGeneratorSubTab() {
                     <Button
                         variant="outline"
                         onClick={handleExportDocx}
-                        disabled={!generatedContent}
+                        disabled={!generatedContent || genType === 'robot_script'}
                         leftIcon={<FileText size={16} className="text-blue-600" />}
                         className="justify-center h-10"
                     >
                         {t('dashboard.actions.export_docx', "Word (.docx)")}
                     </Button>
+                    {genType === 'robot_script' && (
+                        <Button
+                            variant="primary"
+                            onClick={handleExportRobot}
+                            disabled={!generatedContent}
+                            leftIcon={<FileText size={16} />}
+                            className="justify-center h-10 lg:col-span-1 md:col-span-2"
+                        >
+                            {t('dashboard.actions.export_robot', "Robot Script (.robot)")}
+                        </Button>
+                    )}
                 </div>
             </div>
         </div>

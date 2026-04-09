@@ -17,6 +17,8 @@ import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 import { decodeHtml } from '@/lib/utils';
 import { HistoryDetailModal } from '@/components/organisms/HistoryDetailModal';
 import { getCachedHistory, setCachedHistory, TestLog } from '@/lib/historyCache';
+import HistoryAIAnalysisModal from '@/components/organisms/HistoryAIAnalysisModal';
+import { AiButton } from "@/components/atoms/AiButton";
 
 const formatDate = (dateStr: string) => {
     try {
@@ -42,12 +44,12 @@ export function HistorySubTab() {
     const [filterText, setFilterText] = useState("");
     const [filterPeriod, setFilterPeriod] = useState("all_time");
     const [groupBy, setGroupBy] = useState("none");
-    
+
     // Novas variáveis de filtro
     const [filterDevice, setFilterDevice] = useState("all");
     const [filterOS, setFilterOS] = useState("all");
     const [filterStatus, setFilterStatus] = useState("all");
-    
+
     const [countMethod, setCountMethod] = useState<'suites' | 'tests'>('suites');
 
     const [showCharts, setShowCharts] = useState(false);
@@ -56,9 +58,14 @@ export function HistorySubTab() {
     const [selectedLog, setSelectedLog] = useState<TestLog | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
+    // AI Analysis State
+    const [isAIModalOpen, setIsAIModalOpen] = useState(false);
+    const [isAnalyzingHistory] = useState(false);
+
     const parentRef = useRef<HTMLDivElement>(null);
     const historyContainerRef = useRef<HTMLDivElement>(null);
     const [isHistoryNarrow, setIsHistoryNarrow] = useState(false);
+    const abortControllerRef = useRef<AbortController | null>(null);
     const isFirstRun = useRef(true);
 
     useEffect(() => {
@@ -73,12 +80,10 @@ export function HistorySubTab() {
     }, []);
 
     useEffect(() => {
-        // Always load on mount if it's the first render of this instance
-        // But the cache provides immediate content
         const timer = setTimeout(() => {
             loadHistory();
             isFirstRun.current = false;
-        }, 150); // Reduced delay for smoother feel
+        }, 150);
         return () => clearTimeout(timer);
     }, [settings.paths.logs]);
 
@@ -96,6 +101,19 @@ export function HistorySubTab() {
         } finally {
             setLoadingHistory(false);
         }
+    };
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+        };
+    }, []);
+
+    const handleAIAnalysis = () => {
+        setIsAIModalOpen(true);
     };
 
     const isDateInPeriod = (dateStr: string, period: string) => {
@@ -132,7 +150,7 @@ export function HistorySubTab() {
             const decodedName = decodeHtml(log.suite_name);
             const matchesText = decodedName.toLowerCase().includes(filterText.toLowerCase());
             const matchesPeriod = isDateInPeriod(log.timestamp, filterPeriod);
-            
+
             const matchesDevice = filterDevice === "all" || log.device_model === filterDevice;
             const matchesOS = filterOS === "all" || log.android_version === filterOS;
             const matchesStatus = filterStatus === "all" || log.status === filterStatus;
@@ -184,8 +202,17 @@ export function HistorySubTab() {
         setIsModalOpen(true);
     };
 
+    const updateLog = (updatedLog: TestLog) => {
+        setHistory(prev => prev.map(log =>
+            log.xml_path === updatedLog.xml_path ? { ...log, ...updatedLog } : log
+        ));
+        if (selectedLog?.xml_path === updatedLog.xml_path) {
+            setSelectedLog({ ...selectedLog, ...updatedLog });
+        }
+    };
+
     // Flatten the grouped history for virtualization
-    type VirtualItem = 
+    type VirtualItem =
         | { type: 'header'; id: string; groupName: string; count: number }
         | { type: 'log'; id: string; log: TestLog; groupName: string };
 
@@ -223,16 +250,27 @@ export function HistorySubTab() {
                 variant="transparent"
                 className="p-0 pb-4 mb-4"
                 status={
-                    <Button
-                        onClick={() => loadHistory(true)}
-                        variant="ghost"
-                        size="sm"
-                        className="p-1.5 text-on-surface-variant/80 hover:bg-surface-variant/30 rounded-2xl transition-colors h-auto"
-                        title={t('tests_page.actions.refresh')}
-                    >
-                        {loadingHistory ? <ExpressiveLoading size="xsm" variant="circular" /> : <RefreshCw size={16} />}
-                    </Button>
-                }                menus={!isHistoryNarrow ? (
+                    <div className="flex items-center gap-2">
+                        <AiButton
+                            onClick={handleAIAnalysis}
+                            isLoading={isAnalyzingHistory}
+                            disabled={filteredHistory.length === 0 || isAnalyzingHistory}
+                            label={t('tests_page.actions.analyze_history')}
+                            variant="primary"
+                            className="shadow-lg shadow-primary/10 ml-2 h-8"
+                            allowCustomPrompt={false}
+                        />
+                        <Button
+                            onClick={() => loadHistory(true)}
+                            variant="ghost"
+                            size="sm"
+                            className="p-1.5 text-on-surface-variant/80 hover:bg-surface-variant/30 rounded-2xl transition-colors h-auto"
+                            title={t('tests_page.actions.refresh')}
+                        >
+                            {loadingHistory ? <ExpressiveLoading size="xsm" variant="circular" /> : <RefreshCw size={16} />}
+                        </Button>
+                    </div>
+                } menus={!isHistoryNarrow ? (
                     <div className="flex-1 min-w-[200px] max-w-sm">
                         <Input
                             placeholder={t('tests_page.filter.search')}
@@ -245,20 +283,22 @@ export function HistorySubTab() {
                 ) : null
                 }
                 actions={
-                    <Button
-                        onClick={() => setShowCharts(!showCharts)}
-                        variant="ghost"
-                        size="sm"
-                        className={clsx(
-                            "px-3 py-1.5 rounded-2xl flex items-center gap-2 text-sm font-medium transition-colors h-auto",
-                            showCharts 
-                                ? "bg-primary/20 text-primary hover:bg-primary/30" 
-                                : "text-on-surface-variant hover:bg-surface-variant/30"
-                        )}
-                    >
-                        <PieChart size={16} />
-                        {!isHistoryNarrow && (showCharts ? t('tests_page.charts.hide') : t('tests_page.charts.show'))}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            onClick={() => setShowCharts(!showCharts)}
+                            variant="ghost"
+                            size="sm"
+                            className={clsx(
+                                "px-3 py-1.5 rounded-2xl flex items-center gap-2 text-sm font-medium transition-colors h-auto",
+                                showCharts
+                                    ? "bg-primary/20 text-primary hover:bg-primary/30"
+                                    : "text-on-surface-variant hover:bg-surface-variant/30"
+                            )}
+                        >
+                            <PieChart size={16} />
+                            {!isHistoryNarrow && (showCharts ? t('tests_page.charts.hide') : t('tests_page.charts.show'))}
+                        </Button>
+                    </div>
                 }
             />
 
@@ -290,7 +330,7 @@ export function HistorySubTab() {
                             className="bg-surface/50 py-1.5 text-sm"
                             containerClassName="w-auto min-w-[150px]"
                         />
-                        <Select 
+                        <Select
                             value={filterStatus}
                             onChange={(e) => setFilterStatus(e.target.value)}
                             options={[
@@ -300,7 +340,7 @@ export function HistorySubTab() {
                             className="bg-surface/50 py-1.5 text-sm"
                             containerClassName="w-auto min-w-[120px]"
                         />
-                        <Select 
+                        <Select
                             value={filterDevice}
                             onChange={(e) => setFilterDevice(e.target.value)}
                             options={[
@@ -310,7 +350,7 @@ export function HistorySubTab() {
                             className="bg-surface/50 py-1.5 text-sm"
                             containerClassName="w-auto min-w-[150px]"
                         />
-                        <Select 
+                        <Select
                             value={filterOS}
                             onChange={(e) => setFilterOS(e.target.value)}
                             options={[
@@ -320,8 +360,10 @@ export function HistorySubTab() {
                             className="bg-surface/50 py-1.5 text-sm"
                             containerClassName="w-auto min-w-[120px]"
                         />
+
+
                     </div>
-                    
+
                     {showCharts && (
                         <div className="flex items-center bg-surface/50 border border-outline-variant/30 rounded-lg p-1">
                             <button
@@ -381,7 +423,7 @@ export function HistorySubTab() {
                     >
                         {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                             const item = flatItems[virtualRow.index];
-                            
+
                             return (
                                 <div
                                     key={item.id}
@@ -410,7 +452,7 @@ export function HistorySubTab() {
                                             </span>
                                         </Button>
                                     ) : (
-                                        <div 
+                                        <div
                                             onClick={() => handleLogClick(item.log)}
                                             role="button"
                                             tabIndex={0}
@@ -442,8 +484,8 @@ export function HistorySubTab() {
                                                         <div className="flex items-center gap-1">
                                                             <Calendar size={12} /> {formatDate(item.log.timestamp)}
                                                         </div>
-                                                         <div className="flex items-center gap-1 bg-surface-variant/30 px-1.5 py-0.5 rounded text-[10px] font-medium border border-outline-variant/10">
-                                                            <Clock size={10} className="shrink-0" /> 
+                                                        <div className="flex items-center gap-1 bg-surface-variant/30 px-1.5 py-0.5 rounded text-[10px] font-medium border border-outline-variant/10">
+                                                            <Clock size={10} className="shrink-0" />
                                                             <span>{item.log.duration}</span>
                                                             <span className="mx-1 opacity-20 h-2 w-[1px] bg-current" />
                                                             <span className="text-success">{item.log.pass_count}P</span>
@@ -482,10 +524,18 @@ export function HistorySubTab() {
                 </div>
             </div>
 
-            <HistoryDetailModal 
-                isOpen={isModalOpen} 
-                onClose={() => setIsModalOpen(false)} 
-                log={selectedLog} 
+            <HistoryDetailModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                log={selectedLog}
+                onUpdateLog={updateLog}
+            />
+
+            <HistoryAIAnalysisModal
+                isOpen={isAIModalOpen}
+                onClose={() => setIsAIModalOpen(false)}
+                historyData={filteredHistory}
+                logsPath={settings.paths.logs || 'default'}
             />
         </div>
     );

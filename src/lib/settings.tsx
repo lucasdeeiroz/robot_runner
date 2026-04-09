@@ -31,6 +31,7 @@ export interface AppSettings {
     customLogoDark?: string;
     recycleDeviceViews: boolean; // New setting
     allowActionsDuringTest: boolean; // Control whether actions are allowed during test
+    saveLogs: boolean; // Persist log saving preference
     usageMode?: 'explorer' | 'automator';
     automationFramework?: 'robot' | 'appium' | 'maestro';
 
@@ -63,18 +64,31 @@ export interface AppSettings {
     };
 
     // AI
+    aiProvider: 'gemini' | 'claude' | 'openai';
     geminiApiKey?: string;
     geminiModel: string;
+    claudeApiKey?: string;
+    claudeModel: string;
+    openaiApiKey?: string;
+    openaiModel: string;
+    maxExplorationSteps?: number;
+    presentationEnabled: boolean;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
     theme: 'dark',
     language: 'en_US',
     primaryColor: 'blue',
+    aiProvider: 'gemini',
     geminiApiKey: '',
     geminiModel: 'gemini-1.5-flash',
+    claudeApiKey: '',
+    claudeModel: 'claude-3-5-sonnet-20240620',
+    openaiApiKey: '',
+    openaiModel: 'gpt-4o',
     recycleDeviceViews: false, // Default to false
     allowActionsDuringTest: false, // Default to false (blocking)
+    saveLogs: false, // Default to false
     appiumHost: '127.0.0.1',
     appiumPort: 4723,
     appiumBasePath: '/',
@@ -96,7 +110,9 @@ const DEFAULT_SETTINGS: AppSettings = {
         appiumJavaArgs: 'test',
         appPackage: 'com.android.chrome, com.chrome.beta',
         ngrokToken: ''
-    }
+    },
+    maxExplorationSteps: 30,
+    presentationEnabled: false
 };
 
 export interface Profile {

@@ -1,24 +1,7 @@
-
-interface GeminiResponse {
-    candidates: {
-        content: {
-            parts: {
-                text: string;
-            }[];
-        };
-        finishReason?: string;
-        safetyRatings?: any[];
-    }[];
-    error?: {
-        message: string;
-    };
-}
-
 import { ScreenMap, UIElementMap } from '@/lib/types';
+import { AIGenerationType } from './gemini';
 import { DeepAnalysisContext } from "./historyAnalysisUtils";
 import { getExplorationPrompt, formatExistingMaps, getRefinedTestCasesPrompt, getRefinedPBIPrompt, getRefinedImprovementPrompt, getRefinedBugPrompt, getRefinedRobotScriptPrompt, getFlowchartLayoutPrompt, getElementNamingPrompt, getScreenTaggingPrompt, getTestHistoryAnalysisPrompt, getExecutionSummaryPrompt, getQAAssistantWrapper } from "./prompts";
-
-export type AIGenerationType = 'test_case' | 'pbi' | 'improvement' | 'bug' | 'element_name' | 'robot_script' | 'exploration';
 
 function extractBase64Data(imageBase64: string): { mimeType: string, data: string } {
     const trimmed = imageBase64.trim();
@@ -41,7 +24,7 @@ export async function generateRefinedTestCases(
     customPrompt?: string
 ): Promise<string> {
     if (!apiKey) {
-        throw new Error("Missing Gemini API Key");
+        throw new Error("Missing Claude API Key");
     }
 
     let mappingContext = "";
@@ -68,27 +51,25 @@ export async function generateRefinedTestCases(
 
     const systemInstruction = getQAAssistantWrapper(promptString, !!appMapping, mappingContext, customPrompt);
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const url = "https://api.anthropic.com/v1/messages";
 
     try {
         const response = await fetch(url, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01'
             },
             signal,
             body: JSON.stringify({
-                contents: [{
-                    role: 'user',
-                    parts: [{ text: requirements }]
-                }],
-                system_instruction: {
-                    parts: [{ text: systemInstruction }]
-                },
-                generationConfig: {
-                    temperature: 0.4,
-                    maxOutputTokens: 8192,
-                }
+                model: model,
+                max_tokens: 4096,
+                system: systemInstruction,
+                messages: [
+                    { role: 'user', content: requirements }
+                ],
+                temperature: 0.4
             })
         });
 
@@ -98,62 +79,67 @@ export async function generateRefinedTestCases(
             throw (new Error(errMsg || `API Error: ${response.statusText}`));
         }
 
-        const data: GeminiResponse = await response.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        const data = await response.json();
+        const text = data.content?.[0]?.text;
 
         if (!text) {
-            throw new Error("Empty response from Gemini");
+            throw new Error("Empty response from Claude");
         }
 
         return text.trim();
 
     } catch (error: any) {
-        console.error("Gemini API Error:", error);
+        console.error("Claude API Error:", error);
         throw error;
     }
 }
 
 /**
- * Generic AI query for Gemini with multi-modal (image) support.
+ * Generic AI query for Claude with multi-modal (image) support.
  */
-export async function askGemini(
+export async function askClaude(
     prompt: string,
     apiKey: string,
     model: string,
     systemInstruction?: string,
-    imageBase64?: string, // Data URL format
+    imageBase64?: string,
     signal?: AbortSignal
 ): Promise<string> {
-    if (!apiKey) throw new Error("Missing Gemini API Key");
+    if (!apiKey) throw new Error("Missing Claude API Key");
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const url = "https://api.anthropic.com/v1/messages";
 
-    const parts: any[] = [{ text: prompt }];
+    const content: any[] = [];
 
     if (imageBase64) {
         const { mimeType, data } = extractBase64Data(imageBase64);
-        parts.push({
-            inline_data: {
-                mime_type: mimeType,
-                data: data
+        content.push({
+            type: "image",
+            source: {
+                type: "base64",
+                media_type: mimeType,
+                data
             }
         });
     }
 
+    content.push({ type: "text", text: prompt });
+
     try {
         const response = await fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01'
+            },
             signal,
             body: JSON.stringify({
-                contents: [{ role: 'user', parts }],
-                system_instruction: systemInstruction ? {
-                    parts: [{ text: systemInstruction }]
-                } : undefined,
-                generationConfig: {
-                    temperature: 0.4,
-                    maxOutputTokens: 2048,
-                }
+                model,
+                max_tokens: 4096,
+                system: systemInstruction,
+                messages: [{ role: 'user', content }],
+                temperature: 0.4
             })
         });
 
@@ -163,34 +149,48 @@ export async function askGemini(
             throw (new Error(errMsg || `API Error: ${response.statusText}`));
         }
 
-        const data: GeminiResponse = await response.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!text) throw new Error("Empty response from Gemini");
+        const data = await response.json();
+        const text = data.content?.[0]?.text;
+        if (!text) throw new Error("Empty response from Claude");
 
         return text.trim();
     } catch (error: any) {
-        console.error("Gemini API Error (askGemini):", error);
+        console.error("Claude API Error (askClaude):", error, content);
         throw error;
     }
 }
 
 export async function getAvailableModels(apiKey: string): Promise<string[]> {
-    if (!apiKey) return [];
+    const fallbackModels = [
+        "claude-opus-4-6",
+        "claude-sonnet-4-6",
+        "claude-haiku-4-5-20251001"
+    ];
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+    if (!apiKey) return fallbackModels;
 
     try {
-        const response = await fetch(url);
+        const response = await fetch("https://api.anthropic.com/v1/models", {
+            method: 'GET',
+            headers: {
+                'anthropic-version': '2023-06-01',
+                'X-Api-Key': apiKey
+            }
+        });
+
         if (!response.ok) {
-            throw new Error(`Failed to list models: ${response.statusText}`);
+            console.warn("Failed to fetch Anthropic models, using fallback.", response.statusText);
+            return fallbackModels;
         }
+
         const data = await response.json();
-        return data.models
-            .map((m: any) => m.name.replace('models/', ''))
-            .filter((name: string) => name.includes('gemini'));
-    } catch (e) {
-        console.error("Failed to fetch Gemini models:", e);
-        throw e;
+        if (data && Array.isArray(data.data)) {
+            return data.data.map((m: any) => m.id).sort();
+        }
+        return fallbackModels;
+    } catch (error) {
+        console.error("Error fetching Anthropic models:", error);
+        return fallbackModels;
     }
 }
 
@@ -204,7 +204,7 @@ export async function suggestElementName(
     signal?: AbortSignal,
     customPrompt?: string
 ): Promise<{ name: string; justification: string }> {
-    if (!apiKey) throw new Error("Missing Gemini API Key");
+    if (!apiKey) throw new Error("Missing Claude API Key");
 
     let mappingContext = "";
     if (typeof appMapping === 'string') {
@@ -220,95 +220,99 @@ export async function suggestElementName(
     }
 
     const prompt = getElementNamingPrompt(screenName, elementAttr, language, mappingContext, customPrompt);
-
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const url = "https://api.anthropic.com/v1/messages";
 
     const body = {
-        contents: [{
-            parts: [{ text: prompt }]
-        }],
-        generationConfig: {
-            temperature: 0.1,
-            topK: 1,
-            topP: 1,
-            maxOutputTokens: 1024,
-        }
+        model,
+        max_tokens: 1024,
+        system: "You are a professional QA automation naming assistant. Respond with a valid JSON object containing 'name' and 'justification'.",
+        messages: [
+            { role: 'user', content: prompt }
+        ],
+        temperature: 0.1
     };
 
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal,
-        body: JSON.stringify(body)
-    });
-
-    const data: GeminiResponse = await response.json();
-
-    if (data.error) {
-        throw new Error(data.error.message);
-    }
-
-    const candidate = data.candidates?.[0];
-    const content = candidate?.content?.parts?.[0]?.text;
-    
-    // DEBUG: Always log context about the completion
-    console.log("[Gemini Status] Finish Reason:", candidate?.finishReason || "UNKNOWN");
-    console.log("[Gemini Raw Content]:", content);
-
-    if (!content) {
-        if (candidate?.finishReason === "SAFETY") {
-             throw new Error("AI response blocked by safety filters. Try a different element.");
-        }
-        throw new Error("Empty AI response");
-    }
-
     try {
-        const firstBrace = content.indexOf('{');
-        const lastBrace = content.lastIndexOf('}');
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01',
+                'dangerously-allow-browser': 'true'
+            },
+            signal,
+            body: JSON.stringify(body)
+        });
 
-        if (firstBrace === -1) {
-            throw new Error("No JSON object start found");
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            const errMsg = errData.error?.message || JSON.stringify(errData);
+            throw new Error(errMsg || `API Error: ${response.statusText}`);
         }
 
-        let jsonString = "";
-        let parsed: any = null;
+        const data = await response.json();
+        const content = data.content?.[0]?.text;
+        
+        // DEBUG: Log status and content
+        console.log("[Claude Status] Stop Reason:", data.stop_reason || "UNKNOWN");
+        console.log("[Claude Raw Content]:", content);
 
-        // Attempt normal parsing if we have a closing brace
-        if (lastBrace !== -1 && lastBrace > firstBrace) {
-            jsonString = content.substring(firstBrace, lastBrace + 1);
-            try {
-                parsed = JSON.parse(jsonString);
-            } catch (e) {
-                console.warn("[Gemini] Normal parse failed, falling back to fuzzy extraction.");
+        if (!content) {
+            throw new Error("Empty AI response");
+        }
+
+        try {
+            const firstBrace = content.indexOf('{');
+            const lastBrace = content.lastIndexOf('}');
+
+            if (firstBrace === -1) {
+                throw new Error("No JSON object start found");
             }
-        }
 
-        // FUZZY EXTRACTION: If normal parse failed or was skipped due to truncation
-        if (!parsed) {
-            const nameMatch = content.match(/"name"\s*:\s*"([^"]+)"?/);
-            const justificationMatch = content.match(/"justification"\s*:\s*"([^"]+)"?/);
-            
-            if (nameMatch) {
-                parsed = {
-                    name: nameMatch[1],
-                    justification: justificationMatch ? justificationMatch[1] : ""
-                };
-                console.log("[Gemini] Fuzzy extraction successful:", parsed);
+            let jsonString = "";
+            let parsed: any = null;
+
+            // Attempt normal parsing if we have a closing brace
+            if (lastBrace !== -1 && lastBrace > firstBrace) {
+                jsonString = content.substring(firstBrace, lastBrace + 1);
+                try {
+                    parsed = JSON.parse(jsonString);
+                } catch (e) {
+                    console.warn("[Claude] Normal parse failed, falling back to fuzzy extraction.");
+                }
             }
-        }
 
-        if (!parsed || !parsed.name) {
-            console.error("[Gemini Error] Could not extract name from response:", content);
-            throw new Error("Invalid AI response format: No JSON object found");
-        }
+            // FUZZY EXTRACTION: If normal parse failed or was skipped due to truncation
+            if (!parsed) {
+                const nameMatch = content.match(/"name"\s*:\s*"([^"]+)"?/);
+                const justificationMatch = content.match(/"justification"\s*:\s*"([^"]+)"?/);
+                
+                if (nameMatch) {
+                    parsed = {
+                        name: nameMatch[1],
+                        justification: justificationMatch ? justificationMatch[1] : ""
+                    };
+                    console.log("[Claude] Fuzzy extraction successful:", parsed);
+                }
+            }
 
-        return {
-            name: parsed.name.replace(/["']/g, '') || "Unknown Element",
-            justification: parsed.justification || ""
-        };
+            if (!parsed || !parsed.name) {
+                console.error("[Claude Error] Could not extract name from response:", content);
+                throw new Error("Invalid AI response format: No JSON object found");
+            }
+
+            return {
+                name: parsed.name.replace(/["']/g, '') || "Unknown Element",
+                justification: parsed.justification || ""
+            };
+        } catch (e: any) {
+            console.error("[Claude Catch] Failed to process AI response:", content, e);
+            throw new Error(e.message || "Invalid AI response format");
+        }
     } catch (e: any) {
-        console.error("[Gemini Catch] Failed to process AI response:", content, e);
-        throw new Error(e.message || "Invalid AI response format");
+        console.error("Claude suggestElementName failure:", e);
+        throw e;
     }
 }
 
@@ -325,7 +329,7 @@ export async function suggestScreenTags(
     signal?: AbortSignal,
     customPrompt?: string
 ): Promise<string[]> {
-    if (!apiKey) throw new Error("Missing Gemini API Key");
+    if (!apiKey) throw new Error("Missing Claude API Key");
 
     const systemInstruction = getScreenTaggingPrompt(language, customPrompt);
 
@@ -336,10 +340,10 @@ ${elements.map(el => `- Name: "${el.name}" (Type: ${el.type})`).join('\n')}
 `.trim();
 
     try {
-        const result = await askGemini(prompt, apiKey, model, systemInstruction, imageBase64, signal);
+        const result = await askClaude(prompt, apiKey, model, systemInstruction, imageBase64, signal);
         return result.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
     } catch (e) {
-        console.error("Gemini suggestScreenTags failure:", e);
+        console.error("Claude suggestScreenTags failure:", e);
         throw e;
     }
 }
@@ -388,9 +392,9 @@ export async function analyzeTestHistory(
     const prompt = `History Data (JSON):\n${JSON.stringify(historySummary)}${deepContextStr}`;
 
     try {
-        return await askGemini(prompt, apiKey, model, systemInstruction, undefined, signal);
+        return await askClaude(prompt, apiKey, model, systemInstruction, undefined, signal);
     } catch (e) {
-        console.error("Gemini analyzeTestHistory failure:", e);
+        console.error("Claude analyzeTestHistory failure:", e);
         throw e;
     }
 }
@@ -492,9 +496,9 @@ export async function summarizeExecution(
     const prompt = `Execution Tree Structure:\n${JSON.stringify(simplify(tree))}${overallStats}${failureContextStr}`;
 
     try {
-        return await askGemini(prompt, apiKey, model, systemInstruction, undefined, signal);
+        return await askClaude(prompt, apiKey, model, systemInstruction, undefined, signal);
     } catch (e) {
-        console.error("Gemini summarizeExecution failure:", e);
+        console.error("Claude summarizeExecution failure:", e);
         throw e;
     }
 }
@@ -518,7 +522,7 @@ export async function exploreScreen(
     nextAction: { type: 'click' | 'back' | 'swipe' | 'finish' | 'type_text'; targetId?: string; direction?: 'up' | 'down' | 'left' | 'right'; text?: string; details?: string };
     rationale: string;
 }> {
-    if (!apiKey) throw new Error("Missing Gemini API Key");
+    if (!apiKey) throw new Error("Missing Claude API Key");
 
     const systemInstruction = getExplorationPrompt(language, customPrompt);
 
@@ -546,77 +550,42 @@ XML DUMP:
 ${xmlDump.substring(0, 15000)}
 `.trim();
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
+    const url = "https://api.anthropic.com/v1/messages";
     const { mimeType, data } = extractBase64Data(screenshotBase64);
-
-    const body = {
-        contents: [{
-            parts: [
-                { text: prompt },
-                { inline_data: { mime_type: mimeType, data: data } }
-            ]
-        }],
-        system_instruction: {
-            parts: [{ text: systemInstruction }]
-        },
-        generationConfig: {
-            temperature: 0.1,
-            responseMimeType: "application/json"
-        }
-    };
-
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal,
-        body: JSON.stringify(body)
-    });
-
-    const dataRes: GeminiResponse = await response.json();
-    if (dataRes.error) throw new Error(dataRes.error.message);
-
-    const content = dataRes.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!content) throw new Error("Empty AI response");
-
-    return JSON.parse(content);
-}
-
-/**
- * AI-powered flowchart reorganization.
- */
-export async function reorganizeFlowchartLayout(
-    maps: ScreenMap[] | string,
-    apiKey: string,
-    model: string,
-    language: string,
-    signal?: AbortSignal,
-    customPrompt?: string
-): Promise<Record<string, { gridX: number; gridY: number }>> {
-    if (!apiKey) throw new Error("Missing Gemini API Key");
-
-    const systemInstruction = getFlowchartLayoutPrompt(language, customPrompt);
-    const mappingContext = typeof maps === 'string' ? maps : formatExistingMaps(maps);
-
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     try {
         const response = await fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01'
+            },
             signal,
             body: JSON.stringify({
-                contents: [{
-                    role: 'user',
-                    parts: [{ text: `Current Application Mapping:\n${mappingContext}` }]
-                }],
-                system_instruction: {
-                    parts: [{ text: systemInstruction }]
-                },
-                generationConfig: {
-                    temperature: 0.1,
-                    response_mime_type: "application/json"
-                }
+                model,
+                max_tokens: 4096,
+                system: systemInstruction,
+                messages: [
+                    {
+                        role: 'user',
+                        content: [
+                            {
+                                type: "image",
+                                source: {
+                                    type: "base64",
+                                    media_type: mimeType,
+                                    data
+                                }
+                            },
+                            {
+                                type: "text",
+                                text: prompt
+                            }
+                        ]
+                    }
+                ],
+                temperature: 0.1
             })
         });
 
@@ -626,12 +595,66 @@ export async function reorganizeFlowchartLayout(
         }
 
         const resData = await response.json();
-        const resText = resData.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!resText) throw new Error("Empty response from Gemini");
+        const content = resData.content?.[0]?.text;
+        if (!content) throw new Error("Empty response from Claude");
 
-        return JSON.parse(resText);
+        return JSON.parse(content);
     } catch (error: any) {
-        console.error("Gemini reorganizeFlowchartLayout Error:", error);
+        console.error("Claude exploreScreen Error:", error);
+        throw error;
+    }
+}
+
+/**
+ * AI-powered flowchart reorganization using Claude.
+ */
+export async function reorganizeFlowchartLayout(
+    maps: ScreenMap[] | string,
+    apiKey: string,
+    model: string,
+    language: string,
+    signal?: AbortSignal,
+    customPrompt?: string
+): Promise<Record<string, { gridX: number; gridY: number }>> {
+    if (!apiKey) throw new Error("Missing Claude API Key");
+
+    const systemInstruction = getFlowchartLayoutPrompt(language, customPrompt);
+    const mappingContext = typeof maps === 'string' ? maps : formatExistingMaps(maps);
+
+    const url = "https://api.anthropic.com/v1/messages";
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01'
+            },
+            signal,
+            body: JSON.stringify({
+                model,
+                max_tokens: 4096,
+                system: systemInstruction,
+                messages: [
+                    { role: 'user', content: `Current Application Mapping:\n${mappingContext}` }
+                ],
+                temperature: 0.1
+            })
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.error?.message || `API Error: ${response.statusText}`);
+        }
+
+        const resData = await response.json();
+        const content = resData.content?.[0]?.text;
+        if (!content) throw new Error("Empty response from Claude");
+
+        return JSON.parse(content);
+    } catch (error: any) {
+        console.error("Claude reorganizeFlowchartLayout Error:", error);
         throw error;
     }
 }

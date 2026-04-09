@@ -38,12 +38,32 @@ export async function listScreenMaps(profileId: string): Promise<ScreenMap[]> {
 
         for (const entry of entries) {
             if (entry.isFile && entry.name.endsWith('.json') && entry.name !== 'flowchart_layout.json') {
+                const path = `${dir}/${entry.name}`;
                 try {
-                    const content = await readTextFile(`${dir}/${entry.name}`, { baseDir: BaseDirectory.AppLocalData });
-                    const map = JSON.parse(content) as ScreenMap;
-                    maps.push(map);
-                } catch (e) {
-                    console.warn(`Failed to parse map file: ${entry.name}`, e);
+                    const content = await readTextFile(path, { baseDir: BaseDirectory.AppLocalData });
+                    try {
+                        const map = JSON.parse(content) as ScreenMap;
+                        maps.push(map);
+                    } catch (parseError) {
+                        console.error(`CRITICAL: Failed to parse map file "${entry.name}". The JSON syntax is likely invalid.`, parseError);
+                        // Attempt a naive repair for unescaped quotes in XPath-like strings if it's a simple case
+                        // (This is a safety net for the reported issue)
+                        try {
+                            // This regex tries to find "id": "//...[@attr="val"]" and escape the inner quotes
+                            // It's very restricted to avoid breaking valid JSON.
+                            const repaired = content.replace(/"id":\s*"(\/\/.*?)\[(.*?)\]"/g, (_match, prefix, predicates) => {
+                                const escapedPredicates = predicates.replace(/"/g, '\\"');
+                                return `"id": "${prefix}[${escapedPredicates}]"`;
+                            });
+                            const map = JSON.parse(repaired) as ScreenMap;
+                            maps.push(map);
+                            console.info(`Successfully repaired and loaded "${entry.name}" in memory.`);
+                        } catch (repairError) {
+                            console.error(`Repair failed for "${entry.name}". Please fix the JSON manually.`, repairError);
+                        }
+                    }
+                } catch (readError) {
+                    console.error(`Failed to read file ${entry.name}`, readError);
                 }
             }
         }
@@ -86,19 +106,34 @@ export async function loadFlowchartLayout(profileId: string): Promise<FlowchartL
     }
 }
 
+export async function deleteFlowchartLayout(profileId: string): Promise<void> {
+    try {
+        const fileName = 'flowchart_layout.json';
+        const path = `${getMapsDir(profileId)}/${fileName}`;
+        const layoutExists = await exists(path, { baseDir: BaseDirectory.AppLocalData });
+        if (layoutExists) {
+            await remove(path, { baseDir: BaseDirectory.AppLocalData });
+        }
+    } catch (e) {
+        console.error("Failed to delete flowchart layout", e);
+    }
+}
+
 // --- Export / Import ---
 export interface MapperExportData {
     screens: ScreenMap[];
     layout: FlowchartLayout | null;
+    version?: string; // Add a version for future-proofing
 }
 
 export async function exportMapperData(profileId: string): Promise<string> {
     const screens = await listScreenMaps(profileId);
-    const layout = await loadFlowchartLayout(profileId);
+    const layout = await loadFlowchartLayout(profileId); // Still load it in case migration hasn't happened
 
     const data: MapperExportData = {
         screens,
-        layout
+        layout,
+        version: "2.0" // Decentralized version
     };
 
     return JSON.stringify(data, null, 2);
@@ -112,12 +147,14 @@ export async function importMapperData(profileId: string, jsonContent: string): 
             throw new Error("Invalid import data: 'screens' is not an array");
         }
 
-        // Save all screens
+        // 1. Save all screens
+        // Note: New screens already have 'layout' and 'navigation' (via navigates_to)
         for (const screen of data.screens) {
             await saveScreenMap(profileId, screen);
         }
 
-        // Save layout if present
+        // 2. Save legacy layout if present
+        // This allows older exports to be imported, where FlowchartModal will then trigger migration
         if (data.layout) {
             await saveFlowchartLayout(profileId, data.layout);
         }

@@ -23,6 +23,13 @@ export type UIElementType =
     | 'menu'
     | 'tab';
 
+export interface NavigationData {
+    destination: string; // Screen Name
+    sourceHandle?: string;
+    targetHandle?: string;
+    vertices?: { x: number; y: number }[];
+}
+
 export interface UIElementMap {
     id: string; // Unique ID (e.g., resource-id or xpath hash)
     name: string; // User-defined name
@@ -36,7 +43,7 @@ export interface UIElementMap {
     text?: string;
 
     // Navigation
-    navigates_to?: string; // Screen Name
+    navigates_to?: string | NavigationData | NavigationData[] | null;
 
     // Complex Types
     menu_options?: string[]; // For 'menu' type
@@ -51,6 +58,7 @@ export interface ScreenMap {
     tags?: string[];
     elements: UIElementMap[];
     base64_preview?: string; // Optional: Screenshot thumbnail
+    layout?: { gridX: number; gridY: number };
 }
 
 // --- Flowchart Layout ---
