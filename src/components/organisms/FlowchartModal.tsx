@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { ScreenMap, FlowchartLayout, LayoutNode, LayoutEdge, NavigationData } from '@/lib/types';
-import { X, ZoomIn, ZoomOut, Maximize, Pencil, Save, Upload, Download, Camera, Plus, AlertTriangle } from 'lucide-react';
+import { X, ZoomIn, ZoomOut, Maximize, Save, Upload, Download, Camera, Plus, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
 import { loadFlowchartLayout, deleteFlowchartLayout, exportMapperData, importMapperData, saveScreenMap } from '@/lib/dashboard/mapperPersistence';
@@ -17,7 +17,20 @@ import { useSettings } from '@/lib/settings';
 import { reorganizeFlowchartLayout as reorganizeWithGemini } from '@/lib/dashboard/gemini';
 import { reorganizeFlowchartLayout as reorganizeWithOpenAI } from '@/lib/dashboard/openai';
 import { reorganizeFlowchartLayout as reorganizeWithClaude } from '@/lib/dashboard/claude';
-import { AiButton } from '../atoms/AiButton';
+import { AiButton } from '@/components/atoms/AiButton';
+import {
+    CELL_WIDTH,
+    CELL_HEIGHT,
+    NODE_WIDTH,
+    NODE_HEIGHT,
+    NODE_OFFSET_X,
+    NODE_OFFSET_Y,
+    LANE_SIZE,
+    NODE_PORTS
+} from './flowchart/types';
+import { FlowNode } from './flowchart/FlowNode';
+import { FlowEdgeLine, FlowEdgeControls } from './flowchart/FlowEdge';
+import { FlowPort } from './flowchart/FlowPort';
 
 interface FlowchartModalProps {
     isOpen: boolean;
@@ -29,63 +42,9 @@ interface FlowchartModalProps {
 }
 
 
-const CELL_WIDTH = 300;
-const CELL_HEIGHT = 400;
-const NODE_WIDTH = 220;
-const NODE_HEIGHT = 280;
-const LANE_SIZE = 20;
+// Grid and Node constants are now imported from ./flowchart/types
 
-// Grid offsets to center node in cell
-const NODE_OFFSET_X = (CELL_WIDTH - NODE_WIDTH) / 2;
-const NODE_OFFSET_Y = (CELL_HEIGHT - NODE_HEIGHT) / 2;
-
-// Port Configuration
-const PORTS_TOP = 5;
-const PORTS_BOTTOM = 5;
-const PORTS_LEFT = 7;
-const PORTS_RIGHT = 7;
-
-type Side = 'top' | 'bottom' | 'left' | 'right';
-
-interface Port {
-    id: string; // "top-0", "left-3"
-    side: Side;
-    index: number;
-    x: number; // Relative to node
-    y: number;
-}
-
-// Generate Ports for a generic node
-const generatePorts = (): Port[] => {
-    const ports: Port[] = [];
-    const OFFSET = -12; // Move ports outside the node
-
-    // Top (0 to 4)
-    const stepX = NODE_WIDTH / (PORTS_TOP + 1);
-    for (let i = 0; i < PORTS_TOP; i++) {
-        ports.push({ id: `top-${i}`, side: 'top', index: i, x: stepX * (i + 1), y: OFFSET });
-    }
-
-    // Bottom (0 to 4)
-    for (let i = 0; i < PORTS_BOTTOM; i++) {
-        ports.push({ id: `bottom-${i}`, side: 'bottom', index: i, x: stepX * (i + 1), y: NODE_HEIGHT - OFFSET });
-    }
-
-    // Left (0 to 6)
-    const stepY = NODE_HEIGHT / (PORTS_LEFT + 1);
-    for (let i = 0; i < PORTS_LEFT; i++) {
-        ports.push({ id: `left-${i}`, side: 'left', index: i, x: OFFSET, y: stepY * (i + 1) });
-    }
-
-    // Right (0 to 6)
-    for (let i = 0; i < PORTS_RIGHT; i++) {
-        ports.push({ id: `right-${i}`, side: 'right', index: i, x: NODE_WIDTH - OFFSET, y: stepY * (i + 1) });
-    }
-
-    return ports;
-};
-
-const NODE_PORTS = generatePorts();
+// Types and constants are now imported
 
 export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh, activeProfileId }: FlowchartModalProps) {
     const { t, i18n } = useTranslation();
@@ -1195,6 +1154,67 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
         setIsDirty(true);
     };
 
+    // --- Performance Optimizations ---
+
+    // 1. Port Occupancy Map (Avoids expensive O(N*M) lookups in render)
+    const portOccupancyMap = useMemo(() => {
+        const occ: Record<string, Set<string>> = {}; // nodeId -> Set of portId
+
+        maps.forEach(m => {
+            const sourceLayout = layout.nodes[m.name];
+            if (!sourceLayout) return;
+
+            m.elements.forEach(el => {
+                const targetName = typeof el.navigates_to === 'string' ? el.navigates_to : (Array.isArray(el.navigates_to) ? el.navigates_to[0]?.destination : (el.navigates_to as NavigationData)?.destination);
+                if (!targetName) return;
+
+                const targetLayout = layout.nodes[targetName];
+                if (!targetLayout) return;
+
+                const edgeId = `${m.name}-${el.name}-${targetName}`;
+                const edgeData = layout.edges[edgeId] || {};
+
+                let sHandle = edgeData.sourceHandle;
+                let tHandle = edgeData.targetHandle;
+
+                if (!sHandle || !tHandle) {
+                    const dx = targetLayout.gridX - sourceLayout.gridX;
+                    if (!sHandle) sHandle = dx >= 0 ? 'right-3' : 'left-3';
+                    if (!tHandle) tHandle = dx >= 0 ? 'left-3' : 'right-3';
+                }
+
+                if (!occ[m.name]) occ[m.name] = new Set();
+                occ[m.name].add(sHandle);
+
+                if (!occ[targetName]) occ[targetName] = new Set();
+                occ[targetName].add(tHandle);
+            });
+        });
+
+        return occ;
+    }, [maps, layout.edges, layout.nodes]);
+
+    // 2. Viewport Culling Bounds
+    const viewportBounds = useMemo(() => {
+        if (!containerRef.current) return null;
+        const rect = containerRef.current.getBoundingClientRect();
+
+        // Convert screen coordinates to canvas coordinates (including scale and offset)
+        const minX = -offset.x / scale;
+        const minY = -offset.y / scale;
+        const maxX = (rect.width - offset.x) / scale;
+        const maxY = (rect.height - offset.y) / scale;
+
+        // Buffer for smooth scrolling/panning
+        const BUFFER = 200;
+        return {
+            minX: minX - BUFFER,
+            minY: minY - BUFFER,
+            maxX: maxX + BUFFER,
+            maxY: maxY + BUFFER
+        };
+    }, [offset, scale]);
+
     // --- Render Logic ---
     const edgeLayouts = useMemo(() => {
         const layouts: {
@@ -1289,23 +1309,30 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
     // Layer 1: Lines (Z-Index 10) - Beneath Nodes
     const renderEdgeLines = useMemo(() => {
         return sortedEdgeLayouts.map(({ edgeId, points, sourceName, targetName }) => {
-            const isVisible = matchesFilter(sourceName) && matchesFilter(targetName);
-            if (!isVisible && !isInteracting) return null;
+            const sourceLayout = layout.nodes[sourceName];
+            const targetLayout = layout.nodes[targetName];
 
-            let d = `M ${points[0].x} ${points[0].y} `;
-            for (let i = 0; i < points.length - 1; i++) {
-                const p2 = points[i + 1];
-                d += ` L ${p2.x} ${p2.y} `;
-            }
+            // Viewport Culling for Edges
+            const isVisible = matchesFilter(sourceName) && matchesFilter(targetName);
+            const inViewport = viewportBounds ? (
+                (sourceLayout && sourceLayout.gridX * CELL_WIDTH >= viewportBounds.minX && sourceLayout.gridX * CELL_WIDTH <= viewportBounds.maxX && sourceLayout.gridY * CELL_HEIGHT >= viewportBounds.minY && sourceLayout.gridY * CELL_HEIGHT <= viewportBounds.maxY) ||
+                (targetLayout && targetLayout.gridX * CELL_WIDTH >= viewportBounds.minX && targetLayout.gridX * CELL_WIDTH <= viewportBounds.maxX && targetLayout.gridY * CELL_HEIGHT >= viewportBounds.minY && targetLayout.gridY * CELL_HEIGHT <= viewportBounds.maxY)
+            ) : true;
+
+            if ((!isVisible && !isInteracting) || !inViewport) return null;
 
             return (
-                <g key={`${edgeId}-line`} className={clsx(!isVisible && "opacity-20 pointer-events-none")}>
-                    <path d={d} stroke={hoveredEdge === edgeId ? "#3b82f6" : "#9ca3af"} strokeWidth={hoveredEdge === edgeId ? 3 : 2} fill="none" markerEnd={hoveredEdge === edgeId ? "url(#arrowhead-highlighted)" : "url(#arrowhead)"}
-                        className="transition-colors pointer-events-none" />
-                </g>
+                <FlowEdgeLine
+                    key={`${edgeId}-line`}
+                    edgeId={edgeId}
+                    points={points}
+                    isVisible={isVisible}
+                    isInteracting={isInteracting}
+                    hoveredEdge={hoveredEdge}
+                />
             );
         });
-    }, [sortedEdgeLayouts, hoveredEdge, filterTag, isInteracting]);
+    }, [sortedEdgeLayouts, hoveredEdge, filterTag, isInteracting, viewportBounds]);
 
     // Layer 2: Controls & Interaction (Z-Index 50) - Above Nodes
     const renderEdgeControls = useMemo(() => {
@@ -1313,125 +1340,55 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
         const isDraggingEdge = dragItem?.type === 'segment' || dragItem?.type === 'vertex' || isDraggingConnection;
 
         return sortedEdgeLayouts.map(({ edgeId, points, startPoint, endPoint, elName, sourceName, targetName }) => {
+            const sourceLayout = layout.nodes[sourceName];
+            const targetLayout = layout.nodes[targetName];
+
             const isVisible = matchesFilter(sourceName) && matchesFilter(targetName);
-            if (!isVisible && !isInteracting) return null;
+            const inViewport = viewportBounds ? (
+                (sourceLayout && sourceLayout.gridX * CELL_WIDTH >= viewportBounds.minX && sourceLayout.gridX * CELL_WIDTH <= viewportBounds.maxX && sourceLayout.gridY * CELL_HEIGHT >= viewportBounds.minY && sourceLayout.gridY * CELL_HEIGHT <= viewportBounds.maxY) ||
+                (targetLayout && targetLayout.gridX * CELL_WIDTH >= viewportBounds.minX && targetLayout.gridX * CELL_WIDTH <= viewportBounds.maxX && targetLayout.gridY * CELL_HEIGHT >= viewportBounds.minY && targetLayout.gridY * CELL_HEIGHT <= viewportBounds.maxY)
+            ) : true;
 
-            const segments: React.ReactNode[] = [];
-            for (let i = 0; i < points.length - 1; i++) {
-                const p1 = points[i];
-                const p2 = points[i + 1];
-                const isHorizontal = Math.abs(p1.y - p2.y) < 1;
-
-                segments.push(
-                    <line
-                        key={`${edgeId}-seg-${i}`}
-                        x1={p1.x} y1={p1.y}
-                        x2={p2.x} y2={p2.y}
-                        stroke="transparent"
-                        strokeWidth={15}
-                        className={clsx(
-                            "cursor-pointer",
-                            isHorizontal ? "cursor-row-resize" : "cursor-col-resize",
-                            (isDraggingConnection || !isVisible) ? "pointer-events-none" : "pointer-events-auto"
-                        )}
-                        onMouseDown={(e) => {
-                            if (isSpacePressed || e.button === 1 || !isVisible) return;
-                            e.stopPropagation();
-                            setDragItem({ type: 'segment', id: edgeId, index: i, points: points });
-                        }}
-                        onDoubleClick={(e) => handleSegmentDoubleClick(e, edgeId, i)}
-                    />
-                );
-            }
+            if ((!isVisible && !isInteracting) || !inViewport) return null;
 
             return (
-                <g key={`${edgeId}-ctrl`} className={clsx("group/edge pointer-events-auto", !isVisible && "opacity-20")}
+                <FlowEdgeControls
+                    key={`${edgeId}-ctrl`}
+                    edgeId={edgeId}
+                    points={points}
+                    startPoint={startPoint}
+                    endPoint={endPoint}
+                    elName={elName}
+                    isVisible={isVisible}
+                    isInteracting={isInteracting}
+                    hoveredEdge={hoveredEdge}
+                    isDraggingConnection={isDraggingConnection}
+                    isDraggingEdge={isDraggingEdge}
+                    isSpacePressed={isSpacePressed}
                     onMouseEnter={() => isVisible && setHoveredEdge(edgeId)}
                     onMouseLeave={() => setHoveredEdge(null)}
-                >
-                    {segments}
-                    {/* Label (Hidden during ANY drag to prevent visual noise) */}
-                    {points.length >= 2 && !isDraggingEdge && (() => {
-                        // Find the middle segment for better centering
-                        const midSegIndex = Math.floor((points.length - 1) / 2);
-                        const pA = points[midSegIndex];
-                        const pB = points[midSegIndex + 1];
-
-                        // Midpoint of the central segment
-                        let midX = (pA.x + pB.x) / 2;
-                        let midY = (pA.y + pB.y) / 2;
-                        if (pA.x > pB.x) {
-                            midX = midX - 10;
-                        }
-                        else if (pA.x == pB.x) {
-                            midX = midX - 2;
-                        }
-                        else {
-                            midX = midX - 110;
-                        }
-                        if (pA.y > pB.y) {
-                            midY = midY + 10;
-                        }
-                        else if (pA.y == pB.y) {
-                            midY = midY + 2;
-                        }
-                        else {
-                            midY = midY - 30;
-                        }
-
-                        return (
-                            <foreignObject
-                                x={midX}
-                                y={midY}
-                                width={120}
-                                height={24}
-                                style={{ overflow: 'visible' }}
-                            >
-                                <div className={clsx(
-                                    "text-on-surface text-[10px] px-2 py-0.5 rounded-full text-center truncate border shadow-sm pointer-events-auto select-none transition-colors cursor-move",
-                                    hoveredEdge === edgeId ? "bg-surface border-primary text-primary dark:text-primary/80 ring-1 ring-primary" : "bg-surface/90 border-outline-variant/50 hover:border-primary hover:text-primary"
-                                )}
-                                    onMouseDown={(e) => {
-                                        if (isSpacePressed || e.button === 1) return;
-                                        e.stopPropagation();
-                                    }}>
-                                    {elName}
-                                </div>
-                            </foreignObject>
-                        );
-                    })()}
-
-                    {/* Source Handle */}
-                    <circle cx={startPoint.x} cy={startPoint.y} r={6} fill="transparent"
-                        className={clsx(
-                            "cursor-grab hover:fill-primary/50",
-                            (dragItem?.type === 'source' && dragItem.id === edgeId) ? "pointer-events-none" : (isDraggingConnection ? "pointer-events-none" : "pointer-events-auto")
-                        )}
-                        onMouseDown={(e) => { if (isSpacePressed || e.button === 1) return; e.stopPropagation(); setDragItem({ type: 'source', id: edgeId }); }} />
-
-                    {/* Target Handle */}
-                    <circle cx={endPoint.x} cy={endPoint.y} r={6} fill="transparent"
-                        className={clsx(
-                            "cursor-grab hover:fill-primary/50",
-                            (dragItem?.type === 'target' && dragItem.id === edgeId) ? "pointer-events-none" : (isDraggingConnection ? "pointer-events-none" : "pointer-events-auto")
-                        )}
-                        onMouseDown={(e) => { if (isSpacePressed || e.button === 1) return; e.stopPropagation(); setDragItem({ type: 'target', id: edgeId }); }} />
-
-                    {/* Vertices */}
-                    {points.slice(1, -1).map((p, idx) => (
-                        <circle key={`${edgeId}-v-${idx}`} cx={p.x} cy={p.y} r={5} fill="#3b82f6"
-                            className={clsx(
-                                "cursor-move opacity-0 hover:opacity-100",
-                                isDraggingConnection ? "pointer-events-none" : "pointer-events-auto"
-                            )}
-                            onMouseDown={(e) => { if (isSpacePressed || e.button === 1) return; e.stopPropagation(); setDragItem({ type: 'vertex', id: edgeId, index: idx }); }}
-                            onDoubleClick={(e) => handleVertexDoubleClick(e, edgeId, idx)}
-                        />
-                    ))}
-                </g>
+                    onSegmentMouseDown={(idx, e) => {
+                        e.stopPropagation();
+                        setDragItem({ type: 'segment', id: edgeId, index: idx, points: points });
+                    }}
+                    onSegmentDoubleClick={(idx, e) => handleSegmentDoubleClick(e, edgeId, idx)}
+                    onSourceMouseDown={(e) => {
+                        e.stopPropagation();
+                        setDragItem({ type: 'source', id: edgeId });
+                    }}
+                    onTargetMouseDown={(e) => {
+                        e.stopPropagation();
+                        setDragItem({ type: 'target', id: edgeId });
+                    }}
+                    onVertexMouseDown={(idx, e) => {
+                        e.stopPropagation();
+                        setDragItem({ type: 'vertex', id: edgeId, index: idx });
+                    }}
+                    onVertexDoubleClick={(idx, e) => handleVertexDoubleClick(e, edgeId, idx)}
+                />
             );
         });
-    }, [sortedEdgeLayouts, dragItem]); // Added sortedEdgeLayouts dependency // Added dragItem dependency for re-render on drag start
+    }, [sortedEdgeLayouts, dragItem, hoveredEdge, isSpacePressed, viewportBounds]);
 
 
     if (!isOpen) return null;
@@ -1581,79 +1538,33 @@ linear-gradient(to right, rgba(0,0,0,0.05) 1px, transparent 1px),
                             const data = maps.find(m => m.name === name);
                             if (!data) return null;
 
-                            const isVisible = matchesFilter(name);
-                            if (!isVisible && !isInteracting) return null;
-
                             const pixel = getPixelCoords(pos.gridX, pos.gridY);
-                            const isDraggingThis = dragItem?.type === 'node' && dragItem.id === name;
+
+                            // Viewport Culling for Nodes
+                            const isVisible = matchesFilter(name);
+                            const inViewport = viewportBounds ? (
+                                pixel.x >= viewportBounds.minX && pixel.x <= viewportBounds.maxX &&
+                                pixel.y >= viewportBounds.minY && pixel.y <= viewportBounds.maxY
+                            ) : true;
+
+                            if ((!isVisible && !isInteracting) || !inViewport) return null;
 
                             return (
-                                <div
+                                <FlowNode
                                     key={name}
-                                    className={clsx(
-                                        "absolute flex flex-col bg-surface border rounded-xl overflow-visible shadow-sm hover:shadow-xl transition-shadow group/card",
-                                        data.type === 'modal' ? 'border-dashed border-tertiary' : 'border-outline-variant/60',
-                                        isDraggingThis ? 'z-[55] ring-2 ring-primary shadow-2xl opacity-90' : 'z-40',
-                                        !isVisible && "opacity-20 pointer-events-none"
-                                        // Lift dragged node above Edge Controls (50) but below Ports (60)
-                                    )}
-                                    style={{
-                                        left: pixel.x,
-                                        top: pixel.y,
-                                        width: NODE_WIDTH,
-                                        height: NODE_HEIGHT,
-                                        cursor: isDraggingCanvas ? 'move' : 'grab'
-                                    }}
+                                    data={data}
+                                    pixel={pixel}
+                                    isVisible={isVisible}
+                                    isInteracting={isInteracting}
+                                    isDraggingThis={dragItem?.type === 'node' && dragItem.id === name}
+                                    isDraggingCanvas={isDraggingCanvas}
                                     onMouseDown={(e) => {
                                         if (isSpacePressed || e.button === 1 || !isVisible) return;
                                         e.stopPropagation();
                                         setDragItem({ type: 'node', id: name });
                                     }}
-                                >
-                                    {/* Content - Full Card Image */}
-                                    <div className="absolute inset-0 z-0 flex items-center justify-center bg-surface-variant/20 rounded-xl overflow-hidden">
-                                        {data.base64_preview ? (
-                                            <img
-                                                src={`data:image/png;base64,${data.base64_preview}`}
-                                                className="w-full h-full object-contain opacity-90 transition-opacity group-hover/card:opacity-100 placeholder:opacity-100"
-                                                alt={data.name}
-                                            />
-                                        ) : (
-                                            <span className="text-xs text-on-surface-variant/50">No Preview</span>
-                                        )}
-                                        {/* Type Badge - Top Right */}
-                                        <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-black/60 text-[10px] text-white backdrop-blur-sm z-10">
-                                            {t(`mapper.screen_types.${data.type}`, data.type)}
-                                        </div>
-                                    </div>
-
-                                    {/* Footer Overlay */}
-                                    <div className="absolute bottom-0 left-0 right-0 p-3 flex flex-col justify-center bg-surface/50 border-t border-outline-variant/10 rounded-b-xl z-20 transition-colors group-hover/card:bg-surface/70">
-                                        <div className="flex items-center justify-between gap-2 pointer-events-auto">
-                                            <h3 className="font-semibold text-sm text-on-surface truncate" title={data.name}>
-                                                {data.name}
-                                            </h3>
-                                            {onEditScreen && (
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        onEditScreen(data.name);
-                                                        handleClose();
-                                                    }}
-                                                    className="p-1.5 hover:bg-primary/10 text-on-surface-variant hover:text-primary rounded-full transition-all"
-                                                    title={t('mapper.action.edit')}
-                                                >
-                                                    <Pencil size={14} />
-                                                </Button>
-                                            )}
-                                        </div>
-                                        <div className="text-xs text-on-surface-variant/70 mt-1 pointer-events-auto">
-                                            {t('mapper.elements_mapped_count', { count: data.elements.length })}
-                                        </div>
-                                    </div>
-                                </div>
+                                    onEditScreen={onEditScreen}
+                                />
                             );
                         })}
 
@@ -1661,77 +1572,39 @@ linear-gradient(to right, rgba(0,0,0,0.05) 1px, transparent 1px),
                         {Object.entries(layout.nodes).map(([name, pos]) => {
                             const data = maps.find(m => m.name === name);
                             if (!data) return null;
-                            const isVisible = matchesFilter(name);
-                            if (!isVisible && !isInteracting) return null;
 
                             const pixel = getPixelCoords(pos.gridX, pos.gridY);
+
+                            // Viewport Culling for Ports
+                            const isVisible = matchesFilter(name);
+                            const inViewport = viewportBounds ? (
+                                pixel.x >= viewportBounds.minX && pixel.x <= viewportBounds.maxX &&
+                                pixel.y >= viewportBounds.minY && pixel.y <= viewportBounds.maxY
+                            ) : true;
+
+                            if ((!isVisible && !isInteracting) || !inViewport) return null;
 
                             return (
                                 <React.Fragment key={`${name}-ports`}>
                                     {NODE_PORTS.map(p => {
-                                        // Correct Layout-Based Occupancy Check
-                                        const isTrulyOccupied = maps.some(m => {
-                                            const sourceLayout = layout.nodes[m.name];
-                                            if (!sourceLayout) return false;
-
-                                            return m.elements.some(el => {
-                                                const targetName = typeof el.navigates_to === 'string' ? el.navigates_to : (Array.isArray(el.navigates_to) ? el.navigates_to[0]?.destination : (el.navigates_to as NavigationData)?.destination);
-                                                if (!targetName) return false;
-
-                                                const targetLayout = layout.nodes[targetName];
-                                                if (!targetLayout) return false;
-
-                                                const edgeId = `${m.name}-${el.name}-${targetName}`;
-                                                const edgeData = layout.edges[edgeId] || {};
-
-                                                // Determine used handles (explicit or default)
-                                                let sHandle = edgeData.sourceHandle;
-                                                let tHandle = edgeData.targetHandle;
-
-                                                // If no explicit handle, calculate default
-                                                if (!sHandle || !tHandle) {
-                                                    const dx = targetLayout.gridX - sourceLayout.gridX;
-                                                    if (!sHandle) sHandle = dx >= 0 ? 'right-3' : 'left-3';
-                                                    if (!tHandle) tHandle = dx >= 0 ? 'left-3' : 'right-3';
-                                                }
-
-                                                // Check Source
-                                                if (m.name === name && sHandle === p.id) return true;
-                                                // Check Target
-                                                if (targetName === name && tHandle === p.id) return true;
-
-                                                return false;
-                                            });
-                                        });
-
+                                        const isTrulyOccupied = portOccupancyMap[name]?.has(p.id);
                                         const isHovered = hoveredPort?.nodeId === name && hoveredPort?.portId === p.id;
-
-                                        // Visibility & Interaction Logic
                                         const isDraggingConnection = dragItem?.type === 'source' || dragItem?.type === 'target';
                                         const canQuickConnect = !isDraggingConnection && !isDraggingCanvas && !dragItem && !isTrulyOccupied;
                                         const showPorts = isDraggingConnection || (canQuickConnect && isHovered);
-
-                                        // INTERACTION RULE:
-                                        // 1. If Dragging Connection: ALWAYS clickable (to drop).
-                                        // 2. If NOT Occupied: Clickable (for Quick Connect).
-                                        // 3. If Occupied: NOT Clickable (Pass through to Edge Handle underneath).
                                         const isInteractive = isDraggingConnection || canQuickConnect;
 
                                         return (
-                                            <div
+                                            <FlowPort
                                                 key={`${name}-${p.id}`}
-                                                data-port-id={p.id}
-                                                data-node-id={name}
-                                                className={clsx(
-                                                    "absolute w-12 h-12 rounded-full flex items-center justify-center",
-                                                    isInteractive ? "pointer-events-auto" : "pointer-events-none"
-                                                )}
-                                                style={{
-                                                    zIndex: 60,
-                                                    left: pixel.x + p.x - 24,
-                                                    top: pixel.y + p.y - 24,
-                                                    backgroundColor: 'rgba(255, 255, 255, 0.001)' // Force positive hit-test even if transparent
-                                                }}
+                                                nodeId={name}
+                                                port={p}
+                                                pixel={pixel}
+                                                isHovered={isHovered}
+                                                isInteractive={isInteractive}
+                                                showPorts={showPorts}
+                                                canQuickConnect={canQuickConnect}
+                                                isDraggingConnection={isDraggingConnection}
                                                 onMouseEnter={() => setHoveredPort({ nodeId: name, portId: p.id })}
                                                 onMouseLeave={() => setHoveredPort(null)}
                                                 onMouseDown={(e) => {
@@ -1744,25 +1617,7 @@ linear-gradient(to right, rgba(0,0,0,0.05) 1px, transparent 1px),
                                                         handleQuickConnect(name, p.id);
                                                     }
                                                 }}
-                                            >
-                                                {/* Visual Port Loop / Plus */}
-                                                <div
-                                                    className={clsx(
-                                                        "w-4 h-4 rounded-full border border-solid transition-all flex items-center justify-center bg-surface pointer-events-none",
-                                                        showPorts ? "opacity-100 scale-100" : "opacity-0 scale-0",
-                                                        isDraggingConnection ? (isHovered ? "border-primary bg-primary/20 scale-125" : "border-outline-variant/50") : (
-                                                            canQuickConnect && isHovered ? "border-primary scale-125 shadow-lg" : "border-outline-variant/30"
-                                                        )
-                                                    )}
-                                                >
-                                                    {isHovered && canQuickConnect && (
-                                                        <Plus size={10} className="text-primary" />
-                                                    )}
-                                                    {isDraggingConnection && isHovered && (
-                                                        <div className="w-2 h-2 rounded-full bg-primary/50" />
-                                                    )}
-                                                </div>
-                                            </div>
+                                            />
                                         );
                                     })}
                                 </React.Fragment>
