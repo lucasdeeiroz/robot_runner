@@ -22,7 +22,7 @@ import { analyzeTestHistory as analyzeGemini } from '@/lib/dashboard/gemini';
 import { analyzeTestHistory as analyzeOpenAI } from '@/lib/dashboard/openai';
 import { analyzeTestHistory as analyzeClaude } from '@/lib/dashboard/claude';
 import { AiButton } from "@/components/atoms/AiButton";
-import { findPerformanceData, summarizePerformanceCsv, extractAnomalousLogs, DeepAnalysisContext } from '@/lib/dashboard/historyAnalysisUtils';
+import { getAiContext } from '@/lib/dashboard/historyAnalysisUtils';
 
 const formatDate = (dateStr: string) => {
     try {
@@ -71,6 +71,8 @@ export function HistorySubTab() {
     const parentRef = useRef<HTMLDivElement>(null);
     const historyContainerRef = useRef<HTMLDivElement>(null);
     const [isHistoryNarrow, setIsHistoryNarrow] = useState(false);
+    const abortControllerRef = useRef<AbortController | null>(null);
+    const analysisCancelledRef = useRef(false);
     const isFirstRun = useRef(true);
 
     useEffect(() => {
@@ -85,12 +87,10 @@ export function HistorySubTab() {
     }, []);
 
     useEffect(() => {
-        // Always load on mount if it's the first render of this instance
-        // But the cache provides immediate content
         const timer = setTimeout(() => {
             loadHistory();
             isFirstRun.current = false;
-        }, 150); // Reduced delay for smoother feel
+        }, 150);
         return () => clearTimeout(timer);
     }, [settings.paths.logs]);
 
@@ -110,73 +110,17 @@ export function HistorySubTab() {
         }
     };
 
-    const handleAIAnalysis = async () => {
-        if (filteredHistory.length === 0) return;
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+        };
+    }, []);
 
-        setIsAnalyzingHistory(true);
+    const handleAIAnalysis = () => {
         setIsAIModalOpen(true);
-        setAiAnalysisError(null);
-        setAiAnalysisText("");
-
-        try {
-            let result = "";
-            const provider = settings.aiProvider;
-            const apiKey = provider === 'gemini'
-                ? settings.geminiApiKey
-                : provider === 'claude'
-                    ? settings.claudeApiKey
-                    : settings.openaiApiKey;
-
-            if (!apiKey) {
-                setAiAnalysisError(t('dashboard.generator.key_required', { provider: provider.charAt(0).toUpperCase() + provider.slice(1) }));
-                return;
-            }
-
-            const model = provider === 'gemini' ? settings.geminiModel : provider === 'claude' ? settings.claudeModel : settings.openaiModel;
-            const lang = settings.language || i18n.language || 'en';
-
-            // Collect Deep Context for failures (limited to last 10 for token efficiency)
-            const deepContext: Record<string, DeepAnalysisContext> = {};
-            const failuresToAnalyze = filteredHistory
-                .filter(log => log.status === 'FAIL')
-                .slice(0, 10);
-
-            for (const log of failuresToAnalyze) {
-                const logsDir = settings.paths.logs || "";
-                const [perfFile, logs] = await Promise.all([
-                    findPerformanceData(log, logsDir),
-                    extractAnomalousLogs(log.xml_path)
-                ]);
-
-                let performance = undefined;
-                if (perfFile) {
-                    const fullPerfPath = `${logsDir}/${perfFile}`;
-                    performance = await summarizePerformanceCsv(fullPerfPath) || undefined;
-                }
-
-                deepContext[log.suite_name] = {
-                    performance,
-                    anomalousLogs: logs.anomalousLogs,
-                    failureMessages: logs.failureMessages
-                };
-            }
-
-            if (provider === 'gemini') {
-                result = await analyzeGemini(filteredHistory, apiKey, model, lang, deepContext);
-            } else if (provider === 'openai') {
-                result = await analyzeOpenAI(filteredHistory, apiKey, model, lang, deepContext);
-            } else if (provider === 'claude') {
-                result = await analyzeClaude(filteredHistory, apiKey, model, lang, deepContext);
-            }
-
-            setAiAnalysisText(result);
-        } catch (err: any) {
-            console.error("AI Analysis Error:", err);
-            const errorMessage = err?.message || String(err);
-            setAiAnalysisError(`${t('tests_page.actions.ai_analysis_error')}: ${errorMessage}`);
-        } finally {
-            setIsAnalyzingHistory(false);
-        }
     };
 
     const isDateInPeriod = (dateStr: string, period: string) => {
@@ -596,9 +540,8 @@ export function HistorySubTab() {
             <HistoryAIAnalysisModal
                 isOpen={isAIModalOpen}
                 onClose={() => setIsAIModalOpen(false)}
-                analysis={aiAnalysisText}
-                isAnalyzing={isAnalyzingHistory}
-                error={aiAnalysisError}
+                historyData={filteredHistory}
+                logsPath={settings.paths.logs || 'default'}
             />
         </div>
     );

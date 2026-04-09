@@ -44,10 +44,10 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
 
     // AI Analysis State
     const { settings } = useSettings();
-    const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
+    const [aiAnalysis, setAiAnalysis] = useState<string | null>((node as any).aiAnalysis || null);
     const [aiError, setAiError] = useState<string | null>(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
-    const [showAiAnalysis, setShowAiAnalysis] = useState(false);
+    const [showAiAnalysis, setShowAiAnalysis] = useState(!!(node as any).aiAnalysis);
 
     const isRunning = (node as any).status === 'RUNNING';
     const isFailed = (node as any).status === 'FAIL';
@@ -253,8 +253,9 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
             {isOpen && (
                 <div className="flex flex-col gap-1 p-2 pl-4 border-t border-on-surface/5">
                     {node.type === 'test' && isFailed && (node as TestNode).failureDetail && (
-                        <div className="mb-2 p-3 bg-error/10 border border-error/20 rounded-xl text-error text-xs animate-in fade-in slide-in-from-top-1 flex justify-between gap-4 items-center">
-                            <div className="flex flex-col gap-1 min-w-0 w-full">
+                        <div className="mb-2 p-3 bg-error/10 border border-error/20 rounded-xl text-error text-xs animate-in fade-in slide-in-from-top-1 flex flex-col gap-4">
+                            <div className="flex justify-between gap-4 items-start w-full">
+                                <div className="flex flex-col gap-1 min-w-0 w-full">
                                 <div className="flex items-center justify-between mb-1">
                                     <div className="font-bold uppercase tracking-wider opacity-70 flex items-center gap-1.5">
                                         <XCircle size={12} />
@@ -298,6 +299,15 @@ Error Message: ${(node as TestNode).failureDetail?.message}
                                                     throw new Error("No AI provider configured");
                                                 }
                                                 setAiAnalysis(result);
+
+                                                // Persist to Database
+                                                if (dbPath) {
+                                                    invoke('save_node_ai_analysis', {
+                                                        dbPath,
+                                                        nodeId: node.id,
+                                                        analysis: result
+                                                    }).catch(err => console.error("Failed to persist node AI analysis:", err));
+                                                }
                                             } catch (err: any) {
                                                 console.error("AI Analysis Error:", err);
                                                 setAiError(err.message || String(err));
@@ -348,23 +358,24 @@ Error Message: ${(node as TestNode).failureDetail?.message}
                                     )}
                                 </div>
                             )}
+                            </div>
+                            {showAiAnalysis && (
+                                <AiResponse
+                                    title={t('run_tab.console.ai_insight')}
+                                    isLoading={isAnalyzing}
+                                    rationale={aiAnalysis}
+                                    rationaleHeader={t('run_tab.console.ai_analysis_header')}
+                                    error={aiError}
+                                    className="animate-in fade-in slide-in-from-top-1"
+                                    onCopy={(text) => {
+                                        navigator.clipboard.writeText(text);
+                                        feedback.toast.success(t('common.copied'));
+                                    }}
+                                />
+                            )}
                         </div>
                     )}
 
-                    {node.type === 'test' && isFailed && (node as TestNode).failureDetail && showAiAnalysis && (
-                        <AiResponse
-                            title={t('run_tab.console.ai_insight')}
-                            isLoading={isAnalyzing}
-                            rationale={aiAnalysis}
-                            rationaleHeader={t('run_tab.console.ai_analysis_header')}
-                            error={aiError}
-                            className="mb-4"
-                            onCopy={(text) => {
-                                navigator.clipboard.writeText(text);
-                                feedback.toast.success(t('common.copied'));
-                            }}
-                        />
-                    )}
 
                     {node.type === 'keyword' && (node as KeywordNode).screenshotPath && (
                         <div className="mb-2 p-3 text-on-surface-variant text-xs animate-in fade-in slide-in-from-top-1 flex justify-between gap-2">

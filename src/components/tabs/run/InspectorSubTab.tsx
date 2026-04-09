@@ -64,6 +64,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
     const [aiError, setAiError] = useState<string | null>(null);
     const [isAiLoading, setIsAiLoading] = useState(false);
     const [showAiSection, setShowAiSection] = useState(false);
+    const [aiCache, setAiCache] = useState<Record<string, { suggestion: string, rationale: string }>>({});
 
     // Interaction State
     const [swipeStart, setSwipeStart] = useState<{ x: number, y: number } | null>(null);
@@ -364,8 +365,17 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
     const handleAiSuggest = async () => {
         if (!selectedNode) return;
 
-        setIsAiLoading(true);
         setShowAiSection(true);
+        
+        // If we already have a cached suggestion for this exact element, use it instantly without calling API
+        if (aiCache[selectedNode.id]) {
+            setAiSuggestion(aiCache[selectedNode.id].suggestion);
+            setAiRationale(aiCache[selectedNode.id].rationale);
+            setAiError(null);
+            return;
+        }
+
+        setIsAiLoading(true);
         setAiSuggestion(null);
         setAiRationale(null);
 
@@ -421,6 +431,15 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                 setAiRationale(result);
             }
 
+            // Save to cache
+            setAiCache(prev => ({
+                ...prev,
+                [selectedNode.id]: {
+                    suggestion: selectorMatch ? selectorMatch[1].trim().replace(/`|"/g, '') : result.split('\n')[0],
+                    rationale: rationaleMatch ? rationaleMatch[1].trim() : result
+                }
+            }));
+            
         } catch (error: any) {
             console.error("AI Suggestion Error:", error);
             setAiError(error.message || String(error));
@@ -432,16 +451,25 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
 
 
     useEffect(() => {
-        setAiSuggestion(null);
-        setAiRationale(null);
-        setShowAiSection(false);
-    }, [selectedNode]);
+        if (selectedNode && aiCache[selectedNode.id]) {
+            setAiSuggestion(aiCache[selectedNode.id].suggestion);
+            setAiRationale(aiCache[selectedNode.id].rationale);
+            setShowAiSection(true);
+            setAiError(null);
+        } else {
+            setAiSuggestion(null);
+            setAiRationale(null);
+            setShowAiSection(false);
+            setAiError(null);
+        }
+    }, [selectedNode, aiCache]);
 
     useEffect(() => {
         if (!selectedDevice) {
             setScreenshot(null);
             setRootNode(null);
             setSelectedNode(null);
+            setAiCache({});
             prevTestRunning.current = isTestRunning;
             return;
         }

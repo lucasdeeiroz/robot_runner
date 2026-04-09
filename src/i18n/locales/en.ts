@@ -751,9 +751,23 @@ export const en = {
                 summary_title: "Execution Summary",
                 summary_rationale: "Analysis Basis",
                 ai_analysis_placeholder: "Click to perform a smart root cause analysis using AI.",
+                ai_analysis_error: "AI analysis failed",
                 ai_error_generic: "AI analysis failed.",
                 ai_error_details: "Error Details:",
-                ai_error_copy: "Copy Error"
+                ai_error_copy: "Copy Error",
+                ai_history: {
+                    title: "Smart History Analysis",
+                    failures_limit: "Failures to analyze",
+                    token_estimate: "Estimated consumption",
+                    start_analysis: "Start Trend Analysis",
+                    regenerate: "Regenerate Analysis",
+                    last_analysis_on: "Last analysis performed on {{date}}",
+                    no_analysis: "No previous analysis for this history yet.",
+                    tokens: "tokens",
+                    loading_context: "Extracting compressed context...",
+                    success: "Trend analysis completed!",
+                    persistence_note: "This analysis will be saved until you request a new one."
+                }
             }
         },
         scrcpy: {

@@ -9,7 +9,7 @@ import { XMLParser } from 'fast-xml-parser';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { useOutsideClick } from '@/hooks/useOutsideClick';
-import { InspectorNode, transformXmlToTree, findNodesAtCoords, generateXPath, transformBounds, assignShortIds, findNodeByShortId, generateSimplifiedXml } from '@/lib/inspectorUtils';
+import { InspectorNode, transformXmlToTree, findNodesAtCoords, generateXPath, transformBounds, findNodeByShortId } from '@/lib/inspectorUtils';
 import { feedback } from "@/lib/feedback";
 import { Section } from "@/components/organisms/Section";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
@@ -36,6 +36,7 @@ import * as gemini from '@/lib/dashboard/gemini';
 import * as claude from '@/lib/dashboard/claude';
 import * as openai from '@/lib/dashboard/openai';
 import { AutonomousExplorer, ExplorationAction } from '@/lib/dashboard/explorationEngine';
+import { getAiContext } from '@/lib/dashboard/historyAnalysisUtils';
 
 function groupElementsByType<T extends { type: string }>(
     elements: T[],
@@ -375,12 +376,37 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             let result: { name: string; justification: string } | null = null;
             const lang = language || i18n.language || 'en';
 
+            // OPTIMIZATION 1: Filter only CRITICAL attributes to save tokens
+            const criticalAttrs = {
+                text: selectedNode.attributes.text || selectedNode.attributes.label || "",
+                resourceId: selectedNode.attributes['resource-id'] || selectedNode.attributes.id || "",
+                class: selectedNode.attributes.class || selectedNode.attributes.type || "",
+                contentDesc: selectedNode.attributes['content-desc'] || "",
+                hint: selectedNode.attributes.hint || "",
+                path: selectedNode.attributes.path || ""
+            };
+
+            // OPTIMIZATION 2: DRASTIC context reduction
+            // Only send full elements for the CURRENT screen, and just names for other screens
+            const optimizedMaps = savedMaps.map(m => {
+                const isCurrentScreen = m.name === screenName;
+                return {
+                    name: m.name,
+                    type: m.type,
+                    elements: isCurrentScreen 
+                        ? m.elements.map(e => ({ name: e.name, type: e.type }))
+                        : [] // Don't send elements of other screens to save hundreds of tokens
+                };
+            }).slice(-10); // Limit to last 10 screens
+
+            console.log(`[AI Debug] Prompt Context Size: ~${JSON.stringify(criticalAttrs).length + JSON.stringify(optimizedMaps).length} chars`);
+
             if (aiProvider === 'gemini') {
-                result = await gemini.suggestElementName(selectedNode.attributes, screenName, apiKey, model, lang, savedMaps);
+                result = await gemini.suggestElementName(criticalAttrs as any, screenName, apiKey, model, lang, optimizedMaps as any);
             } else if (aiProvider === 'openai') {
-                result = await openai.suggestElementName(selectedNode.attributes, screenName, apiKey, model, lang, savedMaps);
+                result = await openai.suggestElementName(criticalAttrs as any, screenName, apiKey, model, lang, optimizedMaps as any);
             } else if (aiProvider === 'claude') {
-                result = await claude.suggestElementName(selectedNode.attributes, screenName, apiKey, model, lang, savedMaps);
+                result = await claude.suggestElementName(criticalAttrs as any, screenName, apiKey, model, lang, optimizedMaps as any);
             }
 
             if (result && result.name) {
@@ -501,14 +527,23 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             const xml = await invoke<string>('get_xml_dump', { deviceId: selectedDevice });
             if (!isExploringRef.current) return;
 
-            // Parse for local UI update
+            // 2. Prepare Context (Backend-powered)
+            explorer.addLog("Preparing optimized AI context...");
+            setExplorationLogs([...explorer.getLogs()]);
+            
+            const contextResponse = await getAiContext('exploration', {
+                current_xml: xml
+            });
+            
+            if (!isExploringRef.current) return;
+            
+            const simplifiedXml = contextResponse.context;
+            const shortIdMap = contextResponse.metadata.short_id_map as Record<string, string>;
+
+            // Parse for local UI update (Simplified version for visibility)
             const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "", textNodeName: "_text" });
             const jsonObj = parser.parse(xml);
             const root = jsonObj.hierarchy ? transformXmlToTree(jsonObj.hierarchy) : transformXmlToTree(jsonObj);
-
-            // Prepare for AI with Short IDs
-            assignShortIds(root);
-            const simplifiedXml = generateSimplifiedXml(root);
             setRootNode(root);
 
             // 2. AI Analysis
@@ -555,12 +590,12 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
             // 3. Auto-Mapping
             const aiScreen = result.screen;
-            // The AI returns short_id as 'id'. We need to convert it back to XPath for permanent storage
+            // Use the shortIdMap from the backend to map context back to XPaths
             const aiElements = (result.elements || []).map((el: any) => {
-                const node = findNodeByShortId(root, el.id);
+                const xpath = shortIdMap[el.id] || el.id;
                 return {
                     ...el,
-                    id: node ? generateXPath(node) : el.id // Store XPath for stability between app versions
+                    id: xpath 
                 };
             });
 

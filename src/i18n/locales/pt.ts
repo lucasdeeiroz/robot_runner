@@ -750,9 +750,23 @@ export const pt = {
                 summary_title: "Resumo da Execução",
                 summary_rationale: "Base da Análise",
                 ai_analysis_placeholder: "Clique para realizar uma análise inteligente da causa raiz usando IA.",
+                ai_analysis_error: "Falha na análise de IA",
                 ai_error_generic: "Falha na análise de IA.",
                 ai_error_details: "Detalhes do Erro:",
-                ai_error_copy: "Copiar Erro"
+                ai_error_copy: "Copiar Erro",
+                ai_history: {
+                    title: "Análise Inteligente de Histórico",
+                    failures_limit: "Quantidade de falhas para analisar",
+                    token_estimate: "Estimativa de consumo",
+                    start_analysis: "Iniciar Análise de Tendências",
+                    regenerate: "Refazer Análise",
+                    last_analysis_on: "Última análise realizada em {{date}}",
+                    no_analysis: "Nenhuma análise realizada para este histórico ainda.",
+                    tokens: "tokens",
+                    loading_context: "Extraindo contexto compactado...",
+                    success: "Análise de tendências concluída!",
+                    persistence_note: "Esta análise ficará salva até que você solicite uma nova."
+                }
             }
         },
         scrcpy: {

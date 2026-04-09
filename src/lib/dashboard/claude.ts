@@ -18,15 +18,18 @@ export async function generateRefinedTestCases(
     apiKey: string,
     model: string,
     language: string,
-    appMapping?: ScreenMap[],
-    generationType: AIGenerationType = 'test_case'
+    appMapping?: ScreenMap[] | string,
+    generationType: AIGenerationType = 'test_case',
+    signal?: AbortSignal
 ): Promise<string> {
     if (!apiKey) {
         throw new Error("Missing Claude API Key");
     }
 
     let mappingContext = "";
-    if (appMapping && appMapping.length > 0) {
+    if (typeof appMapping === 'string') {
+        mappingContext = appMapping;
+    } else if (Array.isArray(appMapping) && appMapping.length > 0) {
         mappingContext = "\n\nAPPLICATION MAPPING (Use these element names and types for precision):\n";
         appMapping.forEach(screen => {
             mappingContext += `- Screen: "${screen.name}" (${screen.type})\n`;
@@ -57,6 +60,7 @@ export async function generateRefinedTestCases(
                 'x-api-key': apiKey,
                 'anthropic-version': '2023-06-01'
             },
+            signal,
             body: JSON.stringify({
                 model: model,
                 max_tokens: 4096,
@@ -97,7 +101,8 @@ export async function askClaude(
     apiKey: string,
     model: string,
     systemInstruction?: string,
-    imageBase64?: string
+    imageBase64?: string,
+    signal?: AbortSignal
 ): Promise<string> {
     if (!apiKey) throw new Error("Missing Claude API Key");
 
@@ -127,6 +132,7 @@ export async function askClaude(
                 'x-api-key': apiKey,
                 'anthropic-version': '2023-06-01'
             },
+            signal,
             body: JSON.stringify({
                 model,
                 max_tokens: 4096,
@@ -193,12 +199,15 @@ export async function suggestElementName(
     apiKey: string,
     model: string,
     language: string,
-    appMapping?: ScreenMap[]
+    appMapping?: ScreenMap[] | string,
+    signal?: AbortSignal
 ): Promise<{ name: string; justification: string }> {
     if (!apiKey) throw new Error("Missing Claude API Key");
 
     let mappingContext = "";
-    if (appMapping && appMapping.length > 0) {
+    if (typeof appMapping === 'string') {
+        mappingContext = appMapping;
+    } else if (Array.isArray(appMapping) && appMapping.length > 0) {
         mappingContext = "\n\nAPPLICATION MAPPING (Context of other screens for naming consistency):\n";
         appMapping.forEach(screen => {
             mappingContext += `- Screen: "${screen.name}"\n`;
@@ -209,8 +218,17 @@ export async function suggestElementName(
     }
 
     const prompt = getElementNamingPrompt(screenName, elementAttr, language, mappingContext);
-
     const url = "https://api.anthropic.com/v1/messages";
+
+    const body = {
+        model,
+        max_tokens: 1024,
+        system: "You are a professional QA automation naming assistant. Respond with a valid JSON object containing 'name' and 'justification'.",
+        messages: [
+            { role: 'user', content: prompt }
+        ],
+        temperature: 0.1
+    };
 
     try {
         const response = await fetch(url, {
@@ -218,15 +236,11 @@ export async function suggestElementName(
             headers: {
                 'Content-Type': 'application/json',
                 'x-api-key': apiKey,
-                'anthropic-version': '2023-06-01'
+                'anthropic-version': '2023-06-01',
+                'dangerously-allow-browser': 'true'
             },
-            body: JSON.stringify({
-                model,
-                max_tokens: 40,
-                system: "You are a professional QA automation naming assistant. Return ONLY the name requested.",
-                messages: [{ role: 'user', content: prompt }],
-                temperature: 0.1
-            })
+            signal,
+            body: JSON.stringify(body)
         });
 
         if (!response.ok) {
@@ -237,19 +251,62 @@ export async function suggestElementName(
 
         const data = await response.json();
         const content = data.content?.[0]?.text;
+        
+        // DEBUG: Log status and content
+        console.log("[Claude Status] Stop Reason:", data.stop_reason || "UNKNOWN");
+        console.log("[Claude Raw Content]:", content);
+
         if (!content) {
             throw new Error("Empty AI response");
         }
 
         try {
-            const parsed = JSON.parse(content);
+            const firstBrace = content.indexOf('{');
+            const lastBrace = content.lastIndexOf('}');
+
+            if (firstBrace === -1) {
+                throw new Error("No JSON object start found");
+            }
+
+            let jsonString = "";
+            let parsed: any = null;
+
+            // Attempt normal parsing if we have a closing brace
+            if (lastBrace !== -1 && lastBrace > firstBrace) {
+                jsonString = content.substring(firstBrace, lastBrace + 1);
+                try {
+                    parsed = JSON.parse(jsonString);
+                } catch (e) {
+                    console.warn("[Claude] Normal parse failed, falling back to fuzzy extraction.");
+                }
+            }
+
+            // FUZZY EXTRACTION: If normal parse failed or was skipped due to truncation
+            if (!parsed) {
+                const nameMatch = content.match(/"name"\s*:\s*"([^"]+)"?/);
+                const justificationMatch = content.match(/"justification"\s*:\s*"([^"]+)"?/);
+                
+                if (nameMatch) {
+                    parsed = {
+                        name: nameMatch[1],
+                        justification: justificationMatch ? justificationMatch[1] : ""
+                    };
+                    console.log("[Claude] Fuzzy extraction successful:", parsed);
+                }
+            }
+
+            if (!parsed || !parsed.name) {
+                console.error("[Claude Error] Could not extract name from response:", content);
+                throw new Error("Invalid AI response format: No JSON object found");
+            }
+
             return {
-                name: parsed.name?.replace(/["']/g, '') || "Unknown Element",
+                name: parsed.name.replace(/["']/g, '') || "Unknown Element",
                 justification: parsed.justification || ""
             };
-        } catch (e) {
-            console.error("Failed to parse Claude response:", content);
-            throw new Error("Invalid AI response format");
+        } catch (e: any) {
+            console.error("[Claude Catch] Failed to process AI response:", content, e);
+            throw new Error(e.message || "Invalid AI response format");
         }
     } catch (e: any) {
         console.error("Claude suggestElementName failure:", e);
@@ -266,7 +323,8 @@ export async function suggestScreenTags(
     apiKey: string,
     model: string,
     language: string,
-    imageBase64?: string
+    imageBase64?: string,
+    signal?: AbortSignal
 ): Promise<string[]> {
     if (!apiKey) throw new Error("Missing Claude API Key");
 
@@ -279,7 +337,7 @@ ${elements.map(el => `- Name: "${el.name}" (Type: ${el.type})`).join('\n')}
 `.trim();
 
     try {
-        const result = await askClaude(prompt, apiKey, model, systemInstruction, imageBase64);
+        const result = await askClaude(prompt, apiKey, model, systemInstruction, imageBase64, signal);
         return result.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
     } catch (e) {
         console.error("Claude suggestScreenTags failure:", e);
@@ -295,7 +353,8 @@ export async function analyzeTestHistory(
     apiKey: string,
     model: string,
     language: string,
-    deepContext?: Record<string, DeepAnalysisContext>
+    deepContext?: Record<string, DeepAnalysisContext> | string,
+    signal?: AbortSignal
 ): Promise<string> {
     const systemInstruction = getTestHistoryAnalysisPrompt(language);
 
@@ -303,26 +362,33 @@ export async function analyzeTestHistory(
         .slice()
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
         .slice(0, 60)
-        .map(log => ({
-            suite: log.suite_name,
-            status: log.status,
-            device: log.device_model,
-            os: log.android_version,
-            time: log.timestamp,
-            duration: log.duration,
-            pass: log.pass_count,
-            fail: log.fail_count,
-            failedTests: log.failed_tests || []
-        }));
+        .map(log => {
+            const failedArray = log.failed_tests || [];
+            return {
+                suite: log.suite_name,
+                status: log.status,
+                device: log.device_model,
+                os: log.android_version,
+                time: log.timestamp,
+                duration: log.duration,
+                pass: log.pass_count,
+                fail: log.fail_count,
+                failedTests: failedArray.length > 5 
+                    ? [...failedArray.slice(0, 5), `...and ${failedArray.length - 5} more`] 
+                    : failedArray
+            };
+        });
 
-    const deepContextStr = deepContext && Object.keys(deepContext).length > 0
-        ? `\n\nDEEP CONTEXT (Performance & Detailed Logs):\n${JSON.stringify(deepContext, null, 2)}`
-        : "";
+    const deepContextStr = typeof deepContext === 'string'
+        ? `\n\nDEEP CONTEXT (Performance & Detailed Logs):\n${deepContext}`
+        : (deepContext && Object.keys(deepContext).length > 0
+            ? `\n\nDEEP CONTEXT (Performance & Detailed Logs):\n${JSON.stringify(deepContext, null, 2)}`
+            : "");
 
     const prompt = `History Data (JSON):\n${JSON.stringify(historySummary)}${deepContextStr}`;
 
     try {
-        return await askClaude(prompt, apiKey, model, systemInstruction);
+        return await askClaude(prompt, apiKey, model, systemInstruction, undefined, signal);
     } catch (e) {
         console.error("Claude analyzeTestHistory failure:", e);
         throw e;
@@ -337,7 +403,8 @@ export async function summarizeExecution(
     apiKey: string,
     model: string,
     language: string,
-    failureContext?: any[]
+    failureContext?: any[],
+    signal?: AbortSignal
 ): Promise<string> {
     const cleanAnsi = (l: string) => l.replace(/\x1b\[[0-9;]*m/g, '').replace(/[\x00-\x1f\x7f-\x9f]/g, '');
 
@@ -424,7 +491,7 @@ export async function summarizeExecution(
     const prompt = `Execution Tree Structure:\n${JSON.stringify(simplify(tree))}${overallStats}${failureContextStr}`;
 
     try {
-        return await askClaude(prompt, apiKey, model, systemInstruction, undefined);
+        return await askClaude(prompt, apiKey, model, systemInstruction, undefined, signal);
     } catch (e) {
         console.error("Claude summarizeExecution failure:", e);
         throw e;
@@ -441,7 +508,8 @@ export async function exploreScreen(
     model: string,
     language: string,
     existingMaps: ScreenMap[],
-    sessionHistory: string[]
+    sessionHistory: string[],
+    signal?: AbortSignal
 ): Promise<{
     screen: Partial<ScreenMap>;
     elements: UIElementMap[];
@@ -487,6 +555,7 @@ ${xmlDump.substring(0, 15000)}
                 'x-api-key': apiKey,
                 'anthropic-version': '2023-06-01'
             },
+            signal,
             body: JSON.stringify({
                 model,
                 max_tokens: 4096,
@@ -537,7 +606,8 @@ export async function reorganizeFlowchartLayout(
     maps: ScreenMap[],
     apiKey: string,
     model: string,
-    language: string
+    language: string,
+    signal?: AbortSignal
 ): Promise<Record<string, { gridX: number; gridY: number }>> {
     if (!apiKey) throw new Error("Missing Claude API Key");
 
@@ -554,6 +624,7 @@ export async function reorganizeFlowchartLayout(
                 'x-api-key': apiKey,
                 'anthropic-version': '2023-06-01'
             },
+            signal,
             body: JSON.stringify({
                 model,
                 max_tokens: 4096,

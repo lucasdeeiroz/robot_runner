@@ -287,9 +287,14 @@ ${mappingContext}
 Rules:
 1. Use "Space Separated" convention for the name (e.g., "Login Button", "Username Input").
 2. Respond in this language: ${language}.
-3. Return ONLY a valid JSON object with the following keys:
-   - "name": The suggested name.
-   - "justification": A brief explanation of why this name was chosen based on the attributes and existing context.
+3. Return ONLY a valid JSON object.
+4. Do NOT include any markdown code blocks (triple backticks), introductory text, or concluding remarks.
+5. Keep the "justification" field extremely concise (maximum 15 words).
+6. Use the following exact JSON structure:
+   {
+     "name": "Suggested Name",
+     "justification": "Short reason..."
+   }
 `.trim();
 }
 

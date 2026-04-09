@@ -15,7 +15,7 @@ import { AiButton } from "@/components/atoms/AiButton";
 import { generateRefinedTestCases as generateWithGemini, AIGenerationType } from '@/lib/dashboard/gemini';
 import { generateRefinedTestCases as generateWithClaude } from '@/lib/dashboard/claude';
 import { generateRefinedTestCases as generateWithOpenAI } from '@/lib/dashboard/openai';
-import { listScreenMaps } from '@/lib/dashboard/mapperPersistence';
+import { getAiContext } from '@/lib/dashboard/historyAnalysisUtils';
 import { exportToXlsx, exportToDocx } from '@/lib/dashboard/export';
 import { addToHistory } from './HistoryPanel';
 import { save } from '@tauri-apps/plugin-dialog';
@@ -44,20 +44,23 @@ export function AIGeneratorSubTab() {
         setIsGenerating(true);
         setAiError(null);
         try {
-            let maps = undefined;
+            let mapsContext: string | undefined = undefined;
             if (useMapping) {
-                maps = await listScreenMaps(activeProfileId);
+                const contextResponse = await getAiContext('artifact_generation', {
+                    profile_id: activeProfileId || undefined
+                });
+                mapsContext = contextResponse.context;
             }
 
             let aiResponse = "";
             const currentLang = i18n.language === 'pt' ? 'Portuguese' : i18n.language === 'es' ? 'Spanish' : 'English';
 
             if (provider === 'gemini') {
-                aiResponse = await generateWithGemini(requirements, apiKey as string, model, currentLang, maps, genType);
+                aiResponse = await generateWithGemini(requirements, apiKey as string, model, currentLang, mapsContext as any, genType);
             } else if (provider === 'claude') {
-                aiResponse = await generateWithClaude(requirements, apiKey as string, model, currentLang, maps, genType);
+                aiResponse = await generateWithClaude(requirements, apiKey as string, model, currentLang, mapsContext as any, genType);
             } else if (provider === 'openai') {
-                aiResponse = await generateWithOpenAI(requirements, apiKey as string, model, currentLang, maps, genType);
+                aiResponse = await generateWithOpenAI(requirements, apiKey as string, model, currentLang, mapsContext as any, genType);
             }
 
             setGeneratedContent(aiResponse);
@@ -66,7 +69,7 @@ export function AIGeneratorSubTab() {
             console.error("AI generation failed:", e);
             const errorMessage = e?.message || (typeof e === 'string' ? e : JSON.stringify(e)) || "Unknown Error";
             setAiError(errorMessage);
-            feedback.toast.error(t("dashboard.actions.ai_failed"));
+            feedback.toast.error(t("dashboard.actions.ai_failed", { error: errorMessage }));
         } finally {
             setIsGenerating(false);
         }

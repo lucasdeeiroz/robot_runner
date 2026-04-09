@@ -755,10 +755,24 @@ export const es = {
                 summarize_run: "Resumir Ejecución",
                 summary_title: "Resumen de la Ejecución",
                 summary_rationale: "Base del Análisis",
-                ai_analysis_placeholder: "Haga clic para realizar un análisis inteligente de causa raíz utilizando IA.",
-                ai_error_generic: "Fallo en el análisis de IA.",
-                ai_error_details: "Detalles del error:",
-                ai_error_copy: "Copiar error"
+                ai_analysis_placeholder: "Haga clic para realizar un análisis inteligente da causa raíz usando IA.",
+                ai_analysis_error: "Fallo en el análisis de IA",
+                ai_error_generic: "Análisis de IA fallido.",
+                ai_error_details: "Detalles del Error:",
+                ai_error_copy: "Copiar error",
+                ai_history: {
+                    title: "Análisis Inteligente de Historial",
+                    failures_limit: "Fallos a analizar",
+                    token_estimate: "Estimación de consumo",
+                    start_analysis: "Iniciar Análisis de Tendencias",
+                    regenerate: "Rehacer Análisis",
+                    last_analysis_on: "Último análisis realizado el {{date}}",
+                    no_analysis: "Aún no hay análisis previos para este historial.",
+                    tokens: "tokens",
+                    loading_context: "Extrayendo contexto comprimido...",
+                    success: "¡Análisis de tendencias completado!",
+                    persistence_note: "Este análisis se guardará hasta que solicites uno nuevo."
+                }
             }
         },
         scrcpy: {

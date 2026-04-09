@@ -45,6 +45,8 @@ pub struct SuiteNode {
     #[serde(default)]
     pub has_children: bool,
     pub stats: Option<SuiteStats>,
+    #[serde(default)]
+    pub ai_analysis: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -67,6 +69,8 @@ pub struct TestNode {
     pub has_children: bool,
     pub failure_detail: Option<FailureDetail>,
     pub logs: Vec<String>,
+    #[serde(default)]
+    pub ai_analysis: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -89,6 +93,8 @@ pub struct KeywordNode {
     pub children: Vec<LogNode>,
     #[serde(default)]
     pub has_children: bool,
+    #[serde(default)]
+    pub ai_analysis: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -135,23 +141,72 @@ pub async fn parse_robot_xml(
 }
 
 #[tauri::command]
+pub async fn save_node_ai_analysis(
+    db_path: String,
+    node_id: String,
+    analysis: String,
+) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || {
+        let db = LogDb::new(&db_path).map_err(|e| format!("Failed to open DB: {}", e))?;
+        db.update_node_ai_analysis(&node_id, &analysis)
+            .map_err(|e| format!("Update error: {}", e))
+    })
+    .await
+    .map_err(|e| format!("Task join error: {}", e))?
+}
+
+#[tauri::command]
+pub async fn get_node_ai_analysis(
+    db_path: String,
+    node_id: String,
+) -> Result<Option<String>, String> {
+    tokio::task::spawn_blocking(move || {
+        let db = LogDb::new(&db_path).map_err(|e| format!("Failed to open DB: {}", e))?;
+        db.get_node_ai_analysis(&node_id)
+            .map_err(|e| format!("Query error: {}", e))
+    })
+    .await
+    .map_err(|e| format!("Task join error: {}", e))?
+}
+
+#[tauri::command]
 pub async fn get_node_children(
     db_path: String,
     parent_id: String,
 ) -> Result<Vec<LogNode>, String> {
     tokio::task::spawn_blocking(move || {
         let db = LogDb::new(&db_path).map_err(|e| format!("Failed to open DB: {}", e))?;
-        let children_json = db.get_children(&parent_id).map_err(|e| format!("Query error: {}", e))?;
+        
+        // Use a customized query that joins with ai_analysis
+        let mut stmt = db.conn.prepare(
+            "SELECT json_payload, ai_analysis FROM log_nodes 
+             WHERE parent_id = ?1 
+             ORDER BY order_index ASC"
+        ).map_err(|e| e.to_string())?;
+
+        let rows = stmt.query_map([&parent_id], |row| {
+            let json: String = row.get(0)?;
+            let analysis: Option<String> = row.get(1)?;
+            Ok((json, analysis))
+        }).map_err(|e| e.to_string())?;
         
         let mut nodes = Vec::new();
-        println!("[XML Parser] get_node_children called for parent_id: '{}', db path: {}", parent_id, db_path);
-        for (i, json) in children_json.iter().enumerate() {
-            match serde_json::from_str::<LogNode>(json) {
-                Ok(node) => nodes.push(node),
-                Err(e) => println!("[XML Parser] Error deserializing child {} of {}: {}", i, parent_id, e),
+        for row in rows {
+            let (json, analysis) = row.map_err(|e| e.to_string())?;
+            match serde_json::from_str::<LogNode>(&json) {
+                Ok(mut node) => {
+                    // Inject the ai_analysis into the node object
+                    match &mut node {
+                        LogNode::Suite(s) => s.ai_analysis = analysis,
+                        LogNode::Test(t) => t.ai_analysis = analysis,
+                        LogNode::Keyword(k) => k.ai_analysis = analysis,
+                        _ => {}
+                    }
+                    nodes.push(node)
+                },
+                Err(e) => println!("[XML Parser] Error deserializing: {}", e),
             }
         }
-        println!("[XML Parser] get_node_children for parent_id '{}' returning {} nodes.", parent_id, nodes.len());
         Ok(nodes)
     })
     .await
@@ -166,7 +221,32 @@ pub async fn get_execution_failures(db_path: String) -> Result<Vec<serde_json::V
         
         let mut results = Vec::new();
         for json_str in failure_jsons {
-            if let Ok(val) = serde_json::from_str(&json_str) {
+            if let Ok(mut val) = serde_json::from_str::<serde_json::Value>(&json_str) {
+                if let Some(obj) = val.as_object_mut() {
+                    obj.remove("children");
+                    
+                    if let Some(logs) = obj.get_mut("logs") {
+                        if let Some(arr) = logs.as_array_mut() {
+                            if arr.len() > 3 {
+                                let start = arr.len() - 3;
+                                *arr = arr[start..].to_vec();
+                            }
+                        }
+                    }
+
+                    if let Some(fail_detail) = obj.get_mut("failureDetail") {
+                        if let Some(fd_obj) = fail_detail.as_object_mut() {
+                            fd_obj.remove("screenshotPath");
+                            fd_obj.remove("screenshot_path");
+                        }
+                    }
+                    if let Some(fail_detail) = obj.get_mut("failure_detail") {
+                        if let Some(fd_obj) = fail_detail.as_object_mut() {
+                            fd_obj.remove("screenshotPath");
+                            fd_obj.remove("screenshot_path");
+                        }
+                    }
+                }
                 results.push(val);
             }
         }
@@ -315,7 +395,8 @@ fn parse_robot_xml_sax_internal(app: &tauri::AppHandle, xml_path: &str, db_path:
                         
                         let suite = SuiteNode {
                             id, name, status: "PASS".to_string(), duration: "".to_string(),
-                            children: Vec::new(), has_children: false, stats: Some(SuiteStats { passed: 0, failed: 0, skipped: 0 })
+                            children: Vec::new(), has_children: false, stats: Some(SuiteStats { passed: 0, failed: 0, skipped: 0 }),
+                            ai_analysis: None
                         };
                         stack.push(LogNode::Suite(suite));
                     },
@@ -332,7 +413,8 @@ fn parse_robot_xml_sax_internal(app: &tauri::AppHandle, xml_path: &str, db_path:
                         
                         let test = TestNode {
                             id, name, status: "PASS".to_string(), duration: "".to_string(),
-                            children: Vec::new(), has_children: false, failure_detail: None, logs: Vec::new()
+                            children: Vec::new(), has_children: false, failure_detail: None, logs: Vec::new(),
+                            ai_analysis: None
                         };
                         stack.push(LogNode::Test(test));
                     },
@@ -387,7 +469,8 @@ fn parse_robot_xml_sax_internal(app: &tauri::AppHandle, xml_path: &str, db_path:
 
                         let kw = KeywordNode {
                             id, name, sub_type, status: "PASS".to_string(), duration: "".to_string(),
-                            args: Vec::new(), screenshot_path: None, children: Vec::new(), has_children: false
+                            args: Vec::new(), screenshot_path: None, children: Vec::new(), has_children: false,
+                            ai_analysis: None
                         };
                         stack.push(LogNode::Keyword(kw));
                     },

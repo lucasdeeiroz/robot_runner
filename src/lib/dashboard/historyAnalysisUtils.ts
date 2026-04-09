@@ -57,10 +57,16 @@ export async function findPerformanceData(testLog: TestLog, logsDir: string): Pr
 
 /**
  * Summarizes performance CSV data for AI consumption.
+ * Yields to the event loop to keep the UI responsive during large file processing.
  */
-export async function summarizePerformanceCsv(csvPath: string): Promise<PerformanceSummary | null> {
+export async function summarizePerformanceCsv(
+    csvPath: string,
+    onCancel?: () => boolean
+): Promise<PerformanceSummary | null> {
     try {
-        const content = await invoke<string>('read_file', { path: csvPath });
+        // Use read_file_tail to avoid loading massive CSVs into memory
+        // 200KB is usually more than enough for performance analysis of a single test run
+        const content = await invoke<string>('read_file_tail', { path: csvPath, maxBytes: 204800 });
         const lines = content.split('\n').filter(l => l.trim() !== '');
         if (lines.length < 2) return null;
 
@@ -76,7 +82,16 @@ export async function summarizePerformanceCsv(csvPath: string): Promise<Performa
         let totalFps = 0, fpsCount = 0;
         const spikes: string[] = [];
 
-        dataLines.forEach((line, i) => {
+        for (let i = 0; i < dataLines.length; i++) {
+            // Check for early cancellation
+            if (onCancel?.()) return null;
+
+            // Yield every 100 lines to keep UI responsive
+            if (i % 100 === 0 && i > 0) {
+                await new Promise(resolve => setTimeout(resolve, 0));
+            }
+
+            const line = dataLines[i];
             const cols = line.split(',');
             const cpu = parseFloat(cols[cpuIdx]);
             const ram = parseFloat(cols[ramIdx]);
@@ -96,7 +111,7 @@ export async function summarizePerformanceCsv(csvPath: string): Promise<Performa
                 fpsCount++;
                 if (fps < 20) spikes.push(`Low FPS (${fps.toFixed(1)}) at step ${i}`);
             }
-        });
+        }
 
         const count = dataLines.length;
         return {
@@ -116,12 +131,16 @@ export async function summarizePerformanceCsv(csvPath: string): Promise<Performa
 /**
  * Extracts failure messages and anomalous log patterns from Robot XML and Logcat.
  */
-export async function extractAnomalousLogs(xmlPath: string): Promise<{ failureMessages: string[], anomalousLogs: string[] }> {
+export async function extractAnomalousLogs(
+    xmlPath: string,
+    onCancel?: () => boolean
+): Promise<{ failureMessages: string[], anomalousLogs: string[] }> {
     const failureMessages: string[] = [];
     const anomalousLogs: string[] = [];
 
     try {
         // 1. Extract failures from XML
+        if (onCancel?.()) throw new Error("cancelled");
         const xmlContent = await invoke<string>('read_file', { path: xmlPath });
         // Quick extraction via regex (simple but effective for AI context)
         const statusMatches = xmlContent.matchAll(/<status[^>]*status="FAIL"[^>]*>([\s\S]*?)<\/status>/g);
@@ -140,7 +159,9 @@ export async function extractAnomalousLogs(xmlPath: string): Promise<{ failureMe
 
         if (logcatFile) {
             const fullLogcatPath = `${dirPath}/${logcatFile}`;
-            const logcatContent = await invoke<string>('read_file', { path: fullLogcatPath });
+            // Use read_file_tail for logcat as it can be huge. 
+            // 250KB is enough for AI to diagnose failures.
+            const logcatContent = await invoke<string>('read_file_tail', { path: fullLogcatPath, maxBytes: 256000 });
             
             // Search for critical patterns
             const criticalPatterns = [
@@ -152,11 +173,20 @@ export async function extractAnomalousLogs(xmlPath: string): Promise<{ failureMe
             ];
 
             const lines = logcatContent.split('\n');
-            lines.forEach(line => {
+            for (let i = 0; i < lines.length; i++) {
+                // Check for early cancellation
+                if (onCancel?.()) break;
+
+                // Yield every 100 lines to keep UI responsive
+                if (i % 100 === 0 && i > 0) {
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                }
+
+                const line = lines[i];
                 if (criticalPatterns.some(p => p.test(line))) {
                     anomalousLogs.push(line.trim());
                 }
-            });
+            }
         }
     } catch (e) {
         console.error("Failed to extract anomalous logs", e);
@@ -166,4 +196,27 @@ export async function extractAnomalousLogs(xmlPath: string): Promise<{ failureMe
         failureMessages: failureMessages.slice(0, 10), // Top 10 failures
         anomalousLogs: anomalousLogs.slice(0, 20) // Top 20 log anomalies
     };
+}
+
+export interface AiContextResponse {
+    context: string;
+    metadata: any;
+}
+
+/**
+ * Fetches optimized AI context from the Rust backend.
+ * This replaces heavy frontend parsing of logs and XMLs.
+ */
+export async function getAiContext(
+    type: 'history_analysis' | 'exploration' | 'artifact_generation',
+    params: {
+        run_id?: string;
+        db_path?: string;
+        log_paths?: string[];
+        profile_id?: string;
+        current_xml?: string;
+        current_screenshot?: string;
+    }
+): Promise<AiContextResponse> {
+    return await invoke<AiContextResponse>('get_ai_context', { contextType: type, params });
 }

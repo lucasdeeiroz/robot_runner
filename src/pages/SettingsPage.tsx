@@ -917,7 +917,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                 </div>
                             )}
 
-                            <div className="pt-4 border-t border-outline-variant/30 mt-4 animate-in fade-in duration-500">
+                            {/* <div className="pt-4 border-t border-outline-variant/30 mt-4 animate-in fade-in duration-500">
                                 <Input
                                     label={t('settings.ai.max_exploration_steps')}
                                     type="number"
@@ -929,7 +929,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                 <p className="text-[10px] text-on-surface-variant/80 mt-1">
                                     {t('settings.ai.max_exploration_steps_help')}
                                 </p>
-                            </div>
+                            </div> */}
                         </div>
                     </Section>
 
