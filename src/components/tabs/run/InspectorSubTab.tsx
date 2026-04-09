@@ -363,18 +363,12 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
      * Triggers AI-driven selector suggestion based on the selected node's attributes.
      */
     const handleAiSuggest = async (customPrompt?: string) => {
-        if (!selectedNode) return;
+        if (!selectedNode || isAiLoading) return;
 
         setShowAiSection(true);
         
-        // If we already have a cached suggestion for this exact element, use it instantly without calling API
-        if (aiCache[selectedNode.id]) {
-            setAiSuggestion(aiCache[selectedNode.id].suggestion);
-            setAiRationale(aiCache[selectedNode.id].rationale);
-            setAiError(null);
-            return;
-        }
-
+        // Explicit click always triggers a new generation. 
+        // Initial cache load is already handled by the useEffect on selection.
         setIsAiLoading(true);
         setAiSuggestion(null);
         setAiRationale(null);
