@@ -29,9 +29,8 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
     const { t } = useTranslation();
     const [mode, setMode] = useState<SelectionMode>('file');
     const [selectedPath, setSelectedPath] = useState<string>("");
-    const [launchStatus, setLaunchStatus] = useState<string>("");
+    const [launchStatus, setLaunchStatus] = useState("");
     const [isLaunching, setIsLaunching] = useState(false);
-    const [dontOverwrite, setDontOverwrite] = useState(false);
     const [warningModal, setWarningModal] = useState<{ isOpen: boolean, message: string }>({ isOpen: false, message: '' });
     const [selectedEntry, setSelectedEntry] = useState<FileEntry | null>(null);
     const { items, setTests, setArgs, clearSelection } = useSelection();
@@ -120,7 +119,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
         return () => observer.disconnect();
     }, []);
 
-    const { settings } = useSettings();
+    const { settings, updateSetting } = useSettings();
     const { addSession, sessions } = useTestSessions();
 
     const handleRun = async () => {
@@ -368,7 +367,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     devName,
                     finalTestPath || finalArgsFile || suiteName,
                     fw as 'robot' | 'maestro' | 'appium',
-                    dontOverwrite,
+                    settings.saveLogs,
                     finalArgsFile,
                     devModel,
                     devVer,
@@ -392,7 +391,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                         outputDir: logDir,
                         device: deviceUdid === 'local' ? null : deviceUdid,
                         argumentsFile: finalArgsFile,
-                        timestampOutputs: dontOverwrite,
+                        timestampOutputs: settings.saveLogs,
                         deviceModel: devModel,
                         androidVersion: devVer,
                         workingDir,
@@ -406,7 +405,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                         device: deviceUdid === 'local' ? null : deviceUdid,
                         maestroArgs: settings.tools.maestroArgs,
                         working_dir: settings.paths.automationRoot,
-                        timestampOutputs: dontOverwrite
+                        timestampOutputs: settings.saveLogs
                     }).catch(e => {
                         feedback.toast.error("tests.launch_failed", e);
                     });
@@ -560,8 +559,8 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                         <>
                             <Button
                                 variant="secondary"
-                                onClick={() => setDontOverwrite(!dontOverwrite)}
-                                className={clsx("w-full justify-start py-6", dontOverwrite && "bg-warning-container text-on-warning-container/50")}
+                                onClick={() => updateSetting('saveLogs', !settings.saveLogs)}
+                                className={clsx("w-full justify-start py-6", settings.saveLogs && "bg-warning-container text-on-warning-container/50")}
                                 leftIcon={<History size={18} />}
                                 title={t('tests.options.dont_overwrite')}
                             >

@@ -31,6 +31,7 @@ export interface AppSettings {
     customLogoDark?: string;
     recycleDeviceViews: boolean; // New setting
     allowActionsDuringTest: boolean; // Control whether actions are allowed during test
+    saveLogs: boolean; // Persist log saving preference
     usageMode?: 'explorer' | 'automator';
     automationFramework?: 'robot' | 'appium' | 'maestro';
 
@@ -86,6 +87,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     openaiModel: 'gpt-4o',
     recycleDeviceViews: false, // Default to false
     allowActionsDuringTest: false, // Default to false (blocking)
+    saveLogs: false, // Default to false
     appiumHost: '127.0.0.1',
     appiumPort: 4723,
     appiumBasePath: '/',
