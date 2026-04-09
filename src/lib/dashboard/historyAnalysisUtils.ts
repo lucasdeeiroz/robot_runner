@@ -213,6 +213,7 @@ export async function getAiContext(
         run_id?: string;
         db_path?: string;
         log_paths?: string[];
+        failures_limit?: number;
         profile_id?: string;
         current_xml?: string;
         current_screenshot?: string;

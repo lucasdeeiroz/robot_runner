@@ -116,6 +116,8 @@ export const es = {
             cancel: "Cancelar",
             save: "Guardar",
             saved: "Guardado",
+            save_and_run: "Guardar y Ejecutar",
+            run: "Ejecutar",
             undo: "Deshacer",
             redo: "Rehacer",
             next: "Siguiente",
@@ -148,6 +150,14 @@ export const es = {
             }
         },
         components: {
+            ai_button: {
+                customize_prompt: "Personalizar Prompt",
+                custom_rule_active: "Regla personalizada activa",
+                customize_description: "Agrega instrucciones específicas o reglas personalizadas al prompt de IA. Las instrucciones aquí definidas tendrán precedencia (sobrescribirán) sobre el comportamiento predeterminado de la inteligencia artificial para este botón.",
+                customize_placeholder: "Ej: Responda obligatoriamente en este formato específico... o Ignora las pruebas con las etiquetas...",
+                reset_prompt: "Restaurar prompt predeterminado",
+                clear: "Limpiar"
+            },
             logo: {
                 load_error: "Error al cargar logo"
             }

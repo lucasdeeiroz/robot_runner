@@ -154,7 +154,7 @@ export function HistoryDetailModal({ isOpen, onClose, log, onUpdateLog }: Histor
         }
     };
 
-    const handleSummarize = async () => {
+    const handleSummarize = async (customPrompt?: string) => {
         if (!log || tree.length === 0 || isSummarizing) return;
 
         setIsSummarizing(true);
@@ -195,11 +195,11 @@ export function HistoryDetailModal({ isOpen, onClose, log, onUpdateLog }: Histor
             }
 
             if (provider === 'openai') {
-                result = await openai.summarizeExecution(tree, apiKey, model, language, failureContext);
+                result = await openai.summarizeExecution(tree, apiKey, model, language, failureContext, undefined, customPrompt);
             } else if (provider === 'claude') {
-                result = await claude.summarizeExecution(tree, apiKey, model, language, failureContext);
+                result = await claude.summarizeExecution(tree, apiKey, model, language, failureContext, undefined, customPrompt);
             } else {
-                result = await gemini.summarizeExecution(tree, apiKey, model, language, failureContext);
+                result = await gemini.summarizeExecution(tree, apiKey, model, language, failureContext, undefined, customPrompt);
             }
 
             setSummary(result);
@@ -291,7 +291,7 @@ export function HistoryDetailModal({ isOpen, onClose, log, onUpdateLog }: Histor
                         <div className="flex items-center gap-2">
                             <AiButton
                                 isLoading={isSummarizing}
-                                onClick={handleSummarize}
+                                onClick={(_e, customPrompt) => handleSummarize(customPrompt)}
                                 label={t('run_tab.console.summarize_run')}
                                 variant="primary"
                                 disabled={tree.length === 0 || loading}

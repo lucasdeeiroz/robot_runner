@@ -32,7 +32,8 @@ export async function generateRefinedTestCases(
     language: string,
     appMapping?: ScreenMap[] | string,
     generationType: AIGenerationType = 'test_case',
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    customPrompt?: string
 ): Promise<string> {
     if (!apiKey) {
         throw new Error("Missing OpenAI API Key");
@@ -53,14 +54,14 @@ export async function generateRefinedTestCases(
 
     let promptString = "";
     switch (generationType) {
-        case 'test_case': promptString = getRefinedTestCasesPrompt(language); break;
-        case 'pbi': promptString = getRefinedPBIPrompt(language); break;
-        case 'improvement': promptString = getRefinedImprovementPrompt(language); break;
-        case 'bug': promptString = getRefinedBugPrompt(language); break;
-        case 'robot_script': promptString = getRefinedRobotScriptPrompt(language); break;
+        case 'test_case': promptString = getRefinedTestCasesPrompt(language, customPrompt); break;
+        case 'pbi': promptString = getRefinedPBIPrompt(language, customPrompt); break;
+        case 'improvement': promptString = getRefinedImprovementPrompt(language, customPrompt); break;
+        case 'bug': promptString = getRefinedBugPrompt(language, customPrompt); break;
+        case 'robot_script': promptString = getRefinedRobotScriptPrompt(language, customPrompt); break;
     }
 
-    const systemInstruction = getQAAssistantWrapper(promptString, !!appMapping, mappingContext);
+    const systemInstruction = getQAAssistantWrapper(promptString, !!appMapping, mappingContext, customPrompt);
 
     const url = "https://api.openai.com/v1/chat/completions";
 
@@ -208,7 +209,8 @@ export async function suggestElementName(
     model: string,
     language: string,
     appMapping?: ScreenMap[] | string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    customPrompt?: string
 ): Promise<{ name: string; justification: string }> {
     if (!apiKey) throw new Error("Missing OpenAI API Key");
 
@@ -225,7 +227,7 @@ export async function suggestElementName(
         });
     }
 
-    const prompt = getElementNamingPrompt(screenName, elementAttr, language, mappingContext);
+    const prompt = getElementNamingPrompt(screenName, elementAttr, language, mappingContext, customPrompt);
 
     const url = "https://api.openai.com/v1/chat/completions";
 
@@ -327,11 +329,12 @@ export async function suggestScreenTags(
     model: string,
     language: string,
     imageBase64?: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    customPrompt?: string
 ): Promise<string[]> {
     if (!apiKey) throw new Error("Missing OpenAI API Key");
 
-    const systemInstruction = getScreenTaggingPrompt(language);
+    const systemInstruction = getScreenTaggingPrompt(language, customPrompt);
 
     const prompt = `
 Screen Name: ${screenName}
@@ -357,9 +360,10 @@ export async function analyzeTestHistory(
     model: string,
     language: string,
     deepContext?: Record<string, DeepAnalysisContext> | string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    customPrompt?: string
 ): Promise<string> {
-    const systemInstruction = getTestHistoryAnalysisPrompt(language);
+    const systemInstruction = getTestHistoryAnalysisPrompt(language, customPrompt);
 
     const historySummary = history
         .slice()
@@ -407,7 +411,8 @@ export async function summarizeExecution(
     model: string,
     language: string,
     failureContext?: any[],
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    customPrompt?: string
 ): Promise<string> {
     const cleanAnsi = (l: string) => l.replace(/\x1b\[[0-9;]*m/g, '').replace(/[\x00-\x1f\x7f-\x9f]/g, '');
 
@@ -465,7 +470,7 @@ export async function summarizeExecution(
     const totalTests = stats.passed + stats.failed;
     const successRate = totalTests > 0 ? ((stats.passed / totalTests) * 100).toFixed(1) : "0";
 
-    const systemInstruction = getExecutionSummaryPrompt(language, totalTests);
+    const systemInstruction = getExecutionSummaryPrompt(language, totalTests, customPrompt);
 
     // Simplify tree for tokens (only structure + stats)
     const simplify = (nodes: any[]): any[] => {
@@ -512,7 +517,8 @@ export async function exploreScreen(
     language: string,
     existingMaps: ScreenMap[],
     sessionHistory: string[],
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    customPrompt?: string
 ): Promise<{
     screen: Partial<ScreenMap>;
     elements: UIElementMap[];
@@ -521,7 +527,7 @@ export async function exploreScreen(
 }> {
     if (!apiKey) throw new Error("Missing OpenAI API Key");
 
-    const systemInstruction = getExplorationPrompt(language);
+    const systemInstruction = getExplorationPrompt(language, customPrompt);
 
     const actionLogs = sessionHistory.filter(log =>
         log.includes("--- Step") ||
@@ -599,11 +605,12 @@ export async function reorganizeFlowchartLayout(
     apiKey: string,
     model: string,
     language: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    customPrompt?: string
 ): Promise<Record<string, { gridX: number; gridY: number }>> {
     if (!apiKey) throw new Error("Missing OpenAI API Key");
 
-    const systemInstruction = getFlowchartLayoutPrompt(language);
+    const systemInstruction = getFlowchartLayoutPrompt(language, customPrompt);
     const mappingContext = formatExistingMaps(maps);
 
     const url = "https://api.openai.com/v1/chat/completions";

@@ -18,11 +18,7 @@ import { decodeHtml } from '@/lib/utils';
 import { HistoryDetailModal } from '@/components/organisms/HistoryDetailModal';
 import { getCachedHistory, setCachedHistory, TestLog } from '@/lib/historyCache';
 import HistoryAIAnalysisModal from '@/components/organisms/HistoryAIAnalysisModal';
-import { analyzeTestHistory as analyzeGemini } from '@/lib/dashboard/gemini';
-import { analyzeTestHistory as analyzeOpenAI } from '@/lib/dashboard/openai';
-import { analyzeTestHistory as analyzeClaude } from '@/lib/dashboard/claude';
 import { AiButton } from "@/components/atoms/AiButton";
-import { getAiContext } from '@/lib/dashboard/historyAnalysisUtils';
 
 const formatDate = (dateStr: string) => {
     try {
@@ -42,7 +38,7 @@ const formatDate = (dateStr: string) => {
 
 
 export function HistorySubTab() {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const { settings } = useSettings();
     const [history, setHistory] = useState<TestLog[]>(getCachedHistory());
     const [filterText, setFilterText] = useState("");
@@ -64,15 +60,12 @@ export function HistorySubTab() {
 
     // AI Analysis State
     const [isAIModalOpen, setIsAIModalOpen] = useState(false);
-    const [aiAnalysisText, setAiAnalysisText] = useState("");
-    const [isAnalyzingHistory, setIsAnalyzingHistory] = useState(false);
-    const [aiAnalysisError, setAiAnalysisError] = useState<string | null>(null);
+    const [isAnalyzingHistory] = useState(false);
 
     const parentRef = useRef<HTMLDivElement>(null);
     const historyContainerRef = useRef<HTMLDivElement>(null);
     const [isHistoryNarrow, setIsHistoryNarrow] = useState(false);
     const abortControllerRef = useRef<AbortController | null>(null);
-    const analysisCancelledRef = useRef(false);
     const isFirstRun = useRef(true);
 
     useEffect(() => {
@@ -265,6 +258,7 @@ export function HistorySubTab() {
                             label={t('tests_page.actions.analyze_history')}
                             variant="primary"
                             className="shadow-lg shadow-primary/10 ml-2 h-8"
+                            allowCustomPrompt={false}
                         />
                         <Button
                             onClick={() => loadHistory(true)}

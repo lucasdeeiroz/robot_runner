@@ -38,7 +38,7 @@ export function AIGeneratorSubTab() {
     const model = provider === 'gemini' ? settings.geminiModel : provider === 'claude' ? settings.claudeModel : settings.openaiModel;
     const hasApiKey = !!apiKey;
 
-    const handleGenerate = async () => {
+    const handleGenerate = async (customPrompt?: string) => {
         if (!requirements.trim() || !hasApiKey) return;
 
         setIsGenerating(true);
@@ -56,11 +56,11 @@ export function AIGeneratorSubTab() {
             const currentLang = i18n.language === 'pt' ? 'Portuguese' : i18n.language === 'es' ? 'Spanish' : 'English';
 
             if (provider === 'gemini') {
-                aiResponse = await generateWithGemini(requirements, apiKey as string, model, currentLang, mapsContext as any, genType);
+                aiResponse = await generateWithGemini(requirements, apiKey as string, model, currentLang, mapsContext as any, genType, undefined, customPrompt);
             } else if (provider === 'claude') {
-                aiResponse = await generateWithClaude(requirements, apiKey as string, model, currentLang, mapsContext as any, genType);
+                aiResponse = await generateWithClaude(requirements, apiKey as string, model, currentLang, mapsContext as any, genType, undefined, customPrompt);
             } else if (provider === 'openai') {
-                aiResponse = await generateWithOpenAI(requirements, apiKey as string, model, currentLang, mapsContext as any, genType);
+                aiResponse = await generateWithOpenAI(requirements, apiKey as string, model, currentLang, mapsContext as any, genType, undefined, customPrompt);
             }
 
             setGeneratedContent(aiResponse);
@@ -213,12 +213,12 @@ export function AIGeneratorSubTab() {
                             </div>
                         ) : (
                             <AiButton
-                                onClick={handleGenerate}
+                                onClick={(_e, customPrompt) => handleGenerate(customPrompt)}
                                 isLoading={isGenerating}
                                 disabled={!requirements.trim() || isGenerating}
                                 label={t('dashboard.generator.generate_button', "Generate with AI")}
                                 showTextAlways
-                                className="w-full justify-center shadow-lg shadow-primary/20 h-11 text-base"
+                                className="w-full justify-center h-11 text-base shadow-none border-none"
                             />
                         )}
                     </div>

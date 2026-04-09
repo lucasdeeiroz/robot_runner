@@ -362,7 +362,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
     /**
      * Triggers AI-driven selector suggestion based on the selected node's attributes.
      */
-    const handleAiSuggest = async () => {
+    const handleAiSuggest = async (customPrompt?: string) => {
         if (!selectedNode) return;
 
         setShowAiSection(true);
@@ -381,7 +381,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
 
         const currentLang = i18n.language === 'pt' ? 'Portuguese' : i18n.language === 'es' ? 'Spanish' : 'English';
 
-        const systemInstruction = `
+        let systemInstruction = `
 You are an expert QA Automation Engineer. 
 Your task is to analyze the provided mobile element attributes and suggest the most resilient, stable, and unique selector (XPath or Accessibility ID).
 Rules:
@@ -391,6 +391,10 @@ Rules:
 4. Provide the suggestion in a clear format: "Selector: [the selector]" followed by "Rationale: [explanation]".
 5. Provide the Rationale in the requested language: ${currentLang}.
 `.trim();
+
+        if (customPrompt) {
+            systemInstruction += `\n\n=== CUSTOM INSTRUCTIONS ===\n${customPrompt}\n\nNote: The custom instructions above must take precedence and OVERRIDE any conflicting rules defined previously.`;
+        }
 
         const prompt = `
 Element details:
@@ -668,7 +672,7 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                                         <h3 className="text-xs font-semibold text-on-surface-variant/80 uppercase tracking-wider">{t('inspector.attributes.identifiers')}</h3>
                                         <AiButton
                                             isLoading={isAiLoading}
-                                            onClick={handleAiSuggest}
+                                            onClick={(_e, customPrompt) => handleAiSuggest(customPrompt)}
                                             label={t('inspector.attributes.suggest_with_ai')}
                                             variant="primary"
                                             className="h-7"

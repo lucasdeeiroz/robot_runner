@@ -116,6 +116,8 @@ export const en = {
             cancel: "Cancel",
             save: "Save",
             saved: "Saved",
+            save_and_run: "Save and Run",
+            run: "Run",
             undo: "Undo",
             redo: "Redo",
             next: "Next",
@@ -148,6 +150,14 @@ export const en = {
             }
         },
         components: {
+            ai_button: {
+                customize_prompt: "Customize Prompt",
+                custom_rule_active: "Custom rule active",
+                customize_description: "Add specific instructions or custom rules to the AI prompt. The instructions defined here will take precedence (overwrite) the default behavior of the artificial intelligence for this button.",
+                customize_placeholder: "Ex: Always answer in this specific format... or Ignore tests with the tags...",
+                reset_prompt: "Restore default prompt",
+                clear: "Clear"
+            },
             logo: {
                 load_error: "Failed to load logo"
             }

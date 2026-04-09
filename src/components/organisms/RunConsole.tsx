@@ -158,7 +158,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
         return () => { cancelled = true; };
     }, [isRunning, artifactPaths.output, session?.repopulatedTree]);
 
-    const handleSummarize = async () => {
+    const handleSummarize = async (customPrompt?: string) => {
         if (tree.length === 0 || isSummarizing) return;
 
         setIsSummarizing(true);
@@ -181,13 +181,13 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
 
             if (provider === 'gemini') {
                 if (!settings.geminiApiKey) throw new Error("Missing Gemini API Key");
-                result = await gemini.summarizeExecution(tree, settings.geminiApiKey, settings.geminiModel || '', language, failureContext);
+                result = await gemini.summarizeExecution(tree, settings.geminiApiKey, settings.geminiModel || '', language, failureContext, undefined, customPrompt);
             } else if (provider === 'openai') {
                 if (!settings.openaiApiKey) throw new Error("Missing OpenAI API Key");
-                result = await openai.summarizeExecution(tree, settings.openaiApiKey, settings.openaiModel || '', language, failureContext);
+                result = await openai.summarizeExecution(tree, settings.openaiApiKey, settings.openaiModel || '', language, failureContext, undefined, customPrompt);
             } else if (provider === 'claude') {
                 if (!settings.claudeApiKey) throw new Error("Missing Claude API Key");
-                result = await claude.summarizeExecution(tree, settings.claudeApiKey, settings.claudeModel || '', language, failureContext);
+                result = await claude.summarizeExecution(tree, settings.claudeApiKey, settings.claudeModel || '', language, failureContext, undefined, customPrompt);
             }
 
             setSummary(result);
@@ -630,7 +630,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                     {!isRunning && tree.length > 0 && (
                         <AiButton
                             isLoading={isSummarizing}
-                            onClick={handleSummarize}
+                            onClick={(_e, customPrompt) => handleSummarize(customPrompt)}
                             label={t('run_tab.console.summarize_run')}
                             variant="primary"
                             className="h-6"

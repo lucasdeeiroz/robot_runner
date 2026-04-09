@@ -263,20 +263,25 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
                                     </div>
                                     <AiButton
                                         isLoading={isAnalyzing}
-                                        onClick={async (e) => {
+                                        onClick={async (e, customPrompt) => {
                                             e.stopPropagation();
                                             setIsAnalyzing(true);
                                             setShowAiAnalysis(true);
                                             setAiAnalysis(null);
 
                                             const langName = i18n.language === 'pt' ? 'Portuguese' : i18n.language === 'es' ? 'Spanish' : 'English';
-                                            const systemInstruction = `
+                                            let systemInstruction = `
 You are a Senior QA Automation Engineer.
 Analyze the test failure provided (error message + screenshot if available).
 Identify the root cause (e.g., selector issue, synchronization problem, environment error, or actual bug).
 Suggest a technical fix or next steps for the developer.
 Respond in ${langName}. Keep it concise and technical.
 `.trim();
+                                            
+                                            if (customPrompt) {
+                                                systemInstruction += `\n\n=== CUSTOM INSTRUCTIONS ===\n${customPrompt}\n\nNote: The custom instructions above must take precedence and OVERRIDE any conflicting rules defined previously.`;
+                                            }
+
 
                                             const prompt = `
 Test Name: ${node.name}

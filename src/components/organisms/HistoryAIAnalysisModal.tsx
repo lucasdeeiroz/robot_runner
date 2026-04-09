@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { Modal } from './Modal';
 import { AiResponse } from '../molecules/AiResponse';
 import { toast } from 'sonner';
-import { Button } from '../atoms/Button';
 import { AiButton } from '../atoms/AiButton';
 import { useSettings } from '@/lib/settings';
 import { getAiContext } from '@/lib/dashboard/historyAnalysisUtils';
@@ -12,7 +11,6 @@ import { analyzeTestHistory as analyzeOpenAI } from '@/lib/dashboard/openai';
 import { analyzeTestHistory as analyzeClaude } from '@/lib/dashboard/claude';
 import { load } from '@tauri-apps/plugin-store';
 import { BrainCircuit, Info, Sparkles, History as HistoryIcon } from 'lucide-react';
-import clsx from 'clsx';
 
 interface HistoryAIAnalysisModalProps {
     isOpen: boolean;
@@ -35,13 +33,13 @@ const HistoryAIAnalysisModal: React.FC<HistoryAIAnalysisModalProps> = ({
 }) => {
     const { t, i18n } = useTranslation();
     const { settings } = useSettings();
-    
+
     const [failuresLimit, setFailuresLimit] = useState(20);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [analysisResult, setAnalysisResult] = useState("");
     const [analysisError, setAnalysisError] = useState<string | null>(null);
     const [lastAnalysis, setLastAnalysis] = useState<SavedAnalysis | null>(null);
-    
+
     const abortControllerRef = useRef<AbortController | null>(null);
 
     // Load cached analysis when modal opens or logsPath changes
@@ -53,7 +51,7 @@ const HistoryAIAnalysisModal: React.FC<HistoryAIAnalysisModalProps> = ({
 
     const loadCachedAnalysis = async () => {
         try {
-            const store = await load('ai_cache.json', { autoSave: true });
+            const store = await load('ai_cache.json', { autoSave: true, defaults: {} });
             const key = `history_analysis_${logsPath.replace(/[^a-zA-Z0-9]/g, '_')}`;
             const saved = await store.get<SavedAnalysis>(key);
             if (saved) {
@@ -71,7 +69,7 @@ const HistoryAIAnalysisModal: React.FC<HistoryAIAnalysisModalProps> = ({
 
     const saveAnalysisToCache = async (result: string, limit: number) => {
         try {
-            const store = await load('ai_cache.json', { autoSave: true });
+            const store = await load('ai_cache.json', { autoSave: true, defaults: {} });
             const key = `history_analysis_${logsPath.replace(/[^a-zA-Z0-9]/g, '_')}`;
             const data: SavedAnalysis = {
                 result,
@@ -90,7 +88,7 @@ const HistoryAIAnalysisModal: React.FC<HistoryAIAnalysisModalProps> = ({
         return (failuresLimit * 3750) + 500;
     }, [failuresLimit]);
 
-    const handleStartAnalysis = async () => {
+    const handleStartAnalysis = async (customPrompt?: string) => {
         if (historyData.length === 0) return;
 
         // Abort previous if any
@@ -141,11 +139,11 @@ const HistoryAIAnalysisModal: React.FC<HistoryAIAnalysisModalProps> = ({
             let result = "";
 
             if (provider === 'gemini') {
-                result = await analyzeGemini(historyData, apiKey, model, lang, deepContext, controller.signal);
+                result = await analyzeGemini(historyData, apiKey, model, lang, deepContext, controller.signal, customPrompt);
             } else if (provider === 'openai') {
-                result = await analyzeOpenAI(historyData, apiKey, model, lang, deepContext, controller.signal);
+                result = await analyzeOpenAI(historyData, apiKey, model, lang, deepContext, controller.signal, customPrompt);
             } else if (provider === 'claude') {
-                result = await analyzeClaude(historyData, apiKey, model, lang, deepContext, controller.signal);
+                result = await analyzeClaude(historyData, apiKey, model, lang, deepContext, controller.signal, customPrompt);
             }
 
             if (!controller.signal.aborted) {
@@ -213,13 +211,13 @@ const HistoryAIAnalysisModal: React.FC<HistoryAIAnalysisModalProps> = ({
                                 <span>{t('run_tab.console.ai_history.token_estimate')}:</span>
                                 <span className="font-bold text-on-surface">~{tokenEstimate.toLocaleString()} {t('run_tab.console.ai_history.tokens')}</span>
                             </div>
-                            
+
                             <AiButton
-                                onClick={handleStartAnalysis}
+                                onClick={(_e, customPrompt) => handleStartAnalysis(customPrompt)}
                                 isLoading={isAnalyzing}
                                 label={analysisResult ? t('run_tab.console.ai_history.regenerate') : t('run_tab.console.ai_history.start_analysis')}
                                 variant="primary"
-                                className="w-full md:w-auto h-10 px-6"
+                                className="w-full md:w-auto h-10 px-6 shadow-none"
                             />
                         </div>
                     </div>

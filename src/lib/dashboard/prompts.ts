@@ -1,6 +1,14 @@
 import { ScreenMap, NavigationData } from '@/lib/types';
 
 /**
+ * Appends a custom prompt instruction to the end of the original prompt if provided.
+ */
+export function appendCustomPrompt(basePrompt: string, customPrompt?: string): string {
+    if (!customPrompt || customPrompt.trim().length === 0) return basePrompt;
+    return `${basePrompt}\n\n=== CUSTOM INSTRUCTIONS ===\n${customPrompt}\n\nNote: The custom instructions above must take precedence and OVERRIDE any conflicting rules defined previously.`;
+}
+
+/**
  * Generates a rich summary of existing mapped screens for AI context.
  * Includes description, element names, and navigation connections so the AI
  * can make informed decisions about what has already been explored.
@@ -34,8 +42,8 @@ export function formatExistingMaps(maps: ScreenMap[]): string {
   }).join('\n');
 }
 
-export function getExplorationPrompt(language: string): string {
-  return `
+export function getExplorationPrompt(language: string, customPrompt?: string): string {
+  const basePrompt = `
 You are an Autonomous QA Mobile App Exploration Bot.
 Your mission is to explore and map a mobile application's UI as DEEPLY and COMPREHENSIVELY as possible.
 
@@ -153,10 +161,11 @@ JSON STRUCTURE:
   "rationale": "..."
 }
 `.trim();
+  return appendCustomPrompt(basePrompt, customPrompt);
 }
 
-export function getRefinedTestCasesPrompt(language: string): string {
-  return `
+export function getRefinedTestCasesPrompt(language: string, customPrompt?: string): string {
+  const basePrompt = `
 Convert the user's raw requirements into well-structured Gherkin (BDD) test scenarios.
 1. Use the Gherkin format (Given/When/Then).
 2. For each scenario, include:
@@ -172,10 +181,11 @@ Convert the user's raw requirements into well-structured Gherkin (BDD) test scen
 4. Separate multiple scenarios for the same story.
 5. Language: ${language}.
 `.trim();
+  return appendCustomPrompt(basePrompt, customPrompt);
 }
 
-export function getRefinedPBIPrompt(language: string): string {
-  return `
+export function getRefinedPBIPrompt(language: string, customPrompt?: string): string {
+  const basePrompt = `
 Convert requirements into detailed Product Backlog Items (PBIs/User Stories).
 1. Format each PBI as:
    PBI: [ID] - [Title]
@@ -188,10 +198,11 @@ Convert requirements into detailed Product Backlog Items (PBIs/User Stories).
 2. Focus on the user perspective and business value.
 3. Language: ${language}.
 `.trim();
+  return appendCustomPrompt(basePrompt, customPrompt);
 }
 
-export function getRefinedImprovementPrompt(language: string): string {
-  return `
+export function getRefinedImprovementPrompt(language: string, customPrompt?: string): string {
+  const basePrompt = `
 Analyze requirements and suggest UI/UX or functional improvements.
 1. Format as a list of improvements:
    Improvement [number]: [Title]
@@ -201,10 +212,11 @@ Analyze requirements and suggest UI/UX or functional improvements.
 2. Suggest enhancements that would make the feature more robust or user-friendly.
 3. Language: ${language}.
 `.trim();
+  return appendCustomPrompt(basePrompt, customPrompt);
 }
 
-export function getRefinedBugPrompt(language: string): string {
-  return `
+export function getRefinedBugPrompt(language: string, customPrompt?: string): string {
+  const basePrompt = `
 transform a bug description into a professional, structured bug report.
 1. Format as:
    Bug Report: [Title]
@@ -222,10 +234,11 @@ transform a bug description into a professional, structured bug report.
    Notes: [Optional environment details or hints]
 2. Language: ${language}.
 `.trim();
+  return appendCustomPrompt(basePrompt, customPrompt);
 }
 
-export function getRefinedRobotScriptPrompt(language: string): string {
-  return `
+export function getRefinedRobotScriptPrompt(language: string, customPrompt?: string): string {
+  const basePrompt = `
 Generate a complete, functional Robot Framework (.robot) script block.
 1. Use the standard structure: *** Settings ***, *** Variables ***, *** Keywords ***, *** Test Cases ***.
 2. In *** Settings ***, include Library AppiumLibrary.
@@ -234,13 +247,14 @@ Generate a complete, functional Robot Framework (.robot) script block.
 5. Ensure the script is valid and follows best practices for mobile automation.
 6. Language: ${language}.
 `.trim();
+  return appendCustomPrompt(basePrompt, customPrompt);
 }
 
 /**
  * Prompt specifically for reorganizing the flowchart layout.
  */
-export function getFlowchartLayoutPrompt(language: string): string {
-  return `
+export function getFlowchartLayoutPrompt(language: string, customPrompt?: string): string {
+  const basePrompt = `
 Analyze the provided mobile application screens and their navigation connections to reorganize the Flowchart layout using a grid-based system (gridX, gridY).
 
 ORGANIZATION RULES:
@@ -260,6 +274,7 @@ OUTPUT:
 
 Language for any required internal reasoning (though output must be valid JSON): ${language}.
 `.trim();
+  return appendCustomPrompt(basePrompt, customPrompt);
 }
 
 /**
@@ -269,14 +284,15 @@ export function getElementNamingPrompt(
   screenName: string,
   elementAttr: Record<string, string>,
   language: string,
-  mappingContext: string
+  mappingContext: string,
+  customPrompt?: string
 ): string {
   const attributes = Object.entries(elementAttr)
     .filter(([_, v]) => v)
     .map(([k, v]) => `- ${k}: ${v}`)
     .join('\n');
 
-  return `
+  const basePrompt = `
 Context: Professional QA Engineering and Test Automation.
 Task: Suggest a descriptive name and a brief justification for this UI element found in the screen "${screenName}".
 
@@ -296,28 +312,30 @@ Rules:
      "justification": "Short reason..."
    }
 `.trim();
+  return appendCustomPrompt(basePrompt, customPrompt);
 }
 
 /**
  * System instruction for suggesting semantic tags for a screen.
  */
-export function getScreenTaggingPrompt(language: string): string {
-  return `
+export function getScreenTaggingPrompt(language: string, customPrompt?: string): string {
+  const basePrompt = `
 You are a QA Architect.
 Analyze the screen components and optionally the provided screenshot to suggest 3 to 5 highly relevant semantic tags.
 Tags should be dynamic, context-aware, and useful for organizing a large test suite.
 Examples: "Authentication", "User Profile", "Social Media", "Shopping Cart", "Form Validation".
 Respond ONLY in a comma-separated list of tags in this language: ${language}.
 `.trim();
+  return appendCustomPrompt(basePrompt, customPrompt);
 }
 
 /**
  * System instruction for analyzing test history.
  */
-export function getTestHistoryAnalysisPrompt(language: string): string {
+export function getTestHistoryAnalysisPrompt(language: string, customPrompt?: string): string {
   const responseLanguage = language.toLowerCase().startsWith('pt') ? 'Portuguese' : language.toLowerCase().startsWith('es') ? 'Spanish' : 'English';
 
-  return `
+  const basePrompt = `
 You are a Senior QA Automation Engineer and Data Analyst. Do not mention who you are in your responses.
 Analyze the provided test execution history to identify:
 1. Flakiness: Tests that fail and pass intermittently under similar conditions. Use the "failedTests" list to track individual test stability across runs.
@@ -330,15 +348,16 @@ Provide a comprehensive analysis in Markdown format.
 Use professional tone and actionable insights.
 Response language: ${responseLanguage}.
 `.trim();
+  return appendCustomPrompt(basePrompt, customPrompt);
 }
 
 /**
  * System instruction for summarizing test execution results.
  */
-export function getExecutionSummaryPrompt(language: string, totalTests: number): string {
+export function getExecutionSummaryPrompt(language: string, totalTests: number, customPrompt?: string): string {
   const responseLanguage = language.toLowerCase().startsWith('pt') ? 'Portuguese' : language.toLowerCase().startsWith('es') ? 'Spanish' : 'English';
 
-  return `
+  const basePrompt = `
 You are a Senior Lead QA Engineer.
 Analyze the provided test execution tree and failure context to provide a high-level "Executive Summary".
 
@@ -356,13 +375,14 @@ Rules:
 - IF technical details are provided in FAILURE CONTEXT, YOU MUST use them. Do not say they are missing.
 - Response language: ${responseLanguage}.
 `.trim();
+  return appendCustomPrompt(basePrompt, customPrompt);
 }
 
 /**
  * Standardizes the "Senior QA Specialist" wrapper for refined test cases.
  */
-export function getQAAssistantWrapper(promptString: string, appMapping: boolean, mappingContext: string): string {
-  return `
+export function getQAAssistantWrapper(promptString: string, appMapping: boolean, mappingContext: string, customPrompt?: string): string {
+  const basePrompt = `
 You are a Senior QA Specialist and Product Owner assistant.
 
 ${promptString}
@@ -373,4 +393,5 @@ RULES:
 3. ${appMapping ? "PRIORITIZE using the names and screens provided in the APPLICATION MAPPING context below. If a requirement mentions an action that matches a mapped element, use that element's specific name." : "Use generic but clear terminology."}
 ${mappingContext}
 `.trim();
+  return appendCustomPrompt(basePrompt, customPrompt);
 }

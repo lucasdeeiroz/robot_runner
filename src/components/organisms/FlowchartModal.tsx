@@ -592,7 +592,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
     };
 
     /** AI-powered auto-reorganize with BFS fallback */
-    const autoReorganizeLayout = async () => {
+    const autoReorganizeLayout = async (customPrompt?: string) => {
         const provider = settings.aiProvider;
         const apiKey = provider === 'openai' ? settings.openaiApiKey : provider === 'claude' ? settings.claudeApiKey : settings.geminiApiKey;
         const model = provider === 'openai' ? settings.openaiModel : provider === 'claude' ? settings.claudeModel : settings.geminiModel;
@@ -609,11 +609,11 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
             const language = i18n.language || 'en';
 
             if (provider === 'openai') {
-                result = await reorganizeWithOpenAI(maps, apiKey, model, language);
+                result = await reorganizeWithOpenAI(maps, apiKey, model, language, undefined, customPrompt);
             } else if (provider === 'claude') {
-                result = await reorganizeWithClaude(maps, apiKey, model, language);
+                result = await reorganizeWithClaude(maps, apiKey, model, language, undefined, customPrompt);
             } else {
-                result = await reorganizeWithGemini(maps, apiKey, model, language);
+                result = await reorganizeWithGemini(maps, apiKey, model, language, undefined, customPrompt);
             }
 
             if (result && Object.keys(result).length > 0) {
@@ -1436,7 +1436,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                     </h2>
                     <div className="flex items-center gap-2">
                         <AiButton
-                            onClick={autoReorganizeLayout}
+                            onClick={(_, cp) => autoReorganizeLayout(cp)}
                             variant="primary"
                             label={t('mapper.flowchart.reorganize')}
                             isLoading={isReorganizing}
