@@ -1403,8 +1403,10 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                     const edgeId = `${sourceMap.name}-${el.name}-${targetName}`;
                     const edgeData = layout.edges[edgeId] || {};
 
-                    // SAFETY: If either node is at (0,0) (likely invalid/fallback), force no-vertices mode
-                    const isInvalidGeometry = (sourceLayout.gridX === 0 && sourceLayout.gridY === 0) || (targetLayout.gridX === 0 && targetLayout.gridY === 0);
+                    // SAFETY: Only disable custom vertices when either node has unusable coordinates.
+                    // (0,0) is a valid grid position and must not be treated as invalid geometry.
+                    const hasValidGridCoords = (node: LayoutNode) => Number.isFinite(node.gridX) && Number.isFinite(node.gridY);
+                    const isInvalidGeometry = !hasValidGridCoords(sourceLayout) || !hasValidGridCoords(targetLayout);
                     const effectiveVertices = isInvalidGeometry ? [] : (edgeData.vertices || []);
 
                     let startPoint = { x: 0, y: 0 };
