@@ -116,7 +116,7 @@ export function transformXmlToTree(rawNode: any, parent?: InspectorNode, keyName
     });
 
     // Normalize tagName to 'node' for all elements except hierarchy
-    const tagName = (keyName === 'hierarchy') ? 'hierarchy' : 'node';
+    const tagName = keyName;
 
     const node: InspectorNode = {
         id: Math.random().toString(36).substr(2, 9),
@@ -339,43 +339,14 @@ export function findNodesByLocator(root: InspectorNode, locator: string): Inspec
         if (path.startsWith('/hierarchy')) path = path.substring(10);
         if (path === '') return [root];
 
-        const evaluatePart = (nodes: InspectorNode[], segments: string[]): InspectorNode[] => {
-            if (segments.length === 0) return nodes;
-            const segment = segments[0];
-            const remaining = segments.slice(1);
-            const isDescendant = segment === ""; // happens if we have "//"
-
-            if (isDescendant) {
-                // Handle //tag or //tag[predicate]
-                const actualSegment = remaining.shift();
-                if (!actualSegment) return nodes;
-
-                const candidates: InspectorNode[] = [];
-                const searchDescendants = (n: InspectorNode) => {
-                    if (matchSegment(n, actualSegment)) candidates.push(n);
-                    n.children.forEach(searchDescendants);
-                };
-                nodes.forEach(searchDescendants);
-                return evaluatePart(candidates, remaining);
-            } else {
-                // Handle /tag or /tag[predicate]
-                const candidates: InspectorNode[] = [];
-                nodes.forEach(n => {
-                    n.children.forEach(child => {
-                        if (matchSegment(child, segment)) candidates.push(child);
-                    });
-                });
-                return evaluatePart(candidates, remaining);
-            }
-        };
-
-        const matchSegment = (node: InspectorNode, segment: string): boolean => {
-            const match = segment.match(/^(.*?)(?:\[(.*?)\])?$/);
-            if (!match) return false;
-            const [, tag, predicate] = match;
-
+        const checkMatch = (node: InspectorNode, tag: string, predicate: string | null): boolean => {
             // 1. Tag Match
-            const matchesTag = tag === '*' || tag === "" || tag === 'node' || tag === node.tagName || node.tagName.endsWith('.' + tag) || node.attributes['class'] === tag;
+            const matchesTag = tag === '*' || tag === "" || tag === 'node' || 
+                             node.tagName === tag || 
+                             node.tagName.endsWith('.' + tag) || 
+                             node.attributes['class'] === tag ||
+                             node.attributes['class']?.endsWith('.' + tag);
+            
             if (!matchesTag) return false;
 
             // 2. Predicate Match
@@ -385,17 +356,17 @@ export function findNodesByLocator(root: InspectorNode, locator: string): Inspec
             if (/^\d+$/.test(predicate)) {
                 const index = parseInt(predicate, 10);
                 if (!node.parent) return index === 1;
-                
-                // If tag is generic (node, *, empty), we count all siblings regardless of type
-                // Otherwise we follow standard XPath: count siblings of the same tagName/class
-                let siblings: InspectorNode[];
-                if (tag === 'node' || tag === '*' || tag === "") {
-                    siblings = node.parent.children;
-                } else {
-                    siblings = node.parent.children.filter(c => c.tagName === node.tagName || c.attributes['class'] === node.attributes['class']);
-                }
-                
-                return (siblings.indexOf(node) + 1) === index;
+
+                // Standard XPath rule: count siblings that match the SAME tag/criteria
+                const matchingSiblings = node.parent.children.filter(c => 
+                    tag === '*' || tag === "" || tag === 'node' || 
+                    c.tagName === tag || 
+                    c.tagName.endsWith('.' + tag) || 
+                    c.attributes['class'] === tag ||
+                    c.attributes['class']?.endsWith('.' + tag)
+                );
+
+                return (matchingSiblings.indexOf(node) + 1) === index;
             }
 
             // Handle attribute predicates: @attr='val', contains(@attr, 'val'), etc.
@@ -429,6 +400,42 @@ export function findNodesByLocator(root: InspectorNode, locator: string): Inspec
             return true;
         };
 
+        const evaluatePart = (nodes: InspectorNode[], segments: string[]): InspectorNode[] => {
+            if (segments.length === 0) return nodes;
+            const segment = segments[0];
+            const remaining = segments.slice(1);
+            const isDescendant = segment === ""; // happens if we have "//"
+
+            if (isDescendant) {
+                const actualSegmentStr = remaining.shift();
+                if (!actualSegmentStr) return nodes;
+
+                const matchInfo = actualSegmentStr.match(/^(.*?)(?:\[(.*?)\])?$/);
+                const tag = matchInfo ? matchInfo[1] : actualSegmentStr;
+                const predicate = matchInfo ? (matchInfo[2] || null) : null;
+
+                const candidates: InspectorNode[] = [];
+                const searchDescendants = (n: InspectorNode) => {
+                    if (checkMatch(n, tag, predicate)) candidates.push(n);
+                    n.children.forEach(searchDescendants);
+                };
+                nodes.forEach(searchDescendants);
+                return evaluatePart(candidates, remaining);
+            } else {
+                const matchInfo = segment.match(/^(.*?)(?:\[(.*?)\])?$/);
+                const tag = matchInfo ? matchInfo[1] : segment;
+                const predicate = matchInfo ? (matchInfo[2] || null) : null;
+
+                const candidates: InspectorNode[] = [];
+                nodes.forEach(n => {
+                    n.children.forEach(child => {
+                        if (checkMatch(child, tag, predicate)) candidates.push(child);
+                    });
+                });
+                return evaluatePart(candidates, remaining);
+            }
+        };
+
         const segments = path.split('/');
         // If it was absolute (/node), the first segment is ""
         // If it was relative (//node), the first two segments are ""
@@ -441,10 +448,12 @@ export function findNodesByLocator(root: InspectorNode, locator: string): Inspec
 
             // It's an absolute path (/node/...)
             const firstSegment = segments[1];
-            const firstTag = firstSegment ? firstSegment.split('[')[0] : "";
-            const isExplicitRoot = firstTag === 'hierarchy' || firstTag === root.tagName;
+            const matchInfo = firstSegment ? firstSegment.match(/^(.*?)(?:\[(.*?)\])?$/) : null;
+            const tag = matchInfo ? matchInfo[1] : (firstSegment || "");
+            const predicate = matchInfo ? (matchInfo[2] || null) : null;
+            const isExplicitRoot = tag === 'hierarchy' || tag === root.tagName;
 
-            if (firstSegment && isExplicitRoot && matchSegment(root, firstSegment)) {
+            if (firstSegment && isExplicitRoot && checkMatch(root, tag, predicate)) {
                 // Root is explicitly matched (e.g. /hierarchy or /android.widget.FrameLayout matching root)
                 // We proceed to evaluate children against the remaining segments
                 return evaluatePart([root], segments.slice(2));
