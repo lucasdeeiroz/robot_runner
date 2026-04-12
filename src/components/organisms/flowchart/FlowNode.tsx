@@ -1,6 +1,6 @@
 import React from 'react';
 import clsx from 'clsx';
-import { Pencil } from 'lucide-react';
+import { Pencil, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/atoms/Button';
 import { NODE_WIDTH, NODE_HEIGHT } from './types';
@@ -57,7 +57,10 @@ export const FlowNode = React.memo(({
                         alt={data.name}
                     />
                 ) : (
-                    <span className="text-xs text-on-surface-variant/50">No Preview</span>
+                    <div className="flex flex-col items-center gap-1">
+                        <AlertTriangle className="text-warning h-6 w-6 opacity-80" />
+                        <span className="text-[10px] text-on-surface-variant/50">{t('mapper.flowchart.no_preview', 'No Preview')}</span>
+                    </div>
                 )}
                 {/* Type Badge - Top Right */}
                 <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-black/60 text-[10px] text-white backdrop-blur-sm z-10">

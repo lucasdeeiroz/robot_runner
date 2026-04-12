@@ -588,6 +588,11 @@ export const en = {
                 filter_tags: "Filter by Tag",
                 select_source_element: "Please select a source element",
                 element_not_found: "Source element not found",
+                ai_missed_count: "{{count}} screens not mapped by AI",
+                ai_missed_help: "These screens were placed in the quarantine area on the right. Drag them to their places or complete the mapping if they are incomplete.",
+                no_preview: "No preview recorded",
+                clear_curvatures: "Clear all curvatures",
+                curvatures_cleared: "All edge curvatures have been cleared",
                 unsaved_changes: {
                     title: "Unsaved Changes",
                     message: "You have unsaved changes. Do you want to save before exiting?",

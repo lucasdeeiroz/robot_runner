@@ -666,7 +666,7 @@ export async function reorganizeFlowchartLayout(
             signal,
             body: JSON.stringify({
                 model,
-                max_tokens: 4096,
+                max_tokens: 8192,
                 system: systemInstruction,
                 messages: [
                     { role: 'user', content: `Current Application Mapping:\n${mappingContext}` }

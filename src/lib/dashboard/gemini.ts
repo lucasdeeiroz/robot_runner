@@ -647,7 +647,8 @@ export async function reorganizeFlowchartLayout(
                 },
                 generationConfig: {
                     temperature: 0.1,
-                    responseMimeType: "application/json"
+                    responseMimeType: "application/json",
+                    maxOutputTokens: 8192
                 }
             })
         });

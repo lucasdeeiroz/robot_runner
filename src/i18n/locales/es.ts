@@ -595,6 +595,11 @@ export const es = {
                 filter_tags: "Filtrar por Etiqueta",
                 select_source_element: "Por favor, seleccione un elemento de origen",
                 element_not_found: "Elemento de origen no encontrado",
+                ai_missed_count: "{{count}} pantallas no mapeadas por IA",
+                ai_missed_help: "Estas pantallas se colocaron en el área de cuarentena a la derecha. Arrástralas a sus lugares o completa el mapeo si están incompletas.",
+                no_preview: "Sin vista previa registrada",
+                clear_curvatures: "Limpiar todas las curvaturas",
+                curvatures_cleared: "Se han limpiado todas las curvaturas de las aristas",
                 unsaved_changes: {
                     title: "Cambios no guardados",
                     message: "Tienes cambios de diseño sin guardar. ¿Quieres guardar antes de salir?",

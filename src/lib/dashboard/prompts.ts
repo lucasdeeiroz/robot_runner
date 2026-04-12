@@ -257,6 +257,11 @@ export function getFlowchartLayoutPrompt(language: string, customPrompt?: string
   const basePrompt = `
 Analyze the provided mobile application screens and their navigation connections to reorganize the Flowchart layout using a grid-based system (gridX, gridY).
 
+MANDATORY EXHAUSTIVITY RULE:
+- You MUST provide coordinates for EVERY SINGLE screen listed in the input.
+- Do NOT skip any screen, even if it has no connections or seems unimportant.
+- If you find 50 screens in the input, you MUST return exactly 50 entries in the JSON.
+
 ORGANIZATION RULES:
 1. INITIAL SCREEN: The very first screen of the app (Splash/Welcome/Login) MUST be at (gridX: 0, gridY: 0).
 2. AUTHENTICATION: Login and Registration screens should follow to the right (gridX: 1, 2...).
@@ -270,7 +275,7 @@ ORGANIZATION RULES:
 8. CLARITY: Minimize overlapping connection lines. Prioritize a clean, hierarchical tree structure that grows primarily from LEFT to RIGHT and spreads TOP to BOTTOM.
 
 INPUT:
-- A list of screens with their names, descriptions, types, and navigation connections (navigates_to).
+- A list of screens with their names, types, and navigation connections.
 
 OUTPUT:
 - Return ONLY a valid JSON object mapping each screen NAME to its new coordinates.
