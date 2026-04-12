@@ -95,7 +95,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
     } | null>(null);
     const [isQuickConnectOpen, setIsQuickConnectOpen] = useState(false);
 
-    // Unsaved Changes State
+    const [isExporting, setIsExporting] = useState(false);
     const [isDirty, setIsDirty] = useState(false);
     const [missedScreens, setMissedScreens] = useState<string[]>([]);
     const [showUnsavedChangesModal, setShowUnsavedChangesModal] = useState(false);
@@ -111,7 +111,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
         return Array.from(new Set(tags)).sort();
     }, [maps]);
 
-    const isInteracting = !!dragItem || isDraggingCanvas || isQuickConnectOpen;
+    const isInteracting = !!dragItem || isDraggingCanvas || isQuickConnectOpen || isExporting;
 
     const matchesFilter = (screenName: string) => {
         if (!filterTag) return true;
@@ -444,6 +444,12 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
 
     const handleExportImage = async () => {
         if (!contentRef.current) return;
+        
+        setIsExporting(true);
+        
+        // Wait for React to re-render with culling disabled (slightly longer for large grids)
+        await new Promise(resolve => setTimeout(resolve, 400));
+
         try {
             const width = gridBounds.width * CELL_WIDTH;
             const height = gridBounds.height * CELL_HEIGHT;
@@ -454,7 +460,15 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                     transform: `translate(${- gridBounds.minX * CELL_WIDTH}px, ${- gridBounds.minY * CELL_HEIGHT}px)`,
                 },
                 width: width,
-                height: height
+                height: height,
+                filter: (node) => {
+                    // Exclude interactive elements like controls and ports from the static image
+                    if (node instanceof HTMLElement) {
+                        if (node.classList.contains('port-handle')) return false;
+                        if (node.classList.contains('edge-controls')) return false;
+                    }
+                    return true;
+                }
             });
 
             const base64Data = dataUrl.split(',')[1];
@@ -477,6 +491,8 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
         } catch (e) {
             console.error(e);
             feedback.toast.error(t('mapper.flowchart.export_error'));
+        } finally {
+            setIsExporting(false);
         }
     };
 
@@ -1317,7 +1333,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
 
     // 2. Viewport Culling Bounds
     const viewportBounds = useMemo(() => {
-        if (!containerRef.current) return null;
+        if (isExporting || !containerRef.current) return null;
         const rect = containerRef.current.getBoundingClientRect();
 
         // Convert screen coordinates to canvas coordinates (including scale and offset)
@@ -1334,7 +1350,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
             maxX: maxX + BUFFER,
             maxY: maxY + BUFFER
         };
-    }, [offset, scale]);
+    }, [offset, scale, isExporting]);
 
     // --- Render Logic ---
     const edgeLayouts = useMemo(() => {
