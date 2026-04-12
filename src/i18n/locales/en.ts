@@ -639,7 +639,8 @@ export const en = {
                 active: "AI Exploring...",
                 thinking: "Thinking...",
                 summary: "Exploration Ended",
-                stopped: "Exploration stopped: {{reason}}"
+                stopped: "Exploration stopped: {{reason}}",
+                cancelled: "Exploration cancelled"
             },
             modes: {
                 inspect: "Inspect Mode",

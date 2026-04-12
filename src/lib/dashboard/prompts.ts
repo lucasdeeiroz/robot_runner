@@ -258,21 +258,25 @@ export function getFlowchartLayoutPrompt(language: string, customPrompt?: string
 Analyze the provided mobile application screens and their navigation connections to reorganize the Flowchart layout using a grid-based system (gridX, gridY).
 
 ORGANIZATION RULES:
-1. INITIAL SCREEN: The very first screen of the app (usually Splash, Welcome, or Login) must be placed at the leftmost position (gridX: 0).
-2. AUTHENTICATION: Login and Registration screens should immediately follow the Initial Screen to the right.
-3. HOME SCREEN: The main application dashboard/home screen must be placed to the right of the authentication screens.
-4. MAIN FLOWS: All navigation flows originating from the Home Screen must proceed from left to right (increasing gridX).
-5. BRANCHING: When a screen has multiple destinations (branches), place them one below the other (different gridY values) while maintaining their horizontal progression.
-6. CLARITY: Ensure the overall layout is logical, minimize overlapping paths, and prioritize human readability.
+1. INITIAL SCREEN: The very first screen of the app (Splash/Welcome/Login) MUST be at (gridX: 0, gridY: 0).
+2. AUTHENTICATION: Login and Registration screens should follow to the right (gridX: 1, 2...).
+3. HOME SCREEN: The main dashboard/home screen must be placed to the right of the authentication flow.
+4. VERTICAL SPREADING (CRITICAL): Do NOT place all screens in a single horizontal line. If multiple screens originate from the same parent (like different tabs from Home), they MUST be distributed vertically (different gridY values).
+5. BRANCHING HIERARCHY: When a screen has multiple destinations:
+   - The first destination continues the horizontal flow (same gridY, increasing gridX).
+   - Subsequent destinations MUST be placed below (increasing gridY) the first one, creating a clear tree structure.
+6. FUNCTIONAL GROUPING: Screens belonging to distinct areas (e.g., "Settings" flow vs "Profile" flow) should be placed in entirely different Y-sectors (e.g., Settings at gridY: 0-5, Profile at gridY: 10-15) to maintain visual separation.
+7. MAX HORIZONTAL DENSITY: Avoid long horizontal chains. If a flow exceeds 5 screens in a straight line, consider indenting or shifting the Y-level for the next segment if it helps readability.
+8. CLARITY: Minimize overlapping connection lines. Prioritize a clean, hierarchical tree structure that grows primarily from LEFT to RIGHT and spreads TOP to BOTTOM.
 
 INPUT:
 - A list of screens with their names, descriptions, types, and navigation connections (navigates_to).
 
 OUTPUT:
-- Return ONLY a valid JSON object mapping each screen NAME (the unique ID used in navigation) to its new coordinates.
+- Return ONLY a valid JSON object mapping each screen NAME to its new coordinates.
 - Format: { "Screen Name": { "gridX": number, "gridY": number }, ... }
 
-Language for any required internal reasoning (though output must be valid JSON): ${language}.
+Language for any required internal reasoning: ${language}.
 `.trim();
   return appendCustomPrompt(basePrompt, customPrompt);
 }

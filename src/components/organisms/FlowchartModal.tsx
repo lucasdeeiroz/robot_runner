@@ -18,6 +18,7 @@ import { reorganizeFlowchartLayout as reorganizeWithGemini } from '@/lib/dashboa
 import { reorganizeFlowchartLayout as reorganizeWithOpenAI } from '@/lib/dashboard/openai';
 import { reorganizeFlowchartLayout as reorganizeWithClaude } from '@/lib/dashboard/claude';
 import { AiButton } from '@/components/atoms/AiButton';
+import { getAiContext } from '@/lib/dashboard/historyAnalysisUtils';
 import {
     CELL_WIDTH,
     CELL_HEIGHT,
@@ -569,13 +570,20 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
         try {
             let result: Record<string, { gridX: number, gridY: number }> = {};
             const language = i18n.language || 'en';
+            console.log(`[Flowchart] Requesting AI context for profile: ${activeProfileIdRef.current}`);
 
-            // Use the optimized context from Rust
-            const response = await invoke<{ context: string }>('get_ai_context', {
-                contextType: 'FlowchartLayout',
-                params: { profile_id: activeProfileIdRef.current }
+            // Use the optimized context from Rust via helper
+            const response = await getAiContext('flowchart_layout', {
+                profile_id: activeProfileIdRef.current
             });
+
+            if (!response || !response.context) {
+                console.error("[Flowchart] AI context empty or invalid response:", response);
+                throw new Error("Failed to retrieve application navigation context from backend.");
+            }
+
             const mappingContext = response.context;
+            console.log("[Flowchart] AI context received, sending to provider:", provider);
 
             if (provider === 'openai') {
                 result = await reorganizeWithOpenAI(mappingContext, apiKey, model, language, undefined, customPrompt);
@@ -584,6 +592,8 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
             } else {
                 result = await reorganizeWithGemini(mappingContext, apiKey, model, language, undefined, customPrompt);
             }
+            
+            console.log("[Flowchart] AI Layout Result:", result);
 
             if (result && Object.keys(result).length > 0) {
                 // Ensure all mapped screens have a position, even if AI missed them

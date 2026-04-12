@@ -9,7 +9,7 @@ import { XMLParser } from 'fast-xml-parser';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { useOutsideClick } from '@/hooks/useOutsideClick';
-import { InspectorNode, transformXmlToTree, findNodesAtCoords, generateXPath, transformBounds, findNodeByShortId } from '@/lib/inspectorUtils';
+import { InspectorNode, transformXmlToTree, findNodesAtCoords, generateXPath, transformBounds, findNodesByLocator, findNodesByText } from '@/lib/inspectorUtils';
 import { feedback } from "@/lib/feedback";
 import { Section } from "@/components/organisms/Section";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
@@ -544,7 +544,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             // Parse for local UI update (Simplified version for visibility)
             const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "", textNodeName: "_text" });
             const jsonObj = parser.parse(xml);
-            const root = jsonObj.hierarchy ? transformXmlToTree(jsonObj.hierarchy) : transformXmlToTree(jsonObj);
+            const root = jsonObj.hierarchy ? transformXmlToTree(jsonObj.hierarchy, undefined, 'hierarchy') : transformXmlToTree(jsonObj);
             setRootNode(root);
 
             // 2. AI Analysis
@@ -597,9 +597,12 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 const xpath = shortIdMap[el.id] || el.id;
                 return {
                     ...el,
-                    id: xpath
+                    id: xpath,
+                    shortId: el.id
                 };
             });
+
+            aiScreen.elements = aiElements;
 
             explorer.addLog(`AI mapped: ${aiScreen.name} (${aiScreen.type}) with ${aiElements.length} elements.`);
             explorer.addLog(`Rationale: ${result.rationale}`);
@@ -776,12 +779,76 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 explorer.addLog(`Clicking element: ${next.targetId} (${next.details || 'no details'})`);
                 explorer.resetSwipeCount();
 
-                // Use findNodeByShortId to resolve targetId to coordinates
-                const targetNode = findNodeByShortId(root, next.targetId);
+                let targetNode: InspectorNode | null = null;
+                const xpath = shortIdMap[next.targetId] || next.targetId;
+
+                // Priority 1: Label-based search (Text/Desc)
+                // Use shortId to find the original mapping from the AI
+                const aiElement = aiScreen.elements?.find((el: any) => (el.shortId || el.id) === next.targetId);
+                const targetLabel = aiElement?.name || aiElement?.label;
+                
+                if (aiElement && targetLabel) {
+                    explorer.addLog(`[Debug] Priority Search - Label: "${targetLabel}"`);
+                    const matches = findNodesByText(root, targetLabel);
+                    const bestMatch = matches.find(m => (m.attributes['clickable'] === 'true' || m.attributes['text'] || m.attributes['content-desc']) && m.bounds && m.bounds.w > 0);
+                    if (bestMatch) {
+                        targetNode = bestMatch;
+                        explorer.addLog(`[Debug] Success: Found match by label!`);
+                    }
+                }
+
+                // Priority 2: Standard XPath
+                if (!targetNode) {
+                    const nodes = findNodesByLocator(root, xpath);
+                    if (nodes.length > 0) {
+                        targetNode = nodes[0];
+                        explorer.addLog(`[Debug] Target found by XPath.`);
+                    }
+                }
+
+                // Priority 3: Fuzzy Fallback
+                if (!targetNode && (xpath.startsWith('/') || xpath.startsWith('//'))) {
+                    const anyValMatch = xpath.match(/@(?:text|resource-id|content-desc)=['"](.*?)['"]/);
+                    if (anyValMatch) {
+                        const val = anyValMatch[1];
+                        explorer.addLog(`[Debug] XPath failed, trying fuzzy search for value: ${val}`);
+                        const fallbackNodes = findNodesByText(root, val);
+                        if (fallbackNodes.length > 0) {
+                            targetNode = fallbackNodes[0];
+                        }
+                    }
+                }
 
                 if (targetNode && targetNode.bounds) {
-                    const centerX = Math.round(targetNode.bounds.x + targetNode.bounds.w / 2);
-                    const centerY = Math.round(targetNode.bounds.y + targetNode.bounds.h / 2);
+                    // If the found node is an empty container, try to find a meaningful child (with text/id/desc)
+                    // to ensure we click the actual content and not just a layout wrapper.
+                    let effectiveNode = targetNode;
+                    const findContent = (n: InspectorNode): InspectorNode | null => {
+                        if (n.attributes['text'] || n.attributes['content-desc'] || n.attributes['resource-id']) return n;
+                        for (const child of n.children) {
+                            const found = findContent(child);
+                            if (found) return found;
+                        }
+                        return null;
+                    };
+                    const meaningfulChild = findContent(targetNode);
+                    if (meaningfulChild && meaningfulChild.bounds) {
+                        effectiveNode = meaningfulChild;
+                    }
+
+                    const centerX = Math.round(effectiveNode.bounds!.x + effectiveNode.bounds!.w / 2);
+                    const centerY = Math.round(effectiveNode.bounds!.y + effectiveNode.bounds!.h / 2);
+                    const nodeInfo = `text="${effectiveNode.attributes['text'] || ''}", id="${effectiveNode.attributes['resource-id'] || ''}", desc="${effectiveNode.attributes['content-desc'] || ''}"`;
+                    explorer.addLog(`[Debug] Target: ${effectiveNode.tagName} (${nodeInfo})`);
+                    
+                    // Diagnostic: Log siblings to identify index mismatches
+                    if (effectiveNode.parent) {
+                        const siblings = effectiveNode.parent.children;
+                        const siblingIndices = siblings.map((s, i) => `${i+1}: ${s.attributes['text'] || s.attributes['content-desc'] || 'empty'}`).join(' | ');
+                        explorer.addLog(`[Debug] Siblings (Total ${siblings.length}): ${siblingIndices}`);
+                    }
+
+                    explorer.addLog(`[Debug] Resolution: Root ${root.bounds?.w || '?'}x${root.bounds?.h || '?'}, Clicking at: (${centerX}, ${centerY})`);
                     await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'tap', String(centerX), String(centerY)] });
                     addTapAnimation(centerX, centerY);
                     // Record this click so next step can set navigates_to on this element
@@ -833,7 +900,25 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 let swipeBounds: { x: number; y: number; w: number; h: number } | null = null;
 
                 if (next.targetId) {
-                    const targetNode = findNodeByShortId(root, next.targetId);
+                    const actualLocator = shortIdMap[next.targetId] || next.targetId;
+                    let nodes = findNodesByLocator(root, actualLocator);
+                    let targetNode = nodes[0];
+
+                    explorer.addLog(`[Debug] Action: swipe, TargetId: ${next.targetId}, Resolved Locator: ${actualLocator}, Found Nodes: ${nodes.length}`);
+
+                    // Fuzzy Fallback
+                    if (!targetNode && (actualLocator.startsWith('/') || actualLocator.startsWith('//'))) {
+                        const anyValMatch = actualLocator.match(/@(?:text|resource-id|content-desc)=['"](.*?)['"]/);
+                        if (anyValMatch) {
+                            const val = anyValMatch[1];
+                            explorer.addLog(`[Debug] Swipe XPath failed, trying fuzzy fallback for value: ${val}`);
+                            const fallbackNodes = findNodesByLocator(root, val);
+                            if (fallbackNodes.length > 0) {
+                                targetNode = fallbackNodes[0];
+                            }
+                        }
+                    }
+
                     if (targetNode && targetNode.bounds) {
                         swipeBounds = targetNode.bounds;
                     }
@@ -883,7 +968,25 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 explorer.resetSwipeCount();
 
                 // First tap the input field to focus it
-                const targetNode = findNodeByShortId(root, next.targetId);
+                const actualLocator = shortIdMap[next.targetId] || next.targetId;
+                let nodes = findNodesByLocator(root, actualLocator);
+                let targetNode = nodes[0];
+
+                explorer.addLog(`[Debug] Action: type_text, TargetId: ${next.targetId}, Resolved Locator: ${actualLocator}, Found Nodes: ${nodes.length}`);
+
+                // Fuzzy Fallback
+                if (!targetNode && (actualLocator.startsWith('/') || actualLocator.startsWith('//'))) {
+                    const anyValMatch = actualLocator.match(/@(?:text|resource-id|content-desc)=['"](.*?)['"]/);
+                    if (anyValMatch) {
+                        const val = anyValMatch[1];
+                        explorer.addLog(`[Debug] TypeText XPath failed, trying fuzzy fallback for value: ${val}`);
+                        const fallbackNodes = findNodesByLocator(root, val);
+                        if (fallbackNodes.length > 0) {
+                            targetNode = fallbackNodes[0];
+                        }
+                    }
+                }
+
                 if (targetNode && targetNode.bounds) {
                     const centerX = Math.round(targetNode.bounds.x + targetNode.bounds.w / 2);
                     const centerY = Math.round(targetNode.bounds.y + targetNode.bounds.h / 2);

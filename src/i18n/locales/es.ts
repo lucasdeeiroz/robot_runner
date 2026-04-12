@@ -646,7 +646,8 @@ export const es = {
                 active: "IA Explorando...",
                 thinking: "Pensando...",
                 summary: "Exploración Finalizada",
-                stopped: "Exploración detenida: {{reason}}"
+                stopped: "Exploración detenida: {{reason}}",
+                cancelled: "Exploración cancelada"
             },
             modes: {
                 inspect: "Modo Inspección",

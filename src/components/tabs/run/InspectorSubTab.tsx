@@ -139,7 +139,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
                 textNodeName: "_text"
             });
             const jsonObj = parser.parse(xml);
-            const root = jsonObj.hierarchy ? transformXmlToTree(jsonObj.hierarchy) : transformXmlToTree(jsonObj);
+            const root = jsonObj.hierarchy ? transformXmlToTree(jsonObj.hierarchy, undefined, 'hierarchy') : transformXmlToTree(jsonObj);
             setRootNode(root);
             feedback.toast.success('feedback.inspector_updated');
         } catch (e) {

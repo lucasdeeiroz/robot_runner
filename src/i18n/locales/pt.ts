@@ -640,7 +640,8 @@ export const pt = {
                 active: "IA Explorando...",
                 thinking: "Pensando...",
                 summary: "Exploração Finalizada",
-                stopped: "Exploração interrompida: {{reason}}"
+                stopped: "Exploração interrompida: {{reason}}",
+                cancelled: "Exploração cancelada"
             },
             modes: {
                 inspect: "Modo Inspeção",

@@ -208,7 +208,7 @@ export interface AiContextResponse {
  * This replaces heavy frontend parsing of logs and XMLs.
  */
 export async function getAiContext(
-    type: 'history_analysis' | 'exploration' | 'artifact_generation',
+    type: 'history_analysis' | 'exploration' | 'artifact_generation' | 'flowchart_layout' | 'test_summary',
     params: {
         run_id?: string;
         db_path?: string;
