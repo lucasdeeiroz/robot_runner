@@ -262,6 +262,7 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
                                         {t('run_tab.console.failure_detail')}
                                     </div>
                                     <AiButton
+                                        id="log_analysis"
                                         isLoading={isAnalyzing}
                                         onClick={async (e, customPrompt) => {
                                             e.stopPropagation();

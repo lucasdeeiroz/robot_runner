@@ -1550,6 +1550,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                             </div>
                         )}
                         <AiButton
+                            id="flowchart_reorganize"
                             onClick={(_, cp) => autoReorganizeLayout(cp)}
                             variant="primary"
                             label={t('mapper.flowchart.reorganize')}

@@ -1583,6 +1583,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                             )}
                             {hasApiKey && (
                                 <AiButton
+                                    id="mapper_exploration"
                                     variant={isExploring ? "danger" : "primary"}
                                     onClick={isExploring ? () => stopExploration(t('mapper.exploration.cancelled')) : (_e, prompt) => startExploration(prompt)}
                                     isLoading={isExploring}
@@ -1612,6 +1613,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                 tags={screenTags}
                                                 assistant={
                                                     <AiButton
+                                                        id="mapper_suggest_tags"
                                                         isLoading={isAISuggestingTags}
                                                         onClick={handleAISuggestTags}
                                                         label={t('mapper.action.ai_suggest_tags')}
@@ -1997,6 +1999,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                 <div className="flex items-center justify-between">
                                                     <h3 className="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest">{t('inspector.attributes.identifiers')}</h3>
                                                     <AiButton
+                                                        id="mapper_suggest_name"
                                                         isLoading={isAISuggesting}
                                                         onClick={handleAISuggestName}
                                                         label={t('mapper.action.ai_suggest_name')}

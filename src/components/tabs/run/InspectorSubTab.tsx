@@ -665,6 +665,7 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                                     <div className="flex items-center justify-between mb-2">
                                         <h3 className="text-xs font-semibold text-on-surface-variant/80 uppercase tracking-wider">{t('inspector.attributes.identifiers')}</h3>
                                         <AiButton
+                                            id="inspector_suggest"
                                             isLoading={isAiLoading}
                                             onClick={(_e, customPrompt) => handleAiSuggest(customPrompt)}
                                             label={t('inspector.attributes.suggest_with_ai')}

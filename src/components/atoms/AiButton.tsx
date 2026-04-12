@@ -12,6 +12,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface AiButtonProps extends Omit<ButtonProps, 'leftIcon' | 'children' | 'onClick'> {
+    id?: string;
     label?: string;
     expandable?: boolean;
     showTextAlways?: boolean;
@@ -20,6 +21,7 @@ interface AiButtonProps extends Omit<ButtonProps, 'leftIcon' | 'children' | 'onC
 }
 
 export const AiButton: React.FC<AiButtonProps> = ({
+    id,
     label,
     isLoading,
     expandable = true,
@@ -35,25 +37,33 @@ export const AiButton: React.FC<AiButtonProps> = ({
     const [isHovered, setIsHovered] = useState(false);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    
+    const storageKey = useMemo(() => {
+        return id ? `robot_runner_ai_prompt_${id}` : "robot_runner_ai_prompt";
+    }, [id]);
+
     const [customPrompt, setCustomPrompt] = useState(() => {
-        return localStorage.getItem("robot_runner_ai_prompt") || "";
+        return localStorage.getItem(storageKey) || "";
     });
 
     useEffect(() => {
         const handleStorage = () => {
-            setCustomPrompt(localStorage.getItem("robot_runner_ai_prompt") || "");
+            setCustomPrompt(localStorage.getItem(storageKey) || "");
         };
+        const customEventName = id ? `robot_runner_ai_prompt_changed_${id}` : "robot_runner_ai_prompt_changed";
+        
         window.addEventListener("storage", handleStorage);
-        window.addEventListener("robot_runner_ai_prompt_changed", handleStorage);
+        window.addEventListener(customEventName, handleStorage);
         return () => {
             window.removeEventListener("storage", handleStorage);
-            window.removeEventListener("robot_runner_ai_prompt_changed", handleStorage);
+            window.removeEventListener(customEventName, handleStorage);
         };
-    }, []);
+    }, [storageKey, id]);
 
     const saveCustomPrompt = (promptContent: string) => {
-        localStorage.setItem("robot_runner_ai_prompt", promptContent);
-        window.dispatchEvent(new Event("robot_runner_ai_prompt_changed"));
+        localStorage.setItem(storageKey, promptContent);
+        const customEventName = id ? `robot_runner_ai_prompt_changed_${id}` : "robot_runner_ai_prompt_changed";
+        window.dispatchEvent(new Event(customEventName));
     };
 
     const containerRef = useRef<HTMLDivElement>(null);
@@ -232,7 +242,7 @@ export const AiButton: React.FC<AiButtonProps> = ({
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: -4, scale: 0.98 }}
                             transition={{ duration: 0.15, ease: "easeOut" }}
-                            className="fixed z-50 bg-surface border border-outline-variant/30 rounded-2xl shadow-lg py-1.5 overflow-hidden"
+                            className="fixed z-[10000] bg-surface border border-outline-variant/30 rounded-2xl shadow-lg py-1.5 overflow-hidden"
                             style={dropdownStyle}
                         >
                             <button
@@ -291,7 +301,7 @@ export const AiButton: React.FC<AiButtonProps> = ({
                         <div className="flex gap-3">
                             <Button variant="ghost" onClick={() => {
                                 setIsModalOpen(false);
-                                setCustomPrompt(localStorage.getItem("robot_runner_ai_prompt") || "");
+                                setCustomPrompt(localStorage.getItem(storageKey) || "");
                             }}>
                                 {t('common.cancel')}
                             </Button>

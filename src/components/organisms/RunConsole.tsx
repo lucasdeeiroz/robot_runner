@@ -629,6 +629,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                     )}
                     {!isRunning && tree.length > 0 && (
                         <AiButton
+                            id="run_summary"
                             isLoading={isSummarizing}
                             onClick={(_e, customPrompt) => handleSummarize(customPrompt)}
                             label={t('run_tab.console.summarize_run')}
