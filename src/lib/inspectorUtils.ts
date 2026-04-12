@@ -435,7 +435,8 @@ export function findNodesByLocator(root: InspectorNode, locator: string): Inspec
         if (segments[0] === "") {
             // Check if it's a descendant search (//)
             if (segments[1] === "") {
-                return evaluatePart([root], segments.slice(2));
+                // Preserve one empty segment so evaluatePart() treats this as a descendant search
+                return evaluatePart([root], segments.slice(1));
             }
 
             // It's an absolute path (/node/...)
