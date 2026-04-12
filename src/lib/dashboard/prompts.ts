@@ -4,8 +4,8 @@ import { ScreenMap, NavigationData } from '@/lib/types';
  * Appends a custom prompt instruction to the end of the original prompt if provided.
  */
 export function appendCustomPrompt(basePrompt: string, customPrompt?: string): string {
-    if (!customPrompt || customPrompt.trim().length === 0) return basePrompt;
-    return `${basePrompt}\n\n=== CUSTOM INSTRUCTIONS ===\n${customPrompt}\n\nNote: The custom instructions above must take precedence and OVERRIDE any conflicting rules defined previously.`;
+  if (!customPrompt || customPrompt.trim().length === 0) return basePrompt;
+  return `${basePrompt}\n\n=== CUSTOM INSTRUCTIONS ===\n${customPrompt}\n\nNote: The custom instructions above must take precedence and OVERRIDE any conflicting rules defined previously.`;
 }
 
 /**
@@ -105,18 +105,26 @@ NOTES (Maintenance of Memory & Context):
 - IF NO NEWS: If you have no new observations, return the existing description as-is.
 
 GENERAL RULES:
-1. Element names: "Space Separated" (e.g. "Login Button").
-2. Element "type": one of button, input, text, link, toggle, checkbox, image, menu, scroll_view, tab, list_item.
-3. The "id" field in "elements" MUST be the "short_id" from the XML.
-4. Screen Recognition: If XML/Screenshot matches an existing mapped screen, reuse its exact name.
-5. Language for descriptions and rationale: ${language}.
-6. Map ALL visible elements, not just clickable ones. 
+- Element names: "Space Separated" (e.g. "Login Button").
+- Element "type": one of button, input, text, link, toggle, checkbox, image, menu, scroll_view, tab, list_item.
+- The "id" field in "elements" MUST be the "short_id" from the XML.
+- Screen Recognition: If XML/Screenshot matches an existing mapped screen, reuse its exact name.
+- Language for descriptions and rationale: ${language}.
+- Map ALL visible elements, not just clickable ones. 
    - SCROLLABLE: Elements with scrollable="true" (generic View, ScrollView, ListView, etc.) MUST be mapped as "scroll_view". They are targets for swiping.
    - IMAGES: ImageView nodes with content-desc are important context and must be mapped as "image".
    - CONTEXT: Focusable=true or enabled=true nodes provide cues about screen state and should be mapped even if clickable=false.
-7. ELEMENT PERSISTENCE: You must include ALL elements that are currently visible on the screen. If an element was previously mapped elsewhere but is NOT visible now, simply omit it from your 'elements' array (the system will merge it automatically). Do NOT attempt to "delete" elements by sending an empty list.
-8. DESCRIPTION REWRITE: You must return the FULL, cohesive description for the screen and elements. Incorporate new findings into the existing text provided in "EXISTING MAPS". Do NOT use separators like "|" or "---". Write one single flowing descriptive text.
-9. SCREEN MATCHING: Use EXACT names from the PROVIDED CONTEXT "EXISTING MAPS" for existing screens. Do NOT normalize or change capitalization if it's already there.
+- AI TAGGING RULES (CRITICAL):
+TAGGING CONSTRAINTS:
+  - CAPITALIZATION: Every tag MUST start with a Capital Letter (e.g., "Authentication").
+  - FLOW IDENTIFICATION: Prioritize tags that identify the functional business flow or user journey (e.g., "Registration", "Settings", "Login", "Order", "Profile").
+  - NO GENERIC TAGS: Do NOT use generic terms like "Screen", "Button", "Component", "Elements", "Mobile", "Page".
+  - DESCRIPTIVE: Prefer one-word tags that provide clear context for organizing large test suites.
+  - Examples of GOOD tags: "Login", "Registration", "Purchases", "Settings", "Search", "Form".
+  - Examples of BAD tags (DO NOT USE): "Screen", "Buttons", "Mobile", "App".
+- ELEMENT PERSISTENCE: You must include ALL elements that are currently visible on the screen. If an element was previously mapped elsewhere but is NOT visible now, simply omit it from your 'elements' array (the system will merge it automatically). Do NOT attempt to "delete" elements by sending an empty list.
+- DESCRIPTION REWRITE: You must return the FULL, cohesive description for the screen and elements. Incorporate new findings into the existing text provided in "EXISTING MAPS". Do NOT use separators like "|" or "---". Write one single flowing descriptive text.
+- SCREEN MATCHING: Use EXACT names from the PROVIDED CONTEXT "EXISTING MAPS" for existing screens. Do NOT normalize or change capitalization if it's already there.
 
 JSON STRUCTURE:
 {
@@ -331,8 +339,16 @@ export function getScreenTaggingPrompt(language: string, customPrompt?: string):
   const basePrompt = `
 You are a QA Architect.
 Analyze the screen components and optionally the provided screenshot to suggest 3 to 5 highly relevant semantic tags.
-Tags should be dynamic, context-aware, and useful for organizing a large test suite.
-Examples: "Authentication", "User Profile", "Social Media", "Shopping Cart", "Form Validation".
+
+TAGGING CONSTRAINTS:
+- CAPITALIZATION: Every tag MUST start with a Capital Letter (e.g., "Authentication").
+- FLOW IDENTIFICATION: Prioritize tags that identify the functional business flow or user journey (e.g., "Registration", "Settings", "Login", "Order", "Profile").
+- NO GENERIC TAGS: Do NOT use generic terms like "Screen", "Button", "Component", "Elements", "Mobile", "Page".
+- DESCRIPTIVE: Prefer one-word tags that provide clear context for organizing large test suites.
+
+Examples of GOOD tags: "Login", "Registration", "Purchases", "Settings", "Search", "Form".
+Examples of BAD tags (DO NOT USE): "Screen", "Buttons", "Mobile", "App".
+
 Respond ONLY in a comma-separated list of tags in this language: ${language}.
 `.trim();
   return appendCustomPrompt(basePrompt, customPrompt);
