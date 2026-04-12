@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { ScreenMap, FlowchartLayout, LayoutNode, LayoutEdge, NavigationData } from '@/lib/types';
-import { X, ZoomIn, ZoomOut, Maximize, Save, Upload, Download, Camera, Plus, AlertTriangle } from 'lucide-react';
+import { X, ZoomIn, ZoomOut, Maximize, Save, Upload, Download, Camera, Plus, AlertTriangle, Eraser } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
 import { loadFlowchartLayout, deleteFlowchartLayout, exportMapperData, importMapperData, saveScreenMap } from '@/lib/dashboard/mapperPersistence';
@@ -18,6 +18,7 @@ import { reorganizeFlowchartLayout as reorganizeWithGemini } from '@/lib/dashboa
 import { reorganizeFlowchartLayout as reorganizeWithOpenAI } from '@/lib/dashboard/openai';
 import { reorganizeFlowchartLayout as reorganizeWithClaude } from '@/lib/dashboard/claude';
 import { AiButton } from '@/components/atoms/AiButton';
+import { getAiContext } from '@/lib/dashboard/historyAnalysisUtils';
 import {
     CELL_WIDTH,
     CELL_HEIGHT,
@@ -94,8 +95,9 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
     } | null>(null);
     const [isQuickConnectOpen, setIsQuickConnectOpen] = useState(false);
 
-    // Unsaved Changes State
+    const [isExporting, setIsExporting] = useState(false);
     const [isDirty, setIsDirty] = useState(false);
+    const [missedScreens, setMissedScreens] = useState<string[]>([]);
     const [showUnsavedChangesModal, setShowUnsavedChangesModal] = useState(false);
     const [isSpacePressed, setIsSpacePressed] = useState(false);
     const isSpacePressedRef = useRef(isSpacePressed);
@@ -109,7 +111,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
         return Array.from(new Set(tags)).sort();
     }, [maps]);
 
-    const isInteracting = !!dragItem || isDraggingCanvas || isQuickConnectOpen;
+    const isInteracting = !!dragItem || isDraggingCanvas || isQuickConnectOpen || isExporting;
 
     const matchesFilter = (screenName: string) => {
         if (!filterTag) return true;
@@ -148,6 +150,11 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
     }, []);
 
     const loadLayout = useCallback(async () => {
+        // Guard: if we have unsaved changes, don't clobber them unless it's a profile change
+        if (isDirty && !loading) {
+            console.log("[Flowchart] isDirty is true, skipping prop-triggered loadLayout to protect local state.");
+            return;
+        }
         setLoading(true);
 
         // 1. One-way migration: if central flowchart_layout.json exists, merge into individual ScreenMaps
@@ -207,6 +214,11 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
             map.elements.forEach(el => {
                 if (el.navigates_to) {
                     const targetName = typeof el.navigates_to === 'string' ? el.navigates_to : (Array.isArray(el.navigates_to) ? el.navigates_to[0]?.destination : (el.navigates_to as NavigationData)?.destination);
+                    
+                    // SANITY CHECK: Only load edges if target screen still exists in maps
+                    const targetExists = maps.some(m => m.name === targetName);
+                    if (!targetExists) return;
+
                     const edgeId = `${map.name}-${el.name}-${targetName}`;
 
                     if (typeof el.navigates_to === 'object') {
@@ -324,12 +336,12 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
         }
     };
 
-    // Load Layout
+    // Load Layout only on open or profile change to prevent prop updates from clobbering local state
     useEffect(() => {
         if (isOpen) {
             loadLayout();
         }
-    }, [isOpen, loadLayout]);
+    }, [isOpen, activeProfileId]); // maps removed from dependencies to stabilize local state
 
     // Keyboard Listeners
     useEffect(() => {
@@ -432,6 +444,12 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
 
     const handleExportImage = async () => {
         if (!contentRef.current) return;
+        
+        setIsExporting(true);
+        
+        // Wait for React to re-render with culling disabled (slightly longer for large grids)
+        await new Promise(resolve => setTimeout(resolve, 400));
+
         try {
             const width = gridBounds.width * CELL_WIDTH;
             const height = gridBounds.height * CELL_HEIGHT;
@@ -442,7 +460,15 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                     transform: `translate(${- gridBounds.minX * CELL_WIDTH}px, ${- gridBounds.minY * CELL_HEIGHT}px)`,
                 },
                 width: width,
-                height: height
+                height: height,
+                filter: (node) => {
+                    // Exclude interactive elements like controls and ports from the static image
+                    if (node instanceof HTMLElement) {
+                        if (node.classList.contains('port-handle')) return false;
+                        if (node.classList.contains('edge-controls')) return false;
+                    }
+                    return true;
+                }
             });
 
             const base64Data = dataUrl.split(',')[1];
@@ -465,6 +491,8 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
         } catch (e) {
             console.error(e);
             feedback.toast.error(t('mapper.flowchart.export_error'));
+        } finally {
+            setIsExporting(false);
         }
     };
 
@@ -547,7 +575,13 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
             });
         });
 
-        setLayout(prev => ({ ...prev, nodes: newNodes }));
+        const nukedEdges = resetAllVertices();
+ 
+         setLayout(prev => ({
+             ...prev,
+             nodes: newNodes,
+             edges: nukedEdges
+         }));
         setIsDirty(true);
         feedback.toast.success(t('mapper.flowchart.reorganized', 'Layout reorganized (BFS)'));
         setTimeout(centerView, 100);
@@ -567,15 +601,26 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
 
         setIsReorganizing(true);
         try {
+            // Helper to match names regardless of accents/spaces/case
+            const normalize = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+            const nameMap = new Map(maps.map(m => [normalize(m.name), m.name]));
+
             let result: Record<string, { gridX: number, gridY: number }> = {};
             const language = i18n.language || 'en';
+            console.log(`[Flowchart] Requesting AI context for profile: ${activeProfileIdRef.current}`);
 
-            // Use the optimized context from Rust
-            const response = await invoke<{ context: string }>('get_ai_context', {
-                contextType: 'FlowchartLayout',
-                params: { profile_id: activeProfileIdRef.current }
+            // Use the optimized context from Rust via helper
+            const response = await getAiContext('flowchart_layout', {
+                profile_id: activeProfileIdRef.current
             });
+
+            if (!response || !response.context) {
+                console.error("[Flowchart] AI context empty or invalid response:", response);
+                throw new Error("Failed to retrieve application navigation context from backend.");
+            }
+
             const mappingContext = response.context;
+            console.log("[Flowchart] AI context received, sending to provider:", provider);
 
             if (provider === 'openai') {
                 result = await reorganizeWithOpenAI(mappingContext, apiKey, model, language, undefined, customPrompt);
@@ -584,19 +629,64 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
             } else {
                 result = await reorganizeWithGemini(mappingContext, apiKey, model, language, undefined, customPrompt);
             }
+            
+            console.log("[Flowchart] AI Layout Result:", result);
 
             if (result && Object.keys(result).length > 0) {
-                // Ensure all mapped screens have a position, even if AI missed them
-                const newNodes: Record<string, LayoutNode> = { ...result } as Record<string, LayoutNode>;
-                maps.forEach(m => {
-                    if (!newNodes[m.name]) {
-                        // Place missed nodes at the end
-                        const maxX = Math.max(0, ...Object.values(newNodes).map(n => n.gridX));
-                        newNodes[m.name] = { gridX: maxX + 1, gridY: 0 };
+                console.log("[Flowchart] Raw AI Result:", JSON.stringify(result, null, 2));
+
+                // 1. Sanitize and Normalize Response (Case-insensitive matching)
+                const sanitizedNodes: Record<string, LayoutNode> = {};
+
+                Object.entries(result).forEach(([key, pos]) => {
+                    const gridX = Number(pos.gridX);
+                    const gridY = Number(pos.gridY);
+                    
+                    const realName = nameMap.get(normalize(key));
+                    if (realName) {
+                        if (Number.isFinite(gridX) && Number.isFinite(gridY)) {
+                            sanitizedNodes[realName] = { gridX, gridY };
+                        } else {
+                            console.warn(`[Flowchart] AI returned invalid coordinates for "${key}":`, pos);
+                        }
+                    } else {
+                        console.warn(`[Flowchart] AI returned map position for unknown screen: "${key}".`);
                     }
                 });
 
-                setLayout(prev => ({ ...prev, nodes: newNodes }));
+                // 2. Ensure all mapped screens have a position, safely distributed in a "Quarantine" area
+                const finalNodes: Record<string, LayoutNode> = { ...sanitizedNodes };
+                const missedNodes: string[] = [];
+
+                // Track existing columns to find the end
+                const existingX = Object.values(finalNodes).map(n => n.gridX);
+                const startQuarantineX = (existingX.length > 0 ? Math.max(...existingX) : 0) + 1;
+
+                maps.forEach((m) => {
+                    if (!finalNodes[m.name]) {
+                        missedNodes.push(m.name);
+                        // Place missed nodes in columns of 10 to avoid infinity-lines
+                        const qIdx = missedNodes.length - 1;
+                        const qX = startQuarantineX + Math.floor(qIdx / 10);
+                        const qY = qIdx % 10;
+                        finalNodes[m.name] = { gridX: qX, gridY: qY };
+                    }
+                });
+
+                if (missedNodes.length > 0) {
+                    console.log("[Flowchart] AI missed/mismatched these screens:", missedNodes);
+                    setMissedScreens(missedNodes);
+                } else {
+                    setMissedScreens([]);
+                }
+
+                const nukedEdges = resetAllVertices();
+
+                setLayout(prev => ({
+                    ...prev,
+                    nodes: finalNodes,
+                    edges: nukedEdges
+                }));
                 setIsDirty(true);
                 feedback.toast.success(t('mapper.flowchart.reorganized_ai', 'Layout reorganized by AI'));
                 setTimeout(centerView, 100);
@@ -610,6 +700,17 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
         } finally {
             setIsReorganizing(false);
         }
+    };
+
+    /** Manually clear all edge curvatures */
+    const handleClearAllCurvatures = () => {
+        const nukedEdges = resetAllVertices();
+        setLayout(prev => ({
+            ...prev,
+            edges: nukedEdges
+        }));
+        setIsDirty(true);
+        feedback.toast.success(t('mapper.flowchart.curvatures_cleared', 'All edge curvatures cleared'));
     };
 
     const confirmQuickConnect = async (targetScreenName: string, sourceElementName?: string) => {
@@ -702,15 +803,26 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
         if (loading) return;
 
         let hasChanges = false;
-        const newNodes = { ...layout.nodes };
+        const currentNodes = { ...layout.nodes };
+        const mapNames = new Set(maps.map(m => m.name));
+
+        // 1. Remove nodes that are no longer in maps (renamed or deleted)
+        Object.keys(currentNodes).forEach(name => {
+            if (!mapNames.has(name)) {
+                delete currentNodes[name];
+                hasChanges = true;
+            }
+        });
+
+        // 2. Add new nodes from maps
         const occupied = new Set<string>();
-        Object.values(newNodes).forEach(n => occupied.add(`${n.gridX},${n.gridY}`));
+        Object.values(currentNodes).forEach(n => occupied.add(`${n.gridX},${n.gridY}`));
 
         let nextX = 0;
         let nextY = 0;
 
         maps.forEach(map => {
-            if (!newNodes[map.name]) {
+            if (!currentNodes[map.name]) {
                 while (occupied.has(`${nextX},${nextY}`)) {
                     nextX++;
                     if (nextX > 5) {
@@ -718,22 +830,26 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                         nextY++;
                     }
                 }
-                newNodes[map.name] = { gridX: nextX, gridY: nextY };
+                currentNodes[map.name] = { gridX: nextX, gridY: nextY };
                 occupied.add(`${nextX},${nextY}`);
                 hasChanges = true;
             }
         });
 
         if (hasChanges) {
-            setLayout(prev => ({ ...prev, nodes: newNodes }));
+            setLayout(prev => ({ ...prev, nodes: currentNodes }));
         }
     }, [maps, loading]);
     // --- Helper Functions ---
-    const getPixelCoords = (gridX: number, gridY: number) => ({
-        x: gridX * CELL_WIDTH + NODE_OFFSET_X,
-        y: gridY * CELL_HEIGHT + NODE_OFFSET_Y
-    });
+    const getPixelCoords = (gridX: any, gridY: any) => {
+        const xNum = Number(gridX);
+        const yNum = Number(gridY);
 
+        return {
+            x: (Number.isFinite(xNum) ? xNum : 0) * CELL_WIDTH + NODE_OFFSET_X,
+            y: (Number.isFinite(yNum) ? yNum : 0) * CELL_HEIGHT + NODE_OFFSET_Y
+        };
+    };
     const getPortCoords = (nodeX: number, nodeY: number, portId: string) => {
         const port = NODE_PORTS.find(p => p.id === portId);
         if (!port) return { x: nodeX + NODE_WIDTH / 2, y: nodeY + NODE_HEIGHT / 2 }; // Center fallback
@@ -748,6 +864,32 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
     };
 
     const getClosestLane = (val: number) => Math.round(val / LANE_SIZE) * LANE_SIZE;
+    
+    // Exhaustive cleanup of all possible edges
+    const resetAllVertices = () => {
+        const newEdges: Record<string, LayoutEdge> = {};
+        maps.forEach(sourceMap => {
+            sourceMap.elements.forEach(el => {
+                const navigatesTo = el.navigates_to;
+                if (!navigatesTo) return;
+
+                let destinations: string[] = [];
+                if (typeof navigatesTo === 'string') destinations = [navigatesTo];
+                else if (Array.isArray(navigatesTo)) {
+                    destinations = navigatesTo.map(d => typeof d === 'string' ? d : (d as { destination: string }).destination).filter(Boolean);
+                } else if (navigatesTo && typeof navigatesTo === 'object') {
+                    const dest = (navigatesTo as { destination: string }).destination;
+                    if (dest) destinations = [dest];
+                }
+
+                destinations.forEach(targetName => {
+                    const edgeId = `${sourceMap.name}-${el.name}-${targetName}`;
+                    newEdges[edgeId] = { vertices: [], sourceHandle: undefined, targetHandle: undefined };
+                });
+            });
+        });
+        return newEdges;
+    };
     // --- Event Handlers ---
     const handleCanvasMouseDown = (e: React.MouseEvent) => {
         if (e.button !== 0 && e.button !== 1) return;
@@ -998,7 +1140,6 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                 // 1. Get Full Path Context (Start, End)
                 let startPoint = { x: 0, y: 0 };
                 let endPoint = { x: 0, y: 0 };
-
                 // Parse ID: source-element-target
                 const parts = edgeId.split('-');
                 if (parts.length >= 3) {
@@ -1196,7 +1337,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
 
     // 2. Viewport Culling Bounds
     const viewportBounds = useMemo(() => {
-        if (!containerRef.current) return null;
+        if (isExporting || !containerRef.current) return null;
         const rect = containerRef.current.getBoundingClientRect();
 
         // Convert screen coordinates to canvas coordinates (including scale and offset)
@@ -1213,7 +1354,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
             maxX: maxX + BUFFER,
             maxY: maxY + BUFFER
         };
-    }, [offset, scale]);
+    }, [offset, scale, isExporting]);
 
     // --- Render Logic ---
     const edgeLayouts = useMemo(() => {
@@ -1233,64 +1374,83 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
             const sourceOrigin = getPixelCoords(sourceLayout.gridX, sourceLayout.gridY);
 
             sourceMap.elements.forEach(el => {
-                const targetName = typeof el.navigates_to === 'string' ? el.navigates_to : (Array.isArray(el.navigates_to) ? el.navigates_to[0]?.destination : (el.navigates_to as NavigationData)?.destination);
-                if (!targetName) return;
+                const navigatesTo = el.navigates_to;
+                if (!navigatesTo) return;
 
-                const targetMap = maps.find(m => m.name === targetName);
-                const targetLayout = layout.nodes[targetName];
-                if (!targetMap || !targetLayout) return;
-
-                const targetOrigin = getPixelCoords(targetLayout.gridX, targetLayout.gridY);
-                const edgeId = `${sourceMap.name}-${el.name}-${targetName}`;
-                const edgeData = layout.edges[edgeId] || {};
-
-                let startPoint = { x: 0, y: 0 };
-                let endPoint = { x: 0, y: 0 };
-
-                // Source
-                // Check if dragging START point
-                if (dragItem?.type === 'source' && dragItem.id === edgeId) {
-                    startPoint = cursorPos;
-                } else if (edgeData.sourceHandle) {
-                    startPoint = getPortCoords(sourceOrigin.x, sourceOrigin.y, edgeData.sourceHandle);
-                } else {
-                    const dx = targetLayout.gridX - sourceLayout.gridX;
-                    if (dx >= 0) startPoint = getPortCoords(sourceOrigin.x, sourceOrigin.y, 'right-3');
-                    else startPoint = getPortCoords(sourceOrigin.x, sourceOrigin.y, 'left-3');
+                // Normalize destinations into an array of strings
+                let destinations: string[] = [];
+                if (typeof navigatesTo === 'string') {
+                    destinations = [navigatesTo];
+                } else if (Array.isArray(navigatesTo)) {
+                    destinations = navigatesTo.map(d => typeof d === 'string' ? d : (d as { destination: string }).destination).filter(Boolean);
+                } else if (navigatesTo && typeof navigatesTo === 'object') {
+                    const dest = (navigatesTo as { destination: string }).destination;
+                    if (dest) destinations = [dest];
                 }
 
-                // Target
-                // Check if dragging END point
-                if (dragItem?.type === 'target' && dragItem.id === edgeId) {
-                    endPoint = cursorPos;
-                } else if (edgeData.targetHandle) {
-                    endPoint = getPortCoords(targetOrigin.x, targetOrigin.y, edgeData.targetHandle);
-                } else {
-                    const dx = targetLayout.gridX - sourceLayout.gridX;
-                    if (dx >= 0) endPoint = getPortCoords(targetOrigin.x, targetOrigin.y, 'left-3');
-                    else endPoint = getPortCoords(targetOrigin.x, targetOrigin.y, 'right-3');
-                }
-
-                let points = [startPoint, ...(edgeData.vertices || []), endPoint];
-
-                // Default routing for new/unmodified edges (standard dogleg or straight)
-                if ((!edgeData.vertices || edgeData.vertices.length === 0)) {
-                    // Check for straight alignment
-                    if (Math.abs(startPoint.x - endPoint.x) < 10) {
-                        // Vertical Straight Line
-                        points = [startPoint, endPoint];
-                    } else if (Math.abs(startPoint.y - endPoint.y) < 10) {
-                        // Horizontal Straight Line
-                        points = [startPoint, endPoint];
-                    } else {
-                        // Standard dogleg routing
-                        const midX = (startPoint.x + endPoint.x) / 2;
-                        const snappedMidX = getClosestLane(midX);
-                        points = [startPoint, { x: snappedMidX, y: startPoint.y }, { x: snappedMidX, y: endPoint.y }, endPoint];
+                destinations.forEach(targetName => {
+                    const targetMap = maps.find(m => m.name === targetName);
+                    // CRITICAL: Ensure target exists in the actual screens (maps) AND layout
+                    if (!targetMap) {
+                        console.warn(`[Flowchart] Edge from "${sourceMap.name}" points to non-existent screen "${targetName}". Skipping.`);
+                        return;
                     }
-                }
 
-                layouts.push({ edgeId, points, startPoint, endPoint, elName: el.name, sourceName: sourceMap.name, targetName });
+                    const targetLayout = layout.nodes[targetName];
+                    if (!targetLayout) return;
+
+                    const targetOrigin = getPixelCoords(targetLayout.gridX, targetLayout.gridY);
+                    const edgeId = `${sourceMap.name}-${el.name}-${targetName}`;
+                    const edgeData = layout.edges[edgeId] || {};
+
+                    // SAFETY: Only disable custom vertices when either node has unusable coordinates.
+                    // (0,0) is a valid grid position and must not be treated as invalid geometry.
+                    const hasValidGridCoords = (node: LayoutNode) => Number.isFinite(node.gridX) && Number.isFinite(node.gridY);
+                    const isInvalidGeometry = !hasValidGridCoords(sourceLayout) || !hasValidGridCoords(targetLayout);
+                    const effectiveVertices = isInvalidGeometry ? [] : (edgeData.vertices || []);
+
+                    let startPoint = { x: 0, y: 0 };
+                    let endPoint = { x: 0, y: 0 };
+
+                    // Source
+                    if (dragItem?.type === 'source' && dragItem.id === edgeId) {
+                        startPoint = cursorPos;
+                    } else if (edgeData.sourceHandle) {
+                        startPoint = getPortCoords(sourceOrigin.x, sourceOrigin.y, edgeData.sourceHandle);
+                    } else {
+                        const dx = targetLayout.gridX - sourceLayout.gridX;
+                        if (dx >= 0) startPoint = getPortCoords(sourceOrigin.x, sourceOrigin.y, 'right-3');
+                        else startPoint = getPortCoords(sourceOrigin.x, sourceOrigin.y, 'left-3');
+                    }
+
+                    // Target
+                    if (dragItem?.type === 'target' && dragItem.id === edgeId) {
+                        endPoint = cursorPos;
+                    } else if (edgeData.targetHandle) {
+                        endPoint = getPortCoords(targetOrigin.x, targetOrigin.y, edgeData.targetHandle);
+                    } else {
+                        const dx = targetLayout.gridX - sourceLayout.gridX;
+                        if (dx >= 0) endPoint = getPortCoords(targetOrigin.x, targetOrigin.y, 'left-3');
+                        else endPoint = getPortCoords(targetOrigin.x, targetOrigin.y, 'right-3');
+                    }
+
+                    let points = [startPoint, ...effectiveVertices, endPoint];
+
+                    // Default routing for new/unmodified edges
+                    if (effectiveVertices.length === 0) {
+                        if (Math.abs(startPoint.x - endPoint.x) < 10) {
+                            points = [startPoint, endPoint];
+                        } else if (Math.abs(startPoint.y - endPoint.y) < 10) {
+                            points = [startPoint, endPoint];
+                        } else {
+                            const midX = (startPoint.x + endPoint.x) / 2;
+                            const snappedMidX = getClosestLane(midX);
+                            points = [startPoint, { x: snappedMidX, y: startPoint.y }, { x: snappedMidX, y: endPoint.y }, endPoint];
+                        }
+                    }
+
+                    layouts.push({ edgeId, points, startPoint, endPoint, elName: el.name, sourceName: sourceMap.name, targetName });
+                });
             });
         });
         return layouts;
@@ -1402,7 +1562,17 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                         {t('mapper.flowchart.title', 'Navigation Flow')}
                     </h2>
                     <div className="flex items-center gap-2">
+                        {missedScreens.length > 0 && (
+                            <div 
+                                className="flex items-center gap-1.5 px-3 py-1 bg-warning/10 text-warning border border-warning/20 rounded-lg text-xs font-medium animate-pulse cursor-help" 
+                                title={t('mapper.flowchart.ai_missed_help', 'These screens were placed in the quarantine area on the right. Drag them to their places or complete the mapping if they are incomplete.')}
+                            >
+                                <AlertTriangle size={14} />
+                                {t('mapper.flowchart.ai_missed_count', { count: missedScreens.length })}
+                            </div>
+                        )}
                         <AiButton
+                            id="flowchart_reorganize"
                             onClick={(_, cp) => autoReorganizeLayout(cp)}
                             variant="primary"
                             label={t('mapper.flowchart.reorganize')}
@@ -1425,6 +1595,12 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                             className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full"
                             title={t('common.save')}>
                             <Save size={16} />
+                        </Button>
+                        <Button
+                            onClick={handleClearAllCurvatures}
+                            className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full"
+                            title={t('mapper.flowchart.clear_curvatures', 'Clear all edge curvatures')}>
+                            <Eraser size={16} />
                         </Button>
                         <div className="h-4 w-px bg-outline-variant/30 mx-2" />
                         <Button

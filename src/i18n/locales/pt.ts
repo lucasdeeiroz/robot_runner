@@ -589,6 +589,11 @@ export const pt = {
                 filter_tags: "Filtrar por Etiqueta",
                 select_source_element: "Por favor, selecione um elemento de origem",
                 element_not_found: "Elemento de origem não encontrado",
+                ai_missed_count: "{{count}} telas não mapeadas pela IA",
+                ai_missed_help: "Estas telas foram colocadas na área de quarentena à direita. Arraste-as para seus lugares ou complete o mapeamento se estiverem incompletas.",
+                no_preview: "Sem prévia registrada",
+                clear_curvatures: "Limpar todas as curvaturas",
+                curvatures_cleared: "Todas as curvaturas de arestas foram limpas",
                 unsaved_changes: {
                     title: "Alterações não salvas",
                     message: "Você tem alterações de layout não salvas. Deseja salvar antes de sair?",
@@ -640,7 +645,8 @@ export const pt = {
                 active: "IA Explorando...",
                 thinking: "Pensando...",
                 summary: "Exploração Finalizada",
-                stopped: "Exploração interrompida: {{reason}}"
+                stopped: "Exploração interrompida: {{reason}}",
+                cancelled: "Exploração cancelada"
             },
             modes: {
                 inspect: "Modo Inspeção",

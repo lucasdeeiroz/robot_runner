@@ -346,12 +346,8 @@ fn get_flowchart_layout_context(app_handle: tauri::AppHandle, params: AiContextP
                 screen_count += 1;
                 let screen_name = val.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown Screen");
                 let screen_type = val.get("type").and_then(|v| v.as_str()).unwrap_or("screen");
-                let screen_desc = val.get("description").and_then(|v| v.as_str()).unwrap_or("");
 
                 context.push_str(&format!("- Screen: \"{}\" ({})\n", screen_name, screen_type));
-                if !screen_desc.is_empty() {
-                    context.push_str(&format!("  Description: {}\n", screen_desc));
-                }
 
                 let mut destinations = Vec::new();
                 if let Some(elements) = val.get("elements").and_then(|v| v.as_array()) {

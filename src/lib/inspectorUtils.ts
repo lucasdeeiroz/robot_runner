@@ -76,13 +76,13 @@ export function transformBounds(
  * Recursively converts the raw fast-xml-parser object into a cleaner InspectorNode tree.
  * Adds computed bounds and parent references.
  */
-export function transformXmlToTree(rawNode: any, parent?: InspectorNode): InspectorNode {
+/**
+ * Recursively converts the raw fast-xml-parser object into a cleaner InspectorNode tree.
+ * Agnostic to tag names (handles node, hierarchy, or class-based tags).
+ */
+export function transformXmlToTree(rawNode: any, parent?: InspectorNode, keyName: string = 'node'): InspectorNode {
     const attributes: Record<string, string> = {};
     const children: InspectorNode[] = [];
-
-    // keys starting with @ are attributes in fast-xml-parser (usually, dependent on config)
-    // or if we configured ignoreAttributes: false, they might be direct properties.
-    // Based on InspectorPage config: ignoreAttributes: false, attributeNamePrefix: ""
 
     const decodeHtmlEntities = (str: string): string => {
         if (!str) return str;
@@ -96,20 +96,27 @@ export function transformXmlToTree(rawNode: any, parent?: InspectorNode): Inspec
             .replace(/&amp;/g, '&');
     };
 
+    // Iterate over all keys to find children and attributes
     Object.keys(rawNode).forEach(key => {
-        if (key === 'node' || key === 'hierarchy') {
-            const kids = Array.isArray(rawNode[key]) ? rawNode[key] : [rawNode[key]];
-            kids.forEach((k: any) => {
-                children.push(transformXmlToTree(k, undefined));
+        const value = rawNode[key];
+        
+        if (key === '_text') {
+            attributes['text'] = decodeHtmlEntities(String(value));
+        } else if (Array.isArray(value)) {
+            value.forEach((v: any) => {
+                if (typeof v === 'object' && v !== null) {
+                    children.push(transformXmlToTree(v, undefined, key));
+                }
             });
-        } else if (typeof rawNode[key] !== 'object' && key !== '_text') {
-            attributes[key] = decodeHtmlEntities(String(rawNode[key]));
+        } else if (typeof value === 'object' && value !== null) {
+            children.push(transformXmlToTree(value, undefined, key));
+        } else {
+            attributes[key] = decodeHtmlEntities(String(value));
         }
     });
 
-    // Android dumps usually strictly respect "node" as the tag name for elements
-    // The root might be "hierarchy"
-    const tagName = rawNode['class'] || 'node';
+    // Normalize tagName to 'node' for all elements except hierarchy
+    const tagName = keyName;
 
     const node: InspectorNode = {
         id: Math.random().toString(36).substr(2, 9),
@@ -121,9 +128,6 @@ export function transformXmlToTree(rawNode: any, parent?: InspectorNode): Inspec
 
     if (attributes['bounds']) {
         node.bounds = parseBounds(attributes['bounds']);
-
-    } else {
-
     }
 
     // Link parent for children
@@ -194,6 +198,27 @@ export function findNodesAtCoords(node: InspectorNode, x: number, y: number): In
  * Supports XPath, ID, Accessibility ID, Name, or ClassName.
  * Now supports top-level AND and OR logic (e.g. "id=foo OR text=bar").
  */
+export function findNodesByText(root: InspectorNode, query: string): InspectorNode[] {
+    const results: InspectorNode[] = [];
+    const normalizedQuery = query.toLowerCase().trim();
+    if (!normalizedQuery) return results;
+
+    function traverse(node: InspectorNode) {
+        const text = (node.attributes['text'] || "").toLowerCase();
+        const desc = (node.attributes['content-desc'] || "").toLowerCase();
+        
+        if (text.includes(normalizedQuery) || desc.includes(normalizedQuery) || normalizedQuery.includes(text && text.length > 3 ? text : "___never___")) {
+            results.push(node);
+        }
+        for (const child of node.children) {
+            traverse(child);
+        }
+    }
+
+    traverse(root);
+    return results;
+}
+
 export function findNodesByLocator(root: InspectorNode, locator: string): InspectorNode[] {
     const results: InspectorNode[] = [];
     if (!locator) return results;
@@ -307,80 +332,138 @@ export function findNodesByLocator(root: InspectorNode, locator: string): Inspec
         } catch (e) { }
     }
 
-    // 5. XPath Support
+    // 5. XPath Support (Robust Evaluator)
     if (trimmed.startsWith('/') || trimmed.startsWith('//')) {
-        const searchByXPath = (node: InspectorNode) => {
-            const xpathParts = trimmed.match(/^\/\/(.*?)\s*\[([\s\S]*)\]$/);
-            if (!xpathParts) {
-                const simpleTagMatch = trimmed.match(/^\/\/(.*?)$/);
-                if (simpleTagMatch) {
-                    const [, tag] = simpleTagMatch;
-                    const matchesTag = tag === '*' || tag === node.tagName || node.tagName.endsWith('.' + tag) || node.attributes['class'] === tag;
-                    if (matchesTag) results.push(node);
+        let path = trimmed;
+        // Strip redundancy
+        if (path.startsWith('/hierarchy')) path = path.substring(10);
+        if (path === '') return [root];
+
+        const checkMatch = (node: InspectorNode, tag: string, predicate: string | null): boolean => {
+            // 1. Tag Match
+            const matchesTag = tag === '*' || tag === "" || tag === 'node' || 
+                             node.tagName === tag || 
+                             node.tagName.endsWith('.' + tag) || 
+                             node.attributes['class'] === tag ||
+                             node.attributes['class']?.endsWith('.' + tag);
+            
+            if (!matchesTag) return false;
+
+            // 2. Predicate Match
+            if (!predicate) return true;
+
+            // Handle numeric index: node[1]
+            if (/^\d+$/.test(predicate)) {
+                const index = parseInt(predicate, 10);
+                if (!node.parent) return index === 1;
+
+                // Standard XPath rule: count siblings that match the SAME tag/criteria
+                const matchingSiblings = node.parent.children.filter(c => 
+                    tag === '*' || tag === "" || tag === 'node' || 
+                    c.tagName === tag || 
+                    c.tagName.endsWith('.' + tag) || 
+                    c.attributes['class'] === tag ||
+                    c.attributes['class']?.endsWith('.' + tag)
+                );
+
+                return (matchingSiblings.indexOf(node) + 1) === index;
+            }
+
+            // Handle attribute predicates: @attr='val', contains(@attr, 'val'), etc.
+            const andConds = predicate.split(/\s+AND\s+/i);
+            for (const cond of andConds) {
+                const c = cond.trim();
+                let match = false;
+
+                const simpleMatch = c.match(/^@(.*?)\s*=\s*['"]([\s\S]*?)['"]$/);
+                const containsMatch = c.match(/^contains\s*\(\s*@(.*?)\s*,\s*['"]([\s\S]*?)['"]\s*\)$/);
+                const startsWithMatch = c.match(/^starts-with\s*\(\s*@(.*?)\s*,\s*['"]([\s\S]*?)['"]\s*\)$/);
+                const endsWithMatch = c.match(/^(?:ends-with|substring)\s*\(\s*@(.*?)\s*,\s*.*?['"]([\s\S]*?)['"]\s*\)$/) ||
+                    c.match(/^ends-with\s*\(\s*@([\s\S]*?)\s*,\s*['"]([\s\S]*?)['"]\s*\)$/);
+
+                if (simpleMatch) {
+                    const [, attr, val] = simpleMatch;
+                    if (node.attributes[attr] === val) match = true;
+                } else if (containsMatch) {
+                    const [, attr, val] = containsMatch;
+                    if (node.attributes[attr]?.includes(val)) match = true;
+                } else if (startsWithMatch) {
+                    const [, attr, val] = startsWithMatch;
+                    if (node.attributes[attr]?.startsWith(val)) match = true;
+                } else if (endsWithMatch) {
+                    const [, attr, val] = endsWithMatch;
+                    if (node.attributes[attr]?.endsWith(val)) match = true;
                 }
-                node.children.forEach(searchByXPath);
-                return;
+                if (!match) return false;
             }
 
-            const [_, tag, predicates] = xpathParts;
-            const matchesTag = tag === '*' || tag === node.tagName || node.tagName.endsWith('.' + tag) || node.attributes['class'] === tag;
-            if (!matchesTag) {
-                node.children.forEach(searchByXPath);
-                return;
-            }
-
-            // Enhanced Predicate logic: supports ' and ' & ' or '
-            // This is a naive split/evaluator
-            const parts = predicates.split(/\s+OR\s+/i);
-            let anyOrMatch = false;
-
-            for (const OrPart of parts) {
-                const andConds = OrPart.split(/\s+AND\s+/i);
-                let allAndMatch = true;
-
-                for (const cond of andConds) {
-                    const c = cond.trim();
-                    let match = false;
-
-                    const simpleMatch = c.match(/^@(.*?)\s*=\s*['"]([\s\S]*?)['"]$/);
-                    const containsMatch = c.match(/^contains\s*\(\s*@(.*?)\s*,\s*['"]([\s\S]*?)['"]\s*\)$/);
-                    const startsWithMatch = c.match(/^starts-with\s*\(\s*@(.*?)\s*,\s*['"]([\s\S]*?)['"]\s*\)$/);
-                    const endsWithMatch = c.match(/^(?:ends-with|substring)\s*\(\s*@(.*?)\s*,\s*.*?['"]([\s\S]*?)['"]\s*\)$/) ||
-                        c.match(/^ends-with\s*\(\s*@([\s\S]*?)\s*,\s*['"]([\s\S]*?)['"]\s*\)$/);
-                    const regexMatch = c.match(/^matches\s*\(\s*@(.*?)\s*,\s*['"]([\s\S]*?)['"]\s*\)$/);
-
-                    if (simpleMatch) {
-                        const [_, attr, val] = simpleMatch;
-                        if (node.attributes[attr] === val) match = true;
-                    } else if (containsMatch) {
-                        const [_, attr, val] = containsMatch;
-                        if (node.attributes[attr]?.includes(val)) match = true;
-                    } else if (startsWithMatch) {
-                        const [_, attr, val] = startsWithMatch;
-                        if (node.attributes[attr]?.startsWith(val)) match = true;
-                    } else if (endsWithMatch) {
-                        const [_, attr, val] = endsWithMatch;
-                        if (node.attributes[attr]?.endsWith(val)) match = true;
-                    } else if (regexMatch) {
-                        const [_, attr, val] = regexMatch;
-                        try {
-                            const re = new RegExp(val);
-                            if (re.test(node.attributes[attr] || "")) match = true;
-                        } catch { }
-                    }
-
-                    if (!match) { allAndMatch = false; break; }
-                }
-
-                if (allAndMatch) { anyOrMatch = true; break; }
-            }
-
-            if (anyOrMatch) results.push(node);
-            node.children.forEach(searchByXPath);
+            return true;
         };
 
-        searchByXPath(root);
-        return results;
+        const evaluatePart = (nodes: InspectorNode[], segments: string[]): InspectorNode[] => {
+            if (segments.length === 0) return nodes;
+            const segment = segments[0];
+            const remaining = segments.slice(1);
+            const isDescendant = segment === ""; // happens if we have "//"
+
+            if (isDescendant) {
+                const actualSegmentStr = remaining.shift();
+                if (!actualSegmentStr) return nodes;
+
+                const matchInfo = actualSegmentStr.match(/^(.*?)(?:\[(.*?)\])?$/);
+                const tag = matchInfo ? matchInfo[1] : actualSegmentStr;
+                const predicate = matchInfo ? (matchInfo[2] || null) : null;
+
+                const candidates: InspectorNode[] = [];
+                const searchDescendants = (n: InspectorNode) => {
+                    if (checkMatch(n, tag, predicate)) candidates.push(n);
+                    n.children.forEach(searchDescendants);
+                };
+                nodes.forEach(searchDescendants);
+                return evaluatePart(candidates, remaining);
+            } else {
+                const matchInfo = segment.match(/^(.*?)(?:\[(.*?)\])?$/);
+                const tag = matchInfo ? matchInfo[1] : segment;
+                const predicate = matchInfo ? (matchInfo[2] || null) : null;
+
+                const candidates: InspectorNode[] = [];
+                nodes.forEach(n => {
+                    n.children.forEach(child => {
+                        if (checkMatch(child, tag, predicate)) candidates.push(child);
+                    });
+                });
+                return evaluatePart(candidates, remaining);
+            }
+        };
+
+        const segments = path.split('/');
+        // If it was absolute (/node), the first segment is ""
+        // If it was relative (//node), the first two segments are ""
+        if (segments[0] === "") {
+            // Check if it's a descendant search (//)
+            if (segments[1] === "") {
+                // Preserve one empty segment so evaluatePart() treats this as a descendant search
+                return evaluatePart([root], segments.slice(1));
+            }
+
+            // It's an absolute path (/node/...)
+            const firstSegment = segments[1];
+            const matchInfo = firstSegment ? firstSegment.match(/^(.*?)(?:\[(.*?)\])?$/) : null;
+            const tag = matchInfo ? matchInfo[1] : (firstSegment || "");
+            const predicate = matchInfo ? (matchInfo[2] || null) : null;
+            const isExplicitRoot = tag === 'hierarchy' || tag === root.tagName;
+
+            if (firstSegment && isExplicitRoot && checkMatch(root, tag, predicate)) {
+                // Root is explicitly matched (e.g. /hierarchy or /android.widget.FrameLayout matching root)
+                // We proceed to evaluate children against the remaining segments
+                return evaluatePart([root], segments.slice(2));
+            }
+
+            // Fallback: assume the path starts looking from the root's children
+            return evaluatePart([root], segments.slice(1));
+        } else {
+            return evaluatePart([root], segments);
+        }
     }
 
     // 6. Default Fallback

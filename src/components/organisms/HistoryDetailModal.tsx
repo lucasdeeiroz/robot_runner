@@ -290,6 +290,7 @@ export function HistoryDetailModal({ isOpen, onClose, log, onUpdateLog }: Histor
 
                         <div className="flex items-center gap-2">
                             <AiButton
+                                id="history_summarize"
                                 isLoading={isSummarizing}
                                 onClick={(_e, customPrompt) => handleSummarize(customPrompt)}
                                 label={t('run_tab.console.summarize_run')}

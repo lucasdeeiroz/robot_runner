@@ -210,6 +210,7 @@ export function AIGeneratorSubTab() {
                             </div>
                         ) : (
                             <AiButton
+                                id="test_generator"
                                 onClick={(_e, customPrompt) => handleGenerate(customPrompt)}
                                 isLoading={isGenerating}
                                 disabled={!requirements.trim() || isGenerating}

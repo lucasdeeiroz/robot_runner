@@ -213,6 +213,7 @@ const HistoryAIAnalysisModal: React.FC<HistoryAIAnalysisModalProps> = ({
                             </div>
 
                             <AiButton
+                                id="history_analysis"
                                 onClick={(_e, customPrompt) => handleStartAnalysis(customPrompt)}
                                 isLoading={isAnalyzing}
                                 expandable={false}

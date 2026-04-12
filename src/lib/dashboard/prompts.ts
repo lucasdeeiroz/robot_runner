@@ -4,8 +4,8 @@ import { ScreenMap, NavigationData } from '@/lib/types';
  * Appends a custom prompt instruction to the end of the original prompt if provided.
  */
 export function appendCustomPrompt(basePrompt: string, customPrompt?: string): string {
-    if (!customPrompt || customPrompt.trim().length === 0) return basePrompt;
-    return `${basePrompt}\n\n=== CUSTOM INSTRUCTIONS ===\n${customPrompt}\n\nNote: The custom instructions above must take precedence and OVERRIDE any conflicting rules defined previously.`;
+  if (!customPrompt || customPrompt.trim().length === 0) return basePrompt;
+  return `${basePrompt}\n\n=== CUSTOM INSTRUCTIONS ===\n${customPrompt}\n\nNote: The custom instructions above must take precedence and OVERRIDE any conflicting rules defined previously.`;
 }
 
 /**
@@ -105,18 +105,26 @@ NOTES (Maintenance of Memory & Context):
 - IF NO NEWS: If you have no new observations, return the existing description as-is.
 
 GENERAL RULES:
-1. Element names: "Space Separated" (e.g. "Login Button").
-2. Element "type": one of button, input, text, link, toggle, checkbox, image, menu, scroll_view, tab, list_item.
-3. The "id" field in "elements" MUST be the "short_id" from the XML.
-4. Screen Recognition: If XML/Screenshot matches an existing mapped screen, reuse its exact name.
-5. Language for descriptions and rationale: ${language}.
-6. Map ALL visible elements, not just clickable ones. 
+- Element names: "Space Separated" (e.g. "Login Button").
+- Element "type": one of button, input, text, link, toggle, checkbox, image, menu, scroll_view, tab, list_item.
+- The "id" field in "elements" MUST be the "short_id" from the XML.
+- Screen Recognition: If XML/Screenshot matches an existing mapped screen, reuse its exact name.
+- Language for descriptions and rationale: ${language}.
+- Map ALL visible elements, not just clickable ones. 
    - SCROLLABLE: Elements with scrollable="true" (generic View, ScrollView, ListView, etc.) MUST be mapped as "scroll_view". They are targets for swiping.
    - IMAGES: ImageView nodes with content-desc are important context and must be mapped as "image".
    - CONTEXT: Focusable=true or enabled=true nodes provide cues about screen state and should be mapped even if clickable=false.
-7. ELEMENT PERSISTENCE: You must include ALL elements that are currently visible on the screen. If an element was previously mapped elsewhere but is NOT visible now, simply omit it from your 'elements' array (the system will merge it automatically). Do NOT attempt to "delete" elements by sending an empty list.
-8. DESCRIPTION REWRITE: You must return the FULL, cohesive description for the screen and elements. Incorporate new findings into the existing text provided in "EXISTING MAPS". Do NOT use separators like "|" or "---". Write one single flowing descriptive text.
-9. SCREEN MATCHING: Use EXACT names from the PROVIDED CONTEXT "EXISTING MAPS" for existing screens. Do NOT normalize or change capitalization if it's already there.
+- AI TAGGING RULES (CRITICAL):
+TAGGING CONSTRAINTS:
+  - CAPITALIZATION: Every tag MUST start with a Capital Letter (e.g., "Authentication").
+  - FLOW IDENTIFICATION: Prioritize tags that identify the functional business flow or user journey (e.g., "Registration", "Settings", "Login", "Order", "Profile").
+  - NO GENERIC TAGS: Do NOT use generic terms like "Screen", "Button", "Component", "Elements", "Mobile", "Page".
+  - DESCRIPTIVE: Prefer one-word tags that provide clear context for organizing large test suites.
+  - Examples of GOOD tags: "Login", "Registration", "Purchases", "Settings", "Search", "Form".
+  - Examples of BAD tags (DO NOT USE): "Screen", "Buttons", "Mobile", "App".
+- ELEMENT PERSISTENCE: You must include ALL elements that are currently visible on the screen. If an element was previously mapped elsewhere but is NOT visible now, simply omit it from your 'elements' array (the system will merge it automatically). Do NOT attempt to "delete" elements by sending an empty list.
+- DESCRIPTION REWRITE: You must return the FULL, cohesive description for the screen and elements. Incorporate new findings into the existing text provided in "EXISTING MAPS". Do NOT use separators like "|" or "---". Write one single flowing descriptive text.
+- SCREEN MATCHING: Use EXACT names from the PROVIDED CONTEXT "EXISTING MAPS" for existing screens. Do NOT normalize or change capitalization if it's already there.
 
 JSON STRUCTURE:
 {
@@ -257,22 +265,31 @@ export function getFlowchartLayoutPrompt(language: string, customPrompt?: string
   const basePrompt = `
 Analyze the provided mobile application screens and their navigation connections to reorganize the Flowchart layout using a grid-based system (gridX, gridY).
 
+MANDATORY EXHAUSTIVITY RULE:
+- You MUST provide coordinates for EVERY SINGLE screen listed in the input.
+- Do NOT skip any screen, even if it has no connections or seems unimportant.
+- If you find 50 screens in the input, you MUST return exactly 50 entries in the JSON.
+
 ORGANIZATION RULES:
-1. INITIAL SCREEN: The very first screen of the app (usually Splash, Welcome, or Login) must be placed at the leftmost position (gridX: 0).
-2. AUTHENTICATION: Login and Registration screens should immediately follow the Initial Screen to the right.
-3. HOME SCREEN: The main application dashboard/home screen must be placed to the right of the authentication screens.
-4. MAIN FLOWS: All navigation flows originating from the Home Screen must proceed from left to right (increasing gridX).
-5. BRANCHING: When a screen has multiple destinations (branches), place them one below the other (different gridY values) while maintaining their horizontal progression.
-6. CLARITY: Ensure the overall layout is logical, minimize overlapping paths, and prioritize human readability.
+1. INITIAL SCREEN: The very first screen of the app (Splash/Welcome/Login) MUST be at (gridX: 0, gridY: 0).
+2. AUTHENTICATION: Login and Registration screens should follow to the right (gridX: 1, 2...).
+3. HOME SCREEN: The main dashboard/home screen must be placed to the right of the authentication flow.
+4. VERTICAL SPREADING (CRITICAL): Do NOT place all screens in a single horizontal line. If multiple screens originate from the same parent (like different tabs from Home), they MUST be distributed vertically (different gridY values).
+5. BRANCHING HIERARCHY: When a screen has multiple destinations:
+   - The first destination continues the horizontal flow (same gridY, increasing gridX).
+   - Subsequent destinations MUST be placed below (increasing gridY) the first one, creating a clear tree structure.
+6. FUNCTIONAL GROUPING: Screens belonging to distinct areas (e.g., "Settings" flow vs "Profile" flow) should be placed in entirely different Y-sectors (e.g., Settings at gridY: 0-5, Profile at gridY: 10-15) to maintain visual separation.
+7. MAX HORIZONTAL DENSITY: Avoid long horizontal chains. If a flow exceeds 5 screens in a straight line, consider indenting or shifting the Y-level for the next segment if it helps readability.
+8. CLARITY: Minimize overlapping connection lines. Prioritize a clean, hierarchical tree structure that grows primarily from LEFT to RIGHT and spreads TOP to BOTTOM.
 
 INPUT:
-- A list of screens with their names, descriptions, types, and navigation connections (navigates_to).
+- A list of screens with their names, types, and navigation connections.
 
 OUTPUT:
-- Return ONLY a valid JSON object mapping each screen NAME (the unique ID used in navigation) to its new coordinates.
+- Return ONLY a valid JSON object mapping each screen NAME to its new coordinates.
 - Format: { "Screen Name": { "gridX": number, "gridY": number }, ... }
 
-Language for any required internal reasoning (though output must be valid JSON): ${language}.
+Language for any required internal reasoning: ${language}.
 `.trim();
   return appendCustomPrompt(basePrompt, customPrompt);
 }
@@ -322,8 +339,16 @@ export function getScreenTaggingPrompt(language: string, customPrompt?: string):
   const basePrompt = `
 You are a QA Architect.
 Analyze the screen components and optionally the provided screenshot to suggest 3 to 5 highly relevant semantic tags.
-Tags should be dynamic, context-aware, and useful for organizing a large test suite.
-Examples: "Authentication", "User Profile", "Social Media", "Shopping Cart", "Form Validation".
+
+TAGGING CONSTRAINTS:
+- CAPITALIZATION: Every tag MUST start with a Capital Letter (e.g., "Authentication").
+- FLOW IDENTIFICATION: Prioritize tags that identify the functional business flow or user journey (e.g., "Registration", "Settings", "Login", "Order", "Profile").
+- NO GENERIC TAGS: Do NOT use generic terms like "Screen", "Button", "Component", "Elements", "Mobile", "Page".
+- DESCRIPTIVE: Prefer one-word tags that provide clear context for organizing large test suites.
+
+Examples of GOOD tags: "Login", "Registration", "Purchases", "Settings", "Search", "Form".
+Examples of BAD tags (DO NOT USE): "Screen", "Buttons", "Mobile", "App".
+
 Respond ONLY in a comma-separated list of tags in this language: ${language}.
 `.trim();
   return appendCustomPrompt(basePrompt, customPrompt);

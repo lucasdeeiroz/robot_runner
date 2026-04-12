@@ -252,6 +252,7 @@ export function HistorySubTab() {
                 status={
                     <div className="flex items-center gap-2">
                         <AiButton
+                            id="history_analysis"
                             onClick={handleAIAnalysis}
                             isLoading={isAnalyzingHistory}
                             disabled={filteredHistory.length === 0 || isAnalyzingHistory}

@@ -13,6 +13,38 @@ function extractBase64Data(imageBase64: string): { mimeType: string, data: strin
     return { mimeType: 'image/png', data: trimmed };
 }
 
+/**
+ * Robustly parses JSON from a string that might contain markdown backticks or other noise.
+ */
+function safeParseJson<T>(content: string): T {
+    const trimmed = content.trim();
+    try {
+        return JSON.parse(trimmed);
+    } catch (e) {
+        const firstBrace = content.indexOf('{');
+        const firstBracket = content.indexOf('[');
+        const startIndex = (firstBrace !== -1 && firstBracket !== -1)
+            ? Math.min(firstBrace, firstBracket)
+            : (firstBrace !== -1 ? firstBrace : (firstBracket !== -1 ? firstBracket : -1));
+
+        const lastBrace = content.lastIndexOf('}');
+        const lastBracket = content.lastIndexOf(']');
+        const endIndex = Math.max(lastBrace, lastBracket);
+
+        if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+            const jsonString = content.substring(startIndex, endIndex + 1);
+            try {
+                return JSON.parse(jsonString);
+            } catch (e2: any) {
+                console.error("[AI] Failed to parse extracted JSON content:", jsonString);
+                throw new Error(`Failed to parse extracted JSON: ${e2.message}`);
+            }
+        }
+        console.error("[AI] No valid JSON structure found in content:", content);
+        throw e;
+    }
+}
+
 export async function generateRefinedTestCases(
     requirements: string,
     apiKey: string,
@@ -598,7 +630,7 @@ ${xmlDump.substring(0, 15000)}
         const content = resData.content?.[0]?.text;
         if (!content) throw new Error("Empty response from Claude");
 
-        return JSON.parse(content);
+        return safeParseJson(content);
     } catch (error: any) {
         console.error("Claude exploreScreen Error:", error);
         throw error;
@@ -634,7 +666,7 @@ export async function reorganizeFlowchartLayout(
             signal,
             body: JSON.stringify({
                 model,
-                max_tokens: 4096,
+                max_tokens: 8192,
                 system: systemInstruction,
                 messages: [
                     { role: 'user', content: `Current Application Mapping:\n${mappingContext}` }
@@ -652,7 +684,7 @@ export async function reorganizeFlowchartLayout(
         const content = resData.content?.[0]?.text;
         if (!content) throw new Error("Empty response from Claude");
 
-        return JSON.parse(content);
+        return safeParseJson(content);
     } catch (error: any) {
         console.error("Claude reorganizeFlowchartLayout Error:", error);
         throw error;
