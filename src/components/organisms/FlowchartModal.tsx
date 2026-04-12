@@ -841,11 +841,15 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
         }
     }, [maps, loading]);
     // --- Helper Functions ---
-    const getPixelCoords = (gridX: any, gridY: any) => ({
-        x: (Number.isFinite(gridX) ? gridX : 0) * CELL_WIDTH + NODE_OFFSET_X,
-        y: (Number.isFinite(gridY) ? gridY : 0) * CELL_HEIGHT + NODE_OFFSET_Y
-    });
+    const getPixelCoords = (gridX: any, gridY: any) => {
+        const xNum = Number(gridX);
+        const yNum = Number(gridY);
 
+        return {
+            x: (Number.isFinite(xNum) ? xNum : 0) * CELL_WIDTH + NODE_OFFSET_X,
+            y: (Number.isFinite(yNum) ? yNum : 0) * CELL_HEIGHT + NODE_OFFSET_Y
+        };
+    };
     const getPortCoords = (nodeX: number, nodeY: number, portId: string) => {
         const port = NODE_PORTS.find(p => p.id === portId);
         if (!port) return { x: nodeX + NODE_WIDTH / 2, y: nodeY + NODE_HEIGHT / 2 }; // Center fallback
