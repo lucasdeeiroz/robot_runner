@@ -274,8 +274,13 @@ export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen
                                             let systemInstruction = `
 You are a Senior QA Automation Engineer.
 Analyze the test failure provided (error message + screenshot if available).
-Identify the root cause (e.g., selector issue, synchronization problem, environment error, or actual bug).
-Suggest a technical fix or next steps for the developer.
+1. Identify the root cause (e.g., selector issue, synchronization problem, environment error, or actual bug).
+2. If it is an "Element Not Found" error, you MUST act as a "Self-Healing Agent":
+    - Analyze the provided screenshot.
+    - Identify the visually similar or logical substitute element.
+    - Suggest a highly resilient fallback locator (XPath, ID, or Accessibility ID) that could heal this test.
+    - Clearly label this section as "💡 Healed Locator Suggestion:".
+3. Suggest a technical fix or next steps for the developer.
 Respond in ${langName}. Keep it concise and technical.
 `.trim();
                                             

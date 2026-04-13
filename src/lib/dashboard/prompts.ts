@@ -250,10 +250,12 @@ export function getRefinedRobotScriptPrompt(language: string, customPrompt?: str
 Generate a complete, functional Robot Framework (.robot) script block.
 1. Use the standard structure: *** Settings ***, *** Variables ***, *** Keywords ***, *** Test Cases ***.
 2. In *** Settings ***, include Library AppiumLibrary.
-3. In *** Keywords ***, create high-level keywords based on the user requirement. Use the provided APPLICATION MAPPING elements for locators.
-4. If an element name from mapping is found, use it as a basis for the keyword action (e.g., if mapped "Login Button", use its XPath/ID).
-5. Ensure the script is valid and follows best practices for mobile automation.
-6. Language: ${language}.
+3. Parse the user requirement (Given/When/Then steps) robustly and map each step to high-level keywords.
+4. In *** Keywords ***, create those high-level keywords. Use the provided APPLICATION MAPPING elements for locators.
+5. If an element name from mapping is found, use it as a basis for the keyword action (e.g., if mapped "Login Button", use its XPath/ID).
+6. Parameterize the keywords (use variables for dynamic data like usernames, passwords, or search queries found in the text).
+7. Ensure the script is valid and follows best practices for mobile automation.
+8. Language: ${language}.
 `.trim();
   return appendCustomPrompt(basePrompt, customPrompt);
 }
