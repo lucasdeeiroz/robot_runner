@@ -37,6 +37,8 @@ import * as claude from '@/lib/dashboard/claude';
 import * as openai from '@/lib/dashboard/openai';
 import { AutonomousExplorer, ExplorationAction } from '@/lib/dashboard/explorationEngine';
 import { getAiContext } from '@/lib/dashboard/historyAnalysisUtils';
+import { ExplorationLogTree } from '@/components/molecules/ExplorationLogTree';
+
 
 function groupElementsByType<T extends { type: string }>(
     elements: T[],
@@ -2186,17 +2188,17 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                     <div
                         ref={logScrollRef}
                         onScroll={onExplorationScroll}
-                        className="bg-surface-variant/10 rounded-xl p-3 border border-outline-variant/10 overflow-y-auto max-h-60 custom-scrollbar flex flex-col gap-1"
+                        className="bg-surface-variant/5 rounded-xl p-3 border border-outline-variant/10 overflow-y-auto max-h-80 custom-scrollbar"
                     >
-                        {explorationLogs.map((log, i) => (
-                            <div key={i} className="text-[10px] font-mono text-on-surface-variant/80 border-b border-outline-variant/5 pb-1 last:border-0">
-                                {log}
+                        <ExplorationLogTree logs={explorationLogs} />
+                        {isExploring && (
+                            <div className="flex items-center gap-2 text-[10px] text-primary animate-pulse mt-4 px-3 border-l-2 border-primary/30 py-1 font-mono">
+                                <ExpressiveLoading size="xsm" variant="circular" /> 
+                                {t('mapper.exploration.thinking', 'AI exploring and reasoning...')}
                             </div>
-                        ))}
-                        {isExploring && <div className="flex items-center gap-2 text-[10px] text-primary animate-pulse mt-1">
-                            <ExpressiveLoading size="xsm" variant="circular" /> {t('mapper.exploration.thinking', 'Thinking...')}
-                        </div>}
+                        )}
                     </div>
+
                 </div>
             )}
         </div>
