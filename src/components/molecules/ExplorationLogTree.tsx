@@ -44,7 +44,7 @@ export const ExplorationLogTree: React.FC<ExplorationLogTreeProps> = ({ logs }) 
                     parsedSteps.push(currentStep);
                 }
                 currentStep = {
-                    number: parseInt(stepMatch[1]),
+                    number: parseInt(stepMatch[1], 10),
                     status: 'running',
                     title: t('mapper.exploration.step_title', { number: stepMatch[1], defaultValue: `Step ${stepMatch[1]}` }),
                     entries: []
