@@ -103,21 +103,28 @@ export const ExplorationLogTree: React.FC<ExplorationLogTreeProps> = ({ logs }) 
         if (steps.length > 0) {
             const lastStep = steps[steps.length - 1];
 
-            // 1. Auto-expand NEW running steps
-            if (lastStep.status === 'running' && !expandedSteps[lastStep.number]) {
-                setExpandedSteps(prev => ({ ...prev, [lastStep.number]: true }));
-            }
+            setExpandedSteps(prev => {
+                let next = prev;
 
-            // 2. Auto-collapse steps that just transitioned to pass
-            steps.forEach(step => {
-                const prevStep = prevStepsRef.current.find(s => s.number === step.number);
-                if (prevStep && prevStep.status === 'running' && step.status === 'pass') {
-                    setExpandedSteps(prev => {
-                        const next = { ...prev };
-                        delete next[step.number];
-                        return next;
-                    });
+                // 1. Auto-expand NEW running steps
+                if (lastStep.status === 'running' && !prev[lastStep.number]) {
+                    next = { ...next, [lastStep.number]: true };
                 }
+
+                // 2. Auto-collapse steps that just transitioned to pass
+                steps.forEach(step => {
+                    const prevStep = prevStepsRef.current.find(s => s.number === step.number);
+                    if (prevStep && prevStep.status === 'running' && step.status === 'pass') {
+                        if (next[step.number]) {
+                            if (next === prev) {
+                                next = { ...next };
+                            }
+                            delete next[step.number];
+                        }
+                    }
+                });
+
+                return next;
             });
         }
         prevStepsRef.current = steps;
