@@ -347,14 +347,31 @@ TAGGING CONSTRAINTS:
 - FLOW IDENTIFICATION: Prioritize tags that identify the functional business flow or user journey (e.g., "Registration", "Settings", "Login", "Order", "Profile").
 - NO GENERIC TAGS: Do NOT use generic terms like "Screen", "Button", "Component", "Elements", "Mobile", "Page".
 - DESCRIPTIVE: Prefer one-word tags that provide clear context for organizing large test suites.
+- OUTPUT: Return ONLY a comma-separated list of tags.
 
-Examples of GOOD tags: "Login", "Registration", "Purchases", "Settings", "Search", "Form".
-Examples of BAD tags (DO NOT USE): "Screen", "Buttons", "Mobile", "App".
-
-Respond ONLY in a comma-separated list of tags in this language: ${language}.
+Language: ${language}.
 `.trim();
   return appendCustomPrompt(basePrompt, customPrompt);
 }
+
+/**
+ * Prompt for the Smart Selector Suggester in the Inspector.
+ */
+export function getSmartSelectorPrompt(language: string, customPrompt?: string): string {
+  const basePrompt = `
+You are an expert QA Automation Engineer. 
+Your task is to analyze the provided mobile element attributes and suggest the most resilient, stable, and unique selector (XPath or Accessibility ID).
+
+Rules:
+1. Prefer Accessibility ID (content-desc) if available and meaningful.
+2. Second preference is Resource ID if it's unique.
+3. If using XPath, avoid long absolute paths. Use relative paths with unique attributes.
+4. Provide the suggestion in a clear format: "Selector: [the selector]" followed by "Rationale: [explanation]".
+5. Provide the Rationale in the requested language: ${language}.
+`.trim();
+  return appendCustomPrompt(basePrompt, customPrompt);
+}
+
 
 /**
  * System instruction for analyzing test history.
@@ -401,6 +418,27 @@ Rules:
 - ALWAYS use the provided numbers for success rate. If OVERALL STATISTICS shows ${totalTests} tests, then that is the truth.
 - IF technical details are provided in FAILURE CONTEXT, YOU MUST use them. Do not say they are missing.
 - Response language: ${responseLanguage}.
+`.trim();
+  return appendCustomPrompt(basePrompt, customPrompt);
+}
+
+/**
+ * Prompt for root cause analysis and self-healing in the Log Tree.
+ */
+export function getFailureAnalysisPrompt(language: string, customPrompt?: string): string {
+  const basePrompt = `
+You are a Senior QA Automation Engineer.
+Analyze the test failure provided (error message + screenshot if available).
+
+1. Identify the root cause (e.g., selector issue, synchronization problem, environment error, or actual bug).
+2. If it is an "Element Not Found" error, you MUST act as a "Self-Healing Agent":
+    - Analyze the provided screenshot.
+    - Identify the visually similar or logical substitute element.
+    - Suggest a highly resilient fallback locator (XPath, ID, or Accessibility ID) that could heal this test.
+    - Clearly label this section as "💡 Healed Locator Suggestion:".
+3. Suggest a technical fix or next steps for the developer.
+
+Respond in ${language}. Keep it concise and technical.
 `.trim();
   return appendCustomPrompt(basePrompt, customPrompt);
 }

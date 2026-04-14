@@ -20,6 +20,7 @@ import * as claude from "@/lib/dashboard/claude";
 import * as openai from "@/lib/dashboard/openai";
 import { AiButton } from "@/components/atoms/AiButton";
 import { AiResponse } from "@/components/molecules/AiResponse";
+import { getSmartSelectorPrompt } from "@/lib/dashboard/prompts";
 
 
 interface InspectorSubTabProps {
@@ -374,21 +375,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
         setAiRationale(null);
 
         const currentLang = i18n.language === 'pt' ? 'Portuguese' : i18n.language === 'es' ? 'Spanish' : 'English';
-
-        let systemInstruction = `
-You are an expert QA Automation Engineer. 
-Your task is to analyze the provided mobile element attributes and suggest the most resilient, stable, and unique selector (XPath or Accessibility ID).
-Rules:
-1. Prefer Accessibility ID (content-desc) if available and meaningful.
-2. Second preference is Resource ID if it's unique.
-3. If using XPath, avoid long absolute paths. Use relative paths with unique attributes.
-4. Provide the suggestion in a clear format: "Selector: [the selector]" followed by "Rationale: [explanation]".
-5. Provide the Rationale in the requested language: ${currentLang}.
-`.trim();
-
-        if (customPrompt) {
-            systemInstruction += `\n\n=== CUSTOM INSTRUCTIONS ===\n${customPrompt}\n\nNote: The custom instructions above must take precedence and OVERRIDE any conflicting rules defined previously.`;
-        }
+        const systemInstruction = getSmartSelectorPrompt(currentLang, customPrompt);
 
         const prompt = `
 Element details:
