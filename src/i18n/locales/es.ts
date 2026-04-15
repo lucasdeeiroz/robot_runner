@@ -948,7 +948,7 @@ export const es = {
                 upload_logo: "Subir Logo",
                 remove_logo: "Eliminar Logo",
                 zoom: "Zoom de la Interfaz",
-                zoom_hint: "Usa Ctrl+ y Ctrl- para ajustar rápidamente."
+                zoom_hint: "Usa Ctrl/Cmd+ y Ctrl/Cmd- para ajustar rápidamente, y Ctrl/Cmd+0 para restablecer."
             },
             tool_config: {
                 appium_base_path: "Ruta Base de Appium",
