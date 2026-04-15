@@ -2,6 +2,7 @@ import { ScreenMap, UIElementMap } from '@/lib/types';
 import { AIGenerationType } from './gemini';
 import { DeepAnalysisContext } from "./historyAnalysisUtils";
 import { getExplorationPrompt, formatExistingMaps, getRefinedTestCasesPrompt, getRefinedPBIPrompt, getRefinedImprovementPrompt, getRefinedBugPrompt, getRefinedRobotScriptPrompt, getFlowchartLayoutPrompt, getElementNamingPrompt, getScreenTaggingPrompt, getTestHistoryAnalysisPrompt, getExecutionSummaryPrompt, getQAAssistantWrapper } from "./prompts";
+import { fetch } from '@tauri-apps/plugin-http';
 
 function extractBase64Data(imageBase64: string): { mimeType: string, data: string } {
     const trimmed = imageBase64.trim();
@@ -91,7 +92,8 @@ export async function generateRefinedTestCases(
             headers: {
                 'Content-Type': 'application/json',
                 'x-api-key': apiKey,
-                'anthropic-version': '2023-06-01'
+                'anthropic-version': '2023-06-01',
+                'anthropic-dangerous-direct-browser-access': 'true'
             },
             signal,
             body: JSON.stringify({
@@ -163,7 +165,8 @@ export async function askClaude(
             headers: {
                 'Content-Type': 'application/json',
                 'x-api-key': apiKey,
-                'anthropic-version': '2023-06-01'
+                'anthropic-version': '2023-06-01',
+                'anthropic-dangerous-direct-browser-access': 'true'
             },
             signal,
             body: JSON.stringify({
@@ -206,7 +209,8 @@ export async function getAvailableModels(apiKey: string): Promise<string[]> {
             method: 'GET',
             headers: {
                 'anthropic-version': '2023-06-01',
-                'X-Api-Key': apiKey
+                'X-Api-Key': apiKey,
+                'anthropic-dangerous-direct-browser-access': 'true'
             }
         });
 
@@ -271,7 +275,7 @@ export async function suggestElementName(
                 'Content-Type': 'application/json',
                 'x-api-key': apiKey,
                 'anthropic-version': '2023-06-01',
-                'dangerously-allow-browser': 'true'
+                'anthropic-dangerous-direct-browser-access': 'true'
             },
             signal,
             body: JSON.stringify(body)
@@ -591,7 +595,8 @@ ${xmlDump.substring(0, 15000)}
             headers: {
                 'Content-Type': 'application/json',
                 'x-api-key': apiKey,
-                'anthropic-version': '2023-06-01'
+                'anthropic-version': '2023-06-01',
+                'anthropic-dangerous-direct-browser-access': 'true'
             },
             signal,
             body: JSON.stringify({
@@ -661,7 +666,8 @@ export async function reorganizeFlowchartLayout(
             headers: {
                 'Content-Type': 'application/json',
                 'x-api-key': apiKey,
-                'anthropic-version': '2023-06-01'
+                'anthropic-version': '2023-06-01',
+                'anthropic-dangerous-direct-browser-access': 'true'
             },
             signal,
             body: JSON.stringify({
