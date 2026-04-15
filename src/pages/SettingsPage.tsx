@@ -294,6 +294,57 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                 description={t('sidebar.description_settings')}
                 icon={SettingsIcon}
                 iconSize="xl"
+                rightElement={
+                    (
+                        /* Interface Zoom */
+                        <div>
+                            <div className="flex items-center justify-between mb-1">
+                                <h3 className="text-sm font-medium text-on-surface-variant/80">{t('settings.appearance.zoom')}</h3>
+                                <span className="text-xs font-mono bg-primary/10 text-primary px-2 py-0.5 rounded-2xl">
+                                    {Math.round((settings.zoomFactor || 1.0) * 100)}%
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    title={t('settings.appearance.zoom_hint')}
+                                    onClick={() => updateSetting('zoomFactor', Math.max(0.7, Number(((settings.zoomFactor || 1.0) - 0.1).toFixed(1))))}
+                                    className="h-8 w-8 p-0"
+                                >
+                                    -
+                                </Button>
+                                <input
+                                    type="range"
+                                    min="0.7"
+                                    max="1.3"
+                                    step="0.1"
+                                    value={settings.zoomFactor || 1.0}
+                                    onChange={(e) => updateSetting('zoomFactor', parseFloat(e.target.value))}
+                                    className="flex-1 accent-primary h-1.5 bg-surface-variant rounded-2xl appearance-none cursor-pointer"
+                                />
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    title={t('settings.appearance.zoom_hint')}
+                                    onClick={() => updateSetting('zoomFactor', Math.min(1.3, Number(((settings.zoomFactor || 1.0) + 0.1).toFixed(1))))}
+                                    className="h-8 w-8 p-0"
+                                >
+                                    +
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    title={t('settings.appearance.zoom_hint')}
+                                    onClick={() => updateSetting('zoomFactor', 1.0)}
+                                    className="text-[10px] opacity-70 hover:opacity-100"
+                                >
+                                    Reset
+                                </Button>
+                            </div>
+                        </div>
+                    )
+                }
             />
 
             {/* Profile Manager Section */}
@@ -355,7 +406,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                 }
             >
                 <div className={clsx(
-                    "mt-4 pt-4 border-t border-outline-variant/30 grid gap-6 items-end",
+                    "mt-4 grid gap-6 items-end",
                     settings.usageMode === 'automator' ? "grid-cols-1 md:grid-cols-3" : "grid-cols-1 md:grid-cols-2"
                 )}>
                     <div>
@@ -677,6 +728,41 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                         title={t('settings.appearance.title')}
                         icon={Moon}
                         menus={
+                            <>
+                                {/* Primary Color */}
+                                <div>
+                                    {/* <h3 className="text-sm font-medium text-on-surface-variant/80 mb-3">{t('settings.appearance.primary_color')}</h3> */}
+                                    <div className="flex flex-wrap gap-3">
+                                        {[
+                                            { id: 'blue', hex: '#2563eb' },
+                                            { id: 'red', hex: '#dc2626' },
+                                            { id: 'green', hex: '#16a34a' },
+                                            { id: 'purple', hex: '#9333ea' },
+                                            { id: 'orange', hex: '#ea580c' },
+                                            { id: 'cyan', hex: '#0891b2' },
+                                            { id: 'pink', hex: '#db2777' },
+                                        ].map((color) => (
+                                            <Button
+                                                key={color.id}
+                                                onClick={() => updateSetting('primaryColor', color.id)}
+                                                variant="ghost"
+                                                className={clsx(
+                                                    "w-6 h-6 rounded-2xl p-0 min-w-0 transition-transform",
+                                                    settings.primaryColor === color.id ? "ring-2 scale-110" : "hover:scale-105"
+                                                )}
+                                                style={{ backgroundColor: color.hex, borderColor: color.hex, '--tw-ring-color': color.hex } as any}
+                                                title={color.id.charAt(0).toUpperCase() + color.id.slice(1)}
+                                            >
+                                                {settings.primaryColor === color.id && (
+                                                    <div className="w-2.5 h-2.5 bg-on-primary rounded-2xl shadow-sm" />
+                                                )}
+                                            </Button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </>
+                        }
+                        actions={
                             <SegmentedControl
                                 options={[
                                     { value: 'light', icon: <Sun size={18} /> },
@@ -687,40 +773,10 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                             />
                         }
                     >
-                        {/* Primary Color */}
-                        <div className="mt-6">
-                            <h3 className="text-sm font-medium text-on-surface-variant/80 mb-3">{t('settings.appearance.primary_color')}</h3>
-                            <div className="flex flex-wrap gap-3">
-                                {[
-                                    { id: 'blue', hex: '#2563eb' },
-                                    { id: 'red', hex: '#dc2626' },
-                                    { id: 'green', hex: '#16a34a' },
-                                    { id: 'purple', hex: '#9333ea' },
-                                    { id: 'orange', hex: '#ea580c' },
-                                    { id: 'cyan', hex: '#0891b2' },
-                                    { id: 'pink', hex: '#db2777' },
-                                ].map((color) => (
-                                    <Button
-                                        key={color.id}
-                                        onClick={() => updateSetting('primaryColor', color.id)}
-                                        variant="ghost"
-                                        className={clsx(
-                                            "w-8 h-8 rounded-2xl p-0 min-w-0 transition-transform",
-                                            settings.primaryColor === color.id ? "ring-2 scale-110" : "hover:scale-105"
-                                        )}
-                                        style={{ backgroundColor: color.hex, borderColor: color.hex, '--tw-ring-color': color.hex } as any}
-                                        title={color.id.charAt(0).toUpperCase() + color.id.slice(1)}
-                                    >
-                                        {settings.primaryColor === color.id && (
-                                            <div className="w-2.5 h-2.5 bg-on-primary rounded-2xl shadow-sm" />
-                                        )}
-                                    </Button>
-                                ))}
-                            </div>
-                        </div>
+
 
                         {/* Sidebar Logo */}
-                        <div className="mt-6 pt-6 border-t border-outline-variant/30">
+                        <div className="space-y-4 pt-1">
                             <h3 className="text-sm font-medium text-on-surface-variant/80 mb-3">{t('settings.appearance.sidebar_logo')}</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <LogoInput
@@ -745,179 +801,184 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                     </Section>
 
                     {/* AI Settings */}
-                    <Section title={t('settings.ai.title')} icon={Sparkles}>
-                        <div className="space-y-4">
-                            <Select
-                                label={t('settings.ai.provider')}
-                                value={settings.aiProvider || 'gemini'}
-                                onChange={(e) => updateSetting('aiProvider', e.target.value as any)}
-                                options={[
-                                    { value: 'gemini', label: t('settings.ai.gemini.title') },
-                                    { value: 'claude', label: t('settings.ai.claude.title') },
-                                    { value: 'openai', label: t('settings.ai.openai.title') }
-                                ]}
-                            />
+                    <Section
+                        title={t('settings.ai.title')}
+                        icon={Sparkles}
+                        menus={
+                            <div className="space-y-4">
+                                <Select
+                                    value={settings.aiProvider || 'gemini'}
+                                    onChange={(e) => updateSetting('aiProvider', e.target.value as any)}
+                                    options={[
+                                        { value: 'gemini', label: t('settings.ai.gemini.title') },
+                                        { value: 'claude', label: t('settings.ai.claude.title') },
+                                        { value: 'openai', label: t('settings.ai.openai.title') }
+                                    ]}
+                                />
+                            </div>
+                        }
+                    >
 
-                            {/* Gemini Config */}
-                            {settings.aiProvider === 'gemini' && (
-                                <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
+                        {/* Gemini Config */}
+                        {settings.aiProvider === 'gemini' && (
+                            <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
+                                <Input
+                                    label={t('settings.ai.key')}
+                                    type="password"
+                                    value={settings.geminiApiKey || ''}
+                                    onChange={(e) => updateSetting('geminiApiKey', e.target.value)}
+                                    placeholder={t('settings.ai.gemini.placeholder')}
+                                />
+                                <p className="text-[10px] text-on-surface-variant/80 mt-1">
+                                    {t('settings.ai.gemini.help')}{' '}
+                                    <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-primary hover:underline font-medium">Google AI Studio</a>
+                                </p>
+                                <div className="relative">
                                     <Input
-                                        label={t('settings.ai.key')}
-                                        type="password"
-                                        value={settings.geminiApiKey || ''}
-                                        onChange={(e) => updateSetting('geminiApiKey', e.target.value)}
-                                        placeholder={t('settings.ai.gemini.placeholder')}
+                                        label={t('settings.ai.model')}
+                                        type="text"
+                                        value={settings.geminiModel || 'gemini-1.5-flash'}
+                                        onChange={(e) => updateSetting('geminiModel', e.target.value)}
+                                        onFocus={() => {
+                                            handleFetchModels();
+                                        }}
+                                        onBlur={() => setTimeout(() => setShowModelList(false), 200)}
+                                        placeholder="e.g. gemini-1.5-flash"
                                     />
-                                    <p className="text-[10px] text-on-surface-variant/80 mt-1">
-                                        {t('settings.ai.gemini.help')}{' '}
-                                        <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-primary hover:underline font-medium">Google AI Studio</a>
-                                    </p>
-                                    <div className="relative">
-                                        <Input
-                                            label={t('settings.ai.model')}
-                                            type="text"
-                                            value={settings.geminiModel || 'gemini-1.5-flash'}
-                                            onChange={(e) => updateSetting('geminiModel', e.target.value)}
-                                            onFocus={() => {
-                                                handleFetchModels();
-                                            }}
-                                            onBlur={() => setTimeout(() => setShowModelList(false), 200)}
-                                            placeholder="e.g. gemini-1.5-flash"
-                                        />
-                                        {showModelList && settings.aiProvider === 'gemini' && (
-                                            <div className="absolute z-10 w-full mt-1 bg-surface border border-outline-variant/30 rounded-2xl shadow-lg max-h-48 overflow-auto custom-scrollbar">
-                                                {isFetchingModels ? (
-                                                    <div className="px-3 py-4 flex items-center justify-center gap-3 text-sm text-on-surface-variant/70 italic">
-                                                        <ExpressiveLoading size="xsm" variant="circular" />
-                                                        <span>{t('settings.ai.loading_models')}</span>
-                                                    </div>
-                                                ) : modelFetchError ? (
-                                                    <div className="px-3 py-4 text-xs text-error/80 flex flex-col gap-1">
-                                                        <span className="font-medium">{t('common.error_occurred')}</span>
-                                                        <span className="opacity-70">{modelFetchError}</span>
-                                                    </div>
-                                                ) : availableModels.length > 0 ? (
-                                                    availableModels.map(model => (
-                                                        <button key={model} className="w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0" onClick={() => { updateSetting('geminiModel', model); setShowModelList(false); }}>{model}</button>
-                                                    ))
-                                                ) : (
-                                                    <div className="px-3 py-4 text-sm text-on-surface-variant/60 italic text-center">
-                                                        {t('settings.ai.no_models_found')}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
+                                    {showModelList && settings.aiProvider === 'gemini' && (
+                                        <div className="absolute z-10 w-full mt-1 bg-surface border border-outline-variant/30 rounded-2xl shadow-lg max-h-48 overflow-auto custom-scrollbar">
+                                            {isFetchingModels ? (
+                                                <div className="px-3 py-4 flex items-center justify-center gap-3 text-sm text-on-surface-variant/70 italic">
+                                                    <ExpressiveLoading size="xsm" variant="circular" />
+                                                    <span>{t('settings.ai.loading_models')}</span>
+                                                </div>
+                                            ) : modelFetchError ? (
+                                                <div className="px-3 py-4 text-xs text-error/80 flex flex-col gap-1">
+                                                    <span className="font-medium">{t('common.error_occurred')}</span>
+                                                    <span className="opacity-70">{modelFetchError}</span>
+                                                </div>
+                                            ) : availableModels.length > 0 ? (
+                                                availableModels.map(model => (
+                                                    <button key={model} className="w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0" onClick={() => { updateSetting('geminiModel', model); setShowModelList(false); }}>{model}</button>
+                                                ))
+                                            ) : (
+                                                <div className="px-3 py-4 text-sm text-on-surface-variant/60 italic text-center">
+                                                    {t('settings.ai.no_models_found')}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
-                            )}
+                            </div>
+                        )}
 
-                            {/* Claude Config */}
-                            {settings.aiProvider === 'claude' && (
-                                <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
+                        {/* Claude Config */}
+                        {settings.aiProvider === 'claude' && (
+                            <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
+                                <Input
+                                    label={t('settings.ai.key')}
+                                    type="password"
+                                    value={settings.claudeApiKey || ''}
+                                    onChange={(e) => updateSetting('claudeApiKey', e.target.value)}
+                                    placeholder={t('settings.ai.claude.placeholder')}
+                                />
+                                <p className="text-[10px] text-on-surface-variant/80 mt-1">
+                                    {t('settings.ai.claude.help')}{' '}
+                                    <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer" className="text-primary hover:underline font-medium">Anthropic Console</a>
+                                </p>
+                                <div className="relative">
                                     <Input
-                                        label={t('settings.ai.key')}
-                                        type="password"
-                                        value={settings.claudeApiKey || ''}
-                                        onChange={(e) => updateSetting('claudeApiKey', e.target.value)}
-                                        placeholder={t('settings.ai.claude.placeholder')}
+                                        label={t('settings.ai.model')}
+                                        type="text"
+                                        value={settings.claudeModel || 'claude-3-5-sonnet-20240620'}
+                                        onChange={(e) => updateSetting('claudeModel', e.target.value)}
+                                        onFocus={() => {
+                                            handleFetchModels();
+                                        }}
+                                        onBlur={() => setTimeout(() => setShowModelList(false), 200)}
+                                        placeholder="e.g. claude-3-5-sonnet-20240620"
                                     />
-                                    <p className="text-[10px] text-on-surface-variant/80 mt-1">
-                                        {t('settings.ai.claude.help')}{' '}
-                                        <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer" className="text-primary hover:underline font-medium">Anthropic Console</a>
-                                    </p>
-                                    <div className="relative">
-                                        <Input
-                                            label={t('settings.ai.model')}
-                                            type="text"
-                                            value={settings.claudeModel || 'claude-3-5-sonnet-20240620'}
-                                            onChange={(e) => updateSetting('claudeModel', e.target.value)}
-                                            onFocus={() => {
-                                                handleFetchModels();
-                                            }}
-                                            onBlur={() => setTimeout(() => setShowModelList(false), 200)}
-                                            placeholder="e.g. claude-3-5-sonnet-20240620"
-                                        />
-                                        {showModelList && settings.aiProvider === 'claude' && (
-                                            <div className="absolute z-10 w-full mt-1 bg-surface border border-outline-variant/30 rounded-2xl shadow-lg max-h-48 overflow-auto custom-scrollbar">
-                                                {isFetchingModels ? (
-                                                    <div className="px-3 py-4 flex items-center justify-center gap-3 text-sm text-on-surface-variant/70 italic">
-                                                        <ExpressiveLoading size="xsm" variant="circular" />
-                                                        <span>{t('settings.ai.loading_models')}</span>
-                                                    </div>
-                                                ) : modelFetchError ? (
-                                                    <div className="px-3 py-4 text-xs text-error/80 flex flex-col gap-1">
-                                                        <span className="font-medium">{t('common.error_occurred')}</span>
-                                                        <span className="opacity-70">{modelFetchError}</span>
-                                                    </div>
-                                                ) : availableModels.length > 0 ? (
-                                                    availableModels.map(model => (
-                                                        <button key={model} className="w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0" onClick={() => { updateSetting('claudeModel', model); setShowModelList(false); }}>{model}</button>
-                                                    ))
-                                                ) : (
-                                                    <div className="px-3 py-4 text-sm text-on-surface-variant/60 italic text-center">
-                                                        {t('settings.ai.no_models_found')}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
+                                    {showModelList && settings.aiProvider === 'claude' && (
+                                        <div className="absolute z-10 w-full mt-1 bg-surface border border-outline-variant/30 rounded-2xl shadow-lg max-h-48 overflow-auto custom-scrollbar">
+                                            {isFetchingModels ? (
+                                                <div className="px-3 py-4 flex items-center justify-center gap-3 text-sm text-on-surface-variant/70 italic">
+                                                    <ExpressiveLoading size="xsm" variant="circular" />
+                                                    <span>{t('settings.ai.loading_models')}</span>
+                                                </div>
+                                            ) : modelFetchError ? (
+                                                <div className="px-3 py-4 text-xs text-error/80 flex flex-col gap-1">
+                                                    <span className="font-medium">{t('common.error_occurred')}</span>
+                                                    <span className="opacity-70">{modelFetchError}</span>
+                                                </div>
+                                            ) : availableModels.length > 0 ? (
+                                                availableModels.map(model => (
+                                                    <button key={model} className="w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0" onClick={() => { updateSetting('claudeModel', model); setShowModelList(false); }}>{model}</button>
+                                                ))
+                                            ) : (
+                                                <div className="px-3 py-4 text-sm text-on-surface-variant/60 italic text-center">
+                                                    {t('settings.ai.no_models_found')}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
-                            )}
+                            </div>
+                        )}
 
-                            {/* OpenAI Config */}
-                            {settings.aiProvider === 'openai' && (
-                                <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
+                        {/* OpenAI Config */}
+                        {settings.aiProvider === 'openai' && (
+                            <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
+                                <Input
+                                    label={t('settings.ai.key')}
+                                    type="password"
+                                    value={settings.openaiApiKey || ''}
+                                    onChange={(e) => updateSetting('openaiApiKey', e.target.value)}
+                                    placeholder={t('settings.ai.openai.placeholder')}
+                                />
+                                <p className="text-[10px] text-on-surface-variant/80 mt-1">
+                                    {t('settings.ai.openai.help')}{' '}
+                                    <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer" className="text-primary hover:underline font-medium">OpenAI Platform</a>
+                                </p>
+                                <div className="relative">
                                     <Input
-                                        label={t('settings.ai.key')}
-                                        type="password"
-                                        value={settings.openaiApiKey || ''}
-                                        onChange={(e) => updateSetting('openaiApiKey', e.target.value)}
-                                        placeholder={t('settings.ai.openai.placeholder')}
+                                        label={t('settings.ai.model')}
+                                        type="text"
+                                        value={settings.openaiModel || 'gpt-4o'}
+                                        onChange={(e) => updateSetting('openaiModel', e.target.value)}
+                                        onFocus={() => {
+                                            handleFetchModels();
+                                        }}
+                                        onBlur={() => setTimeout(() => setShowModelList(false), 200)}
+                                        placeholder="e.g. gpt-4o"
                                     />
-                                    <p className="text-[10px] text-on-surface-variant/80 mt-1">
-                                        {t('settings.ai.openai.help')}{' '}
-                                        <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer" className="text-primary hover:underline font-medium">OpenAI Platform</a>
-                                    </p>
-                                    <div className="relative">
-                                        <Input
-                                            label={t('settings.ai.model')}
-                                            type="text"
-                                            value={settings.openaiModel || 'gpt-4o'}
-                                            onChange={(e) => updateSetting('openaiModel', e.target.value)}
-                                            onFocus={() => {
-                                                handleFetchModels();
-                                            }}
-                                            onBlur={() => setTimeout(() => setShowModelList(false), 200)}
-                                            placeholder="e.g. gpt-4o"
-                                        />
-                                        {showModelList && settings.aiProvider === 'openai' && (
-                                            <div className="absolute z-10 w-full mt-1 bg-surface border border-outline-variant/30 rounded-2xl shadow-lg max-h-48 overflow-auto custom-scrollbar">
-                                                {isFetchingModels ? (
-                                                    <div className="px-3 py-4 flex items-center justify-center gap-3 text-sm text-on-surface-variant/70 italic">
-                                                        <ExpressiveLoading size="xsm" variant="circular" />
-                                                        <span>{t('settings.ai.loading_models')}</span>
-                                                    </div>
-                                                ) : modelFetchError ? (
-                                                    <div className="px-3 py-4 text-xs text-error/80 flex flex-col gap-1">
-                                                        <span className="font-medium">{t('common.error_occurred')}</span>
-                                                        <span className="opacity-70">{modelFetchError}</span>
-                                                    </div>
-                                                ) : availableModels.length > 0 ? (
-                                                    availableModels.map(model => (
-                                                        <button key={model} className="w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0" onClick={() => { updateSetting('openaiModel', model); setShowModelList(false); }}>{model}</button>
-                                                    ))
-                                                ) : (
-                                                    <div className="px-3 py-4 text-sm text-on-surface-variant/60 italic text-center">
-                                                        {t('settings.ai.no_models_found')}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
+                                    {showModelList && settings.aiProvider === 'openai' && (
+                                        <div className="absolute z-10 w-full mt-1 bg-surface border border-outline-variant/30 rounded-2xl shadow-lg max-h-48 overflow-auto custom-scrollbar">
+                                            {isFetchingModels ? (
+                                                <div className="px-3 py-4 flex items-center justify-center gap-3 text-sm text-on-surface-variant/70 italic">
+                                                    <ExpressiveLoading size="xsm" variant="circular" />
+                                                    <span>{t('settings.ai.loading_models')}</span>
+                                                </div>
+                                            ) : modelFetchError ? (
+                                                <div className="px-3 py-4 text-xs text-error/80 flex flex-col gap-1">
+                                                    <span className="font-medium">{t('common.error_occurred')}</span>
+                                                    <span className="opacity-70">{modelFetchError}</span>
+                                                </div>
+                                            ) : availableModels.length > 0 ? (
+                                                availableModels.map(model => (
+                                                    <button key={model} className="w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0" onClick={() => { updateSetting('openaiModel', model); setShowModelList(false); }}>{model}</button>
+                                                ))
+                                            ) : (
+                                                <div className="px-3 py-4 text-sm text-on-surface-variant/60 italic text-center">
+                                                    {t('settings.ai.no_models_found')}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
-                            )}
+                            </div>
+                        )}
 
-                            {/* <div className="pt-4 border-t border-outline-variant/30 mt-4 animate-in fade-in duration-500">
+                        {/* <div className="pt-4 border-t border-outline-variant/30 mt-4 animate-in fade-in duration-500">
                                 <Input
                                     label={t('settings.ai.max_exploration_steps')}
                                     type="number"
@@ -930,11 +991,8 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                     {t('settings.ai.max_exploration_steps_help')}
                                 </p>
                             </div> */}
-                        </div>
                     </Section>
-
-
-                </div >
+                </div>
 
                 {/* System Versions */}
                 <Section

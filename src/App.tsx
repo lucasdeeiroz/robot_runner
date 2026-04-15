@@ -23,7 +23,7 @@ import { ExpressiveLoading } from "./components/atoms/ExpressiveLoading";
 function App() {
   const [activePage, setActivePage] = useState("run");
   const { t, i18n } = useTranslation();
-  const { settings, checkSystemVersions, systemCheckStatus, loading: settings_loading, checkForAppUpdate } = useSettings();
+  const { settings, updateSetting, checkSystemVersions, systemCheckStatus, loading: settings_loading, checkForAppUpdate } = useSettings();
 
   // State to track if we should show the overlay or if it has been dismissed/handled
   const [initialCheckDismissed, setInitialCheckDismissed] = useState(false);
@@ -166,6 +166,37 @@ function App() {
     }
 
   }, [settings.theme, settings.primaryColor]);
+
+  // Apply Global Zoom Scaling
+  useEffect(() => {
+    document.documentElement.style.fontSize = `${(settings.zoomFactor || 1.0) * 100}%`;
+  }, [settings.zoomFactor]);
+
+  // Global Keyboard Shortcuts (Zoom)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        const step = 0.1;
+        const currentZoom = settings.zoomFactor || 1.0;
+
+        if (e.key === '+' || e.key === '=') {
+          e.preventDefault();
+          const nextZoom = Math.min(1.3, currentZoom + step);
+          updateSetting('zoomFactor', Number(nextZoom.toFixed(1)));
+        } else if (e.key === '-') {
+          e.preventDefault();
+          const nextZoom = Math.max(0.7, currentZoom - step);
+          updateSetting('zoomFactor', Number(nextZoom.toFixed(1)));
+        } else if (e.key === '0') {
+          e.preventDefault();
+          updateSetting('zoomFactor', 1.0);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [settings.zoomFactor, updateSetting]);
 
   // Only check system versions AFTER settings are loaded
   useEffect(() => {

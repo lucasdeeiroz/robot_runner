@@ -185,6 +185,7 @@ export const es = {
             }
         },
         common: {
+            beta: "Beta",
             cancel: "Cancelar",
             save: "Guardar",
             saved: "Guardado",
@@ -945,7 +946,9 @@ export const es = {
                 logo_set: "Logo establecido",
                 no_logo: "Ningún logo",
                 upload_logo: "Subir Logo",
-                remove_logo: "Eliminar Logo"
+                remove_logo: "Eliminar Logo",
+                zoom: "Zoom de la Interfaz",
+                zoom_hint: "Usa Ctrl/Cmd+ y Ctrl/Cmd- para ajustar rápidamente, y Ctrl/Cmd+0 para restablecer."
             },
             tool_config: {
                 appium_base_path: "Ruta Base de Appium",
@@ -972,17 +975,17 @@ export const es = {
                 gemini: {
                     title: "Google Gemini",
                     placeholder: "Ingrese su Clave API Gemini",
-                    help: "Obtenga su Clave API gratuita en Google AI Studio"
+                    help: "Obtenga su Clave API gratuita en"
                 },
                 claude: {
                     title: "Anthropic Claude",
                     placeholder: "Ingrese su Clave API Claude",
-                    help: "Obtenga su Clave API en Anthropic Console"
+                    help: "Obtenga su Clave API en"
                 },
                 openai: {
                     title: "OpenAI ChatGPT",
                     placeholder: "Ingrese su Clave API de OpenAI",
-                    help: "Obtenga su Clave API en OpenAI Platform"
+                    help: "Obtenga su Clave API en"
                 },
                 max_exploration_steps: "Pasos Máximos de Exploración",
                 max_exploration_steps_help: "Número máximo de acciones autónomas que la IA realizará antes de detener la exploración."

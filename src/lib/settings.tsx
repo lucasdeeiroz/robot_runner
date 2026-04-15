@@ -73,6 +73,7 @@ export interface AppSettings {
     openaiModel: string;
     maxExplorationSteps?: number;
     presentationEnabled: boolean;
+    zoomFactor: number;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -112,7 +113,8 @@ const DEFAULT_SETTINGS: AppSettings = {
         ngrokToken: ''
     },
     maxExplorationSteps: 30,
-    presentationEnabled: false
+    presentationEnabled: false,
+    zoomFactor: 1.0
 };
 
 export interface Profile {

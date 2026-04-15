@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useSettings } from '@/lib/settings';
 import { Button } from '@/components/atoms/Button';
 import { Select } from '@/components/atoms/Select';
+import { Badge } from '@/components/atoms/Badge';
 import { Compass, Bot, CheckCircle2, Zap, Terminal } from 'lucide-react';
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
@@ -234,7 +235,10 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                                     <Terminal size={24} />
                                 </div>
                                 <div className="flex-1">
-                                    <h3 className="text-lg font-bold text-on-surface">{t('onboarding.framework.appium.title')}</h3>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-lg font-bold text-on-surface">{t('onboarding.framework.appium.title')}</h3>
+                                        <Badge variant="info" size="sm" className="font-bold opacity-70">{t('common.beta')}</Badge>
+                                    </div>
                                     <p className="text-sm text-on-surface-variant/80">
                                         {t('onboarding.framework.appium.description')}
                                     </p>
@@ -260,7 +264,10 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                                     <Zap size={24} />
                                 </div>
                                 <div className="flex-1">
-                                    <h3 className="text-lg font-bold text-on-surface">{t('onboarding.framework.maestro.title')}</h3>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-lg font-bold text-on-surface">{t('onboarding.framework.maestro.title')}</h3>
+                                        <Badge variant="info" size="sm" className="font-bold opacity-70">{t('common.beta')}</Badge>
+                                    </div>
                                     <p className="text-sm text-on-surface-variant/80">
                                         {t('onboarding.framework.maestro.description')}
                                     </p>

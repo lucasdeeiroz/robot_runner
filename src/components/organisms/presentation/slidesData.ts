@@ -59,9 +59,9 @@ export const SLIDES_DATA: SlideData[] = [
         id: 'ai_assistant',
         titleKey: 'presentation.slides.ai_assistant.title',
         pointsKeys: [
-            'presentation.slides.ai_assistant.points.0',
-            'presentation.slides.ai_assistant.points.1',
             'presentation.slides.ai_assistant.points.2',
+            'presentation.slides.ai_assistant.points.1',
+            'presentation.slides.ai_assistant.points.0',
             'presentation.slides.ai_assistant.points.3',
         ]
     },
@@ -69,10 +69,10 @@ export const SLIDES_DATA: SlideData[] = [
         id: 'settings',
         titleKey: 'presentation.slides.settings.title',
         pointsKeys: [
-            'presentation.slides.settings.points.0',
-            'presentation.slides.settings.points.1',
             'presentation.slides.settings.points.2',
             'presentation.slides.settings.points.3',
+            'presentation.slides.settings.points.1',
+            'presentation.slides.settings.points.0',
         ]
     }
 ];
