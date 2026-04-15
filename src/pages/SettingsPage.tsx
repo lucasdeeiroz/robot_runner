@@ -309,7 +309,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                     variant="ghost"
                                     size="sm"
                                     title={t('settings.appearance.zoom_hint')}
-                                    onClick={() => updateSetting('zoomFactor', Math.max(0.5, Number(((settings.zoomFactor || 1.0) - 0.1).toFixed(1))))}
+                                    onClick={() => updateSetting('zoomFactor', Math.max(0.7, Number(((settings.zoomFactor || 1.0) - 0.1).toFixed(1))))}
                                     className="h-8 w-8 p-0"
                                 >
                                     -
@@ -327,7 +327,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                     variant="ghost"
                                     size="sm"
                                     title={t('settings.appearance.zoom_hint')}
-                                    onClick={() => updateSetting('zoomFactor', Math.min(2.5, Number(((settings.zoomFactor || 1.0) + 0.1).toFixed(1))))}
+                                    onClick={() => updateSetting('zoomFactor', Math.min(1.3, Number(((settings.zoomFactor || 1.0) + 0.1).toFixed(1))))}
                                     className="h-8 w-8 p-0"
                                 >
                                     +
