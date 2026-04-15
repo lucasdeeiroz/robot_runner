@@ -398,6 +398,8 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
             } else {
                 throw new Error("No AI provider configured");
             }
+            
+            console.log("[Inspector] Raw AI Response:", result);
 
             // Simple parsing of "Selector: " and "Rationale: "
             const selectorMatch = result.match(/Selector:\s*([^\n]*)/i);
@@ -875,7 +877,7 @@ function NodeBreadcrumbs({ node, onSelect, onHover }: { node: InspectorNode, onS
     let path: InspectorNode[] = [];
     let curr: InspectorNode | undefined = node;
     while (curr) {
-        if (curr.tagName !== 'hierarchy' && curr.tagName !== 'node') path.unshift(curr);
+        if (curr.tagName !== 'hierarchy') path.unshift(curr);
         curr = curr.parent;
     }
     const contentIndex = path.findIndex(n => n.attributes['resource-id']?.endsWith(':id/content'));
@@ -911,7 +913,7 @@ function NodeBreadcrumbs({ node, onSelect, onHover }: { node: InspectorNode, onS
                             )}
                             title={generateXPath(n)}
                         >
-                            {cleanTag(n.tagName)}
+                            {n.tagName === 'node' && n.attributes['class'] ? cleanTag(n.attributes['class']) : cleanTag(n.tagName)}
                             {n.attributes['resource-id'] && <span className="ml-1 text-primary dark:text-primary/80">resource-id="{n.attributes['resource-id'].split('/').pop()}"</span>}
                             {!n.attributes['resource-id'] && n.attributes['content-desc'] && <span className="ml-1 text-on-success-container/10">content-desc="{n.attributes['content-desc'].substring(0, 15)}..."</span>}
                         </button>

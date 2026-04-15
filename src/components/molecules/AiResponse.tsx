@@ -83,8 +83,8 @@ export const AiResponse: React.FC<AiResponseProps> = ({
 
                 <div className="relative z-10 space-y-4">
                     {/* Header */}
-                    <div 
-                        className="flex items-center justify-between cursor-pointer group/header" 
+                    <div
+                        className="flex items-center justify-between cursor-pointer group/header"
                         onClick={() => setIsCollapsed(!isCollapsed)}
                     >
                         <div className={clsx("flex items-center gap-2", error ? "text-error" : "text-primary")}>
