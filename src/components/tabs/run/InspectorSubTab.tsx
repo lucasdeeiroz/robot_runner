@@ -398,8 +398,6 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
             } else {
                 throw new Error("No AI provider configured");
             }
-            
-            console.log("[Inspector] Raw AI Response:", result);
 
             // Simple parsing of "Selector: " and "Rationale: "
             const selectorMatch = result.match(/Selector:\s*([^\n]*)/i);
