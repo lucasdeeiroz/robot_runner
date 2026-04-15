@@ -943,7 +943,7 @@ export const en = {
                 upload_logo: "Upload Logo",
                 remove_logo: "Remove Logo",
                 zoom: "Interface Zoom",
-                zoom_hint: "Use Ctrl+ and Ctrl- to adjust quickly."
+                zoom_hint: "Use Ctrl/Cmd+ and Ctrl/Cmd- to adjust quickly, or Ctrl/Cmd+0 to reset."
             },
             tool_config: {
                 appium_base_path: "Appium Base Path",
