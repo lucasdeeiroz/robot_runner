@@ -185,6 +185,7 @@ export const pt = {
             }
         },
         common: {
+            beta: "Beta",
             cancel: "Cancelar",
             save: "Salvar",
             saved: "Salvo",
