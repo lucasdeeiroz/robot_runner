@@ -939,7 +939,9 @@ export const pt = {
                 logo_set: "Logo definida",
                 no_logo: "Nenhuma logo",
                 upload_logo: "Carregar Logo",
-                remove_logo: "Remover Logo"
+                remove_logo: "Remover Logo",
+                zoom: "Zoom da Interface",
+                zoom_hint: "Use Ctrl+ e Ctrl- para ajustar rapidamente."
             },
             tool_config: {
                 appium_base_path: "Caminho Base do Appium (Base Path)",
@@ -966,17 +968,17 @@ export const pt = {
                 gemini: {
                     title: "Google Gemini",
                     placeholder: "Digite a Chave API Gemini",
-                    help: "Obtenha sua chave gratuita no Google AI Studio"
+                    help: "Obtenha sua chave gratuita no"
                 },
                 claude: {
                     title: "Anthropic Claude",
                     placeholder: "Digite a Chave API Claude",
-                    help: "Obtenha sua chave no Anthropic Console"
+                    help: "Obtenha sua chave no"
                 },
                 openai: {
                     title: "OpenAI ChatGPT",
                     placeholder: "Digite a Chave de API da OpenAI",
-                    help: "Obtenha sua Chave de API na OpenAI Platform"
+                    help: "Obtenha sua Chave de API na"
                 },
                 max_exploration_steps: "Limite de Passos de Exploração",
                 max_exploration_steps_help: "Número máximo de ações autônomas que a IA realizará antes de interromper a exploração."
