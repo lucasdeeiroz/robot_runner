@@ -406,7 +406,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                 }
             >
                 <div className={clsx(
-                    "mt-4 pt-4 border-t border-outline-variant/30 grid gap-6 items-end",
+                    "mt-4 grid gap-6 items-end",
                     settings.usageMode === 'automator' ? "grid-cols-1 md:grid-cols-3" : "grid-cols-1 md:grid-cols-2"
                 )}>
                     <div>
@@ -776,7 +776,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
 
 
                         {/* Sidebar Logo */}
-                        <div className="mt-6 pt-6 border-t border-outline-variant/30">
+                        <div className="space-y-4 pt-1">
                             <h3 className="text-sm font-medium text-on-surface-variant/80 mb-3">{t('settings.appearance.sidebar_logo')}</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <LogoInput
