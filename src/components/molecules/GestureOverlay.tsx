@@ -5,7 +5,7 @@ export function GestureOverlay() {
     const { t } = useTranslation();
 
     return (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-transparent backdrop-blur-sm rounded-lg pointer-events-none w-full max-w-sm transition-all duration-1000 ease-in-out">
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-transparent backdrop-blur-sm rounded-lg pointer-events-none w-full max-w-md transition-all duration-1000 ease-in-out">
             <div className="bg-transparent border-none shadow-none rounded-2xl p-6 flex flex-col gap-8 w-full max-w-sm">
                 <h3 className="text-base font-semibold text-on-surface text-center mb-2">{t('inspector.overlay.title')}</h3>
 

@@ -3,6 +3,7 @@ import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { Play, Square, Eraser, AlignLeft, Package as PackageIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
+import clsx from "clsx";
 
 import { useSettings } from "@/lib/settings";
 import { feedback } from "@/lib/feedback";
@@ -10,6 +11,12 @@ import { FileSavedFeedback } from "@/components/molecules/FileSavedFeedback";
 import { Section } from "@/components/organisms/Section";
 import { Button } from "@/components/atoms/Button";
 import { Select } from "@/components/atoms/Select";
+import { Modal } from "@/components/organisms/Modal";
+import { AiResponse } from "@/components/molecules/AiResponse";
+import * as gemini from "@/lib/dashboard/gemini";
+import * as claude from "@/lib/dashboard/claude";
+import * as openai from "@/lib/dashboard/openai";
+import { Sparkles } from "lucide-react";
 
 interface LogcatSubTabProps {
     selectedDevice: string;
@@ -24,6 +31,12 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
     const virtuosoRef = useRef<VirtuosoHandle>(null);
     const { settings } = useSettings();
     const [currentDumpFile, setCurrentDumpFile] = useState<string | null>(null);
+
+    // AI State
+    const [isAiLoading, setIsAiLoading] = useState(false);
+    const [aiResult, setAiResult] = useState<{ summary: string, analysis: string } | null>(null);
+    const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+    const [aiError, setAiError] = useState<string | null>(null);
 
     // Responsive State
     const containerRef = useRef<HTMLDivElement>(null);
@@ -190,6 +203,47 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
         }
     };
 
+    const handleAiAnalyze = async () => {
+        if (logs.length === 0 || isAiLoading) return;
+
+        setIsAiLoading(true);
+        setIsAiModalOpen(true);
+        setAiError(null);
+        setAiResult(null);
+
+        const lastLogs = logs.slice(-100).join('\n'); // Take last 100 lines for context
+        const prompt = `Analyze the following Android Logcat output. Identify potential errors, crashes, or performance bottlenecks. Provide a summary and then a detailed analysis.\n\nLOGS:\n${lastLogs}`;
+        const systemInstruction = "You are an expert Android Developer and QA Engineer. Analyze logcat snippets precisely.";
+
+        try {
+            let result = "";
+            const provider = settings.aiProvider;
+
+            if (provider === 'gemini') {
+                result = await gemini.askGemini(prompt, settings.geminiApiKey || '', settings.geminiModel, systemInstruction);
+            } else if (provider === 'claude') {
+                result = await claude.askClaude(prompt, settings.claudeApiKey || '', settings.claudeModel, systemInstruction);
+            } else if (provider === 'openai') {
+                result = await openai.askOpenAI(prompt, settings.openaiApiKey || '', settings.openaiModel, systemInstruction);
+            } else {
+                throw new Error("No AI provider configured");
+            }
+
+            // Simple parsing (expecting Summary and Analysis sections)
+            const summaryMatch = result.match(/Summary:\s*([^\n]*)/i);
+            const analysis = result.replace(/Summary:\s*[^\n]*/i, '').trim();
+
+            setAiResult({
+                summary: summaryMatch ? summaryMatch[1].trim() : "Log Analysis",
+                analysis: analysis || result
+            });
+        } catch (e: any) {
+            setAiError(e.message || String(e));
+        } finally {
+            setIsAiLoading(false);
+        }
+    };
+
     if (!selectedDevice) {
         return (
             <div className="h-full flex flex-col items-center justify-center text-on-surface/80">
@@ -266,6 +320,17 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
                         >
                             {!isNarrow && t(isStreaming ? 'logcat.stop' : 'logcat.start')}
                         </Button>
+                        <Button
+                            onClick={handleAiAnalyze}
+                            variant="outline"
+                            size="sm"
+                            disabled={logs.length === 0 || isAiLoading}
+                            className="bg-primary/5 border-primary/20 text-primary hover:bg-primary/10"
+                            title={t('logcat.ai_analyze')}
+                        >
+                            <Sparkles size={14} className={clsx("mr-1", isAiLoading && "animate-pulse")} />
+                            {!isNarrow && t('logcat.ai_analyze')}
+                        </Button>
                     </div>
                 }
             />
@@ -312,6 +377,29 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
                     />
                 )}
             </div>
+
+            {/* AI Analysis Modal */}
+            <Modal
+                isOpen={isAiModalOpen}
+                onClose={() => setIsAiModalOpen(false)}
+                title={t('logcat.ai_analyze')}
+                className="max-w-2xl"
+            >
+                <div className="space-y-4">
+                    <AiResponse
+                        title={aiResult?.summary || t('logcat.analyzing')}
+                        isLoading={isAiLoading}
+                        response={aiResult?.analysis}
+                        error={aiError}
+                        onCopy={() => {
+                            if (aiResult) {
+                                navigator.clipboard.writeText(`${aiResult.summary}\n\n${aiResult.analysis}`);
+                                feedback.toast.success(t('common.copied'));
+                            }
+                        }}
+                    />
+                </div>
+            </Modal>
         </div >
     );
 }

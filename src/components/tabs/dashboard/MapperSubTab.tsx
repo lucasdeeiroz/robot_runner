@@ -788,7 +788,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 // Use shortId to find the original mapping from the AI
                 const aiElement = aiScreen.elements?.find((el: any) => (el.shortId || el.id) === next.targetId);
                 const targetLabel = aiElement?.name || aiElement?.label;
-                
+
                 if (aiElement && targetLabel) {
                     explorer.addLog(`[Debug] Priority Search - Label: "${targetLabel}"`);
                     const matches = findNodesByText(root, targetLabel);
@@ -842,11 +842,11 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                     const centerY = Math.round(effectiveNode.bounds!.y + effectiveNode.bounds!.h / 2);
                     const nodeInfo = `text="${effectiveNode.attributes['text'] || ''}", id="${effectiveNode.attributes['resource-id'] || ''}", desc="${effectiveNode.attributes['content-desc'] || ''}"`;
                     explorer.addLog(`[Debug] Target: ${effectiveNode.tagName} (${nodeInfo})`);
-                    
+
                     // Diagnostic: Log siblings to identify index mismatches
                     if (effectiveNode.parent) {
                         const siblings = effectiveNode.parent.children;
-                        const siblingIndices = siblings.map((s, i) => `${i+1}: ${s.attributes['text'] || s.attributes['content-desc'] || 'empty'}`).join(' | ');
+                        const siblingIndices = siblings.map((s, i) => `${i + 1}: ${s.attributes['text'] || s.attributes['content-desc'] || 'empty'}`).join(' | ');
                         explorer.addLog(`[Debug] Siblings (Total ${siblings.length}): ${siblingIndices}`);
                     }
 
@@ -1443,14 +1443,6 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                         className="p-0"
                         status={
                             <div className="flex items-center gap-2">
-                                <div className="flex items-center gap-2">
-                                    <span className={clsx(
-                                        "px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider",
-                                        screenshot ? "bg-success/10 text-success" : "bg-warning/10 text-warning"
-                                    )}>
-                                        {screenshot ? t('mapper.status.ready') : (loading ? t('mapper.status.fetching') : t('mapper.status.loading'))}
-                                    </span>
-                                </div>
                                 <div className="flex gap-1">
                                     <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 4')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" title={t('mapper.nav.back')}><ArrowLeft size={16} /></Button>
                                     <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 3')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" title={t('mapper.nav.home')}><Home size={16} /></Button>
@@ -1491,20 +1483,16 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                         }
                         actions={
                             <>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={refreshAll}
-                                    disabled={loading}
-                                    className={clsx(
-                                        "flex items-center gap-2 px-3 py-1.5 bg-surface-variant/30 border border-outline-variant/30 rounded-2xl hover:bg-surface/50 text-sm font-medium transition-colors disabled:opacity-50",
-                                        loading && "cursor-wait"
-                                    )}
-                                    title={t('mapper.refresh')}
-                                >
-                                    {loading ? <ExpressiveLoading size="xsm" variant="circular" /> : <RefreshCw size={16} />}
-                                    <span className={clsx(isNarrow && "hidden")}>{t('mapper.refresh')}</span>
-                                </Button>
+                                {hasApiKey && (
+                                    <AiButton
+                                        id="mapper_exploration"
+                                        variant={isExploring ? "danger" : "primary"}
+                                        {...isNarrow ? { showTextAlways: false, expandable: false } : { showTextAlways: true }}
+                                        onClick={isExploring ? () => stopExploration(t('mapper.exploration.cancelled')) : (_e, prompt) => startExploration(prompt)}
+                                        isLoading={isExploring}
+                                        label={isExploring ? t('mapper.exploration.stop') : t('mapper.exploration.start')}
+                                    />
+                                )}
                                 <Button
                                     variant="primary"
                                     size="sm"
@@ -1523,16 +1511,54 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                     >
                     </Section>
 
-                    <div className="flex-1 grid grid-cols-[auto_1fr] min-h-0 overflow-hidden mt-0 mb-0 py-0">
-                        <div className="flex flex-col items-center justify-center overflow-hidden relative max-w-[48vw] bg-transparent px-2 py-0 mb-0 mt-0">
+                    <div className="flex-1 grid grid-cols-[auto_1fr] gap-2 min-h-0 overflow-hidden">
+                        <div className="flex flex-col items-center justify-center overflow-hidden relative max-w-[30vw] rounded-2xl">
                             {screenshot ? (
-                                <div className="relative inline-block shadow-2xl rounded-lg border border-outline-variant/30 flex-shrink-0 mb-2">
+                                <div className="relative inline-block shadow-2xl rounded-lg border border-outline-variant/30 flex-shrink-0 overflow-hidden group/screen">
+                                    {/* Camera-cutout style Refresh Button */}
+                                    {loading ? (
+                                        <Button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                refreshAll();
+                                            }}
+                                            disabled={loading}
+                                            className={clsx(
+                                                "absolute top-0.5 left-1/2 -translate-x-1/2 z-[60] w-auto h-6 rounded-full",
+                                                "bg-black/50 backdrop-blur-sm border border-white/20 flex items-center justify-center",
+                                                "text-white/80 hover:text-white hover:bg-black/80 transition-all shadow-lg",
+                                                loading && "cursor-wait"
+                                            )}
+                                            title={t('inspector.refresh')}
+                                            leftIcon={<RefreshCw size={12} className={clsx(loading && "animate-spin")} />}
+                                        >
+                                            {t('common.loading')}
+                                        </Button>
+                                    )
+                                        : <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                refreshAll();
+                                            }}
+                                            disabled={loading}
+                                            className={clsx(
+                                                "absolute top-0.5 left-1/2 -translate-x-1/2 z-[60] w-6 h-6 rounded-full",
+                                                "bg-black/50 backdrop-blur-sm border border-white/20 flex items-center justify-center",
+                                                "text-white/80 hover:text-white hover:bg-black/80 transition-all shadow-lg",
+                                                loading && "cursor-wait"
+                                            )}
+                                            title={t('inspector.refresh')}
+                                        >
+                                            <RefreshCw size={12} className={clsx(loading && "animate-spin")} />
+                                        </button>
+                                    }
+
                                     {loading && <GestureOverlay />}
                                     <img
                                         ref={imgRef}
                                         src={`data:image/png;base64,${screenshot}`}
                                         alt="Device Screenshot"
-                                        className="block w-auto h-auto max-w-full max-h-[600px] select-none rounded-lg"
+                                        className="block w-auto h-auto max-w-full max-h-[650px] select-none rounded-lg"
                                         onLoad={(e) => {
                                             const img = e.currentTarget;
                                             setImgLayout({
@@ -1582,17 +1608,6 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                     {loading ? <ExpressiveLoading size="lg" variant="circular" className="mb-2" /> : <Maximize size={32} className="mb-2 opacity-50" />}
                                     <p className="mb-10">{loading ? t('mapper.status.loading') : t('mapper.status.no_screenshot')}</p>
                                 </div>
-                            )}
-                            {hasApiKey && (
-                                <AiButton
-                                    id="mapper_exploration"
-                                    variant={isExploring ? "danger" : "primary"}
-                                    onClick={isExploring ? () => stopExploration(t('mapper.exploration.cancelled')) : (_e, prompt) => startExploration(prompt)}
-                                    isLoading={isExploring}
-                                    className="flex items-center gap-2 px-3 py-1.5 rounded-2xl transition-all shadow-sm text-sm font-medium"
-                                    title={isExploring ? t('mapper.exploration.stop') : t('mapper.exploration.start')}
-                                    label={isExploring ? t('mapper.exploration.stop') : t('mapper.exploration.start')}
-                                />
                             )}
                         </div>
 
@@ -2193,7 +2208,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                         <ExplorationLogTree logs={explorationLogs} />
                         {isExploring && (
                             <div className="flex items-center gap-2 text-[10px] text-primary animate-pulse mt-4 px-3 border-l-2 border-primary/30 py-1 font-mono">
-                                <ExpressiveLoading size="xsm" variant="circular" /> 
+                                <ExpressiveLoading size="xsm" variant="circular" />
                                 {t('mapper.exploration.thinking', 'AI exploring and reasoning...')}
                             </div>
                         )}

@@ -513,6 +513,37 @@ export const es = {
                 ai_rationale: "Justificación de IA",
                 rationale: "Justificación",
                 ai_error_generic: "Fallo en la sugerencia de IA."
+            },
+            recorder: {
+                title: "Grabador de Pasos",
+                start: "Iniciar Grabación",
+                stop: "Detener Grabación",
+                steps: "Pasos Grabados",
+                clear: "Limpiar Pasos",
+                copy: "Copiar Código",
+                empty: "Aún no hay pasos grabados",
+                actions: {
+                    tap: "Toque",
+                    double_tap: "Doble Toque",
+                    long_press: "Presión Larga",
+                    swipe: "Deslizar",
+                    drag_drop: "Arrastrar y Soltar"
+                },
+                directions: {
+                    up: "Arriba",
+                    down: "Abajo",
+                    left: "Izquierda",
+                    right: "Derecha"
+                },
+                params: {
+                    duration: "Duración (ms)",
+                    offset_x: "Desplazamiento X",
+                    offset_y: "Desplazamiento Y",
+                    start_offset: "Margen de Inicio %",
+                    end_offset: "Margen Final %"
+                },
+                selection: "Selección Activa",
+                siblings: "Nodos Alternativos (Misma posición)"
             }
         },
         logcat: {
@@ -544,7 +575,9 @@ export const es = {
             clear: "Limpiar Logs",
             lines: "líneas",
             no_logs: "Ningún log capturado",
-            select_device: "Seleccione un dispositivo para ver logs"
+            select_device: "Seleccione un dispositivo para ver logs",
+            ai_analyze: "Análisis con IA",
+            analyzing: "Analizando logs..."
         },
         mapper: {
             title: "Mapeador",

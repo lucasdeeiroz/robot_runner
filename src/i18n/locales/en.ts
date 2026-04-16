@@ -513,6 +513,37 @@ export const en = {
                 ai_rationale: "AI Rationale",
                 rationale: "Rationale",
                 ai_error_generic: "AI suggestion failed."
+            },
+            recorder: {
+                title: "Steps Recorder",
+                start: "Start Recording",
+                stop: "Stop Recording",
+                steps: "Recorded Steps",
+                clear: "Clear Steps",
+                copy: "Copy Code",
+                empty: "No steps recorded yet",
+                actions: {
+                    tap: "Tap",
+                    double_tap: "Double Tap",
+                    long_press: "Long Press",
+                    swipe: "Swipe",
+                    drag_drop: "Drag & Drop"
+                },
+                directions: {
+                    up: "Up",
+                    down: "Down",
+                    left: "Left",
+                    right: "Right"
+                },
+                params: {
+                    duration: "Duration (ms)",
+                    offset_x: "Offset X",
+                    offset_y: "Offset Y",
+                    start_offset: "Start Offset %",
+                    end_offset: "End Offset %"
+                },
+                selection: "Active Selection",
+                siblings: "Alternative Nodes (Same position)"
             }
         },
         logcat: {
@@ -538,7 +569,9 @@ export const en = {
             clear: "Clear Logs",
             lines: "lines",
             no_logs: "No logs captured",
-            select_device: "Select a device to view logs"
+            select_device: "Select a device to view logs",
+            ai_analyze: "AI Analyze",
+            analyzing: "Analyzing logs..."
         },
         mapper: {
             title: "Mapper",
