@@ -570,7 +570,8 @@ export const en = {
             lines: "lines",
             no_logs: "No logs captured",
             select_device: "Select a device to view logs",
-            ai_analyze: "AI Analyze",
+            ai_analyze_button: "Analyze with AI",
+            ai_analysis_title: "AI Analysis Result",
             analyzing: "Analyzing logs..."
         },
         mapper: {

@@ -25,7 +25,7 @@ interface LogcatSubTabProps {
 }
 
 export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActionsDuringTest = false }: LogcatSubTabProps) {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const [isStreaming, setIsStreaming] = useState(false);
     const [logs, setLogs] = useState<string[]>([]);
     const virtuosoRef = useRef<VirtuosoHandle>(null);
@@ -206,14 +206,15 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
     const handleAiAnalyze = async () => {
         if (logs.length === 0 || isAiLoading) return;
 
+        const currentLang = i18n.language || 'en';
         setIsAiLoading(true);
         setIsAiModalOpen(true);
         setAiError(null);
         setAiResult(null);
 
         const lastLogs = logs.slice(-100).join('\n'); // Take last 100 lines for context
-        const prompt = `Analyze the following Android Logcat output. Identify potential errors, crashes, or performance bottlenecks. Provide a summary and then a detailed analysis.\n\nLOGS:\n${lastLogs}`;
-        const systemInstruction = "You are an expert Android Developer and QA Engineer. Analyze logcat snippets precisely.";
+        const prompt = `Analyze the following Android Logcat output. Identify potential errors, crashes, or performance bottlenecks. Provide a summary and then a detailed analysis. Respond in ${currentLang}.\n\nLOGS:\n${lastLogs}`;
+        const systemInstruction = `You are an expert Android Developer and QA Engineer. Analyze logcat snippets precisely. Always provide your response in ${currentLang}. Use the exact prefix "Summary: " followed by an EXTREMELY CONCISE one-line summary (MAXIMUM 15 WORDS).`;
 
         try {
             let result = "";
@@ -326,10 +327,10 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
                             size="sm"
                             disabled={logs.length === 0 || isAiLoading}
                             className="bg-primary/5 border-primary/20 text-primary hover:bg-primary/10"
-                            title={t('logcat.ai_analyze')}
+                            title={t('logcat.ai_analyze_button', 'Analyze with AI')}
                         >
                             <Sparkles size={14} className={clsx("mr-1", isAiLoading && "animate-pulse")} />
-                            {!isNarrow && t('logcat.ai_analyze')}
+                            {!isNarrow && t('logcat.ai_analyze_button', 'Analyze with AI')}
                         </Button>
                     </div>
                 }
@@ -382,7 +383,7 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
             <Modal
                 isOpen={isAiModalOpen}
                 onClose={() => setIsAiModalOpen(false)}
-                title={t('logcat.ai_analyze')}
+                title={t('logcat.ai_analysis_title', 'AI Analysis Result')}
                 className="max-w-2xl"
             >
                 <div className="space-y-4">
