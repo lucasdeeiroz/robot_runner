@@ -79,7 +79,7 @@ pub async fn stop_test(state: State<'_, TestState>, run_id: String) -> Result<St
 
     if let Some(info) = procs.get_mut(&rid_wd) {
             // Still alive after 10s? Hard kill.
-            let _ = info.child.kill();
+            let _ = info.child.start_kill();
             // Note: We leave it in the map, the monitor loop will handle removal 
             // and event emission when it detects the exit.
         }
