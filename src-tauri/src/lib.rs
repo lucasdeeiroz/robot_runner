@@ -8,6 +8,7 @@ mod system;
 mod xml_parser;
 mod ai_context;
 mod db;
+pub mod cmd_utils;
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};

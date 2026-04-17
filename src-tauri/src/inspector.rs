@@ -1,20 +1,17 @@
 use base64::{engine::general_purpose, Engine as _};
-use std::process::Command;
 use tauri::command;
+use crate::cmd_utils::new_tokio_command;
 
 #[command]
 pub async fn get_screenshot(device_id: String) -> Result<String, String> {
     // 1. Run adb exec-out screencap -p
     // Usage of exec-out is better for binary data transfer without shell mangling
-    let mut cmd = Command::new("adb");
+    let mut cmd = new_tokio_command("adb");
     cmd.args(&["-s", &device_id, "exec-out", "screencap", "-p"]);
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000);
-    }
+
     let output = cmd
         .output()
+        .await
         .map_err(|e| format!("Failed to execute adb screencap: {}", e))?;
 
     if !output.status.success() {
@@ -40,7 +37,7 @@ pub async fn get_xml_dump(device_id: String) -> Result<String, String> {
     loop {
         attempts += 1;
         
-        let mut cmd = Command::new("adb");
+        let mut cmd = new_tokio_command("adb");
         cmd.args(&[
             "-s",
             &device_id,
@@ -49,32 +46,38 @@ pub async fn get_xml_dump(device_id: String) -> Result<String, String> {
             "dump",
             "/data/local/tmp/window_dump.xml",
         ]);
-        #[cfg(target_os = "windows")]
-        {
-            use std::os::windows::process::CommandExt;
-            cmd.creation_flags(0x08000000);
-        }
         
-        match cmd.output() {
+        match cmd.output().await {
             Ok(output) => {
                 if output.status.success() {
                     break;
                 } else {
                     let stderr = String::from_utf8_lossy(&output.stderr);
                     let stdout = String::from_utf8_lossy(&output.stdout);
-                    // eprintln!("uiautomator dump failed (attempt {}/{}). Stderr: '{}', Stdout: '{}'", attempts, max_attempts, stderr.trim(), stdout.trim());
                     
                     if attempts >= max_attempts {
                         return Err(format!("uiautomator dump failed: {} {}", stderr, stdout));
                     }
 
                     // cleanup before retry
-                    let _ = Command::new("adb").args(&["-s", &device_id, "shell", "rm", "/data/local/tmp/window_dump.xml"]).output();
-                    let _ = Command::new("adb").args(&["-s", &device_id, "shell", "pkill", "uiautomator"]).output();
+                    let _ = new_tokio_command("adb")
+                        .args(&["-s", &device_id, "shell", "rm", "/data/local/tmp/window_dump.xml"])
+                        .output()
+                        .await;
+                    let _ = new_tokio_command("adb")
+                        .args(&["-s", &device_id, "shell", "pkill", "uiautomator"])
+                        .output()
+                        .await;
                     
                     // Also try to stop appium server if it's hanging
-                    let _ = Command::new("adb").args(&["-s", &device_id, "shell", "am", "force-stop", "io.appium.uiautomator2.server"]).output();
-                    let _ = Command::new("adb").args(&["-s", &device_id, "shell", "am", "force-stop", "io.appium.uiautomator2.server.test"]).output();
+                    let _ = new_tokio_command("adb")
+                        .args(&["-s", &device_id, "shell", "am", "force-stop", "io.appium.uiautomator2.server"])
+                        .output()
+                        .await;
+                    let _ = new_tokio_command("adb")
+                        .args(&["-s", &device_id, "shell", "am", "force-stop", "io.appium.uiautomator2.server.test"])
+                        .output()
+                        .await;
                 }
             }
             Err(e) => {
@@ -85,12 +88,12 @@ pub async fn get_xml_dump(device_id: String) -> Result<String, String> {
             }
         }
         
-        // Wait a bit before retry
-        std::thread::sleep(std::time::Duration::from_millis(1500));
+        // Wait a bit before retry using tokio sleep for async functions
+        tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
     }
 
     // 2. Cat the file
-    let mut cmd_cat = Command::new("adb");
+    let mut cmd_cat = new_tokio_command("adb");
     cmd_cat.args(&[
         "-s",
         &device_id,
@@ -98,13 +101,10 @@ pub async fn get_xml_dump(device_id: String) -> Result<String, String> {
         "cat",
         "/data/local/tmp/window_dump.xml",
     ]);
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd_cat.creation_flags(0x08000000);
-    }
+    
     let cat_cmd = cmd_cat
         .output()
+        .await
         .map_err(|e| format!("Failed to cat window_dump.xml: {}", e))?;
 
     if !cat_cmd.status.success() {
