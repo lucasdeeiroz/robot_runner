@@ -3510,6 +3510,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "futures",
+ "libc",
  "nosleep",
  "once_cell",
  "quick-xml 0.39.2",

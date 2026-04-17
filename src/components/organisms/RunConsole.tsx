@@ -706,10 +706,12 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                                 </div>
                             )}
                             {tree.map(node => <LogTree key={node.id} node={node} dbPath={session?.parsedDbPath} />)}
-                            {isRunning && (
+                            {(isRunning || session?.status === 'stopping') && (
                                 <div className="text-primary dark:text-primary/80 mt-4 flex items-center gap-2 text-sm italic opacity-70 animate-pulse ml-2">
                                     <ExpressiveLoading size="sm" variant="circular" />
-                                    {t('run_tab.console.processing', "Processing...")}
+                                    {session?.status === 'stopping' 
+                                        ? t('run_tab.console.stopping', "Finalizando relatórios...") 
+                                        : t('run_tab.console.processing', "Processing...")}
                                 </div>
                             )}
                             {!isRunning && reparseLoading && (

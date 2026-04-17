@@ -8,7 +8,7 @@ import {
     ChevronRight, ChevronDown, CheckCircle2, XCircle, MinusCircle,
     Layers, BugPlay, CirclePlay, Repeat, IterationCcw, Workflow,
     Infinity, Split, StepForward, CalendarCog, Maximize2,
-    ShieldAlert, Anchor
+    ShieldAlert, Anchor, Hand, CircleSlash
 } from "lucide-react";
 import { LogNode, TestNode, KeywordNode, SuiteNode } from "@/lib/robotParser";
 import { LinkRenderer } from "../molecules/LinkRenderer";
@@ -53,6 +53,12 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({ node, depth = 0, in
     const isRunning = (node as any).status === 'RUNNING';
     const isFailed = (node as any).status === 'FAIL';
     const isNotRun = (node as any).status === 'NOT_RUN';
+
+    const failureMessage = (node as TestNode).failureDetail?.message || '';
+    const isInterrupted = isFailed && (
+        failureMessage.includes('Execution terminated by signal') ||
+        failureMessage.includes('Test execution stopped due to a fatal error.')
+    );
 
     // Auto-expand when status changes from PASS/NOT_RUN/undefined to RUNNING/FAIL
     React.useEffect(() => {
@@ -127,11 +133,11 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({ node, depth = 0, in
 
     const subType = node.type === 'keyword' ? (node as KeywordNode).subType : undefined;
 
-    const borderColor = isRunning ? "border-on-surface-variant/20" : isNotRun ? "border-on-surface-variant/10" : (isFailed ? "border-error/20" : "border-success/20");
-    const summaryColor = isRunning ? "text-on-surface-variant/80" : isNotRun ? "text-on-surface-variant/40" : (isFailed ? "text-error" : "text-success");
+    const borderColor = isRunning ? "border-on-surface-variant/20" : isNotRun ? "border-on-surface-variant/10" : (isInterrupted ? "border-amber-500/30" : (isFailed ? "border-error/20" : "border-success/20"));
+    const summaryColor = isRunning ? "text-on-surface-variant/80" : isNotRun ? "text-on-surface-variant/40" : (isInterrupted ? "text-amber-500" : (isFailed ? "text-error" : "text-success"));
     const isDirectTestChild = parentType === 'test' && node.type === 'keyword';
     const bgColor = isDirectTestChild
-        ? (isRunning ? "bg-surface-variant/10" : isNotRun ? "bg-surface-variant/5" : (isFailed ? "bg-error/5" : "bg-success/5"))
+        ? (isRunning ? "bg-surface-variant/10" : isNotRun ? "bg-surface-variant/5" : (isInterrupted ? "bg-amber-500/5" : (isFailed ? "bg-error/5" : "bg-success/5")))
         : "bg-transparent";
 
     const nodeConfig: Record<string, { label: string; color: string }> = {
@@ -168,7 +174,7 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({ node, depth = 0, in
                 {(node.type === 'suite' || node.type === 'test') && (
                     <div className={clsx(
                         "absolute left-0 top-0 bottom-0 w-1 rounded",
-                        isFailed ? "bg-error/40" : "bg-success/40"
+                        isInterrupted ? "bg-amber-500/50" : (isFailed ? "bg-error/40" : "bg-success/40")
                     )} />
                 )}
                 <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -195,7 +201,7 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({ node, depth = 0, in
                         className={clsx(
                             "truncate",
                             node.type === 'suite' ? "font-bold text-sm" : "text-xs font-medium",
-                            isRunning ? "text-on-surface-variant/80" : isNotRun ? "text-on-surface-variant/50" : (isFailed ? "text-error" : "text-success")
+                            isRunning ? "text-on-surface-variant/80" : isNotRun ? "text-on-surface-variant/50" : (isInterrupted ? "text-amber-500" : (isFailed ? "text-error" : "text-success"))
                         )}
                         title={node.name}
                     >
@@ -238,88 +244,98 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({ node, depth = 0, in
                         ? <ExpressiveLoading size="xsm" variant="circular" />
                         : isNotRun
                             ? <MinusCircle size={10} />
-                            : isFailed
-                                ? <XCircle size={10} />
-                                : <CheckCircle2 size={10} />}
+                            : isInterrupted
+                                ? <CircleSlash size={10} />
+                                : isFailed
+                                    ? <XCircle size={10} />
+                                    : <CheckCircle2 size={10} />}
                     {isRunning
                         ? t('run_tab.console.running')
                         : isNotRun
                             ? t('run_tab.console.not_run')
-                            : isFailed
-                                ? t('run_tab.console.fail')
-                                : t('run_tab.console.pass')}
+                            : isInterrupted
+                                ? t('run_tab.console.interrupted')
+                                : isFailed
+                                    ? t('run_tab.console.fail')
+                                    : t('run_tab.console.pass')}
                 </div>
             </div>
 
             {isOpen && (
                 <div className="flex flex-col gap-1 p-2 pl-4 border-t border-on-surface/5">
                     {node.type === 'test' && isFailed && (node as TestNode).failureDetail && (
-                        <div className="mb-2 p-3 bg-error/10 border border-error/20 rounded-xl text-error text-xs animate-in fade-in slide-in-from-top-1 flex flex-col gap-4">
+                        <div className={clsx(
+                            "mb-2 p-3 border rounded-xl text-xs animate-in fade-in slide-in-from-top-1 flex flex-col gap-4",
+                            isInterrupted ? "bg-amber-500/10 border-amber-500/20 text-amber-500" : "bg-error/10 border-error/20 text-error"
+                        )}>
                             <div className="flex justify-between gap-4 items-start w-full">
                                 <div className="flex flex-col gap-1 min-w-0 w-full">
                                 <div className="flex items-center justify-between mb-1">
                                     <div className="font-bold uppercase tracking-wider opacity-70 flex items-center gap-1.5">
-                                        <XCircle size={12} />
-                                        {t('run_tab.console.failure_detail')}
+                                        {isInterrupted ? <Hand size={12} /> : <XCircle size={12} />}
+                                        {isInterrupted ? t('run_tab.console.interrupted') : t('run_tab.console.failure_detail')}
                                     </div>
-                                    <AiButton
-                                        id="log_analysis"
-                                        isLoading={isAnalyzing}
-                                        onClick={async (e, customPrompt) => {
-                                            e.stopPropagation();
-                                            setIsAnalyzing(true);
-                                            setShowAiAnalysis(true);
-                                            setAiAnalysis(null);
+                                    {!isInterrupted && (
+                                        <AiButton
+                                            id="log_analysis"
+                                            isLoading={isAnalyzing}
+                                            onClick={async (e, customPrompt) => {
+                                                // ... (existing AiButton code)
+                                                e.stopPropagation();
+                                                setIsAnalyzing(true);
+                                                setShowAiAnalysis(true);
+                                                setAiAnalysis(null);
 
-                                            const langName = i18n.language === 'pt' ? 'Portuguese' : i18n.language === 'es' ? 'Spanish' : 'English';
-                                            const systemInstruction = getFailureAnalysisPrompt(langName, customPrompt);
+                                                const langName = i18n.language === 'pt' ? 'Portuguese' : i18n.language === 'es' ? 'Spanish' : 'English';
+                                                const systemInstruction = getFailureAnalysisPrompt(langName, customPrompt);
 
 
-                                            const prompt = `
+                                                const prompt = `
 Test Name: ${node.name}
 Error Message: ${(node as TestNode).failureDetail?.message}
 `.trim();
 
-                                            try {
-                                                setAiError(null);
-                                                let result = "";
-                                                const provider = settings.aiProvider;
-                                                const screenshot = failureScreenshotData && !failureScreenshotData.startsWith("ERROR") ? failureScreenshotData : undefined;
+                                                try {
+                                                    setAiError(null);
+                                                    let result = "";
+                                                    const provider = settings.aiProvider;
+                                                    const screenshot = failureScreenshotData && !failureScreenshotData.startsWith("ERROR") ? failureScreenshotData : undefined;
 
-                                                if (provider === 'gemini') {
-                                                    result = await askGemini(prompt, settings.geminiApiKey || '', settings.geminiModel, systemInstruction, screenshot);
-                                                } else if (provider === 'claude') {
-                                                    result = await askClaude(prompt, settings.claudeApiKey || '', settings.claudeModel, systemInstruction, screenshot);
-                                                } else if (provider === 'openai') {
-                                                    result = await askOpenAI(prompt, settings.openaiApiKey || '', settings.openaiModel, systemInstruction, screenshot);
-                                                } else {
-                                                    throw new Error("No AI provider configured");
-                                                }
-                                                setAiAnalysis(result);
+                                                    if (provider === 'gemini') {
+                                                        result = await askGemini(prompt, settings.geminiApiKey || '', settings.geminiModel, systemInstruction, screenshot);
+                                                    } else if (provider === 'claude') {
+                                                        result = await askClaude(prompt, settings.claudeApiKey || '', settings.claudeModel, systemInstruction, screenshot);
+                                                    } else if (provider === 'openai') {
+                                                        result = await askOpenAI(prompt, settings.openaiApiKey || '', settings.openaiModel, systemInstruction, screenshot);
+                                                    } else {
+                                                        throw new Error("No AI provider configured");
+                                                    }
+                                                    setAiAnalysis(result);
 
-                                                // Persist to Database
-                                                if (dbPath) {
-                                                    invoke('save_node_ai_analysis', {
-                                                        dbPath,
-                                                        nodeId: node.id,
-                                                        analysis: result
-                                                    }).catch(err => console.error("Failed to persist node AI analysis:", err));
+                                                    // Persist to Database
+                                                    if (dbPath) {
+                                                        invoke('save_node_ai_analysis', {
+                                                            dbPath,
+                                                            nodeId: node.id,
+                                                            analysis: result
+                                                        }).catch(err => console.error("Failed to persist node AI analysis:", err));
+                                                    }
+                                                } catch (err: any) {
+                                                    console.error("AI Analysis Error:", err);
+                                                    setAiError(err.message || String(err));
+                                                    feedback.toast.error(t('run_tab.console.ai_error_generic'));
+                                                } finally {
+                                                    setIsAnalyzing(false);
                                                 }
-                                            } catch (err: any) {
-                                                console.error("AI Analysis Error:", err);
-                                                setAiError(err.message || String(err));
-                                                feedback.toast.error(t('run_tab.console.ai_error_generic'));
-                                            } finally {
-                                                setIsAnalyzing(false);
-                                            }
-                                        }}
-                                        label={t('run_tab.console.analyze_failure')}
-                                        title={t('run_tab.console.analyze_failure')}
-                                        variant="ghost"
-                                        expandable={true}
-                                        showTextAlways={false}
-                                        className="h-8 p-1 px-2 border-error/20 bg-error/5 text-error hover:bg-error/20 shadow-sm"
-                                    />
+                                            }}
+                                            label={t('run_tab.console.analyze_failure')}
+                                            title={t('run_tab.console.analyze_failure')}
+                                            variant="ghost"
+                                            expandable={true}
+                                            showTextAlways={false}
+                                            className="h-8 p-1 px-2 border-error/20 bg-error/5 text-error hover:bg-error/20 shadow-sm"
+                                        />
+                                    )}
                                 </div>
                                 <div className="font-mono whitespace-pre-wrap leading-relaxed overflow-auto max-h-40">{(node as TestNode).failureDetail!.message}</div>
                             </div>

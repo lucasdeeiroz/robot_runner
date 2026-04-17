@@ -7,20 +7,88 @@ use tauri::{AppHandle, Emitter, State};
 use tokio::io::AsyncBufReadExt;
 use tokio::process::{Child, Command};
 
-pub struct TestState(pub Arc<Mutex<HashMap<String, Child>>>);
+pub struct ProcessInfo {
+    pub child: Child,
+    pub output_dir: String,
+}
+
+pub struct TestState(pub Arc<Mutex<HashMap<String, ProcessInfo>>>);
+
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+/// Sends a graceful stop signal to a process.
+/// On Windows: Sends CTRL_C_EVENT to the process group.
+/// On Unix: Sends SIGINT.
+fn graceful_stop(child: &mut Child, output_dir: &str) -> bool {
+    // 1. Trigger Listener-based stop via file flag
+    let stop_file = std::path::Path::new(output_dir).join("stop.flag");
+    if let Ok(_) = std::fs::File::create(&stop_file) {
+        println!("[System] Created stop.flag in {}", output_dir);
+    }
+
+    if let Some(pid) = child.id() {
+        #[cfg(target_os = "windows")]
+        {
+            // Windows Fallback: taskkill /T (Tree) WITHOUT /F (Force)
+            // This sends a WM_CLOSE or similar close request to GUI apps and handles console apps politely.
+            let _ = std::process::Command::new("taskkill")
+                .arg("/T")
+                .arg("/PID")
+                .arg(pid.to_string())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .spawn();
+            
+            return true;
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            unsafe {
+                if libc::kill(pid as i32, libc::SIGINT) == 0 {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
 
 #[tauri::command]
 pub async fn stop_test(state: State<'_, TestState>, run_id: String) -> Result<String, String> {
-    let child = {
+    let signalled = {
         let mut procs = state.0.lock().map_err(|e| e.to_string())?;
-        procs.remove(&run_id)
+        if let Some(info) = procs.get_mut(&run_id) {
+            graceful_stop(&mut info.child, &info.output_dir)
+        } else {
+            return Err(format!("No running test found for id: {}", run_id));
+        }
     };
 
-    if let Some(mut c) = child {
-        let _ = c.kill().await;
-        Ok(format!("Test {} stopped", run_id))
+    // Step 2: Spawn a background watchdog for 10s timeout
+    let state_wd = state.0.clone();
+    let rid_wd = run_id.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+        
+        let mut procs = match state_wd.lock() {
+            Ok(p) => p,
+            Err(_) => return,
+        };
+
+    if let Some(info) = procs.get_mut(&rid_wd) {
+            // Still alive after 10s? Hard kill.
+            let _ = info.child.kill();
+            // Note: We leave it in the map, the monitor loop will handle removal 
+            // and event emission when it detects the exit.
+        }
+    });
+
+    if signalled {
+        Ok(format!("Graceful stop signal sent to test {}", run_id))
     } else {
-        Err(format!("No running test found for id: {}", run_id))
+        Ok(format!("Could not signal test {}, falling back to kill after timeout", run_id))
     }
 }
 
@@ -33,13 +101,14 @@ pub fn shutdown_all_tests(state: &State<'_, TestState>) {
         }
     };
 
-    for (run_id, child) in procs.iter_mut() {
-        if let Some(pid) = child.id() {
+    for (run_id, info) in procs.iter_mut() {
+        if let Some(pid) = info.child.id() {
             println!("Shutting down robot test {} (PID: {})", run_id, pid);
 
             #[cfg(target_os = "windows")]
             {
-                use std::os::windows::process::CommandExt;
+                // Try graceful first even in shutdown, but with a shorter path if needed
+                // For global shutdown, taskkill is safer to ensure everything dies
                 let _ = std::process::Command::new("taskkill")
                     .args(&["/F", "/T", "/PID", &pid.to_string()])
                     .creation_flags(0x08000000)
@@ -54,7 +123,7 @@ pub fn shutdown_all_tests(state: &State<'_, TestState>) {
             }
         }
         
-        let _ = child.start_kill();
+        let _ = info.child.start_kill();
     }
     procs.clear();
 }
@@ -101,12 +170,23 @@ pub async fn run_robot_test(
         })
         .unwrap_or_else(|_| output_dir.clone());
 
+    // Cleanup any stale stop flag before starting the test
+    let stop_file_init = std::path::Path::new(&abs_output_dir).join("stop.flag");
+    if stop_file_init.exists() {
+        let _ = std::fs::remove_file(stop_file_init);
+    }
+
     let mut args = vec!["-d", &abs_output_dir, "--console", "verbose"];
 
     // Inject LiveConsoleListener to force real-time stdout updates for test names
     let listener_path = std::path::Path::new(&abs_output_dir).join("LiveConsoleListener.py");
     let listener_code = r#"
 import sys
+import os
+import threading
+import time
+import _thread
+from robot.libraries.BuiltIn import BuiltIn
 
 ROBOT_LISTENER_API_VERSION = 2
 
@@ -125,6 +205,23 @@ def start_test(name, attrs):
 def end_test(name, attrs):
     sys.stdout.write(f"\n[RR-TEST-END] {name} | {attrs['status']}\n")
     sys.stdout.flush()
+
+def start_keyword(name, attrs):
+    pass
+
+def _monitor_stop():
+    # Check for stop signal in the same directory as the listener
+    stop_file = os.path.join(os.path.dirname(__file__), "stop.flag")
+    while True:
+        if os.path.exists(stop_file):
+            # Inject a KeyboardInterrupt into the main thread
+            _thread.interrupt_main()
+            break
+        time.sleep(0.5)
+
+# Start background monitor thread
+t = threading.Thread(target=_monitor_stop, daemon=True)
+t.start()
 "#;
     // Ensure dir exists before writing and fail clearly if we cannot set up the listener
     std::fs::create_dir_all(&abs_output_dir)
@@ -231,7 +328,7 @@ def end_test(name, attrs):
     cmd.arg("-m").arg("robot");
     cmd.args(&args);
 
-    spawn_and_monitor(app, state, run_id, cmd, working_dir).await
+    spawn_and_monitor(app, state, run_id, cmd, working_dir, abs_output_dir).await
 }
 
 #[tauri::command]
@@ -325,7 +422,7 @@ pub async fn run_maestro_test(
 
     cmd.env("JAVA_TOOL_OPTIONS", "-Dfile.encoding=UTF-8");
 
-    spawn_and_monitor(app, state, run_id, cmd, working_dir).await
+    spawn_and_monitor(app, state, run_id, cmd, working_dir, abs_output_dir).await
 }
 
 #[tauri::command]
@@ -391,7 +488,7 @@ pub async fn run_appium_test(
 
     cmd.env("JAVA_TOOL_OPTIONS", "-Dfile.encoding=UTF-8");
 
-    spawn_and_monitor(app, state, run_id, cmd, Some(abs_project_path)).await
+    spawn_and_monitor(app, state, run_id, cmd, Some(abs_project_path), abs_output_dir).await
 }
 
 async fn spawn_and_monitor(
@@ -400,11 +497,20 @@ async fn spawn_and_monitor(
     run_id: String,
     mut cmd: Command,
     working_dir: Option<String>,
+    output_dir: String,
 ) -> Result<String, String> {
     if let Some(wd) = working_dir {
         if !wd.is_empty() {
             cmd.current_dir(wd);
         }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        // 0x00000200 = CREATE_NEW_PROCESS_GROUP
+        // 0x08000000 = CREATE_NO_WINDOW
+        // Isolate process group for better management
+        cmd.creation_flags(0x00000200 | 0x08000000);
     }
 
     let child = cmd
@@ -448,10 +554,16 @@ async fn spawn_and_monitor(
         }
     });
 
+    // Store process info
+    let info = ProcessInfo {
+        child,
+        output_dir: output_dir.clone(),
+    };
+
     // Store process
     {
         let mut procs = state.0.lock().map_err(|e| e.to_string())?;
-        procs.insert(run_id.clone(), child);
+        procs.insert(run_id.clone(), info);
     }
 
     // Monitor for finish (Async Polling)
@@ -464,15 +576,22 @@ async fn spawn_and_monitor(
         loop {
             tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
             
-            let mut procs: std::sync::MutexGuard<'_, HashMap<String, Child>> = match state_mon.lock() {
+            let mut procs = match state_mon.lock() {
                 Ok(p) => p,
                 Err(_) => break,
             };
 
-            if let Some(child) = procs.get_mut(&rid_mon) {
-                match child.try_wait() {
+            if let Some(info) = procs.get_mut(&rid_mon) {
+                match info.child.try_wait() {
                     Ok(Some(status)) => {
                         final_status = Some(status);
+                        
+                        // Cleanup stop signal if it exists
+                        let stop_file = std::path::Path::new(&info.output_dir).join("stop.flag");
+                        if stop_file.exists() {
+                            let _ = std::fs::remove_file(stop_file);
+                        }
+
                         procs.remove(&rid_mon);
                         break;
                     }

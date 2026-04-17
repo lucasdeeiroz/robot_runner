@@ -237,7 +237,11 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
 
         setSessions(prev => prev.map(s => {
             if (s.runId === runId) {
-                return { ...s, logs: [...s.logs, '\n[System] Stopping...'] };
+                return { 
+                    ...s, 
+                    status: 'stopping',
+                    logs: [...s.logs, '\n[System] Graceful stop initiated. Waiting for reports...'] 
+                };
             }
             return s;
         }));
