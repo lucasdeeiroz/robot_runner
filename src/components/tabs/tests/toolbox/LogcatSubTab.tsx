@@ -395,7 +395,7 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
                         onCopy={() => {
                             if (aiResult) {
                                 navigator.clipboard.writeText(`${aiResult.summary}\n\n${aiResult.analysis}`);
-                                feedback.toast.success(t('common.copied'));
+                                feedback.toast.success('common.copied');
                             }
                         }}
                     />
