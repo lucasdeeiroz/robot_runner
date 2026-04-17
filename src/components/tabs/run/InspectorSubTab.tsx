@@ -764,7 +764,7 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                                 onCopy={() => {
                                     const code = generateRobotCode(recordedSteps);
                                     navigator.clipboard.writeText(code);
-                                    feedback.toast.success(t('common.copied'));
+                                    feedback.toast.success('common.copied');
                                 }}
                                 availableNodes={availableNodes}
                                 onSelectNode={setSelectedNode}
