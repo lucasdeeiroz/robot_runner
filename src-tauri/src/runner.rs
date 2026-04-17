@@ -14,8 +14,7 @@ pub struct ProcessInfo {
 
 pub struct TestState(pub Arc<Mutex<HashMap<String, ProcessInfo>>>);
 
-#[cfg(target_os = "windows")]
-use std::os::windows::process::CommandExt;
+use crate::cmd_utils::{new_std_command, new_tokio_command};
 
 /// Sends a graceful stop signal to a process.
 /// On Windows: Uses `taskkill /T` without `/F` to request termination of the process tree.
@@ -32,7 +31,7 @@ fn graceful_stop(child: &mut Child, output_dir: &str) -> bool {
         {
             // Windows Fallback: taskkill /T (Tree) WITHOUT /F (Force)
             // This sends a WM_CLOSE or similar close request to GUI apps and handles console apps politely.
-            let _ = std::process::Command::new("taskkill")
+            let _ = new_std_command("taskkill")
                 .arg("/T")
                 .arg("/PID")
                 .arg(pid.to_string())
@@ -109,15 +108,14 @@ pub fn shutdown_all_tests(state: &State<'_, TestState>) {
             {
                 // Try graceful first even in shutdown, but with a shorter path if needed
                 // For global shutdown, taskkill is safer to ensure everything dies
-                let _ = std::process::Command::new("taskkill")
+                let _ = new_std_command("taskkill")
                     .args(&["/F", "/T", "/PID", &pid.to_string()])
-                    .creation_flags(0x08000000)
                     .output();
             }
 
             #[cfg(not(target_os = "windows"))]
             {
-                let _ = std::process::Command::new("kill")
+                let _ = new_std_command("kill")
                     .args(&["-9", &pid.to_string()])
                     .output();
             }
@@ -322,7 +320,7 @@ t.start()
         let _ = std::fs::write(metadata_path, json);
     }
 
-    let mut cmd = Command::new("python");
+    let mut cmd = new_tokio_command("python");
     cmd.env("PYTHONIOENCODING", "utf-8");
     cmd.env("PYTHONUTF8", "1");
     cmd.arg("-m").arg("robot");
@@ -407,7 +405,7 @@ pub async fn run_maestro_test(
     #[cfg(target_os = "windows")]
     {
         // Use shell on Windows to resolve maestro.cmd/ps1
-        cmd = Command::new("cmd");
+        cmd = new_tokio_command("cmd");
         cmd.arg("/C").arg("maestro");
         for arg in cmd_args {
             cmd.arg(arg);
@@ -416,7 +414,7 @@ pub async fn run_maestro_test(
     
     #[cfg(not(target_os = "windows"))]
     {
-        cmd = Command::new("maestro");
+        cmd = new_tokio_command("maestro");
         cmd.args(cmd_args);
     }
 
@@ -466,12 +464,12 @@ pub async fn run_appium_test(
     let mut cmd;
     #[cfg(target_os = "windows")]
     {
-        cmd = Command::new("cmd");
+        cmd = new_tokio_command("cmd");
         cmd.arg("/C").arg("mvn");
     }
     #[cfg(not(target_os = "windows"))]
     {
-        cmd = Command::new("mvn");
+        cmd = new_tokio_command("mvn");
     }
 
     if let Some(args) = appium_java_args {
@@ -507,10 +505,10 @@ async fn spawn_and_monitor(
 
     #[cfg(target_os = "windows")]
     {
+        use std::os::windows::process::CommandExt;
         // 0x00000200 = CREATE_NEW_PROCESS_GROUP
-        // 0x08000000 = CREATE_NO_WINDOW
-        // Isolate process group for better management
-        cmd.creation_flags(0x00000200 | 0x08000000);
+        // We already set CREATE_NO_WINDOW in new_tokio_command, but we need to combine it here
+        cmd.as_std_mut().creation_flags(0x00000200 | 0x08000000);
     }
 
     let child = cmd

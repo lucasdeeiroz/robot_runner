@@ -1,20 +1,17 @@
-use std::process::Command;
 use tauri::command;
+use crate::cmd_utils::new_tokio_command;
 
 #[command]
-pub fn adb_connect(ip: String, port: String) -> Result<String, String> {
+pub async fn adb_connect(ip: String, port: String) -> Result<String, String> {
     let target = format!("{}:{}", ip, port);
     // println!("ADB Connecting to {}", target);
 
-    let mut cmd = Command::new("adb");
+    let mut cmd = new_tokio_command("adb");
     cmd.args(&["connect", &target]);
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000);
-    }
+
     let output = cmd
         .output()
+        .await
         .map_err(|e| format!("Failed to execute adb: {}", e))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
@@ -33,19 +30,16 @@ pub fn adb_connect(ip: String, port: String) -> Result<String, String> {
 }
 
 #[command]
-pub fn adb_pair(ip: String, port: String, code: String) -> Result<String, String> {
+pub async fn adb_pair(ip: String, port: String, code: String) -> Result<String, String> {
     let target = format!("{}:{}", ip, port);
     // println!("ADB Pairing with {} using code {}", target, code);
 
-    let mut cmd = Command::new("adb");
+    let mut cmd = new_tokio_command("adb");
     cmd.args(&["pair", &target, &code]);
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000);
-    }
+
     let output = cmd
         .output()
+        .await
         .map_err(|e| format!("Failed to execute adb: {}", e))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
@@ -59,18 +53,14 @@ pub fn adb_pair(ip: String, port: String, code: String) -> Result<String, String
 }
 
 #[command]
-pub fn adb_disconnect(ip: String, port: String) -> Result<String, String> {
-    let mut cmd = Command::new("adb");
+pub async fn adb_disconnect(ip: String, port: String) -> Result<String, String> {
+    let mut cmd = new_tokio_command("adb");
     let target = format!("{}:{}", ip, port);
     cmd.args(&["disconnect", &target]);
 
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000);
-    }
     let output = cmd
         .output()
+        .await
         .map_err(|e| format!("Failed to execute adb: {}", e))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
@@ -78,17 +68,13 @@ pub fn adb_disconnect(ip: String, port: String) -> Result<String, String> {
 }
 
 #[command]
-pub fn adb_disconnect_all() -> Result<String, String> {
-    let mut cmd = Command::new("adb");
+pub async fn adb_disconnect_all() -> Result<String, String> {
+    let mut cmd = new_tokio_command("adb");
     cmd.arg("disconnect");
 
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000);
-    }
     let output = cmd
         .output()
+        .await
         .map_err(|e| format!("Failed to execute adb: {}", e))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();

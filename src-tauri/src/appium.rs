@@ -1,9 +1,9 @@
 use std::sync::{Arc, Mutex};
 use tauri::{State, Emitter, AppHandle, Manager};
 use tokio::io::{AsyncBufReadExt, BufReader as TokioBufReader, AsyncWriteExt};
-use tokio::process::{Child, Command};
+use tokio::process::Child;
 use std::process::Stdio;
-
+use crate::cmd_utils::new_tokio_command;
 
 // State to hold the Appium process
 pub struct AppiumState(pub Arc<Mutex<Option<Child>>>);
@@ -138,7 +138,7 @@ pub async fn start_appium_server(
     #[cfg(not(target_os = "windows"))]
     let cmd = "appium";
 
-    let mut command = Command::new(cmd);
+    let mut command = new_tokio_command(cmd);
 
     // Add Host and Port
     command.arg("--address").arg(&host);
@@ -165,11 +165,6 @@ pub async fn start_appium_server(
     // Configure stdout/stderr
     command.stdout(Stdio::piped());
     command.stderr(Stdio::piped());
-
-    #[cfg(target_os = "windows")]
-    {
-        command.creation_flags(0x08000000); // CREATE_NO_WINDOW
-    }
 
     match command.spawn() {
         Ok(mut child) => {
@@ -271,11 +266,12 @@ pub fn open_appium_log_terminal(app_handle: AppHandle) -> Result<(), String> {
 
     #[cfg(target_os = "windows")]
     {
+        use std::os::windows::process::CommandExt;
         const CREATE_NEW_CONSOLE: u32 = 0x00000010;
         let p_str = log_path.to_string_lossy().to_string();
         // Use double quotes for PowerShell path escaping
         let cmd_args = format!("Get-Content -Path \"{}\" -Wait -Tail 100", p_str);
-        match Command::new("powershell")
+        match std::process::Command::new("powershell")
             .arg("-NoExit")
             .arg("-Command")
             .arg(cmd_args)
@@ -290,7 +286,7 @@ pub fn open_appium_log_terminal(app_handle: AppHandle) -> Result<(), String> {
     {
         // Simple fallback for unix
         let p_str = log_path.to_string_lossy().to_string();
-        match Command::new("x-terminal-emulator")
+        match std::process::Command::new("x-terminal-emulator")
             .arg("-e")
             .arg("tail")
             .arg("-f")

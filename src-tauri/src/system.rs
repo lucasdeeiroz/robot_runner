@@ -1,15 +1,10 @@
 use regex::Regex;
 use serde::Serialize;
 use serde_json::Value;
-#[cfg(target_os = "windows")]
-use std::os::windows::process::CommandExt;
-use std::process::Command;
 use tauri::{command, State};
 use std::sync::Mutex;
 use nosleep::{NoSleep, NoSleepType};
-
-// CREATE_NO_WINDOW constant for Windows
-const CREATE_NO_WINDOW: u32 = 0x08000000;
+use crate::cmd_utils::new_std_command;
 
 #[derive(Debug, Serialize)]
 pub struct SystemVersions {
@@ -196,11 +191,8 @@ fn get_version(cmd: &str, args: &[&str]) -> String {
 
 fn get_version_internal(cmd: &str, args: &[&str], strict: bool) -> String {
     // Try executing directly
-    let mut command = Command::new(cmd);
+    let mut command = new_std_command(cmd);
     command.args(args);
-
-    #[cfg(target_os = "windows")]
-    command.creation_flags(CREATE_NO_WINDOW);
 
     match command.output() {
         Ok(output) => {
@@ -231,8 +223,7 @@ fn get_version_internal(cmd: &str, args: &[&str], strict: bool) -> String {
             // Fallback to shell execution on Windows for .cmd/.bat resolution
             #[cfg(target_os = "windows")]
             {
-                let mut shell_cmd = Command::new("cmd");
-                shell_cmd.creation_flags(CREATE_NO_WINDOW);
+                let mut shell_cmd = new_std_command("cmd");
                 shell_cmd.args(&["/C", cmd]);
                 shell_cmd.args(args);
                 if let Ok(output) = shell_cmd.output() {
@@ -265,18 +256,14 @@ fn get_version_internal(cmd: &str, args: &[&str], strict: bool) -> String {
 
 fn check_uiautomator2(appium_cmd: &str) -> String {
     // try --json first for better parsing
-    let mut command = Command::new(appium_cmd);
+    let mut command = new_std_command(appium_cmd);
     command.args(&["driver", "list", "--installed", "--json"]);
-
-    #[cfg(target_os = "windows")]
-    command.creation_flags(CREATE_NO_WINDOW);
 
     // If direct fails, try shell wrapper logic again
     let output_res = command.output().or_else(|_| {
         #[cfg(target_os = "windows")]
         {
-            let mut shell_cmd = Command::new("cmd");
-            shell_cmd.creation_flags(CREATE_NO_WINDOW);
+            let mut shell_cmd = new_std_command("cmd");
             shell_cmd.args(&["/C", appium_cmd, "driver", "list", "--installed", "--json"]);
             shell_cmd.output()
         }

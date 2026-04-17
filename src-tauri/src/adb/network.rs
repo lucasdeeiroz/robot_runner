@@ -1,19 +1,12 @@
-use std::process::Command;
-// use crate::adb::check_adb_path; // Removed
+use crate::cmd_utils::new_tokio_command;
 
 #[tauri::command]
 pub async fn get_device_ip(serial: String) -> Result<String, String> {
-    let adb_path = "adb";
-
     // Strategy 1: ip route (reliable on most modern Androids)
-    let mut cmd_route = Command::new(&adb_path);
+    let mut cmd_route = new_tokio_command("adb");
     cmd_route.args(&["-s", &serial, "shell", "ip", "route"]);
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd_route.creation_flags(0x08000000);
-    }
-    let output = cmd_route.output().map_err(|e| e.to_string())?;
+    
+    let output = cmd_route.output().await.map_err(|e| e.to_string())?;
 
     if output.status.success() {
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -32,14 +25,10 @@ pub async fn get_device_ip(serial: String) -> Result<String, String> {
     }
 
     // Strategy 2: ifconfig (older devices)
-    let mut cmd_ifconfig = Command::new(&adb_path);
+    let mut cmd_ifconfig = new_tokio_command("adb");
     cmd_ifconfig.args(&["-s", &serial, "shell", "ifconfig", "wlan0"]);
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd_ifconfig.creation_flags(0x08000000);
-    }
-    let output_ifconfig = cmd_ifconfig.output().map_err(|e| e.to_string())?;
+    
+    let output_ifconfig = cmd_ifconfig.output().await.map_err(|e| e.to_string())?;
 
     if output_ifconfig.status.success() {
         let stdout = String::from_utf8_lossy(&output_ifconfig.stdout);

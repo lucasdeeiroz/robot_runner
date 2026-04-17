@@ -1,21 +1,17 @@
 use std::fs::File;
 use std::io::Write;
-use std::process::Command;
-use std::thread;
-use std::time::Duration;
+use crate::cmd_utils::new_tokio_command;
+use tokio::time::{sleep, Duration};
 
 #[tauri::command]
 pub async fn save_screenshot(device: String, path: String) -> Result<String, String> {
     // execute adb exec-out screencap -p
-    let mut cmd = Command::new("adb");
+    let mut cmd = new_tokio_command("adb");
     cmd.args(&["-s", &device, "exec-out", "screencap", "-p"]);
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000);
-    }
+
     let output = cmd
         .output()
+        .await
         .map_err(|e| format!("Failed to run adb: {}", e))?;
 
     if !output.status.success() {
@@ -39,7 +35,7 @@ pub async fn start_screen_recording(device: String) -> Result<String, String> {
     // We use /sdcard/robot_runner_rec.mp4 as a temp file
     // "screenrecord" typically runs until 3 mins or SIGINT.
 
-    let mut cmd = Command::new("adb");
+    let mut cmd = new_tokio_command("adb");
     cmd.args(&[
         "-s",
         &device,
@@ -48,12 +44,6 @@ pub async fn start_screen_recording(device: String) -> Result<String, String> {
         "--verbose",
         "/sdcard/robot_runner_rec.mp4",
     ]);
-
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
-    }
 
     cmd.spawn()
         .map_err(|e| format!("Failed to start recording: {}", e))?;
@@ -65,34 +55,26 @@ pub async fn start_screen_recording(device: String) -> Result<String, String> {
 pub async fn stop_screen_recording(device: String, local_path: String) -> Result<String, String> {
     // 1. Send SIGINT (2) to screenrecord to make it finalize the MP4
 
-    let mut cmd_kill = Command::new("adb");
+    let mut cmd_kill = new_tokio_command("adb");
     cmd_kill.args(&["-s", &device, "shell", "pkill", "-2", "screenrecord"]);
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd_kill.creation_flags(0x08000000);
-    }
+    
     let kill_output = cmd_kill
         .output()
+        .await
         .map_err(|e| format!("Failed to run pkill: {}", e))?;
 
     // If pkill fails (e.g. old android), try killall
     if !kill_output.status.success() {
-        let mut cmd_killall = Command::new("adb");
+        let mut cmd_killall = new_tokio_command("adb");
         cmd_killall.args(&["-s", &device, "shell", "killall", "-2", "screenrecord"]);
-        #[cfg(target_os = "windows")]
-        {
-            use std::os::windows::process::CommandExt;
-            cmd_killall.creation_flags(0x08000000);
-        }
-        let _ = cmd_killall.output();
+        let _ = cmd_killall.output().await;
     }
 
     // 2. Wait a bit for file to finalize
-    thread::sleep(Duration::from_secs(2));
+    sleep(Duration::from_secs(2)).await;
 
     // 3. Pull the file
-    let mut cmd_pull = Command::new("adb");
+    let mut cmd_pull = new_tokio_command("adb");
     cmd_pull.args(&[
         "-s",
         &device,
@@ -100,13 +82,10 @@ pub async fn stop_screen_recording(device: String, local_path: String) -> Result
         "/sdcard/robot_runner_rec.mp4",
         &local_path,
     ]);
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd_pull.creation_flags(0x08000000);
-    }
+    
     let pull_output = cmd_pull
         .output()
+        .await
         .map_err(|e| format!("Failed to pull video: {}", e))?;
 
     if !pull_output.status.success() {
@@ -117,14 +96,9 @@ pub async fn stop_screen_recording(device: String, local_path: String) -> Result
     }
 
     // 4. Delete temp file
-    let mut cmd_rm = Command::new("adb");
+    let mut cmd_rm = new_tokio_command("adb");
     cmd_rm.args(&["-s", &device, "shell", "rm", "/sdcard/robot_runner_rec.mp4"]);
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd_rm.creation_flags(0x08000000);
-    }
-    let _ = cmd_rm.output();
+    let _ = cmd_rm.output().await;
 
     Ok(local_path)
 }

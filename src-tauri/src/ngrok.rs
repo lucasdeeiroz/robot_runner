@@ -1,12 +1,8 @@
-use std::process::{Command, Stdio};
-#[cfg(target_os = "windows")]
-use std::os::windows::process::CommandExt;
+use std::process::Stdio;
 use std::sync::Mutex;
 use tauri::{command, State};
-
-// Constants
-#[cfg(target_os = "windows")]
-const CREATE_NO_WINDOW: u32 = 0x08000000;
+use crate::cmd_utils::{new_std_command, new_tokio_command};
+use tokio::io::{AsyncBufReadExt, BufReader as TokioBufReader};
 
 // Wrapper for Tauri State management
 pub struct NgrokState(pub Mutex<Option<u32>>);
@@ -20,80 +16,82 @@ pub async fn start_ngrok(
     // 1. Configure Auth Token if provided
     if let Some(auth_token) = &token {
         if !auth_token.is_empty() {
-             let mut cmd = Command::new("ngrok");
+             let mut cmd = new_tokio_command("ngrok");
              cmd.args(&["config", "add-authtoken", auth_token]);
-             #[cfg(target_os = "windows")]
-             cmd.creation_flags(CREATE_NO_WINDOW);
-             let _ = cmd.output().map_err(|e| format!("Failed to set authtoken: {}", e))?;
+             let _ = cmd.output().await.map_err(|e| format!("Failed to set authtoken: {}", e))?;
         }
     }
 
     // 2. Stop existing if any (using the state)
-    {
+    let old_pid = {
         let mut lock = state.0.lock().map_err(|_| "Failed to lock mutex")?;
-        if let Some(pid) = *lock {
-             #[cfg(target_os = "windows")]
-             {
-                let mut cmd = Command::new("taskkill");
-                cmd.args(&["/F", "/PID", &pid.to_string()]);
-                cmd.creation_flags(CREATE_NO_WINDOW);
-                let _ = cmd.output();
-             }
-             #[cfg(not(target_os = "windows"))]
-             {
-                let _ = Command::new("kill")
-                    .arg(pid.to_string())
-                    .output();
-             }
-             *lock = None;
-        }
+        lock.take()
+    };
+
+    if let Some(pid) = old_pid {
+         #[cfg(target_os = "windows")]
+         {
+            let mut cmd = new_tokio_command("taskkill");
+            cmd.args(&["/F", "/PID", &pid.to_string()]);
+            let _ = cmd.output().await;
+         }
+         #[cfg(not(target_os = "windows"))]
+         {
+            let _ = new_tokio_command("kill")
+                .arg(pid.to_string())
+                .output()
+                .await;
+         }
     }
 
     // 3. Start ngrok tcp <port>
-    let mut child_cmd = Command::new("ngrok");
+    let mut child_cmd = new_tokio_command("ngrok");
     child_cmd.args(&["tcp", &port.to_string(), "--log=stdout"])
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    
-    #[cfg(target_os = "windows")]
-    child_cmd.creation_flags(CREATE_NO_WINDOW);
+        .stderr(Stdio::null());
     
     let mut child = child_cmd.spawn()
         .map_err(|e| format!("Failed to start ngrok: {}", e))?;
 
-    let child_id = child.id();
+    let child_id = child.id().ok_or("Failed to get ngrok PID")?;
     {
         let mut lock = state.0.lock().map_err(|_| "Failed to lock mutex")?;
         *lock = Some(child_id);
     }
 
-    // 4. Parse output for URL
+    // 4. Parse output for URL (Async parsing)
     let stdout = child.stdout.take().ok_or("Failed to capture stdout")?;
-    let reader = std::io::BufReader::new(stdout);
-    use std::io::BufRead;
+    let mut reader = TokioBufReader::new(stdout).lines();
 
     let mut output_buffer = Vec::new();
     let start = std::time::Instant::now();
     
-    for line in reader.lines() {
-        if start.elapsed().as_secs() > 10 {
-            let _ = child.kill();
-             let debug_log = output_buffer.join("\n");
-            return Err(format!("Timed out waiting for ngrok URL. Output:\n{}", debug_log));
-        }
-
-        if let Ok(l) = line {
-            output_buffer.push(l.clone());
-            // Keep buffer size reasonable
-            if output_buffer.len() > 20 {
-                output_buffer.remove(0);
-            }
-
-            if let Some(idx) = l.find("url=") {
-                let url = l[idx+4..].split_whitespace().next().unwrap_or("").to_string();
-                if !url.is_empty() {
-                     return Ok(url);
+    loop {
+        match reader.next_line().await {
+            Ok(Some(l)) => {
+                if start.elapsed().as_secs() > 10 {
+                    let _ = child.kill().await;
+                    let debug_log = output_buffer.join("\n");
+                    return Err(format!("Timed out waiting for ngrok URL. Output:\n{}", debug_log));
                 }
+
+                output_buffer.push(l.clone());
+                // Keep buffer size reasonable
+                if output_buffer.len() > 20 {
+                    output_buffer.remove(0);
+                }
+
+                if let Some(idx) = l.find("url=") {
+                    let url = l[idx+4..].split_whitespace().next().unwrap_or("").to_string();
+                    if !url.is_empty() {
+                         return Ok(url);
+                    }
+                }
+            }
+            Ok(None) => break,
+            Err(e) => {
+                let _ = child.kill().await;
+                return Err(format!("Error reading ngrok output: {}. Logs:\n{}", e, output_buffer.join("\n")));
             }
         }
     }
@@ -104,74 +102,75 @@ pub async fn start_ngrok(
 
 #[command]
 pub async fn stop_ngrok(state: State<'_, NgrokState>) -> Result<(), String> {
-    let mut lock = state.0.lock().map_err(|_| "Failed to lock mutex")?;
+    let pid = {
+        let mut lock = state.0.lock().map_err(|_| "Failed to lock mutex")?;
+        lock.take()
+    };
     
-    if let Some(pid) = *lock {
+    if let Some(p) = pid {
         #[cfg(target_os = "windows")]
         {
-            let _ = Command::new("taskkill")
-                .args(&["/F", "/PID", &pid.to_string()])
-                .creation_flags(CREATE_NO_WINDOW)
-                .output();
+            let _ = new_tokio_command("taskkill")
+                .args(&["/F", "/PID", &p.to_string()])
+                .output()
+                .await;
         }
         #[cfg(not(target_os = "windows"))]
         {
-             let _ = Command::new("kill")
-                .arg(pid.to_string())
-                .output();
+             let _ = new_tokio_command("kill")
+                .arg(p.to_string())
+                .output()
+                .await;
         }
-        *lock = None;
     }
     
     // Safety net
     #[cfg(target_os = "windows")]
     {
-        let _ = Command::new("taskkill")
+        let _ = new_tokio_command("taskkill")
             .args(&["/F", "/IM", "ngrok.exe"])
-            .creation_flags(CREATE_NO_WINDOW)
-            .output();
+            .output()
+            .await;
     }
     #[cfg(not(target_os = "windows"))]
     {
-        let _ = Command::new("pkill")
+        let _ = new_tokio_command("pkill")
             .arg("ngrok")
-            .output();
+            .output()
+            .await;
     }
         
     Ok(())
 }
 
 pub fn shutdown_ngrok(state: &State<'_, NgrokState>) {
-    if let Ok(lock) = state.0.lock() {
-        if let Some(pid) = *lock {
+    if let Ok(mut lock) = state.0.lock() {
+        if let Some(pid) = lock.take() {
             #[cfg(target_os = "windows")]
             {
-                let _ = Command::new("taskkill")
+                let _ = new_std_command("taskkill")
                     .args(&["/F", "/PID", &pid.to_string()])
-                    .creation_flags(CREATE_NO_WINDOW)
                     .output();
             }
             #[cfg(not(target_os = "windows"))]
             {
-                let _ = Command::new("kill")
+                let _ = new_std_command("kill")
                     .arg(pid.to_string())
                     .output();
             }
-            // *lock = None; // Not strictly necessary on exit, but good practice
         }
     }
 
     // Safety net: Kill by name
     #[cfg(target_os = "windows")]
     {
-        let _ = Command::new("taskkill")
+        let _ = new_std_command("taskkill")
             .args(&["/F", "/IM", "ngrok.exe"])
-            .creation_flags(CREATE_NO_WINDOW)
             .output();
     }
     #[cfg(not(target_os = "windows"))]
     {
-        let _ = Command::new("pkill")
+        let _ = new_std_command("pkill")
             .arg("ngrok")
             .output();
     }

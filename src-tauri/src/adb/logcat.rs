@@ -1,15 +1,13 @@
 use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Write};
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 use tauri::State;
-
-#[cfg(target_os = "windows")]
-use std::os::windows::process::CommandExt;
+use crate::cmd_utils::new_std_command;
 
 // Structure to hold the process and the shared buffer
 pub struct LogcatProcess {
@@ -111,11 +109,9 @@ pub fn start_logcat(
             args.push(&level_arg);
 
             // Spawn
-            let mut cmd = Command::new("adb");
+            let mut cmd = new_std_command("adb");
             cmd.args(&args);
             cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
-            #[cfg(target_os = "windows")]
-            cmd.creation_flags(0x08000000); 
 
             match cmd.spawn() {
                 Ok(mut child_proc) => {
@@ -247,7 +243,7 @@ pub fn start_logcat(
         }
         // println!("Logcat: Supervisor thread exiting for {}", device_id);
     });
-
+ 
     procs.insert(device, LogcatProcess { 
         child: child_mutex, 
         should_stop, 
@@ -259,10 +255,8 @@ pub fn start_logcat(
 }
 
 fn get_pid(device: &str, pkg: &str) -> Result<Option<String>, String> {
-    let mut pidof_cmd = Command::new("adb");
+    let mut pidof_cmd = new_std_command("adb");
     pidof_cmd.args(&["-s", device, "shell", "pidof", "-s", pkg]);
-    #[cfg(target_os = "windows")]
-    pidof_cmd.creation_flags(0x08000000);
 
     match pidof_cmd.output() {
         Ok(output) => {
@@ -272,10 +266,8 @@ fn get_pid(device: &str, pkg: &str) -> Result<Option<String>, String> {
             }
             
             // Check process state (zombie/cached check)
-            let mut oom_cmd = Command::new("adb");
+            let mut oom_cmd = new_std_command("adb");
             oom_cmd.args(&["-s", device, "shell", "cat", &format!("/proc/{}/oom_score_adj", pid)]);
-            #[cfg(target_os = "windows")]
-            oom_cmd.creation_flags(0x08000000);
 
             if let Ok(oom_output) = oom_cmd.output() {
                 let score_str = String::from_utf8_lossy(&oom_output.stdout).trim().to_string();

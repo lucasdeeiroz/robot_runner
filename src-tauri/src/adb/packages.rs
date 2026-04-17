@@ -1,5 +1,5 @@
 use tauri::command;
-use std::process::Command;
+use crate::cmd_utils::new_tokio_command;
 
 #[derive(serde::Serialize)]
 pub struct PackageInfo {
@@ -10,12 +10,12 @@ pub struct PackageInfo {
 }
 
 #[command]
-pub fn get_installed_packages(device: String) -> Result<Vec<PackageInfo>, String> {
+pub async fn get_installed_packages(device: String) -> Result<Vec<PackageInfo>, String> {
     // 1. Get All Packages with Path (-f)
-    let output_all = run_adb(device.clone(), vec!["shell", "pm", "list", "packages", "-f"])?;
+    let output_all = run_adb(device.clone(), vec!["shell", "pm", "list", "packages", "-f"]).await?;
     
     // 2. Get Disabled Packages (-d)
-    let output_disabled = run_adb(device.clone(), vec!["shell", "pm", "list", "packages", "-d"]).unwrap_or_default();
+    let output_disabled = run_adb(device.clone(), vec!["shell", "pm", "list", "packages", "-d"]).await.unwrap_or_default();
     let disabled_set: std::collections::HashSet<String> = output_disabled
         .lines()
         .filter_map(|line| line.strip_prefix("package:").map(|s| s.trim().to_string()))
@@ -50,38 +50,38 @@ pub fn get_installed_packages(device: String) -> Result<Vec<PackageInfo>, String
 }
 
 #[command]
-pub fn uninstall_package(device: String, package: String) -> Result<String, String> {
-    run_adb(device, vec!["uninstall", &package])
+pub async fn uninstall_package(device: String, package: String) -> Result<String, String> {
+    run_adb(device, vec!["uninstall", &package]).await
 }
 
 #[command]
-pub fn enable_package(device: String, package: String) -> Result<String, String> {
+pub async fn enable_package(device: String, package: String) -> Result<String, String> {
     // pm enable <pkg>
-    run_adb(device, vec!["shell", "pm", "enable", &package])
+    run_adb(device, vec!["shell", "pm", "enable", &package]).await
 }
 
 #[command]
-pub fn disable_package(device: String, package: String) -> Result<String, String> {
+pub async fn disable_package(device: String, package: String) -> Result<String, String> {
     // pm disable-user --user 0 <pkg>
-    run_adb(device, vec!["shell", "pm", "disable-user", "--user", "0", &package])
+    run_adb(device, vec!["shell", "pm", "disable-user", "--user", "0", &package]).await
 }
 
 #[command]
-pub fn clear_package(device: String, package: String) -> Result<String, String> {
-    run_adb(device, vec!["shell", "pm", "clear", &package])
+pub async fn clear_package(device: String, package: String) -> Result<String, String> {
+    run_adb(device, vec!["shell", "pm", "clear", &package]).await
 }
 
 #[command]
 pub async fn install_package(device: String, path: String) -> Result<String, String> {
     // adb install -r <path>
-    run_adb(device, vec!["install", "-r", &path])
+    run_adb(device, vec!["install", "-r", &path]).await
 }
 
 #[command]
-pub fn get_focused_package(device: String) -> Result<String, String> {
+pub async fn get_focused_package(device: String) -> Result<String, String> {
     // Extract package from dumpsys window
     // Format usually: mCurrentFocus=Window{... com.package.name/com.package.name.Activity}
-    let output = run_adb(device, vec!["shell", "dumpsys", "window"])?;
+    let output = run_adb(device, vec!["shell", "dumpsys", "window"]).await?;
     
     if let Some(pos) = output.find("u0 ") {
         let rest = &output[pos + 3..];
@@ -111,24 +111,19 @@ pub fn get_focused_package(device: String) -> Result<String, String> {
 }
 
 #[command]
-pub fn launch_package(device: String, package: String) -> Result<String, String> {
-    run_adb(device, vec!["shell", "monkey", "-p", &package, "-c", "android.intent.category.LAUNCHER", "1"])
+pub async fn launch_package(device: String, package: String) -> Result<String, String> {
+    run_adb(device, vec!["shell", "monkey", "-p", &package, "-c", "android.intent.category.LAUNCHER", "1"]).await
 }
 
 #[command]
-pub fn set_stay_on(device: String, enabled: bool) -> Result<String, String> {
+pub async fn set_stay_on(device: String, enabled: bool) -> Result<String, String> {
     let mode = if enabled { "true" } else { "false" };
-    run_adb(device, vec!["shell", "svc", "power", "stayon", mode])
+    run_adb(device, vec!["shell", "svc", "power", "stayon", mode]).await
 }
 
 // Internal Helper
-fn run_adb(device: String, args: Vec<&str>) -> Result<String, String> {
-    #[cfg(target_os = "windows")]
-    let cmd = "adb"; // Rely on PATH for now or improve later
-    #[cfg(not(target_os = "windows"))]
-    let cmd = "adb";
-
-    let mut command = Command::new(cmd);
+async fn run_adb(device: String, args: Vec<&str>) -> Result<String, String> {
+    let mut command = new_tokio_command("adb");
     
     // Select device
     if !device.is_empty() {
@@ -137,14 +132,7 @@ fn run_adb(device: String, args: Vec<&str>) -> Result<String, String> {
 
     command.args(&args);
 
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        command.creation_flags(CREATE_NO_WINDOW);
-    }
-
-    let output = command.output().map_err(|e| format!("Failed to execute adb: {}", e))?;
+    let output = command.output().await.map_err(|e| format!("Failed to execute adb: {}", e))?;
 
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
