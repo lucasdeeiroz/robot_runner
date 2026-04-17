@@ -18,7 +18,7 @@ pub struct TestState(pub Arc<Mutex<HashMap<String, ProcessInfo>>>);
 use std::os::windows::process::CommandExt;
 
 /// Sends a graceful stop signal to a process.
-/// On Windows: Sends CTRL_C_EVENT to the process group.
+/// On Windows: Uses `taskkill /T` without `/F` to request termination of the process tree.
 /// On Unix: Sends SIGINT.
 fn graceful_stop(child: &mut Child, output_dir: &str) -> bool {
     // 1. Trigger Listener-based stop via file flag
