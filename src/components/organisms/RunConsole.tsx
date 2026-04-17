@@ -709,8 +709,8 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                             {(isRunning || session?.status === 'stopping') && (
                                 <div className="text-primary dark:text-primary/80 mt-4 flex items-center gap-2 text-sm italic opacity-70 animate-pulse ml-2">
                                     <ExpressiveLoading size="sm" variant="circular" />
-                                    {session?.status === 'stopping' 
-                                        ? t('run_tab.console.stopping', "Finalizando relatórios...") 
+                                    {session?.status === 'stopping'
+                                        ? t('run_tab.console.stopping', "Generating reports...")
                                         : t('run_tab.console.processing', "Processing...")}
                                 </div>
                             )}
