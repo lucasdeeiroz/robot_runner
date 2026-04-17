@@ -555,7 +555,7 @@ async fn spawn_and_monitor(
     });
 
     // Store process info
-    let info = ProcessInfo {
+    let mut info = ProcessInfo {
         child,
         output_dir: output_dir.clone(),
     };
@@ -563,6 +563,10 @@ async fn spawn_and_monitor(
     // Store process
     {
         let mut procs = state.0.lock().map_err(|e| e.to_string())?;
+        if procs.contains_key(&run_id) {
+            let _ = info.child.start_kill();
+            return Err(format!("Process with run_id '{}' already exists", run_id));
+        }
         procs.insert(run_id.clone(), info);
     }
 
