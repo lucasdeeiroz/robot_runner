@@ -314,7 +314,7 @@ export function PerformanceSubTab({
                     setShowHighImpactWarning(false);
                     if (setForceEnable) {
                         setForceEnable(true);
-                        feedback.toast.info('performance.force_enabled_msg', 'Monitoring forced during test');
+                        feedback.toast.info('performance.force_enabled_msg');
                     }
                 }}
                 title={t('performance.warning_high_impact_title', "High Impact Warning")}
