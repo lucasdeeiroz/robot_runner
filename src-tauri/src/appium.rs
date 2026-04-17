@@ -273,7 +273,8 @@ pub fn open_appium_log_terminal(app_handle: AppHandle) -> Result<(), String> {
     {
         const CREATE_NEW_CONSOLE: u32 = 0x00000010;
         let p_str = log_path.to_string_lossy().to_string();
-        let cmd_args = format!("Get-Content -Path '{}' -Wait -Tail 100", p_str);
+        // Use double quotes for PowerShell path escaping
+        let cmd_args = format!("Get-Content -Path \"{}\" -Wait -Tail 100", p_str);
         match Command::new("powershell")
             .arg("-NoExit")
             .arg("-Command")
@@ -314,30 +315,31 @@ pub fn start_appium_in_terminal(
     #[cfg(not(target_os = "windows"))]
     let cmd = "appium";
 
-    let mut command_line = format!("{} --address {} --port {}", cmd, host, port);
-
-    let trimmed_base = base_path.trim();
-    if !trimmed_base.is_empty() && trimmed_base != "/" {
-        let final_base = if trimmed_base.starts_with('/') {
-            trimmed_base.to_string()
-        } else {
-            format!("/{}", trimmed_base)
-        };
-        command_line.push_str(&format!(" --base-path {}", final_base));
-    }
-
-    if !args.trim().is_empty() {
-        command_line.push_str(&format!(" {}", args));
-    }
-
     #[cfg(target_os = "windows")]
     {
+        // Build arguments vector safely
+        let mut full_args = vec!["/c".to_string(), "start".to_string(), "cmd".to_string(), "/k".to_string()];
+        
+        let mut appium_cmd = format!("{} --address {} --port {}", cmd, host, port);
+        let trimmed_base = base_path.trim();
+        if !trimmed_base.is_empty() && trimmed_base != "/" {
+            let final_base = if trimmed_base.starts_with('/') {
+                trimmed_base.to_string()
+            } else {
+                format!("/{}", trimmed_base)
+            };
+            appium_cmd.push_str(&format!(" --base-path {}", final_base));
+        }
+        
+        // Add extra args safely by splitting them for the terminal execution
+        if !args.trim().is_empty() {
+            appium_cmd.push_str(&format!(" {}", args));
+        }
+
+        full_args.push(appium_cmd);
+
         match std::process::Command::new("cmd")
-            .arg("/c")
-            .arg("start")
-            .arg("cmd")
-            .arg("/k")
-            .arg(&command_line)
+            .args(&full_args)
             .spawn()
         {
             Ok(_) => Ok("Appium started in new terminal".to_string()),
@@ -346,11 +348,25 @@ pub fn start_appium_in_terminal(
     }
     #[cfg(not(target_os = "windows"))]
     {
+        let mut appium_cmd = format!("{} --address {} --port {}", cmd, host, port);
+        let trimmed_base = base_path.trim();
+        if !trimmed_base.is_empty() && trimmed_base != "/" {
+            let final_base = if trimmed_base.starts_with('/') {
+                trimmed_base.to_string()
+            } else {
+                format!("/{}", trimmed_base)
+            };
+            appium_cmd.push_str(&format!(" --base-path {}", final_base));
+        }
+        if !args.trim().is_empty() {
+             appium_cmd.push_str(&format!(" {}", args));
+        }
+
         match std::process::Command::new("x-terminal-emulator")
             .arg("-e")
             .arg("bash")
             .arg("-c")
-            .arg(format!("{}; exec bash", command_line))
+            .arg(format!("{}; exec bash", appium_cmd))
             .spawn()
         {
             Ok(_) => Ok("Appium started in new terminal".to_string()),

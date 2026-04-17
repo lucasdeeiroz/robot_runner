@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Virtuoso, VirtuosoHandle } from "react-virtuoso";
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
@@ -686,8 +686,8 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                             className="flex-1 w-full"
                             style={{ height: '100%', minWidth: '100%' }}
                             itemContent={(index, line) => (
-                                <div className="min-h-[1.2em] px-4 whitespace-pre-wrap font-mono text-xs text-on-surface/50 leading-tight border-l-2 border-transparent hover:border-primary/20 hover:bg-primary/5 transition-colors">
-                                    {line}
+                                <div key={index} className="min-h-[1.2em] px-4 whitespace-pre-wrap font-mono text-xs text-on-surface/50 leading-tight border-l-2 border-transparent hover:border-primary/20 hover:bg-primary/5 transition-colors">
+                                    {index} {line}
                                 </div>
                             )}
                         />
@@ -741,8 +741,8 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                                 style={{ height: '100%' }}
                                 className="custom-scrollbar"
                                 itemContent={(index, line) => (
-                                    <div className="px-3 whitespace-pre-wrap break-all opacity-80 hover:opacity-100 transition-opacity hover:bg-surface-variant/10">
-                                        {line}
+                                    <div key={index} className="px-3 whitespace-pre-wrap break-all opacity-80 hover:opacity-100 transition-opacity hover:bg-surface-variant/10">
+                                        {index} {line}
                                     </div>
                                 )}
                             />
