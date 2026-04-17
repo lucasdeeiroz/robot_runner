@@ -208,7 +208,7 @@ export function PerformanceSubTab({
                             className="bg-warning-container/10 text-on-warning-container/80 border-warning-container/20 hover:bg-warning-container/20"
                             leftIcon={<Zap size={14} />}
                         >
-                            {t('performance.force_enable', 'Force Enable')}
+                            {t('performance.actions.force_enable', 'Force Enable')}
                         </Button>
                     </div>
                 ) : !stats ? (
