@@ -123,7 +123,8 @@ export const AiButton: React.FC<AiButtonProps> = ({
         danger: "bg-on-error/20",
         secondary: "bg-outline-variant",
         ghost: "bg-outline-variant/30",
-        outline: "bg-outline-variant/30"
+        outline: "bg-outline-variant/30",
+        warning: "bg-on-warning-container/20"
     };
 
     const sizeHeights: Record<string, string> = {
@@ -144,6 +145,7 @@ export const AiButton: React.FC<AiButtonProps> = ({
                     variant === 'primary' && "bg-primary/10 hover:bg-secondary-container shadow-none border-transparent",
                     variant === 'secondary' && "bg-surface hover:bg-surface-variant/50 shadow-none border-transparent",
                     variant === 'danger' && "bg-error hover:bg-error/90 shadow-none border-transparent",
+                    variant === 'warning' && "bg-warning-container/20 hover:bg-warning-container/40 shadow-none border-transparent",
                     variant === 'outline' && "bg-transparent hover:bg-surface-variant/30 text-on-surface/80 border border-outline-variant/30 shadow-none",
                     variant === 'ghost' && "bg-transparent hover:bg-surface-variant/30 text-on-surface-variant/80 border-transparent shadow-none",
                     heightClass,
