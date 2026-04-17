@@ -35,6 +35,7 @@ export function usePerformanceRecorder(
     const [autoRefresh, setAutoRefresh] = useState(initialAutoRefresh);
     const [selectedPackage, setSelectedPackage] = useState<string>("");
     const [isLoading, setIsLoading] = useState(false);
+    const [forceEnable, setForceEnable] = useState(false);
 
     // Recording State
     const [lastSaved, setLastSaved] = useState<string | null>(null);
@@ -44,25 +45,32 @@ export function usePerformanceRecorder(
     // Fetch Stats Loop
     useEffect(() => {
         let interval: NodeJS.Timeout;
-        // Update if active AND auto-refresh is on AND (test is NOT running OR actions are allowed), OR if recording
-        const shouldUpdate = selectedDevice && ((autoRefresh && isActive && (!isTestRunning || allowActionsDuringTest)) || isRecording);
 
-        // If a test is running, we strictly pause auto-polling unless allowed.
-        const pollInterval = 2000;
+        // Condition to fetch data:
+        // 1. Device selected AND
+        // 2. (Auto-refresh + Active Screen OR Recording) AND
+        // 3. (Not a test OR allowActionsDuringTest OR forceEnable)
+        const canUpdateDuringTest = allowActionsDuringTest || forceEnable;
+        const shouldUpdate = selectedDevice && 
+                          ((autoRefresh && isActive) || isRecording) && 
+                          (!isTestRunning || canUpdateDuringTest);
+
+        // Slow down polling significantly during tests if forced to reduce impact
+        const pollInterval = (isTestRunning && forceEnable) ? 5000 : 2000;
 
         if (shouldUpdate) {
             fetchStats();
             interval = setInterval(fetchStats, pollInterval);
-        }
-        return () => clearInterval(interval);
-    }, [selectedDevice, autoRefresh, selectedPackage, isActive, isRecording, isTestRunning, allowActionsDuringTest]);
-
-    // Clear stats when test starts to show "Paused" state, UNLESS allowed
-    useEffect(() => {
-        if (isTestRunning && !allowActionsDuringTest) {
+        } else if (isTestRunning && !canUpdateDuringTest && stats) {
+            // Clear stats and error if we are paused to show the correct UI
             setStats(null);
+            setError(null);
         }
-    }, [isTestRunning, allowActionsDuringTest]);
+
+        return () => {
+            if (interval) clearInterval(interval);
+        };
+    }, [selectedDevice, autoRefresh, selectedPackage, isActive, isRecording, isTestRunning, allowActionsDuringTest, forceEnable]);
 
     const fetchStats = async () => {
         if (isLoading) return; // Prevent stacking requests
@@ -157,6 +165,8 @@ export function usePerformanceRecorder(
         lastSaved,
         setLastSaved,
         fetchStats,
-        isLoading
+        isLoading,
+        forceEnable,
+        setForceEnable
     };
 }

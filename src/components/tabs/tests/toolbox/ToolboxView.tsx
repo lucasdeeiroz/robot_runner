@@ -456,6 +456,8 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                                             onRefresh={performanceState.fetchStats}
                                             isTestRunning={isTestRunning}
                                             allowActionsDuringTest={settings.allowActionsDuringTest}
+                                            forceEnable={performanceState.forceEnable}
+                                            setForceEnable={performanceState.setForceEnable}
                                         />
                                     )}
                                     {tool === 'apps' && <AppsSubTab isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
@@ -485,6 +487,8 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                             onRefresh={performanceState.fetchStats}
                             isTestRunning={isTestRunning}
                             allowActionsDuringTest={settings.allowActionsDuringTest}
+                            forceEnable={performanceState.forceEnable}
+                            setForceEnable={performanceState.setForceEnable}
                         />
                     </div>
 

@@ -1,9 +1,10 @@
-use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
-use tauri::{Emitter, State};
+use std::process::Stdio;
+use std::process::Command;
+use tauri::{State, Emitter};
 
 // State to hold the Appium process
-pub struct AppiumState(pub Mutex<Option<Child>>);
+pub struct AppiumState(pub Mutex<Option<std::process::Child>>);
 
 #[derive(serde::Serialize, Clone)]
 pub struct AppiumStatus {
@@ -12,57 +13,63 @@ pub struct AppiumStatus {
 }
 
 #[tauri::command]
-pub fn get_appium_status(
+pub async fn get_appium_status(
     state: State<'_, AppiumState>,
     host: Option<String>,
     port: Option<u32>,
     base_path: Option<String>,
-) -> AppiumStatus {
-    let mut child_guard = match state.0.lock() {
-        Ok(guard) => guard,
-        Err(_) => {
-            return AppiumStatus {
-                running: false,
-                pid: None,
-            };
-        }
-    };
-    let (internal_running, internal_pid) = if let Some(child) = &mut *child_guard {
-        match child.try_wait() {
-            Ok(Some(_)) => {
-                *child_guard = None; // Clean up
-                (false, None)
-            }
-            Ok(None) => (true, Some(child.id())),
+    is_test_running: Option<bool>,
+) -> Result<AppiumStatus, String> {
+    let (internal_running, internal_pid) = {
+        let mut child_guard = match state.0.lock() {
+            Ok(guard) => guard,
             Err(_) => {
-                *child_guard = None;
-                (false, None)
+                return Ok(AppiumStatus {
+                    running: false,
+                    pid: None,
+                });
             }
+        };
+        if let Some(child) = &mut *child_guard {
+            match child.try_wait() {
+                Ok(Some(_)) => {
+                    *child_guard = None; // Clean up
+                    (false, None)
+                }
+                Ok(None) => (true, Some(child.id())),
+                Err(_) => {
+                    *child_guard = None;
+                    (false, None)
+                }
+            }
+        } else {
+            (false, None)
         }
-    } else {
-        (false, None)
     };
 
-    let is_ready = if let (Some(h), Some(p)) = (host, port) {
-        check_appium_ready(&h, p, base_path.as_deref().unwrap_or(""))
+    // Guard: skip network check if test is already running to avoid ADB contention
+    let is_ready = if is_test_running.unwrap_or(false) {
+        false 
+    } else if let (Some(h), Some(p)) = (host, port) {
+        check_appium_ready(&h, p, base_path.as_deref().unwrap_or("")).await
     } else {
         false
     };
 
     if is_ready {
-        AppiumStatus {
+        Ok(AppiumStatus {
             running: true,
             pid: internal_pid,
-        }
+        })
     } else {
-        AppiumStatus {
+        Ok(AppiumStatus {
             running: internal_running,
             pid: internal_pid,
-        }
+        })
     }
 }
 
-fn check_appium_ready(host: &str, port: u32, base_path: &str) -> bool {
+async fn check_appium_ready(host: &str, port: u32, base_path: &str) -> bool {
     let check_host = if host == "0.0.0.0" { "127.0.0.1" } else { host };
 
     // Normalize base path for URL construction
@@ -76,7 +83,7 @@ fn check_appium_ready(host: &str, port: u32, base_path: &str) -> bool {
 
     let url = format!("http://{}:{}{}/status", check_host, port, path);
 
-    let client = match reqwest::blocking::Client::builder()
+    let client = match reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(2))
         .connect_timeout(std::time::Duration::from_secs(1))
         .build()
@@ -85,13 +92,13 @@ fn check_appium_ready(host: &str, port: u32, base_path: &str) -> bool {
         Err(_) => return false,
     };
 
-    match client.get(&url).send() {
+    match client.get(&url).send().await {
         Ok(resp) => {
             if !resp.status().is_success() {
                 return false;
             }
             // Parse JSON to verify { "value": { "ready": true } }
-            match resp.json::<serde_json::Value>() {
+            match resp.json::<serde_json::Value>().await {
                 Ok(json) => {
                     json.get("value")
                         .and_then(|v| v.get("ready"))
@@ -235,7 +242,7 @@ pub fn start_appium_server(
 
 pub fn shutdown_appium(state: &AppiumState) {
     if let Ok(mut child_guard) = state.0.lock() {
-        if let Some(mut child) = child_guard.take() { // take() replaces with None immediately
+        if let Some(mut child) = (*child_guard).take() { // take() replaces with None immediately
              // Handle Windows Process Tree Killing
             #[cfg(target_os = "windows")]
             {

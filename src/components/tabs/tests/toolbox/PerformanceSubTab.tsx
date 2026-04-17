@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { Activity, Cpu, Battery, CircuitBoard, Play, Square, Package as PackageIcon, Eye, RefreshCw } from "lucide-react";
+import { AlertTriangle, Activity, Cpu, Battery, CircuitBoard, Play, Square, Package as PackageIcon, Eye, RefreshCw, Zap } from "lucide-react";
 import clsx from "clsx";
 import { useSettings } from "@/lib/settings";
+import { feedback } from "@/lib/feedback";
+import { WarningModal } from "@/components/organisms/WarningModal";
 
 import { FileSavedFeedback } from "@/components/molecules/FileSavedFeedback";
 import { Section } from "@/components/organisms/Section";
@@ -28,6 +30,8 @@ interface PerformanceSubTabProps {
 
     onRefresh: () => void;
     isLoading?: boolean;
+    forceEnable?: boolean;
+    setForceEnable?: (val: boolean) => void;
 }
 
 export function PerformanceSubTab({
@@ -46,10 +50,13 @@ export function PerformanceSubTab({
     allowActionsDuringTest = false,
 
     onRefresh,
-    isLoading = false
+    isLoading = false,
+    forceEnable = false,
+    setForceEnable
 }: PerformanceSubTabProps) {
     const { t } = useTranslation();
     const { settings } = useSettings();
+    const [showHighImpactWarning, setShowHighImpactWarning] = useState(false);
 
     // Responsive State
     const containerRef = useRef<HTMLDivElement>(null);
@@ -93,6 +100,15 @@ export function PerformanceSubTab({
     const appPackages = settings.tools.appPackage
         ? settings.tools.appPackage.split(',').map((p: string) => p.trim()).filter(Boolean)
         : [];
+
+    const handleToggleRecording = () => {
+        // If trying to start recording during a test without allowance
+        if (!isRecording && isTestRunning && !allowActionsDuringTest && !forceEnable) {
+            setShowHighImpactWarning(true);
+            return;
+        }
+        toggleRecording();
+    };
 
     if (!selectedDevice) {
         return <div className="p-8 text-center text-on-surface/80">{t('performance.select_device')}</div>;
@@ -152,10 +168,10 @@ export function PerformanceSubTab({
                 actions={
                     <>
                         <Button
-                            onClick={toggleRecording}
-                            variant={isRecording ? "danger" : "secondary"}
+                            onClick={handleToggleRecording}
+                            variant={isRecording ? "danger" : (forceEnable ? "warning" : "secondary")}
                             size="sm"
-                            disabled={isTestRunning && !allowActionsDuringTest}
+                            disabled={(isTestRunning && !allowActionsDuringTest && !forceEnable)}
                             leftIcon={isRecording ? <Square size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
                             title={isRecording ? t('performance.stop_record') : t('performance.start_record')}
                         >
@@ -179,10 +195,21 @@ export function PerformanceSubTab({
                     onClose={() => setLastSaved(null)}
                 />
 
-                {(isTestRunning && !allowActionsDuringTest && !stats) ? (
-                    <div className="absolute inset-0 flex-1 flex flex-col items-center justify-center text-on-surface-variant/80 text-sm">
-                        <Activity size={32} className="opacity-20 mb-2" />
-                        <p>{t('performance.status.paused_test', "Performance monitoring paused during test")}</p>
+                {(isTestRunning && !allowActionsDuringTest && !forceEnable && !stats) ? (
+                    <div className="absolute inset-0 flex-1 flex flex-col items-center justify-center text-on-surface-variant/80 text-sm p-8 text-center bg-surface/80 backdrop-blur-[2px] z-10 rounded-2xl">
+                        <Activity size={48} className="opacity-20 mb-4" />
+                        <h4 className="font-bold text-on-surface mb-2">{t('performance.status.paused_test', "Monitoring Paused")}</h4>
+                        <p className="max-w-xs mb-6 opacity-70 italic">{t('performance.paused_description', "Performance polling is disabled to avoid interference with the running test.")}</p>
+                        
+                        <Button 
+                            onClick={() => setShowHighImpactWarning(true)}
+                            variant="secondary"
+                            size="sm"
+                            className="bg-warning-container/10 text-on-warning-container/80 border-warning-container/20 hover:bg-warning-container/20"
+                            leftIcon={<Zap size={14} />}
+                        >
+                            {t('performance.force_enable', 'Force Enable')}
+                        </Button>
                     </div>
                 ) : !stats ? (
                     <div className="flex-1 flex flex-col items-center justify-center text-on-surface/80">
@@ -279,6 +306,32 @@ export function PerformanceSubTab({
                     </div>
                 )}
             </Section>
+
+            <WarningModal
+                isOpen={showHighImpactWarning}
+                onClose={() => setShowHighImpactWarning(false)}
+                onConfirm={() => {
+                    setShowHighImpactWarning(false);
+                    if (setForceEnable) {
+                        setForceEnable(true);
+                        feedback.toast.info('performance.force_enabled_msg', 'Monitoring forced during test');
+                    }
+                }}
+                title={t('performance.warning_high_impact_title', "High Impact Warning")}
+                description={
+                    <div className="space-y-3">
+                        <p className="text-warning font-bold flex items-center gap-2">
+                            <AlertTriangle size={18} />
+                            {t('performance.warning_high_impact', "Activating monitoring during a test can cause ADB congestion and lead to execution failures (Socket Hang Up).")}
+                        </p>
+                        <p className="text-sm opacity-70">
+                            {t('performance.warning_high_impact_detail', "Proceed only if investigation of performance issues is strictly necessary.")}
+                        </p>
+                    </div>
+                }
+                confirmText={t('performance.actions.force_enable', "Force Enable")}
+                variant="danger"
+            />
         </div>
     );
 }

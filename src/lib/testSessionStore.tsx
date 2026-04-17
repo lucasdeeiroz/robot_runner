@@ -289,7 +289,8 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
             if (fw !== 'maestro') {
                 const status = await invoke<{ running: boolean }>('get_appium_status', {
                     host: settings.appiumHost,
-                    port: Number(settings.appiumPort)
+                    port: Number(settings.appiumPort),
+                    is_test_running: false // Just starting
                 });
                 if (!status.running) {
                     await invoke('start_appium_server', {

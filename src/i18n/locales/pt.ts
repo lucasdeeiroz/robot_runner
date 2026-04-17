@@ -821,8 +821,16 @@ export const pt = {
             app_stats: "Desempenho do Aplicativo",
             auto: "Auto",
             na: "N/D",
+            warning_high_impact: "Ativar o monitoramento durante um teste pode causar congestionamento no ADB e levar a falhas de execução (Socket Hang Up).",
+            warning_high_impact_title: "Aviso de Alto Impacto",
+            warning_high_impact_detail: "Prossiga apenas se a investigação de problemas de desempenho for estritamente necessária.",
+            force_enabled_msg: "Monitoramento forçado durante o teste",
+            paused_description: "A coleta de performance está desativada para evitar interferência no teste em execução.",
             status: {
-                paused_test: "Monitoramento de performance pausado durante o teste"
+                paused_test: "Monitoramento Pausado"
+            },
+            actions: {
+                force_enable: "Forçar Ativação"
             }
         },
         run_tab: {

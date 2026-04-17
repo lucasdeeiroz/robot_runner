@@ -822,8 +822,16 @@ export const en = {
             app_stats: "App Performance",
             auto: "Auto",
             na: "N/A",
+            warning_high_impact: "Activating monitoring during a test can cause ADB congestion and lead to execution failures (Socket Hang Up).",
+            warning_high_impact_title: "High Impact Warning",
+            warning_high_impact_detail: "Proceed only if investigation of performance issues is strictly necessary.",
+            force_enabled_msg: "Monitoring forced during test",
+            paused_description: "Performance polling is disabled to avoid interference with the running test.",
             status: {
-                paused_test: "Performance monitoring paused during test"
+                paused_test: "Monitoring Paused"
+            },
+            actions: {
+                force_enable: "Force Enable"
             }
         },
         run_tab: {
