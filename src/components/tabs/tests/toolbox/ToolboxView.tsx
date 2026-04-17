@@ -9,6 +9,7 @@ import { useTranslation } from "react-i18next";
 import { CommandsSubTab } from "./CommandsSubTab";
 import { PerformanceSubTab } from "./PerformanceSubTab";
 import { RunConsole } from "@/components/organisms/RunConsole";
+import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 import { TestSession, useTestSessions } from "@/lib/testSessionStore";
 import { feedback } from "@/lib/feedback";
 import { FileSavedFeedback } from "@/components/molecules/FileSavedFeedback";
@@ -357,18 +358,23 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
 
                         {session.type === 'test' && (
                             <>
-                                {session.status === 'running' && (
+                                {(session.status === 'running' || session.status === 'stopping') && (
                                     <Button
                                         onClick={() => stopSession(session.runId)}
                                         variant="danger"
                                         size="sm"
-                                        leftIcon={<StopCircle size={16} />}
-                                        title={t('toolbox.actions.stop_execution')}
+                                        disabled={session.status === 'stopping'}
+                                        leftIcon={session.status === 'stopping' ? <ExpressiveLoading size="xsm" variant="circular" /> : <StopCircle size={16} />}
+                                        title={session.status === 'stopping' ? t('toolbox.actions.stopping') : t('toolbox.actions.stop_execution')}
                                     >
-                                        {!isCompact && !isNarrow && t('toolbox.actions.stop_execution')}
+                                        {!isCompact && !isNarrow && (
+                                            session.status === 'stopping'
+                                                ? t('toolbox.actions.stopping', "Stopping...")
+                                                : t('toolbox.actions.stop_execution')
+                                        )}
                                     </Button>
                                 )}
-                                {session.status !== 'running' && (
+                                {session.status !== 'running' && session.status !== 'stopping' && (
                                     <div className="flex items-center">
                                         <SplitButton
                                             variant="primary"
@@ -445,7 +451,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                                     maximizeLabel={t('common.maximize')}
                                 >
                                     {tool === 'console' && (
-                                        <RunConsole key={`console-${session.runId}-${session.sessionEpoch}`} runId={session.runId} logs={session.logs} isSessionRunning={session.status === 'running'} testPath={session.testPath} />
+                                        <RunConsole key={`console-${session.runId}-${session.sessionEpoch}`} runId={session.runId} logs={session.logs} isSessionRunning={session.status === 'running' || session.status === 'stopping'} testPath={session.testPath} />
                                     )}
                                     {tool === 'logcat' && <LogcatSubTab key={session.deviceUdid} selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
                                     {tool === 'commands' && <CommandsSubTab selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
@@ -456,6 +462,8 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                                             onRefresh={performanceState.fetchStats}
                                             isTestRunning={isTestRunning}
                                             allowActionsDuringTest={settings.allowActionsDuringTest}
+                                            forceEnable={performanceState.forceEnable}
+                                            setForceEnable={performanceState.setForceEnable}
                                         />
                                     )}
                                     {tool === 'apps' && <AppsSubTab isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
@@ -467,7 +475,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
             ) : (
                 <div className="h-full flex-1 min-h-0 bg-surface border border-outline-variant/30 rounded-2xl overflow-hidden relative">
                     <div className={clsx("h-full flex-1 min-h-0 flex flex-col overflow-hidden", activeTool === 'console' && session.type === 'test' ? "flex" : "hidden")}>
-                        <RunConsole key={`console-${session.runId}-${session.sessionEpoch}`} runId={session.runId} logs={session.logs} isSessionRunning={session.status === 'running'} testPath={session.testPath} />
+                        <RunConsole key={`console-${session.runId}-${session.sessionEpoch}`} runId={session.runId} logs={session.logs} isSessionRunning={session.status === 'running' || session.status === 'stopping'} testPath={session.testPath} />
                     </div>
 
                     <div className={clsx("h-full flex-1 min-h-0 flex flex-col", activeTool === 'logcat' ? "flex" : "hidden")}>
@@ -485,6 +493,8 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                             onRefresh={performanceState.fetchStats}
                             isTestRunning={isTestRunning}
                             allowActionsDuringTest={settings.allowActionsDuringTest}
+                            forceEnable={performanceState.forceEnable}
+                            setForceEnable={performanceState.setForceEnable}
                         />
                     </div>
 

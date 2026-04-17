@@ -19,7 +19,7 @@ interface AiResponseProps {
     variant?: 'primary' | 'error';
 }
 
-export const AiResponse: React.FC<AiResponseProps> = ({
+export const AiResponse: React.FC<AiResponseProps> = React.memo(({
     title,
     responseTitle,
     response,
@@ -174,4 +174,4 @@ export const AiResponse: React.FC<AiResponseProps> = ({
             </motion.div>
         </AnimatePresence>
     );
-};
+});

@@ -146,7 +146,8 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                 const status = await invoke<{ running: boolean }>('get_appium_status', {
                     host: settings.appiumHost,
                     port: Number(settings.appiumPort),
-                    base_path: settings.appiumBasePath
+                    base_path: settings.appiumBasePath,
+                    is_test_running: false // Checking before start
                 });
                 if (!status.running) {
                     setLaunchStatus(t('tests.status.starting'));
@@ -163,7 +164,8 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                         const s = await invoke<{ running: boolean }>('get_appium_status', {
                             host: settings.appiumHost,
                             port: Number(settings.appiumPort),
-                            base_path: settings.appiumBasePath
+                            base_path: settings.appiumBasePath,
+                            is_test_running: false
                         });
                         if (s.running) {
                             isReady = true;

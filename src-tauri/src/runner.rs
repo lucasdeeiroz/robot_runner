@@ -1,42 +1,95 @@
 use chrono;
+use serde::Serialize;
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader};
-use std::process::{Child, Command, Stdio};
-use std::sync::Mutex;
-use std::thread;
-use std::time::Duration;
-use tauri::{AppHandle, Emitter, Manager, State};
+use std::sync::{Arc, Mutex};
+use std::process::Stdio;
+use tauri::{AppHandle, Emitter, State};
+use tokio::io::AsyncBufReadExt;
+use tokio::process::{Child, Command};
 
-pub struct TestState(pub Mutex<HashMap<String, Child>>);
+pub struct ProcessInfo {
+    pub child: Child,
+    pub output_dir: String,
+}
 
-#[tauri::command]
-pub async fn stop_test(state: State<'_, TestState>, run_id: String) -> Result<String, String> {
-    let mut procs = state.0.lock().map_err(|e| e.to_string())?;
+pub struct TestState(pub Arc<Mutex<HashMap<String, ProcessInfo>>>);
 
-    if let Some(child) = procs.get_mut(&run_id) {
-        let pid = child.id();
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 
+/// Sends a graceful stop signal to a process.
+/// On Windows: Uses `taskkill /T` without `/F` to request termination of the process tree.
+/// On Unix: Sends SIGINT.
+fn graceful_stop(child: &mut Child, output_dir: &str) -> bool {
+    // 1. Trigger Listener-based stop via file flag
+    let stop_file = std::path::Path::new(output_dir).join("stop.flag");
+    if let Ok(_) = std::fs::File::create(&stop_file) {
+        println!("[System] Created stop.flag in {}", output_dir);
+    }
+
+    if let Some(pid) = child.id() {
         #[cfg(target_os = "windows")]
         {
-            use std::os::windows::process::CommandExt;
-            let _ = Command::new("taskkill")
-                .args(&["/F", "/T", "/PID", &pid.to_string()])
-                .creation_flags(0x08000000)
-                .output();
+            // Windows Fallback: taskkill /T (Tree) WITHOUT /F (Force)
+            // This sends a WM_CLOSE or similar close request to GUI apps and handles console apps politely.
+            let _ = std::process::Command::new("taskkill")
+                .arg("/T")
+                .arg("/PID")
+                .arg(pid.to_string())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .spawn();
+            
+            return true;
         }
 
         #[cfg(not(target_os = "windows"))]
         {
-            let _ = Command::new("kill")
-                .args(&["-9", &pid.to_string()])
-                .output();
+            unsafe {
+                if libc::kill(pid as i32, libc::SIGINT) == 0 {
+                    return true;
+                }
+            }
         }
-        
-        // Final fallback
-        let _ = child.kill(); 
-        return Ok(format!("Test {} stopped", run_id));
     }
-    Err(format!("Test {} not running", run_id))
+    false
+}
+
+#[tauri::command]
+pub async fn stop_test(state: State<'_, TestState>, run_id: String) -> Result<String, String> {
+    let signalled = {
+        let mut procs = state.0.lock().map_err(|e| e.to_string())?;
+        if let Some(info) = procs.get_mut(&run_id) {
+            graceful_stop(&mut info.child, &info.output_dir)
+        } else {
+            return Err(format!("No running test found for id: {}", run_id));
+        }
+    };
+
+    // Step 2: Spawn a background watchdog for 10s timeout
+    let state_wd = state.0.clone();
+    let rid_wd = run_id.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+        
+        let mut procs = match state_wd.lock() {
+            Ok(p) => p,
+            Err(_) => return,
+        };
+
+    if let Some(info) = procs.get_mut(&rid_wd) {
+            // Still alive after 10s? Hard kill.
+            let _ = info.child.start_kill();
+            // Note: We leave it in the map, the monitor loop will handle removal 
+            // and event emission when it detects the exit.
+        }
+    });
+
+    if signalled {
+        Ok(format!("Graceful stop signal sent to test {}", run_id))
+    } else {
+        Ok(format!("Could not signal test {}, falling back to kill after timeout", run_id))
+    }
 }
 
 pub fn shutdown_all_tests(state: &State<'_, TestState>) {
@@ -48,27 +101,29 @@ pub fn shutdown_all_tests(state: &State<'_, TestState>) {
         }
     };
 
-    for (run_id, child) in procs.iter_mut() {
-        let pid = child.id();
-        println!("Shutting down robot test {} (PID: {})", run_id, pid);
+    for (run_id, info) in procs.iter_mut() {
+        if let Some(pid) = info.child.id() {
+            println!("Shutting down robot test {} (PID: {})", run_id, pid);
 
-        #[cfg(target_os = "windows")]
-        {
-            use std::os::windows::process::CommandExt;
-            let _ = Command::new("taskkill")
-                .args(&["/F", "/T", "/PID", &pid.to_string()])
-                .creation_flags(0x08000000)
-                .output();
-        }
+            #[cfg(target_os = "windows")]
+            {
+                // Try graceful first even in shutdown, but with a shorter path if needed
+                // For global shutdown, taskkill is safer to ensure everything dies
+                let _ = std::process::Command::new("taskkill")
+                    .args(&["/F", "/T", "/PID", &pid.to_string()])
+                    .creation_flags(0x08000000)
+                    .output();
+            }
 
-        #[cfg(not(target_os = "windows"))]
-        {
-            let _ = Command::new("kill")
-                .args(&["-9", &pid.to_string()])
-                .output();
+            #[cfg(not(target_os = "windows"))]
+            {
+                let _ = std::process::Command::new("kill")
+                    .args(&["-9", &pid.to_string()])
+                    .output();
+            }
         }
         
-        let _ = child.kill();
+        let _ = info.child.start_kill();
     }
     procs.clear();
 }
@@ -82,11 +137,12 @@ struct TestOutput {
 #[derive(serde::Serialize, Clone)]
 struct TestFinished {
     run_id: String,
+    success: bool,
     status: String,
 }
 
 #[tauri::command]
-pub fn run_robot_test(
+pub async fn run_robot_test(
     app: AppHandle,
     state: State<'_, TestState>,
     run_id: String,
@@ -114,12 +170,23 @@ pub fn run_robot_test(
         })
         .unwrap_or_else(|_| output_dir.clone());
 
+    // Cleanup any stale stop flag before starting the test
+    let stop_file_init = std::path::Path::new(&abs_output_dir).join("stop.flag");
+    if stop_file_init.exists() {
+        let _ = std::fs::remove_file(stop_file_init);
+    }
+
     let mut args = vec!["-d", &abs_output_dir, "--console", "verbose"];
 
     // Inject LiveConsoleListener to force real-time stdout updates for test names
     let listener_path = std::path::Path::new(&abs_output_dir).join("LiveConsoleListener.py");
     let listener_code = r#"
 import sys
+import os
+import threading
+import time
+import _thread
+from robot.libraries.BuiltIn import BuiltIn
 
 ROBOT_LISTENER_API_VERSION = 2
 
@@ -138,6 +205,23 @@ def start_test(name, attrs):
 def end_test(name, attrs):
     sys.stdout.write(f"\n[RR-TEST-END] {name} | {attrs['status']}\n")
     sys.stdout.flush()
+
+def start_keyword(name, attrs):
+    pass
+
+def _monitor_stop():
+    # Check for stop signal in the same directory as the listener
+    stop_file = os.path.join(os.path.dirname(__file__), "stop.flag")
+    while True:
+        if os.path.exists(stop_file):
+            # Inject a KeyboardInterrupt into the main thread
+            _thread.interrupt_main()
+            break
+        time.sleep(0.5)
+
+# Start background monitor thread
+t = threading.Thread(target=_monitor_stop, daemon=True)
+t.start()
 "#;
     // Ensure dir exists before writing and fail clearly if we cannot set up the listener
     std::fs::create_dir_all(&abs_output_dir)
@@ -214,35 +298,29 @@ def end_test(name, attrs):
     }
 
     // Write metadata.json for history
+    #[derive(Serialize)]
+    struct RunMetadata {
+        run_id: String,
+        device_udid: String,
+        test_path: String,
+        timestamp: String,
+        device_model: String,
+        android_version: String,
+    }
+
+    let metadata = RunMetadata {
+        run_id: run_id.clone(),
+        device_udid: device.clone().unwrap_or_else(|| "Local/Unknown".to_string()),
+        test_path: test_path.clone().unwrap_or_default(),
+        timestamp: chrono::Local::now().to_rfc3339(),
+        device_model: device_model.unwrap_or_default(),
+        android_version: android_version.unwrap_or_default(),
+    };
+
     let metadata_path = std::path::Path::new(&abs_output_dir).join("metadata.json");
-    let meta_device = device.clone().unwrap_or("Local/Unknown".to_string());
-    let meta_model = device_model.unwrap_or_default();
-    let meta_version = android_version.unwrap_or_default();
-
-    // Simple JSON construction format!
-    let metadata_json = format!(
-        r#"{{
-            "run_id": "{}",
-            "device_udid": "{}",
-            "test_path": "{}",
-            "timestamp": "{}",
-            "device_model": "{}",
-            "android_version": "{}"
-        }}"#,
-        run_id,
-        meta_device.replace("\\", "\\\\").replace("\"", "\\\""),
-        test_path
-            .clone()
-            .unwrap_or_default()
-            .replace("\\", "\\\\")
-            .replace("\"", "\\\""),
-        chrono::Local::now().to_rfc3339(),
-        meta_model.replace("\\", "\\\\").replace("\"", "\\\""),
-        meta_version.replace("\\", "\\\\").replace("\"", "\\\"")
-    );
-
-    // Create dir if not exists (already created above for listener, but safe to repeat or omit)
-    let _ = std::fs::write(metadata_path, metadata_json);
+    if let Ok(json) = serde_json::to_string_pretty(&metadata) {
+        let _ = std::fs::write(metadata_path, json);
+    }
 
     let mut cmd = Command::new("python");
     cmd.env("PYTHONIOENCODING", "utf-8");
@@ -250,11 +328,11 @@ def end_test(name, attrs):
     cmd.arg("-m").arg("robot");
     cmd.args(&args);
 
-    spawn_and_monitor(app, state, run_id, cmd, working_dir)
+    spawn_and_monitor(app, state, run_id, cmd, working_dir, abs_output_dir).await
 }
 
 #[tauri::command]
-pub fn run_maestro_test(
+pub async fn run_maestro_test(
     app: AppHandle,
     state: State<'_, TestState>,
     run_id: String,
@@ -279,19 +357,25 @@ pub fn run_maestro_test(
     }
     
     // Metadata
+    #[derive(Serialize)]
+    struct RunMetadata {
+        run_id: String,
+        framework: String,
+        test_path: String,
+        timestamp: String,
+    }
+
+    let metadata = RunMetadata {
+        run_id: run_id.clone(),
+        framework: "maestro".to_string(),
+        test_path: test_path.clone(),
+        timestamp: chrono::Local::now().to_rfc3339(),
+    };
+
     let metadata_path = std::path::Path::new(&abs_output_dir).join("metadata.json");
-    let metadata_json = format!(
-        r#"{{
-            "run_id": "{}",
-            "framework": "maestro",
-            "test_path": "{}",
-            "timestamp": "{}"
-        }}"#,
-        run_id,
-        test_path.replace("\\", "\\\\").replace("\"", "\\\""),
-        chrono::Local::now().to_rfc3339()
-    );
-    let _ = std::fs::write(metadata_path, metadata_json);
+    if let Ok(json) = serde_json::to_string_pretty(&metadata) {
+        let _ = std::fs::write(metadata_path, json);
+    }
 
     let mut cmd_args = vec![];
     
@@ -338,11 +422,11 @@ pub fn run_maestro_test(
 
     cmd.env("JAVA_TOOL_OPTIONS", "-Dfile.encoding=UTF-8");
 
-    spawn_and_monitor(app, state, run_id, cmd, working_dir)
+    spawn_and_monitor(app, state, run_id, cmd, working_dir, abs_output_dir).await
 }
 
 #[tauri::command]
-pub fn run_appium_test(
+pub async fn run_appium_test(
     app: AppHandle,
     state: State<'_, TestState>,
     run_id: String,
@@ -361,17 +445,23 @@ pub fn run_appium_test(
     let _ = std::fs::create_dir_all(&abs_output_dir);
 
     // Metadata
+    #[derive(Serialize)]
+    struct RunMetadata {
+        run_id: String,
+        framework: String,
+        timestamp: String,
+    }
+
+    let metadata = RunMetadata {
+        run_id: run_id.clone(),
+        framework: "appium".to_string(),
+        timestamp: chrono::Local::now().to_rfc3339(),
+    };
+
     let metadata_path = std::path::Path::new(&abs_output_dir).join("metadata.json");
-    let metadata_json = format!(
-        r#"{{
-            "run_id": "{}",
-            "framework": "appium",
-            "timestamp": "{}"
-        }}"#,
-        run_id,
-        chrono::Local::now().to_rfc3339()
-    );
-    let _ = std::fs::write(metadata_path, metadata_json);
+    if let Ok(json) = serde_json::to_string_pretty(&metadata) {
+        let _ = std::fs::write(metadata_path, json);
+    }
 
     let mut cmd;
     #[cfg(target_os = "windows")]
@@ -398,15 +488,16 @@ pub fn run_appium_test(
 
     cmd.env("JAVA_TOOL_OPTIONS", "-Dfile.encoding=UTF-8");
 
-    spawn_and_monitor(app, state, run_id, cmd, Some(abs_project_path))
+    spawn_and_monitor(app, state, run_id, cmd, Some(abs_project_path), abs_output_dir).await
 }
 
-fn spawn_and_monitor(
+async fn spawn_and_monitor(
     app: AppHandle,
     state: State<'_, TestState>,
     run_id: String,
     mut cmd: Command,
     working_dir: Option<String>,
+    output_dir: String,
 ) -> Result<String, String> {
     if let Some(wd) = working_dir {
         if !wd.is_empty() {
@@ -416,124 +507,123 @@ fn spawn_and_monitor(
 
     #[cfg(target_os = "windows")]
     {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        // 0x00000200 = CREATE_NEW_PROCESS_GROUP
+        // 0x08000000 = CREATE_NO_WINDOW
+        // Isolate process group for better management
+        cmd.creation_flags(0x00000200 | 0x08000000);
     }
 
-    let mut child = cmd
+    let child = cmd
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("Failed to spawn process: {}", e))?;
 
+    let mut child = child;
     let stdout = child.stdout.take().ok_or("Failed to open stdout")?;
     let stderr = child.stderr.take().ok_or("Failed to open stderr")?;
 
-    // Streaming threads
+    // Streaming tasks
     let app_handle = app.clone();
     let rid = run_id.clone();
-    thread::spawn(move || {
-        let mut reader = BufReader::new(stdout);
-        let mut buf = Vec::new();
-        while let Ok(n) = reader.read_until(b'\n', &mut buf) {
-            if n == 0 {
-                break;
-            }
-            let line = String::from_utf8_lossy(&buf).to_string();
+    tokio::spawn(async move {
+        let mut reader = tokio::io::BufReader::new(stdout).lines();
+        while let Ok(Some(line)) = reader.next_line().await {
             let _ = app_handle.emit(
                 "test-output",
                 TestOutput {
                     run_id: rid.clone(),
-                    message: line.trim_end().to_string(),
+                    message: line,
                 },
             );
-            buf.clear();
         }
     });
 
     let app_handle_err = app.clone();
     let rid_err = run_id.clone();
-    thread::spawn(move || {
-        let mut reader = BufReader::new(stderr);
-        let mut buf = Vec::new();
-        while let Ok(n) = reader.read_until(b'\n', &mut buf) {
-            if n == 0 {
-                break;
-            }
-            let line = String::from_utf8_lossy(&buf).to_string();
+    tokio::spawn(async move {
+        let mut reader = tokio::io::BufReader::new(stderr).lines();
+        while let Ok(Some(line)) = reader.next_line().await {
             let _ = app_handle_err.emit(
                 "test-output",
                 TestOutput {
                     run_id: rid_err.clone(),
-                    message: format!("STDERR: {}", line.trim_end()),
+                    message: line,
                 },
             );
-            buf.clear();
         }
     });
 
-    // Store child in state
+    // Store process info
+    let mut info = ProcessInfo {
+        child,
+        output_dir: output_dir.clone(),
+    };
+
+    // Store process
     {
         let mut procs = state.0.lock().map_err(|e| e.to_string())?;
         if procs.contains_key(&run_id) {
-            return Err(format!("Run ID {} already exists", run_id));
+            let _ = info.child.start_kill();
+            return Err(format!("Process with run_id '{}' already exists", run_id));
         }
-        procs.insert(run_id.clone(), child);
+        procs.insert(run_id.clone(), info);
     }
 
-    // Monitoring thread
-    let app_handle_finish = app.clone();
-    let rid_monitor = run_id.clone();
-
-    thread::spawn(move || {
+    // Monitor for finish (Async Polling)
+    let app_handle_mon = app.clone();
+    let rid_mon = run_id.clone();
+    let state_mon = state.0.clone();
+    
+    tokio::spawn(async move {
+        let mut final_status: Option<std::process::ExitStatus> = None;
         loop {
-            thread::sleep(Duration::from_millis(500));
-
-            let state = app_handle_finish.state::<TestState>();
-            let mut procs: std::sync::MutexGuard<HashMap<String, Child>> = match state.0.lock() {
-                Ok(g) => g,
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+            
+            let mut procs = match state_mon.lock() {
+                Ok(p) => p,
                 Err(_) => break,
             };
 
-            // Check if process exists and is running
-            let mut finished = false;
-            let mut status_msg = String::new();
-
-            if let Some(child) = procs.get_mut(&rid_monitor) {
-                match child.try_wait() {
+            if let Some(info) = procs.get_mut(&rid_mon) {
+                match info.child.try_wait() {
                     Ok(Some(status)) => {
-                        finished = true;
-                        status_msg = format!("Exit Code: {}", status);
+                        final_status = Some(status);
+                        
+                        // Cleanup stop signal if it exists
+                        let stop_file = std::path::Path::new(&info.output_dir).join("stop.flag");
+                        if stop_file.exists() {
+                            let _ = std::fs::remove_file(stop_file);
+                        }
+
+                        procs.remove(&rid_mon);
+                        break;
                     }
                     Ok(None) => {} // Still running
-                    Err(e) => {
-                        finished = true;
-                        status_msg = format!("Error checking status: {}", e);
+                    Err(_) => {
+                        procs.remove(&rid_mon);
+                        break;
                     }
                 }
             } else {
-                // Removed from map (stopped externally)
-                break;
+                break; // Process removed or stopped elsewhere
             }
+        }
 
-            if finished {
-                // Remove from map
-                procs.remove(&rid_monitor);
-                drop(procs);
-
-                let _ = app_handle_finish.emit(
-                    "test-finished",
-                    TestFinished {
-                        run_id: rid_monitor,
-                        status: status_msg,
-                    },
-                );
-                break;
-            }
+        if let Some(status) = final_status {
+            let code = status.code().unwrap_or(-1);
+            let _ = app_handle_mon.emit(
+                "test-finished",
+                TestFinished {
+                    run_id: rid_mon,
+                    success: status.success(),
+                    status: format!("Process finished with exit code: {}", code),
+                },
+            );
         }
     });
 
-    Ok("Started".to_string())
+    Ok(run_id)
 }
 
 #[tauri::command]

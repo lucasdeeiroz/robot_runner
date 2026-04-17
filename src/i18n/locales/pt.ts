@@ -513,6 +513,37 @@ export const pt = {
                 ai_rationale: "Justificativa da IA",
                 rationale: "Justificativa",
                 ai_error_generic: "Falha na sugestão de IA."
+            },
+            recorder: {
+                title: "Gravador de Passos",
+                start: "Iniciar Gravação",
+                stop: "Parar Gravação",
+                steps: "Passos Gravados",
+                clear: "Limpar Passos",
+                copy: "Copiar Código",
+                empty: "Nenhum passo gravado ainda",
+                actions: {
+                    tap: "Toque",
+                    double_tap: "Toque Duplo",
+                    long_press: "Toque Longo",
+                    swipe: "Deslizar",
+                    drag_drop: "Arrastar e Soltar"
+                },
+                directions: {
+                    up: "Para Cima",
+                    down: "Para Baixo",
+                    left: "Para Esquerda",
+                    right: "Para Direita"
+                },
+                params: {
+                    duration: "Duração (ms)",
+                    offset_x: "Offset X",
+                    offset_y: "Offset Y",
+                    start_offset: "Margem Inicial %",
+                    end_offset: "Margem Final %"
+                },
+                selection: "Seleção Ativa",
+                siblings: "Nós Alternativos (Mesma posição)"
             }
         },
         logcat: {
@@ -538,7 +569,10 @@ export const pt = {
             clear: "Limpar Logs",
             lines: "linhas",
             no_logs: "Nenhum log capturado",
-            select_device: "Selecione um dispositivo para ver logs"
+            select_device: "Selecione um dispositivo para ver logs",
+            ai_analyze_button: "Analisar com IA",
+            ai_analysis_title: "Resultado da Análise",
+            analyzing: "Analisando logs..."
         },
         mapper: {
             title: "Mapeador",
@@ -787,8 +821,16 @@ export const pt = {
             app_stats: "Desempenho do Aplicativo",
             auto: "Auto",
             na: "N/D",
+            warning_high_impact: "Ativar o monitoramento durante um teste pode causar congestionamento no ADB e levar a falhas de execução (Socket Hang Up).",
+            warning_high_impact_title: "Aviso de Alto Impacto",
+            warning_high_impact_detail: "Prossiga apenas se a investigação de problemas de desempenho for estritamente necessária.",
+            force_enabled_msg: "Monitoramento forçado durante o teste",
+            paused_description: "A coleta de performance está desativada para evitar interferência no teste em execução.",
             status: {
-                paused_test: "Monitoramento de performance pausado durante o teste"
+                paused_test: "Monitoramento Pausado"
+            },
+            actions: {
+                force_enable: "Forçar Ativação"
             }
         },
         run_tab: {
@@ -815,9 +857,11 @@ export const pt = {
                 pass: "SUCESSO",
                 fail: "FALHA",
                 not_run: "NÃO EXECUTADO",
+                interrupted: "INTERROMPIDO",
                 fancy_mode: "Modo Decorado",
                 raw_mode: "Modo Texto (Raw)",
                 running: "EXECUTANDO",
+                stopping: "Finalizando relatórios...",
                 processing: "Processando...",
                 test_summary: "{{total}} TESTES: {{passed}} COM SUCESSO, {{failed}} COM FALHA",
                 waiting: "Aguardando logs...",
@@ -1211,6 +1255,7 @@ export const pt = {
                 start_recording: "Gravar Tela",
                 stop_recording: "Parar Gravação",
                 stop_execution: "Parar Execução",
+                stopping: "Parando...",
                 rerun: "Re-executar",
                 switch_to_grid: "Alternar para Grade",
                 switch_to_tabs: "Alternar para Abas",

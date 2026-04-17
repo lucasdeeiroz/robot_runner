@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Virtuoso, VirtuosoHandle } from "react-virtuoso";
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
 import { Star, ExternalLink, FileOutput, Eye, EyeOff, Terminal, X } from "lucide-react";
@@ -42,11 +43,9 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
     const [summary, setSummary] = useState<string | null>(null);
     const [summaryError, setSummaryError] = useState<string | null>(null);
 
+    const virtuosoRef = useRef<VirtuosoHandle>(null);
+    const debugVirtuosoRef = useRef<VirtuosoHandle>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    const debugContainerRef = useRef<HTMLDivElement>(null);
-
-    // Incremental Parsing State
-    // Incremental Parsing State initialized from session store
     const [tree, setTree] = useState<LogNode[]>(() => session?.repopulatedTree ? [session.repopulatedTree] : []);
     const [artifactPaths, setArtifactPaths] = useState(() => session?.artifactPaths || {});
 
@@ -60,23 +59,18 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
         }
     }, [session?.repopulatedTree, session?.artifactPaths]);
 
-    // Auto-scroll on new logs with stick-to-bottom logic
+    // Auto-scroll logic for tree (Non-virtualized part)
     useEffect(() => {
-        if (!stickToBottom) return;
-
-        // Reset scroll lock if a new session starts
-        if (logs.length < 5 && !stickToBottom) setStickToBottom(true);
-
-        const el = containerRef.current;
-        const debugEl = debugContainerRef.current;
-
-        // Small timeout to allow the latest tree nodes to render
-        const timer = setTimeout(() => {
-            if (el) el.scrollTop = el.scrollHeight;
-            if (debugEl) debugEl.scrollTop = debugEl.scrollHeight;
-        }, 120);
-        return () => clearTimeout(timer);
-    }, [logs, tree, isRunning, isRawMode, stickToBottom, showDebugConsole]);
+        if (!isRawMode && stickToBottom && !showDebugConsole) {
+            const el = containerRef.current;
+            if (el) {
+                const timer = setTimeout(() => {
+                    el.scrollTop = el.scrollHeight;
+                }, 100);
+                return () => clearTimeout(timer);
+            }
+        }
+    }, [tree, isRawMode, stickToBottom, showDebugConsole]);
 
     // Keep Screen Awake Lifecycle
     useEffect(() => {
@@ -674,16 +668,29 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
             <div className="flex-1 min-h-0 flex flex-col relative">
                 <div
                     ref={containerRef}
-                    onScroll={onScroll}
-                    className="h-full flex-1 min-h-0 flex flex-col bg-surface overflow-y-auto p-4 font-mono text-xs custom-scrollbar relative"
+                    onScroll={!isRawMode ? onScroll : undefined}
+                    className={clsx(
+                        "h-full flex-1 min-h-0 flex flex-col bg-surface overflow-y-auto font-mono text-xs custom-scrollbar relative",
+                        !isRawMode && "p-4"
+                    )}
                 >
                     {logs.length === 0 && (
-                        <div className="text-on-surface-variant/80 italic opacity-50 select-none pb-4">{t('run_tab.console.waiting')}</div>
+                        <div className="text-on-surface-variant/80 italic opacity-50 select-none pb-4 p-4">{t('run_tab.console.waiting')}</div>
                     )}
                     {isRawMode ? (
-                        <div className="on-primary space-pre-wrap font-mono text-xs text-on-surface/50 leading-tight">
-                            {logs.map((line, i) => <div key={i} className="min-h-[1.2em]">{line}</div>)}
-                        </div>
+                        <Virtuoso
+                            ref={virtuosoRef}
+                            data={logs}
+                            followOutput={stickToBottom}
+                            atBottomStateChange={setStickToBottom}
+                            className="flex-1 w-full"
+                            style={{ height: '100%', minWidth: '100%' }}
+                            itemContent={(index, line) => (
+                                <div key={index} className="min-h-[1.2em] px-4 whitespace-pre-wrap font-mono text-xs text-on-surface/50 leading-tight border-l-2 border-transparent hover:border-primary/20 hover:bg-primary/5 transition-colors">
+                                    {index} {line}
+                                </div>
+                            )}
+                        />
                     ) : (
                         <div className="relative z-10 w-full mb-8">
                             {(summary || isSummarizing || summaryError) && (
@@ -699,10 +706,12 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                                 </div>
                             )}
                             {tree.map(node => <LogTree key={node.id} node={node} dbPath={session?.parsedDbPath} />)}
-                            {isRunning && (
+                            {(isRunning || session?.status === 'stopping') && (
                                 <div className="text-primary dark:text-primary/80 mt-4 flex items-center gap-2 text-sm italic opacity-70 animate-pulse ml-2">
                                     <ExpressiveLoading size="sm" variant="circular" />
-                                    {t('run_tab.console.processing', "Processing...")}
+                                    {session?.status === 'stopping'
+                                        ? t('run_tab.console.stopping', "Generating reports...")
+                                        : t('run_tab.console.processing', "Processing...")}
                                 </div>
                             )}
                             {!isRunning && reparseLoading && (
@@ -724,14 +733,21 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                             </button>
                         </div>
                         <div
-                            ref={debugContainerRef}
-                            className="flex-1 overflow-y-auto p-2 font-mono text-[10px] text-on-surface-variant/70 leading-tight select-text custom-scrollbar"
+                            className="flex-1 overflow-hidden font-mono text-[10px] text-on-surface-variant/70 leading-tight select-text"
                         >
-                            {logs.map((line, i) => (
-                                <div key={i} className="whitespace-pre-wrap break-all opacity-80 hover:opacity-100 transition-opacity">
-                                    {line}
-                                </div>
-                            ))}
+                            <Virtuoso
+                                ref={debugVirtuosoRef}
+                                data={logs}
+                                followOutput={stickToBottom}
+                                atBottomStateChange={setStickToBottom}
+                                style={{ height: '100%' }}
+                                className="custom-scrollbar"
+                                itemContent={(index, line) => (
+                                    <div key={index} className="px-3 whitespace-pre-wrap break-all opacity-80 hover:opacity-100 transition-opacity hover:bg-surface-variant/10">
+                                        {index} {line}
+                                    </div>
+                                )}
+                            />
                         </div>
                     </div>
                 )}

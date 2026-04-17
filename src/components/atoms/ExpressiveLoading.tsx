@@ -1,6 +1,7 @@
+import { useMemo, memo } from "react";
 import { motion } from "framer-motion";
 
-export const ExpressiveLoading = ({ size = "md", className, variant = "linear" }: { size?: "xsm" | "sm" | "md" | "lg", className?: string, variant?: "linear" | "circular" }) => {
+const ExpressiveLoadingComponent = ({ size = "md", className, variant = "linear" }: { size?: "xsm" | "sm" | "md" | "lg", className?: string, variant?: "linear" | "circular" }) => {
 
     const strokeWidthMap = {
         xsm: "2",
@@ -9,15 +10,9 @@ export const ExpressiveLoading = ({ size = "md", className, variant = "linear" }
         lg: "5"
     };
 
-    if (variant === 'circular') {
-        const sizePx = {
-            xsm: "w-4 h-4",
-            sm: "w-6 h-6",
-            md: "w-10 h-10",
-            lg: "w-16 h-16"
-        };
-
-        // Generate Wavy Circle Path
+    // Memoize circular path calculation
+    const circularPath = useMemo(() => {
+        if (variant !== 'circular') return "";
         const radius = 20;
         const amplitude = 2.5;
         const lobes = 8;
@@ -31,10 +26,22 @@ export const ExpressiveLoading = ({ size = "md", className, variant = "linear" }
             const y = 24 + r * Math.sin(angle);
             d += (i === 0 ? "M " : "L ") + x.toFixed(2) + " " + y.toFixed(2);
         }
-        d += " Z";
+        return d + " Z";
+    }, [variant]);
+
+    if (variant === 'circular') {
+        const sizePx = {
+            xsm: "w-4 h-4",
+            sm: "w-6 h-6",
+            md: "w-10 h-10",
+            lg: "w-16 h-16"
+        };
 
         return (
-            <div className={`flex items-center justify-center ${sizePx[size]} ${className || ''} text-primary dark:text-primary/80`}>
+            <div 
+                className={`flex items-center justify-center ${sizePx[size]} ${className || ''} text-primary dark:text-primary/80`}
+                style={{ willChange: 'transform' }}
+            >
                 <motion.svg
                     viewBox="0 0 48 48"
                     className="w-full h-full overflow-visible"
@@ -43,7 +50,7 @@ export const ExpressiveLoading = ({ size = "md", className, variant = "linear" }
                 >
                     {/* Background Track */}
                     <path
-                        d={d}
+                        d={circularPath}
                         fill="none"
                         stroke="currentColor"
                         strokeWidth={strokeWidthMap[size]}
@@ -54,7 +61,7 @@ export const ExpressiveLoading = ({ size = "md", className, variant = "linear" }
 
                     {/* The "Snake" Scanner */}
                     <motion.path
-                        d={d}
+                        d={circularPath}
                         fill="none"
                         stroke="currentColor"
                         strokeWidth={strokeWidthMap[size]}
@@ -85,10 +92,6 @@ export const ExpressiveLoading = ({ size = "md", className, variant = "linear" }
     }
 
     // Linear Wavy Path Data (Sine Wave)
-    // M 0 10: Start middle-left
-    // Q 12.5 0 25 10: Quadratic Bezier to create first half-wave (up)
-    // T 50 10: Smooth Quadratic Bezier to create second half-wave (down)
-    // Repeated to ensure enough length for the "snake" to travel
     const pathData = "M 0 10 Q 12.5 2 25 10 T 50 10 T 75 10 T 100 10 T 125 10 T 150 10 T 175 10 T 200 10";
 
     const heightMap = {
@@ -99,7 +102,10 @@ export const ExpressiveLoading = ({ size = "md", className, variant = "linear" }
     };
 
     return (
-        <div className={`flex items-center justify-center ${heightMap[size]} ${className || ''} text-primary dark:text-primary/80`}>
+        <div 
+            className={`flex items-center justify-center ${heightMap[size]} ${className || ''} text-primary dark:text-primary/80`}
+            style={{ willChange: 'transform' }}
+        >
             <svg
                 viewBox="0 0 100 20"
                 className="w-full h-full overflow-visible"
@@ -147,3 +153,5 @@ export const ExpressiveLoading = ({ size = "md", className, variant = "linear" }
         </div>
     );
 };
+
+export const ExpressiveLoading = memo(ExpressiveLoadingComponent);

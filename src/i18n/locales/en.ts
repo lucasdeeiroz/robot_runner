@@ -513,6 +513,37 @@ export const en = {
                 ai_rationale: "AI Rationale",
                 rationale: "Rationale",
                 ai_error_generic: "AI suggestion failed."
+            },
+            recorder: {
+                title: "Steps Recorder",
+                start: "Start Recording",
+                stop: "Stop Recording",
+                steps: "Recorded Steps",
+                clear: "Clear Steps",
+                copy: "Copy Code",
+                empty: "No steps recorded yet",
+                actions: {
+                    tap: "Tap",
+                    double_tap: "Double Tap",
+                    long_press: "Long Press",
+                    swipe: "Swipe",
+                    drag_drop: "Drag & Drop"
+                },
+                directions: {
+                    up: "Up",
+                    down: "Down",
+                    left: "Left",
+                    right: "Right"
+                },
+                params: {
+                    duration: "Duration (ms)",
+                    offset_x: "Offset X",
+                    offset_y: "Offset Y",
+                    start_offset: "Start Offset %",
+                    end_offset: "End Offset %"
+                },
+                selection: "Active Selection",
+                siblings: "Alternative Nodes (Same position)"
             }
         },
         logcat: {
@@ -538,7 +569,10 @@ export const en = {
             clear: "Clear Logs",
             lines: "lines",
             no_logs: "No logs captured",
-            select_device: "Select a device to view logs"
+            select_device: "Select a device to view logs",
+            ai_analyze_button: "Analyze with AI",
+            ai_analysis_title: "AI Analysis Result",
+            analyzing: "Analyzing logs..."
         },
         mapper: {
             title: "Mapper",
@@ -788,8 +822,16 @@ export const en = {
             app_stats: "App Performance",
             auto: "Auto",
             na: "N/A",
+            warning_high_impact: "Activating monitoring during a test can cause ADB congestion and lead to execution failures (Socket Hang Up).",
+            warning_high_impact_title: "High Impact Warning",
+            warning_high_impact_detail: "Proceed only if investigation of performance issues is strictly necessary.",
+            force_enabled_msg: "Monitoring forced during test",
+            paused_description: "Performance polling is disabled to avoid interference with the running test.",
             status: {
-                paused_test: "Performance monitoring paused during test"
+                paused_test: "Monitoring Paused"
+            },
+            actions: {
+                force_enable: "Force Enable"
             }
         },
         run_tab: {
@@ -816,9 +858,11 @@ export const en = {
                 pass: "PASS",
                 fail: "FAIL",
                 not_run: "NOT RUN",
+                interrupted: "INTERRUPTED",
                 fancy_mode: "Fancy Mode",
                 raw_mode: "Raw Mode",
                 running: "RUNNING",
+                stopping: "Generating reports...",
                 processing: "Processing...",
                 test_summary: "{{total}} TESTS: {{passed}} PASSED, {{failed}} FAILED",
                 waiting: "Waiting for logs...",
@@ -1212,6 +1256,7 @@ export const en = {
                 start_recording: "Start Screen Recording",
                 stop_recording: "Stop Recording",
                 stop_execution: "Stop Execution",
+                stopping: "Stopping...",
                 rerun: "Re-run",
                 switch_to_grid: "Switch to Grid View",
                 switch_to_tabs: "Switch to Tab View",

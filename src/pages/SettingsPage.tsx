@@ -3,6 +3,7 @@ import { Moon, Sun, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal,
 import { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { useTestSessions } from "@/lib/testSessionStore";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readFile } from "@tauri-apps/plugin-fs";
 import { appDataDir, join } from "@tauri-apps/api/path";
@@ -40,6 +41,8 @@ interface SettingsPageProps {
 export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
     const { settings, updateSetting, loading, profiles, activeProfileId, createProfile, switchProfile, renameProfile, deleteProfile, systemVersions, checkSystemVersions, systemCheckStatus, isNgrokEnabled } = useSettings();
     const { t } = useTranslation();
+    const { sessions } = useTestSessions();
+    const isTestRunning = sessions.some(s => s.status === 'running');
 
     // Profile Management Details
     const [showProfileModal, setShowProfileModal] = useState(false);
@@ -136,8 +139,11 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
     const [appiumLogs, setAppiumLogs] = useState<string[]>([]);
     const [showAppiumLogs, setShowAppiumLogs] = useState(false);
     const logsContainerRef = useRef<HTMLDivElement>(null);
+    const isTestRunningRef = useRef(isTestRunning);
 
-
+    useEffect(() => {
+        isTestRunningRef.current = isTestRunning;
+    }, [isTestRunning]);
 
     useEffect(() => {
         // Cached System Versions
@@ -146,10 +152,10 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
         }
 
         // Initial status check
-        checkAppiumStatus();
+        checkAppiumStatus(isTestRunningRef.current);
 
         // Poll status every 2 seconds
-        const interval = setInterval(checkAppiumStatus, 2000);
+        const interval = setInterval(() => checkAppiumStatus(isTestRunningRef.current), 2000);
 
         // Listen for logs
         const unlistenPromise = listen<string>('appium-output', (event) => {
@@ -174,11 +180,12 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
         }
     }, [appiumLogs, showAppiumLogs]);
 
-    const checkAppiumStatus = async () => {
+    const checkAppiumStatus = async (isRunning: boolean = false) => {
         try {
             const status = await invoke<{ running: boolean, pid?: number }>('get_appium_status', {
                 host: settings.appiumHost,
-                port: Number(settings.appiumPort)
+                port: Number(settings.appiumPort),
+                is_test_running: isRunning
             });
             setAppiumStatus(status);
         } catch (e) {

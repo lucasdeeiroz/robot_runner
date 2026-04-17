@@ -80,7 +80,8 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     }
 
                     // Feedback
-                    if (status.includes('Exit Code: 0') || status.includes('exit code: 0')) {
+                    const finalStatus = status || "";
+                    if (finalStatus.includes('Exit Code: 0') || finalStatus.includes('exit code: 0')) {
                         feedback.notify('feedback.test_passed', 'feedback.details.device', { device: s.deviceName });
                     } else {
                         feedback.notify('feedback.test_failed', 'feedback.details.device', { device: s.deviceName });
@@ -236,7 +237,11 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
 
         setSessions(prev => prev.map(s => {
             if (s.runId === runId) {
-                return { ...s, logs: [...s.logs, '\n[System] Stopping...'] };
+                return { 
+                    ...s, 
+                    status: 'stopping',
+                    logs: [...s.logs, '\n[System] Graceful stop initiated. Waiting for reports...'] 
+                };
             }
             return s;
         }));
@@ -289,7 +294,8 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
             if (fw !== 'maestro') {
                 const status = await invoke<{ running: boolean }>('get_appium_status', {
                     host: settings.appiumHost,
-                    port: Number(settings.appiumPort)
+                    port: Number(settings.appiumPort),
+                    is_test_running: false // Just starting
                 });
                 if (!status.running) {
                     await invoke('start_appium_server', {

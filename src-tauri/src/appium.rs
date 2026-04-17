@@ -1,9 +1,12 @@
-use std::process::{Child, Command, Stdio};
-use std::sync::Mutex;
-use tauri::{Emitter, State};
+use std::sync::{Arc, Mutex};
+use tauri::{State, Emitter, AppHandle, Manager};
+use tokio::io::{AsyncBufReadExt, BufReader as TokioBufReader, AsyncWriteExt};
+use tokio::process::{Child, Command};
+use std::process::Stdio;
+
 
 // State to hold the Appium process
-pub struct AppiumState(pub Mutex<Option<Child>>);
+pub struct AppiumState(pub Arc<Mutex<Option<Child>>>);
 
 #[derive(serde::Serialize, Clone)]
 pub struct AppiumStatus {
@@ -12,57 +15,63 @@ pub struct AppiumStatus {
 }
 
 #[tauri::command]
-pub fn get_appium_status(
+pub async fn get_appium_status(
     state: State<'_, AppiumState>,
     host: Option<String>,
     port: Option<u32>,
     base_path: Option<String>,
-) -> AppiumStatus {
-    let mut child_guard = match state.0.lock() {
-        Ok(guard) => guard,
-        Err(_) => {
-            return AppiumStatus {
-                running: false,
-                pid: None,
-            };
-        }
-    };
-    let (internal_running, internal_pid) = if let Some(child) = &mut *child_guard {
-        match child.try_wait() {
-            Ok(Some(_)) => {
-                *child_guard = None; // Clean up
-                (false, None)
-            }
-            Ok(None) => (true, Some(child.id())),
+    is_test_running: Option<bool>,
+) -> Result<AppiumStatus, String> {
+    let (internal_running, internal_pid) = {
+        let mut child_guard = match state.0.lock() {
+            Ok(guard) => guard,
             Err(_) => {
-                *child_guard = None;
-                (false, None)
+                return Ok(AppiumStatus {
+                    running: false,
+                    pid: None,
+                });
             }
+        };
+        if let Some(child) = &mut *child_guard {
+            match child.try_wait() {
+                Ok(Some(_)) => {
+                    *child_guard = None; // Clean up
+                    (false, None)
+                }
+                Ok(None) => (true, child.id()),
+                Err(_) => {
+                    *child_guard = None;
+                    (false, None)
+                }
+            }
+        } else {
+            (false, None)
         }
-    } else {
-        (false, None)
     };
 
-    let is_ready = if let (Some(h), Some(p)) = (host, port) {
-        check_appium_ready(&h, p, base_path.as_deref().unwrap_or(""))
+    // Guard: skip network check if test is already running to avoid ADB contention
+    let is_ready = if is_test_running.unwrap_or(false) {
+        false 
+    } else if let (Some(h), Some(p)) = (host, port) {
+        check_appium_ready(&h, p, base_path.as_deref().unwrap_or("")).await
     } else {
         false
     };
 
     if is_ready {
-        AppiumStatus {
+        Ok(AppiumStatus {
             running: true,
             pid: internal_pid,
-        }
+        })
     } else {
-        AppiumStatus {
+        Ok(AppiumStatus {
             running: internal_running,
             pid: internal_pid,
-        }
+        })
     }
 }
 
-fn check_appium_ready(host: &str, port: u32, base_path: &str) -> bool {
+async fn check_appium_ready(host: &str, port: u32, base_path: &str) -> bool {
     let check_host = if host == "0.0.0.0" { "127.0.0.1" } else { host };
 
     // Normalize base path for URL construction
@@ -76,7 +85,7 @@ fn check_appium_ready(host: &str, port: u32, base_path: &str) -> bool {
 
     let url = format!("http://{}:{}{}/status", check_host, port, path);
 
-    let client = match reqwest::blocking::Client::builder()
+    let client = match reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(2))
         .connect_timeout(std::time::Duration::from_secs(1))
         .build()
@@ -85,13 +94,13 @@ fn check_appium_ready(host: &str, port: u32, base_path: &str) -> bool {
         Err(_) => return false,
     };
 
-    match client.get(&url).send() {
+    match client.get(&url).send().await {
         Ok(resp) => {
             if !resp.status().is_success() {
                 return false;
             }
             // Parse JSON to verify { "value": { "ready": true } }
-            match resp.json::<serde_json::Value>() {
+            match resp.json::<serde_json::Value>().await {
                 Ok(json) => {
                     json.get("value")
                         .and_then(|v| v.get("ready"))
@@ -106,13 +115,13 @@ fn check_appium_ready(host: &str, port: u32, base_path: &str) -> bool {
 }
 
 #[tauri::command]
-pub fn start_appium_server(
+pub async fn start_appium_server(
     state: State<'_, AppiumState>,
     host: String,
     port: u32,
     base_path: String,
     args: String, // Extra args string
-    app_handle: tauri::AppHandle,
+    app_handle: AppHandle,
 ) -> Result<String, String> {
     let mut child_guard = state.0.lock().map_err(|e| e.to_string())?;
 
@@ -148,7 +157,6 @@ pub fn start_appium_server(
 
     // Add extra args
     if !args.trim().is_empty() {
-        // Simple splitting by space - simplistic for now, might need shell-words crate for quotes
         for arg in args.split_whitespace() {
             command.arg(arg);
         }
@@ -160,9 +168,7 @@ pub fn start_appium_server(
 
     #[cfg(target_os = "windows")]
     {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        command.creation_flags(CREATE_NO_WINDOW);
+        command.creation_flags(0x08000000); // CREATE_NO_WINDOW
     }
 
     match command.spawn() {
@@ -175,7 +181,6 @@ pub fn start_appium_server(
 
             // Log file path
             let mut log_path_opt = None;
-            use tauri::Manager;
             if let Ok(app_data_dir) = app_handle.path().app_data_dir() {
                 let log_file_path = app_data_dir.join("appium.log");
                 let _ = std::fs::create_dir_all(&app_data_dir);
@@ -183,24 +188,21 @@ pub fn start_appium_server(
                 log_path_opt = Some(log_file_path);
             }
 
-            // Spawn threads to read output and emit events
+            // Spawn tasks to read output and emit events
             if let Some(out) = stdout {
                 let handle = app_handle.clone();
                 let log_path = log_path_opt.clone();
-                std::thread::spawn(move || {
-                    use std::io::{BufRead, BufReader, Write};
-                    let reader = BufReader::new(out);
+                tokio::spawn(async move {
+                    let mut reader = TokioBufReader::new(out).lines();
                     let mut file = if let Some(p) = &log_path {
-                        std::fs::OpenOptions::new().create(true).append(true).open(p).ok()
+                        tokio::fs::OpenOptions::new().create(true).append(true).open(p).await.ok()
                     } else {
                         None
                     };
-                    for line in reader.lines() {
-                        if let Ok(l) = line {
-                            let _ = handle.emit("appium-output", &l);
-                            if let Some(f) = &mut file {
-                                let _ = writeln!(f, "{}", l);
-                            }
+                    while let Ok(Some(line)) = reader.next_line().await {
+                        let _ = handle.emit("appium-output", &line);
+                        if let Some(f) = &mut file {
+                            let _ = f.write_all(format!("{}\n", line).as_bytes()).await;
                         }
                     }
                 });
@@ -208,20 +210,17 @@ pub fn start_appium_server(
             if let Some(err) = stderr {
                 let handle = app_handle.clone();
                 let log_path = log_path_opt.clone();
-                std::thread::spawn(move || {
-                    use std::io::{BufRead, BufReader, Write};
-                    let reader = BufReader::new(err);
+                tokio::spawn(async move {
+                    let mut reader = TokioBufReader::new(err).lines();
                     let mut file = if let Some(p) = &log_path {
-                        std::fs::OpenOptions::new().create(true).append(true).open(p).ok()
+                        tokio::fs::OpenOptions::new().create(true).append(true).open(p).await.ok()
                     } else {
                         None
                     };
-                    for line in reader.lines() {
-                        if let Ok(l) = line {
-                            let _ = handle.emit("appium-output", &l);
-                            if let Some(f) = &mut file {
-                                let _ = writeln!(f, "{}", l);
-                            }
+                    while let Ok(Some(line)) = reader.next_line().await {
+                        let _ = handle.emit("appium-output", &line);
+                        if let Some(f) = &mut file {
+                            let _ = f.write_all(format!("{}\n", line).as_bytes()).await;
                         }
                     }
                 });
@@ -233,34 +232,33 @@ pub fn start_appium_server(
     }
 }
 
-pub fn shutdown_appium(state: &AppiumState) {
-    if let Ok(mut child_guard) = state.0.lock() {
-        if let Some(mut child) = child_guard.take() { // take() replaces with None immediately
-             // Handle Windows Process Tree Killing
-            #[cfg(target_os = "windows")]
-            {
-                use std::os::windows::process::CommandExt;
-                let pid = child.id();
-                let _ = Command::new("taskkill")
-                    .args(&["/F", "/T", "/PID", &pid.to_string()])
-                    .creation_flags(0x08000000) // CREATE_NO_WINDOW
-                    .output();
-            }
-            let _ = child.kill();
-            let _ = child.wait(); // prevent zombie
+pub async fn shutdown_appium(state: &AppiumState) {
+    shutdown_appium_with_inner(&state.0).await;
+}
+
+pub async fn shutdown_appium_with_inner(inner: &Arc<Mutex<Option<Child>>>) {
+    let child = {
+        if let Ok(mut guard) = inner.lock() {
+            guard.take()
+        } else {
+            None
         }
+    };
+
+    if let Some(mut c) = child {
+        let _ = c.kill().await;
+        let _ = c.wait().await;
     }
 }
 
 #[tauri::command]
-pub fn stop_appium_server(state: State<'_, AppiumState>) -> Result<String, String> {
-    shutdown_appium(&state);
+pub async fn stop_appium_server(state: State<'_, AppiumState>) -> Result<String, String> {
+    shutdown_appium(&state).await;
     Ok("Appium server stopped".to_string())
 }
 
 #[tauri::command]
-pub fn open_appium_log_terminal(app_handle: tauri::AppHandle) -> Result<(), String> {
-    use tauri::Manager;
+pub fn open_appium_log_terminal(app_handle: AppHandle) -> Result<(), String> {
     let log_path = app_handle
         .path()
         .app_data_dir()
@@ -273,10 +271,10 @@ pub fn open_appium_log_terminal(app_handle: tauri::AppHandle) -> Result<(), Stri
 
     #[cfg(target_os = "windows")]
     {
-        use std::os::windows::process::CommandExt;
         const CREATE_NEW_CONSOLE: u32 = 0x00000010;
         let p_str = log_path.to_string_lossy().to_string();
-        let cmd_args = format!("Get-Content -Path '{}' -Wait -Tail 100", p_str);
+        // Use double quotes for PowerShell path escaping
+        let cmd_args = format!("Get-Content -Path \"{}\" -Wait -Tail 100", p_str);
         match Command::new("powershell")
             .arg("-NoExit")
             .arg("-Command")
@@ -317,30 +315,31 @@ pub fn start_appium_in_terminal(
     #[cfg(not(target_os = "windows"))]
     let cmd = "appium";
 
-    let mut command_line = format!("{} --address {} --port {}", cmd, host, port);
-
-    let trimmed_base = base_path.trim();
-    if !trimmed_base.is_empty() && trimmed_base != "/" {
-        let final_base = if trimmed_base.starts_with('/') {
-            trimmed_base.to_string()
-        } else {
-            format!("/{}", trimmed_base)
-        };
-        command_line.push_str(&format!(" --base-path {}", final_base));
-    }
-
-    if !args.trim().is_empty() {
-        command_line.push_str(&format!(" {}", args));
-    }
-
     #[cfg(target_os = "windows")]
     {
-        match Command::new("cmd")
-            .arg("/c")
-            .arg("start")
-            .arg("cmd")
-            .arg("/k")
-            .arg(&command_line)
+        // Build arguments vector safely
+        let mut full_args = vec!["/c".to_string(), "start".to_string(), "cmd".to_string(), "/k".to_string()];
+        
+        let mut appium_cmd = format!("{} --address {} --port {}", cmd, host, port);
+        let trimmed_base = base_path.trim();
+        if !trimmed_base.is_empty() && trimmed_base != "/" {
+            let final_base = if trimmed_base.starts_with('/') {
+                trimmed_base.to_string()
+            } else {
+                format!("/{}", trimmed_base)
+            };
+            appium_cmd.push_str(&format!(" --base-path {}", final_base));
+        }
+        
+        // Add extra args safely by splitting them for the terminal execution
+        if !args.trim().is_empty() {
+            appium_cmd.push_str(&format!(" {}", args));
+        }
+
+        full_args.push(appium_cmd);
+
+        match std::process::Command::new("cmd")
+            .args(&full_args)
             .spawn()
         {
             Ok(_) => Ok("Appium started in new terminal".to_string()),
@@ -349,11 +348,25 @@ pub fn start_appium_in_terminal(
     }
     #[cfg(not(target_os = "windows"))]
     {
-        match Command::new("x-terminal-emulator")
+        let mut appium_cmd = format!("{} --address {} --port {}", cmd, host, port);
+        let trimmed_base = base_path.trim();
+        if !trimmed_base.is_empty() && trimmed_base != "/" {
+            let final_base = if trimmed_base.starts_with('/') {
+                trimmed_base.to_string()
+            } else {
+                format!("/{}", trimmed_base)
+            };
+            appium_cmd.push_str(&format!(" --base-path {}", final_base));
+        }
+        if !args.trim().is_empty() {
+             appium_cmd.push_str(&format!(" {}", args));
+        }
+
+        match std::process::Command::new("x-terminal-emulator")
             .arg("-e")
             .arg("bash")
             .arg("-c")
-            .arg(format!("{}; exec bash", command_line))
+            .arg(format!("{}; exec bash", appium_cmd))
             .spawn()
         {
             Ok(_) => Ok("Appium started in new terminal".to_string()),

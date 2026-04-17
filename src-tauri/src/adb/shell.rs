@@ -1,33 +1,32 @@
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader};
-use std::process::{Child, Command, Stdio};
-use std::sync::Mutex;
-use std::thread;
+use std::sync::{Arc, Mutex};
 use tauri::{command, AppHandle, Emitter, State};
+use tokio::io::{AsyncBufReadExt, BufReader as TokioBufReader};
+use tokio::process::{Child, Command};
+use std::process::Stdio;
 
 pub struct ShellState {
-    pub running_commands: Mutex<HashMap<String, Child>>,
+    pub running_commands: Arc<Mutex<HashMap<String, Child>>>,
 }
 
 impl Default for ShellState {
     fn default() -> Self {
         Self {
-            running_commands: Mutex::new(HashMap::new()),
+            running_commands: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 }
 
 #[command]
-pub fn get_adb_version() -> Result<String, String> {
+pub async fn get_adb_version() -> Result<String, String> {
     let mut cmd = Command::new("adb");
     cmd.arg("version");
     #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000);
-    }
+    cmd.creation_flags(0x08000000);
+
     let output = cmd
         .output()
+        .await
         .map_err(|e| format!("Failed to execute adb: {}", e))?;
 
     if output.status.success() {
@@ -38,18 +37,16 @@ pub fn get_adb_version() -> Result<String, String> {
 }
 
 #[command]
-pub fn run_adb_command(device: String, args: Vec<String>) -> Result<String, String> {
+pub async fn run_adb_command(device: String, args: Vec<String>) -> Result<String, String> {
     let mut cmd = Command::new("adb");
     cmd.arg("-s").arg(&device).args(&args);
 
     #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
-    }
+    cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
 
     let output = cmd
         .output()
+        .await
         .map_err(|e| format!("Failed to execute adb: {}", e))?;
 
     if output.status.success() {
@@ -60,44 +57,36 @@ pub fn run_adb_command(device: String, args: Vec<String>) -> Result<String, Stri
 }
 
 #[command]
-pub fn start_adb_command(
+pub async fn start_adb_command(
     app: AppHandle,
     state: State<'_, ShellState>,
     id: String,
     device: String,
     command: String,
 ) -> Result<(), String> {
-    // Split command string into args
+    // Split command string into args - Note: Ideally use Vec<String> from frontend
     let args: Vec<&str> = command.split_whitespace().collect();
 
     let mut cmd = Command::new("adb");
     cmd.arg("-s").arg(&device).args(&args);
 
-    // We need pipes for output
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
 
     #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000);
-    }
+    cmd.creation_flags(0x08000000);
 
     let mut child = cmd.spawn().map_err(|e| e.to_string())?;
-
     let stdout = child.stdout.take().ok_or("Failed to open stdout")?;
-    // let stderr = child.stderr.take().ok_or("Failed to open stderr")?;
 
     let id_clone = id.clone();
     let app_clone = app.clone();
 
-    // stdout thread
-    thread::spawn(move || {
-        let reader = BufReader::new(stdout);
-        for line in reader.lines() {
-            if let Ok(l) = line {
-                let _ = app_clone.emit(&format!("cmd-output-{}", id_clone), l);
-            }
+    // stdout task
+    tokio::spawn(async move {
+        let mut reader = TokioBufReader::new(stdout).lines();
+        while let Ok(Some(line)) = reader.next_line().await {
+            let _ = app_clone.emit(&format!("cmd-output-{}", id_clone), line);
         }
         let _ = app_clone.emit(&format!("cmd-close-{}", id_clone), "Process finished");
     });
@@ -107,10 +96,14 @@ pub fn start_adb_command(
 }
 
 #[command]
-pub fn stop_adb_command(state: State<'_, ShellState>, id: String) -> Result<(), String> {
-    let mut commands = state.running_commands.lock().map_err(|e| e.to_string())?;
-    if let Some(mut child) = commands.remove(&id) {
-        child.kill().map_err(|e| e.to_string())?;
+pub async fn stop_adb_command(state: State<'_, ShellState>, id: String) -> Result<(), String> {
+    let child = {
+        let mut commands = state.running_commands.lock().map_err(|e| e.to_string())?;
+        commands.remove(&id)
+    };
+
+    if let Some(mut c) = child {
+        let _ = c.kill().await;
         Ok(())
     } else {
         Err("Command not found".to_string())
@@ -118,10 +111,7 @@ pub fn stop_adb_command(state: State<'_, ShellState>, id: String) -> Result<(), 
 }
 
 #[command]
-pub fn restart_adb_server() -> Result<String, String> {
-    #[cfg(target_os = "windows")]
-    use std::os::windows::process::CommandExt;
-
+pub async fn restart_adb_server() -> Result<String, String> {
     // Kill
     let mut kill_cmd = Command::new("adb");
     kill_cmd.arg("kill-server");
@@ -130,6 +120,7 @@ pub fn restart_adb_server() -> Result<String, String> {
 
     let kill_output = kill_cmd
         .output()
+        .await
         .map_err(|e| format!("Failed to kill server: {}", e))?;
 
     // Start
@@ -140,6 +131,7 @@ pub fn restart_adb_server() -> Result<String, String> {
 
     let start_output = start_cmd
         .output()
+        .await
         .map_err(|e| format!("Failed to start server: {}", e))?;
 
     Ok(format!(
@@ -150,14 +142,13 @@ pub fn restart_adb_server() -> Result<String, String> {
 }
 
 #[command]
-pub fn is_adb_server_running() -> bool {
+pub async fn is_adb_server_running() -> bool {
     #[cfg(target_os = "windows")]
     {
         let mut cmd = Command::new("tasklist");
         cmd.args(&["/FI", "IMAGENAME eq adb.exe", "/NH"]);
-        use std::os::windows::process::CommandExt;
         cmd.creation_flags(0x08000000);
-        let output = cmd.output();
+        let output = cmd.output().await;
 
         if let Ok(o) = output {
             let s = String::from_utf8_lossy(&o.stdout);
@@ -167,7 +158,7 @@ pub fn is_adb_server_running() -> bool {
 
     #[cfg(not(target_os = "windows"))]
     {
-        let output = Command::new("pgrep").arg("adb").output();
+        let output = Command::new("pgrep").arg("adb").output().await;
         if let Ok(o) = output {
             return o.status.success();
         }
@@ -177,29 +168,23 @@ pub fn is_adb_server_running() -> bool {
 }
 
 #[command]
-pub fn kill_adb_server() -> Result<String, String> {
+pub async fn kill_adb_server() -> Result<String, String> {
     let mut cmd = Command::new("adb");
     cmd.arg("kill-server");
     #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000);
-    }
+    cmd.creation_flags(0x08000000);
 
-    let output = cmd.output().map_err(|e| e.to_string())?;
+    let output = cmd.output().await.map_err(|e| e.to_string())?;
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
 #[command]
-pub fn start_adb_server() -> Result<String, String> {
+pub async fn start_adb_server() -> Result<String, String> {
     let mut cmd = Command::new("adb");
     cmd.arg("start-server");
     #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000);
-    }
+    cmd.creation_flags(0x08000000);
 
-    let output = cmd.output().map_err(|e| e.to_string())?;
+    let output = cmd.output().await.map_err(|e| e.to_string())?;
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }

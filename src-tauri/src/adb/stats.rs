@@ -1,5 +1,5 @@
 use serde::Serialize;
-use std::process::Command;
+use tokio::process::Command;
 
 #[derive(Debug, Serialize, Default)]
 pub struct AppStats {
@@ -23,30 +23,38 @@ pub async fn get_device_stats(
     device: String,
     package: Option<String>,
 ) -> Result<DeviceStats, String> {
-    // 1. Get Battery Level & Temperature
-    let bat_output = run_adb_shell(&device, "dumpsys battery");
+    // 1. Prepare async tasks for base device stats
+    let battery_task = run_adb_shell(&device, "dumpsys battery");
+    let meminfo_task = run_adb_shell(&device, "cat /proc/meminfo");
+    let top_task = run_adb_shell(&device, "top -n 1 -m 5");
+
+    // Start these in parallel
+    let (bat_output, mem_output, top_output) = tokio::join!(
+        battery_task,
+        meminfo_task,
+        top_task
+    );
+
     let (battery_level, temperature) = parse_battery_info(&bat_output).unwrap_or((0, 0.0));
-
-    // 2. Get System RAM Info
-    let mem_output = run_adb_shell(&device, "cat /proc/meminfo");
     let (ram_total, ram_used) = parse_mem_info(&mem_output).unwrap_or((0, 0));
-
-    // 3. Get System CPU Info (Simplified top)
-    let top_output = run_adb_shell(&device, "top -n 1 -m 5");
     let cpu_usage = parse_cpu_usage(&top_output).unwrap_or(0.0);
 
-    // 4. Get App Stats (if package provided)
+    // 2. Prepare app stats if package provided
     let mut app_stats = None;
     if let Some(pkg) = package {
         if !pkg.is_empty() {
             let app_cpu = parse_app_cpu(&top_output, &pkg).unwrap_or(0.0);
-            let app_ram = get_app_ram(&device, &pkg).unwrap_or(0);
-            let app_fps = get_app_fps(&device, &pkg).unwrap_or(0);
-
+            
+            // These still call adb individually but we can parallelize them too
+            let ram_task = get_app_ram(&device, &pkg);
+            let fps_task = get_app_fps(&device, &pkg);
+            
+            let (app_ram_res, app_fps_res) = tokio::join!(ram_task, fps_task);
+            
             app_stats = Some(AppStats {
                 cpu_usage: app_cpu,
-                ram_used: app_ram,
-                fps: app_fps,
+                ram_used: app_ram_res.unwrap_or(0),
+                fps: app_fps_res.unwrap_or(0),
             });
         }
     }
@@ -61,7 +69,7 @@ pub async fn get_device_stats(
     })
 }
 
-fn run_adb_shell(device: &str, command: &str) -> String {
+async fn run_adb_shell(device: &str, command: &str) -> String {
     let program = "adb";
 
     // Split command for arguments
@@ -70,14 +78,17 @@ fn run_adb_shell(device: &str, command: &str) -> String {
     let mut full_args = vec!["-s", device, "shell"];
     full_args.extend(args);
 
-    let mut cmd = Command::new(program);
-    cmd.args(&full_args);
+    let mut std_cmd = std::process::Command::new(program);
+    std_cmd.args(&full_args);
+
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000);
+        std_cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
     }
-    let output = cmd.output();
+    
+    let mut cmd = Command::from(std_cmd);
+    let output = cmd.output().await;
 
     match output {
         Ok(o) => String::from_utf8_lossy(&o.stdout).to_string(),
@@ -227,10 +238,10 @@ fn parse_app_cpu(top_output: &str, package: &str) -> Option<f32> {
     None
 }
 
-fn get_app_ram(device: &str, package: &str) -> Option<u64> {
+async fn get_app_ram(device: &str, package: &str) -> Option<u64> {
     // dumpsys meminfo <package>
     // Look for "TOTAL" row or "Total PSS"
-    let output = run_adb_shell(device, &format!("dumpsys meminfo {}", package));
+    let output = run_adb_shell(device, &format!("dumpsys meminfo {}", package)).await;
 
     // Output format varies but usually has a "TOTAL" line at bottom of "App Summary" or "Total PSS"
     // "TOTAL    123456    ..."
@@ -249,7 +260,7 @@ fn get_app_ram(device: &str, package: &str) -> Option<u64> {
     None
 }
 
-fn get_app_fps(device: &str, package: &str) -> Option<u32> {
+async fn get_app_fps(device: &str, package: &str) -> Option<u32> {
     // Use chained command to get stats and uptime together
     // "dumpsys gfxinfo <pkg> framestats" gives CSV data with frame timings.
     // "cat /proc/uptime" gives system uptime in seconds, which matches CLOCK_MONOTONIC used in gfxinfo.
@@ -257,7 +268,7 @@ fn get_app_fps(device: &str, package: &str) -> Option<u32> {
         "dumpsys gfxinfo {} framestats; echo UPTIME_MARKER; cat /proc/uptime",
         package
     );
-    let output = run_adb_shell(device, &cmd);
+    let output = run_adb_shell(device, &cmd).await;
 
     let mut intended_vsyncs: Vec<u64> = Vec::new();
     let mut uptime_ns: u64 = 0;

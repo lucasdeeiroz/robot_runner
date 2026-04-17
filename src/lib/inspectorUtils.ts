@@ -115,8 +115,12 @@ export function transformXmlToTree(rawNode: any, parent?: InspectorNode, keyName
         }
     });
 
-    // Normalize tagName to 'node' for all elements except hierarchy
-    const tagName = keyName;
+    // Normalize tagName to class name if generic 'node' is used
+    let tagName = keyName;
+    if (tagName === 'node' && attributes['class']) {
+        const fullClass = attributes['class'];
+        tagName = fullClass.includes('.') ? fullClass.split('.').pop()! : fullClass;
+    }
 
     const node: InspectorNode = {
         id: Math.random().toString(36).substr(2, 9),
