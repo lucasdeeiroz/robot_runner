@@ -48,7 +48,7 @@ pub async fn start_ngrok(
     let mut child_cmd = new_tokio_command("ngrok");
     child_cmd.args(&["tcp", &port.to_string(), "--log=stdout"])
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+        .stderr(Stdio::null());
     
     let mut child = child_cmd.spawn()
         .map_err(|e| format!("Failed to start ngrok: {}", e))?;
@@ -66,23 +66,32 @@ pub async fn start_ngrok(
     let mut output_buffer = Vec::new();
     let start = std::time::Instant::now();
     
-    while let Ok(Some(l)) = reader.next_line().await {
-        if start.elapsed().as_secs() > 10 {
-            let _ = child.kill().await;
-            let debug_log = output_buffer.join("\n");
-            return Err(format!("Timed out waiting for ngrok URL. Output:\n{}", debug_log));
-        }
+    loop {
+        match reader.next_line().await {
+            Ok(Some(l)) => {
+                if start.elapsed().as_secs() > 10 {
+                    let _ = child.kill().await;
+                    let debug_log = output_buffer.join("\n");
+                    return Err(format!("Timed out waiting for ngrok URL. Output:\n{}", debug_log));
+                }
 
-        output_buffer.push(l.clone());
-        // Keep buffer size reasonable
-        if output_buffer.len() > 20 {
-            output_buffer.remove(0);
-        }
+                output_buffer.push(l.clone());
+                // Keep buffer size reasonable
+                if output_buffer.len() > 20 {
+                    output_buffer.remove(0);
+                }
 
-        if let Some(idx) = l.find("url=") {
-            let url = l[idx+4..].split_whitespace().next().unwrap_or("").to_string();
-            if !url.is_empty() {
-                 return Ok(url);
+                if let Some(idx) = l.find("url=") {
+                    let url = l[idx+4..].split_whitespace().next().unwrap_or("").to_string();
+                    if !url.is_empty() {
+                         return Ok(url);
+                    }
+                }
+            }
+            Ok(None) => break,
+            Err(e) => {
+                let _ = child.kill().await;
+                return Err(format!("Error reading ngrok output: {}. Logs:\n{}", e, output_buffer.join("\n")));
             }
         }
     }

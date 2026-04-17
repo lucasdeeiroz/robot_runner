@@ -16,7 +16,7 @@ pub fn new_tokio_command(program: &str) -> tokio::process::Command {
     let mut cmd = tokio::process::Command::new(program);
     #[cfg(target_os = "windows")]
     {
-        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        cmd.as_std_mut().creation_flags(0x08000000); // CREATE_NO_WINDOW
     }
     cmd
 }
