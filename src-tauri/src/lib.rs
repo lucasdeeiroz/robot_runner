@@ -9,6 +9,8 @@ mod xml_parser;
 mod ai_context;
 mod db;
 
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use tauri::Manager;
 
 mod files;
@@ -28,13 +30,11 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .manage(adb::shell::ShellState::default())
-        .manage(runner::TestState(std::sync::Mutex::new(
-            std::collections::HashMap::new(),
-        )))
-        .manage(appium::AppiumState(std::sync::Mutex::new(None)))
-        .manage(ngrok::NgrokState(std::sync::Mutex::new(None)))
-        .manage(adb::logcat::LogcatState(std::sync::Mutex::new(
-            std::collections::HashMap::new(),
+        .manage(runner::TestState(Arc::new(Mutex::new(HashMap::new()))))
+        .manage(appium::AppiumState(Arc::new(Mutex::new(None))))
+        .manage(ngrok::NgrokState(Mutex::new(None)))
+        .manage(adb::logcat::LogcatState(Mutex::new(
+            HashMap::new(),
         )))
         .manage(system::WakelockState(std::sync::Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
@@ -117,7 +117,10 @@ pub fn run() {
             tauri::RunEvent::ExitRequested { .. } => {}
             tauri::RunEvent::Exit => {
                 let state = app_handle.state::<appium::AppiumState>();
-                appium::shutdown_appium(&state);
+                let state_inner = state.0.clone();
+                tauri::async_runtime::block_on(async move {
+                    appium::shutdown_appium_with_inner(&state_inner).await;
+                });
                 let ngrok_state = app_handle.state::<ngrok::NgrokState>();
                 ngrok::shutdown_ngrok(&ngrok_state);
                 let runner_state = app_handle.state::<runner::TestState>();

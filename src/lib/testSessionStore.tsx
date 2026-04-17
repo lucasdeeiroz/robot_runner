@@ -80,7 +80,8 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     }
 
                     // Feedback
-                    if (status.includes('Exit Code: 0') || status.includes('exit code: 0')) {
+                    const finalStatus = status || "";
+                    if (finalStatus.includes('Exit Code: 0') || finalStatus.includes('exit code: 0')) {
                         feedback.notify('feedback.test_passed', 'feedback.details.device', { device: s.deviceName });
                     } else {
                         feedback.notify('feedback.test_failed', 'feedback.details.device', { device: s.deviceName });
