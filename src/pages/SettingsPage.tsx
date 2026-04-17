@@ -139,8 +139,11 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
     const [appiumLogs, setAppiumLogs] = useState<string[]>([]);
     const [showAppiumLogs, setShowAppiumLogs] = useState(false);
     const logsContainerRef = useRef<HTMLDivElement>(null);
+    const isTestRunningRef = useRef(isTestRunning);
 
-
+    useEffect(() => {
+        isTestRunningRef.current = isTestRunning;
+    }, [isTestRunning]);
 
     useEffect(() => {
         // Cached System Versions
@@ -149,10 +152,10 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
         }
 
         // Initial status check
-        checkAppiumStatus(isTestRunning);
+        checkAppiumStatus(isTestRunningRef.current);
 
         // Poll status every 2 seconds
-        const interval = setInterval(() => checkAppiumStatus(isTestRunning), 2000);
+        const interval = setInterval(() => checkAppiumStatus(isTestRunningRef.current), 2000);
 
         // Listen for logs
         const unlistenPromise = listen<string>('appium-output', (event) => {
