@@ -30,7 +30,7 @@ interface LogTreeProps {
     parentType?: LogNode['type'];
 }
 
-export const LogTree: React.FC<LogTreeProps> = ({ node, depth = 0, initiallyOpen, dbPath, parentType }) => {
+export const LogTree: React.FC<LogTreeProps> = React.memo(({ node, depth = 0, initiallyOpen, dbPath, parentType }) => {
     const { t, i18n } = useTranslation();
     const [isOpen, setIsOpen] = useState(initiallyOpen ?? (
         node.type !== 'text' && node.type !== 'suite-start' && (node as any).status !== 'PASS' && (node as any).status !== 'NOT_RUN'
@@ -468,4 +468,4 @@ Error Message: ${(node as TestNode).failureDetail?.message}
             )}
         </div>
     );
-};
+});
