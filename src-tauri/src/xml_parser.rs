@@ -197,9 +197,9 @@ pub async fn get_node_children(
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| AppError::DbError(e.to_string()))?;
 
-        // Parallel processing of JSON deserialization using Rayon
-        let nodes: Vec<LogNode> = raw_data.into_par_iter()
-            .filter_map(|(json, analysis)| {
+        // Parallel processing of JSON deserialization using Rayon while preserving row order
+        let ordered_nodes: Vec<Option<LogNode>> = raw_data.into_par_iter()
+            .map(|(json, analysis)| {
                 match serde_json::from_str::<LogNode>(&json) {
                     Ok(mut node) => {
                         match &mut node {
@@ -217,6 +217,8 @@ pub async fn get_node_children(
                 }
             })
             .collect();
+
+        let nodes: Vec<LogNode> = ordered_nodes.into_iter().flatten().collect();
 
         Ok(nodes)
     })

@@ -174,6 +174,36 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setIsNgrokEnabled(true);
     };
 
+    const isRootOrTooBroadPath = (path: string): boolean => {
+        const normalized = path.replace(/\\/g, '/');
+        if (normalized === '/') return true;
+        if (/^[A-Za-z]:\/?$/.test(normalized)) return true;
+        if (/^\/\/[^/]+\/?$/.test(normalized)) return true;
+        return false;
+    };
+
+    const sanitizeWorkspacePaths = (paths: unknown[]): string[] => {
+        const sanitized: string[] = [];
+        const seen = new Set<string>();
+
+        paths.forEach((rawPath) => {
+            if (typeof rawPath !== 'string') return;
+
+            const trimmed = rawPath.trim();
+            if (!trimmed) return;
+
+            const withoutTrailingSeparator = trimmed.replace(/[\\/]+$/, '') || trimmed;
+            if (isRootOrTooBroadPath(withoutTrailingSeparator)) return;
+
+            const dedupeKey = withoutTrailingSeparator.replace(/\\/g, '/').toLowerCase();
+            if (seen.has(dedupeKey)) return;
+            seen.add(dedupeKey);
+            sanitized.push(withoutTrailingSeparator);
+        });
+
+        return sanitized;
+    };
+
     useEffect(() => {
         loadSettings();
     }, []);
@@ -225,7 +255,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                 const activeId = saved.activeProfileId;
                 const paths = saved.profiles[activeId]?.settings?.paths;
                 if (paths) {
-                    invoke('sync_workspace_permissions', { paths: Object.values(paths) }).catch(console.error);
+                    const sanitizedPaths = sanitizeWorkspacePaths(Object.values(paths));
+                    if (sanitizedPaths.length > 0) {
+                        invoke('sync_workspace_permissions', { paths: sanitizedPaths }).catch(console.error);
+                    }
                 }
             }
 
@@ -237,7 +270,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     };
 
     const syncWorkspaces = (paths: Record<string, string>) => {
-        invoke('sync_workspace_permissions', { paths: Object.values(paths) })
+        const sanitizedPaths = sanitizeWorkspacePaths(Object.values(paths));
+        if (sanitizedPaths.length === 0) return;
+        invoke('sync_workspace_permissions', { paths: sanitizedPaths })
             .catch(e => console.error("[Security] Sync failed:", e));
     };
 

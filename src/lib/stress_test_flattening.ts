@@ -27,30 +27,34 @@ function generateLargeFlatTree(count: number): LogNode[] {
     return root;
 }
 
-const TOTAL_TOP_NODES = 35000;
-console.log(`Generating tree with ${TOTAL_TOP_NODES} top nodes...`);
-const tree = generateLargeFlatTree(TOTAL_TOP_NODES);
+export function runFlatteningStressTest(totalTopNodes: number = 35000) {
+    console.log(`Generating tree with ${totalTopNodes} top nodes...`);
+    const tree = generateLargeFlatTree(totalTopNodes);
 
-// Expand all nodes
-const expandedIds = new Set<string>();
-function collectIds(nodes: LogNode[]) {
-    nodes.forEach(n => {
-        expandedIds.add(n.id);
-        if ((n as any).children) collectIds((n as any).children);
-    });
+    const expandedIds = new Set<string>();
+    function collectIds(nodes: LogNode[]) {
+        nodes.forEach(n => {
+            expandedIds.add(n.id);
+            if ((n as any).children) collectIds((n as any).children);
+        });
+    }
+    collectIds(tree);
+
+    console.log(`Running flattenLogNodes for ${expandedIds.size} nodes...`);
+    const start = performance.now();
+    const flattened = flattenLogNodes(tree, expandedIds);
+    const end = performance.now();
+
+    console.log(`Result: ${flattened.length} flat rows`);
+    console.log(`Time taken: ${(end - start).toFixed(2)}ms`);
+
+    if (end - start > 16) {
+        console.warn("⚠️ Performance Warning: Flattening took more than 16ms (one frame)!");
+    } else {
+        console.log("✅ Performance OK: Flattening completed within one frame.");
+    }
 }
-collectIds(tree);
 
-console.log(`Running flattenLogNodes for ${expandedIds.size} nodes...`);
-const start = performance.now();
-const flattened = flattenLogNodes(tree, expandedIds);
-const end = performance.now();
-
-console.log(`Result: ${flattened.length} flat rows`);
-console.log(`Time taken: ${(end - start).toFixed(2)}ms`);
-
-if (end - start > 16) {
-    console.warn("⚠️ Performance Warning: Flattening took more than 16ms (one frame)!");
-} else {
-    console.log("✅ Performance OK: Flattening completed within one frame.");
+if (import.meta.env.DEV && (globalThis as any).__RUN_FLATTENING_STRESS_TEST__) {
+    runFlatteningStressTest();
 }

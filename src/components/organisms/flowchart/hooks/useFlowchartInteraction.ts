@@ -44,6 +44,34 @@ function interactionReducer(state: InteractionState, action: InteractionAction):
     }
 }
 
+function normalizeEdgeVertices(vertices: { x: number; y: number }[]): { x: number; y: number }[] {
+    if (vertices.length <= 1) return vertices;
+
+    const deduped: { x: number; y: number }[] = [];
+    vertices.forEach(vertex => {
+        const last = deduped[deduped.length - 1];
+        if (!last || last.x !== vertex.x || last.y !== vertex.y) {
+            deduped.push(vertex);
+        }
+    });
+
+    if (deduped.length <= 2) return deduped;
+
+    const normalized: { x: number; y: number }[] = [deduped[0]];
+    for (let i = 1; i < deduped.length - 1; i++) {
+        const prev = normalized[normalized.length - 1];
+        const curr = deduped[i];
+        const next = deduped[i + 1];
+        const isCollinear = (prev.x === curr.x && curr.x === next.x) || (prev.y === curr.y && curr.y === next.y);
+        if (!isCollinear) {
+            normalized.push(curr);
+        }
+    }
+    normalized.push(deduped[deduped.length - 1]);
+
+    return normalized;
+}
+
 interface UseFlowchartInteractionProps {
     layout: FlowchartLayout;
     setLayout: React.Dispatch<React.SetStateAction<FlowchartLayout>>;
@@ -153,14 +181,26 @@ export function useFlowchartInteraction({
         }
 
         if (state.type === 'DRAGGING_VERTEX' || state.type === 'DRAGGING_SEGMENT') {
-            // Edge cleanup (merge collinear, remove overlapping)
-            // (Implementation from handleMouseUp in original file)
             setLayout(prev => {
                 const edgeId = state.id;
                 const edge = prev.edges[edgeId];
                 if (!edge || !edge.vertices) return prev;
-                // ... (Cleanup logic ported here)
-                return prev; // Simplified for now
+
+                const cleanedVertices = normalizeEdgeVertices(edge.vertices);
+                if (JSON.stringify(cleanedVertices) === JSON.stringify(edge.vertices)) {
+                    return prev;
+                }
+
+                return {
+                    ...prev,
+                    edges: {
+                        ...prev.edges,
+                        [edgeId]: {
+                            ...edge,
+                            vertices: cleanedVertices
+                        }
+                    }
+                };
             });
         }
 

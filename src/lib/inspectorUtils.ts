@@ -666,14 +666,29 @@ export function getHighlighterStyle(
 ): React.CSSProperties {
     if (!node?.bounds || !imgLayout) return { display: 'none' };
 
+    let transformedBounds = node.bounds;
+    let root: InspectorNode | undefined = node;
+    while (root?.parent) {
+        root = root.parent;
+    }
+    if (root?.bounds?.w && root.bounds.h) {
+        transformedBounds = transformBounds(
+            node.bounds,
+            root.bounds.w,
+            root.bounds.h,
+            imgLayout.naturalWidth,
+            imgLayout.naturalHeight
+        );
+    }
+
     const scaleX = imgLayout.width / imgLayout.naturalWidth;
     const scaleY = imgLayout.height / imgLayout.naturalHeight;
 
     return {
-        left: node.bounds.x * scaleX,
-        top: node.bounds.y * scaleY,
-        width: node.bounds.w * scaleX,
-        height: node.bounds.h * scaleY,
+        left: transformedBounds.x * scaleX,
+        top: transformedBounds.y * scaleY,
+        width: transformedBounds.w * scaleX,
+        height: transformedBounds.h * scaleY,
         borderColor: color,
         backgroundColor: `${color}15` // 15 is ~8% opacity in hex
     };

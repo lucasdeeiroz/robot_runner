@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 import { useSettings } from './settings';
@@ -60,6 +60,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
     const [activeSessionId, setActiveSessionId] = useState<string | 'dashboard'>('dashboard');
     const [appiumRunning, setAppiumRunning] = useState(false);
     const { settings } = useSettings();
+    const isTestRunning = useMemo(() => sessions.some(s => s.status === 'running'), [sessions]);
 
     // Periodic Appium Status Check
     useEffect(() => {
@@ -68,7 +69,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                 const status = await invoke<{ running: boolean }>('get_appium_status', {
                     host: settings.appiumHost,
                     port: Number(settings.appiumPort),
-                    is_test_running: sessions.some(s => s.status === 'running')
+                    is_test_running: isTestRunning
                 });
                 setAppiumRunning(status.running);
             } catch (e) {
@@ -79,7 +80,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
         checkAppium();
         const interval = setInterval(checkAppium, 10000); // Every 10 seconds
         return () => clearInterval(interval);
-    }, [settings.appiumHost, settings.appiumPort, sessions]);
+    }, [settings.appiumHost, settings.appiumPort, isTestRunning]);
     useEffect(() => {
         const unlistenOutputPromise = listen<TestOutputPayload>('test-output', (event) => {
             const { run_id, message } = event.payload;

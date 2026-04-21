@@ -87,7 +87,7 @@ export function useFlowchartLayout({ maps, activeProfileId, onRefresh, settings 
 
                 const mapEdges: Record<string, LayoutEdge> = {};
                 Object.entries(layout.edges).forEach(([eId, eData]) => {
-                    if (eId.startsWith(`${map.name}-`)) {
+                    if (eId.startsWith(`${map.name}-`) || eId.startsWith(`${map.name}->`)) {
                         mapEdges[eId] = eData;
                     }
                 });
@@ -174,7 +174,19 @@ export function useFlowchartLayout({ maps, activeProfileId, onRefresh, settings 
         } finally {
             setIsReorganizing(false);
         }
-    }, [activeProfileId, settings.ai_provider, t, isReorganizing]);
+    }, [
+        activeProfileId,
+        isReorganizing,
+        settings.ai_provider,
+        settings.language,
+        settings.openai_api_key,
+        settings.openai_model,
+        settings.claude_api_key,
+        settings.claude_model,
+        settings.gemini_api_key,
+        settings.gemini_model,
+        t
+    ]);
 
     const allTags = useMemo(() => {
         const tags = new Set<string>();
