@@ -72,7 +72,7 @@ export const DeviceViewport: React.FC<DeviceViewportProps> = ({
                     <Maximize size={32} className="mb-2 opacity-50 text-on-surface" />
                 )}
                 <p className="text-on-surface/80">
-                    {loading ? t('common.loading') : t('inspector.no_screenshot')}
+                    {loading ? t('common.loading') : t('inspector.status.no_screenshot')}
                 </p>
             </div>
         );
