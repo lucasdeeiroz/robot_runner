@@ -45,12 +45,15 @@ function interactionReducer(state: InteractionState, action: InteractionAction):
 }
 
 function normalizeEdgeVertices(vertices: { x: number; y: number }[]): { x: number; y: number }[] {
+    const EPSILON = 0.001;
+    const isClose = (a: number, b: number) => Math.abs(a - b) <= EPSILON;
+
     if (vertices.length <= 1) return vertices;
 
     const deduped: { x: number; y: number }[] = [];
     vertices.forEach(vertex => {
         const last = deduped[deduped.length - 1];
-        if (!last || last.x !== vertex.x || last.y !== vertex.y) {
+        if (!last || !isClose(last.x, vertex.x) || !isClose(last.y, vertex.y)) {
             deduped.push(vertex);
         }
     });
@@ -62,7 +65,9 @@ function normalizeEdgeVertices(vertices: { x: number; y: number }[]): { x: numbe
         const prev = normalized[normalized.length - 1];
         const curr = deduped[i];
         const next = deduped[i + 1];
-        const isCollinear = (prev.x === curr.x && curr.x === next.x) || (prev.y === curr.y && curr.y === next.y);
+        const isCollinear =
+            (isClose(prev.x, curr.x) && isClose(curr.x, next.x)) ||
+            (isClose(prev.y, curr.y) && isClose(curr.y, next.y));
         if (!isCollinear) {
             normalized.push(curr);
         }

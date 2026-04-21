@@ -86,8 +86,16 @@ export function useFlowchartLayout({ maps, activeProfileId, onRefresh, settings 
                 if (!nodeLayout) return;
 
                 const mapEdges: Record<string, LayoutEdge> = {};
+                const isEdgeOwnedByMap = (edgeId: string) => {
+                    if (edgeId.includes('->')) {
+                        const [source] = edgeId.split('->');
+                        return source === map.name;
+                    }
+                    const [source] = edgeId.split('-');
+                    return source === map.name;
+                };
                 Object.entries(layout.edges).forEach(([eId, eData]) => {
-                    if (eId.startsWith(`${map.name}-`) || eId.startsWith(`${map.name}->`)) {
+                    if (isEdgeOwnedByMap(eId)) {
                         mapEdges[eId] = eData;
                     }
                 });
