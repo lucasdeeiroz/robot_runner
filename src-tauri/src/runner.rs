@@ -564,9 +564,16 @@ async fn spawn_and_monitor(
         }
 
         // Cleanup after exit
-        {
-            let mut procs = state_mon.lock().unwrap();
-            procs.remove(&rid_mon);
+        match state_mon.lock() {
+            Ok(mut procs) => {
+                procs.remove(&rid_mon);
+            }
+            Err(e) => {
+                eprintln!(
+                    "[Monitor] Failed to acquire process state lock during cleanup for {}: {}",
+                    rid_mon, e
+                );
+            }
         }
 
         // Cleanup stop signal if it exists
