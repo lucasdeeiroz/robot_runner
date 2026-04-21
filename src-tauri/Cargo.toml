@@ -1,6 +1,6 @@
 [package]
 name = "robot_runner"
-version = "2.2.30"
+version = "2.2.40"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -18,7 +18,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["test"] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -42,6 +42,10 @@ tokio = { version = "1", features = ["rt", "process", "macros", "time", "fs", "i
 quick-xml = { version = "0.39.2", features = ["serialize"] }
 rusqlite = { version = "0.39.0", features = ["bundled"] }
 futures = "0.3"
+thiserror = "2"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
+
+[dev-dependencies]
+tempfile = "3"

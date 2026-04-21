@@ -11,18 +11,20 @@ pub struct Device {
     pub android_version: Option<String>,
 }
 
+use crate::errors::{AppError, AppResult};
+
 #[tauri::command]
-pub async fn get_connected_devices() -> Result<Vec<Device>, String> {
+pub async fn get_connected_devices() -> AppResult<Vec<Device>> {
     let mut cmd = new_tokio_command("adb");
     cmd.args(&["devices", "-l"]);
 
     let output = cmd
         .output()
         .await
-        .map_err(|e| format!("Failed to execute adb: {}", e))?;
+        .map_err(|e| AppError::AdbError(format!("Failed to execute adb: {}", e)))?;
 
     if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+        return Err(AppError::AdbError(String::from_utf8_lossy(&output.stderr).to_string()));
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);

@@ -1,0 +1,259 @@
+
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import { XMLParser } from 'fast-xml-parser';
+import { InspectorNode, transformXmlToTree, findNodesAtCoords } from '@/lib/inspectorUtils';
+import { feedback } from '@/lib/feedback';
+
+interface DeviceViewportOptions {
+    deviceId: string | null;
+    isActive: boolean;
+    isBusy?: boolean; // e.g. test is running
+    onRefreshSuccess?: () => void;
+    onNodeSelected?: (node: InspectorNode | null) => void;
+    onNodeHovered?: (node: InspectorNode | null) => void;
+}
+
+export function useDeviceViewport({
+    deviceId,
+    isActive,
+    isBusy = false,
+    onRefreshSuccess,
+    onNodeSelected,
+    onNodeHovered
+}: DeviceViewportOptions) {
+    const [screenshot, setScreenshot] = useState<string | null>(null);
+    const [rootNode, setRootNode] = useState<InspectorNode | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [imgLayout, setImgLayout] = useState<{ width: number, height: number, naturalWidth: number, naturalHeight: number } | null>(null);
+    const [selectedNode, setSelectedNode] = useState<InspectorNode | null>(null);
+    const [hoveredNode, setHoveredNode] = useState<InspectorNode | null>(null);
+
+    const [taps, setTaps] = useState<{ id: number, x: number, y: number }[]>([]);
+    const [swipes, setSwipes] = useState<{ id: number, startX: number, startY: number, endX: number, endY: number }[]>([]);
+
+    const [swipeStart, setSwipeStart] = useState<{ x: number, y: number } | null>(null);
+    const [swipeStartTime, setSwipeStartTime] = useState<number | null>(null);
+    const [isDragging, setIsDragging] = useState(false);
+
+    const imgRef = useRef<HTMLImageElement>(null);
+    const prevBusy = useRef(isBusy);
+
+    const [availableNodes, setAvailableNodes] = useState<InspectorNode[]>([]);
+
+    const refreshAll = useCallback(async () => {
+        if (!deviceId) return;
+        setLoading(true);
+        try {
+            const b64 = await invoke<string>('get_screenshot', { deviceId });
+            setScreenshot(b64);
+
+            const xml = await invoke<string>('get_xml_dump', { deviceId });
+            const parser = new XMLParser({
+                ignoreAttributes: false,
+                attributeNamePrefix: "",
+                textNodeName: "_text"
+            });
+            const jsonObj = parser.parse(xml);
+            const root = jsonObj.hierarchy ? transformXmlToTree(jsonObj.hierarchy) : transformXmlToTree(jsonObj);
+            setRootNode(root);
+
+            if (onRefreshSuccess) onRefreshSuccess();
+        } catch (e) {
+            feedback.toast.error("inspector.update_error", e);
+        } finally {
+            setLoading(false);
+        }
+    }, [deviceId, onRefreshSuccess]);
+
+    // Handle auto-refresh on activation or busy state change
+    useEffect(() => {
+        if (!deviceId) {
+            setScreenshot(null);
+            setRootNode(null);
+            setSelectedNode(null);
+            setAvailableNodes([]);
+            prevBusy.current = isBusy;
+            return;
+        }
+
+        const wasBusy = prevBusy.current;
+        prevBusy.current = isBusy;
+
+        if (isActive && !isBusy) {
+            if (wasBusy) {
+                // Device just finished a busy task, wait a bit for system to settle
+                const timer = setTimeout(refreshAll, 1500);
+                return () => clearTimeout(timer);
+            } else {
+                refreshAll();
+            }
+        }
+    }, [deviceId, isActive, isBusy, refreshAll]);
+
+    const addTapAnimation = useCallback((x: number, y: number) => {
+        const id = Date.now();
+        if (!imgRef.current) return;
+        const rect = imgRef.current.getBoundingClientRect();
+        const scaleX = rect.width / imgRef.current.naturalWidth;
+        const scaleY = rect.height / imgRef.current.naturalHeight;
+
+        setTaps(prev => [...prev, { id, x: x * scaleX, y: y * scaleY }]);
+        setTimeout(() => setTaps(prev => prev.filter(t => t.id !== id)), 500);
+    }, []);
+
+    const addSwipeAnimation = useCallback((startX: number, startY: number, endX: number, endY: number) => {
+        const id = Date.now();
+        if (!imgRef.current) return;
+        const rect = imgRef.current.getBoundingClientRect();
+        const scaleX = rect.width / imgRef.current.naturalWidth;
+        const scaleY = rect.height / imgRef.current.naturalHeight;
+
+        setSwipes(prev => [...prev, {
+            id,
+            startX: startX * scaleX,
+            startY: startY * scaleY,
+            endX: endX * scaleX,
+            endY: endY * scaleY
+        }]);
+        setTimeout(() => setSwipes(prev => prev.filter(s => s.id !== id)), 600);
+    }, []);
+
+    const sendAdbInput = useCallback(async (cmd: string) => {
+        if (!deviceId || isBusy) return;
+        const args = ['shell', 'input', ...cmd.split(' ')];
+        try {
+            await invoke('run_adb_command', { device: deviceId, args });
+            setTimeout(refreshAll, 1500);
+        } catch (e) {
+            feedback.toast.error("inspector.input_error", e);
+        }
+    }, [deviceId, isBusy, refreshAll]);
+
+    const getCoords = useCallback((e: React.MouseEvent<HTMLImageElement>) => {
+        if (!imgRef.current) return null;
+        const rect = imgRef.current.getBoundingClientRect();
+        const scaleX = imgRef.current.naturalWidth / rect.width;
+        const scaleY = imgRef.current.naturalHeight / rect.height;
+        return {
+            x: Math.round((e.clientX - rect.left) * scaleX),
+            y: Math.round((e.clientY - rect.top) * scaleY)
+        };
+    }, []);
+
+    const processInteractionAt = useCallback((coords: { x: number, y: number }, isHover: boolean) => {
+        if (!rootNode) return;
+        const candidates = findNodesAtCoords(rootNode, coords.x, coords.y);
+        if (candidates.length === 0) {
+            if (isHover) setHoveredNode(null);
+            return;
+        }
+
+        const best = candidates[0];
+
+        if (isHover) {
+            setHoveredNode(best);
+            if (onNodeHovered) onNodeHovered(best);
+        } else {
+            // Priority-based sorting for selection stack
+            const exactMatches = candidates.filter((c: InspectorNode) =>
+                c.bounds && best.bounds &&
+                c.bounds.x === best.bounds.x &&
+                c.bounds.y === best.bounds.y &&
+                c.bounds.w === best.bounds.w &&
+                c.bounds.h === best.bounds.h
+            );
+
+            const getPriority = (node: InspectorNode): number => {
+                const attr = node.attributes || {};
+                if (attr['content-desc']) return 60;
+                if (attr['resource-id']) return 50;
+                if (attr['text']) return 40;
+                if (attr['clickable'] === 'true') return 30;
+                const isScrollView = (node.tagName && node.tagName.includes('ScrollView')) ||
+                    (attr['class'] && attr['class'].includes('ScrollView'));
+                if (isScrollView) return 20;
+                return 10;
+            };
+
+            exactMatches.sort((a, b) => getPriority(b) - getPriority(a));
+            setAvailableNodes(exactMatches);
+            setSelectedNode(exactMatches[0]);
+            if (onNodeSelected) onNodeSelected(exactMatches[0]);
+        }
+    }, [rootNode, onNodeHovered, onNodeSelected]);
+
+    const handleMouseMove = useCallback((e: React.MouseEvent<HTMLImageElement>) => {
+        const coords = getCoords(e);
+        if (!coords) return;
+
+        if (swipeStart) {
+            const dist = Math.sqrt(Math.pow(coords.x - swipeStart.x, 2) + Math.pow(coords.y - swipeStart.y, 2));
+            if (dist > 10) setIsDragging(true);
+        } else {
+            processInteractionAt(coords, true);
+        }
+    }, [swipeStart, getCoords, processInteractionAt]);
+
+    const handleMouseDown = useCallback((e: React.MouseEvent<HTMLImageElement>) => {
+        const coords = getCoords(e);
+        if (coords) {
+            setSwipeStart(coords);
+            setSwipeStartTime(Date.now());
+            setIsDragging(false);
+        }
+    }, [getCoords]);
+
+    const handleMouseUp = useCallback((e: React.MouseEvent<HTMLImageElement>) => {
+        if (swipeStart) {
+            const end = getCoords(e);
+            if (end && isDragging) {
+                const duration = swipeStartTime ? Math.max(100, Math.min(3000, Date.now() - swipeStartTime)) : 500;
+                sendAdbInput(`swipe ${swipeStart.x} ${swipeStart.y} ${end.x} ${end.y} ${Math.floor(duration)}`);
+                addSwipeAnimation(swipeStart.x, swipeStart.y, end.x, end.y);
+            } else if (end && !isDragging) {
+                processInteractionAt(end, false);
+            }
+        }
+        setSwipeStart(null);
+        setSwipeStartTime(null);
+        setIsDragging(false);
+    }, [swipeStart, isDragging, swipeStartTime, getCoords, processInteractionAt, sendAdbInput, addSwipeAnimation]);
+
+    const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLImageElement>) => {
+        const coords = getCoords(e);
+        if (coords) {
+            sendAdbInput(`tap ${coords.x} ${coords.y}`);
+            addTapAnimation(coords.x, coords.y);
+        }
+    }, [getCoords, sendAdbInput, addTapAnimation]);
+
+    return {
+        screenshot,
+        setScreenshot,
+        rootNode,
+        setRootNode,
+        loading,
+        imgLayout,
+        setImgLayout,
+        selectedNode,
+        setSelectedNode,
+        hoveredNode,
+        setHoveredNode,
+        availableNodes,
+        setAvailableNodes,
+        taps,
+        swipes,
+        imgRef,
+        refreshAll,
+        sendAdbInput,
+        addTapAnimation,
+        addSwipeAnimation,
+        handlers: {
+            onMouseMove: handleMouseMove,
+            onMouseDown: handleMouseDown,
+            onMouseUp: handleMouseUp,
+            onDoubleClick: handleDoubleClick
+        }
+    };
+}

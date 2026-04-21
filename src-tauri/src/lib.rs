@@ -9,12 +9,15 @@ mod xml_parser;
 mod ai_context;
 mod db;
 pub mod cmd_utils;
+pub mod errors;
+mod monitor;
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
 
 mod files;
+mod cmd_registry;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -38,80 +41,11 @@ pub fn run() {
             HashMap::new(),
         )))
         .manage(system::WakelockState(std::sync::Mutex::new(None)))
-        .invoke_handler(tauri::generate_handler![
-            greet,
-            adb::shell::get_adb_version,
-            adb::shell::run_adb_command,
-            adb::shell::start_adb_command,
-            adb::shell::stop_adb_command,
-            adb::shell::restart_adb_server,
-            adb::device::get_connected_devices,
-            runner::run_robot_test,
-            runner::run_maestro_test,
-            runner::run_appium_test,
-            runner::stop_test,
-            inspector::get_screenshot,
-            inspector::get_xml_dump,
-            logs::get_test_history,
-            logs::open_log_folder,
-            logs::open_path,
-            adb::wireless::adb_connect,
-            adb::wireless::adb_pair,
-            adb::wireless::adb_disconnect,
-            adb::wireless::adb_disconnect_all,
-            system::get_system_versions,
-            adb::shell::is_adb_server_running,
-            adb::shell::kill_adb_server,
-            adb::shell::start_adb_server,
-            adb::shell::get_adb_version,
-            appium::start_appium_server,
-            appium::stop_appium_server,
-            appium::get_appium_status,
-            appium::open_appium_log_terminal,
-            appium::start_appium_in_terminal,
-            ngrok::start_ngrok,
-            ngrok::stop_ngrok,
-            // Logcat
-            adb::logcat::start_logcat,
-            adb::logcat::stop_logcat,
-            adb::logcat::fetch_logcat_buffer,
-            adb::logcat::is_logcat_active,
-            adb::logcat::get_logcat_details,
-            // Stats
-            adb::stats::get_device_stats,
-            // Scrcpy
-            adb::scrcpy::open_scrcpy,
-            // Media
-            adb::media::save_screenshot,
-            adb::media::start_screen_recording,
-            adb::media::stop_screen_recording,
-            adb::network::get_device_ip,
-            files::list_directory,
-            files::save_file,
-            files::read_file,
-            files::read_file_tail,
-            files::read_image_base64,
-            files::save_image,
-            ai_context::get_ai_context,
-            // Packages
-            adb::packages::get_installed_packages,
-            adb::packages::uninstall_package,
-            adb::packages::enable_package,
-            adb::packages::disable_package,
-            adb::packages::clear_package,
-            adb::packages::install_package,
-            adb::packages::get_focused_package,
-            adb::packages::launch_package,
-            adb::packages::set_stay_on,
-            runner::get_robot_test_cases,
-            xml_parser::parse_robot_xml,
-            xml_parser::get_node_children,
-            xml_parser::get_execution_failures,
-            xml_parser::save_node_ai_analysis,
-            xml_parser::get_node_ai_analysis,
-            logs::save_test_summary,
-            system::toggle_wakelock
-        ])
+        .setup(|app| {
+            monitor::start_heartbeat_monitor(app.handle().clone());
+            Ok(())
+        })
+        .invoke_handler(generate_robot_runner_handler![])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| match event {

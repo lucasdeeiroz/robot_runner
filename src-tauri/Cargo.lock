@@ -3505,7 +3505,7 @@ dependencies = [
 
 [[package]]
 name = "robot_runner"
-version = "2.2.30"
+version = "2.2.40"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -3530,6 +3530,8 @@ dependencies = [
  "tauri-plugin-notification",
  "tauri-plugin-opener",
  "tauri-plugin-store",
+ "tempfile",
+ "thiserror 2.0.17",
  "tokio",
  "walkdir",
  "zstd",

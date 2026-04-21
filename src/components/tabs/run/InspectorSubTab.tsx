@@ -1,19 +1,15 @@
 
-import { useState, useEffect, useRef } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import { Maximize, Check, Scan, Home, ArrowLeft, Rows, X, RefreshCw, Search, Pencil, Copy, ChevronDown, ChevronUp, Videotape, Play, Trash2, Code, Move, MousePointer2, ArrowRight, ArrowUp, ArrowDown } from 'lucide-react';
-import { XMLParser } from 'fast-xml-parser';
+import { useState, useEffect } from 'react';
+import { Check, Scan, Home, ArrowLeft, Rows, X, Search, Pencil, Copy, ChevronDown, ChevronUp, Videotape, Play, Trash2, Code, Move, MousePointer2, ArrowRight, ArrowUp, ArrowDown } from 'lucide-react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
-import { InspectorNode, transformXmlToTree, findNodesAtCoords, generateXPath, findNodesByLocator, generateUiSelector, transformBounds } from '@/lib/inspectorUtils';
+import { InspectorNode, generateXPath, findNodesByLocator, generateUiSelector } from '@/lib/inspectorUtils';
 import { feedback } from "@/lib/feedback";
 import { Section } from "@/components/organisms/Section";
-import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 import { Button } from "@/components/atoms/Button";
 import { Input } from "@/components/atoms/Input";
 import { Select } from "@/components/atoms/Select";
 import { Modal } from "@/components/organisms/Modal";
-import { GestureOverlay } from "@/components/molecules/GestureOverlay";
 import { useSettings } from "@/lib/settings";
 import * as gemini from "@/lib/dashboard/gemini";
 import * as claude from "@/lib/dashboard/claude";
@@ -21,6 +17,8 @@ import * as openai from "@/lib/dashboard/openai";
 import { AiButton } from "@/components/atoms/AiButton";
 import { AiResponse } from "@/components/molecules/AiResponse";
 import { getSmartSelectorPrompt } from "@/lib/dashboard/prompts";
+import { useDeviceViewport } from '@/hooks/useDeviceViewport';
+import { DeviceViewport } from '@/components/organisms/DeviceViewport';
 
 
 interface InspectorSubTabProps {
@@ -46,16 +44,31 @@ interface RecordingStep {
 
 export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = false }: InspectorSubTabProps) {
     const { t, i18n } = useTranslation();
-    const [screenshot, setScreenshot] = useState<string | null>(null);
-    const [rootNode, setRootNode] = useState<InspectorNode | null>(null);
-    const [imgLayout, setImgLayout] = useState<{ width: number, height: number, naturalWidth: number, naturalHeight: number } | null>(null);
-    const [selectedNode, setSelectedNode] = useState<InspectorNode | null>(null);
-    const [hoveredNode, setHoveredNode] = useState<InspectorNode | null>(null);
-    const [availableNodes, setAvailableNodes] = useState<InspectorNode[]>([]);
+    const {
+        screenshot,
+        rootNode,
+        loading,
+        imgLayout,
+        setImgLayout,
+        selectedNode,
+        setSelectedNode,
+        hoveredNode,
+        setHoveredNode,
+        availableNodes,
+        setAvailableNodes,
+        taps,
+        swipes,
+        imgRef,
+        refreshAll,
+        sendAdbInput,
+        addTapAnimation,
+        handlers
+    } = useDeviceViewport({
+        deviceId: selectedDevice,
+        isActive,
+        isBusy: isTestRunning
+    });
 
-    const prevTestRunning = useRef(isTestRunning);
-
-    const [loading, setLoading] = useState(false);
     const [copied, setCopied] = useState<string | null>(null);
 
     // AI Suggestion State
@@ -68,9 +81,6 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
     const [aiCache, setAiCache] = useState<Record<string, { suggestion: string, rationale: string }>>({});
 
     // Interaction State
-    const [swipeStart, setSwipeStart] = useState<{ x: number, y: number } | null>(null);
-    const [swipeStartTime, setSwipeStartTime] = useState<number | null>(null);
-    const [isDragging, setIsDragging] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [searchResults, setSearchResults] = useState<InspectorNode[]>([]);
     const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -97,37 +107,19 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
     });
     const [customLocator, setCustomLocator] = useState("");
 
-    const imgRef = useRef<HTMLImageElement>(null);
-
-    // Animation State
-    const [taps, setTaps] = useState<{ id: number, x: number, y: number }[]>([]);
-    const [swipes, setSwipes] = useState<{ id: number, startX: number, startY: number, endX: number, endY: number }[]>([]);
-
-    const addTapAnimation = (x: number, y: number) => {
-        const id = Date.now();
-        if (!imgRef.current) return;
-        const rect = imgRef.current.getBoundingClientRect();
-        const scaleX = rect.width / imgRef.current.naturalWidth;
-        const scaleY = rect.height / imgRef.current.naturalHeight;
-        setTaps(prev => [...prev, { id, x: x * scaleX, y: y * scaleY }]);
-        setTimeout(() => setTaps(prev => prev.filter(t => t.id !== id)), 500);
-    };
-
-    const addSwipeAnimation = (startX: number, startY: number, endX: number, endY: number) => {
-        const id = Date.now();
-        if (!imgRef.current) return;
-        const rect = imgRef.current.getBoundingClientRect();
-        const scaleX = rect.width / imgRef.current.naturalWidth;
-        const scaleY = rect.height / imgRef.current.naturalHeight;
-        setSwipes(prev => [...prev, {
-            id,
-            startX: startX * scaleX,
-            startY: startY * scaleY,
-            endX: endX * scaleX,
-            endY: endY * scaleY
-        }]);
-        setTimeout(() => setSwipes(prev => prev.filter(s => s.id !== id)), 600);
-    };
+    // Auto-load AI suggestion from cache when node changes
+    useEffect(() => {
+        if (selectedNode && aiCache[selectedNode.id]) {
+            const cached = aiCache[selectedNode.id];
+            setAiSuggestion(cached.suggestion);
+            setAiRationale(cached.rationale);
+            setShowAiSection(true);
+        } else {
+            setAiSuggestion(null);
+            setAiRationale(null);
+            setShowAiSection(false);
+        }
+    }, [selectedNode, aiCache]);
 
     const handleSearch = (query: string) => {
         setSearchQuery(query);
@@ -139,172 +131,11 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
         setSearchResults(results);
     };
 
-    const refreshAll = async () => {
-        if (!selectedDevice) return;
-        setLoading(true);
-        try {
-            const b64 = await invoke<string>('get_screenshot', { deviceId: selectedDevice });
-            setScreenshot(b64);
-            const xml = await invoke<string>('get_xml_dump', { deviceId: selectedDevice });
-            const parser = new XMLParser({
-                ignoreAttributes: false,
-                attributeNamePrefix: "",
-                textNodeName: "_text"
-            });
-            const jsonObj = parser.parse(xml);
-            const root = jsonObj.hierarchy ? transformXmlToTree(jsonObj.hierarchy, undefined, 'hierarchy') : transformXmlToTree(jsonObj);
-            setRootNode(root);
-            feedback.toast.success('feedback.inspector_updated');
-        } catch (e) {
-            feedback.toast.error("inspector.update_error", e);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const sendAdbInput = async (cmd: string) => {
-        if (!selectedDevice || isTestRunning) return;
-        const args = ['shell', 'input', ...cmd.split(' ')];
-        try {
-            await invoke('run_adb_command', { device: selectedDevice, args });
-            setTimeout(refreshAll, 1500);
-        } catch (e) {
-            feedback.toast.error("inspector.input_error", e);
-        }
-    };
-
-    const getCoords = (e: React.MouseEvent<HTMLImageElement>) => {
-        if (!imgRef.current) return null;
-        const rect = imgRef.current.getBoundingClientRect();
-        const scaleX = imgRef.current.naturalWidth / rect.width;
-        const scaleY = imgRef.current.naturalHeight / rect.height;
-        return {
-            x: Math.round((e.clientX - rect.left) * scaleX),
-            y: Math.round((e.clientY - rect.top) * scaleY)
-        };
-    };
-
-    const processMouseInteraction = (e: React.MouseEvent<HTMLImageElement>, isHover: boolean) => {
-        if (!rootNode || !imgRef.current) return false;
-        const coords = getCoords(e);
-        if (!coords) return false;
-
-        const candidates = findNodesAtCoords(rootNode, coords.x, coords.y);
-        if (candidates.length === 0) return false;
-        const best = candidates[0];
-
-        if (isHover) {
-            if (best !== hoveredNode) setHoveredNode(best);
-        } else {
-            const exactMatches = candidates.filter((c: InspectorNode) =>
-                c.bounds && best.bounds &&
-                c.bounds.x === best.bounds.x &&
-                c.bounds.y === best.bounds.y &&
-                c.bounds.w === best.bounds.w &&
-                c.bounds.h === best.bounds.h
-            );
-
-            const getPriority = (node: InspectorNode): number => {
-                const attr = node.attributes || {};
-                if (attr['content-desc']) return 60;
-                if (attr['resource-id']) return 50;
-                if (attr['text']) return 40;
-                if (attr['clickable'] === 'true') return 30;
-                const isScrollView = (node.tagName && node.tagName.includes('ScrollView')) ||
-                    (attr['class'] && attr['class'].includes('ScrollView'));
-                if (isScrollView) return 20;
-                return 10;
-            };
-
-            exactMatches.sort((a, b) => getPriority(b) - getPriority(a));
-            setAvailableNodes(exactMatches);
-            setSelectedNode(exactMatches[0]);
-        }
-        return true;
-    };
-
-    const handleImageMouseDown = (e: React.MouseEvent<HTMLImageElement>) => {
-        const coords = getCoords(e);
-        if (coords) {
-            setSwipeStart(coords);
-            setSwipeStartTime(Date.now());
-            setIsDragging(false);
-        }
-    };
-
-    const handleImageMouseUp = (e: React.MouseEvent<HTMLImageElement>) => {
-        if (swipeStart) {
-            const end = getCoords(e);
-            if (end && isDragging) {
-                const duration = swipeStartTime ? Math.max(100, Math.min(3000, Date.now() - swipeStartTime)) : 500;
-                sendAdbInput(`swipe ${swipeStart.x} ${swipeStart.y} ${end.x} ${end.y} ${Math.floor(duration)}`);
-                addSwipeAnimation(swipeStart.x, swipeStart.y, end.x, end.y);
-            } else if (end && !isDragging) {
-                processMouseInteraction(e, false);
-                setSearchResults([]);
-            }
-        }
-        setSwipeStart(null);
-        setSwipeStartTime(null);
-        setIsDragging(false);
-    };
-
-    const handleScreenshotDoubleClick = (e: React.MouseEvent<HTMLImageElement>) => {
-        const coords = getCoords(e);
-        if (coords) {
-            sendAdbInput(`tap ${coords.x} ${coords.y}`);
-            addTapAnimation(coords.x, coords.y);
-        }
-    };
-
-    const handleImageMouseMove = (e: React.MouseEvent<HTMLImageElement>) => {
-        if (swipeStart) {
-            const coords = getCoords(e);
-            if (coords) {
-                const dist = Math.sqrt(Math.pow(coords.x - swipeStart.x, 2) + Math.pow(coords.y - swipeStart.y, 2));
-                if (dist > 10) setIsDragging(true);
-            }
-        }
-        processMouseInteraction(e, true);
-    };
-
     const copyToClipboard = (text: string, label: string) => {
         if (!text) return;
         navigator.clipboard.writeText(text);
         setCopied(label);
         setTimeout(() => setCopied(null), 2000);
-    };
-
-    const getHighlighterStyle = (node: InspectorNode | null, color: string) => {
-        if (!node || !node.bounds || !imgLayout || !rootNode) return {};
-
-        // Use natural dimensions from the captured layout
-        const { width: dispWidth, height: dispHeight, naturalWidth, naturalHeight } = imgLayout;
-
-        // Detect XML orientation from rootNode bounds (now reliably computed in transformXmlToTree)
-        const xmlWidth = rootNode.bounds?.w || naturalWidth;
-        const xmlHeight = rootNode.bounds?.h || naturalHeight;
-
-        // Transform bounds if there's an orientation mismatch
-        const transformedBounds = transformBounds(
-            node.bounds,
-            xmlWidth,
-            xmlHeight,
-            naturalWidth,
-            naturalHeight
-        );
-
-        const scaleX = dispWidth / naturalWidth;
-        const scaleY = dispHeight / naturalHeight;
-
-        return {
-            left: (transformedBounds.x * scaleX),
-            top: (transformedBounds.y * scaleY),
-            width: transformedBounds.w * scaleX,
-            height: transformedBounds.h * scaleY,
-            borderColor: color,
-            display: 'block'
-        };
     };
 
     const handleOpenEditModal = (attr: 'resource-id' | 'content-desc' | 'xpath' | 'uiselector') => {
@@ -378,6 +209,15 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
     const handleAiSuggest = async (customPrompt?: string) => {
         if (!selectedNode || isAiLoading) return;
 
+        // Check cache first (unless a custom prompt is provided)
+        if (!customPrompt && aiCache[selectedNode.id]) {
+            const cached = aiCache[selectedNode.id];
+            setAiSuggestion(cached.suggestion);
+            setAiRationale(cached.rationale);
+            setShowAiSection(true);
+            return;
+        }
+
         setShowAiSection(true);
 
         // Explicit click always triggers a new generation. 
@@ -446,41 +286,6 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
         }
     };
 
-
-    useEffect(() => {
-        if (selectedNode && aiCache[selectedNode.id]) {
-            setAiSuggestion(aiCache[selectedNode.id].suggestion);
-            setAiRationale(aiCache[selectedNode.id].rationale);
-            setShowAiSection(true);
-            setAiError(null);
-        } else {
-            setAiSuggestion(null);
-            setAiRationale(null);
-            setShowAiSection(false);
-            setAiError(null);
-        }
-    }, [selectedNode, aiCache]);
-
-    useEffect(() => {
-        if (!selectedDevice) {
-            setScreenshot(null);
-            setRootNode(null);
-            setSelectedNode(null);
-            setAiCache({});
-            prevTestRunning.current = isTestRunning;
-            return;
-        }
-        if (isActive && !isTestRunning) {
-            if (prevTestRunning.current) {
-                const timer = setTimeout(refreshAll, 1500);
-                prevTestRunning.current = false;
-                return () => clearTimeout(timer);
-            } else {
-                refreshAll();
-            }
-        }
-        prevTestRunning.current = isTestRunning;
-    }, [selectedDevice, isActive, isTestRunning]);
 
     if (!selectedDevice) {
         return (
@@ -566,106 +371,28 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
 
             <div className="flex-1 grid grid-cols-[auto_1fr] gap-2 min-h-0 overflow-hidden">
                 <div className="flex flex-col items-center justify-center overflow-hidden relative max-w-[30vw] rounded-2xl">
-                    {screenshot ? (
-                        <div className="relative inline-block shadow-2xl rounded-lg flex-shrink-0 overflow-hidden group/screen">
-                            {/* Camera-cutout style Refresh Button */}
-                            {loading ? (
-                                <Button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        refreshAll();
-                                    }}
-                                    disabled={loading}
-                                    className={clsx(
-                                        "absolute top-0.5 left-1/2 -translate-x-1/2 z-[60] w-auto h-6 rounded-full",
-                                        "bg-black/50 backdrop-blur-sm border border-white/20 flex items-center justify-center",
-                                        "text-white/80 hover:text-white hover:bg-black/80 transition-all shadow-lg",
-                                        loading && "cursor-wait"
-                                    )}
-                                    title={t('inspector.refresh')}
-                                    leftIcon={<RefreshCw size={12} className={clsx(loading && "animate-spin")} />}
-                                >
-                                    {t('common.loading')}
-                                </Button>
-                            )
-                                : <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        refreshAll();
-                                    }}
-                                    disabled={loading}
-                                    className={clsx(
-                                        "absolute top-0.5 left-1/2 -translate-x-1/2 z-[60] w-6 h-6 rounded-full",
-                                        "bg-black/50 backdrop-blur-sm border border-white/20 flex items-center justify-center",
-                                        "text-white/80 hover:text-white hover:bg-black/80 transition-all shadow-lg",
-                                        loading && "cursor-wait"
-                                    )}
-                                    title={t('inspector.refresh')}
-                                >
-                                    <RefreshCw size={12} className={clsx(loading && "animate-spin")} />
-                                </button>
-                            }
-
-                            {loading && <GestureOverlay />}
-                            <img
-                                ref={imgRef}
-                                src={`data:image/png;base64,${screenshot}`}
-                                alt="Device Screenshot"
-                                className="block w-auto h-auto max-w-full max-h-[650px] select-none rounded-lg"
-                                onLoad={(e) => {
-                                    const img = e.currentTarget;
-                                    setImgLayout({
-                                        width: img.clientWidth,
-                                        height: img.clientHeight,
-                                        naturalWidth: img.naturalWidth,
-                                        naturalHeight: img.naturalHeight
-                                    });
-                                }}
-                                onMouseMove={handleImageMouseMove}
-                                onMouseDown={handleImageMouseDown}
-                                onMouseUp={handleImageMouseUp}
-                                onDoubleClick={handleScreenshotDoubleClick}
-                                draggable={false}
-                            />
-                            {taps.map(tap => (
-                                <div
-                                    key={tap.id}
-                                    className="absolute rounded-2xl bg-surface border-2 border-on-primary animate-ping pointer-events-none"
-                                    style={{ left: tap.x - 20, top: tap.y - 20, width: 40, height: 40, animationDuration: '0.4s' }}
-                                />
-                            ))}
-                            {swipes.map(swipe => (
-                                <svg key={swipe.id} className="absolute top-0 left-0 w-full h-full pointer-events-none" style={{ zIndex: 30 }}>
-                                    <defs>
-                                        <marker id={`arrow-${swipe.id}`} markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
-                                            <path d="M0,0 L0,6 L9,3 z" fill="#f97316" />
-                                        </marker>
-                                    </defs>
-                                    <line
-                                        x1={swipe.startX} y1={swipe.startY} x2={swipe.endX} y2={swipe.endY}
-                                        stroke="#f97316" strokeWidth="4" strokeOpacity="0.8" markerEnd={`url(#arrow-${swipe.id})`}
-                                    >
-                                        <animate attributeName="opacity" values="1;0" dur="0.5s" fill="freeze" />
-                                    </line>
-                                </svg>
-                            ))}
-                            {isDragging && swipeStart && (
-                                <div className="absolute w-full h-full top-0 left-0 pointer-events-none z-30">
-                                    <div className="absolute w-4 h-4 bg-orange-500 rounded-2xl -ml-2 -mt-2 opacity-50" style={{ left: swipeStart.x, top: swipeStart.y }} />
-                                </div>
-                            )}
-                            {searchResults.map((node) => (
-                                <div key={node.id} className="absolute border-2 border-success pointer-events-none z-30" style={getHighlighterStyle(node, '#22c55e')} />
-                            ))}
-                            <div className="absolute border-2 border-info-container/80 pointer-events-none transition-all duration-75 z-10" style={{ ...getHighlighterStyle(hoveredNode, '#60a5fa'), display: hoveredNode ? 'block' : 'none' }} />
-                            <div className="absolute border-2 border-error pointer-events-none z-20" style={{ ...getHighlighterStyle(selectedNode, '#ef4444'), display: selectedNode ? 'block' : 'none' }} />
-                        </div>
-                    ) : (
-                        <div className="text-on-surface/80 flex flex-col items-center">
-                            {loading ? <ExpressiveLoading size="lg" variant="circular" className="mb-2" /> : <Maximize size={32} className="mb-2 opacity-50" />}
-                            <p>{loading ? t('inspector.status.loading') : t('inspector.status.no_screenshot')}</p>
-                        </div>
-                    )}
+                    <DeviceViewport
+                        screenshot={screenshot}
+                        loading={loading}
+                        imgRef={imgRef}
+                        imgLayout={imgLayout}
+                        onImgLoad={(e) => {
+                            const img = e.currentTarget;
+                            setImgLayout({
+                                width: img.clientWidth,
+                                height: img.clientHeight,
+                                naturalWidth: img.naturalWidth,
+                                naturalHeight: img.naturalHeight
+                            });
+                        }}
+                        hoveredNode={hoveredNode}
+                        selectedNode={selectedNode}
+                        searchResults={searchResults}
+                        taps={taps}
+                        swipes={swipes}
+                        onRefresh={refreshAll}
+                        handlers={handlers}
+                    />
                 </div>
 
                 <div className="bg-surface border border-outline-variant/30 rounded-2xl flex flex-col overflow-hidden shadow-sm flex-1">

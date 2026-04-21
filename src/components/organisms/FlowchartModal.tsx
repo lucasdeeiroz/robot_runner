@@ -1,37 +1,31 @@
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { ScreenMap, FlowchartLayout, LayoutNode, LayoutEdge, NavigationData } from '@/lib/types';
-import { X, ZoomIn, ZoomOut, Maximize, Save, Upload, Download, Camera, Plus, AlertTriangle, Eraser } from 'lucide-react';
+import { ScreenMap } from '@/lib/types';
 import { useTranslation } from 'react-i18next';
-import clsx from 'clsx';
-import { loadFlowchartLayout, deleteFlowchartLayout, exportMapperData, importMapperData, saveScreenMap } from '@/lib/dashboard/mapperPersistence';
+import { exportMapperData, importMapperData } from '@/lib/dashboard/mapperPersistence';
 import { feedback } from '@/lib/feedback';
 import { save, open } from '@tauri-apps/plugin-dialog';
-import { invoke } from '@tauri-apps/api/core';
 import { toPng } from 'html-to-image';
-import { Button } from '@/components/atoms/Button';
-import { Select } from '@/components/atoms/Select';
-import { GroupedScreenSelect } from '@/components/molecules/GroupedScreenSelect';
-import { GroupedElementSelect } from '@/components/molecules/GroupedElementSelect';
 import { useSettings } from '@/lib/settings';
-import { reorganizeFlowchartLayout as reorganizeWithGemini } from '@/lib/dashboard/gemini';
-import { reorganizeFlowchartLayout as reorganizeWithOpenAI } from '@/lib/dashboard/openai';
-import { reorganizeFlowchartLayout as reorganizeWithClaude } from '@/lib/dashboard/claude';
-import { AiButton } from '@/components/atoms/AiButton';
-import { getAiContext } from '@/lib/dashboard/historyAnalysisUtils';
-import {
-    CELL_WIDTH,
-    CELL_HEIGHT,
-    NODE_WIDTH,
-    NODE_HEIGHT,
-    NODE_OFFSET_X,
-    NODE_OFFSET_Y,
-    LANE_SIZE,
-    NODE_PORTS
-} from './flowchart/types';
+
+// Hooks
+import { useFlowchartView } from './flowchart/hooks/useFlowchartView';
+import { useFlowchartLayout } from './flowchart/hooks/useFlowchartLayout';
+import { useFlowchartInteraction } from './flowchart/hooks/useFlowchartInteraction';
+
+// Components
+import { FlowchartHeader } from './flowchart/components/FlowchartHeader';
+import { FlowchartCanvas } from './flowchart/components/FlowchartCanvas';
+import { FlowchartSVG } from './flowchart/components/FlowchartSVG';
+import { QuickConnectDialog } from './flowchart/components/QuickConnectDialog';
+import { UnsavedChangesDialog } from './flowchart/components/UnsavedChangesDialog';
 import { FlowNode } from './flowchart/FlowNode';
 import { FlowEdgeLine, FlowEdgeControls } from './flowchart/FlowEdge';
 import { FlowPort } from './flowchart/FlowPort';
+
+import { 
+    NODE_PORTS 
+} from './flowchart/types';
 
 interface FlowchartModalProps {
     isOpen: boolean;
@@ -42,1917 +36,330 @@ interface FlowchartModalProps {
     activeProfileId: string;
 }
 
-
-// Grid and Node constants are now imported from ./flowchart/types
-
-// Types and constants are now imported
-
 export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh, activeProfileId }: FlowchartModalProps) {
-    const { t, i18n } = useTranslation();
-    const [viewTransform, setViewTransform] = useState({ scale: 1, offset: { x: 0, y: 0 } });
-    const scale = viewTransform.scale;
-    const offset = viewTransform.offset;
-    const setOffset = (o: { x: number, y: number } | ((prev: { x: number, y: number }) => { x: number, y: number })) => setViewTransform(curr => ({ ...curr, offset: typeof o === 'function' ? o(curr.offset) : o }));
-
-    const transformRef = useRef(viewTransform);
-    useEffect(() => { transformRef.current = viewTransform; }, [viewTransform]);
-    const [isDraggingCanvas, setIsDraggingCanvas] = useState(false);
-    const containerRef = useRef<HTMLDivElement>(null);
-
-    const activeProfileIdRef = useRef(activeProfileId);
-    useEffect(() => { activeProfileIdRef.current = activeProfileId; }, [activeProfileId]);
-    const contentRef = useRef<HTMLDivElement>(null);
-    const dragStart = useRef({ x: 0, y: 0 });
-
-    // Layout State
-    const [layout, setLayout] = useState<FlowchartLayout>({ version: 1, nodes: {}, edges: {} });
+    const { t } = useTranslation();
     const { settings } = useSettings();
-    const [isReorganizing, setIsReorganizing] = useState(false);
-    const layoutRef = useRef(layout);
-    useEffect(() => { layoutRef.current = layout; }, [layout]);
-    const [loading, setLoading] = useState(true);
-
-    // Interaction State
-    const [dragItem, setDragItem] = useState<{
-        type: 'node' | 'vertex' | 'source' | 'target' | 'segment';
-        id: string; // Node Name or Edge ID
-        index?: number;
-        points?: { x: number, y: number }[]; // Snapshot of points for segment dragging
-    } | null>(null);
-
-    // Initial drag position
-    const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
-
-    // For rendering potential connections
-    const [hoveredPort, setHoveredPort] = useState<{ nodeId: string, portId: string } | null>(null);
-    const [hoveredEdge, setHoveredEdge] = useState<string | null>(null);
-
-    // Quick Connect State
-    const [quickConnectData, setQuickConnectData] = useState<{
-        sourceNodeId: string;
-        sourcePortId: string;
-        sourceElement?: string; // If mapped element
-    } | null>(null);
-    const [isQuickConnectOpen, setIsQuickConnectOpen] = useState(false);
-
-    const [isExporting, setIsExporting] = useState(false);
-    const [isDirty, setIsDirty] = useState(false);
-    const [missedScreens, setMissedScreens] = useState<string[]>([]);
-    const [showUnsavedChangesModal, setShowUnsavedChangesModal] = useState(false);
-    const [isSpacePressed, setIsSpacePressed] = useState(false);
-    const isSpacePressedRef = useRef(isSpacePressed);
-    useEffect(() => { isSpacePressedRef.current = isSpacePressed; }, [isSpacePressed]);
-
-    // Filtering State
+    const containerRef = useRef<HTMLDivElement>(null);
+    const contentRef = useRef<HTMLDivElement>(null);
     const [filterTag, setFilterTag] = useState<string | null>(null);
+    const [showUnsavedChangesModal, setShowUnsavedChangesModal] = useState(false);
+    const [isQuickConnectOpen, setIsQuickConnectOpen] = useState(false);
+    const [quickConnectData, setQuickConnectData] = useState<{ sourceNodeId: string; sourcePortId: string } | null>(null);
 
-    const allTags = useMemo(() => {
-        const tags = maps.flatMap(m => m.tags || []);
-        return Array.from(new Set(tags)).sort();
-    }, [maps]);
-
-    const isInteracting = !!dragItem || isDraggingCanvas || isQuickConnectOpen || isExporting;
-
-    const matchesFilter = (screenName: string) => {
-        if (!filterTag) return true;
-        const screen = maps.find(m => m.name === screenName);
-        return screen?.tags?.includes(filterTag) || false;
-    };
-
-    // --- Logic Callbacks ---
-
-    const centerView = useCallback(() => {
-        if (!containerRef.current) return;
-        const currentLayout = layoutRef.current;
-        const currentTransform = transformRef.current;
-
-        const nodePositions = Object.values(currentLayout.nodes);
-        if (nodePositions.length === 0) {
-            setOffset({ x: 0, y: 0 });
-            return;
-        }
-
-        const minX = Math.min(...nodePositions.map(n => n.gridX * CELL_WIDTH + NODE_OFFSET_X));
-        const maxX = Math.max(...nodePositions.map(n => n.gridX * CELL_WIDTH + NODE_OFFSET_X + NODE_WIDTH));
-        const minY = Math.min(...nodePositions.map(n => n.gridY * CELL_HEIGHT + NODE_OFFSET_Y));
-        const maxY = Math.max(...nodePositions.map(n => n.gridY * CELL_HEIGHT + NODE_OFFSET_Y + NODE_HEIGHT));
-
-        const centerX = (minX + maxX) / 2;
-        const centerY = (minY + maxY) / 2;
-
-        const containerWidth = containerRef.current.clientWidth;
-        const containerHeight = containerRef.current.clientHeight;
-
-        setOffset({
-            x: (containerWidth / 2) - (centerX * currentTransform.scale),
-            y: (containerHeight / 2) - (centerY * currentTransform.scale)
-        });
-    }, []);
-
-    const loadLayout = useCallback(async () => {
-        // Guard: if we have unsaved changes, don't clobber them unless it's a profile change
-        if (isDirty && !loading) {
-            console.log("[Flowchart] isDirty is true, skipping prop-triggered loadLayout to protect local state.");
-            return;
-        }
-        setLoading(true);
-
-        // 1. One-way migration: if central flowchart_layout.json exists, merge into individual ScreenMaps
-        const centralLayout = await loadFlowchartLayout(activeProfileId);
-        if (centralLayout) {
-            feedback.toast.info(t('mapper.flowchart.migrating', 'Migrating layout data...'));
-            for (const [screenName, node] of Object.entries(centralLayout.nodes)) {
-                const map = maps.find(m => m.name === screenName);
-                if (map) {
-                    map.layout = { gridX: node.gridX, gridY: node.gridY };
-                }
-            }
-
-            for (const [edgeId, edge] of Object.entries(centralLayout.edges)) {
-                // Find matching source and element
-                for (const map of maps) {
-                    for (const el of map.elements) {
-                        const targetName = typeof el.navigates_to === 'string' ? el.navigates_to : (Array.isArray(el.navigates_to) ? el.navigates_to[0]?.destination : (el.navigates_to as NavigationData)?.destination);
-                        if (!targetName) continue;
-
-                        const expectedEdgeId = `${map.name}-${el.name}-${targetName}`;
-                        if (expectedEdgeId === edgeId) {
-                            el.navigates_to = {
-                                destination: targetName,
-                                sourceHandle: edge.sourceHandle,
-                                targetHandle: edge.targetHandle,
-                                vertices: edge.vertices
-                            };
-                        }
-                    }
-                }
-            }
-
-            // Save all migrated maps and delete central file
-            try {
-                for (const map of maps) {
-                    await saveScreenMap(activeProfileId, map);
-                }
-                await deleteFlowchartLayout(activeProfileId);
-                feedback.toast.success(t('mapper.flowchart.migration_success', 'Layout migration complete!'));
-                if (onRefresh) onRefresh();
-            } catch (e) {
-                console.error("Migration failed", e);
-                feedback.toast.error(t('mapper.flowchart.migration_error'));
-            }
-        }
-
-        // 2. Reconstruct state from maps (Source of truth is now individual ScreenMaps)
-        const reconstructedNodes: Record<string, LayoutNode> = {};
-        const reconstructedEdges: Record<string, LayoutEdge> = {};
-
-        maps.forEach(map => {
-            if (map.layout) {
-                reconstructedNodes[map.name] = map.layout;
-            }
-
-            map.elements.forEach(el => {
-                if (el.navigates_to) {
-                    const targetName = typeof el.navigates_to === 'string' ? el.navigates_to : (Array.isArray(el.navigates_to) ? el.navigates_to[0]?.destination : (el.navigates_to as NavigationData)?.destination);
-                    
-                    // SANITY CHECK: Only load edges if target screen still exists in maps
-                    const targetExists = maps.some(m => m.name === targetName);
-                    if (!targetExists) return;
-
-                    const edgeId = `${map.name}-${el.name}-${targetName}`;
-
-                    if (typeof el.navigates_to === 'object') {
-                        reconstructedEdges[edgeId] = {
-                            sourceHandle: Array.isArray(el.navigates_to) ? el.navigates_to[0]?.sourceHandle : (el.navigates_to as NavigationData)?.sourceHandle,
-                            targetHandle: Array.isArray(el.navigates_to) ? el.navigates_to[0]?.targetHandle : (el.navigates_to as NavigationData)?.targetHandle,
-                            vertices: Array.isArray(el.navigates_to) ? el.navigates_to[0]?.vertices : (el.navigates_to as NavigationData)?.vertices
-                        };
-                    } else {
-                        reconstructedEdges[edgeId] = {};
-                    }
-                }
-            });
-        });
-
-        setLayout({ version: 2, nodes: reconstructedNodes, edges: reconstructedEdges });
-        setLoading(false);
-
-        // Auto-center after layout is loaded
-        setTimeout(centerView, 100);
-    }, [activeProfileId, maps, centerView, onRefresh, t]);
-
-    const performZoom = useCallback((change: number, center?: { x: number, y: number }) => {
-        if (!containerRef.current) return;
-
-        setViewTransform(curr => {
-            const rect = containerRef.current!.getBoundingClientRect();
-
-            // If no center provided (e.g. buttons), use center of viewport
-            const viewportX = center ? center.x : rect.width / 2;
-            const viewportY = center ? center.y : rect.height / 2;
-
-            // Calculate point in "Content Space" before zoom
-            const contentX = (viewportX - curr.offset.x) / curr.scale;
-            const contentY = (viewportY - curr.offset.y) / curr.scale;
-
-            // Calculate New Scale
-            const newScale = Math.min(Math.max(curr.scale + change, 0.1), 3);
-            if (newScale === curr.scale) return curr;
-
-            // Calculate New Offset to preserve content point at viewport point
-            const newOffsetX = viewportX - (contentX * newScale);
-            const newOffsetY = viewportY - (contentY * newScale);
-
-            return {
-                scale: newScale,
-                offset: { x: newOffsetX, y: newOffsetY }
-            };
-        });
-    }, []);
-
-    const saveLayout = async () => {
-        // Now persists back to individual ScreenMap files
-        const mapsToSave = [...maps];
-        let hasChanges = false;
-
-        // 1. Update Layout Nodes (gridX, gridY)
-        Object.entries(layout.nodes).forEach(([screenName, nodeLayout]) => {
-            const map = mapsToSave.find(m => m.name === screenName);
-            if (map) {
-                if (JSON.stringify(map.layout) !== JSON.stringify(nodeLayout)) {
-                    map.layout = nodeLayout;
-                    hasChanges = true;
-                }
-            }
-        });
-
-        // 2. Update Layout Edges (handles, vertices)
-        Object.entries(layout.edges).forEach(([edgeId, edgeData]) => {
-            mapsToSave.forEach(m => {
-                m.elements.forEach(el => {
-                    const targetName = typeof el.navigates_to === 'string' ? el.navigates_to : (Array.isArray(el.navigates_to) ? el.navigates_to[0]?.destination : (el.navigates_to as NavigationData)?.destination);
-                    if (!targetName) return;
-
-                    const currentEdgeId = `${m.name}-${el.name}-${targetName}`;
-                    if (currentEdgeId === edgeId) {
-                        const newNav: any = {
-                            destination: targetName,
-                            sourceHandle: edgeData.sourceHandle,
-                            targetHandle: edgeData.targetHandle,
-                            vertices: edgeData.vertices
-                        };
-                        if (JSON.stringify(el.navigates_to) !== JSON.stringify(newNav)) {
-                            el.navigates_to = newNav;
-                            hasChanges = true;
-                        }
-                    }
-                });
-            });
-        });
-
-        if (hasChanges || isDirty) {
-            try {
-                for (const map of mapsToSave) {
-                    await saveScreenMap(activeProfileId, map);
-                }
-                setIsDirty(false);
-                feedback.toast.success(t('common.saved', 'Saved'));
-                if (onRefresh) onRefresh();
-            } catch (e) {
-                console.error("Failed to save decentralized layout", e);
-                feedback.toast.error(t('mapper.flowchart.save_error'));
-            }
-        } else {
-            feedback.toast.info(t('mapper.flowchart.no_changes'));
-            setIsDirty(false);
-        }
-    };
-
-    const handleClose = () => {
-        if (isDirty) {
-            setShowUnsavedChangesModal(true);
-        } else {
-            onClose();
-        }
-    };
-
-    // Load Layout only on open or profile change to prevent prop updates from clobbering local state
+    const [isSpacePressed, setIsSpacePressed] = useState(false);
     useEffect(() => {
-        if (isOpen) {
-            loadLayout();
-        }
-    }, [isOpen, activeProfileId]); // maps removed from dependencies to stabilize local state
-
-    // Keyboard Listeners
-    useEffect(() => {
-        if (!isOpen) return;
-
-        const handleKeyDown = (e: KeyboardEvent) => {
-            // 1. Space for Pan Mode
-            if (e.code === 'Space' && !isSpacePressedRef.current && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'SELECT') {
-                e.preventDefault();
-                setIsSpacePressed(true);
-            }
-
-            // 2. Arrows for Panning
-            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
-                if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'SELECT') return;
-                e.preventDefault();
-                const step = 40;
-                setOffset(prev => ({
-                    x: e.code === 'ArrowLeft' ? prev.x + step : (e.code === 'ArrowRight' ? prev.x - step : prev.x),
-                    y: e.code === 'ArrowUp' ? prev.y + step : (e.code === 'ArrowDown' ? prev.y - step : prev.y)
-                }));
-            }
-
-            // 3. Zoom Shortcuts (+, -, Ctrl+0)
-            if (e.key === '+' || e.key === '=') {
-                performZoom(0.1);
-            }
-            if (e.key === '-' || e.key === '_') {
-                performZoom(-0.1);
-            }
-            if ((e.ctrlKey || e.metaKey) && e.key === '0') {
-                e.preventDefault();
-                setViewTransform({ scale: 1, offset: { x: 0, y: 0 } });
-            }
-        };
-
-        const handleKeyUp = (e: KeyboardEvent) => {
-            if (e.code === 'Space') {
-                setIsSpacePressed(false);
-            }
-        };
-
+        const handleKeyDown = (e: KeyboardEvent) => { if (e.code === 'Space') setIsSpacePressed(true); };
+        const handleKeyUp = (e: KeyboardEvent) => { if (e.code === 'Space') setIsSpacePressed(false); };
         window.addEventListener('keydown', handleKeyDown);
         window.addEventListener('keyup', handleKeyUp);
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('keyup', handleKeyUp);
         };
-    }, [isOpen, performZoom]);
+    }, []);
 
-    const handleSaveAndExit = async () => {
-        await saveLayout();
-        setShowUnsavedChangesModal(false);
-        onClose();
-    };
+    const view = useFlowchartView(containerRef);
+    const layoutHook = useFlowchartLayout({ maps, activeProfileId, onRefresh, settings });
+    const { 
+        layout, setLayout, isDirty, setIsDirty, 
+        isReorganizing, missedScreens, allTags, gridBounds, 
+        saveLayout, autoReorganizeLayout, handleClearAllCurvatures 
+    } = layoutHook;
 
-    const handleExitWithoutSaving = () => {
-        setIsDirty(false);
-        setShowUnsavedChangesModal(false);
-        onClose();
-    };
+    const interaction = useFlowchartInteraction({
+        layout, setLayout, viewTransform: view.viewTransform,
+        setOffset: view.setOffset, performZoom: view.performZoom,
+        setIsDirty, containerRef, 
+        getPixelCoords: view.getPixelCoords, getPortCoords: view.getPortCoords,
+        snapToLanes: view.snapToLanes, getClosestLane: view.getClosestLane
+    });
 
-    const handleExport = async () => {
-        try {
-            const data = await exportMapperData(activeProfileId);
-            const path = await save({
-                filters: [{ name: 'Robot Runner Flow', extensions: ['json'] }],
-                defaultPath: `flowchart_export_${new Date().toISOString().split('T')[0]}.json`
-            });
 
-            if (path) {
-                await invoke('save_file', { path, content: data, append: false });
-                feedback.toast.success(t('mapper.flowchart.export_success'));
-            }
-        } catch (e) {
-            console.error(e);
-            feedback.toast.error(t('mapper.flowchart.export_error'));
-        }
-    };
+    const matchesFilter = useCallback((screenName: string) => {
+        if (!filterTag) return true;
+        const map = maps.find(m => m.name === screenName);
+        return map?.tags?.includes(filterTag) || false;
+    }, [maps, filterTag]);
 
     const handleImport = async () => {
-        try {
-            const path = await open({
-                filters: [{ name: 'Robot Runner Flow', extensions: ['json'] }],
-                multiple: false
-            });
-
-            if (path && typeof path === 'string') {
-                const content = await invoke<string>('read_file', { path });
+        const selected = await open({ filters: [{ name: 'JSON', extensions: ['json'] }] });
+        if (selected) {
+            try {
+                const { readTextFile } = await import('@tauri-apps/plugin-fs');
+                const content = await readTextFile(selected as string);
                 await importMapperData(activeProfileId, content);
                 feedback.toast.success(t('mapper.flowchart.import_success'));
                 if (onRefresh) onRefresh();
-                loadLayout(); // Reload layout in this modal
-            }
-        } catch (e) {
-            console.error(e);
-            feedback.toast.error(t('mapper.flowchart.import_error'));
+            } catch (error) { feedback.toast.error(t('mapper.flowchart.import_error')); }
+        }
+    };
+
+    const handleExport = async () => {
+        const path = await save({ filters: [{ name: 'JSON', extensions: ['json'] }], defaultPath: 'mapper_backup.json' });
+        if (path) {
+            try {
+                const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+                const content = await exportMapperData(activeProfileId);
+                await writeTextFile(path, content);
+                feedback.toast.success(t('mapper.flowchart.export_success'));
+            } catch (error) { feedback.toast.error(t('mapper.flowchart.export_error')); }
         }
     };
 
     const handleExportImage = async () => {
         if (!contentRef.current) return;
-        
-        setIsExporting(true);
-        
-        // Wait for React to re-render with culling disabled (slightly longer for large grids)
-        await new Promise(resolve => setTimeout(resolve, 400));
-
         try {
-            const width = gridBounds.width * CELL_WIDTH;
-            const height = gridBounds.height * CELL_HEIGHT;
-
-            const dataUrl = await toPng(contentRef.current, {
-                backgroundColor: '#1a1b1e', // Dark theme background
-                style: {
-                    transform: `translate(${- gridBounds.minX * CELL_WIDTH}px, ${- gridBounds.minY * CELL_HEIGHT}px)`,
-                },
-                width: width,
-                height: height,
-                filter: (node) => {
-                    // Exclude interactive elements like controls and ports from the static image
-                    if (node instanceof HTMLElement) {
-                        if (node.classList.contains('port-handle')) return false;
-                        if (node.classList.contains('edge-controls')) return false;
-                    }
-                    return true;
-                }
-            });
-
-            const base64Data = dataUrl.split(',')[1];
-            const binaryString = atob(base64Data);
-            const len = binaryString.length;
-            const bytes = new Uint8Array(len);
-            for (let i = 0; i < len; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
-            }
-
-            const path = await save({
-                filters: [{ name: 'Image', extensions: ['png'] }],
-                defaultPath: `flowchart_${new Date().toISOString().split('T')[0]}.png`
-            });
-
-            if (path) {
-                await invoke('save_image', { path, content: Array.from(bytes) });
-                feedback.toast.success(t('mapper.flowchart.export_success'));
-            }
-        } catch (e) {
-            console.error(e);
-            feedback.toast.error(t('mapper.flowchart.export_error'));
-        } finally {
-            setIsExporting(false);
-        }
+            const dataUrl = await toPng(contentRef.current, { backgroundColor: '#ffffff', skipAutoScale: true });
+            const link = document.createElement('a');
+            link.download = `flowchart-${activeProfileId}.png`;
+            link.href = dataUrl;
+            link.click();
+        } catch (error) { feedback.toast.error(t('mapper.flowchart.export_image_error')); }
     };
 
-    const handleQuickConnect = (nodeId: string, portId: string) => {
-        setQuickConnectData({ sourceNodeId: nodeId, sourcePortId: portId });
-        setIsQuickConnectOpen(true);
-    };
-
-    /** BFS-based auto-reorganize fallback */
-    const autoReorganizeLayoutBFS = () => {
-        // Build adjacency from navigates_to connections
-        const adjacency: Record<string, Set<string>> = {};
-        const allScreenNames = new Set(maps.map(m => m.name));
-
-        maps.forEach(map => {
-            if (!adjacency[map.name]) adjacency[map.name] = new Set();
-            map.elements.forEach(el => {
-                const target = typeof el.navigates_to === 'string'
-                    ? el.navigates_to
-                    : (Array.isArray(el.navigates_to)
-                        ? el.navigates_to[0]?.destination
-                        : (el.navigates_to as NavigationData)?.destination);
-                if (target && allScreenNames.has(target)) {
-                    adjacency[map.name].add(target);
-                }
-            });
-        });
-
-        // Find root candidates: screens that no one navigates to, or first screen
-        const hasIncoming = new Set<string>();
-        Object.values(adjacency).forEach(targets => targets.forEach(t => hasIncoming.add(t)));
-        const roots = maps.filter(m => !hasIncoming.has(m.name)).map(m => m.name);
-        if (roots.length === 0 && maps.length > 0) roots.push(maps[0].name);
-
-        // BFS to assign depths
-        const visited = new Set<string>();
-        const depthMap: Record<string, number> = {};
-        const queue: { name: string; depth: number }[] = [];
-
-        roots.forEach(r => {
-            if (!visited.has(r)) {
-                queue.push({ name: r, depth: 0 });
-                visited.add(r);
-            }
-        });
-
-        while (queue.length > 0) {
-            const { name, depth } = queue.shift()!;
-            depthMap[name] = depth;
-
-            const children = adjacency[name] || new Set();
-            children.forEach(child => {
-                if (!visited.has(child)) {
-                    visited.add(child);
-                    queue.push({ name: child, depth: depth + 1 });
-                }
-            });
-        }
-
-        // Add orphaned screens (no connections at all)
-        maps.forEach(m => {
-            if (!visited.has(m.name)) {
-                const maxDepth = Math.max(0, ...Object.values(depthMap));
-                depthMap[m.name] = maxDepth + 1;
-            }
-        });
-
-        // Group screens by depth, then assign Y positions per group
-        const depthGroups: Record<number, string[]> = {};
-        Object.entries(depthMap).forEach(([name, depth]) => {
-            if (!depthGroups[depth]) depthGroups[depth] = [];
-            depthGroups[depth].push(name);
-        });
-
-        const newNodes: Record<string, LayoutNode> = {};
-        Object.entries(depthGroups).forEach(([depthStr, names]) => {
-            const gridX = parseInt(depthStr);
-            names.forEach((name, idx) => {
-                newNodes[name] = { gridX, gridY: idx };
-            });
-        });
-
-        const nukedEdges = resetAllVertices();
- 
-         setLayout(prev => ({
-             ...prev,
-             nodes: newNodes,
-             edges: nukedEdges
-         }));
-        setIsDirty(true);
-        feedback.toast.success(t('mapper.flowchart.reorganized', 'Layout reorganized (BFS)'));
-        setTimeout(centerView, 100);
-    };
-
-    /** AI-powered auto-reorganize with BFS fallback */
-    const autoReorganizeLayout = async (customPrompt?: string) => {
-        const provider = settings.aiProvider;
-        const apiKey = provider === 'openai' ? settings.openaiApiKey : provider === 'claude' ? settings.claudeApiKey : settings.geminiApiKey;
-        const model = provider === 'openai' ? settings.openaiModel : provider === 'claude' ? settings.claudeModel : settings.geminiModel;
-
-        if (!apiKey) {
-            feedback.toast.info(t('mapper.flowchart.ai_key_missing', 'Missing AI API Key. Using standard reorganization...'));
-            autoReorganizeLayoutBFS();
-            return;
-        }
-
-        setIsReorganizing(true);
-        try {
-            // Helper to match names regardless of accents/spaces/case
-            const normalize = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, '');
-            const nameMap = new Map(maps.map(m => [normalize(m.name), m.name]));
-
-            let result: Record<string, { gridX: number, gridY: number }> = {};
-            const language = i18n.language || 'en';
-            console.log(`[Flowchart] Requesting AI context for profile: ${activeProfileIdRef.current}`);
-
-            // Use the optimized context from Rust via helper
-            const response = await getAiContext('flowchart_layout', {
-                profile_id: activeProfileIdRef.current
-            });
-
-            if (!response || !response.context) {
-                console.error("[Flowchart] AI context empty or invalid response:", response);
-                throw new Error("Failed to retrieve application navigation context from backend.");
-            }
-
-            const mappingContext = response.context;
-            console.log("[Flowchart] AI context received, sending to provider:", provider);
-
-            if (provider === 'openai') {
-                result = await reorganizeWithOpenAI(mappingContext, apiKey, model, language, undefined, customPrompt);
-            } else if (provider === 'claude') {
-                result = await reorganizeWithClaude(mappingContext, apiKey, model, language, undefined, customPrompt);
-            } else {
-                result = await reorganizeWithGemini(mappingContext, apiKey, model, language, undefined, customPrompt);
-            }
-            
-            console.log("[Flowchart] AI Layout Result:", result);
-
-            if (result && Object.keys(result).length > 0) {
-                console.log("[Flowchart] Raw AI Result:", JSON.stringify(result, null, 2));
-
-                // 1. Sanitize and Normalize Response (Case-insensitive matching)
-                const sanitizedNodes: Record<string, LayoutNode> = {};
-
-                Object.entries(result).forEach(([key, pos]) => {
-                    const gridX = Number(pos.gridX);
-                    const gridY = Number(pos.gridY);
-                    
-                    const realName = nameMap.get(normalize(key));
-                    if (realName) {
-                        if (Number.isFinite(gridX) && Number.isFinite(gridY)) {
-                            sanitizedNodes[realName] = { gridX, gridY };
-                        } else {
-                            console.warn(`[Flowchart] AI returned invalid coordinates for "${key}":`, pos);
-                        }
-                    } else {
-                        console.warn(`[Flowchart] AI returned map position for unknown screen: "${key}".`);
-                    }
-                });
-
-                // 2. Ensure all mapped screens have a position, safely distributed in a "Quarantine" area
-                const finalNodes: Record<string, LayoutNode> = { ...sanitizedNodes };
-                const missedNodes: string[] = [];
-
-                // Track existing columns to find the end
-                const existingX = Object.values(finalNodes).map(n => n.gridX);
-                const startQuarantineX = (existingX.length > 0 ? Math.max(...existingX) : 0) + 1;
-
-                maps.forEach((m) => {
-                    if (!finalNodes[m.name]) {
-                        missedNodes.push(m.name);
-                        // Place missed nodes in columns of 10 to avoid infinity-lines
-                        const qIdx = missedNodes.length - 1;
-                        const qX = startQuarantineX + Math.floor(qIdx / 10);
-                        const qY = qIdx % 10;
-                        finalNodes[m.name] = { gridX: qX, gridY: qY };
-                    }
-                });
-
-                if (missedNodes.length > 0) {
-                    console.log("[Flowchart] AI missed/mismatched these screens:", missedNodes);
-                    setMissedScreens(missedNodes);
-                } else {
-                    setMissedScreens([]);
-                }
-
-                const nukedEdges = resetAllVertices();
-
-                setLayout(prev => ({
-                    ...prev,
-                    nodes: finalNodes,
-                    edges: nukedEdges
-                }));
-                setIsDirty(true);
-                feedback.toast.success(t('mapper.flowchart.reorganized_ai', 'Layout reorganized by AI'));
-                setTimeout(centerView, 100);
-            } else {
-                throw new Error("Empty AI response");
-            }
-        } catch (error) {
-            console.error("AI Reorganization failed:", error);
-            feedback.toast.error(t('mapper.flowchart.reorganize_ai_error', 'AI Reorganization failed. Falling back to BFS.'));
-            autoReorganizeLayoutBFS();
-        } finally {
-            setIsReorganizing(false);
-        }
-    };
-
-    /** Manually clear all edge curvatures */
-    const handleClearAllCurvatures = () => {
-        const nukedEdges = resetAllVertices();
-        setLayout(prev => ({
-            ...prev,
-            edges: nukedEdges
-        }));
-        setIsDirty(true);
-        feedback.toast.success(t('mapper.flowchart.curvatures_cleared', 'All edge curvatures cleared'));
-    };
-
-    const confirmQuickConnect = async (targetScreenName: string, sourceElementName?: string) => {
-        if (!quickConnectData) return;
-
-        const { sourceNodeId, sourcePortId } = quickConnectData;
-        const sourceMap = maps.find(m => m.name === sourceNodeId);
-
-        if (!sourceMap || !sourceElementName) {
-            feedback.toast.error(t('mapper.flowchart.select_source_element'));
-            return;
-        }
-
-        const elementIndex = sourceMap.elements.findIndex(el => el.name === sourceElementName);
-        if (elementIndex === -1) {
-            feedback.toast.error(t('mapper.flowchart.element_not_found'));
-            return;
-        }
-
-        try {
-            setIsQuickConnectOpen(false);
-            setQuickConnectData(null);
-
-            // Update ScreenMap element directly with structured NavigationData
-            const targetHandle = 'left-3';
-            const nav: any = {
-                destination: targetScreenName,
-                sourceHandle: sourcePortId,
-                targetHandle: targetHandle
-            };
-
-            const updatedElements = [...sourceMap.elements];
-            updatedElements[elementIndex] = { ...updatedElements[elementIndex], navigates_to: nav };
-            const updatedMap = { ...sourceMap, elements: updatedElements };
-
-            await saveScreenMap(activeProfileId, updatedMap);
-
-            // Local state update for the flowchart view
-            const edgeId = `${sourceNodeId}-${sourceElementName}-${targetScreenName}`;
-            setLayout(prev => ({
-                ...prev,
-                edges: {
-                    ...prev.edges,
-                    [edgeId]: {
-                        sourceHandle: sourcePortId,
-                        targetHandle: targetHandle,
-                    }
-                }
-            }));
-
-            setIsDirty(true);
-            if (onRefresh) onRefresh();
-            feedback.toast.success(t('common.saved', 'Saved'));
-        } catch (e) {
-            console.error(e);
-            feedback.toast.error(t('mapper.flowchart.save_connection_error'));
-        }
-    };
-
-    // Dynamic Grid Calculation
-    const gridBounds = useMemo(() => {
-        const nodePositions = Object.values(layout.nodes);
-        if (nodePositions.length === 0) {
-            return { minX: 0, minY: 0, maxX: 5, maxY: 5, width: 10, height: 10 };
-        }
-
-        let minX = Math.min(...nodePositions.map(n => n.gridX));
-        let maxX = Math.max(...nodePositions.map(n => n.gridX));
-        let minY = Math.min(...nodePositions.map(n => n.gridY));
-        let maxY = Math.max(...nodePositions.map(n => n.gridY));
-
-        // Add 2 cells padding
-        const paddedMinX = minX - 2;
-        const paddedMaxX = maxX + 2;
-        const paddedMinY = minY - 2;
-        const paddedMaxY = maxY + 2;
-
-        return {
-            minX: paddedMinX,
-            minY: paddedMinY,
-            maxX: paddedMaxX,
-            maxY: paddedMaxY,
-            width: paddedMaxX - paddedMinX + 1,
-            height: paddedMaxY - paddedMinY + 1
-        };
-    }, [layout.nodes]);
-
-    // Auto-Layout New Nodes
-    useEffect(() => {
-        if (loading) return;
-
-        let hasChanges = false;
-        const currentNodes = { ...layout.nodes };
-        const mapNames = new Set(maps.map(m => m.name));
-
-        // 1. Remove nodes that are no longer in maps (renamed or deleted)
-        Object.keys(currentNodes).forEach(name => {
-            if (!mapNames.has(name)) {
-                delete currentNodes[name];
-                hasChanges = true;
-            }
-        });
-
-        // 2. Add new nodes from maps
-        const occupied = new Set<string>();
-        Object.values(currentNodes).forEach(n => occupied.add(`${n.gridX},${n.gridY}`));
-
-        let nextX = 0;
-        let nextY = 0;
-
-        maps.forEach(map => {
-            if (!currentNodes[map.name]) {
-                while (occupied.has(`${nextX},${nextY}`)) {
-                    nextX++;
-                    if (nextX > 5) {
-                        nextX = 0;
-                        nextY++;
-                    }
-                }
-                currentNodes[map.name] = { gridX: nextX, gridY: nextY };
-                occupied.add(`${nextX},${nextY}`);
-                hasChanges = true;
-            }
-        });
-
-        if (hasChanges) {
-            setLayout(prev => ({ ...prev, nodes: currentNodes }));
-        }
-    }, [maps, loading]);
-    // --- Helper Functions ---
-    const getPixelCoords = (gridX: any, gridY: any) => {
-        const xNum = Number(gridX);
-        const yNum = Number(gridY);
-
-        return {
-            x: (Number.isFinite(xNum) ? xNum : 0) * CELL_WIDTH + NODE_OFFSET_X,
-            y: (Number.isFinite(yNum) ? yNum : 0) * CELL_HEIGHT + NODE_OFFSET_Y
-        };
-    };
-    const getPortCoords = (nodeX: number, nodeY: number, portId: string) => {
-        const port = NODE_PORTS.find(p => p.id === portId);
-        if (!port) return { x: nodeX + NODE_WIDTH / 2, y: nodeY + NODE_HEIGHT / 2 }; // Center fallback
-        return { x: nodeX + port.x, y: nodeY + port.y };
-    };
-
-    const snapToLanes = (x: number, y: number) => {
-        return {
-            x: Math.round(x / LANE_SIZE) * LANE_SIZE,
-            y: Math.round(y / LANE_SIZE) * LANE_SIZE
-        };
-    };
-
-    const getClosestLane = (val: number) => Math.round(val / LANE_SIZE) * LANE_SIZE;
-    
-    // Exhaustive cleanup of all possible edges
-    const resetAllVertices = () => {
-        const newEdges: Record<string, LayoutEdge> = {};
-        maps.forEach(sourceMap => {
-            sourceMap.elements.forEach(el => {
-                const navigatesTo = el.navigates_to;
-                if (!navigatesTo) return;
-
-                let destinations: string[] = [];
-                if (typeof navigatesTo === 'string') destinations = [navigatesTo];
-                else if (Array.isArray(navigatesTo)) {
-                    destinations = navigatesTo.map(d => typeof d === 'string' ? d : (d as { destination: string }).destination).filter(Boolean);
-                } else if (navigatesTo && typeof navigatesTo === 'object') {
-                    const dest = (navigatesTo as { destination: string }).destination;
-                    if (dest) destinations = [dest];
-                }
-
-                destinations.forEach(targetName => {
-                    const edgeId = `${sourceMap.name}-${el.name}-${targetName}`;
-                    newEdges[edgeId] = { vertices: [], sourceHandle: undefined, targetHandle: undefined };
-                });
-            });
-        });
-        return newEdges;
-    };
-    // --- Event Handlers ---
-    const handleCanvasMouseDown = (e: React.MouseEvent) => {
-        if (e.button !== 0 && e.button !== 1) return;
-        if (e.button === 1) {
-            e.preventDefault();
-        }
-        setIsDraggingCanvas(true);
-        dragStart.current = { x: e.clientX - offset.x, y: e.clientY - offset.y };
-    };
-
-    const handleMouseMove = (e: React.MouseEvent) => {
-        if (!containerRef.current) return;
-
-        // Canvas Panning
-        if (isDraggingCanvas) {
-            setOffset({
-                x: e.clientX - dragStart.current.x,
-                y: e.clientY - dragStart.current.y
-            });
-            return;
-        }
-
-        const rect = containerRef.current.getBoundingClientRect();
-        const mouseX = (e.clientX - rect.left - offset.x) / scale;
-        const mouseY = (e.clientY - rect.top - offset.y) / scale;
-
-        // Update Cursor Position for Visual Feedback
-        if (dragItem) {
-            setCursorPos({ x: mouseX, y: mouseY });
-        }
-
-        // Node Dragging
-        if (dragItem?.type === 'node') {
-            const gridX = Math.round((mouseX - NODE_OFFSET_X) / CELL_WIDTH);
-            const gridY = Math.round((mouseY - NODE_OFFSET_Y) / CELL_HEIGHT);
-
-            // Check grid occupancy (exclude self)
-            const isOccupied = Object.entries(layout.nodes).some(([name, pos]) => {
-                if (name === dragItem.id) return false;
-                return pos.gridX === gridX && pos.gridY === gridY;
-            });
-
-            if (!isOccupied) {
-                setLayout(prev => ({
-                    ...prev,
-                    nodes: {
-                        ...prev.nodes,
-                        [dragItem.id]: { gridX, gridY }
-                    }
-                }));
-                setIsDirty(true);
-            }
-        }
-
-        // Edge Connection Dragging (Source / Target)
-        if (dragItem?.type === 'source' || dragItem?.type === 'target') {
-            // Manual collision detection for ports
-            const el = document.elementFromPoint(e.clientX, e.clientY);
-            const portEl = el?.closest('[data-port-id]');
-
-            if (portEl) {
-                const portId = portEl.getAttribute('data-port-id');
-                const nodeId = portEl.getAttribute('data-node-id');
-                if (portId && nodeId) {
-                    setHoveredPort({ nodeId, portId });
-                }
-            } else {
-                setHoveredPort(null);
-            }
-        }
-
-        // Edge Dragging (Vertex, Source, Target, Segment)
-        if (dragItem?.type === 'vertex' || dragItem?.type === 'source' || dragItem?.type === 'target' || dragItem?.type === 'segment') {
-            // Lane Snapping for Vertices
-            let snapped = { x: mouseX, y: mouseY };
-
-            // Smart Snapping to Edge Extremities (Start/End)
-            if (dragItem.type === 'vertex') {
-                // Default grid snap
-                snapped = snapToLanes(mouseX, mouseY);
-
-                // Try to get Edge Start/End for Align-Snapping
-                const edgeId = dragItem.id;
-                const parts = edgeId.split('-');
-                if (parts.length >= 3) {
-                    const sourceName = parts[0];
-                    const targetName = parts[parts.length - 1];
-                    const sourceLayout = layout.nodes[sourceName];
-                    const targetLayout = layout.nodes[targetName];
-                    const edge = layout.edges[edgeId];
-
-                    if (sourceLayout && targetLayout && edge) {
-                        const sourceMap = maps.find(m => m.name === sourceName);
-                        const targetMap = maps.find(m => m.name === targetName);
-                        if (sourceMap && targetMap) {
-                            const sOrigin = getPixelCoords(sourceLayout.gridX, sourceLayout.gridY);
-                            const tOrigin = getPixelCoords(targetLayout.gridX, targetLayout.gridY);
-                            let startPoint = { x: 0, y: 0 };
-                            let endPoint = { x: 0, y: 0 };
-
-                            if (edge.sourceHandle) startPoint = getPortCoords(sOrigin.x, sOrigin.y, edge.sourceHandle);
-                            else {
-                                const dx = targetLayout.gridX - sourceLayout.gridX;
-                                startPoint = getPortCoords(sOrigin.x, sOrigin.y, dx >= 0 ? 'right-3' : 'left-3');
-                            }
-
-                            if (edge.targetHandle) endPoint = getPortCoords(tOrigin.x, tOrigin.y, edge.targetHandle);
-                            else {
-                                const dx = targetLayout.gridX - sourceLayout.gridX;
-                                endPoint = getPortCoords(tOrigin.x, tOrigin.y, dx >= 0 ? 'left-3' : 'right-3');
-                            }
-
-                            // Snap X to Start/End X if close (20px threshold)
-                            if (Math.abs(snapped.x - startPoint.x) < 20) snapped.x = startPoint.x;
-                            if (Math.abs(snapped.x - endPoint.x) < 20) snapped.x = endPoint.x;
-
-                            // Snap Y to Start/End Y if close
-                            if (Math.abs(snapped.y - startPoint.y) < 20) snapped.y = startPoint.y;
-                            if (Math.abs(snapped.y - endPoint.y) < 20) snapped.y = endPoint.y;
-                        }
-                    }
-                }
-            }
-
-            // Segment Dragging
-            if (dragItem.type === 'segment' && dragItem.points && typeof dragItem.index === 'number') {
-                const { points, index, id: edgeId } = dragItem;
-
-                const p1 = points[index];
-                const p2 = points[index + 1];
-                const isHorizontal = Math.abs(p1.y - p2.y) < 1;
-
-                const snappedX = getClosestLane(mouseX);
-                const snappedY = getClosestLane(mouseY);
-
-                setLayout(prev => {
-                    const prevEdge = prev.edges[edgeId] || {};
-                    let newVertices: { x: number, y: number }[] = [];
-
-                    // If no vertices yet, we are creating them from the default path snapshot
-                    if (!prevEdge.vertices || prevEdge.vertices.length === 0) {
-                        const currentPoints = points.map(p => ({ ...p })); // Deep copy
-
-                        if (isHorizontal && index > 0 && index < points.length - 1) {
-                            currentPoints[index].y = snappedY;
-                            currentPoints[index + 1].y = snappedY;
-                        } else if (!isHorizontal && index > 0 && index < points.length - 1) {
-                            currentPoints[index].x = snappedX;
-                            currentPoints[index + 1].x = snappedX;
-                        }
-
-                        newVertices = currentPoints.slice(1, -1);
-                    } else {
-                        newVertices = [...prevEdge.vertices];
-
-                        // Update vertices based on segment drag (absolute)
-                        if (isHorizontal) {
-                            const vIndex1 = index - 1; // Start of segment (if vertex)
-                            const vIndex2 = index;     // End of segment (if vertex)
-
-                            if (vIndex1 >= 0 && vIndex1 < newVertices.length) newVertices[vIndex1].y = snappedY;
-                            if (vIndex2 >= 0 && vIndex2 < newVertices.length) newVertices[vIndex2].y = snappedY;
-
-                        } else {
-                            const vIndex1 = index - 1;
-                            const vIndex2 = index;
-
-                            if (vIndex1 >= 0 && vIndex1 < newVertices.length) newVertices[vIndex1].x = snappedX;
-                            if (vIndex2 >= 0 && vIndex2 < newVertices.length) newVertices[vIndex2].x = snappedX;
-                        }
-                    }
-
-                    return {
-                        ...prev,
-                        edges: {
-                            ...prev.edges,
-                            [edgeId]: { ...prevEdge, vertices: newVertices }
-                        }
-                    };
-                });
-                setIsDirty(true);
-                return;
-            }
-
-            // Update Layout temporarily for feedback (Vertex/Handles)
-            setLayout(prev => {
-                const edgeId = dragItem.id;
-                const edge = prev.edges[edgeId] || { vertices: [] };
-
-                if (dragItem.type === 'vertex' && typeof dragItem.index === 'number') {
-                    const newVertices = [...(edge.vertices || [])];
-                    if (newVertices[dragItem.index]) {
-                        newVertices[dragItem.index] = snapped;
-                    }
-
-                    return { ...prev, edges: { ...prev.edges, [edgeId]: { ...edge, vertices: newVertices } } };
-                }
-                return prev;
-            });
-            setIsDirty(true);
-        }
-    };
-
-    const handleMouseUp = () => {
-        // Grid Occupancy is handled in MouseMove (we don't allow move if occupied)
-
-        // Port Occupancy
-        if (dragItem?.type === 'source' || dragItem?.type === 'target') {
-            if (hoveredPort) {
-                // Check if port is occupied
-                const isOccupied = Object.entries(layout.edges).some(([eKey, edge]) => {
-                    // Check if ANY edge uses this port on this node
-                    // This mimics the logic in render
-                    const [sName, _, tName] = eKey.split('-');
-                    // IMPORTANT: We must NOT block if the edge occupying it is the ONE WE ARE DRAGGING (dragItem.id)
-                    if (eKey === dragItem.id) return false;
-
-                    if (sName === hoveredPort.nodeId && edge.sourceHandle === hoveredPort.portId) return true;
-                    if (tName === hoveredPort.nodeId && edge.targetHandle === hoveredPort.portId) return true;
-                    return false;
-                });
-
-                if (!isOccupied) {
-                    setLayout(prev => ({
-                        ...prev, // Keep prev layout
-                        edges: {
-                            ...prev.edges,
-                            [dragItem.id]: {
-                                ...prev.edges[dragItem.id],
-                                [dragItem.type === 'source' ? 'sourceHandle' : 'targetHandle']: hoveredPort.portId
-                            }
-                        }
-                    }));
-                    setIsDirty(true);
-                } else {
-                    feedback.toast.error(t('mapper.flowchart.port_occupied'));
-                }
-            }
-        }
-
-        // Edge Cleanups (Merge/Straighten) on Drop
-        if (dragItem?.type === 'vertex' || dragItem?.type === 'segment') {
-            setLayout(prev => {
-                const edgeId = dragItem.id;
-                const edge = prev.edges[edgeId];
-                if (!edge || !edge.vertices) return prev;
-
-                // 1. Get Full Path Context (Start, End)
-                let startPoint = { x: 0, y: 0 };
-                let endPoint = { x: 0, y: 0 };
-                // Parse ID: source-element-target
-                const parts = edgeId.split('-');
-                if (parts.length >= 3) {
-                    const sourceName = parts[0];
-                    const targetName = parts[parts.length - 1]; // Last part is target
-
-                    const sourceMap = maps.find(m => m.name === sourceName);
-                    const targetMap = maps.find(m => m.name === targetName);
-                    const sourceLayout = prev.nodes[sourceName];
-                    const targetLayout = prev.nodes[targetName];
-
-                    if (sourceMap && targetMap && sourceLayout && targetLayout) {
-                        const sOrigin = getPixelCoords(sourceLayout.gridX, sourceLayout.gridY);
-                        const tOrigin = getPixelCoords(targetLayout.gridX, targetLayout.gridY);
-
-                        if (edge.sourceHandle) startPoint = getPortCoords(sOrigin.x, sOrigin.y, edge.sourceHandle);
-                        else {
-                            const dx = targetLayout.gridX - sourceLayout.gridX;
-                            startPoint = getPortCoords(sOrigin.x, sOrigin.y, dx >= 0 ? 'right-3' : 'left-3');
-                        }
-
-                        if (edge.targetHandle) endPoint = getPortCoords(tOrigin.x, tOrigin.y, edge.targetHandle);
-                        else {
-                            const dx = targetLayout.gridX - sourceLayout.gridX;
-                            endPoint = getPortCoords(tOrigin.x, tOrigin.y, dx >= 0 ? 'left-3' : 'right-3');
-                        }
-                    }
-                }
-
-                // 2. Merge duplicated vertices and Remove vertices overlapping Start/End
-                let cleaned = edge.vertices.filter((v, i, arr) => {
-                    // Start point overlap logic (already absolute)
-                    if (Math.abs(v.x - startPoint.x) < 15 && Math.abs(v.y - startPoint.y) < 15) return false;
-                    // End point overlap logic (already absolute)
-                    if (Math.abs(v.x - endPoint.x) < 15 && Math.abs(v.y - endPoint.y) < 15) return false;
-
-                    if (i === 0) return true;
-                    // Internal duplicates logic
-                    const p = arr[i - 1];
-                    return (Math.abs(v.x - p.x) > 10 || Math.abs(v.y - p.y) > 10);
-                });
-
-                // 3. Remove collinear with Start/End
-                // Full path: [start, ...cleaned, end]
-                const fullPath = [startPoint, ...cleaned, endPoint];
-
-                // We check internal points (indices 1 to length-2)
-                const toRemove = new Set<number>();
-
-                for (let i = 1; i < fullPath.length - 1; i++) {
-                    const p0 = fullPath[i - 1];
-                    const p1 = fullPath[i];
-                    const p2 = fullPath[i + 1];
-
-                    // Everything is absolute already
-                    const crossProduct = (p1.y - p0.y) * (p2.x - p1.x) - (p2.y - p1.y) * (p1.x - p0.x);
-
-                    const l2 = (p2.x - p0.x) ** 2 + (p2.y - p0.y) ** 2;
-                    if (l2 === 0) continue;
-
-                    const dist = Math.abs(crossProduct) / Math.sqrt(l2);
-
-                    if (dist < 15) {
-                        toRemove.add(i - 1);
-                    }
-                }
-
-                cleaned = cleaned.filter((_, i) => !toRemove.has(i));
-
-                if (JSON.stringify(prev.edges[edgeId]?.vertices) !== JSON.stringify(cleaned)) {
-                    // Only dirty if actually changed (optimization)
-                    // But strictly speaking, if we dragged, it's dirty.
-                }
-
-                return {
-                    ...prev,
-                    edges: { ...prev.edges, [edgeId]: { ...edge, vertices: cleaned } }
-                };
-            });
-            setIsDirty(true);
-        }
-
-        setIsDraggingCanvas(false);
-        setDragItem(null);
-        setHoveredPort(null);
-    };
-
-
-    const handleWheel = (e: React.WheelEvent) => {
-        e.stopPropagation();
-        if (e.ctrlKey || e.metaKey) {
-            const rect = containerRef.current?.getBoundingClientRect();
-            if (!rect) return;
-
-            // Calculate Mouse Position relative to Container
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
-
-            // Standard delta direction
-            const pixelDelta = e.deltaY > 0 ? -0.1 : 0.1;
-
-            performZoom(pixelDelta, { x: mouseX, y: mouseY });
-        } else if (e.shiftKey) {
-            // Horizontal Pan
-            setOffset(prev => ({ ...prev, x: prev.x - e.deltaY }));
-        } else {
-            // Vertical Pan
-            setOffset(prev => ({ ...prev, y: prev.y - e.deltaY }));
-        }
-    };
-
-    const handleSegmentDoubleClick = (e: React.MouseEvent, edgeId: string, segmentIndex: number) => {
-        e.stopPropagation();
-        const rect = containerRef.current?.getBoundingClientRect();
-        if (!rect) return;
-
-        const mouseX = (e.clientX - rect.left - offset.x) / scale;
-        const mouseY = (e.clientY - rect.top - offset.y) / scale;
-
-        setLayout(prev => {
-            const edge = prev.edges[edgeId];
-            if (!edge) return prev;
-
-            const newVertices = [...(edge.vertices || [])];
-            // Insert at segmentIndex
-            newVertices.splice(segmentIndex, 0, {
-                x: mouseX,
-                y: mouseY
-            });
-
-            return {
-                ...prev,
-                edges: { ...prev.edges, [edgeId]: { ...edge, vertices: newVertices } }
-            };
-        });
-        setIsDirty(true);
-    };
-
-    const handleVertexDoubleClick = (e: React.MouseEvent, edgeId: string, vertexIndex: number) => {
-        e.stopPropagation();
-        setLayout(prev => {
-            const edge = prev.edges[edgeId];
-            if (!edge || !edge.vertices) return prev;
-
-            const newVertices = [...edge.vertices];
-            newVertices.splice(vertexIndex, 1);
-
-            return {
-                ...prev,
-                edges: { ...prev.edges, [edgeId]: { ...edge, vertices: newVertices } }
-            };
-        });
-        setIsDirty(true);
-    };
-
-    // --- Performance Optimizations ---
-
-    // 1. Port Occupancy Map (Avoids expensive O(N*M) lookups in render)
-    const portOccupancyMap = useMemo(() => {
-        const occ: Record<string, Set<string>> = {}; // nodeId -> Set of portId
-
-        maps.forEach(m => {
-            const sourceLayout = layout.nodes[m.name];
-            if (!sourceLayout) return;
-
-            m.elements.forEach(el => {
-                const targetName = typeof el.navigates_to === 'string' ? el.navigates_to : (Array.isArray(el.navigates_to) ? el.navigates_to[0]?.destination : (el.navigates_to as NavigationData)?.destination);
-                if (!targetName) return;
-
-                const targetLayout = layout.nodes[targetName];
-                if (!targetLayout) return;
-
-                const edgeId = `${m.name}-${el.name}-${targetName}`;
-                const edgeData = layout.edges[edgeId] || {};
-
-                let sHandle = edgeData.sourceHandle;
-                let tHandle = edgeData.targetHandle;
-
-                if (!sHandle || !tHandle) {
-                    const dx = targetLayout.gridX - sourceLayout.gridX;
-                    if (!sHandle) sHandle = dx >= 0 ? 'right-3' : 'left-3';
-                    if (!tHandle) tHandle = dx >= 0 ? 'left-3' : 'right-3';
-                }
-
-                if (!occ[m.name]) occ[m.name] = new Set();
-                occ[m.name].add(sHandle);
-
-                if (!occ[targetName]) occ[targetName] = new Set();
-                occ[targetName].add(tHandle);
-            });
-        });
-
-        return occ;
-    }, [maps, layout.edges, layout.nodes]);
-
-    // 2. Viewport Culling Bounds
-    const viewportBounds = useMemo(() => {
-        if (isExporting || !containerRef.current) return null;
-        const rect = containerRef.current.getBoundingClientRect();
-
-        // Convert screen coordinates to canvas coordinates (including scale and offset)
-        const minX = -offset.x / scale;
-        const minY = -offset.y / scale;
-        const maxX = (rect.width - offset.x) / scale;
-        const maxY = (rect.height - offset.y) / scale;
-
-        // Buffer for smooth scrolling/panning
-        const BUFFER = 200;
-        return {
-            minX: minX - BUFFER,
-            minY: minY - BUFFER,
-            maxX: maxX + BUFFER,
-            maxY: maxY + BUFFER
-        };
-    }, [offset, scale, isExporting]);
-
-    // --- Render Logic ---
-    const edgeLayouts = useMemo(() => {
-        const layouts: {
-            edgeId: string;
-            points: { x: number, y: number }[];
-            startPoint: { x: number, y: number };
-            endPoint: { x: number, y: number };
-            elName: string;
-            sourceName: string;
-            targetName: string;
-        }[] = [];
-
+    // viewportBounds logic removed as it was unused
+
+    const baseEdgeLayouts = useMemo(() => {
+        const layouts: any[] = [];
+        const seenEdgeIds = new Set<string>();
         maps.forEach(sourceMap => {
             const sourceLayout = layout.nodes[sourceMap.name];
             if (!sourceLayout) return;
-            const sourceOrigin = getPixelCoords(sourceLayout.gridX, sourceLayout.gridY);
-
+            const sourceOrigin = view.getPixelCoords(sourceLayout.gridX, sourceLayout.gridY);
             sourceMap.elements.forEach(el => {
                 const navigatesTo = el.navigates_to;
                 if (!navigatesTo) return;
-
-                // Normalize destinations into an array of strings
                 let destinations: string[] = [];
-                if (typeof navigatesTo === 'string') {
-                    destinations = [navigatesTo];
-                } else if (Array.isArray(navigatesTo)) {
-                    destinations = navigatesTo.map(d => typeof d === 'string' ? d : (d as { destination: string }).destination).filter(Boolean);
-                } else if (navigatesTo && typeof navigatesTo === 'object') {
-                    const dest = (navigatesTo as { destination: string }).destination;
+                if (typeof navigatesTo === 'string') destinations = [navigatesTo];
+                else if (Array.isArray(navigatesTo)) destinations = navigatesTo.map(d => typeof d === 'string' ? d : (d as any).destination).filter(Boolean);
+                else if (navigatesTo && typeof navigatesTo === 'object') {
+                    const dest = (navigatesTo as any).destination;
                     if (dest) destinations = [dest];
                 }
+                [...new Set(destinations)].forEach(targetName => {
+                    const edgeId = `${sourceMap.name}-${el.name}-${targetName}`;
+                    if (seenEdgeIds.has(edgeId)) return;
+                    seenEdgeIds.add(edgeId);
 
-                destinations.forEach(targetName => {
                     const targetMap = maps.find(m => m.name === targetName);
-                    // CRITICAL: Ensure target exists in the actual screens (maps) AND layout
-                    if (!targetMap) {
-                        console.warn(`[Flowchart] Edge from "${sourceMap.name}" points to non-existent screen "${targetName}". Skipping.`);
-                        return;
-                    }
-
+                    if (!targetMap) return;
                     const targetLayout = layout.nodes[targetName];
                     if (!targetLayout) return;
-
-                    const targetOrigin = getPixelCoords(targetLayout.gridX, targetLayout.gridY);
-                    const edgeId = `${sourceMap.name}-${el.name}-${targetName}`;
+                    const targetOrigin = view.getPixelCoords(targetLayout.gridX, targetLayout.gridY);
                     const edgeData = layout.edges[edgeId] || {};
+                    const effectiveVertices = edgeData.vertices || [];
 
-                    // SAFETY: Only disable custom vertices when either node has unusable coordinates.
-                    // (0,0) is a valid grid position and must not be treated as invalid geometry.
-                    const hasValidGridCoords = (node: LayoutNode) => Number.isFinite(node.gridX) && Number.isFinite(node.gridY);
-                    const isInvalidGeometry = !hasValidGridCoords(sourceLayout) || !hasValidGridCoords(targetLayout);
-                    const effectiveVertices = isInvalidGeometry ? [] : (edgeData.vertices || []);
-
-                    let startPoint = { x: 0, y: 0 };
-                    let endPoint = { x: 0, y: 0 };
-
-                    // Source
-                    if (dragItem?.type === 'source' && dragItem.id === edgeId) {
-                        startPoint = cursorPos;
-                    } else if (edgeData.sourceHandle) {
-                        startPoint = getPortCoords(sourceOrigin.x, sourceOrigin.y, edgeData.sourceHandle);
-                    } else {
-                        const dx = targetLayout.gridX - sourceLayout.gridX;
-                        if (dx >= 0) startPoint = getPortCoords(sourceOrigin.x, sourceOrigin.y, 'right-3');
-                        else startPoint = getPortCoords(sourceOrigin.x, sourceOrigin.y, 'left-3');
-                    }
-
-                    // Target
-                    if (dragItem?.type === 'target' && dragItem.id === edgeId) {
-                        endPoint = cursorPos;
-                    } else if (edgeData.targetHandle) {
-                        endPoint = getPortCoords(targetOrigin.x, targetOrigin.y, edgeData.targetHandle);
-                    } else {
-                        const dx = targetLayout.gridX - sourceLayout.gridX;
-                        if (dx >= 0) endPoint = getPortCoords(targetOrigin.x, targetOrigin.y, 'left-3');
-                        else endPoint = getPortCoords(targetOrigin.x, targetOrigin.y, 'right-3');
-                    }
+                    let startPoint = edgeData.sourceHandle
+                        ? view.getPortCoords(sourceOrigin.x, sourceOrigin.y, edgeData.sourceHandle)
+                        : view.getPortCoords(sourceOrigin.x, sourceOrigin.y, targetLayout.gridX >= sourceLayout.gridX ? 'right-3' : 'left-3');
+                    let endPoint = edgeData.targetHandle
+                        ? view.getPortCoords(targetOrigin.x, targetOrigin.y, edgeData.targetHandle)
+                        : view.getPortCoords(targetOrigin.x, targetOrigin.y, targetLayout.gridX >= sourceLayout.gridX ? 'left-3' : 'right-3');
 
                     let points = [startPoint, ...effectiveVertices, endPoint];
-
-                    // Default routing for new/unmodified edges
                     if (effectiveVertices.length === 0) {
-                        if (Math.abs(startPoint.x - endPoint.x) < 10) {
-                            points = [startPoint, endPoint];
-                        } else if (Math.abs(startPoint.y - endPoint.y) < 10) {
-                            points = [startPoint, endPoint];
-                        } else {
-                            const midX = (startPoint.x + endPoint.x) / 2;
-                            const snappedMidX = getClosestLane(midX);
-                            points = [startPoint, { x: snappedMidX, y: startPoint.y }, { x: snappedMidX, y: endPoint.y }, endPoint];
+                        if (Math.abs(startPoint.x - endPoint.x) < 10 || Math.abs(startPoint.y - endPoint.y) < 10) points = [startPoint, endPoint];
+                        else {
+                            const midX = view.getClosestLane((startPoint.x + endPoint.x) / 2);
+                            points = [startPoint, { x: midX, y: startPoint.y }, { x: midX, y: endPoint.y }, endPoint];
                         }
                     }
-
                     layouts.push({ edgeId, points, startPoint, endPoint, elName: el.name, sourceName: sourceMap.name, targetName });
                 });
             });
         });
         return layouts;
-    }, [maps, layout, dragItem, cursorPos, filterTag]);
+    }, [maps, layout, filterTag, view]);
 
-    // Sorted layouts for Z-indexing (Hovered edge last = on top)
+    const edgeLayouts = useMemo(() => {
+        const dragState = interaction.state;
+        const isDraggingSource = dragState.type === 'DRAGGING_SOURCE';
+        const isDraggingTarget = dragState.type === 'DRAGGING_TARGET';
+        if (!isDraggingSource && !isDraggingTarget) return baseEdgeLayouts;
+
+        const dragEdgeId = dragState.id;
+        return baseEdgeLayouts.map(e => {
+            if (e.edgeId !== dragEdgeId) return e;
+
+            let startPoint = e.startPoint;
+            let endPoint = e.endPoint;
+
+            if (isDraggingSource) {
+                if (interaction.hoveredPort) {
+                    const p = interaction.hoveredPort;
+                    const node = layout.nodes[p.nodeId];
+                    if (node) {
+                        const nodeP = view.getPixelCoords(node.gridX, node.gridY);
+                        startPoint = view.getPortCoords(nodeP.x, nodeP.y, p.portId);
+                    }
+                } else {
+                    startPoint = interaction.cursorPos;
+                }
+            } else {
+                if (interaction.hoveredPort) {
+                    const p = interaction.hoveredPort;
+                    const node = layout.nodes[p.nodeId];
+                    if (node) {
+                        const nodeP = view.getPixelCoords(node.gridX, node.gridY);
+                        endPoint = view.getPortCoords(nodeP.x, nodeP.y, p.portId);
+                    }
+                } else {
+                    endPoint = interaction.cursorPos;
+                }
+            }
+
+            const edgeData = layout.edges[e.edgeId] || {};
+            const effectiveVertices = edgeData.vertices || [];
+            let points = [startPoint, ...effectiveVertices, endPoint];
+            if (effectiveVertices.length === 0) {
+                if (Math.abs(startPoint.x - endPoint.x) < 10 || Math.abs(startPoint.y - endPoint.y) < 10) points = [startPoint, endPoint];
+                else {
+                    const midX = view.getClosestLane((startPoint.x + endPoint.x) / 2);
+                    points = [startPoint, { x: midX, y: startPoint.y }, { x: midX, y: endPoint.y }, endPoint];
+                }
+            }
+            return { ...e, points, startPoint, endPoint };
+        });
+    }, [baseEdgeLayouts, interaction.state, interaction.hoveredPort, interaction.cursorPos, layout, view]);
+
     const sortedEdgeLayouts = useMemo(() => {
-        if (!hoveredEdge) return edgeLayouts;
-        return [...edgeLayouts].sort((a, b) => {
-            if (a.edgeId === hoveredEdge) return 1;
-            if (b.edgeId === hoveredEdge) return -1;
-            return 0;
+        if (!interaction.hoveredEdge) return edgeLayouts;
+        return [...edgeLayouts].sort((a, b) => a.edgeId === interaction.hoveredEdge ? 1 : (b.edgeId === interaction.hoveredEdge ? -1 : 0));
+    }, [edgeLayouts, interaction.hoveredEdge]);
+
+    const portOccupancyMap = useMemo(() => {
+        const occ: Record<string, Set<string>> = {};
+        edgeLayouts.forEach(e => {
+            const edgeData = layout.edges[e.edgeId] || {};
+            const sHandle = edgeData.sourceHandle || (view.getPixelCoords(layout.nodes[e.sourceName]?.gridX, 0).x <= view.getPixelCoords(layout.nodes[e.targetName]?.gridX, 0).x ? 'right-3' : 'left-3');
+            const tHandle = edgeData.targetHandle || (view.getPixelCoords(layout.nodes[e.sourceName]?.gridX, 0).x <= view.getPixelCoords(layout.nodes[e.targetName]?.gridX, 0).x ? 'left-3' : 'right-3');
+            if (!occ[e.sourceName]) occ[e.sourceName] = new Set();
+            occ[e.sourceName].add(sHandle);
+            if (!occ[e.targetName]) occ[e.targetName] = new Set();
+            occ[e.targetName].add(tHandle);
         });
-    }, [edgeLayouts, hoveredEdge]);
+        return occ;
+    }, [edgeLayouts, layout.edges, layout.nodes, view]);
 
-    // Layer 1: Lines (Z-Index 10) - Beneath Nodes
-    const renderEdgeLines = useMemo(() => {
-        return sortedEdgeLayouts.map(({ edgeId, points, sourceName, targetName }) => {
-            const sourceLayout = layout.nodes[sourceName];
-            const targetLayout = layout.nodes[targetName];
-
-            // Viewport Culling for Edges
-            const isVisible = matchesFilter(sourceName) && matchesFilter(targetName);
-            const inViewport = viewportBounds ? (
-                (sourceLayout && sourceLayout.gridX * CELL_WIDTH >= viewportBounds.minX && sourceLayout.gridX * CELL_WIDTH <= viewportBounds.maxX && sourceLayout.gridY * CELL_HEIGHT >= viewportBounds.minY && sourceLayout.gridY * CELL_HEIGHT <= viewportBounds.maxY) ||
-                (targetLayout && targetLayout.gridX * CELL_WIDTH >= viewportBounds.minX && targetLayout.gridX * CELL_WIDTH <= viewportBounds.maxX && targetLayout.gridY * CELL_HEIGHT >= viewportBounds.minY && targetLayout.gridY * CELL_HEIGHT <= viewportBounds.maxY)
-            ) : true;
-
-            if ((!isVisible && !isInteracting) || !inViewport) return null;
-
-            return (
-                <FlowEdgeLine
-                    key={`${edgeId}-line`}
-                    edgeId={edgeId}
-                    points={points}
-                    isVisible={isVisible}
-                    isInteracting={isInteracting}
-                    hoveredEdge={hoveredEdge}
-                />
-            );
+    // Maps each occupied port to its edge and whether it's the source or target side
+    const portEdgeMap = useMemo(() => {
+        const map: Record<string, { edgeId: string, isSource: boolean }> = {};
+        edgeLayouts.forEach(e => {
+            const edgeData = layout.edges[e.edgeId] || {};
+            const sHandle = edgeData.sourceHandle || (view.getPixelCoords(layout.nodes[e.sourceName]?.gridX, 0).x <= view.getPixelCoords(layout.nodes[e.targetName]?.gridX, 0).x ? 'right-3' : 'left-3');
+            const tHandle = edgeData.targetHandle || (view.getPixelCoords(layout.nodes[e.sourceName]?.gridX, 0).x <= view.getPixelCoords(layout.nodes[e.targetName]?.gridX, 0).x ? 'left-3' : 'right-3');
+            const sKey = `${e.sourceName}::${sHandle}`;
+            const tKey = `${e.targetName}::${tHandle}`;
+            if (!map[sKey]) map[sKey] = { edgeId: e.edgeId, isSource: true };
+            if (!map[tKey]) map[tKey] = { edgeId: e.edgeId, isSource: false };
         });
-    }, [sortedEdgeLayouts, hoveredEdge, filterTag, isInteracting, viewportBounds]);
+        return map;
+    }, [edgeLayouts, layout.edges, layout.nodes, view]);
 
-    // Layer 2: Controls & Interaction (Z-Index 50) - Above Nodes
-    const renderEdgeControls = useMemo(() => {
-        const isDraggingConnection = dragItem?.type === 'source' || dragItem?.type === 'target';
-        const isDraggingEdge = dragItem?.type === 'segment' || dragItem?.type === 'vertex' || isDraggingConnection;
-
-        return sortedEdgeLayouts.map(({ edgeId, points, startPoint, endPoint, elName, sourceName, targetName }) => {
-            const sourceLayout = layout.nodes[sourceName];
-            const targetLayout = layout.nodes[targetName];
-
-            const isVisible = matchesFilter(sourceName) && matchesFilter(targetName);
-            const inViewport = viewportBounds ? (
-                (sourceLayout && sourceLayout.gridX * CELL_WIDTH >= viewportBounds.minX && sourceLayout.gridX * CELL_WIDTH <= viewportBounds.maxX && sourceLayout.gridY * CELL_HEIGHT >= viewportBounds.minY && sourceLayout.gridY * CELL_HEIGHT <= viewportBounds.maxY) ||
-                (targetLayout && targetLayout.gridX * CELL_WIDTH >= viewportBounds.minX && targetLayout.gridX * CELL_WIDTH <= viewportBounds.maxX && targetLayout.gridY * CELL_HEIGHT >= viewportBounds.minY && targetLayout.gridY * CELL_HEIGHT <= viewportBounds.maxY)
-            ) : true;
-
-            if ((!isVisible && !isInteracting) || !inViewport) return null;
-
-            return (
-                <FlowEdgeControls
-                    key={`${edgeId}-ctrl`}
-                    edgeId={edgeId}
-                    points={points}
-                    startPoint={startPoint}
-                    endPoint={endPoint}
-                    elName={elName}
-                    isVisible={isVisible}
-                    isInteracting={isInteracting}
-                    hoveredEdge={hoveredEdge}
-                    isDraggingConnection={isDraggingConnection}
-                    isDraggingEdge={isDraggingEdge}
-                    isSpacePressed={isSpacePressed}
-                    onMouseEnter={() => isVisible && setHoveredEdge(edgeId)}
-                    onMouseLeave={() => setHoveredEdge(null)}
-                    onSegmentMouseDown={(idx, e) => {
-                        e.stopPropagation();
-                        setDragItem({ type: 'segment', id: edgeId, index: idx, points: points });
-                    }}
-                    onSegmentDoubleClick={(idx, e) => handleSegmentDoubleClick(e, edgeId, idx)}
-                    onSourceMouseDown={(e) => {
-                        e.stopPropagation();
-                        setDragItem({ type: 'source', id: edgeId });
-                    }}
-                    onTargetMouseDown={(e) => {
-                        e.stopPropagation();
-                        setDragItem({ type: 'target', id: edgeId });
-                    }}
-                    onVertexMouseDown={(idx, e) => {
-                        e.stopPropagation();
-                        setDragItem({ type: 'vertex', id: edgeId, index: idx });
-                    }}
-                    onVertexDoubleClick={(idx, e) => handleVertexDoubleClick(e, edgeId, idx)}
-                />
-            );
-        });
-    }, [sortedEdgeLayouts, dragItem, hoveredEdge, isSpacePressed, viewportBounds]);
-
+    const handleClose = () => { if (isDirty) setShowUnsavedChangesModal(true); else onClose(); };
 
     if (!isOpen) return null;
 
     return createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-surface w-[90vw] h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-outline-variant/30">
-                {/* Header */}
-                <div className="flex items-center justify-between px-6 py-2 border-b border-outline-variant/30 bg-surface">
-                    <h2 className="text-lg font-semibold text-on-surface flex items-center gap-2">
-                        {t('mapper.flowchart.title', 'Navigation Flow')}
-                    </h2>
-                    <div className="flex items-center gap-2">
-                        {missedScreens.length > 0 && (
-                            <div 
-                                className="flex items-center gap-1.5 px-3 py-1 bg-warning/10 text-warning border border-warning/20 rounded-lg text-xs font-medium animate-pulse cursor-help" 
-                                title={t('mapper.flowchart.ai_missed_help', 'These screens were placed in the quarantine area on the right. Drag them to their places or complete the mapping if they are incomplete.')}
-                            >
-                                <AlertTriangle size={14} />
-                                {t('mapper.flowchart.ai_missed_count', { count: missedScreens.length })}
-                            </div>
-                        )}
-                        <AiButton
-                            id="flowchart_reorganize"
-                            onClick={(_, cp) => autoReorganizeLayout(cp)}
-                            variant="primary"
-                            label={t('mapper.flowchart.reorganize')}
-                            isLoading={isReorganizing}
-                        />
-                        <Button
-                            onClick={handleImport}
-                            className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full"
-                            title={t('mapper.flowchart.import')}>
-                            <Download size={16} />
-                        </Button>
-                        <Button
-                            onClick={handleExport}
-                            className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full"
-                            title={t('mapper.flowchart.export')}>
-                            <Upload size={16} />
-                        </Button>
-                        <Button
-                            onClick={saveLayout}
-                            className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full"
-                            title={t('common.save')}>
-                            <Save size={16} />
-                        </Button>
-                        <Button
-                            onClick={handleClearAllCurvatures}
-                            className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full"
-                            title={t('mapper.flowchart.clear_curvatures', 'Clear all edge curvatures')}>
-                            <Eraser size={16} />
-                        </Button>
-                        <div className="h-4 w-px bg-outline-variant/30 mx-2" />
-                        <Button
-                            onClick={handleExportImage}
-                            className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full transition-colors"
-                            title={t('mapper.flowchart.export_image')}>
-                            <Camera size={16} />
-                        </Button>
-                        <div className="h-4 w-px bg-outline-variant/30 mx-1" />
-                        <div className="flex items-center gap-2 px-2 py-1 bg-surface-variant/10 rounded-lg border border-outline-variant/20 ml-2">
-                            <span className="text-[10px] uppercase font-bold text-on-surface-variant/70 whitespace-nowrap">{t('mapper.flowchart.filter_by_tag')}</span>
-                            <Select
-                                className="bg-transparent border-none text-xs font-semibold text-primary dark:text-primary/80 outline-none cursor-pointer py-0 h-6 min-w-[100px]"
-                                value={filterTag || ""}
-                                onChange={(e) => setFilterTag(e.target.value || null)}
-                                options={[
-                                    { value: "", label: t('mapper.flowchart.all_tags') },
-                                    ...allTags.map(tag => ({ value: tag, label: tag }))
-                                ]}
-                            />
-                        </div>
-                        <Button
-                            onClick={centerView}
-                            className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full"
-                            title={t('mapper.flowchart.center_view')}>
-                            <Maximize size={16} />
-                        </Button>
-                        <div className="h-6 w-px bg-outline-variant/30 mx-2" />
-                        <div className="flex bg-surface-variant/30 rounded-lg p-1 mr-4">
-                            <Button
-                                onClick={() => performZoom(-0.1)}
-                                className="p-1.5 hover:bg-surface/50 rounded text-on-surface-variant">
-                                <ZoomOut size={16} />
-                            </Button>
-                            <span className="px-2 text-xs flex items-center text-on-surface-variant/80 min-w-[3rem] justify-center">{Math.round(scale * 100)}%</span>
-                            <Button
-                                onClick={() => performZoom(0.1)}
-                                className="p-1.5 hover:bg-surface/50 rounded text-on-surface-variant">
-                                <ZoomIn size={16} />
-                            </Button>
-                        </div>
-                        <Button
-                            onClick={handleClose}
-                            className="p-2 hover:bg-error/10 hover:text-error rounded-full transition-colors text-on-surface/60">
-                            <X size={16} />
-                        </Button>
-                    </div>
-                </div>
+                <FlowchartHeader 
+                    missedScreensCount={missedScreens.length}
+                    isReorganizing={isReorganizing}
+                    onAutoReorganize={autoReorganizeLayout}
+                    onImport={handleImport}
+                    onExport={handleExport}
+                    onSave={() => saveLayout()}
+                    onClearCurvatures={handleClearAllCurvatures}
+                    onExportImage={handleExportImage}
+                    filterTag={filterTag}
+                    setFilterTag={setFilterTag}
+                    allTags={allTags}
+                    onCenterView={() => view.centerView(layout.nodes)}
+                    onZoom={view.performZoom}
+                    scale={view.scale}
+                    onClose={handleClose}
+                />
 
-                {/* Canvas Container */}
-                <div
-                    ref={containerRef}
-                    className={clsx(
-                        "flex-1 bg-surface-variant/5 relative overflow-hidden",
-                        isDraggingCanvas ? "cursor-grabbing" : (isSpacePressed ? "cursor-grab" : "cursor-default")
-                    )}
-                    onMouseDown={handleCanvasMouseDown}
-                    onMouseMove={handleMouseMove}
-                    onMouseUp={handleMouseUp}
-                    onMouseLeave={handleMouseUp}
-                    onWheel={handleWheel}
+                <FlowchartCanvas
+                    containerRef={containerRef}
+                    contentRef={contentRef}
+                    isDraggingCanvas={interaction.isDraggingCanvas}
+                    isSpacePressed={isSpacePressed}
+                    offset={view.offset}
+                    scale={view.scale}
+                    gridBounds={gridBounds}
+                    onMouseDown={interaction.handleCanvasMouseDown}
+                    onMouseMove={interaction.handleMouseMove}
+                    onMouseUp={interaction.handleMouseUp}
+                    onMouseLeave={interaction.handleMouseUp}
+                    onWheel={interaction.handleWheel}
                 >
-                    {/* Flowchart Content */}
-                    <div
-                        ref={contentRef}
-                        className="absolute inset-0 z-0 bg-surface-variant/5 lines-bg"
-                        style={{
-                            transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
-                            transformOrigin: '0 0',
-                            width: `${gridBounds.width * CELL_WIDTH}px`,
-                            height: `${gridBounds.height * CELL_HEIGHT}px`
-                        }}
-                    >
-                        {/* Grid Background */}
-                        <div className="absolute pointer-events-none"
-                            style={{
-                                zIndex: 0,
-                                left: `${gridBounds.minX * CELL_WIDTH}px`,
-                                top: `${gridBounds.minY * CELL_HEIGHT}px`,
-                                width: `${gridBounds.width * CELL_WIDTH}px`,
-                                height: `${gridBounds.height * CELL_HEIGHT}px`,
-                                backgroundImage: `
-linear-gradient(to right, rgba(0,0,0,0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(0,0,0,0.05) 1px, transparent 1px)
-        `,
-                                backgroundSize: `${CELL_WIDTH}px ${CELL_HEIGHT}px`,
-                                backgroundPosition: `0 0`
-                            }}
-                        />
+                    <FlowchartSVG zIndex={10}>
+                        {sortedEdgeLayouts.map(e => (
+                            <FlowEdgeLine key={`${e.edgeId}-line`} edgeId={e.edgeId} points={e.points} isVisible={matchesFilter(e.sourceName) && matchesFilter(e.targetName)} isInteracting={interaction.state.type !== 'IDLE'} hoveredEdge={interaction.hoveredEdge} />
+                        ))}
+                    </FlowchartSVG>
+                    <FlowchartSVG zIndex={50}>
+                        {sortedEdgeLayouts.map(e => (
+                            <FlowEdgeControls 
+                                key={`${e.edgeId}-ctrl`} 
+                                edgeId={e.edgeId} 
+                                points={e.points} 
+                                startPoint={e.startPoint} 
+                                endPoint={e.endPoint} 
+                                elName={e.elName} 
+                                isVisible={matchesFilter(e.sourceName) && matchesFilter(e.targetName)} 
+                                isInteracting={interaction.state.type !== 'IDLE'} 
+                                hoveredEdge={interaction.hoveredEdge} 
+                                isDraggingConnection={interaction.state.type === 'DRAGGING_CONNECTION' || interaction.state.type === 'DRAGGING_SOURCE' || interaction.state.type === 'DRAGGING_TARGET'}
+                                isDraggingEdge={interaction.state.type !== 'IDLE'} 
+                                isSpacePressed={isSpacePressed} 
+                                onMouseEnter={() => interaction.setHoveredEdge(e.edgeId)} 
+                                onMouseLeave={() => interaction.setHoveredEdge(null)} 
+                                onSegmentMouseDown={(idx) => interaction.dispatch({ type: 'START_SEGMENT_DRAG', id: e.edgeId, index: idx, points: e.points })} 
+                                onSegmentDoubleClick={(idx, ev) => interaction.handleSegmentDoubleClick(idx, ev, e.edgeId)}
+                                onSourceMouseDown={() => interaction.dispatch({ type: 'START_SOURCE_DRAG', id: e.edgeId })} 
+                                onTargetMouseDown={() => interaction.dispatch({ type: 'START_TARGET_DRAG', id: e.edgeId })} 
+                                onVertexMouseDown={(idx) => interaction.dispatch({ type: 'START_VERTEX_DRAG', id: e.edgeId, index: idx })} 
+                                onVertexDoubleClick={(idx) => interaction.handleVertexDoubleClick(idx, e.edgeId)}
+                            />
+                        ))}
+                    </FlowchartSVG>
 
-                        {/* Edges Layer (Lines) - Z-Index 10 */}
-                        <svg className="absolute top-0 left-0 w-full h-full pointer-events-none" style={{ zIndex: 10, overflow: 'visible' }}>
-                            <defs>
-                                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                                    <polygon points="0 0, 10 3.5, 0 7" fill="#9ca3af" />
-                                </marker>
-                                <marker id="arrowhead-highlighted" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                                    <polygon points="0 0, 10 3.5, 0 7" fill="#3b82f6" />
-                                </marker>
-                            </defs>
-                            {renderEdgeLines}
-                        </svg>
-
-                        {/* Edges Layer (Controls) - Z-Index 50 (Above Nodes) */}
-                        <svg className="absolute top-0 left-0 w-full h-full pointer-events-none" style={{ zIndex: 50, overflow: 'visible' }}>
-                            {renderEdgeControls}
-                        </svg>
-
-                        {/* Nodes (Z-Index 40) */}
-                        {Object.entries(layout.nodes).map(([name, pos]) => {
-                            const data = maps.find(m => m.name === name);
-                            if (!data) return null;
-
-                            const pixel = getPixelCoords(pos.gridX, pos.gridY);
-
-                            // Viewport Culling for Nodes
-                            const isVisible = matchesFilter(name);
-                            const inViewport = viewportBounds ? (
-                                pixel.x >= viewportBounds.minX && pixel.x <= viewportBounds.maxX &&
-                                pixel.y >= viewportBounds.minY && pixel.y <= viewportBounds.maxY
-                            ) : true;
-
-                            if ((!isVisible && !isInteracting) || !inViewport) return null;
-
-                            return (
-                                <FlowNode
-                                    key={name}
-                                    data={data}
-                                    pixel={pixel}
-                                    isVisible={isVisible}
-                                    isInteracting={isInteracting}
-                                    isDraggingThis={dragItem?.type === 'node' && dragItem.id === name}
-                                    isDraggingCanvas={isDraggingCanvas}
-                                    onMouseDown={(e) => {
-                                        if (isSpacePressed || e.button === 1 || !isVisible) return;
-                                        e.stopPropagation();
-                                        setDragItem({ type: 'node', id: name });
-                                    }}
-                                    onEditScreen={onEditScreen}
-                                />
-                            );
-                        })}
-
-                        {/* Global Ports Layer (Z-Index 60 - Topmost) */}
-                        {Object.entries(layout.nodes).map(([name, pos]) => {
-                            const data = maps.find(m => m.name === name);
-                            if (!data) return null;
-
-                            const pixel = getPixelCoords(pos.gridX, pos.gridY);
-
-                            // Viewport Culling for Ports
-                            const isVisible = matchesFilter(name);
-                            const inViewport = viewportBounds ? (
-                                pixel.x >= viewportBounds.minX && pixel.x <= viewportBounds.maxX &&
-                                pixel.y >= viewportBounds.minY && pixel.y <= viewportBounds.maxY
-                            ) : true;
-
-                            if ((!isVisible && !isInteracting) || !inViewport) return null;
-
-                            return (
-                                <React.Fragment key={`${name}-ports`}>
-                                    {NODE_PORTS.map(p => {
-                                        const isTrulyOccupied = portOccupancyMap[name]?.has(p.id);
-                                        const isHovered = hoveredPort?.nodeId === name && hoveredPort?.portId === p.id;
-                                        const isDraggingConnection = dragItem?.type === 'source' || dragItem?.type === 'target';
-                                        const canQuickConnect = !isDraggingConnection && !isDraggingCanvas && !dragItem && !isTrulyOccupied;
-                                        const showPorts = isDraggingConnection || (canQuickConnect && isHovered);
-                                        const isInteractive = isDraggingConnection || canQuickConnect;
-
-                                        return (
-                                            <FlowPort
-                                                key={`${name}-${p.id}`}
-                                                nodeId={name}
-                                                port={p}
-                                                pixel={pixel}
-                                                isHovered={isHovered}
-                                                isInteractive={isInteractive}
-                                                showPorts={showPorts}
-                                                canQuickConnect={canQuickConnect}
-                                                isDraggingConnection={isDraggingConnection}
-                                                onMouseEnter={() => setHoveredPort({ nodeId: name, portId: p.id })}
-                                                onMouseLeave={() => setHoveredPort(null)}
-                                                onMouseDown={(e) => {
-                                                    if (isSpacePressed || e.button === 1) return;
-                                                    if (isInteractive) e.stopPropagation();
-                                                }}
-                                                onClick={(e) => {
-                                                    if (canQuickConnect) {
-                                                        e.stopPropagation();
-                                                        handleQuickConnect(name, p.id);
-                                                    }
-                                                }}
-                                            />
-                                        );
-                                    })}
-                                </React.Fragment>
-                            );
-                        })}
-                    </div>
-                </div>
+                    {Object.entries(layout.nodes).map(([name, pos]) => {
+                        const data = maps.find(m => m.name === name);
+                        if (!data) return null;
+                        const pixel = view.getPixelCoords(pos.gridX, pos.gridY);
+                        const isVisible = matchesFilter(name);
+                        return (
+                            <React.Fragment key={name}>
+                                <FlowNode data={data} pixel={pixel} isVisible={isVisible} isInteracting={interaction.state.type !== 'IDLE'} isDraggingThis={interaction.state.type === 'DRAGGING_NODE' && interaction.state.id === name} isDraggingCanvas={interaction.isDraggingCanvas} onMouseDown={(e) => { if (!isSpacePressed && e.button !== 1 && isVisible) { e.preventDefault(); e.stopPropagation(); interaction.dispatch({ type: 'START_NODE_DRAG', id: name }); } }} onEditScreen={onEditScreen} />
+                                {NODE_PORTS.map(p => {
+                                    const isOccupied = portOccupancyMap[name]?.has(p.id);
+                                    const isHovered = interaction.hoveredPort?.nodeId === name && interaction.hoveredPort?.portId === p.id;
+                                    const isDraggingConn = interaction.state.type === 'DRAGGING_SOURCE' || interaction.state.type === 'DRAGGING_TARGET' || interaction.state.type === 'DRAGGING_CONNECTION';
+                                    return <FlowPort key={`${name}-${p.id}`} nodeId={name} port={p} pixel={pixel} isHovered={isHovered} isInteractive={true} showPorts={isDraggingConn || isHovered} canQuickConnect={!isDraggingConn && !isOccupied} isDraggingConnection={isDraggingConn} onMouseEnter={() => interaction.setHoveredPort({ nodeId: name, portId: p.id })} onMouseLeave={() => interaction.setHoveredPort(null)} onMouseDown={e => { e.preventDefault(); e.stopPropagation(); if (isDraggingConn) return; if (isOccupied) { const edgeInfo = portEdgeMap[`${name}::${p.id}`]; if (edgeInfo) { interaction.dispatch({ type: edgeInfo.isSource ? 'START_SOURCE_DRAG' : 'START_TARGET_DRAG', id: edgeInfo.edgeId }); } } else { interaction.dispatch({ type: 'START_CONNECTION_DRAG', nodeId: name, portId: p.id }); } }} onClick={() => { if (!isOccupied && !isDraggingConn && !interaction.justStoppedDragging) { setQuickConnectData({ sourceNodeId: name, sourcePortId: p.id }); setIsQuickConnectOpen(true); } }} />;
+                                })}
+                            </React.Fragment>
+                        );
+                    })}
+                </FlowchartCanvas>
             </div>
 
-            {/* Quick Connect Modal */}
             {isQuickConnectOpen && quickConnectData && (
-                <QuickConnectDialog
-                    maps={maps}
-                    sourceNodeId={quickConnectData.sourceNodeId}
-                    onClose={() => {
-                        setIsQuickConnectOpen(false);
-                        setQuickConnectData(null);
-                    }}
-                    onConfirm={confirmQuickConnect}
-                />
+                <QuickConnectDialog maps={maps} sourceNodeId={quickConnectData.sourceNodeId} onClose={() => setIsQuickConnectOpen(false)} onConfirm={(target, element) => {
+                    const edgeId = `${quickConnectData.sourceNodeId}-${element}-${target}`;
+                    setLayout(prev => ({ ...prev, edges: { ...prev.edges, [edgeId]: { sourceHandle: quickConnectData.sourcePortId, vertices: [] } } }));
+                    setIsDirty(true);
+                    setIsQuickConnectOpen(false);
+                }} />
             )}
-            {/* Unsaved Changes Modal */}
+
             {showUnsavedChangesModal && (
-                <UnsavedChangesDialog
-                    onCancel={() => setShowUnsavedChangesModal(false)}
-                    onSaveAndExit={handleSaveAndExit}
-                    onExitWithoutSaving={handleExitWithoutSaving}
-                />
+                <UnsavedChangesDialog onCancel={() => setShowUnsavedChangesModal(false)} onSaveAndExit={async () => { await saveLayout(); onClose(); }} onExitWithoutSaving={onClose} />
             )}
         </div>,
         document.body
-    );
-}
-
-function QuickConnectDialog({ maps, sourceNodeId, onClose, onConfirm }: {
-    maps: ScreenMap[],
-    sourceNodeId: string,
-    onClose: () => void,
-    onConfirm: (target: string, element: string) => void
-}) {
-    const { t } = useTranslation();
-    const sourceMap = maps.find(m => m.name === sourceNodeId);
-
-    const availableElements = useMemo(() => sourceMap?.elements.filter(el => !el.navigates_to) || [], [sourceMap]);
-    const availableTargets = useMemo(() => maps.filter(m => m.name !== sourceNodeId).map(m => m.name), [maps, sourceNodeId]);
-
-    const [selectedElement, setSelectedElement] = useState<string>(availableElements[0]?.name || "");
-    const [selectedTarget, setSelectedTarget] = useState<string>(availableTargets[0] || "");
-
-    useEffect(() => {
-        if (!selectedElement && availableElements.length > 0) setSelectedElement(availableElements[0].name);
-    }, [availableElements]);
-
-    useEffect(() => {
-        if (!selectedTarget && availableTargets.length > 0) setSelectedTarget(availableTargets[0]);
-    }, [availableTargets]);
-
-    return (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
-            <div className="bg-surface p-6 rounded-2xl shadow-xl w-96 border border-outline-variant/30" onClick={e => e.stopPropagation()}>
-                <h3 className="text-lg font-semibold mb-4 text-on-surface flex items-center gap-2">
-                    <Plus size={20} className="text-primary" />
-                    {t('mapper.flowchart.quick_connect', 'Quick Connect')}
-                </h3>
-
-                <div className="space-y-4">
-                    <div className="space-y-1">
-                        <GroupedElementSelect
-                            label={t('mapper.flowchart.source_element', 'Source Element')}
-                            value={selectedElement}
-                            onChange={setSelectedElement}
-                            elements={availableElements.map(el => ({
-                                ...el,
-                                // Map to expected shape if needed, but it already uses UIElementMap type
-                            }))}
-                            disabled={availableElements.length === 0}
-                        />
-                        {availableElements.length === 0 && (
-                            <p className="text-xs text-error">{t('mapper.flowchart.no_elements', 'No unmapped elements available.')}</p>
-                        )}
-                    </div>
-
-                    <div className="space-y-1">
-                        <GroupedScreenSelect
-                            label={t('mapper.flowchart.target_screen', 'Target Screen')}
-                            value={selectedTarget}
-                            onChange={setSelectedTarget}
-                            maps={availableTargets
-                                .map(name => maps.find(m => m.name === name))
-                                .filter((m): m is ScreenMap => m !== undefined)}
-                        />
-                    </div>
-
-                    <div className="flex justify-end gap-2 mt-6">
-                        <Button
-                            onClick={onClose}
-                            className="px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-variant/20 rounded-lg">
-                            {t('mapper.flowchart.cancel', 'Cancel')}
-                        </Button>
-                        <Button
-                            onClick={() => onConfirm(selectedTarget, selectedElement)}
-                            className="px-4 py-2 text-sm bg-primary text-on-primary rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {t('mapper.flowchart.connect', 'Connect')}
-                        </Button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-function UnsavedChangesDialog({ onCancel, onSaveAndExit, onExitWithoutSaving }: {
-    onCancel: () => void,
-    onSaveAndExit: () => void,
-    onExitWithoutSaving: () => void
-}) {
-    const { t } = useTranslation();
-
-    return (
-        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onCancel}>
-            <div className="bg-surface p-6 rounded-2xl shadow-xl w-96 border border-outline-variant/30" onClick={e => e.stopPropagation()}>
-                <div className="flex flex-col items-center text-center">
-                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4 bg-warning-container/50 text-on-surface/80">
-                        <AlertTriangle size={24} />
-                    </div>
-
-                    <h3 className="text-lg font-semibold text-on-surface/80 mb-2">
-                        {t('mapper.flowchart.unsaved_changes.title', 'Unsaved Changes')}
-                    </h3>
-
-                    <p className="text-sm text-on-surface-variant/80 mb-6">
-                        {t('mapper.flowchart.unsaved_changes.message', 'You have unsaved changes. Do you want to save before exiting?')}
-                    </p>
-
-                    <div className="flex flex-col gap-2 w-full">
-                        <Button
-                            onClick={onSaveAndExit}
-                            variant="primary"
-                        >
-                            {t('mapper.flowchart.unsaved_changes.save_and_exit', 'Save and Exit')}
-                        </Button>
-                        <Button
-                            onClick={onExitWithoutSaving}
-                            variant="danger"
-                            className="w-full bg-error-container text-error hover:bg-error-container/80"
-                        >
-                            {t('mapper.flowchart.unsaved_changes.exit_without_saving', 'Exit without Saving')}
-                        </Button>
-                        <Button
-                            onClick={onCancel}
-                            variant="ghost"
-                            className="w-full"
-                        >
-                            {t('mapper.flowchart.unsaved_changes.cancel', 'Cancel')}
-                        </Button>
-                    </div>
-                </div>
-            </div>
-        </div>
     );
 }

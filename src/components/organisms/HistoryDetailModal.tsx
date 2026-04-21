@@ -154,6 +154,30 @@ export function HistoryDetailModal({ isOpen, onClose, log, onUpdateLog }: Histor
         }
     };
 
+    const handleChildrenLoaded = useCallback((id: string, children: LogNode[]) => {
+        const updateNode = (nodes: LogNode[]): boolean => {
+            for (const n of nodes) {
+                if (n.id === id) {
+                    // Type narrowing: only update if it can have children
+                    if (n.type === 'suite' || n.type === 'test' || n.type === 'keyword') {
+                        (n as any).children = children;
+                        return true;
+                    }
+                }
+                const nodeWithChildren = n as any;
+                if (nodeWithChildren.children && Array.isArray(nodeWithChildren.children)) {
+                    if (updateNode(nodeWithChildren.children)) return true;
+                }
+            }
+            return false;
+        };
+
+        const newTree = [...tree];
+        if (updateNode(newTree)) {
+            setTree(newTree);
+        }
+    }, [tree]);
+
     const handleSummarize = async (customPrompt?: string) => {
         if (!log || tree.length === 0 || isSummarizing) return;
 
@@ -301,22 +325,21 @@ export function HistoryDetailModal({ isOpen, onClose, log, onUpdateLog }: Histor
                     </div>
 
                     {/* Content / Tree */}
-                    <div className="flex-1 overflow-y-auto px-1">
-                        {(isSummarizing || summary || summaryError) && (
-                            <div className="mb-6 px-3">
-                                <AiResponse
-                                    title={t('run_tab.console.summary_title')}
-                                    isLoading={isSummarizing}
-                                    responseTitle={t('run_tab.console.summary_rationale')}
-                                    response={summary}
-                                    error={summaryError}
-                                    onCopy={() => { }}
-                                />
-                            </div>
-                        )}
-
+                    <div className="flex-1 min-h-0">
                         {loading ? (
-                            <div className="h-full flex flex-col items-center justify-center gap-4 opacity-80">
+                            <div className="h-full flex flex-col items-center justify-center gap-4 opacity-80 overflow-y-auto">
+                                {(isSummarizing || summary || summaryError) && (
+                                    <div className="w-full mb-6 px-3">
+                                        <AiResponse
+                                            title={t('run_tab.console.summary_title')}
+                                            isLoading={isSummarizing}
+                                            responseTitle={t('run_tab.console.summary_rationale')}
+                                            response={summary}
+                                            error={summaryError}
+                                            onCopy={() => { }}
+                                        />
+                                    </div>
+                                )}
                                 <ExpressiveLoading size="md" variant="circular" />
                                 <div className="flex flex-col items-center gap-2 w-64">
                                     <span className="text-sm font-medium animate-pulse">
@@ -338,9 +361,27 @@ export function HistoryDetailModal({ isOpen, onClose, log, onUpdateLog }: Histor
                                 </div>
                             </div>
                         ) : tree.length > 0 ? (
-                            <div className="space-y-2 pb-4">
+                            <div className="h-full overflow-y-auto space-y-3 pb-8 px-4 custom-scrollbar">
+                                {(isSummarizing || summary || summaryError) && (
+                                    <div className="mb-6">
+                                        <AiResponse
+                                            title={t('run_tab.console.summary_title')}
+                                            isLoading={isSummarizing}
+                                            responseTitle={t('run_tab.console.summary_rationale')}
+                                            response={summary}
+                                            error={summaryError}
+                                            onCopy={() => { }}
+                                        />
+                                    </div>
+                                )}
                                 {tree.map(node => (
-                                    <LogTree key={node.id} node={node} initiallyOpen={true} dbPath={dbPath} />
+                                    <LogTree
+                                        key={node.id}
+                                        node={node}
+                                        initiallyOpen={true}
+                                        dbPath={dbPath}
+                                        onChildrenLoaded={handleChildrenLoaded}
+                                    />
                                 ))}
                             </div>
                         ) : (

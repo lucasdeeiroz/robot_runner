@@ -7,6 +7,7 @@ use quick_xml::events::Event;
 use quick_xml::reader::Reader;
 use std::io::BufReader;
 use crate::db::LogDb;
+use crate::errors::{AppError, AppResult};
 
 static RE_SRC: Lazy<regex::Regex> =
     Lazy::new(|| regex::Regex::new(r#"src=["']([^"']+)["']"#).unwrap());
@@ -112,7 +113,7 @@ struct ParseProgress {
     percent: u8,
 }
 
-fn emit_progress(app: &tauri::AppHandle, xml_path: &str, stage: &str, percent: u8) {
+fn emit_progress<R: tauri::Runtime>(app: &tauri::AppHandle<R>, xml_path: &str, stage: &str, percent: u8) {
     let _ = app.emit(
         "xml-parse-progress",
         ParseProgress {
@@ -134,10 +135,10 @@ pub struct ParseResult {
 pub async fn parse_robot_xml(
     app: tauri::AppHandle,
     xml_path: String,
-) -> Result<ParseResult, String> {
+) -> AppResult<ParseResult> {
     tokio::task::spawn_blocking(move || parse_robot_xml_blocking(&app, &xml_path))
         .await
-        .map_err(|e| format!("Task join error: {}", e))?
+        .map_err(|e| AppError::ProcessError(format!("Task join error: {}", e)))?
 }
 
 #[tauri::command]
@@ -145,121 +146,138 @@ pub async fn save_node_ai_analysis(
     db_path: String,
     node_id: String,
     analysis: String,
-) -> Result<(), String> {
+) -> AppResult<()> {
     tokio::task::spawn_blocking(move || {
-        let db = LogDb::new(&db_path).map_err(|e| format!("Failed to open DB: {}", e))?;
+        let db = LogDb::new(&db_path).map_err(|e| AppError::DbError(format!("Failed to open DB: {}", e)))?;
         db.update_node_ai_analysis(&node_id, &analysis)
-            .map_err(|e| format!("Update error: {}", e))
+            .map_err(|e| AppError::DbError(format!("Update error: {}", e)))
     })
     .await
-    .map_err(|e| format!("Task join error: {}", e))?
+    .map_err(|e| AppError::ProcessError(format!("Task join error: {}", e)))?
 }
 
 #[tauri::command]
 pub async fn get_node_ai_analysis(
     db_path: String,
     node_id: String,
-) -> Result<Option<String>, String> {
+) -> AppResult<Option<String>> {
     tokio::task::spawn_blocking(move || {
-        let db = LogDb::new(&db_path).map_err(|e| format!("Failed to open DB: {}", e))?;
+        let db = LogDb::new(&db_path).map_err(|e| AppError::DbError(format!("Failed to open DB: {}", e)))?;
         db.get_node_ai_analysis(&node_id)
-            .map_err(|e| format!("Query error: {}", e))
+            .map_err(|e| AppError::DbError(format!("Query error: {}", e)))
     })
     .await
-    .map_err(|e| format!("Task join error: {}", e))?
+    .map_err(|e| AppError::ProcessError(format!("Task join error: {}", e)))?
 }
 
 #[tauri::command]
 pub async fn get_node_children(
     db_path: String,
     parent_id: String,
-) -> Result<Vec<LogNode>, String> {
+) -> AppResult<Vec<LogNode>> {
     tokio::task::spawn_blocking(move || {
-        let db = LogDb::new(&db_path).map_err(|e| format!("Failed to open DB: {}", e))?;
+        use rayon::prelude::*;
+
+        let db = LogDb::new(&db_path).map_err(|e| AppError::DbError(format!("Failed to open DB: {}", e)))?;
         
         // Use a customized query that joins with ai_analysis
         let mut stmt = db.conn.prepare(
             "SELECT json_payload, ai_analysis FROM log_nodes 
              WHERE parent_id = ?1 
              ORDER BY order_index ASC"
-        ).map_err(|e| e.to_string())?;
+        ).map_err(|e| AppError::DbError(e.to_string()))?;
 
         let rows = stmt.query_map([&parent_id], |row| {
             let json: String = row.get(0)?;
             let analysis: Option<String> = row.get(1)?;
             Ok((json, analysis))
-        }).map_err(|e| e.to_string())?;
+        }).map_err(|e| AppError::DbError(e.to_string()))?;
         
-        let mut nodes = Vec::new();
-        for row in rows {
-            let (json, analysis) = row.map_err(|e| e.to_string())?;
-            match serde_json::from_str::<LogNode>(&json) {
-                Ok(mut node) => {
-                    // Inject the ai_analysis into the node object
-                    match &mut node {
-                        LogNode::Suite(s) => s.ai_analysis = analysis,
-                        LogNode::Test(t) => t.ai_analysis = analysis,
-                        LogNode::Keyword(k) => k.ai_analysis = analysis,
-                        _ => {}
+        let raw_data: Vec<(String, Option<String>)> = rows
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| AppError::DbError(e.to_string()))?;
+
+        // Parallel processing of JSON deserialization using Rayon while preserving row order
+        let ordered_nodes: Vec<Option<LogNode>> = raw_data.into_par_iter()
+            .map(|(json, analysis)| {
+                match serde_json::from_str::<LogNode>(&json) {
+                    Ok(mut node) => {
+                        match &mut node {
+                            LogNode::Suite(s) => s.ai_analysis = analysis,
+                            LogNode::Test(t) => t.ai_analysis = analysis,
+                            LogNode::Keyword(k) => k.ai_analysis = analysis,
+                            _ => {}
+                        }
+                        Some(node)
+                    },
+                    Err(e) => {
+                        println!("[XML Parser] Error deserializing node: {}", e);
+                        None
                     }
-                    nodes.push(node)
-                },
-                Err(e) => println!("[XML Parser] Error deserializing: {}", e),
-            }
-        }
+                }
+            })
+            .collect();
+
+        let nodes: Vec<LogNode> = ordered_nodes.into_iter().flatten().collect();
+
         Ok(nodes)
     })
     .await
-    .map_err(|e| format!("Task join error: {}", e))?
+    .map_err(|e| AppError::ProcessError(format!("Task join error: {}", e)))?
 }
 
 #[tauri::command]
-pub async fn get_execution_failures(db_path: String) -> Result<Vec<serde_json::Value>, String> {
+pub async fn get_execution_failures(db_path: String) -> AppResult<Vec<serde_json::Value>> {
     tokio::task::spawn_blocking(move || {
-        let db = LogDb::new(&db_path).map_err(|e| e.to_string())?;
-        let failure_jsons = db.get_failures().map_err(|e| e.to_string())?;
+        use rayon::prelude::*;
+
+        let db = LogDb::new(&db_path).map_err(|e| AppError::DbError(e.to_string()))?;
+        let failure_jsons = db.get_failures().map_err(|e| AppError::DbError(e.to_string()))?;
         
-        let mut results = Vec::new();
-        for json_str in failure_jsons {
-            if let Ok(mut val) = serde_json::from_str::<serde_json::Value>(&json_str) {
-                if let Some(obj) = val.as_object_mut() {
-                    obj.remove("children");
-                    
-                    if let Some(logs) = obj.get_mut("logs") {
-                        if let Some(arr) = logs.as_array_mut() {
-                            if arr.len() > 3 {
-                                let start = arr.len() - 3;
-                                *arr = arr[start..].to_vec();
+        let results: Vec<serde_json::Value> = failure_jsons.into_par_iter()
+            .filter_map(|json_str| {
+                if let Ok(mut val) = serde_json::from_str::<serde_json::Value>(&json_str) {
+                    if let Some(obj) = val.as_object_mut() {
+                        obj.remove("children");
+                        
+                        if let Some(logs) = obj.get_mut("logs") {
+                            if let Some(arr) = logs.as_array_mut() {
+                                if arr.len() > 3 {
+                                    let start = arr.len() - 3;
+                                    *arr = arr[start..].to_vec();
+                                }
+                            }
+                        }
+
+                        if let Some(fail_detail) = obj.get_mut("failureDetail") {
+                            if let Some(fd_obj) = fail_detail.as_object_mut() {
+                                fd_obj.remove("screenshotPath");
+                                fd_obj.remove("screenshot_path");
+                            }
+                        }
+                        if let Some(fail_detail) = obj.get_mut("failure_detail") {
+                            if let Some(fd_obj) = fail_detail.as_object_mut() {
+                                fd_obj.remove("screenshotPath");
+                                fd_obj.remove("screenshot_path");
                             }
                         }
                     }
-
-                    if let Some(fail_detail) = obj.get_mut("failureDetail") {
-                        if let Some(fd_obj) = fail_detail.as_object_mut() {
-                            fd_obj.remove("screenshotPath");
-                            fd_obj.remove("screenshot_path");
-                        }
-                    }
-                    if let Some(fail_detail) = obj.get_mut("failure_detail") {
-                        if let Some(fd_obj) = fail_detail.as_object_mut() {
-                            fd_obj.remove("screenshotPath");
-                            fd_obj.remove("screenshot_path");
-                        }
-                    }
+                    Some(val)
+                } else {
+                    None
                 }
-                results.push(val);
-            }
-        }
+            })
+            .collect();
         
         Ok(results)
     })
     .await
-    .map_err(|e| format!("Task join error: {}", e))?
+    .map_err(|e| AppError::ProcessError(format!("Task join error: {}", e)))?
 }
 
 
 // We drop the legacy load logic for `.zst` chunks, we completely use DB cache!
-fn parse_robot_xml_blocking(app: &tauri::AppHandle, xml_path: &str) -> Result<ParseResult, String> {
+fn parse_robot_xml_blocking(app: &tauri::AppHandle, xml_path: &str) -> AppResult<ParseResult> {
     let xml_file_name = Path::new(xml_path)
         .file_name()
         .and_then(|n| n.to_str())
@@ -280,7 +298,7 @@ fn parse_robot_xml_blocking(app: &tauri::AppHandle, xml_path: &str) -> Result<Pa
         println!("[XML Parser] Loading from DB cache: {:?}", cache_path);
         emit_progress(app, xml_path, "loading_tree", 90);
         
-        let db = LogDb::new(&cache_path).map_err(|e| e.to_string())?;
+        let db = LogDb::new(&cache_path).map_err(|e| AppError::DbError(e.to_string()))?;
         if let Ok(root_json) = db.get_root_suite() {
             if let Ok(root_suite) = serde_json::from_str::<LogNode>(&root_json) {
                 return Ok(ParseResult {
@@ -311,7 +329,7 @@ fn parse_robot_xml_blocking(app: &tauri::AppHandle, xml_path: &str) -> Result<Pa
 
     Ok(ParseResult {
         db_path: cache_path.to_string_lossy().to_string(),
-        root_suite,
+        root_suite: root_suite.clone(),
     })
 }
 
@@ -325,10 +343,11 @@ struct KwState {
     variable: String,
 }
 
-fn parse_robot_xml_sax_internal(app: &tauri::AppHandle, xml_path: &str, db_path: &Path, base_dir: &Path) -> Result<LogNode, String> {
-    let mut db = LogDb::new(db_path).map_err(|e| e.to_string())?;
+fn parse_robot_xml_sax_internal<R: tauri::Runtime>(app: &tauri::AppHandle<R>, xml_path: &str, db_path: &Path, base_dir: &Path) -> AppResult<LogNode> {
+    let mut db = LogDb::new(db_path).map_err(|e| AppError::DbError(format!("Failed to create DB: {}", e)))?;
+    let tx = db.begin_transaction().map_err(|e| AppError::DbError(format!("Transaction error: {}", e)))?;
     
-    let file = fs::File::open(xml_path).map_err(|e| e.to_string())?;
+    let file = fs::File::open(xml_path).map_err(|e| AppError::IoError(format!("Failed to open XML: {}", e)))?;
     let mut reader = Reader::from_reader(BufReader::new(file));
     reader.config_mut().trim_text(true);
 
@@ -344,8 +363,6 @@ fn parse_robot_xml_sax_internal(app: &tauri::AppHandle, xml_path: &str, db_path:
     let total_bytes = fs::metadata(xml_path).map(|m| m.len()).unwrap_or(1);
     let mut last_percent_reported = 10;
     
-    let tx = db.begin_transaction().map_err(|e| e.to_string())?;
-
     loop {
         let current_pos = reader.buffer_position() as u64;
         let percent = 10 + ((current_pos * 80) / total_bytes) as u8; // Reserve 10 for init, 10 for completion
@@ -355,7 +372,7 @@ fn parse_robot_xml_sax_internal(app: &tauri::AppHandle, xml_path: &str, db_path:
         }
 
         match reader.read_event_into(&mut buf) {
-            Err(e) => return Err(format!("Error at {} : {}", reader.buffer_position(), e)),
+            Err(e) => return Err(AppError::ParserError(format!("Error at {} : {}", reader.buffer_position(), e))),
             Ok(Event::Eof) => break,
 
             Ok(event @ Event::Start(_)) | Ok(event @ Event::Empty(_)) => {
@@ -669,8 +686,8 @@ fn parse_robot_xml_sax_internal(app: &tauri::AppHandle, xml_path: &str, db_path:
                                     
                                     order_counter += 1;
                                     let node_enum = LogNode::Text(c);
-                                    let json_payload = serde_json::to_string(&node_enum).unwrap();
-                                    LogDb::insert_node(&tx, node_enum.id(), parent.id(), "text", &json_payload, order_counter).unwrap();
+                                    let json_payload = serde_json::to_string(&node_enum).map_err(|e| AppError::ParserError(e.to_string()))?;
+                                    LogDb::insert_node(&tx, node_enum.id(), parent.id(), "text", &json_payload, order_counter).map_err(|e| AppError::DbError(e.to_string()))?;
 
                                     append_child_stats(parent, &node_enum);
                                 }
@@ -689,11 +706,11 @@ fn parse_robot_xml_sax_internal(app: &tauri::AppHandle, xml_path: &str, db_path:
         buf.clear();
     }
     
-    tx.commit().map_err(|e| e.to_string())?;
+    tx.commit().map_err(|e| AppError::DbError(format!("Commit error: {}", e)))?;
 
     match root_suite {
         Some(s) => Ok(LogNode::Suite(s)),
-        None => Err("No valid suite found in XML".to_string())
+        None => Err(AppError::ParserError("No valid suite found in XML".to_string()))
     }
 }
 
@@ -839,5 +856,91 @@ fn clean_message(txt: &str) -> String {
         RE_HIERARCHY.replace_all(txt, "").trim().to_string()
     } else {
         txt.trim().to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use tempfile::tempdir;
+
+    fn create_test_xml(content: &str) -> (tempfile::TempDir, std::path::PathBuf) {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("output.xml");
+        let mut file = std::fs::File::create(&file_path).unwrap();
+        file.write_all(content.as_bytes()).unwrap();
+        (dir, file_path)
+    }
+
+    #[test]
+    fn test_parse_basic_structure() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<robot generator="Robot 7.0 (Python 3.10.12 on linux)" generated="2024-04-20T10:00:00.000000" rpa="false" schemaversion="5">
+<suite id="s1" name="Root Suite" source="/tmp/test.robot">
+<test id="s1-t1" name="First Test">
+<kw name="Log" library="BuiltIn">
+<arg>Hello World</arg>
+<status status="PASS" start="20240420 10:00:00.000" end="20240420 10:00:00.001"/>
+</kw>
+<status status="PASS" start="20240420 10:00:00.000" end="20240420 10:00:00.001"/>
+</test>
+<status status="PASS" start="20240420 10:00:00.000" end="20240420 10:00:00.001"/>
+</suite>
+<statistics>
+</statistics>
+<errors>
+</errors>
+</robot>"#;
+
+        let (_dir, file_path) = create_test_xml(xml);
+        let db_path = file_path.with_extension("db");
+        
+        let app = tauri::test::mock_app();
+        let result = parse_robot_xml_sax_internal(&app.handle(), file_path.to_str().unwrap(), &db_path, &std::path::PathBuf::from("."));
+        
+        assert!(result.is_ok());
+        let root = result.unwrap();
+        if let LogNode::Suite(s) = root {
+            assert_eq!(s.name, "Root Suite");
+            assert_eq!(s.status, "PASS");
+        } else {
+            panic!("Expected SuiteNode");
+        }
+    }
+
+    #[test]
+    fn test_parse_failure_with_screenshot() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<robot>
+<suite id="s1" name="Fail Suite">
+<test id="s1-t1" name="Fail Test">
+<kw name="Capture Page Screenshot" library="SeleniumLibrary">
+<msg timestamp="20240420 10:00:00.000" level="INFO" html="true">&lt;td&gt;&lt;a href="selenium-screenshot-1.png"&gt;&lt;img src="selenium-screenshot-1.png" width="800px"&gt;&lt;/a&gt;&lt;/td&gt;</msg>
+<status status="FAIL" start="20240420 10:00:00.000" end="20240420 10:00:00.001"/>
+</kw>
+<status status="FAIL" start="20240420 10:00:00.000" end="20240420 10:00:00.001">Test failed!</status>
+</test>
+<status status="FAIL" start="20240420 10:00:00.000" end="20240420 10:00:00.001"/>
+</suite>
+</robot>"#;
+
+        let (_dir, file_path) = create_test_xml(xml);
+        let db_path = file_path.with_extension("db");
+        
+        let app = tauri::test::mock_app();
+        let result = parse_robot_xml_sax_internal(&app.handle(), file_path.to_str().unwrap(), &db_path, &std::path::PathBuf::from("."));
+        
+        assert!(result.is_ok());
+        // Verification would involve checking the DB, but since we return the root suite node,
+        // we can check if it reflects the failure. 
+        // Note: internal structure is not fully populated in the returned root node (lazy load from DB),
+        // but stats should be updated.
+        if let LogNode::Suite(s) = result.unwrap() {
+            assert_eq!(s.status, "FAIL");
+            if let Some(stats) = s.stats {
+                assert_eq!(stats.failed, 1);
+            }
+        }
     }
 }

@@ -398,6 +398,8 @@ export const es = {
             mirror_launched: "Espejo Iniciado",
             screenshot_saved: "Captura de Pantalla Guardada",
             profile_changed: "Perfil de Configuración Cambiado",
+            adb_restarting: "Reiniciando servidor ADB...",
+            adb_restarted: "Servidor ADB reiniciado con éxito",
             details: {
                 device: "Dispositivo: {{device}}",
                 path: "Ruta: {{path}}",
@@ -638,6 +640,10 @@ export const es = {
                 no_preview: "Sin vista previa registrada",
                 clear_curvatures: "Limpiar todas las curvaturas",
                 curvatures_cleared: "Se han limpiado todas las curvaturas de las aristas",
+                save_success: "¡Diseño guardado con éxito!",
+                load_error: "Error al cargar el diseño del diagrama de flujo",
+                reorganize_error: "Fallo en la reorganización por IA",
+                export_image_error: "Error al exportar imagen del diagrama de flujo",
                 unsaved_changes: {
                     title: "Cambios no guardados",
                     message: "Tienes cambios de diseño sin guardar. ¿Quieres guardar antes de salir?",
@@ -1065,7 +1071,8 @@ export const es = {
                 default: "Predeterminado"
             },
             action: {
-                open_file: "Abrir Archivo de Configuración"
+                open_file: "Abrir Archivo de Configuración",
+                restart_adb: "Reiniciar Servidor ADB"
             },
             path_labels: {
                 suites: "Directorio de Suites",
@@ -1084,7 +1091,9 @@ export const es = {
             }
         },
         sidebar: {
-            dashboard: "Dashboard QA",
+            dashboard: "Tablero",
+            adb_active: "ADB Activo",
+            appium_active: "Servidor Appium Activo",
             run: "Ejecutar",
             description_run: "Gestión de dispositivos y ejecución de automatización.",
             tests: "Pruebas",

@@ -7,14 +7,19 @@ use tauri::{AppHandle, Emitter, State};
 use tokio::io::AsyncBufReadExt;
 use tokio::process::{Child, Command};
 
+pub enum ProcessCommand {
+    Stop,
+    Kill,
+}
+
 pub struct ProcessInfo {
-    pub child: Child,
-    pub output_dir: String,
+    pub control_tx: tokio::sync::mpsc::Sender<ProcessCommand>,
 }
 
 pub struct TestState(pub Arc<Mutex<HashMap<String, ProcessInfo>>>);
 
 use crate::cmd_utils::{new_std_command, new_tokio_command};
+use crate::errors::{AppError, AppResult};
 
 /// Sends a graceful stop signal to a process.
 /// On Windows: Uses `taskkill /T` without `/F` to request termination of the process tree.
@@ -55,44 +60,22 @@ fn graceful_stop(child: &mut Child, output_dir: &str) -> bool {
 }
 
 #[tauri::command]
-pub async fn stop_test(state: State<'_, TestState>, run_id: String) -> Result<String, String> {
-    let signalled = {
-        let mut procs = state.0.lock().map_err(|e| e.to_string())?;
-        if let Some(info) = procs.get_mut(&run_id) {
-            graceful_stop(&mut info.child, &info.output_dir)
-        } else {
-            return Err(format!("No running test found for id: {}", run_id));
-        }
+pub async fn stop_test(state: State<'_, TestState>, run_id: String) -> AppResult<String> {
+    let tx = {
+        let procs = state.0.lock().map_err(|e| AppError::StringError(e.to_string()))?;
+        procs.get(&run_id).map(|info| info.control_tx.clone())
     };
 
-    // Step 2: Spawn a background watchdog for 10s timeout
-    let state_wd = state.0.clone();
-    let rid_wd = run_id.clone();
-    tokio::spawn(async move {
-        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
-        
-        let mut procs = match state_wd.lock() {
-            Ok(p) => p,
-            Err(_) => return,
-        };
-
-    if let Some(info) = procs.get_mut(&rid_wd) {
-            // Still alive after 10s? Hard kill.
-            let _ = info.child.start_kill();
-            // Note: We leave it in the map, the monitor loop will handle removal 
-            // and event emission when it detects the exit.
-        }
-    });
-
-    if signalled {
-        Ok(format!("Graceful stop signal sent to test {}", run_id))
+    if let Some(tx) = tx {
+        let _ = tx.send(ProcessCommand::Stop).await;
+        Ok(format!("Stop signal sent to test {}", run_id))
     } else {
-        Ok(format!("Could not signal test {}, falling back to kill after timeout", run_id))
+        Err(AppError::ProcessError(format!("No running test found for id: {}", run_id)))
     }
 }
 
 pub fn shutdown_all_tests(state: &State<'_, TestState>) {
-    let mut procs = match state.0.lock() {
+    let procs = match state.0.lock() {
         Ok(g) => g,
         Err(e) => {
             eprintln!("Failed to lock TestState mutex: {}", e);
@@ -100,30 +83,10 @@ pub fn shutdown_all_tests(state: &State<'_, TestState>) {
         }
     };
 
-    for (run_id, info) in procs.iter_mut() {
-        if let Some(pid) = info.child.id() {
-            println!("Shutting down robot test {} (PID: {})", run_id, pid);
-
-            #[cfg(target_os = "windows")]
-            {
-                // Try graceful first even in shutdown, but with a shorter path if needed
-                // For global shutdown, taskkill is safer to ensure everything dies
-                let _ = new_std_command("taskkill")
-                    .args(&["/F", "/T", "/PID", &pid.to_string()])
-                    .output();
-            }
-
-            #[cfg(not(target_os = "windows"))]
-            {
-                let _ = new_std_command("kill")
-                    .args(&["-9", &pid.to_string()])
-                    .output();
-            }
-        }
-        
-        let _ = info.child.start_kill();
+    for (run_id, info) in procs.iter() {
+        println!("Shutting down test {}", run_id);
+        let _ = info.control_tx.blocking_send(ProcessCommand::Kill);
     }
-    procs.clear();
 }
 
 #[derive(serde::Serialize, Clone)]
@@ -135,8 +98,7 @@ struct TestOutput {
 #[derive(serde::Serialize, Clone)]
 struct TestFinished {
     run_id: String,
-    success: bool,
-    status: String,
+    exit_code: i32,
 }
 
 #[tauri::command]
@@ -147,14 +109,14 @@ pub async fn run_robot_test(
     test_path: Option<String>,
     output_dir: String,
     device: Option<String>,
-    arguments_file: Option<String>,
-    timestamp_outputs: Option<bool>,
     device_model: Option<String>,
     android_version: Option<String>,
     working_dir: Option<String>,
-    rerun_failed_from: Option<String>,
     selected_tests: Option<Vec<String>>,
-) -> Result<String, String> {
+    arguments_file: Option<String>,
+    timestamp_outputs: Option<bool>,
+    rerun_failed_from: Option<String>,
+) -> AppResult<String> {
     // Resolve absolute path for output_dir to ensure clean logs
     let abs_output_dir = std::fs::canonicalize(&output_dir)
         .map(|p| {
@@ -223,14 +185,14 @@ t.start()
 "#;
     // Ensure dir exists before writing and fail clearly if we cannot set up the listener
     std::fs::create_dir_all(&abs_output_dir)
-        .map_err(|e| format!("Failed to create output directory '{}': {}", abs_output_dir, e))?;
+        .map_err(|e| AppError::IoError(format!("Failed to create output directory '{}': {}", abs_output_dir, e)))?;
     std::fs::write(&listener_path, listener_code)
-        .map_err(|e| format!("Failed to write listener file '{}': {}", listener_path.display(), e))?;
+        .map_err(|e| AppError::IoError(format!("Failed to write listener file '{}': {}", listener_path.display(), e)))?;
 
     args.push("--listener");
     let listener_str = listener_path
         .to_str()
-        .ok_or_else(|| format!("Listener path '{}' is not valid UTF-8", listener_path.display()))?;
+        .ok_or_else(|| AppError::IoError(format!("Listener path '{}' is not valid UTF-8", listener_path.display())))?;
     args.push(listener_str);
 
     // Rerunning logic: Must appear before any Datasource (which might come from -A)
@@ -340,7 +302,7 @@ pub async fn run_maestro_test(
     maestro_args: Option<String>,
     working_dir: Option<String>,
     timestamp_outputs: Option<bool>,
-) -> Result<String, String> {
+) -> AppResult<String> {
     let abs_output_dir = std::fs::canonicalize(&output_dir)
         .map(|p| p.to_string_lossy().to_string().replace(r"\\?\", ""))
         .unwrap_or_else(|_| output_dir.clone());
@@ -431,7 +393,7 @@ pub async fn run_appium_test(
     project_path: String,
     output_dir: String,
     appium_java_args: Option<String>,
-) -> Result<String, String> {
+) -> AppResult<String> {
     let abs_project_path = std::fs::canonicalize(&project_path)
         .map(|p| p.to_string_lossy().to_string().replace(r"\\?\", ""))
         .unwrap_or_else(|_| project_path.clone());
@@ -496,7 +458,7 @@ async fn spawn_and_monitor(
     mut cmd: Command,
     working_dir: Option<String>,
     output_dir: String,
-) -> Result<String, String> {
+) -> AppResult<String> {
     if let Some(wd) = working_dir {
         if !wd.is_empty() {
             cmd.current_dir(wd);
@@ -515,11 +477,11 @@ async fn spawn_and_monitor(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| format!("Failed to spawn process: {}", e))?;
+        .map_err(|e| AppError::ProcessError(format!("Failed to spawn process: {}", e)))?;
 
     let mut child = child;
-    let stdout = child.stdout.take().ok_or("Failed to open stdout")?;
-    let stderr = child.stderr.take().ok_or("Failed to open stderr")?;
+    let stdout = child.stdout.take().ok_or_else(|| AppError::ProcessError("Failed to open stdout".to_string()))?;
+    let stderr = child.stderr.take().ok_or_else(|| AppError::ProcessError("Failed to open stderr".to_string()))?;
 
     // Streaming tasks
     let app_handle = app.clone();
@@ -553,89 +515,99 @@ async fn spawn_and_monitor(
     });
 
     // Store process info
-    let mut info = ProcessInfo {
-        child,
-        output_dir: output_dir.clone(),
-    };
-
-    // Store process
+    let (control_tx, mut control_rx) = tokio::sync::mpsc::channel::<ProcessCommand>(10);
     {
-        let mut procs = state.0.lock().map_err(|e| e.to_string())?;
+        let mut procs = state.0.lock().map_err(|e| AppError::StringError(e.to_string()))?;
         if procs.contains_key(&run_id) {
-            let _ = info.child.start_kill();
-            return Err(format!("Process with run_id '{}' already exists", run_id));
+            let _ = child.start_kill();
+            return Err(AppError::ProcessError(format!("Process with run_id '{}' already exists", run_id)));
         }
-        procs.insert(run_id.clone(), info);
+        procs.insert(run_id.clone(), ProcessInfo {
+            control_tx: control_tx.clone(),
+        });
     }
 
-    // Monitor for finish (Async Polling)
+    // Monitor for finish (Reactive Wait)
     let app_handle_mon = app.clone();
     let rid_mon = run_id.clone();
     let state_mon = state.0.clone();
+    let output_dir_mon = output_dir.clone();
     
     tokio::spawn(async move {
         let mut final_status: Option<std::process::ExitStatus> = None;
+        
         loop {
-            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-            
-            let mut procs = match state_mon.lock() {
-                Ok(p) => p,
-                Err(_) => break,
-            };
-
-            if let Some(info) = procs.get_mut(&rid_mon) {
-                match info.child.try_wait() {
-                    Ok(Some(status)) => {
-                        final_status = Some(status);
-                        
-                        // Cleanup stop signal if it exists
-                        let stop_file = std::path::Path::new(&info.output_dir).join("stop.flag");
-                        if stop_file.exists() {
-                            let _ = std::fs::remove_file(stop_file);
-                        }
-
-                        procs.remove(&rid_mon);
-                        break;
+            tokio::select! {
+                status = child.wait() => {
+                    match status {
+                        Ok(s) => final_status = Some(s),
+                        Err(e) => eprintln!("[Monitor] Error waiting for process: {}", e),
                     }
-                    Ok(None) => {} // Still running
-                    Err(_) => {
-                        procs.remove(&rid_mon);
-                        break;
+                    break;
+                }
+                Some(cmd) = control_rx.recv() => {
+                    match cmd {
+                        ProcessCommand::Stop => {
+                            let _ = graceful_stop(&mut child, &output_dir_mon);
+                            let tx_kill = control_tx.clone();
+                            tokio::spawn(async move {
+                                tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+                                let _ = tx_kill.send(ProcessCommand::Kill).await;
+                            });
+                        }
+                        ProcessCommand::Kill => {
+                            let _ = child.start_kill();
+                        }
                     }
                 }
-            } else {
-                break; // Process removed or stopped elsewhere
             }
         }
 
-        if let Some(status) = final_status {
-            let code = status.code().unwrap_or(-1);
-            let _ = app_handle_mon.emit(
-                "test-finished",
-                TestFinished {
-                    run_id: rid_mon,
-                    success: status.success(),
-                    status: format!("Process finished with exit code: {}", code),
-                },
-            );
+        // Cleanup after exit
+        match state_mon.lock() {
+            Ok(mut procs) => {
+                procs.remove(&rid_mon);
+            }
+            Err(e) => {
+                eprintln!(
+                    "[Monitor] Failed to acquire process state lock during cleanup for {}: {}",
+                    rid_mon, e
+                );
+            }
         }
+
+        // Cleanup stop signal if it exists
+        let stop_file = std::path::Path::new(&output_dir_mon).join("stop.flag");
+        if stop_file.exists() {
+            let _ = std::fs::remove_file(stop_file);
+        }
+
+        // Emit finished event
+        let exit_code = final_status.and_then(|s| s.code()).unwrap_or(-1);
+        let _ = app_handle_mon.emit(
+            "test-finished",
+            TestFinished {
+                run_id: rid_mon,
+                exit_code,
+            },
+        );
     });
 
-    Ok(run_id)
+    Ok(format!("Test {} started successfully", run_id))
 }
 
 #[tauri::command]
-pub async fn get_robot_test_cases(path: String) -> Result<Vec<String>, String> {
+pub async fn get_robot_test_cases(path: String) -> AppResult<Vec<String>> {
     use std::fs::File;
     use std::io::{BufRead, BufReader};
 
-    let file = File::open(&path).map_err(|e| e.to_string())?;
+    let file = File::open(&path).map_err(|e| AppError::FileSystemError(e.to_string()))?;
     let reader = BufReader::new(file);
     let mut tests = Vec::new();
     let mut in_test_cases = false;
 
     for line in reader.lines() {
-        let line = line.map_err(|e| e.to_string())?;
+        let line = line.map_err(|e| AppError::FileSystemError(e.to_string()))?;
         let trimmed = line.trim();
 
         if trimmed.starts_with("*** Test Cases ***") || trimmed.starts_with("*** Tasks ***") {

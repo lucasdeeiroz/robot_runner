@@ -174,6 +174,36 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setIsNgrokEnabled(true);
     };
 
+    const isRootOrTooBroadPath = (path: string): boolean => {
+        const normalized = path.replace(/\\/g, '/');
+        if (normalized === '/') return true;
+        if (/^[A-Za-z]:\/?$/.test(normalized)) return true;
+        if (/^\/\/[^/]+\/?$/.test(normalized)) return true;
+        return false;
+    };
+
+    const sanitizeWorkspacePaths = (paths: unknown[]): string[] => {
+        const sanitized: string[] = [];
+        const seen = new Set<string>();
+
+        paths.forEach((rawPath) => {
+            if (typeof rawPath !== 'string') return;
+
+            const trimmed = rawPath.trim();
+            if (!trimmed) return;
+
+            const withoutTrailingSeparator = trimmed.replace(/[\\/]+$/, '') || trimmed;
+            if (isRootOrTooBroadPath(withoutTrailingSeparator)) return;
+
+            const dedupeKey = withoutTrailingSeparator.replace(/\\/g, '/').toLowerCase();
+            if (seen.has(dedupeKey)) return;
+            seen.add(dedupeKey);
+            sanitized.push(withoutTrailingSeparator);
+        });
+
+        return sanitized;
+    };
+
     useEffect(() => {
         loadSettings();
     }, []);
@@ -220,11 +250,30 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                     saveStore(newStoreData);
                 }
             }
+            // Initial sync
+            if (saved && saved.profiles) {
+                const activeId = saved.activeProfileId;
+                const paths = saved.profiles[activeId]?.settings?.paths;
+                if (paths) {
+                    const sanitizedPaths = sanitizeWorkspacePaths(Object.values(paths));
+                    if (sanitizedPaths.length > 0) {
+                        invoke('sync_workspace_permissions', { paths: sanitizedPaths }).catch(console.error);
+                    }
+                }
+            }
+
         } catch (e) {
             feedback.toast.error("settings.load_error", e);
         } finally {
             setLoading(false);
         }
+    };
+
+    const syncWorkspaces = (paths: Record<string, string>) => {
+        const sanitizedPaths = sanitizeWorkspacePaths(Object.values(paths));
+        if (sanitizedPaths.length === 0) return;
+        invoke('sync_workspace_permissions', { paths: sanitizedPaths })
+            .catch(e => console.error("[Security] Sync failed:", e));
     };
 
     const saveStore = (data: SettingsStoreData) => {
@@ -256,6 +305,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
             // Fire and forget save to disk
             saveStore(newData);
+
+            // Sync permissions if paths changed
+            if (key === 'paths') {
+                syncWorkspaces(value as Record<string, string>);
+            }
+
             return newData;
         });
     };

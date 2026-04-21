@@ -12,7 +12,10 @@
       "identifier": "opener:allow-open-path",
       "allow": [
         {
-          "path": "**"
+          "path": "$APPLOCALDATA/**"
+        },
+        {
+          "path": "$TEMP/**"
         }
       ]
     },
@@ -41,10 +44,13 @@
       "identifier": "fs:scope",
       "allow": [
         {
-          "path": "**"
+          "path": "$APPLOCALDATA/**"
         },
         {
-          "path": "$APPLOCALDATA/**"
+          "path": "$CACHE/**"
+        },
+        {
+          "path": "$TEMP/**"
         }
       ]
     }

@@ -5,6 +5,7 @@ use tauri::{command, State};
 use std::sync::Mutex;
 use nosleep::{NoSleep, NoSleepType};
 use crate::cmd_utils::new_std_command;
+use crate::errors::{AppError, AppResult};
 
 #[derive(Debug, Serialize)]
 pub struct SystemVersions {
@@ -25,13 +26,32 @@ pub struct SystemVersions {
 pub struct WakelockState(pub Mutex<Option<NoSleep>>);
 
 #[command]
-pub async fn toggle_wakelock(enabled: bool, state: State<'_, WakelockState>) -> Result<(), String> {
-    let mut lock_guard = state.0.lock().map_err(|e| e.to_string())?;
+pub async fn sync_workspace_permissions(app_handle: tauri::AppHandle, paths: Vec<String>) -> AppResult<()> {
+    use tauri_plugin_fs::FsExt;
+    
+    for path in paths {
+        if path.is_empty() {
+            continue;
+        }
+        
+        let path_obj = std::path::Path::new(&path);
+        if path_obj.exists() {
+            let _ = app_handle.fs_scope().allow_directory(&path, true);
+            #[cfg(debug_assertions)]
+            println!("[Security] Allowed directory: {}", path);
+        }
+    }
+    Ok(())
+}
+
+#[command]
+pub async fn toggle_wakelock(enabled: bool, state: State<'_, WakelockState>) -> AppResult<()> {
+    let mut lock_guard = state.0.lock().map_err(|e| AppError::StringError(e.to_string()))?;
     
     if enabled {
         if lock_guard.is_none() {
-            let mut nosleep = NoSleep::new().map_err(|e| e.to_string())?;
-            nosleep.start(NoSleepType::PreventUserIdleDisplaySleep).map_err(|e| e.to_string())?;
+            let mut nosleep = NoSleep::new().map_err(|e| AppError::StringError(e.to_string()))?;
+            nosleep.start(NoSleepType::PreventUserIdleDisplaySleep).map_err(|e| AppError::StringError(e.to_string()))?;
             *lock_guard = Some(nosleep);
         }
     } else {

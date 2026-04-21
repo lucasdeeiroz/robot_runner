@@ -289,7 +289,7 @@ INPUT:
 
 OUTPUT:
 - Return ONLY a valid JSON object mapping each screen NAME to its new coordinates.
-- Format: { "Screen Name": { "gridX": number, "gridY": number }, ... }
+- Format: { "nodes": { "Screen Name": { "gridX": number, "gridY": number }, ... }, "missed": ["Screen Name", ...] }
 
 Language for any required internal reasoning: ${language}.
 `.trim();
