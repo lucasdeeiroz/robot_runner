@@ -60,6 +60,24 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
     const [availableModels, setAvailableModels] = useState<string[]>(['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-2.0-pro']);
     const [showModelList, setShowModelList] = useState(false);
 
+    const [isRestartingADB, setIsRestartingADB] = useState(false);
+
+    const handleRestartADB = async () => {
+        try {
+            setIsRestartingADB(true);
+            feedback.toast.info('feedback.adb_restarting');
+            await invoke('restart_adb_server');
+            feedback.toast.success('feedback.adb_restarted');
+            // Refresh system versions to make sure ADB is back
+            checkSystemVersions();
+        } catch (e: any) {
+            let errStr = String(e).replace(/^Error:/, '').trim();
+            feedback.toast.error('common.error_occurred', { error: errStr });
+        } finally {
+            setIsRestartingADB(false);
+        }
+    };
+
     const handleFetchModels = async () => {
         const provider = settings.aiProvider;
         const apiKey = provider === 'gemini' ? settings.geminiApiKey : provider === 'claude' ? settings.claudeApiKey : settings.openaiApiKey;
@@ -222,7 +240,10 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
     const toggleAppium = async () => {
         try {
             if (appiumStatus.running) {
-                await invoke('stop_appium_server');
+                await invoke('stop_appium_server', {
+                    host: settings.appiumHost,
+                    port: Number(settings.appiumPort)
+                });
                 feedback.toast.info('feedback.appium_stopped');
             } else {
                 await invoke('start_appium_server', {
@@ -642,6 +663,18 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                         title={t('settings.tools')}
                         icon={Wrench}
                         className={clsx((settings.usageMode === 'explorer' || settings.automationFramework === 'maestro') && "col-span-full")}
+                        menus={
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleRestartADB}
+                                disabled={isRestartingADB}
+                                leftIcon={isRestartingADB ? <ExpressiveLoading size="xsm" variant="circular" /> : <RefreshCcw size={16} />}
+                                className="text-on-surface/80 hover:text-primary hover:bg-primary/10"
+                            >
+                                {t('settings.action.restart_adb')}
+                            </Button>
+                        }
                     >
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {['robotArgs', 'maestroArgs', 'appiumJavaArgs', 'scrcpyArgs'].map((key) => {

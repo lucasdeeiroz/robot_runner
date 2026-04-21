@@ -655,3 +655,26 @@ export function generateUiSelector(node: InspectorNode, options: {
     const fullSelector = selectorArr.join('.');
     return options.useUiSelectorWrapper ? `new UiSelector().${fullSelector}` : fullSelector;
 }
+
+/**
+ * Calculates the absolute position and size for a highlighter overlay based on node bounds and image layout.
+ */
+export function getHighlighterStyle(
+    node: InspectorNode | null,
+    color: string,
+    imgLayout?: { width: number, height: number, naturalWidth: number, naturalHeight: number } | null
+): React.CSSProperties {
+    if (!node?.bounds || !imgLayout) return { display: 'none' };
+
+    const scaleX = imgLayout.width / imgLayout.naturalWidth;
+    const scaleY = imgLayout.height / imgLayout.naturalHeight;
+
+    return {
+        left: node.bounds.x * scaleX,
+        top: node.bounds.y * scaleY,
+        width: node.bounds.w * scaleX,
+        height: node.bounds.h * scaleY,
+        borderColor: color,
+        backgroundColor: `${color}15` // 15 is ~8% opacity in hex
+    };
+}

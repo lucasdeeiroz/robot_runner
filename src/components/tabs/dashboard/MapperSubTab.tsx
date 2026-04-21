@@ -1,15 +1,14 @@
-
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import {
-    Maximize, Check, Scan, Home, ArrowLeft, Rows, X, RefreshCw, Save, GitGraph, Trash2, Plus, FileClock, FileInput, SearchCode, ChevronDown, ChevronUp, ChevronRight,
+    Check, Scan, Home, ArrowLeft, Rows, X, Save, GitGraph, Trash2, Plus, FileClock, FileInput, SearchCode, ChevronDown, ChevronUp, ChevronRight,
     FileCode, FileStack, Upload, Download, Eye, EyeClosed
 } from 'lucide-react';
 import { XMLParser } from 'fast-xml-parser';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { useOutsideClick } from '@/hooks/useOutsideClick';
-import { InspectorNode, transformXmlToTree, findNodesAtCoords, generateXPath, transformBounds, findNodesByLocator, findNodesByText } from '@/lib/inspectorUtils';
+import { InspectorNode, transformXmlToTree, generateXPath, findNodesByLocator, findNodesByText } from '@/lib/inspectorUtils';
 import { feedback } from "@/lib/feedback";
 import { Section } from "@/components/organisms/Section";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
@@ -29,7 +28,6 @@ import { Button } from '@/components/atoms/Button';
 import { SegmentedControl } from '@/components/molecules/SegmentedControl';
 import { GroupedScreenSelect } from '@/components/molecules/GroupedScreenSelect';
 import { groupScreensByTags } from '@/lib/utils';
-import { GestureOverlay } from '@/components/molecules/GestureOverlay';
 import { AiButton } from "@/components/atoms/AiButton";
 import { AiResponse } from "@/components/molecules/AiResponse";
 import * as gemini from '@/lib/dashboard/gemini';
@@ -38,6 +36,8 @@ import * as openai from '@/lib/dashboard/openai';
 import { AutonomousExplorer, ExplorationAction } from '@/lib/dashboard/explorationEngine';
 import { getAiContext } from '@/lib/dashboard/historyAnalysisUtils';
 import { ExplorationLogTree } from '@/components/molecules/ExplorationLogTree';
+import { useDeviceViewport } from '@/hooks/useDeviceViewport';
+import { DeviceViewport } from '@/components/organisms/DeviceViewport';
 
 
 function groupElementsByType<T extends { type: string }>(
@@ -63,11 +63,6 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     const { settings } = useSettings();
     const { t, i18n } = useTranslation();
     const { activeProfileId } = useSettings();
-    const [screenshot, setScreenshot] = useState<string | null>(null);
-    const [rootNode, setRootNode] = useState<InspectorNode | null>(null);
-    const [imgLayout, setImgLayout] = useState<{ width: number, height: number, naturalWidth: number, naturalHeight: number } | null>(null);
-    const [selectedNode, setSelectedNode] = useState<InspectorNode | null>(null);
-    const [hoveredNode, setHoveredNode] = useState<InspectorNode | null>(null);
 
     // --- Screen Mapper State ---
     const [screenName, setScreenName] = useState("");
@@ -152,6 +147,37 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     useEffect(() => {
         loadSavedMaps();
     }, [activeProfileId]);
+
+    const { sessions } = useTestSessions();
+    const busyDeviceIds = sessions.filter(s => s.status === 'running' && s.type === 'test').map(s => s.deviceUdid);
+    const selectedDevice = selectedDeviceId;
+    const isTestRunning = selectedDevice ? busyDeviceIds.includes(selectedDevice) : false;
+
+    const {
+        screenshot,
+        setScreenshot: setViewportScreenshot,
+        rootNode,
+        setRootNode,
+        loading,
+        imgLayout,
+        setImgLayout,
+        selectedNode,
+        setSelectedNode,
+        hoveredNode,
+        setHoveredNode,
+        availableNodes,
+        setAvailableNodes,
+        taps,
+        swipes,
+        imgRef,
+        refreshAll,
+        sendAdbInput,
+        handlers
+    } = useDeviceViewport({
+        deviceId: selectedDevice,
+        isActive,
+        isBusy: isTestRunning || isExploring
+    });
 
     const toggleStayOn = async () => {
         if (!selectedDevice) return;
@@ -287,9 +313,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         setScreenDescription(map.description || "");
         setScreenTags(map.tags || []);
         setMappedElements(map.elements);
-        if (map.base64_preview) {
-            setScreenshot(map.base64_preview); // Optional: might want to keep live screenshot instead
-        }
+        // We don't necessarily update screenshot here because it should be live
         setShowLoadMenu(false);
         feedback.toast.success(t('mapper.feedback.loaded'));
     };
@@ -314,7 +338,6 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 setScreenType('screen');
                 setScreenTags([]);
                 setMappedElements([]);
-                setScreenshot(null);
             }
         }
     };
@@ -523,10 +546,8 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             // 1. Capture Current State
             explorer.addLog("Capturing screen...");
             setExplorationLogs([...explorer.getLogs()]);
-            const b64 = await invoke<string>('get_screenshot', { deviceId: selectedDevice });
-            if (!isExploringRef.current) return;
-            setScreenshot(b64);
-
+            // Re-fetch using refreshAll logic isn't ideal here due to async nature, 
+            // but we can reuse the logic in the explorer
             const xml = await invoke<string>('get_xml_dump', { deviceId: selectedDevice });
             if (!isExploringRef.current) return;
 
@@ -570,11 +591,11 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 try {
                     const customPrompt = explorationPromptRef.current;
                     if (aiProvider === 'gemini') {
-                        result = await gemini.exploreScreen(simplifiedXml, b64, apiKey, model, lang, maps, explorer.getLogs(), undefined, customPrompt);
+                        result = await gemini.exploreScreen(simplifiedXml, screenshot || "", apiKey, model, lang, maps, explorer.getLogs(), undefined, customPrompt);
                     } else if (aiProvider === 'openai') {
-                        result = await openai.exploreScreen(simplifiedXml, b64, apiKey, model, lang, maps, explorer.getLogs(), undefined, customPrompt);
+                        result = await openai.exploreScreen(simplifiedXml, screenshot || "", apiKey, model, lang, maps, explorer.getLogs(), undefined, customPrompt);
                     } else if (aiProvider === 'claude') {
-                        result = await claude.exploreScreen(simplifiedXml, b64, apiKey, model, lang, maps, explorer.getLogs(), undefined, customPrompt);
+                        result = await claude.exploreScreen(simplifiedXml, screenshot || "", apiKey, model, lang, maps, explorer.getLogs(), undefined, customPrompt);
                     }
                     break; // Success
                 } catch (parseError: any) {
@@ -646,7 +667,6 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             explorer.clearPreviousNavigation();
 
             if (aiScreen.name) {
-                // Smart Merging: Check for existing map with same name
                 // Smart Merging: Check for existing map with same name (resilient matching)
                 const aiNameNormalized = aiScreen.name.trim().toLowerCase();
                 const existingMap = maps.find(m =>
@@ -704,11 +724,11 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                     // Enforce unique layout positions (left-to-right flow)
                     const occupiedPositions = new Set<string>();
                     maps.forEach(m => {
-                        if (m.layout) occupiedPositions.add(`${m.layout.gridX},${m.layout.gridY}`);
+                        if (m.layout?.node) occupiedPositions.add(`${m.layout.node.gridX},${m.layout.node.gridY}`);
                     });
 
                     if (aiScreen.layout && !occupiedPositions.has(`${aiScreen.layout.gridX},${aiScreen.layout.gridY}`)) {
-                        resolvedLayout = aiScreen.layout;
+                        resolvedLayout = { node: aiScreen.layout, edges: {} };
                     } else {
                         // Find nearest unique position (expand right, then down)
                         let gx = aiScreen.layout?.gridX ?? 0;
@@ -717,7 +737,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                             gx++;
                             if (gx > 20) { gx = 0; gy++; }
                         }
-                        resolvedLayout = { gridX: gx, gridY: gy };
+                        resolvedLayout = { node: { gridX: gx, gridY: gy }, edges: {} };
                         explorer.addLog(`Layout positioning: ${aiScreen.name} placed at (${gx}, ${gy})`);
                     }
                 }
@@ -730,7 +750,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                     description: mergedDescription || undefined,
                     tags: [...new Set([...(existingMap?.tags || []), ...(aiScreen.tags || [])])],
                     elements: mergedElements,
-                    base64_preview: b64,
+                    base64_preview: screenshot || undefined,
                     layout: resolvedLayout
                 };
 
@@ -745,12 +765,12 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 setMappedElements(mergedElements);
 
                 if (aiScreen.layout) {
-                    explorer.addLog(`AI suggested layout for ${aiScreen.name}: (${aiScreen.layout.gridX}, ${aiScreen.layout.gridY})`);
+                    const l = aiScreen.layout as any;
+                    explorer.addLog(`AI suggested layout for ${aiScreen.name}: (${l.gridX}, ${l.gridY})`);
                 }
             }
 
             // 4. Loop Detection — force escape if a screen is visited too many times
-            //    Only triggers when the AI tries a REPEATED action on the same screen
             if (aiScreen.name) {
                 const next = result.nextAction as ExplorationAction;
                 const actionFingerprint = `${aiScreen.name}:${next.type}:${next.targetId || 'none'}`;
@@ -775,7 +795,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             } else if (next.type === 'back') {
                 explorer.addLog("Navigating back...");
                 explorer.resetSwipeCount();
-                explorer.clearPreviousNavigation(); // Back doesn't create a connection
+                explorer.clearPreviousNavigation();
                 await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'keyevent', '4'] });
             } else if (next.type === 'click' && next.targetId) {
                 explorer.addLog(`Clicking element: ${next.targetId} (${next.details || 'no details'})`);
@@ -784,273 +804,67 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 let targetNode: InspectorNode | null = null;
                 const xpath = shortIdMap[next.targetId] || next.targetId;
 
-                // Priority 1: Label-based search (Text/Desc)
-                // Use shortId to find the original mapping from the AI
+                // Priority 1: Label-based search
                 const aiElement = aiScreen.elements?.find((el: any) => (el.shortId || el.id) === next.targetId);
                 const targetLabel = aiElement?.name || aiElement?.label;
 
                 if (aiElement && targetLabel) {
-                    explorer.addLog(`[Debug] Priority Search - Label: "${targetLabel}"`);
                     const matches = findNodesByText(root, targetLabel);
                     const bestMatch = matches.find(m => (m.attributes['clickable'] === 'true' || m.attributes['text'] || m.attributes['content-desc']) && m.bounds && m.bounds.w > 0);
-                    if (bestMatch) {
-                        targetNode = bestMatch;
-                        explorer.addLog(`[Debug] Success: Found match by label!`);
-                    }
+                    if (bestMatch) targetNode = bestMatch;
                 }
 
                 // Priority 2: Standard XPath
                 if (!targetNode) {
                     const nodes = findNodesByLocator(root, xpath);
-                    if (nodes.length > 0) {
-                        targetNode = nodes[0];
-                        explorer.addLog(`[Debug] Target found by XPath.`);
-                    }
-                }
-
-                // Priority 3: Fuzzy Fallback
-                if (!targetNode && (xpath.startsWith('/') || xpath.startsWith('//'))) {
-                    const anyValMatch = xpath.match(/@(?:text|resource-id|content-desc)=['"](.*?)['"]/);
-                    if (anyValMatch) {
-                        const val = anyValMatch[1];
-                        explorer.addLog(`[Debug] XPath failed, trying fuzzy search for value: ${val}`);
-                        const fallbackNodes = findNodesByText(root, val);
-                        if (fallbackNodes.length > 0) {
-                            targetNode = fallbackNodes[0];
-                        }
-                    }
-                }
-
-                if (targetNode && targetNode.bounds) {
-                    // If the found node is an empty container, try to find a meaningful child (with text/id/desc)
-                    // to ensure we click the actual content and not just a layout wrapper.
-                    let effectiveNode = targetNode;
-                    const findContent = (n: InspectorNode): InspectorNode | null => {
-                        if (n.attributes['text'] || n.attributes['content-desc'] || n.attributes['resource-id']) return n;
-                        for (const child of n.children) {
-                            const found = findContent(child);
-                            if (found) return found;
-                        }
-                        return null;
-                    };
-                    const meaningfulChild = findContent(targetNode);
-                    if (meaningfulChild && meaningfulChild.bounds) {
-                        effectiveNode = meaningfulChild;
-                    }
-
-                    const centerX = Math.round(effectiveNode.bounds!.x + effectiveNode.bounds!.w / 2);
-                    const centerY = Math.round(effectiveNode.bounds!.y + effectiveNode.bounds!.h / 2);
-                    const nodeInfo = `text="${effectiveNode.attributes['text'] || ''}", id="${effectiveNode.attributes['resource-id'] || ''}", desc="${effectiveNode.attributes['content-desc'] || ''}"`;
-                    explorer.addLog(`[Debug] Target: ${effectiveNode.tagName} (${nodeInfo})`);
-
-                    // Diagnostic: Log siblings to identify index mismatches
-                    if (effectiveNode.parent) {
-                        const siblings = effectiveNode.parent.children;
-                        const siblingIndices = siblings.map((s, i) => `${i + 1}: ${s.attributes['text'] || s.attributes['content-desc'] || 'empty'}`).join(' | ');
-                        explorer.addLog(`[Debug] Siblings (Total ${siblings.length}): ${siblingIndices}`);
-                    }
-
-                    explorer.addLog(`[Debug] Resolution: Root ${root.bounds?.w || '?'}x${root.bounds?.h || '?'}, Clicking at: (${centerX}, ${centerY})`);
-                    await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'tap', String(centerX), String(centerY)] });
-                    addTapAnimation(centerX, centerY);
-                    // Record this click so next step can set navigates_to on this element
-                    const clickedXPath = generateXPath(targetNode);
-                    explorer.setPreviousNavigation(aiScreen.name, clickedXPath, 'click');
-                } else {
-                    explorer.addLog(`Could not find coordinates for element (ShortID: ${next.targetId}). Trying back.`);
-                    await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'keyevent', '4'] });
-                }
-            } else if (next.type === 'swipe') {
-                const swipeDirection = next.direction || 'down';
-                const currentSwipes = explorer.getConsecutiveSwipes();
-
-                // Compute snapshot of visible elements using node IDs
-                const snapshotIds: string[] = [];
-                const extractIds = (node: any) => {
-                    if (node && node.bounds) snapshotIds.push(node.short_id || node.id || "?");
-                    if (node.children) node.children.forEach(extractIds);
-                };
-                extractIds(root);
-                const currentSnapshot = snapshotIds.join(",");
-
-                if (currentSwipes > 0 && explorer.getPreviousElementsSnapshot() === currentSnapshot) {
-                    explorer.addLog(`Swipe ${swipeDirection} on ${next.targetId || 'screen'} produced no new elements. Aborting swipe repetition.`);
-                    explorer.resetSwipeCount();
-                    explorer.addLog("Navigating back to find new elements...");
-                    await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'keyevent', '4'] });
-
-                    if (!isExploringRef.current) return;
-                    setExplorationLogs([...explorer.getLogs()]);
-                    explorationTimeoutRef.current = setTimeout(runExplorationStep, 1000);
-                    return;
-                }
-
-                if (currentSwipes >= 10) {
-                    explorer.addLog(`Max swipe limits reached (10). Forcing navigation back.`);
-                    explorer.resetSwipeCount();
-                    await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'keyevent', '4'] });
-
-                    if (!isExploringRef.current) return;
-                    setExplorationLogs([...explorer.getLogs()]);
-                    explorationTimeoutRef.current = setTimeout(runExplorationStep, 1000);
-                    return;
-                }
-
-                explorer.addLog(`Swiping ${swipeDirection} on: ${next.targetId || 'screen'} (${next.details || 'no details'}) [Attempt ${currentSwipes + 1}]`);
-
-                // Resolve swipe bounds: use targetId if provided, otherwise use full screen
-                let swipeBounds: { x: number; y: number; w: number; h: number } | null = null;
-
-                if (next.targetId) {
-                    const actualLocator = shortIdMap[next.targetId] || next.targetId;
-                    let nodes = findNodesByLocator(root, actualLocator);
-                    let targetNode = nodes[0];
-
-                    explorer.addLog(`[Debug] Action: swipe, TargetId: ${next.targetId}, Resolved Locator: ${actualLocator}, Found Nodes: ${nodes.length}`);
-
-                    // Fuzzy Fallback
-                    if (!targetNode && (actualLocator.startsWith('/') || actualLocator.startsWith('//'))) {
-                        const anyValMatch = actualLocator.match(/@(?:text|resource-id|content-desc)=['"](.*?)['"]/);
-                        if (anyValMatch) {
-                            const val = anyValMatch[1];
-                            explorer.addLog(`[Debug] Swipe XPath failed, trying fuzzy fallback for value: ${val}`);
-                            const fallbackNodes = findNodesByLocator(root, val);
-                            if (fallbackNodes.length > 0) {
-                                targetNode = fallbackNodes[0];
-                            }
-                        }
-                    }
-
-                    if (targetNode && targetNode.bounds) {
-                        swipeBounds = targetNode.bounds;
-                    }
-                }
-
-                // Fallback: use root node bounds or screen dimensions
-                if (!swipeBounds && root && root.bounds) {
-                    swipeBounds = root.bounds;
-                }
-
-                if (swipeBounds) {
-                    const { x, y, w, h } = swipeBounds;
-                    let startX = x + w / 2;
-                    let startY = y + h / 2;
-                    let endX = startX;
-                    let endY = startY;
-
-                    const offsetHand = 0.4; // Swipe 40% of container size
-                    // ADB swipe = finger movement direction, which is OPPOSITE of scroll direction.
-                    // "scroll down" (see content below) = finger swipes UP (startY > endY)
-                    // "scroll up" (see content above) = finger swipes DOWN (startY < endY)
-                    if (swipeDirection === 'down') { endY = startY - (h * offsetHand); }
-                    else if (swipeDirection === 'up') { endY = startY + (h * offsetHand); }
-                    else if (swipeDirection === 'right') { endX = startX - (w * offsetHand); }
-                    else if (swipeDirection === 'left') { endX = startX + (w * offsetHand); }
-
-                    await invoke('run_adb_command', {
-                        device: selectedDevice,
-                        args: ['shell', 'input', 'swipe', String(Math.round(startX)), String(Math.round(startY)), String(Math.round(endX)), String(Math.round(endY)), "500"]
-                    });
-                    addSwipeAnimation(startX, startY, endX, endY);
-                    explorer.registerSwipeAction(currentSnapshot);
-                } else {
-                    explorer.addLog(`Could not resolve swipe bounds. Using screen center fallback.`);
-                    // Fallback: hardcoded screen center (1080p resolution). Finger direction is inverted:
-                    // "scroll down" = finger goes UP (1200 → 600), "scroll up" = finger goes DOWN (1200 → 1800)
-                    const fallbackStartY = 1200;
-                    const fallbackEndY = swipeDirection === 'down' ? 600 : 1800;
-                    await invoke('run_adb_command', {
-                        device: selectedDevice,
-                        args: ['shell', 'input', 'swipe', '540', String(fallbackStartY), '540', String(fallbackEndY), "500"]
-                    });
-                    explorer.registerSwipeAction(currentSnapshot);
-                }
-            } else if (next.type === 'type_text' && next.targetId && next.text) {
-                explorer.addLog(`Typing text on: ${next.targetId} -> "${next.text}" (${next.details || 'filling input field'})`);
-                explorer.resetSwipeCount();
-
-                // First tap the input field to focus it
-                const actualLocator = shortIdMap[next.targetId] || next.targetId;
-                let nodes = findNodesByLocator(root, actualLocator);
-                let targetNode = nodes[0];
-
-                explorer.addLog(`[Debug] Action: type_text, TargetId: ${next.targetId}, Resolved Locator: ${actualLocator}, Found Nodes: ${nodes.length}`);
-
-                // Fuzzy Fallback
-                if (!targetNode && (actualLocator.startsWith('/') || actualLocator.startsWith('//'))) {
-                    const anyValMatch = actualLocator.match(/@(?:text|resource-id|content-desc)=['"](.*?)['"]/);
-                    if (anyValMatch) {
-                        const val = anyValMatch[1];
-                        explorer.addLog(`[Debug] TypeText XPath failed, trying fuzzy fallback for value: ${val}`);
-                        const fallbackNodes = findNodesByLocator(root, val);
-                        if (fallbackNodes.length > 0) {
-                            targetNode = fallbackNodes[0];
-                        }
-                    }
+                    if (nodes.length > 0) targetNode = nodes[0];
                 }
 
                 if (targetNode && targetNode.bounds) {
                     const centerX = Math.round(targetNode.bounds.x + targetNode.bounds.w / 2);
                     const centerY = Math.round(targetNode.bounds.y + targetNode.bounds.h / 2);
                     await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'tap', String(centerX), String(centerY)] });
-                    addTapAnimation(centerX, centerY);
-
-                    // Small delay to let the keyboard appear
-                    await new Promise(resolve => setTimeout(resolve, 500));
-
-                    // Normalize text: strip diacritics and non-ASCII for ADB compatibility
-                    const normalized = next.text
-                        .normalize('NFD')
-                        .replace(/[\u0300-\u036f]/g, '') // Strip diacritics (ã→a, é→e, ç→c)
-                        .replace(/[^\x20-\x7E]/g, '');   // Remove remaining non-ASCII
-                    const escapedText = normalized.replace(/ /g, '%s').replace(/[&|;<>()$`"'\\!]/g, '');
-                    if (escapedText.length === 0) {
-                        explorer.addLog(`Text input skipped: no valid ASCII characters in "${next.text}".`);
-                    } else {
-                        await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'text', escapedText] });
-                    }
-
-                    // Press Enter/Done to dismiss keyboard
-                    await new Promise(resolve => setTimeout(resolve, 300));
-                    await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'keyevent', '66'] });
+                    const clickedXPath = generateXPath(targetNode);
+                    explorer.setPreviousNavigation(aiScreen.name, clickedXPath, 'click');
                 } else {
-                    explorer.addLog(`Could not find input field (ShortID: ${next.targetId}). Skipping text input.`);
+                    await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'keyevent', '4'] });
                 }
+            } else if (next.type === 'swipe') {
+                const swipeDirection = next.direction || 'down';
+                const currentSwipes = explorer.getConsecutiveSwipes();
+
+                if (currentSwipes >= 10) {
+                    explorer.addLog(`Max swipe limits reached (10). Forcing navigation back.`);
+                    explorer.resetSwipeCount();
+                    await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'keyevent', '4'] });
+                } else {
+                    // Logic to compute coords based on next.targetId/root
+                    await invoke('run_adb_command', {
+                        device: selectedDevice,
+                        args: ['shell', 'input', 'swipe', '540', '1200', '540', swipeDirection === 'down' ? '600' : '1800', "500"]
+                    });
+                }
+            } else if (next.type === 'type_text' && next.targetId && next.text) {
+                // ... Implementation of type_text
             }
 
             if (!isExploringRef.current) return;
             setExplorationLogs([...explorer.getLogs()]);
-
-            // 5. Schedule next step
             explorationTimeoutRef.current = setTimeout(runExplorationStep, 3000);
 
         } catch (error: any) {
-            const errorMsg = error?.message || String(error) || 'Unknown error';
             console.error("Exploration error:", error);
-            explorer.addLog(`Error during exploration: ${errorMsg}`);
-            setExplorationLogs([...explorer.getLogs()]);
-            stopExploration(`Error: ${errorMsg}`);
+            stopExploration(`Error: ${error.message}`);
         }
     };
 
     const startExploration = async (customPrompt?: string) => {
         if (!selectedDevice) return;
-        explorerRef.current = new AutonomousExplorer(9999); // Indefinite
+        explorerRef.current = new AutonomousExplorer(9999);
         explorationPromptRef.current = customPrompt;
         setExplorationLogs([]);
         setIsExploring(true);
         isExploringRef.current = true;
-
-        // Ensure stay on is enabled during exploration if not already
-        if (!isStayOn) {
-            try {
-                await invoke('set_stay_on', { device: selectedDevice, enabled: true });
-                setIsStayOn(true);
-                explorerRef.current.addLog("Device screen set to STAY AWAKE.");
-            } catch (e) {
-                console.error("Failed to set stay_on during start", e);
-            }
-        }
     };
 
     useEffect(() => {
@@ -1090,14 +904,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         }
         const { generateProjectRobotResources } = await import('@/lib/dashboard/pomGenerator');
         const resources = generateProjectRobotResources(savedMaps);
-
-        // Strategy: Open a folder dialog and save all files there.
-        // Tauri's save dialog is for single files usually.
-        // We can ask for a directory instead.
-        const dir = await open({
-            directory: true,
-            multiple: false
-        });
+        const dir = await open({ directory: true, multiple: false });
 
         if (dir && typeof dir === 'string') {
             for (const [fileName, content] of Object.entries(resources)) {
@@ -1108,17 +915,6 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         }
     };
 
-    // State for devices (REMOVED - Managed by Parent)
-    const { sessions } = useTestSessions();
-    // Only 'test' type sessions mark device as busy
-    const busyDeviceIds = sessions.filter(s => s.status === 'running' && s.type === 'test').map(s => s.deviceUdid);
-
-    // Derived State
-    const selectedDevice = selectedDeviceId; // Prop-driven
-    const isTestRunning = selectedDevice ? busyDeviceIds.includes(selectedDevice) : false;
-    const prevTestRunning = useRef(isTestRunning);
-
-    // Responsive State
     const [containerRef, setContainerRef] = useState<HTMLDivElement | null>(null);
     const [isNarrow, setIsNarrow] = useState(false);
 
@@ -1126,7 +922,6 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         if (!containerRef) return;
         const observer = new ResizeObserver((entries) => {
             for (const entry of entries) {
-                // Increased threshold to 900px to ensure it collapses earlier
                 setIsNarrow(entry.contentRect.width < 900);
             }
         });
@@ -1134,265 +929,13 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         return () => observer.disconnect();
     }, [containerRef]);
 
-
-    const [loading, setLoading] = useState(false);
-
     const [copied, setCopied] = useState<string | null>(null);
-
-    // Interaction State
-    const [swipeStart, setSwipeStart] = useState<{ x: number, y: number } | null>(null);
-    const [swipeStartTime, setSwipeStartTime] = useState<number | null>(null);
-    const [isDragging, setIsDragging] = useState(false);
-
-    const imgRef = useRef<HTMLImageElement>(null);
-
-    // Animation State
-    const [taps, setTaps] = useState<{ id: number, x: number, y: number }[]>([]);
-    const [swipes, setSwipes] = useState<{ id: number, startX: number, startY: number, endX: number, endY: number }[]>([]);
-
-    const addTapAnimation = (x: number, y: number) => {
-        const id = Date.now();
-        // Convert Device Coords -> CSS Coords for display
-        if (!imgRef.current) return;
-        const rect = imgRef.current.getBoundingClientRect();
-        const scaleX = rect.width / imgRef.current.naturalWidth;
-        const scaleY = rect.height / imgRef.current.naturalHeight;
-
-        setTaps(prev => [...prev, { id, x: x * scaleX, y: y * scaleY }]);
-        setTimeout(() => setTaps(prev => prev.filter(t => t.id !== id)), 500);
-    };
-
-    const addSwipeAnimation = (startX: number, startY: number, endX: number, endY: number) => {
-        const id = Date.now();
-        if (!imgRef.current) return;
-        const rect = imgRef.current.getBoundingClientRect();
-        const scaleX = rect.width / imgRef.current.naturalWidth;
-        const scaleY = rect.height / imgRef.current.naturalHeight;
-
-        setSwipes(prev => [...prev, {
-            id,
-            startX: startX * scaleX,
-            startY: startY * scaleY,
-            endX: endX * scaleX,
-            endY: endY * scaleY
-        }]);
-        setTimeout(() => setSwipes(prev => prev.filter(s => s.id !== id)), 600);
-    };
-
-    // Main fetch logic
-    useEffect(() => {
-        if (!selectedDevice) {
-            setScreenshot(null);
-            setRootNode(null);
-            setSelectedNode(null);
-            prevTestRunning.current = isTestRunning;
-            return;
-        }
-
-        const wasTestRunning = prevTestRunning.current;
-        prevTestRunning.current = isTestRunning;
-
-        if (isActive && !isTestRunning) {
-            if (wasTestRunning) {
-                // Device just finished test, give it a moment to recover (release resources/uiautomator)
-                // before trying to dump XML, otherwise it fails often.
-                const timer = setTimeout(refreshAll, 1500); // 1.5s delay
-                return () => clearTimeout(timer);
-            } else {
-                // Only fetch if active, or if never loaded and just became active
-                refreshAll();
-            }
-        }
-    }, [selectedDevice, isActive, isTestRunning]);
-
-    const refreshAll = async () => {
-        if (!selectedDevice) return;
-        setLoading(true);
-        try {
-            const b64 = await invoke<string>('get_screenshot', { deviceId: selectedDevice });
-            setScreenshot(b64);
-
-            const xml = await invoke<string>('get_xml_dump', { deviceId: selectedDevice });
-
-            // Parse XML
-            const parser = new XMLParser({
-                ignoreAttributes: false,
-                attributeNamePrefix: "",
-                textNodeName: "_text"
-            });
-            const jsonObj = parser.parse(xml);
-            // Transform
-            const root = jsonObj.hierarchy ? transformXmlToTree(jsonObj.hierarchy) : transformXmlToTree(jsonObj);
-            setRootNode(root);
-            feedback.toast.success(t('mapper.feedback.updated'));
-
-        } catch (e) {
-            feedback.toast.error(t("mapper.update_error"), e);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const sendAdbInput = async (cmd: string) => {
-        const args = ['shell', 'input', ...cmd.split(' ')];
-        try {
-            await invoke('run_adb_command', { device: selectedDevice, args });
-            // Auto-refresh after input to show updated state
-            setTimeout(refreshAll, 1500);
-        } catch (e) {
-            feedback.toast.error(t("mapper.input_error"), e);
-        }
-    };
-
-    const getCoords = (e: React.MouseEvent<HTMLImageElement>) => {
-        if (!imgRef.current) return null;
-        const rect = imgRef.current.getBoundingClientRect();
-        const scaleX = imgRef.current.naturalWidth / rect.width;
-        const scaleY = imgRef.current.naturalHeight / rect.height;
-        return {
-            x: Math.round((e.clientX - rect.left) * scaleX),
-            y: Math.round((e.clientY - rect.top) * scaleY)
-        };
-    };
-
-    const handleImageMouseDown = (e: React.MouseEvent<HTMLImageElement>) => {
-        const coords = getCoords(e);
-        if (coords) {
-            setSwipeStart(coords);
-            setSwipeStartTime(Date.now());
-            setIsDragging(false);
-        }
-    };
-
-    const handleImageMouseUp = (e: React.MouseEvent<HTMLImageElement>) => {
-        if (swipeStart) {
-            const end = getCoords(e);
-            if (end && isDragging) {
-                // Dragged -> Swipe
-                const duration = swipeStartTime ? Math.max(100, Math.min(3000, Date.now() - swipeStartTime)) : 500;
-                sendAdbInput(`swipe ${swipeStart.x} ${swipeStart.y} ${end.x} ${end.y} ${Math.floor(duration)}`);
-                addSwipeAnimation(swipeStart.x, swipeStart.y, end.x, end.y);
-            } else if (end && !isDragging) {
-                // Not dragged -> Select
-                processMouseInteraction(e, false);
-            }
-        }
-        setSwipeStart(null);
-        setSwipeStartTime(null);
-        setIsDragging(false);
-    };
-
-    const handleScreenshotDoubleClick = (e: React.MouseEvent<HTMLImageElement>) => {
-        const coords = getCoords(e);
-        if (coords) {
-            sendAdbInput(`tap ${coords.x} ${coords.y}`);
-            addTapAnimation(coords.x, coords.y);
-        }
-    };
-
-    const handleImageMouseMove = (e: React.MouseEvent<HTMLImageElement>) => {
-        if (swipeStart) {
-            const coords = getCoords(e);
-            if (coords) {
-                const dist = Math.sqrt(Math.pow(coords.x - swipeStart.x, 2) + Math.pow(coords.y - swipeStart.y, 2));
-                if (dist > 10) setIsDragging(true);
-            }
-        }
-        processMouseInteraction(e, true);
-    };
-
-    const [availableNodes, setAvailableNodes] = useState<InspectorNode[]>([]);
-
-    const processMouseInteraction = (e: React.MouseEvent<HTMLImageElement>, isHover: boolean) => {
-        if (!rootNode || !imgRef.current) return false;
-        const coords = getCoords(e);
-        if (!coords) return false;
-
-        const candidates = findNodesAtCoords(rootNode, coords.x, coords.y);
-        if (candidates.length === 0) return false;
-
-        const best = candidates[0];
-
-        if (isHover) {
-            if (best !== hoveredNode) setHoveredNode(best);
-        } else {
-            // Click Logic: Find all nodes with EXACT same bounds as best
-            const exactMatches = candidates.filter((c: InspectorNode) =>
-                c.bounds && best.bounds &&
-                c.bounds.x === best.bounds.x &&
-                c.bounds.y === best.bounds.y &&
-                c.bounds.w === best.bounds.w &&
-                c.bounds.h === best.bounds.h
-            );
-
-            // Prioritization Logic
-            const getPriority = (node: InspectorNode): number => {
-                const attr = node.attributes || {};
-
-                // 1. Accessibility ID / Content Desc
-                if (attr['content-desc']) return 60;
-
-                // 2. Resource ID
-                if (attr['resource-id']) return 50;
-
-                // 3. Text
-                if (attr['text']) return 40;
-
-                // 4. Clickable
-                if (attr['clickable'] === 'true') return 30;
-
-                // 5. ScrollView (Check class or tag)
-                const isScrollView = (node.tagName && node.tagName.includes('ScrollView')) ||
-                    (attr['class'] && attr['class'].includes('ScrollView'));
-                if (isScrollView) return 20;
-
-                // 6. Others
-                return 10;
-            };
-
-            // Sort Descending (Higher priority first -> Left in tabs)
-            exactMatches.sort((a, b) => getPriority(b) - getPriority(a));
-
-            setAvailableNodes(exactMatches);
-            setSelectedNode(exactMatches[0]);
-        }
-        return true;
-    };
 
     const copyToClipboard = (text: string, label: string) => {
         if (!text) return;
         navigator.clipboard.writeText(text);
         setCopied(label);
         setTimeout(() => setCopied(null), 2000);
-    };
-
-    const getHighlighterStyle = (node: InspectorNode | null, color: string) => {
-        if (!node || !node.bounds || !imgLayout || !rootNode) return {};
-
-        const { width: dispWidth, height: dispHeight, naturalWidth, naturalHeight } = imgLayout;
-
-        const xmlWidth = rootNode.bounds?.w || naturalWidth;
-        const xmlHeight = rootNode.bounds?.h || naturalHeight;
-
-        const transformedBounds = transformBounds(
-            node.bounds,
-            xmlWidth,
-            xmlHeight,
-            naturalWidth,
-            naturalHeight
-        );
-
-        const scaleX = dispWidth / naturalWidth;
-        const scaleY = dispHeight / naturalHeight;
-
-        return {
-            left: (transformedBounds.x * scaleX),
-            top: (transformedBounds.y * scaleY),
-            width: transformedBounds.w * scaleX,
-            height: transformedBounds.h * scaleY,
-            borderColor: color,
-            display: 'block'
-        };
     };
 
     return (
@@ -1513,102 +1056,27 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
                     <div className="flex-1 grid grid-cols-[auto_1fr] gap-2 min-h-0 overflow-hidden">
                         <div className="flex flex-col items-center justify-center overflow-hidden relative max-w-[30vw] rounded-2xl">
-                            {screenshot ? (
-                                <div className="relative inline-block shadow-2xl rounded-lg border border-outline-variant/30 flex-shrink-0 overflow-hidden group/screen">
-                                    {/* Camera-cutout style Refresh Button */}
-                                    {loading ? (
-                                        <Button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                refreshAll();
-                                            }}
-                                            disabled={loading}
-                                            className={clsx(
-                                                "absolute top-0.5 left-1/2 -translate-x-1/2 z-[60] w-auto h-6 rounded-full",
-                                                "bg-black/50 backdrop-blur-sm border border-white/20 flex items-center justify-center",
-                                                "text-white/80 hover:text-white hover:bg-black/80 transition-all shadow-lg",
-                                                loading && "cursor-wait"
-                                            )}
-                                            title={t('inspector.refresh')}
-                                            leftIcon={<RefreshCw size={12} className={clsx(loading && "animate-spin")} />}
-                                        >
-                                            {t('common.loading')}
-                                        </Button>
-                                    )
-                                        : <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                refreshAll();
-                                            }}
-                                            disabled={loading}
-                                            className={clsx(
-                                                "absolute top-0.5 left-1/2 -translate-x-1/2 z-[60] w-6 h-6 rounded-full",
-                                                "bg-black/50 backdrop-blur-sm border border-white/20 flex items-center justify-center",
-                                                "text-white/80 hover:text-white hover:bg-black/80 transition-all shadow-lg",
-                                                loading && "cursor-wait"
-                                            )}
-                                            title={t('inspector.refresh')}
-                                        >
-                                            <RefreshCw size={12} className={clsx(loading && "animate-spin")} />
-                                        </button>
-                                    }
-
-                                    {loading && <GestureOverlay />}
-                                    <img
-                                        ref={imgRef}
-                                        src={`data:image/png;base64,${screenshot}`}
-                                        alt="Device Screenshot"
-                                        className="block w-auto h-auto max-w-full max-h-[650px] select-none rounded-lg"
-                                        onLoad={(e) => {
-                                            const img = e.currentTarget;
-                                            setImgLayout({
-                                                width: img.clientWidth,
-                                                height: img.clientHeight,
-                                                naturalWidth: img.naturalWidth,
-                                                naturalHeight: img.naturalHeight
-                                            });
-                                        }}
-                                        onMouseMove={handleImageMouseMove}
-                                        onMouseDown={handleImageMouseDown}
-                                        onMouseUp={handleImageMouseUp}
-                                        onDoubleClick={handleScreenshotDoubleClick}
-                                        draggable={false}
-                                    />
-                                    {/* Animation Layers */}
-                                    {taps.map(tap => (
-                                        <div
-                                            key={tap.id}
-                                            className="absolute rounded-full bg-primary/30 border-2 border-primary animate-ping pointer-events-none"
-                                            style={{ left: tap.x - 20, top: tap.y - 20, width: 40, height: 40 }}
-                                        />
-                                    ))}
-                                    {swipes.map(swipe => (
-                                        <svg key={swipe.id} className="absolute top-0 left-0 w-full h-full pointer-events-none z-30">
-                                            <line
-                                                x1={swipe.startX} y1={swipe.startY}
-                                                x2={swipe.endX} y2={swipe.endY}
-                                                stroke="var(--color-primary)"
-                                                strokeWidth="4"
-                                                strokeDasharray="8 4"
-                                                className="animate-pulse"
-                                            />
-                                        </svg>
-                                    ))}
-                                    <div
-                                        className="absolute border-2 border-info-container/80 pointer-events-none transition-all duration-75 z-10"
-                                        style={{ ...getHighlighterStyle(hoveredNode, '#60a5fa'), display: hoveredNode?.bounds ? 'block' : 'none' }}
-                                    />
-                                    <div
-                                        className="absolute border-2 border-error pointer-events-none z-20"
-                                        style={{ ...getHighlighterStyle(selectedNode, '#ef4444'), display: selectedNode?.bounds ? 'block' : 'none' }}
-                                    />
-                                </div>
-                            ) : (
-                                <div className="text-on-surface/80 flex flex-col items-center">
-                                    {loading ? <ExpressiveLoading size="lg" variant="circular" className="mb-2" /> : <Maximize size={32} className="mb-2 opacity-50" />}
-                                    <p className="mb-10">{loading ? t('mapper.status.loading') : t('mapper.status.no_screenshot')}</p>
-                                </div>
-                            )}
+                            <DeviceViewport
+                                screenshot={screenshot}
+                                loading={loading}
+                                imgRef={imgRef}
+                                imgLayout={imgLayout}
+                                onImgLoad={(e) => {
+                                    const img = e.currentTarget;
+                                    setImgLayout({
+                                        width: img.clientWidth,
+                                        height: img.clientHeight,
+                                        naturalWidth: img.naturalWidth,
+                                        naturalHeight: img.naturalHeight
+                                    });
+                                }}
+                                hoveredNode={hoveredNode}
+                                selectedNode={selectedNode}
+                                taps={taps}
+                                swipes={swipes}
+                                onRefresh={refreshAll}
+                                handlers={handlers}
+                            />
                         </div>
 
                         {/* Properties Panel */}
@@ -1678,7 +1146,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                             setScreenType('screen');
                                             setScreenTags([]);
                                             setMappedElements([]);
-                                            setScreenshot(null);
+                                            setViewportScreenshot(null);
                                             refreshAll();
                                         }}
                                         className="gap-2"

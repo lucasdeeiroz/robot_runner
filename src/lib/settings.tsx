@@ -220,11 +220,25 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                     saveStore(newStoreData);
                 }
             }
+            // Initial sync
+            if (saved && saved.profiles) {
+                const activeId = saved.activeProfileId;
+                const paths = saved.profiles[activeId]?.settings?.paths;
+                if (paths) {
+                    invoke('sync_workspace_permissions', { paths: Object.values(paths) }).catch(console.error);
+                }
+            }
+
         } catch (e) {
             feedback.toast.error("settings.load_error", e);
         } finally {
             setLoading(false);
         }
+    };
+
+    const syncWorkspaces = (paths: Record<string, string>) => {
+        invoke('sync_workspace_permissions', { paths: Object.values(paths) })
+            .catch(e => console.error("[Security] Sync failed:", e));
     };
 
     const saveStore = (data: SettingsStoreData) => {
@@ -256,6 +270,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
             // Fire and forget save to disk
             saveStore(newData);
+
+            // Sync permissions if paths changed
+            if (key === 'paths') {
+                syncWorkspaces(value as Record<string, string>);
+            }
+
             return newData;
         });
     };

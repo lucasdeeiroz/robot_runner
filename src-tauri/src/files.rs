@@ -2,6 +2,7 @@ use std::fs;
 
 use serde::{Deserialize, Serialize};
 use tauri::command;
+use crate::errors::{AppError, AppResult};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FileEntry {
@@ -11,7 +12,7 @@ pub struct FileEntry {
 }
 
 #[command]
-pub fn list_directory(path: Option<String>) -> Result<Vec<FileEntry>, String> {
+pub fn list_directory(path: Option<String>) -> AppResult<Vec<FileEntry>> {
     let target_path = if let Some(p) = path {
         if p.is_empty() {
             ".".to_string()
@@ -22,13 +23,13 @@ pub fn list_directory(path: Option<String>) -> Result<Vec<FileEntry>, String> {
         ".".to_string()
     };
 
-    let read_dir = fs::read_dir(&target_path).map_err(|e| e.to_string())?;
+    let read_dir = fs::read_dir(&target_path).map_err(|e| AppError::FileSystemError(e.to_string()))?;
     let mut entries = Vec::new();
 
     for entry in read_dir {
-        let entry = entry.map_err(|e| e.to_string())?;
+        let entry = entry.map_err(|e| AppError::FileSystemError(e.to_string()))?;
         let path_buf = entry.path();
-        let metadata = fs::metadata(&path_buf).map_err(|e| e.to_string())?;
+        let metadata = fs::metadata(&path_buf).map_err(|e| AppError::FileSystemError(e.to_string()))?;
 
         // Skip hidden files/dirs (starting with dot)
         let name = entry.file_name().to_string_lossy().to_string();
@@ -58,7 +59,7 @@ pub fn list_directory(path: Option<String>) -> Result<Vec<FileEntry>, String> {
 }
 
 #[command]
-pub fn save_file(path: String, content: String, append: bool) -> Result<(), String> {
+pub fn save_file(path: String, content: String, append: bool) -> AppResult<()> {
     use std::io::Write;
 
     let mut file = if append {
@@ -66,25 +67,25 @@ pub fn save_file(path: String, content: String, append: bool) -> Result<(), Stri
             .create(true)
             .append(true)
             .open(&path)
-            .map_err(|e| e.to_string())?
+            .map_err(|e| AppError::FileSystemError(e.to_string()))?
     } else {
-        fs::File::create(&path).map_err(|e| e.to_string())?
+        fs::File::create(&path).map_err(|e| AppError::FileSystemError(e.to_string()))?
     };
 
     file.write_all(content.as_bytes())
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| AppError::FileSystemError(e.to_string()))?;
     Ok(())
 }
 
 #[command]
-pub fn read_file(path: String) -> Result<String, String> {
-    fs::read_to_string(&path).map_err(|e| e.to_string())
+pub fn read_file(path: String) -> AppResult<String> {
+    fs::read_to_string(&path).map_err(|e| AppError::FileSystemError(e.to_string()))
 }
 
-pub fn read_file_tail_internal(path: &str, max_bytes: u64) -> Result<String, String> {
+pub fn read_file_tail_internal(path: &str, max_bytes: u64) -> AppResult<String> {
     use std::io::{Read, Seek, SeekFrom};
-    let mut file = fs::File::open(path).map_err(|e| e.to_string())?;
-    let metadata = file.metadata().map_err(|e| e.to_string())?;
+    let mut file = fs::File::open(path).map_err(|e| AppError::FileSystemError(e.to_string()))?;
+    let metadata = file.metadata().map_err(|e| AppError::FileSystemError(e.to_string()))?;
     let size = metadata.len();
 
     let start = if size > max_bytes {
@@ -92,32 +93,32 @@ pub fn read_file_tail_internal(path: &str, max_bytes: u64) -> Result<String, Str
     } else {
         0
     };
-    file.seek(SeekFrom::Start(start)).map_err(|e| e.to_string())?;
+    file.seek(SeekFrom::Start(start)).map_err(|e| AppError::FileSystemError(e.to_string()))?;
 
     let mut buffer = Vec::with_capacity(std::cmp::min(size, max_bytes) as usize);
-    file.read_to_end(&mut buffer).map_err(|e| e.to_string())?;
+    file.read_to_end(&mut buffer).map_err(|e| AppError::FileSystemError(e.to_string()))?;
 
     // Safety: use lossy conversion to handle cases where we split a multi-byte character
     Ok(String::from_utf8_lossy(&buffer).to_string())
 }
 
 #[command]
-pub fn read_file_tail(path: String, max_bytes: u64) -> Result<String, String> {
+pub fn read_file_tail(path: String, max_bytes: u64) -> AppResult<String> {
     read_file_tail_internal(&path, max_bytes)
 }
 
 #[command]
-pub fn read_image_base64(path: String) -> Result<String, String> {
+pub fn read_image_base64(path: String) -> AppResult<String> {
     use base64::{Engine as _, engine::general_purpose};
-    let bytes = fs::read(&path).map_err(|e| e.to_string())?;
+    let bytes = fs::read(&path).map_err(|e| AppError::FileSystemError(e.to_string()))?;
     let b64 = general_purpose::STANDARD.encode(bytes);
     Ok(b64)
 }
 
 #[command]
-pub fn save_image(path: String, content: Vec<u8>) -> Result<(), String> {
+pub fn save_image(path: String, content: Vec<u8>) -> AppResult<()> {
     use std::io::Write;
-    let mut file = fs::File::create(&path).map_err(|e| e.to_string())?;
-    file.write_all(&content).map_err(|e| e.to_string())?;
+    let mut file = fs::File::create(&path).map_err(|e| AppError::FileSystemError(e.to_string()))?;
+    file.write_all(&content).map_err(|e| AppError::FileSystemError(e.to_string()))?;
     Ok(())
 }

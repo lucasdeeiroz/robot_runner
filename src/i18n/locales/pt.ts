@@ -398,6 +398,8 @@ export const pt = {
             mirror_launched: "Espelhamento Iniciado",
             screenshot_saved: "Captura de Tela Salva",
             profile_changed: "Perfil de Configuração Alterado",
+            adb_restarting: "Reiniciando servidor ADB...",
+            adb_restarted: "Servidor ADB reiniciado com sucesso",
             details: {
                 device: "Dispositivo: {{device}}",
                 path: "Caminho: {{path}}",
@@ -632,6 +634,10 @@ export const pt = {
                 no_preview: "Sem prévia registrada",
                 clear_curvatures: "Limpar todas as curvaturas",
                 curvatures_cleared: "Todas as curvaturas de arestas foram limpas",
+                save_success: "Layout salvo com sucesso!",
+                load_error: "Falha ao carregar layout do fluxograma",
+                reorganize_error: "Falha na reorganização por IA",
+                export_image_error: "Falha ao exportar imagem do fluxograma",
                 unsaved_changes: {
                     title: "Alterações não salvas",
                     message: "Você tem alterações de layout não salvas. Deseja salvar antes de sair?",
@@ -1059,7 +1065,8 @@ export const pt = {
                 default: "Padrão"
             },
             action: {
-                open_file: "Abrir Arquivo de Configurações"
+                open_file: "Abrir Arquivo de Configurações",
+                restart_adb: "Reiniciar Servidor ADB"
             },
             path_labels: {
                 suites: "Diretório de Suítes",
@@ -1078,7 +1085,9 @@ export const pt = {
             }
         },
         sidebar: {
-            dashboard: "Dashboard QA",
+            dashboard: "Dashboard",
+            adb_active: "ADB Ativo",
+            appium_active: "Servidor Appium Ativo",
             run: "Executar",
             description_run: "Gerenciamento de dispositivos e execução de automação.",
             tests: "Testes",

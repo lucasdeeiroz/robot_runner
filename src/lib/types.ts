@@ -58,7 +58,10 @@ export interface ScreenMap {
     tags?: string[];
     elements: UIElementMap[];
     base64_preview?: string; // Optional: Screenshot thumbnail
-    layout?: { gridX: number; gridY: number };
+    layout?: { 
+        node: LayoutNode; 
+        edges?: Record<string, LayoutEdge>;
+    };
 }
 
 // --- Flowchart Layout ---

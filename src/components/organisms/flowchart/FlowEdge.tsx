@@ -95,6 +95,7 @@ export const FlowEdgeControls = React.memo(({
                 )}
                 onMouseDown={(e) => {
                     if (isSpacePressed || e.button === 1 || !isVisible) return;
+                    e.preventDefault();
                     e.stopPropagation();
                     onSegmentMouseDown(i, e);
                 }}
@@ -149,14 +150,20 @@ export const FlowEdgeControls = React.memo(({
 
             {/* Source/Target Handles */}
             <circle
-                cx={startPoint.x} cy={startPoint.y} r={6} fill="transparent"
-                className={clsx("cursor-grab hover:fill-primary/50", isDraggingConnection ? "pointer-events-none" : "pointer-events-auto")}
-                onMouseDown={(e) => { if (!isSpacePressed && e.button !== 1) { onSourceMouseDown(e); } }}
+                cx={startPoint.x} cy={startPoint.y} r={6} 
+                fill={hoveredEdge === edgeId ? "rgba(59, 130, 246, 0.8)" : "rgba(156, 163, 175, 0.3)"}
+                stroke={hoveredEdge === edgeId ? "#3b82f6" : "transparent"}
+                strokeWidth={2}
+                className={clsx("cursor-grab transition-all", isDraggingConnection ? "pointer-events-none" : "pointer-events-auto")}
+                onMouseDown={(e) => { if (!isSpacePressed && e.button !== 1) { e.preventDefault(); e.stopPropagation(); onSourceMouseDown(e); } }}
             />
             <circle
-                cx={endPoint.x} cy={endPoint.y} r={6} fill="transparent"
-                className={clsx("cursor-grab hover:fill-primary/50", isDraggingConnection ? "pointer-events-none" : "pointer-events-auto")}
-                onMouseDown={(e) => { if (!isSpacePressed && e.button !== 1) { onTargetMouseDown(e); } }}
+                cx={endPoint.x} cy={endPoint.y} r={6}
+                fill={hoveredEdge === edgeId ? "rgba(59, 130, 246, 0.8)" : "rgba(156, 163, 175, 0.3)"}
+                stroke={hoveredEdge === edgeId ? "#3b82f6" : "transparent"}
+                strokeWidth={2}
+                className={clsx("cursor-grab transition-all", isDraggingConnection ? "pointer-events-none" : "pointer-events-auto")}
+                onMouseDown={(e) => { if (!isSpacePressed && e.button !== 1) { e.preventDefault(); e.stopPropagation(); onTargetMouseDown(e); } }}
             />
 
             {/* Vertices */}
@@ -165,8 +172,8 @@ export const FlowEdgeControls = React.memo(({
                     key={`${edgeId}-v-${idx}`}
                     cx={p.x} cy={p.y} r={5} fill="#3b82f6"
                     className={clsx("cursor-move opacity-0 hover:opacity-100", isDraggingConnection ? "pointer-events-none" : "pointer-events-auto")}
-                    onMouseDown={(e) => { if (!isSpacePressed && e.button !== 1) { onVertexMouseDown(idx, e); } }}
-                    onDoubleClick={(e) => { onVertexDoubleClick(idx, e); }}
+                    onMouseDown={(e) => { if (!isSpacePressed && e.button !== 1) { e.preventDefault(); e.stopPropagation(); onVertexMouseDown(idx, e); } }}
+                    onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); onVertexDoubleClick(idx, e); }}
                 />
             ))}
         </g>

@@ -50,6 +50,7 @@ interface TestSessionContextType {
     setSessionActiveTool: (runId: string, tool: string) => void;
     setSessionTree: (runId: string, tree: any, dbPath: string) => void;
     updateSessionArtifacts: (runId: string, paths: Partial<NonNullable<TestSession['artifactPaths']>>) => void;
+    appiumRunning: boolean;
 }
 
 const TestSessionContext = createContext<TestSessionContextType | undefined>(undefined);
@@ -57,8 +58,28 @@ const TestSessionContext = createContext<TestSessionContextType | undefined>(und
 export function TestSessionProvider({ children }: { children: React.ReactNode }) {
     const [sessions, setSessions] = useState<TestSession[]>([]);
     const [activeSessionId, setActiveSessionId] = useState<string | 'dashboard'>('dashboard');
+    const [appiumRunning, setAppiumRunning] = useState(false);
+    const { settings } = useSettings();
 
-    // Global Event Listener
+    // Periodic Appium Status Check
+    useEffect(() => {
+        const checkAppium = async () => {
+            try {
+                const status = await invoke<{ running: boolean }>('get_appium_status', {
+                    host: settings.appiumHost,
+                    port: Number(settings.appiumPort),
+                    is_test_running: sessions.some(s => s.status === 'running')
+                });
+                setAppiumRunning(status.running);
+            } catch (e) {
+                setAppiumRunning(false);
+            }
+        };
+
+        checkAppium();
+        const interval = setInterval(checkAppium, 10000); // Every 10 seconds
+        return () => clearInterval(interval);
+    }, [settings.appiumHost, settings.appiumPort, sessions]);
     useEffect(() => {
         const unlistenOutputPromise = listen<TestOutputPayload>('test-output', (event) => {
             const { run_id, message } = event.payload;
@@ -105,7 +126,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
         };
     }, []);
 
-    const { settings } = useSettings();
+
 
     const addSession = useCallback((runId: string, deviceUdid: string, deviceName: string, testPath: string, framework: 'robot' | 'maestro' | 'appium', timestampOutputs: boolean, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string, selectedTests?: string[]) => {
         setSessions(prev => {
@@ -398,7 +419,8 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
     return (
         <TestSessionContext.Provider value={{ 
             sessions, addSession, addToolboxSession, stopSession, rerunSession, clearSession, 
-            activeSessionId, setActiveSessionId, setSessionActiveTool, setSessionTree, updateSessionArtifacts 
+            activeSessionId, setActiveSessionId, setSessionActiveTool, setSessionTree, updateSessionArtifacts,
+            appiumRunning
         }}>
             {children}
         </TestSessionContext.Provider>

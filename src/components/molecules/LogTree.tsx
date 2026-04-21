@@ -28,13 +28,29 @@ interface LogTreeProps {
     initiallyOpen?: boolean;
     dbPath?: string;
     parentType?: LogNode['type'];
+    isFlatRow?: boolean;
+    isExpanded?: boolean;
+    isLast?: boolean;
+    onToggleExpand?: (id: string, expanded: boolean) => void;
+    onChildrenLoaded?: (id: string, children: LogNode[]) => void;
 }
 
-export const LogTree: React.FC<LogTreeProps> = React.memo(({ node, depth = 0, initiallyOpen, dbPath, parentType }) => {
+export const LogTree: React.FC<LogTreeProps> = React.memo(({
+    node,
+    depth = 0,
+    initiallyOpen,
+    dbPath,
+    parentType,
+    isFlatRow,
+    isExpanded,
+    onToggleExpand,
+    onChildrenLoaded
+}) => {
     const { t, i18n } = useTranslation();
-    const [isOpen, setIsOpen] = useState(initiallyOpen ?? (
+    const [internalIsOpen, setInternalIsOpen] = useState(initiallyOpen ?? (
         node.type !== 'text' && node.type !== 'suite-start' && (node as any).status !== 'PASS' && (node as any).status !== 'NOT_RUN'
     ));
+    const isOpen = isFlatRow ? !!isExpanded : internalIsOpen;
     const [previewImage, setPreviewImage] = useState<string | null>(null);
     const [screenshotData, setScreenshotData] = useState<string | null>(null);
     const [failureScreenshotData, setFailureScreenshotData] = useState<string | null>(null);
@@ -60,12 +76,37 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({ node, depth = 0, in
         failureMessage.includes('Test execution stopped due to a fatal error.')
     );
 
+    const toggleOpen = () => {
+        if (isFlatRow) {
+            onToggleExpand?.(node.id, !isExpanded);
+        } else {
+            setInternalIsOpen(!isOpen);
+        }
+    };
+
+    // Track previous status to only auto-expand on transitions. 
+    // Initialized to undefined to allow the first status check to trigger auto-expansion on mount.
+    const prevStatusRef = React.useRef<string | undefined>(undefined);
+
     // Auto-expand when status changes from PASS/NOT_RUN/undefined to RUNNING/FAIL
     React.useEffect(() => {
-        if (initiallyOpen === undefined && node.type !== 'text' && (node as any).status && (node as any).status !== 'PASS' && (node as any).status !== 'NOT_RUN') {
-            setIsOpen(true);
+        const currentStatus = (node as any).status;
+        const prevStatus = prevStatusRef.current;
+
+        // Only proceed if status is defined and actually changed OR it's the first check for a non-passing status
+        if (currentStatus && currentStatus !== prevStatus) {
+            const isFailingOrRunning = currentStatus !== 'PASS' && currentStatus !== 'NOT_RUN';
+
+            if (initiallyOpen === undefined && node.type !== 'text' && isFailingOrRunning) {
+                if (isFlatRow) {
+                    if (!isExpanded) onToggleExpand?.(node.id, true);
+                } else {
+                    setInternalIsOpen(true);
+                }
+            }
+            prevStatusRef.current = currentStatus;
         }
-    }, [(node as any).status, initiallyOpen, node.type]);
+    }, [node.id, (node as any).status, initiallyOpen, node.type, isFlatRow, isExpanded, onToggleExpand]);
 
     // Fetch attempt reference to avoid dependency trigger loop cancellation
     const fetchAttempted = React.useRef(false);
@@ -81,6 +122,7 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({ node, depth = 0, in
                 .then(children => {
                     if (isMounted) {
                         setLazyChildren(children);
+                        onChildrenLoaded?.(node.id, children);
                     }
                 })
                 .catch(err => console.error("Failed to lazy load children for node", node.id, err))
@@ -163,13 +205,22 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({ node, depth = 0, in
     const { label: pill, color: pillColor } = nodeConfig[nodeKey] ?? nodeConfig['keyword'];
 
     return (
-        <div key={node.id} className={clsx("flex flex-col mb-1.5 rounded-xl border transition-all overflow-hidden", borderColor, bgColor)}>
+        <div
+            id={`log-node-${node.id}`}
+            className={clsx(
+                "flex flex-col transition-all overflow-hidden mb-1.5 rounded-xl border",
+                borderColor,
+                bgColor
+            )}
+        >
             <div
                 className={clsx(
-                    "flex items-center gap-2 p-2 cursor-pointer hover:bg-on-surface/5 rounded-t-xl min-w-0 relative",
+                    "flex items-center gap-2 p-2 cursor-pointer hover:bg-on-surface/5 min-w-0 relative",
+                    !isFlatRow && "rounded-t-xl",
+                    isFlatRow && depth === 0 && "rounded-t-xl",
                     (node.type === 'suite' || node.type === 'test') && "pl-4"
                 )}
-                onClick={() => setIsOpen(!isOpen)}
+                onClick={toggleOpen}
             >
                 {(node.type === 'suite' || node.type === 'test') && (
                     <div className={clsx(
@@ -262,7 +313,10 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({ node, depth = 0, in
             </div>
 
             {isOpen && (
-                <div className="flex flex-col gap-1 p-2 pl-4 border-t border-on-surface/5">
+                <div className={clsx(
+                    "flex flex-col gap-1 p-2 pl-4 border-t border-on-surface/5",
+                    isFlatRow && "bg-on-surface/[0.02]"
+                )}>
                     {node.type === 'test' && isFailed && (node as TestNode).failureDetail && (
                         <div className={clsx(
                             "mb-2 p-3 border rounded-xl text-xs animate-in fade-in slide-in-from-top-1 flex flex-col gap-4",
@@ -270,107 +324,104 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({ node, depth = 0, in
                         )}>
                             <div className="flex justify-between gap-4 items-start w-full">
                                 <div className="flex flex-col gap-1 min-w-0 w-full">
-                                <div className="flex items-center justify-between mb-1">
-                                    <div className="font-bold uppercase tracking-wider opacity-70 flex items-center gap-1.5">
-                                        {isInterrupted ? <Hand size={12} /> : <XCircle size={12} />}
-                                        {isInterrupted ? t('run_tab.console.interrupted') : t('run_tab.console.failure_detail')}
-                                    </div>
-                                    {!isInterrupted && (
-                                        <AiButton
-                                            id="log_analysis"
-                                            isLoading={isAnalyzing}
-                                            onClick={async (e, customPrompt) => {
-                                                // ... (existing AiButton code)
-                                                e.stopPropagation();
-                                                setIsAnalyzing(true);
-                                                setShowAiAnalysis(true);
-                                                setAiAnalysis(null);
+                                    <div className="flex items-center justify-between mb-1">
+                                        <div className="font-bold uppercase tracking-wider opacity-70 flex items-center gap-1.5">
+                                            {isInterrupted ? <Hand size={12} /> : <XCircle size={12} />}
+                                            {isInterrupted ? t('run_tab.console.interrupted') : t('run_tab.console.failure_detail')}
+                                        </div>
+                                        {!isInterrupted && (
+                                            <AiButton
+                                                id="log_analysis"
+                                                isLoading={isAnalyzing}
+                                                onClick={async (e, customPrompt) => {
+                                                    e.stopPropagation();
+                                                    setIsAnalyzing(true);
+                                                    setShowAiAnalysis(true);
+                                                    setAiAnalysis(null);
 
-                                                const langName = i18n.language === 'pt' ? 'Portuguese' : i18n.language === 'es' ? 'Spanish' : 'English';
-                                                const systemInstruction = getFailureAnalysisPrompt(langName, customPrompt);
+                                                    const langName = i18n.language === 'pt' ? 'Portuguese' : i18n.language === 'es' ? 'Spanish' : 'English';
+                                                    const systemInstruction = getFailureAnalysisPrompt(langName, customPrompt);
 
-
-                                                const prompt = `
+                                                    const prompt = `
 Test Name: ${node.name}
 Error Message: ${(node as TestNode).failureDetail?.message}
 `.trim();
 
-                                                try {
-                                                    setAiError(null);
-                                                    let result = "";
-                                                    const provider = settings.aiProvider;
-                                                    const screenshot = failureScreenshotData && !failureScreenshotData.startsWith("ERROR") ? failureScreenshotData : undefined;
+                                                    try {
+                                                        setAiError(null);
+                                                        let result = "";
+                                                        const provider = settings.aiProvider;
+                                                        const screenshot = failureScreenshotData && !failureScreenshotData.startsWith("ERROR") ? failureScreenshotData : undefined;
 
-                                                    if (provider === 'gemini') {
-                                                        result = await askGemini(prompt, settings.geminiApiKey || '', settings.geminiModel, systemInstruction, screenshot);
-                                                    } else if (provider === 'claude') {
-                                                        result = await askClaude(prompt, settings.claudeApiKey || '', settings.claudeModel, systemInstruction, screenshot);
-                                                    } else if (provider === 'openai') {
-                                                        result = await askOpenAI(prompt, settings.openaiApiKey || '', settings.openaiModel, systemInstruction, screenshot);
-                                                    } else {
-                                                        throw new Error("No AI provider configured");
-                                                    }
-                                                    setAiAnalysis(result);
+                                                        if (provider === 'gemini') {
+                                                            result = await askGemini(prompt, settings.geminiApiKey || '', settings.geminiModel, systemInstruction, screenshot);
+                                                        } else if (provider === 'claude') {
+                                                            result = await askClaude(prompt, settings.claudeApiKey || '', settings.claudeModel, systemInstruction, screenshot);
+                                                        } else if (provider === 'openai') {
+                                                            result = await askOpenAI(prompt, settings.openaiApiKey || '', settings.openaiModel, systemInstruction, screenshot);
+                                                        } else {
+                                                            throw new Error("No AI provider configured");
+                                                        }
+                                                        setAiAnalysis(result);
 
-                                                    // Persist to Database
-                                                    if (dbPath) {
-                                                        invoke('save_node_ai_analysis', {
-                                                            dbPath,
-                                                            nodeId: node.id,
-                                                            analysis: result
-                                                        }).catch(err => console.error("Failed to persist node AI analysis:", err));
+                                                        if (dbPath) {
+                                                            invoke('save_node_ai_analysis', {
+                                                                dbPath,
+                                                                nodeId: node.id,
+                                                                analysis: result
+                                                            }).catch(err => console.error("Failed to persist node AI analysis:", err));
+                                                        }
+                                                    } catch (err: any) {
+                                                        console.error("AI Analysis Error:", err);
+                                                        setAiError(err.message || String(err));
+                                                        feedback.toast.error(t('run_tab.console.ai_error_generic'));
+                                                    } finally {
+                                                        setIsAnalyzing(false);
                                                     }
-                                                } catch (err: any) {
-                                                    console.error("AI Analysis Error:", err);
-                                                    setAiError(err.message || String(err));
-                                                    feedback.toast.error(t('run_tab.console.ai_error_generic'));
-                                                } finally {
-                                                    setIsAnalyzing(false);
-                                                }
-                                            }}
-                                            label={t('run_tab.console.analyze_failure')}
-                                            title={t('run_tab.console.analyze_failure')}
-                                            variant="ghost"
-                                            expandable={true}
-                                            showTextAlways={false}
-                                            className="h-8 p-1 px-2 border-error/20 bg-error/5 text-error hover:bg-error/20 shadow-sm"
-                                        />
-                                    )}
+                                                }}
+                                                label={t('run_tab.console.analyze_failure')}
+                                                title={t('run_tab.console.analyze_failure')}
+                                                variant="ghost"
+                                                expandable={true}
+                                                showTextAlways={false}
+                                                className="h-8 p-1 px-2 border-error/20 bg-error/5 text-error hover:bg-error/20 shadow-sm"
+                                            />
+                                        )}
+                                    </div>
+                                    <div className="font-mono whitespace-pre-wrap leading-relaxed">{(node as TestNode).failureDetail!.message}</div>
                                 </div>
-                                <div className="font-mono whitespace-pre-wrap leading-relaxed overflow-auto max-h-40">{(node as TestNode).failureDetail!.message}</div>
-                            </div>
-                            {(node as TestNode).failureDetail!.screenshotPath && (
-                                <div
-                                    className="shrink-0 group relative cursor-zoom-in overflow-hidden self-start rounded-lg border border-error/20 shadow-sm min-w-[100px] min-h-[60px] bg-black/5 flex items-center justify-center"
-                                    onClick={(e) => { e.stopPropagation(); if (failureScreenshotData) setPreviewImage(failureScreenshotData); }}
-                                >
-                                    {failureScreenshotData ? (
-                                        failureScreenshotData.startsWith("ERROR") ? (
-                                            <div className="flex flex-col items-center gap-2 px-4 py-2 text-error text-xs text-center max-w-[250px]">
-                                                <XCircle size={20} className="text-error" />
-                                                <span className="break-all">{failureScreenshotData.replace("ERROR: ", "")}</span>
-                                            </div>
-                                        ) : (
-                                            <>
-                                                <img
-                                                    src={failureScreenshotData}
-                                                    alt={t('run_tab.console.failure_screenshot')}
-                                                    className="h-28 object-cover"
-                                                />
-                                                <div className="absolute inset-0 bg-black/0 flex items-center justify-center">
-                                                    <div className="opacity-0 group-hover:opacity-100 transition-all transform scale-90 group-hover:scale-100 bg-black/60 text-white p-2.5 rounded-full shadow-lg backdrop-blur-sm">
-                                                        <Maximize2 size={16} />
-                                                    </div>
+                                {(node as TestNode).failureDetail!.screenshotPath && (
+                                    <div
+                                        className="shrink-0 group relative cursor-zoom-in overflow-hidden self-start rounded-lg border border-error/20 shadow-sm min-w-[100px] min-h-[60px] bg-black/5 flex items-center justify-center"
+                                        onClick={(e) => { e.stopPropagation(); if (failureScreenshotData) setPreviewImage(failureScreenshotData); }}
+                                    >
+                                        {failureScreenshotData ? (
+                                            failureScreenshotData.startsWith("ERROR") ? (
+                                                <div className="flex flex-col items-center gap-2 px-4 py-2 text-error text-xs text-center max-w-[250px]">
+                                                    <XCircle size={20} className="text-error" />
+                                                    <span className="break-all">{failureScreenshotData.replace("ERROR: ", "")}</span>
                                                 </div>
-                                            </>
-                                        )
-                                    ) : (
-                                        <div className="flex flex-col items-center gap-2 px-4 py-2 opacity-50">
-                                            <ExpressiveLoading size="sm" variant="circular" />
-                                        </div>
-                                    )}
-                                </div>
-                            )}
+                                            ) : (
+                                                <>
+                                                    <img
+                                                        src={failureScreenshotData}
+                                                        alt={t('run_tab.console.failure_screenshot')}
+                                                        className="h-28 object-cover"
+                                                    />
+                                                    <div className="absolute inset-0 bg-black/0 flex items-center justify-center">
+                                                        <div className="opacity-0 group-hover:opacity-100 transition-all transform scale-90 group-hover:scale-100 bg-black/60 text-white p-2.5 rounded-full shadow-lg backdrop-blur-sm">
+                                                            <Maximize2 size={16} />
+                                                        </div>
+                                                    </div>
+                                                </>
+                                            )
+                                        ) : (
+                                            <div className="flex flex-col items-center gap-2 px-4 py-2 opacity-50">
+                                                <ExpressiveLoading size="sm" variant="circular" />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                             {showAiAnalysis && (
                                 <AiResponse
@@ -433,12 +484,16 @@ Error Message: ${(node as TestNode).failureDetail?.message}
                         <LinkRenderer key={`log-${i}-${node.id}`} content={log} />
                     ))}
 
-                    {((node as any).children && !lazyChildren) && (node as any).children.map((child: LogNode) => (
-                        <LogTree key={child.id} node={child} depth={depth + 1} dbPath={dbPath} parentType={node.type} />
-                    ))}
-                    {lazyChildren && lazyChildren.map((child: LogNode) => (
-                        <LogTree key={child.id} node={child} depth={depth + 1} dbPath={dbPath} parentType={node.type} />
-                    ))}
+                    {!isFlatRow && (
+                        <>
+                            {((node as any).children && !lazyChildren) && (node as any).children.map((child: LogNode) => (
+                                <LogTree key={child.id} node={child} depth={depth + 1} dbPath={dbPath} parentType={node.type} />
+                            ))}
+                            {lazyChildren && lazyChildren.map((child: LogNode) => (
+                                <LogTree key={child.id} node={child} depth={depth + 1} dbPath={dbPath} parentType={node.type} />
+                            ))}
+                        </>
+                    )}
                     {isLoadingChildren && (
                         <div className="flex items-center gap-2 p-3 text-xs opacity-60 ml-4 font-mono text-on-surface-variant">
                             <ExpressiveLoading size="xsm" variant="circular" />

@@ -624,7 +624,7 @@ export async function reorganizeFlowchartLayout(
     language: string,
     signal?: AbortSignal,
     customPrompt?: string
-): Promise<Record<string, { gridX: number; gridY: number }>> {
+): Promise<{ nodes: Record<string, { gridX: number; gridY: number }>; missed: string[] }> {
     if (!apiKey) throw new Error("Missing Gemini API Key");
 
     const systemInstruction = getFlowchartLayoutPrompt(language, customPrompt);

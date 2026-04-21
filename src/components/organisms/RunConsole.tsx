@@ -20,6 +20,8 @@ import { useSettings } from "@/lib/settings";
 import * as gemini from "@/lib/dashboard/gemini";
 import * as openai from "@/lib/dashboard/openai";
 import * as claude from "@/lib/dashboard/claude";
+import { flattenLogNodes } from "@/lib/logTreeFlattening";
+import { useCallback, useMemo } from "react";
 
 interface RunConsoleProps {
     runId: string;
@@ -47,7 +49,44 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
     const debugVirtuosoRef = useRef<VirtuosoHandle>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [tree, setTree] = useState<LogNode[]>(() => session?.repopulatedTree ? [session.repopulatedTree] : []);
+    const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
     const [artifactPaths, setArtifactPaths] = useState(() => session?.artifactPaths || {});
+
+    const visibleNodes = useMemo(() => flattenLogNodes(tree, expandedIds), [tree, expandedIds]);
+
+    const handleToggleExpand = useCallback((id: string, expanded: boolean) => {
+        setExpandedIds(prev => {
+            const next = new Set(prev);
+            if (expanded) next.add(id);
+            else next.delete(id);
+            return next;
+        });
+    }, []);
+
+    const handleChildrenLoaded = useCallback((id: string, children: LogNode[]) => {
+        // Find node in tree and attach children so flattenLogNodes can see them
+        const updateNode = (nodes: LogNode[]): boolean => {
+            for (const n of nodes) {
+                if (n.id === id) {
+                    // Type narrowing: only update if it can have children
+                    if (n.type === 'suite' || n.type === 'test' || n.type === 'keyword') {
+                        (n as any).children = children;
+                        return true;
+                    }
+                }
+                const nodeWithChildren = n as any;
+                if (nodeWithChildren.children && Array.isArray(nodeWithChildren.children)) {
+                    if (updateNode(nodeWithChildren.children)) return true;
+                }
+            }
+            return false;
+        };
+
+        const newTree = [...tree];
+        if (updateNode(newTree)) {
+            setTree(newTree);
+        }
+    }, [tree]);
 
     // Sync state with session store when background updates happen (e.g. artifacts detected)
     useEffect(() => {
@@ -705,7 +744,34 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                                     />
                                 </div>
                             )}
-                            {tree.map(node => <LogTree key={node.id} node={node} dbPath={session?.parsedDbPath} />)}
+                            {!isRawMode && visibleNodes.length > 0 && (
+                                <div className="flex-1 min-h-0">
+                                    <Virtuoso
+                                        style={{ height: '100%', minHeight: '400px' }}
+                                        data={visibleNodes}
+                                        useWindowScroll={false}
+                                        customScrollParent={containerRef.current || undefined}
+                                        itemContent={(_index, item) => (
+                                            <div style={{ paddingLeft: item.depth * 16 }} key={item.id} className="py-0.5">
+                                                <LogTree 
+                                                    node={item.node} 
+                                                    depth={item.depth}
+                                                    dbPath={session?.parsedDbPath} 
+                                                    parentType={item.parentType as any}
+                                                    isFlatRow={true}
+                                                    isExpanded={expandedIds.has(item.id)}
+                                                    isLast={item.isLast}
+                                                    onToggleExpand={handleToggleExpand}
+                                                    onChildrenLoaded={handleChildrenLoaded}
+                                                />
+                                            </div>
+                                        )}
+                                    />
+                                </div>
+                            )}
+                            {(!isRawMode && visibleNodes.length === 0 && tree.length > 0) && (
+                                tree.map(node => <LogTree key={node.id} node={node} dbPath={session?.parsedDbPath} />)
+                            )}
                             {(isRunning || session?.status === 'stopping') && (
                                 <div className="text-primary dark:text-primary/80 mt-4 flex items-center gap-2 text-sm italic opacity-70 animate-pulse ml-2">
                                     <ExpressiveLoading size="sm" variant="circular" />

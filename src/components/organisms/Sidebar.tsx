@@ -15,6 +15,8 @@ import { feedback } from '@/lib/feedback';
 import { useTranslation } from "react-i18next";
 import packageJson from '../../../package.json';
 import { CustomLogo } from '../molecules/CustomLogo';
+import { useDevices } from "@/lib/deviceStore";
+import { useTestSessions } from "@/lib/testSessionStore";
 
 interface SidebarProps {
     activePage: string;
@@ -23,10 +25,14 @@ interface SidebarProps {
 
 export function Sidebar({ activePage, onNavigate }: SidebarProps) {
     const { settings, updateInfo, updateSetting } = useSettings();
+    const { sessions, appiumRunning } = useTestSessions();
+    const { devices } = useDevices();
     const [collapsed, setCollapsed] = useState(false);
     const [clickCount, setClickCount] = useState(0);
     const [lastClickTime, setLastClickTime] = useState(0);
     const { t } = useTranslation();
+
+    const adbRunning = devices.length > 0;
 
     const updateAvailable = updateInfo?.available || false;
     const appVersion = updateInfo?.currentVersion || packageJson.version;
@@ -126,6 +132,29 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                     >
                         <div className="relative">
                             <item.icon size={20} />
+                            {/* Status Indicators */}
+                            {item.id === 'tests' && sessions.some(s => s.status === 'running') && (
+                                <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                                </span>
+                            )}
+                            
+                            {/* ADB Indicator */}
+                            {item.id === 'run' && adbRunning && (
+                                <span className="absolute -top-1 -right-1 flex h-2 w-2" title={t('sidebar.adb_active')}>
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                </span>
+                            )}
+
+                            {/* Appium Indicator */}
+                            {item.id === 'settings' && appiumRunning && (
+                                <span className="absolute -top-1 -right-1 flex h-2 w-2" title={t('sidebar.appium_active')}>
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-500 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                                </span>
+                            )}
                         </div>
                         {!collapsed && <span className="font-medium">{item.label}</span>}
                     </button>

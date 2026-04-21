@@ -4,6 +4,7 @@ use tokio::io::{AsyncBufReadExt, BufReader as TokioBufReader, AsyncWriteExt};
 use tokio::process::Child;
 use std::process::Stdio;
 use crate::cmd_utils::new_tokio_command;
+use crate::errors::{AppError, AppResult};
 
 // State to hold the Appium process
 pub struct AppiumState(pub Arc<Mutex<Option<Child>>>);
@@ -21,7 +22,7 @@ pub async fn get_appium_status(
     port: Option<u32>,
     base_path: Option<String>,
     is_test_running: Option<bool>,
-) -> Result<AppiumStatus, String> {
+) -> AppResult<AppiumStatus> {
     let (internal_running, internal_pid) = {
         let mut child_guard = match state.0.lock() {
             Ok(guard) => guard,
@@ -122,13 +123,13 @@ pub async fn start_appium_server(
     base_path: String,
     args: String, // Extra args string
     app_handle: AppHandle,
-) -> Result<String, String> {
-    let mut child_guard = state.0.lock().map_err(|e| e.to_string())?;
+) -> AppResult<String> {
+    let mut child_guard = state.0.lock().map_err(|e| AppError::ProcessError(e.to_string()))?;
 
     // Check if already running
     if let Some(child) = &mut *child_guard {
-        if let Ok(None) = child.try_wait() {
-            return Err("Appium is already running".to_string());
+        if matches!(child.try_wait(), Ok(None)) {
+            return Err(AppError::ProcessError("Appium is already running".to_string()));
         }
     }
 
@@ -223,7 +224,7 @@ pub async fn start_appium_server(
 
             Ok("Appium started".to_string())
         }
-        Err(e) => Err(format!("Failed to spawn Appium process: {}. Ensure Appium is installed and available in PATH.", e)),
+        Err(e) => Err(AppError::ProcessError(format!("Failed to spawn Appium process: {}. Ensure Appium is installed and available in PATH.", e))),
     }
 }
 
@@ -247,21 +248,69 @@ pub async fn shutdown_appium_with_inner(inner: &Arc<Mutex<Option<Child>>>) {
 }
 
 #[tauri::command]
-pub async fn stop_appium_server(state: State<'_, AppiumState>) -> Result<String, String> {
+pub async fn stop_appium_server(
+    state: State<'_, AppiumState>,
+    host: Option<String>,
+    port: Option<u32>,
+) -> AppResult<String> {
+    // 1. Try to kill the internal process handle first
     shutdown_appium(&state).await;
+
+    // 2. If host and port are provided, try to kill any process listening on that port
+    // This handles cases where Appium was started in a new terminal or as an orphan
+    if let (Some(h), Some(p)) = (host, port) {
+        kill_process_by_port(&h, p).await?;
+    }
+
     Ok("Appium server stopped".to_string())
 }
 
+async fn kill_process_by_port(_host: &str, port: u32) -> AppResult<()> {
+    #[cfg(target_os = "windows")]
+    {
+        // Use netstat to find the PID
+        let output = std::process::Command::new("cmd")
+            .args(&["/c", &format!("netstat -ano | findstr :{}", port)])
+            .output()
+            .map_err(|e| AppError::ProcessError(format!("Failed to run netstat: {}", e)))?;
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        for line in stdout.lines() {
+            // Typical line: TCP    0.0.0.0:4723           0.0.0.0:0              LISTENING       1234
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() >= 5 && parts[1].ends_with(&format!(":{}", port)) && parts[3] == "LISTENING" {
+                if let Ok(pid) = parts[4].parse::<u32>() {
+                    // Kill the process and its children
+                    let _ = std::process::Command::new("taskkill")
+                        .args(&["/F", "/T", "/PID", &pid.to_string()])
+                        .output();
+                }
+            }
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        // Use lsof to find and kill the process
+        let _ = std::process::Command::new("sh")
+            .arg("-c")
+            .arg(format!("lsof -ti :{} | xargs kill -9", port))
+            .output();
+    }
+
+    Ok(())
+}
+
 #[tauri::command]
-pub fn open_appium_log_terminal(app_handle: AppHandle) -> Result<(), String> {
+pub fn open_appium_log_terminal(app_handle: AppHandle) -> AppResult<()> {
     let log_path = app_handle
         .path()
         .app_data_dir()
-        .map_err(|e| format!("Could not get app data dir: {}", e))?
+        .map_err(|e| AppError::FileSystemError(format!("Could not get app data dir: {}", e)))?
         .join("appium.log");
 
     if !log_path.exists() {
-        return Err("appium.log file does not exist. Appium might not have been started internally.".to_string());
+        return Err(AppError::FileSystemError("appium.log file does not exist. Appium might not have been started internally.".to_string()));
     }
 
     #[cfg(target_os = "windows")]
@@ -279,7 +328,7 @@ pub fn open_appium_log_terminal(app_handle: AppHandle) -> Result<(), String> {
             .spawn()
         {
             Ok(_) => Ok(()),
-            Err(e) => Err(format!("Failed to open terminal: {}", e)),
+            Err(e) => Err(AppError::ProcessError(format!("Failed to open terminal: {}", e))),
         }
     }
     #[cfg(not(target_os = "windows"))]
@@ -294,7 +343,7 @@ pub fn open_appium_log_terminal(app_handle: AppHandle) -> Result<(), String> {
             .spawn()
         {
             Ok(_) => Ok(()),
-            Err(e) => Err(format!("Failed to open terminal: {}", e)),
+            Err(e) => Err(AppError::ProcessError(format!("Failed to open terminal: {}", e))),
         }
     }
 }
@@ -305,7 +354,7 @@ pub fn start_appium_in_terminal(
     port: u32,
     base_path: String,
     args: String, 
-) -> Result<String, String> {
+) -> AppResult<String> {
     #[cfg(target_os = "windows")]
     let cmd = "appium.cmd";
     #[cfg(not(target_os = "windows"))]
@@ -339,7 +388,7 @@ pub fn start_appium_in_terminal(
             .spawn()
         {
             Ok(_) => Ok("Appium started in new terminal".to_string()),
-            Err(e) => Err(format!("Failed to start terminal: {}", e)),
+            Err(e) => Err(AppError::ProcessError(format!("Failed to start terminal: {}", e))),
         }
     }
     #[cfg(not(target_os = "windows"))]
@@ -366,7 +415,7 @@ pub fn start_appium_in_terminal(
             .spawn()
         {
             Ok(_) => Ok("Appium started in new terminal".to_string()),
-            Err(e) => Err(format!("Failed to start terminal: {}", e)),
+            Err(e) => Err(AppError::ProcessError(format!("Failed to start terminal: {}", e))),
         }
     }
 }

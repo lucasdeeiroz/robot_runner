@@ -398,6 +398,8 @@ export const en = {
             mirror_launched: "Device Mirror Launched",
             screenshot_saved: "Screenshot Saved",
             profile_changed: "Settings Profile Changed",
+            adb_restarting: "Restarting ADB server...",
+            adb_restarted: "ADB server restarted successfully",
             details: {
                 device: "Device: {{device}}",
                 path: "Path: {{path}}",
@@ -631,6 +633,10 @@ export const en = {
                 no_preview: "No preview recorded",
                 clear_curvatures: "Clear all curvatures",
                 curvatures_cleared: "All edge curvatures have been cleared",
+                save_success: "Layout saved successfully!",
+                load_error: "Failed to load flowchart layout",
+                reorganize_error: "AI reorganization failed",
+                export_image_error: "Failed to export flowchart image",
                 unsaved_changes: {
                     title: "Unsaved Changes",
                     message: "You have unsaved changes. Do you want to save before exiting?",
@@ -1060,7 +1066,8 @@ export const en = {
                 default: "Default"
             },
             action: {
-                open_file: "Open Settings File"
+                open_file: "Open Settings File",
+                restart_adb: "Restart ADB Server"
             },
             path_labels: {
                 suites: "Suites Directory",
@@ -1080,6 +1087,8 @@ export const en = {
         },
         sidebar: {
             dashboard: "QA Dashboard",
+            adb_active: "ADB Active",
+            appium_active: "Appium Server Active",
             run: "Run",
             description_run: "Device management and automation execution.",
             tests: "Tests",
