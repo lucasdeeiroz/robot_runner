@@ -16,7 +16,7 @@ export interface TestNode {
     type: 'test';
     name: string;
     documentation?: string;
-    status: 'PASS' | 'FAIL' | 'RUNNING';
+    status: 'PASS' | 'FAIL' | 'SKIP' | 'RUNNING';
     logs: string[];
     children?: LogNode[];
     hasChildren?: boolean;
@@ -33,7 +33,7 @@ export interface SuiteEndNode {
     type: 'suite-end';
     name: string;
     documentation?: string;
-    status: 'PASS' | 'FAIL';
+    status: 'PASS' | 'FAIL' | 'SKIP';
     summary: string;
     id: string;
 }
@@ -43,7 +43,7 @@ export interface SuiteNode {
     id: string;
     name: string;
     documentation?: string;
-    status: 'PASS' | 'FAIL' | 'RUNNING';
+    status: 'PASS' | 'FAIL' | 'SKIP' | 'RUNNING';
     summary: string;
     duration?: string;
     children: LogNode[];
@@ -63,7 +63,7 @@ export interface KeywordNode {
     id: string;
     name: string;
     library?: string;
-    status: 'PASS' | 'FAIL' | 'NOT_RUN' | 'RUNNING';
+    status: 'PASS' | 'FAIL' | 'SKIP' | 'NOT_RUN' | 'RUNNING';
     duration?: string;
     args?: string[];
     screenshotPath?: string;
@@ -73,7 +73,7 @@ export interface KeywordNode {
 }
 
 export type LogNode = TextNode | SuiteStartNode | TestNode | SuiteNode | SuiteEndNode | KeywordNode;
-export type LinearNode = TextNode | SuiteStartNode | SuiteEndNode | { type: 'test-end', name: string, status: 'PASS'|'FAIL', id: string };
+export type LinearNode = TextNode | SuiteStartNode | SuiteEndNode | { type: 'test-end', name: string, status: 'PASS' | 'FAIL' | 'SKIP', id: string };
 
 export const formatRobotDuration = (start: string, end: string): string => {
     if (!start || !end) return "";
@@ -278,7 +278,9 @@ export const mapXmlNode = async (
     obj: any,
     outputXmlPath: string,
     _readImageBase64: (path: string) => Promise<string>,
-    nodeType?: string
+    nodeType?: string,
+    parentId: string = 'root',
+    index: number = 0
 ): Promise<LogNode | null> => {
     if (!obj || typeof obj !== "object") return null;
 
@@ -294,9 +296,11 @@ export const mapXmlNode = async (
 
     let name = String(obj.name || obj.variable || "").trim();
     const subType = nodeType as KeywordSubType;
-    // Use a more stable ID generation to avoid React state loss during re-parses
-    const idList = [name, startTime || nodeType || 'node'];
-    const id = `xml-${idList.join('-')}`.replace(/\s+/g, '-').substring(0, 100);
+    
+    // Stable and collision-resistant ID generation
+    // Using parentId + index + shortened name hash for visual debugging/uniqueness
+    const nameHash = name ? `-${hashString(name)}` : '';
+    const id = `${parentId}-${index}${nameHash}`;
 
     if (subType === 'iteration' && name.startsWith('${') && name.endsWith('}')) {
         name = "";
@@ -305,9 +309,16 @@ export const mapXmlNode = async (
     if (nodeType === 'suite') {
         const children: LogNode[] = [];
         const suites = Array.isArray(obj.suite) ? obj.suite : (obj.suite ? [obj.suite] : []);
-        for (const s of suites) { const n = await mapXmlNode(s, outputXmlPath, _readImageBase64, 'suite'); if (n) children.push(n); }
+        for (let i = 0; i < suites.length; i++) { 
+            const n = await mapXmlNode(suites[i], outputXmlPath, _readImageBase64, 'suite', id, i); 
+            if (n) children.push(n); 
+        }
         const tests = Array.isArray(obj.test) ? obj.test : (obj.test ? [obj.test] : []);
-        for (const t of tests) { const n = await mapXmlNode(t, outputXmlPath, _readImageBase64, 'test'); if (n) children.push(n); }
+        const baseIdx = suites.length;
+        for (let i = 0; i < tests.length; i++) { 
+            const n = await mapXmlNode(tests[i], outputXmlPath, _readImageBase64, 'test', id, baseIdx + i); 
+            if (n) children.push(n); 
+        }
         
         // Extract stats from <statistics> if available, or compute from children
         let passed = 0, failed = 0, skipped = 0;
@@ -332,7 +343,7 @@ export const mapXmlNode = async (
         }
 
         return { 
-            type: 'suite', id, name, status: statusStr as 'PASS' | 'FAIL', 
+            type: 'suite', id, name, status: (statusStr === 'SKIP' ? 'SKIP' : statusStr) as 'PASS' | 'FAIL' | 'SKIP', 
             summary: '', duration, children,
             stats: { passed, failed, skipped }
         };
@@ -371,8 +382,8 @@ export const mapXmlNode = async (
         for (const w of whiles) { const n = await mapXmlNode(w, outputXmlPath, _readImageBase64, 'while'); if (n) children.push(n); }
         if (obj.teardown) { const n = await mapXmlNode(obj.teardown, outputXmlPath, _readImageBase64, 'teardown'); if (n) children.push(n); }
 
-        const normalizedStatus: 'PASS' | 'FAIL' | 'RUNNING' =
-            statusStr === 'PASS' || statusStr === 'FAIL' || statusStr === 'RUNNING'
+        const normalizedStatus: 'PASS' | 'FAIL' | 'SKIP' | 'RUNNING' =
+            statusStr === 'PASS' || statusStr === 'FAIL' || statusStr === 'SKIP' || statusStr === 'RUNNING'
                 ? statusStr
                 : 'FAIL';
 
@@ -442,7 +453,7 @@ export const mapXmlNode = async (
 
     children.push(...parseMsgChildren(obj));
 
-    const kwStatus = statusStr === 'NOT RUN' ? 'NOT_RUN' : (statusStr === 'FAIL' ? 'FAIL' : 'PASS');
+    const kwStatus = statusStr === 'NOT RUN' ? 'NOT_RUN' : (statusStr === 'SKIP' ? 'SKIP' : (statusStr === 'FAIL' ? 'FAIL' : 'PASS'));
     const screenshotPath = await resolveScreenshot(directScreenshotSrc(obj), outputXmlPath, _readImageBase64);
 
     let args = parseArgs(obj);

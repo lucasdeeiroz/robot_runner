@@ -192,7 +192,7 @@ export function TestsPage({ onNavigate: _onNavigate }: TestsPageProps) {
                         selected: isGridView ? false : undefined
                     }]),
                     ...sessions.map(s => {
-                        const isSuccess = s.exitCode && (s.exitCode.includes("exit code: 0") || s.exitCode === "0");
+                        const isSuccess = s.exitCode === "0";
                         const isFailed = s.status === 'finished' && !isSuccess;
 
                         return {
@@ -345,7 +345,7 @@ export function TestsPage({ onNavigate: _onNavigate }: TestsPageProps) {
                                         <div className="flex items-center gap-2">
                                             {s.type === 'toolbox' && <span className="w-2 h-2 rounded-2xl bg-on-surface/10" />}
                                             {s.type === 'test' && s.status === 'running' && <span className="w-2 h-2 rounded-2xl bg-orange-500 animate-pulse" />}
-                                            {s.type === 'test' && s.status === 'finished' && <span className={clsx("w-2 h-2 rounded-2xl", (s.exitCode?.includes("0") || s.exitCode === "0") ? "bg-success" : "bg-error")} />}
+                                            {s.type === 'test' && s.status === 'finished' && <span className={clsx("w-2 h-2 rounded-2xl", (s.exitCode === "0") ? "bg-success" : "bg-error")} />}
                                             <span>{s.deviceModel || s.deviceName}</span>
                                             <AndroidVersionPill version={s.androidVersion} className="bg-surface-variant/30" />
                                         </div>

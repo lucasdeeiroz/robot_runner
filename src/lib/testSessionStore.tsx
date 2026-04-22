@@ -112,7 +112,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     return {
                         ...s,
                         status: 'finished',
-                        exitCode: statusStr,
+                        exitCode: String(exit_code),
                         activeRunId: undefined, // Clean up: clear activeRunId after test finishes
                         logs: [...s.logs, `\n[System] Finished: ${statusStr}`]
                     };

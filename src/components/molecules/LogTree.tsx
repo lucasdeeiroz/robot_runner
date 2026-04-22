@@ -74,7 +74,7 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({
 
     const isRunning = computedStatus === 'RUNNING';
     const isFailed = computedStatus === 'FAIL';
-    const isNotRun = computedStatus === 'NOT_RUN';
+    const isNotRun = computedStatus === 'NOT_RUN' || computedStatus === 'SKIP';
 
     const isInterrupted = computedStatus === 'FAIL' && failureMessage.includes('Execution terminated by signal');
 
@@ -97,7 +97,7 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({
 
         // Only proceed if status is defined and actually changed OR it's the first check for a non-passing status
         if (currentStatus && currentStatus !== prevStatus) {
-            const isFailingOrRunning = currentStatus !== 'PASS' && currentStatus !== 'NOT_RUN';
+            const isFailingOrRunning = currentStatus !== 'PASS' && currentStatus !== 'NOT_RUN' && currentStatus !== 'SKIP';
 
             if (initiallyOpen === undefined && node.type !== 'text' && isFailingOrRunning) {
                 if (isFlatRow) {
@@ -299,22 +299,26 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({
                     )}
                     {isRunning
                         ? <ExpressiveLoading size="xsm" variant="circular" />
-                        : isNotRun
-                            ? <MinusCircle size={10} />
-                            : isInterrupted
-                                ? <CircleSlash size={10} />
-                                : isFailed
-                                    ? <XCircle size={10} />
-                                    : <CheckCircle2 size={10} />}
+                        : (computedStatus === 'SKIP')
+                            ? <MinusCircle size={10} className="text-on-surface-variant/40" />
+                            : isNotRun
+                                ? <MinusCircle size={10} />
+                                : isInterrupted
+                                    ? <CircleSlash size={10} />
+                                    : isFailed
+                                        ? <XCircle size={10} />
+                                        : <CheckCircle2 size={10} />}
                     {isRunning
                         ? t('run_tab.console.running')
-                        : isNotRun
-                            ? t('run_tab.console.not_run')
-                            : isInterrupted
-                                ? t('run_tab.console.interrupted')
-                                : isFailed
-                                    ? t('run_tab.console.fail')
-                                    : t('run_tab.console.pass')}
+                        : (computedStatus === 'SKIP')
+                            ? t('run_tab.console.skip', 'SKIPPED')
+                            : isNotRun
+                                ? t('run_tab.console.not_run')
+                                : isInterrupted
+                                    ? t('run_tab.console.interrupted')
+                                    : isFailed
+                                        ? t('run_tab.console.fail')
+                                        : t('run_tab.console.pass')}
                 </div>
             </div>
 

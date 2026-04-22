@@ -432,13 +432,14 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                 const testLogs = currentTest.logs;
                 for (let j = testLogs.length - 1; j >= 0; j--) {
                     const cleanLog = cleanAnsi(testLogs[j]);
-                    const match = cleanLog.match(/\|\s+(PASS|FAIL)\s+\|/);
+                    const match = cleanLog.match(/\|\s+(PASS|FAIL|SKIP)\s+\|/);
                     if (match) {
-                        const finalStatus = match[1] as 'PASS' | 'FAIL';
+                        const finalStatus = match[1] as 'PASS' | 'FAIL' | 'SKIP';
                         currentTest.status = finalStatus;
                         const suite = activeSuite();
                         if (suite && suite.stats) {
                             if (finalStatus === 'PASS') suite.stats.passed++;
+                            else if (finalStatus === 'SKIP') suite.stats.skipped++;
                             else if (finalStatus === 'FAIL') {
                                 suite.stats.failed++;
                                 // Propagate FAIL to all parents in the stack
@@ -496,6 +497,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                     const suite = activeSuite();
                     if (suite && suite.stats) {
                         if (node.status === 'PASS') suite.stats.passed++;
+                        else if (node.status === 'SKIP') suite.stats.skipped++;
                         else if (node.status === 'FAIL') {
                             suite.stats.failed++;
                             suiteStack.forEach(s => s.status = 'FAIL');
@@ -608,7 +610,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                             const isStatusLine = !!statusMatch;
 
                             if (isStatusLine && statusMatch) {
-                                const status = statusMatch[2] as any;
+                                const status = statusMatch[2] as 'PASS' | 'FAIL' | 'SKIP';
                                 currentTest.status = status;
                                 // Propagate to suites
                                 if (status === 'FAIL') {
@@ -618,6 +620,9 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                                 } else if (status === 'PASS') {
                                     const suite = activeSuite();
                                     if (suite && suite.stats) suite.stats.passed++;
+                                } else if (status === 'SKIP') {
+                                    const suite = activeSuite();
+                                    if (suite && suite.stats) suite.stats.skipped++;
                                 }
                             }
 
