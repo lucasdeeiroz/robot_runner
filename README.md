@@ -63,6 +63,16 @@ Support for **AppImage**, **.deb**, **.rpm**, and **.dmg** available on the [Rel
 
 ---
 
+## 📚 Documentation
+
+For detailed information on how to get the most out of Robot Runner, check our documentation:
+
+*   [**User Guide**](docs/USAGE.md): Learn how to use mirroring, the inspector, and AI features.
+*   [**Setup Guide**](docs/SETUP.md): Instructions on installing dependencies (ADB, Scrcpy, Robot Framework).
+*   [**Troubleshooting**](docs/TROUBLESHOOTING.md): Solutions for common connection and execution issues.
+
+---
+
 ## 🛠️ Technical Stack & Architecture
 
 Robot Runner is built with modern, industrial-grade technologies for maximum performance and security:
