@@ -383,23 +383,39 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                                                 onClick: handleRerun,
                                                 icon: <RefreshCcw size={16} />
                                             }}
-                                            secondaryActions={[
-                                                ...(session.status === 'finished' && session.exitCode && !session.exitCode.toLowerCase().includes("exit code: 0") && session.logs.some(l => l.includes("Output:  ") && l.endsWith(".xml")) ? [{
+                                            secondaryActions={(() => {
+                                                if (session.status !== 'finished') return [];
+                                                
+                                                // Find if there were any failures in the logs
+                                                const hasFailures = session.logs.some(l => {
+                                                    const clean = l.replace(/\x1b\[[0-9;]*m/g, '').trim();
+                                                    const match = clean.match(/(\d+)\s+failed/);
+                                                    return match && parseInt(match[1], 10) > 0;
+                                                });
+
+                                                if (!hasFailures) return [];
+
+                                                // Find XML path with resilience to ANSI and spaces
+                                                let xmlPath: string | null = null;
+                                                for (const l of session.logs) {
+                                                    const clean = l.replace(/\x1b\[[0-9;]*m/g, '').trim();
+                                                    const match = clean.match(/Output:\s+(.*\.xml)$/);
+                                                    if (match && match[1]) {
+                                                        xmlPath = match[1].trim();
+                                                        break;
+                                                    }
+                                                }
+
+                                                if (!xmlPath) return [];
+
+                                                return [{
                                                     label: t('connect.actions.rerun_failed'),
                                                     icon: <RefreshCcw size={14} className="text-error" />,
                                                     onClick: () => {
-                                                        // Find XML path
-                                                        const outputLine = session.logs.find(l => l.includes("Output:  ") && l.endsWith(".xml"));
-                                                        if (outputLine) {
-                                                            const match = outputLine.match(/Output:\s+(.*\.xml)/);
-                                                            if (match && match[1]) {
-                                                                const xmlPath = match[1].trim();
-                                                                rerunSession(session.runId, xmlPath);
-                                                            }
-                                                        }
+                                                        if (xmlPath) rerunSession(session.runId, xmlPath);
                                                     }
-                                                }] : [])
-                                            ]}
+                                                }];
+                                            })()}
                                         />
                                     </div>
                                 )}
