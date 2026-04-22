@@ -20,8 +20,7 @@ import { useSettings } from "@/lib/settings";
 import * as gemini from "@/lib/dashboard/gemini";
 import * as openai from "@/lib/dashboard/openai";
 import * as claude from "@/lib/dashboard/claude";
-import { flattenLogNodes } from "@/lib/logTreeFlattening";
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 
 interface RunConsoleProps {
     runId: string;
@@ -51,8 +50,6 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
     const [tree, setTree] = useState<LogNode[]>(() => session?.repopulatedTree ? [session.repopulatedTree] : []);
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
     const [artifactPaths, setArtifactPaths] = useState(() => session?.artifactPaths || {});
-
-    const visibleNodes = useMemo(() => flattenLogNodes(tree, expandedIds), [tree, expandedIds]);
 
     const handleToggleExpand = useCallback((id: string, expanded: boolean) => {
         setExpandedIds(prev => {
@@ -261,7 +258,11 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
         const IS_DOUBLE = (l: string) => /^={10,}$/.test(l.trim());
         const IS_SINGLE = (l: string) => /^-{10,}$/.test(l.trim());
         const cleanAnsi = (l: string) => l.replace(/\x1b\[[0-9;]*m/g, '').replace(/[\x00-\x1f\x7f-\x9f]/g, '');
-        const IS_STATUS = (l: string) => / \|\s+(PASS|FAIL)\s+\|/.test(cleanAnsi(l));
+        const IS_STATUS = (line: string) => {
+            const clean = cleanAnsi(line).trim();
+            // Match | PASS | or | FAIL | or | SKIP | with any amount of padding/content
+            return /\|\s+(PASS|FAIL|SKIP)\s+\|/.test(clean);
+        };
         const IS_SUMMARY = (l: string) => /^\d+ tests?, \d+ passed, \d+ failed/.test(l.trim());
         const IS_MAESTRO_VERBOSE = (l: string) => /disableAnsi=false/.test(l) || /\(\[\s*(INFO|DEBUG|ERROR|WARN|TRACE)\s*\]\)/.test(l);
         const IS_SYSTEM = (l: string) => l.trim().startsWith('[System]') || l.trim().startsWith('[Error]') || /^\s*(Output|Log|Report|STDERR|STDOUT):/.test(l) || IS_MAESTRO_VERBOSE(l);
@@ -333,6 +334,19 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                         continue;
                     }
 
+                    // Heuristic: If we see a DOUBLE line and the last node was a TEXT that looks like a sub-suite (often preceded by SINGLE line)
+                    if (last?.type === 'text' && !IS_SYSTEM(last.content)) {
+                        const prevNode = linearNodes[linearNodes.length - 2];
+                        const isPrevSingle = prevNode?.type === 'text' && IS_SINGLE(prevNode.content);
+                        if (isPrevSingle) {
+                            const suiteName = last.content.trim();
+                            linearNodes.pop();
+                            linearNodes.pop();
+                            linearNodes.push({ type: 'suite-start', name: suiteName.split(' :: ')[0], originalLine: suiteName, id: `sub-suite-start-${processedCount + i}` });
+                            continue;
+                        }
+                    }
+
                     if (last?.type === 'text' && IS_SUMMARY(last.content)) {
                         const summaryLine = last.content;
                         let statusNodeIndex = -1;
@@ -376,13 +390,16 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                     }
                     linearNodes.push({ type: 'suite-start', name: normalizedName, originalLine: name, id: `rr-s-start-${processedCount + i}` });
                 } else if (IS_RR_SUITE_END(cleanLine)) {
-                    const name = cleanLine.replace("[RR-SUITE-END]", "").trim();
-                    linearNodes.push({ type: 'suite-end', name: name.split(' :: ')[0], status: 'PASS', summary: '', id: `rr-s-end-${processedCount + i}` });
+                    const raw = cleanLine.replace("[RR-SUITE-END]", "").trim();
+                    const parts = raw.split(" | ");
+                    const name = parts[0].trim();
+                    const status = (parts[1] || 'PASS').trim() as 'PASS' | 'FAIL';
+                    linearNodes.push({ type: 'suite-end', name: name.split(' :: ')[0], status: status, summary: '', id: `rr-s-end-${processedCount + i}` });
                 } else if (IS_RR_TEST_END(cleanLine)) {
                     const parts = cleanLine.replace("[RR-TEST-END]", "").split(" | ");
                     const name = parts[0].trim();
                     const status = (parts[1] || 'PASS').trim() as 'PASS' | 'FAIL';
-                    linearNodes.push({ type: 'text', content: `| ${name} | ${status} |`, isSystem: true, id: `rr-t-end-${processedCount + i}` });
+                    linearNodes.push({ type: 'test-end', name: name, status: status, id: `rr-t-end-${processedCount + i}` });
                 } else if (IS_MAESTRO_SUITE_START(line)) {
                     linearNodes.push({ type: 'suite-start', name: 'Maestro Suite', originalLine: line, id: `m-suite-start-${processedCount + i}` });
                 } else if (IS_MAESTRO_SUITE_END(line)) {
@@ -436,7 +453,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
         };
 
         parsedNodesRef.current.forEach((node, idx) => {
-            const nodeId = node.id || `node-${processedCountRef.current + idx}`;
+            const nodeId = node.id || `node-${idx}`;
             if (node.type === 'suite-start') {
                 closeCurrentTest();
                 const newSuite: SuiteNode = {
@@ -460,7 +477,8 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                 for (let i = suiteStack.length - 1; i >= 0; i--) {
                     const s = suiteStack[i];
                     const cleanStack = normalize(s.name);
-                    if (cleanStack === cleanTarget || cleanStack.startsWith(cleanTarget) || cleanTarget.startsWith(cleanStack)) {
+                    // Match exactly or check if it's the leaf name of a dotted path
+                    if (cleanStack === cleanTarget || cleanStack.endsWith('.' + cleanTarget) || cleanStack === cleanTarget.split('.').pop()) {
                         matchIndex = i;
                         break;
                     }
@@ -472,10 +490,28 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                     suite.documentation = node.documentation;
                     suiteStack.splice(matchIndex);
                 }
+            } else if (node.type === 'test-end') {
+                if (currentTest) {
+                    currentTest.status = node.status;
+                    const suite = activeSuite();
+                    if (suite && suite.stats) {
+                        if (node.status === 'PASS') suite.stats.passed++;
+                        else if (node.status === 'FAIL') {
+                            suite.stats.failed++;
+                            suiteStack.forEach(s => s.status = 'FAIL');
+                        }
+                    }
+                    currentTest = null;
+                }
             } else if (node.type === 'text') {
                 const line = node.content;
                 if (IS_SINGLE(line) || IS_DOUBLE(line)) {
-                    if (currentTest) closeCurrentTest();
+                    // Do NOT close test on separators. They are often part of the test output.
+                    if (currentTest) {
+                        currentTest.logs.push(line);
+                    } else {
+                        addToCurrentContext({ type: 'text', content: line, id: nodeId });
+                    }
                 } else if (IS_MAESTRO_TEST_START(line)) {
                     closeCurrentTest();
                     const name = line.replace(/.*Running flow\s+/, '').trim();
@@ -568,8 +604,25 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                         if (currentTest) {
                             const isMarker = IS_ROBOT_RUNNER_TEST_START(line);
                             const cleanLineText = cleanAnsi(line);
+                            const statusMatch = cleanLineText.match(/^(.*?)\s*\|\s+(PASS|FAIL|SKIP)\s+\|/);
+                            const isStatusLine = !!statusMatch;
+
+                            if (isStatusLine && statusMatch) {
+                                const status = statusMatch[2] as any;
+                                currentTest.status = status;
+                                // Propagate to suites
+                                if (status === 'FAIL') {
+                                    suiteStack.forEach(s => s.status = 'FAIL');
+                                    const suite = activeSuite();
+                                    if (suite && suite.stats) suite.stats.failed++;
+                                } else if (status === 'PASS') {
+                                    const suite = activeSuite();
+                                    if (suite && suite.stats) suite.stats.passed++;
+                                }
+                            }
+
                             const nameOnly = cleanLineText.trim().split(' :: ')[0].trim();
-                            const isTestNameLine = nameOnly === currentTest.name || cleanLineText.match(/^(.*?)\s*\|\s+(PASS|FAIL)\s+\|\s*$/)?.[1].trim() === currentTest.name;
+                            const isTestNameLine = nameOnly === currentTest.name || (statusMatch?.[1].trim() === currentTest.name);
                             if (!isMarker && !isTestNameLine) currentTest.logs.push(line);
                         } else {
                             if (IS_ROBOT_RUNNER_TEST_START(line)) {
@@ -600,8 +653,33 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                                 if (line.trim().length > 0 && !isMaestroSuite && !line.includes('[RobotRunner-Test-Start]') && !line.includes('[RR-TEST-START]') && !IS_STATUS(line)) {
                                     let name = line.trim();
                                     if (name.includes(' :: ')) name = name.split(' :: ')[0].trim();
-                                    const statusMatch = name.match(/^(.*?)\s*\|\s+(PASS|FAIL)\s+\|\s*$/);
-                                    if (statusMatch) name = statusMatch[1].trim();
+                                    const statusMatch = cleanAnsi(name).match(/^(.*?)\s*\|\s+(PASS|FAIL|SKIP)\s+\|/);
+                                    if (statusMatch) {
+                                        // It's a status line. Try to apply it to the last test instead of starting a new one.
+                                        const actualName = statusMatch[1].trim();
+                                        const suite = activeSuite();
+                                        if (suite) {
+                                            const lastNode = suite.children[suite.children.length - 1];
+                                            if (lastNode?.type === 'test' && (lastNode.name === actualName || actualName.endsWith('.' + lastNode.name))) {
+                                                const status = statusMatch[2] as any;
+                                                lastNode.status = status;
+                                                lastNode.logs.push(line);
+                                                if (status === 'FAIL') suiteStack.forEach(s => s.status = 'FAIL');
+                                                return;
+                                            }
+                                        }
+                                        // Fallback: don't create a new test for a status line if it's orphaned
+                                        addToCurrentContext({ type: 'text', content: line, id: nodeId });
+                                        return;
+                                    }
+
+                                    // Conservative heuristic: only start a new test if the line doesn't look like a log/status line
+                                    const isLikelyLog = name.startsWith('|') || name.startsWith('...') || name.startsWith('Arguments:');
+                                    if (isLikelyLog) {
+                                        addToCurrentContext({ type: 'text', content: line, id: nodeId });
+                                        return;
+                                    }
+
                                     const newTest: TestNode = {
                                         type: 'test',
                                         name: name,
@@ -744,33 +822,20 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                                     />
                                 </div>
                             )}
-                            {!isRawMode && visibleNodes.length > 0 && (
-                                <div className="flex-1 min-h-0">
-                                    <Virtuoso
-                                        style={{ height: '100%', minHeight: '400px' }}
-                                        data={visibleNodes}
-                                        useWindowScroll={false}
-                                        customScrollParent={containerRef.current || undefined}
-                                        itemContent={(_index, item) => (
-                                            <div style={{ paddingLeft: item.depth * 16 }} key={item.id} className="py-0.5">
-                                                <LogTree 
-                                                    node={item.node} 
-                                                    depth={item.depth}
-                                                    dbPath={session?.parsedDbPath} 
-                                                    parentType={item.parentType as any}
-                                                    isFlatRow={true}
-                                                    isExpanded={expandedIds.has(item.id)}
-                                                    isLast={item.isLast}
-                                                    onToggleExpand={handleToggleExpand}
-                                                    onChildrenLoaded={handleChildrenLoaded}
-                                                />
-                                            </div>
-                                        )}
-                                    />
+                            {!isRawMode && tree.length > 0 && (
+                                <div className="flex-1 min-h-0 space-y-2">
+                                    {tree.map((node) => (
+                                        <LogTree
+                                            key={node.id}
+                                            node={node}
+                                            depth={0}
+                                            dbPath={session?.parsedDbPath}
+                                            onToggleExpand={handleToggleExpand}
+                                            isExpanded={expandedIds.has(node.id)}
+                                            onChildrenLoaded={handleChildrenLoaded}
+                                        />
+                                    ))}
                                 </div>
-                            )}
-                            {(!isRawMode && visibleNodes.length === 0 && tree.length > 0) && (
-                                tree.map(node => <LogTree key={node.id} node={node} dbPath={session?.parsedDbPath} />)
                             )}
                             {(isRunning || session?.status === 'stopping') && (
                                 <div className="text-primary dark:text-primary/80 mt-4 flex items-center gap-2 text-sm italic opacity-70 animate-pulse ml-2">

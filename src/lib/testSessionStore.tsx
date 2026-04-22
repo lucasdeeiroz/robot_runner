@@ -35,7 +35,7 @@ interface TestOutputPayload {
 
 interface TestFinishedPayload {
     run_id: string;
-    status: string;
+    exit_code: number;
 }
 
 interface TestSessionContextType {
@@ -93,7 +93,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
         });
 
         const unlistenFinishedPromise = listen<TestFinishedPayload>('test-finished', (event) => {
-            const { run_id, status } = event.payload;
+            const { run_id, exit_code } = event.payload;
             setSessions(prev => prev.map(s => {
                 if (s.runId === run_id || s.activeRunId === run_id) {
                     // Guard: if session was recycled and is already running a NEW test, skip stale event
@@ -102,8 +102,8 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     }
 
                     // Feedback
-                    const finalStatus = status || "";
-                    if (finalStatus.includes('Exit Code: 0') || finalStatus.includes('exit code: 0')) {
+                    const statusStr = `Exit Code: ${exit_code}`;
+                    if (exit_code === 0) {
                         feedback.notify('feedback.test_passed', 'feedback.details.device', { device: s.deviceName });
                     } else {
                         feedback.notify('feedback.test_failed', 'feedback.details.device', { device: s.deviceName });
@@ -112,9 +112,9 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     return {
                         ...s,
                         status: 'finished',
-                        exitCode: status,
+                        exitCode: statusStr,
                         activeRunId: undefined, // Clean up: clear activeRunId after test finishes
-                        logs: [...s.logs, `\n[System] Finished: ${status}`]
+                        logs: [...s.logs, `\n[System] Finished: ${statusStr}`]
                     };
                 }
                 return s;

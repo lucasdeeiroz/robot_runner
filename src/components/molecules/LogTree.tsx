@@ -47,8 +47,14 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({
     onChildrenLoaded
 }) => {
     const { t, i18n } = useTranslation();
+    const failureMessage = (node as TestNode).failureDetail?.message || '';
+    const isFatalError = (node as any).status === 'FAIL' && failureMessage.includes('Test execution stopped due to a fatal error.');
+
+    // Override status locally for display and expansion logic
+    const computedStatus = isFatalError ? 'NOT_RUN' : (node as any).status;
+
     const [internalIsOpen, setInternalIsOpen] = useState(initiallyOpen ?? (
-        node.type !== 'text' && node.type !== 'suite-start' && (node as any).status !== 'PASS' && (node as any).status !== 'NOT_RUN'
+        node.type !== 'text' && node.type !== 'suite-start' && computedStatus !== 'PASS' && computedStatus !== 'NOT_RUN'
     ));
     const isOpen = isFlatRow ? !!isExpanded : internalIsOpen;
     const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -66,15 +72,11 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [showAiAnalysis, setShowAiAnalysis] = useState(!!(node as any).aiAnalysis);
 
-    const isRunning = (node as any).status === 'RUNNING';
-    const isFailed = (node as any).status === 'FAIL';
-    const isNotRun = (node as any).status === 'NOT_RUN';
+    const isRunning = computedStatus === 'RUNNING';
+    const isFailed = computedStatus === 'FAIL';
+    const isNotRun = computedStatus === 'NOT_RUN';
 
-    const failureMessage = (node as TestNode).failureDetail?.message || '';
-    const isInterrupted = isFailed && (
-        failureMessage.includes('Execution terminated by signal') ||
-        failureMessage.includes('Test execution stopped due to a fatal error.')
-    );
+    const isInterrupted = computedStatus === 'FAIL' && failureMessage.includes('Execution terminated by signal');
 
     const toggleOpen = () => {
         if (isFlatRow) {
@@ -90,7 +92,7 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({
 
     // Auto-expand when status changes from PASS/NOT_RUN/undefined to RUNNING/FAIL
     React.useEffect(() => {
-        const currentStatus = (node as any).status;
+        const currentStatus = computedStatus;
         const prevStatus = prevStatusRef.current;
 
         // Only proceed if status is defined and actually changed OR it's the first check for a non-passing status
@@ -106,7 +108,7 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({
             }
             prevStatusRef.current = currentStatus;
         }
-    }, [node.id, (node as any).status, initiallyOpen, node.type, isFlatRow, isExpanded, onToggleExpand]);
+    }, [node.id, computedStatus, initiallyOpen, node.type, isFlatRow, isExpanded, onToggleExpand]);
 
     // Fetch attempt reference to avoid dependency trigger loop cancellation
     const fetchAttempted = React.useRef(false);
@@ -178,9 +180,12 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({
     const borderColor = isRunning ? "border-on-surface-variant/20" : isNotRun ? "border-on-surface-variant/10" : (isInterrupted ? "border-amber-500/30" : (isFailed ? "border-error/20" : "border-success/20"));
     const summaryColor = isRunning ? "text-on-surface-variant/80" : isNotRun ? "text-on-surface-variant/40" : (isInterrupted ? "text-amber-500" : (isFailed ? "text-error" : "text-success"));
     const isDirectTestChild = parentType === 'test' && node.type === 'keyword';
+    const isSuiteOrTest = node.type === 'suite' || node.type === 'test';
     const bgColor = isDirectTestChild
         ? (isRunning ? "bg-surface-variant/10" : isNotRun ? "bg-surface-variant/5" : (isInterrupted ? "bg-amber-500/5" : (isFailed ? "bg-error/5" : "bg-success/5")))
-        : "bg-transparent";
+        : (isSuiteOrTest ? "bg-transparent" : "bg-transparent");
+
+    const markerColor = isRunning ? "bg-on-surface-variant/20" : isNotRun ? "bg-on-surface-variant/10" : (isInterrupted ? "bg-amber-500/50" : (isFailed ? "bg-error/40" : "bg-success/40"));
 
     const nodeConfig: Record<string, { label: string; color: string }> = {
         suite: { label: t('run_tab.console.node_types.suite', 'SUITE'), color: 'text-primary/70' },
@@ -208,7 +213,8 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({
         <div
             id={`log-node-${node.id}`}
             className={clsx(
-                "flex flex-col transition-all overflow-hidden mb-1.5 rounded-xl border",
+                "flex flex-col transition-all overflow-hidden border",
+                "mb-2 rounded-xl",
                 borderColor,
                 bgColor
             )}
@@ -225,7 +231,7 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({
                 {(node.type === 'suite' || node.type === 'test') && (
                     <div className={clsx(
                         "absolute left-0 top-0 bottom-0 w-1 rounded",
-                        isInterrupted ? "bg-amber-500/50" : (isFailed ? "bg-error/40" : "bg-success/40")
+                        markerColor
                     )} />
                 )}
                 <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -317,9 +323,9 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({
                     "flex flex-col gap-1 p-2 pl-4 border-t border-on-surface/5",
                     isFlatRow && "bg-on-surface/[0.02]"
                 )}>
-                    {node.type === 'test' && isFailed && (node as TestNode).failureDetail && (
+                    {node.type === 'test' && (isFailed || isFatalError) && (node as TestNode).failureDetail && (
                         <div className={clsx(
-                            "mb-2 p-3 border rounded-xl text-xs animate-in fade-in slide-in-from-top-1 flex flex-col gap-4",
+                            "mb-2 p-2 border rounded-xl text-xs animate-in fade-in slide-in-from-top-1 flex flex-col gap-4",
                             isInterrupted ? "bg-amber-500/10 border-amber-500/20 text-amber-500" : "bg-error/10 border-error/20 text-error"
                         )}>
                             <div className="flex justify-between gap-4 items-start w-full">
@@ -485,14 +491,14 @@ Error Message: ${(node as TestNode).failureDetail?.message}
                     ))}
 
                     {!isFlatRow && (
-                        <>
+                        <div className="flex flex-col space-y-2">
                             {((node as any).children && !lazyChildren) && (node as any).children.map((child: LogNode) => (
-                                <LogTree key={child.id} node={child} depth={depth + 1} dbPath={dbPath} parentType={node.type} />
+                                <LogTree key={child.id} node={child} depth={depth + 1} dbPath={dbPath} parentType={node.type} onChildrenLoaded={onChildrenLoaded} />
                             ))}
                             {lazyChildren && lazyChildren.map((child: LogNode) => (
-                                <LogTree key={child.id} node={child} depth={depth + 1} dbPath={dbPath} parentType={node.type} />
+                                <LogTree key={child.id} node={child} depth={depth + 1} dbPath={dbPath} parentType={node.type} onChildrenLoaded={onChildrenLoaded} />
                             ))}
-                        </>
+                        </div>
                     )}
                     {isLoadingChildren && (
                         <div className="flex items-center gap-2 p-3 text-xs opacity-60 ml-4 font-mono text-on-surface-variant">

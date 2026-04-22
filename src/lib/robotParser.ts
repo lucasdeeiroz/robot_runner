@@ -73,7 +73,7 @@ export interface KeywordNode {
 }
 
 export type LogNode = TextNode | SuiteStartNode | TestNode | SuiteNode | SuiteEndNode | KeywordNode;
-export type LinearNode = TextNode | SuiteStartNode | SuiteEndNode;
+export type LinearNode = TextNode | SuiteStartNode | SuiteEndNode | { type: 'test-end', name: string, status: 'PASS'|'FAIL', id: string };
 
 export const formatRobotDuration = (start: string, end: string): string => {
     if (!start || !end) return "";
@@ -294,8 +294,9 @@ export const mapXmlNode = async (
 
     let name = String(obj.name || obj.variable || "").trim();
     const subType = nodeType as KeywordSubType;
-    const idList = [name, startTime || String(Math.random())];
-    const id = `xml-${idList.join('-')}`.replace(/\s+/g, '-');
+    // Use a more stable ID generation to avoid React state loss during re-parses
+    const idList = [name, startTime || nodeType || 'node'];
+    const id = `xml-${idList.join('-')}`.replace(/\s+/g, '-').substring(0, 100);
 
     if (subType === 'iteration' && name.startsWith('${') && name.endsWith('}')) {
         name = "";
