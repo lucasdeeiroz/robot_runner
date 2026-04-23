@@ -131,5 +131,8 @@ Robot Runner automatically injects device metadata into your Robot Framework ses
 ---
 
 ## 📄 License
-This project is licensed under the MIT License.
-Copyright (c) 2026 Lucas de Eiroz Rodrigues
+
+This project is licensed under a **Non-Commercial / No-Resale license**:
+free to use, modify, and redistribute **for free**, as long as you keep credits
+and link back to the original repository. Commercialization (selling/licensing)
+requires written permission. See `LICENSE`.
