@@ -15,12 +15,16 @@ In a traditional workflow, a QA engineer switches between Appium Inspector, term
 ## 🚀 Core Capabilities
 
 ### 🎛️ Unified Device Command Center
+<img width="1335" height="557" alt="image" src="https://github.com/user-attachments/assets/7452a0f2-e602-408c-9207-cda4e10b136b" />
+
 *   **Intelligent Discovery**: Instant detection of USB and Wi-Fi devices.
 *   **Wireless Freedom**: Seamless pairing via Android 11+ Pairing Codes and TCP/IP.
 *   **Global Reach**: Integrated **ngrok** tunneling for remote device testing across different networks.
 *   **High-Fidelity Mirroring**: Ultra-low latency screen mirroring powered by `scrcpy`, supporting full interaction (tap, double-tap, swipe) even during test design.
 
 ### 🔍 Precision UI Inspection & Locator Strategy
+<img width="1308" height="607" alt="image" src="https://github.com/user-attachments/assets/eae6bd5f-ae9a-482d-9ee8-b58787df742b" />
+
 *   **Dynamic Locator Generation**: Instantly generate optimized XPaths and chained `UiSelector` methods.
 *   **Visual Selection**: Select elements directly from the screen mirroring.
 *   **Smart Selection Candidates**: The inspector automatically prioritizes elements based on automation best practices (`resource-id` > `content-desc` > `text`).
@@ -28,18 +32,24 @@ In a traditional workflow, a QA engineer switches between Appium Inspector, term
 *   **Hierarchy Visualization**: Deep-dive into the view hierarchy with an interactive breadcrumb system and XML dump analysis.
 
 ### 📊 Real-Time Diagnostics & Performance Monitoring
+<img width="1294" height="558" alt="image" src="https://github.com/user-attachments/assets/c9923d34-a233-4fce-96eb-a31d45de9b54" />
+
 *   **Smart Logcat**: Real-time system and app logs with advanced package-based filtering and search.
 *   **Deep Performance Insights**: Track **CPU usage**, **RAM consumption**, and **Battery health** (including temperature) in real-time.
 *   **App-Specific Metrics**: Monitor **FPS** and specific resource usage for the application under test.
 *   **Data-Driven QA**: Record performance sessions and export them to **CSV** for detailed bottleneck analysis and reporting.
 
 ### 🧠 AI-Driven Mapping & Test Design
+<img width="1134" height="545" alt="image" src="https://github.com/user-attachments/assets/b8ab6449-df3f-4c70-a324-d4241c1904b3" />
+
 *   **Visual App Mapping**: Create a digital twin of your application by mapping screens, modals, and drawers.
 *   **Flowchart Visualization**: Automatically generate interactive flowcharts of your app's navigation logic.
 *   **Screen Tagging**: Organize large-scale applications using custom tags for targeted filtering and analysis.
 *   **AI Artifact Generation**: Leverage **Google Gemini AI** to transform your app mapping into professional-grade **BDD Test Cases**, **Product Backlog Items (PBIs)**, or **Bug Reports**, exportable directly to **XLSX** and **DOCX**.
 
 ### ⚡ Professional-Grade Execution
+<img width="1375" height="869" alt="image" src="https://github.com/user-attachments/assets/46247bb5-c73b-4ad8-8102-a55dd5e08e65" />
+
 *   **Execution Modes**: Native support for individual `.robot` files, entire directories, and complex `.args` configurations. Maestro is also supported.
 *   **Automation Root**: Intelligent working directory management to ensure relative path resolution for complex projects.
 *   **Configuration Profiles**: Instantly switch between multiple project setups, API keys, and environment variables.
