@@ -49,7 +49,7 @@ export function PresentationPanel() {
             <div className="absolute top-[-10%] right-[-10%] w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
             
             {/* Header */}
-            <div className="p-6 h-[65px] flex items-center justify-between border-b border-outline-variant/20 relative z-10">
+            <div className="p-6 h-16 flex items-center justify-between border-b border-outline-variant/20 relative z-10 shrink-0">
                 <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
                     <span className="text-xs font-bold uppercase tracking-widest text-on-surface-variant/60">
@@ -76,7 +76,7 @@ export function PresentationPanel() {
 
             {/* Slide Area */}
             <div 
-                className="flex-1 flex flex-col p-8 cursor-pointer active:scale-[0.99] transition-transform"
+                className="flex-1 flex flex-col p-8 cursor-pointer active:scale-[0.99] transition-transform overflow-y-auto custom-scrollbar"
                 onClick={handleNext}
             >
                 <AnimatePresence mode="wait">
@@ -129,7 +129,7 @@ export function PresentationPanel() {
             </div>
 
             {/* Footer / Controls */}
-            <div className="p-6 grid grid-cols-3 gap-3 border-t border-outline-variant/20 bg-surface/30 backdrop-blur-sm">
+            <div className="p-6 grid grid-cols-3 gap-3 border-t border-outline-variant/20 bg-surface/30 backdrop-blur-sm shrink-0">
                 <button
                     onClick={(e) => { e.stopPropagation(); handleBack(); }}
                     disabled={currentSlideIndex === 0 && activePointsCount === 0}

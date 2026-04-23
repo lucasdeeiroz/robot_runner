@@ -22,7 +22,7 @@ export function Layout({ children, activePage, onNavigate }: LayoutProps) {
                 {settings.presentationEnabled && (
                     <motion.div
                         initial={{ width: 0, opacity: 0 }}
-                        animate={{ width: 320, opacity: 1 }}
+                        animate={{ width: "19rem", opacity: 1 }}
                         exit={{ width: 0, opacity: 0 }}
                         transition={{ duration: 0.5, ease: "easeInOut" }}
                         className="overflow-hidden h-full flex-shrink-0"

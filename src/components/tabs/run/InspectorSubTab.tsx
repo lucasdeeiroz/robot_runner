@@ -306,7 +306,7 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
     }
 
     return (
-        <div className="flex-1 min-h-[700px] flex flex-col space-y-4">
+        <div className="flex-1 min-h-[44rem] flex flex-col space-y-4">
             <Section
                 title={t('inspector.title', 'Inspector')}
                 icon={Scan}
@@ -341,7 +341,7 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                 menus={
                     <div className={clsx(
                         "flex items-center transition-all duration-300 ease-in-out",
-                        isSearchFocused ? "w-[450px]" : "w-[300px]"
+                        isSearchFocused ? "w-[28rem]" : "w-72"
                     )}>
                         <Input
                             placeholder={t('inspector.search.placeholder', 'Search by ID, XPath, etc...')}

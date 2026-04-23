@@ -536,7 +536,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     onChange={handleTabChange}
                     variant="pills"
                     orientation="vertical"
-                    className={clsx("shrink-0 gap-6 justify-between", isNarrow ? "w-fit" : "w-[200px]")}
+                    className={clsx("shrink-0 gap-6 justify-between", isNarrow ? "w-fit" : "w-48")}
                     actions={
                         <>
                             <Button
@@ -638,7 +638,7 @@ function TestSelectorModal({ isOpen, onClose, tests, selected, onToggle, onSelec
                     </div>
                 )}
 
-                <div className="p-4 max-h-[400px] overflow-y-auto custom-scrollbar">
+                <div className="p-4 max-h-[25rem] overflow-y-auto custom-scrollbar">
                     {isLoading ? (
                         <div className="py-12 flex flex-col items-center justify-center gap-4 text-on-surface-variant">
                             <ExpressiveLoading size="md" variant="circular" />

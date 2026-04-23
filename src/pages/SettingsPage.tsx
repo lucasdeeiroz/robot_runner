@@ -408,7 +408,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                             }))}
                             value={activeProfileId}
                             onChange={(e) => { switchProfile(e.target.value); feedback.toast.success('feedback.profile_changed'); }}
-                            containerClassName="w-[180px]"
+                            containerClassName="w-[11.25rem]"
                         />
                     </>
                 }
