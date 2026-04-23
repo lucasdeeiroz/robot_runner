@@ -8,6 +8,7 @@ import { AboutPage } from "./pages/AboutPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { TestSessionProvider } from "./lib/testSessionStore";
 import { Toaster } from "sonner";
+import "sonner/dist/styles.css";
 import { useSettings } from "./lib/settings";
 import { SystemCheckOverlay } from "./components/organisms/SystemCheckOverlay";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -219,7 +220,6 @@ function App() {
     <TestSessionProvider>
       <DeviceProvider>
         <SelectionProvider>
-          <Toaster richColors position="bottom-right" theme={settings.theme === 'dark' ? 'dark' : 'light'} />
           <AnimatePresence>
             {!settings.usageMode && (
               <Onboarding key="onboarding-flow" onComplete={() => {
@@ -308,6 +308,7 @@ function App() {
               </AnimatePresence>
             </div>
           </Layout>
+          <Toaster richColors position="bottom-right" theme={settings.theme === 'dark' ? 'dark' : 'light'} />
         </SelectionProvider>
       </DeviceProvider>
     </TestSessionProvider>
