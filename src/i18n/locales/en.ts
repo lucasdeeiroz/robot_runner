@@ -900,6 +900,7 @@ export const en = {
                     "continue": "CONTINUE"
                 },
                 keep_awake: "Keep Screen Awake",
+                open_output_dir: "Open Results Folder",
                 debug_on: "Show Debug Logs",
                 debug_off: "Hide Debug Logs",
                 analyze_failure: "Analyze Failure",

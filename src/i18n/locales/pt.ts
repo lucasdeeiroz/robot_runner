@@ -899,6 +899,7 @@ export const pt = {
                     "continue": "CONTINUE"
                 },
                 keep_awake: "Manter Tela Acordada",
+                open_output_dir: "Abrir Pasta de Resultados",
                 debug_on: "Ver Logs de Depuração",
                 debug_off: "Ocultar Logs de Depuração",
                 analyze_failure: "Analisar Falha",

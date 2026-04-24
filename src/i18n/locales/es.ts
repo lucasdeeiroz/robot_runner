@@ -905,6 +905,7 @@ export const es = {
                     "continue": "CONTINUE"
                 },
                 keep_awake: "Mantener Pantalla Activa",
+                open_output_dir: "Abrir Carpeta de Resultados",
                 debug_on: "Ver Logs de Depuración",
                 debug_off: "Ocultar Logs de Depuración",
                 analyze_failure: "Analizar Fallo",
