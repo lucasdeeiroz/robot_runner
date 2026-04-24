@@ -308,10 +308,20 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                         const prevNode = linearNodes[linearNodes.length - 2];
                         const isPrevSingle = prevNode?.type === 'text' && IS_SINGLE(prevNode.content);
                         if (isPrevSingle) {
-                            const suiteName = last.content.trim();
+                            const suiteLine = last.content.trim();
+                            const parts = suiteLine.split(' :: ');
+                            const suiteName = parts[0].trim();
+                            const doc = parts.length > 1 ? parts.slice(1).join(' :: ').trim() : undefined;
+                            
                             linearNodes.pop();
                             linearNodes.pop();
-                            linearNodes.push({ type: 'suite-start', name: suiteName.split(' :: ')[0], originalLine: suiteName, id: `sub-suite-start-${processedCount + i}` });
+                            linearNodes.push({ 
+                                type: 'suite-start', 
+                                name: suiteName, 
+                                doc,
+                                originalLine: suiteLine, 
+                                id: `sub-suite-start-${processedCount + i}` 
+                            });
                             continue;
                         }
                     }
@@ -342,7 +352,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                                     finalName = parts[0].trim();
                                     doc = parts.slice(1).join(' :: ');
                                 }
-                                linearNodes.push({ type: 'suite-end', name: finalName, status, documentation: doc, summary: summaryLine, id: `suite-end-${processedCount + i}` });
+                                linearNodes.push({ type: 'suite-end', name: finalName, status, doc, summary: summaryLine, id: `suite-end-${processedCount + i}` });
                                 continue;
                             }
                         }
@@ -457,7 +467,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                     const suite = suiteStack[matchIndex];
                     suite.status = node.status;
                     suite.summary = node.summary;
-                    suite.documentation = node.documentation;
+                    if ((node as any).doc) suite.doc = (node as any).doc;
                     suiteStack.splice(matchIndex);
                 }
             } else if (node.type === 'test-end') {

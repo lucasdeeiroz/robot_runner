@@ -8,7 +8,7 @@ import {
     ChevronRight, ChevronDown, CheckCircle2, XCircle, MinusCircle,
     Layers, BugPlay, CirclePlay, Repeat, IterationCcw, Workflow,
     Infinity, Split, StepForward, CalendarCog, Maximize2,
-    ShieldAlert, Anchor, Hand, CircleSlash
+    ShieldAlert, Anchor, Hand, CircleSlash, Info, CornerDownRight
 } from "lucide-react";
 import { LogNode, TestNode, KeywordNode, SuiteNode } from "@/lib/robotParser";
 import { LinkRenderer } from "../molecules/LinkRenderer";
@@ -327,6 +327,31 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({
                     "flex flex-col gap-1 p-2 pl-4 border-t border-on-surface/5",
                     isFlatRow && "bg-on-surface/[0.02]"
                 )}>
+                    {/* Documentation Section */}
+                    {(node as any).doc && (
+                        <div className="mb-2 p-2.5 bg-on-surface/[0.03] border border-on-surface/5 rounded-lg text-[11px] animate-in fade-in slide-in-from-top-1">
+                            <div className="flex items-center gap-1.5 opacity-40 font-bold uppercase tracking-wider mb-1">
+                                <Info size={10} />
+                                {t('run_tab.console.documentation', 'Documentation')}
+                            </div>
+                            <div className="text-on-surface-variant/80 italic whitespace-pre-wrap leading-relaxed font-medium">
+                                {(node as any).doc}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Return Value Section */}
+                    {(node.type === 'keyword' || node.type === 'test') && (node as any).ret && (
+                        <div className="mb-2 p-2.5 bg-success/5 border border-success/10 rounded-lg text-[11px] animate-in fade-in slide-in-from-top-1">
+                            <div className="flex items-center gap-1.5 text-success/60 font-bold uppercase tracking-wider mb-1">
+                                <CornerDownRight size={10} />
+                                {t('run_tab.console.return_value', 'Return Value')}
+                            </div>
+                            <div className="font-mono text-success/90 break-all bg-success/10 p-1.5 rounded border border-success/5">
+                                {(node as KeywordNode).ret}
+                            </div>
+                        </div>
+                    )}
                     {node.type === 'test' && (isFailed || isFatalError) && (node as TestNode).failureDetail && (
                         <div className={clsx(
                             "mb-2 p-2 border rounded-xl text-xs animate-in fade-in slide-in-from-top-1 flex flex-col gap-4",
