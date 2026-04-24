@@ -78,7 +78,19 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({
 
     const isInterrupted = computedStatus === 'FAIL' && failureMessage.includes('Execution terminated by signal');
 
+    const hasChildrenArray = (node as any).children && (node as any).children.length > 0;
+    const hasLazyChildren = lazyChildren && lazyChildren.length > 0;
+    const hasMetadata = !!((node as any).doc || (node as any).ret || (node as any).aiAnalysis);
+    const hasFailure = node.type === 'test' && !!(node as TestNode).failureDetail;
+    const hasLogs = node.type === 'test' && (node as TestNode).logs && (node as TestNode).logs.length > 0;
+    const hasScreenshot = (node.type === 'keyword' && !!(node as KeywordNode).screenshotPath) || 
+                          (node.type === 'test' && !!(node as TestNode).failureDetail?.screenshotPath);
+
+    // A node can be expanded if it has any children, lazy-load flag, documentation, return values, logs, failure details or screenshots
+    const canExpand = (node as any).hasChildren || hasChildrenArray || hasLazyChildren || hasMetadata || hasFailure || hasLogs || hasScreenshot;
+
     const toggleOpen = () => {
+        if (!canExpand) return;
         if (isFlatRow) {
             onToggleExpand?.(node.id, !isExpanded);
         } else {
@@ -221,7 +233,8 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({
         >
             <div
                 className={clsx(
-                    "flex items-center gap-2 p-2 cursor-pointer hover:bg-on-surface/5 min-w-0 relative",
+                    "flex items-center gap-2 p-2 min-w-0 relative",
+                    canExpand ? "cursor-pointer hover:bg-on-surface/5" : "cursor-default",
                     !isFlatRow && "rounded-t-xl",
                     isFlatRow && depth === 0 && "rounded-t-xl",
                     (node.type === 'suite' || node.type === 'test') && "pl-4"
@@ -235,7 +248,11 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({
                     )} />
                 )}
                 <div className="flex items-center gap-2 flex-1 min-w-0">
-                    {isOpen ? <ChevronDown size={14} className="text-on-surface-variant/80 shrink-0" /> : <ChevronRight size={14} className="text-on-surface-variant/80 shrink-0" />}
+                    {canExpand ? (
+                        isOpen ? <ChevronDown size={14} className="text-on-surface-variant/80 shrink-0" /> : <ChevronRight size={14} className="text-on-surface-variant/80 shrink-0" />
+                    ) : (
+                        <div className="w-[14px] h-[14px] shrink-0" /> // Spacer for alignment
+                    )}
 
                     {node.type === 'suite' && <Layers size={14} className="opacity-70 shrink-0" />}
                     {node.type === 'test' && <BugPlay size={14} className="opacity-70 shrink-0" />}
