@@ -413,8 +413,9 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                 } else if (IS_RR_TEST_END(cleanLine)) {
                     const parts = cleanLine.replace("[RR-TEST-END]", "").split(" | ");
                     const { name, doc } = splitNameAndDoc(parts[0]);
-                    const status = (parts[1] || 'PASS').trim() as 'PASS' | 'FAIL';
-                    linearNodes.push({ type: 'test-end', name, doc, status: status, id: `rr-t-end-${processedCount + i}` });
+                    const status = (parts[1] || 'PASS').trim() as 'PASS' | 'FAIL' | 'SKIP';
+                    const ret = parts[2]?.trim();
+                    linearNodes.push({ type: 'test-end', name, doc, status, ret, id: `rr-t-end-${processedCount + i}` });
                 } else if (IS_MAESTRO_SUITE_START(line)) {
                     linearNodes.push({ type: 'suite-start', name: 'Maestro Suite', originalLine: line, id: `m-suite-start-${processedCount + i}` });
                 } else if (IS_MAESTRO_SUITE_END(line)) {
@@ -511,6 +512,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                 if (currentTest) {
                     currentTest.status = node.status;
                     if (node.doc) currentTest.doc = node.doc;
+                    if (node.ret) currentTest.ret = node.ret;
                     const suite = activeSuite();
                     if (suite && suite.stats) {
                         if (node.status === 'PASS') suite.stats.passed++;

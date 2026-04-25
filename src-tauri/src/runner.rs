@@ -150,24 +150,33 @@ from robot.libraries.BuiltIn import BuiltIn
 
 ROBOT_LISTENER_API_VERSION = 2
 
+def _sanitize(txt):
+    if txt is None: return ""
+    # Replace newlines/tabs with spaces, pipe with 'I', and ' :: ' with ' : ' to avoid breaking delimiters
+    return str(txt).replace('\n', ' ').replace('\r', '').replace('\t', ' ').replace('|', 'I').replace(' :: ', ' : ')
+
 def start_suite(name, attrs):
-    doc = attrs.get('doc', '')
-    sys.stdout.write(f"\n[RR-SUITE-START] {name} :: {doc}\n")
+    doc = _sanitize(attrs.get('doc', ''))
+    s_name = _sanitize(name)
+    sys.stdout.write(f"\n[RR-SUITE-START] {s_name} :: {doc}\n")
     sys.stdout.flush()
 
 def end_suite(name, attrs):
-    sys.stdout.write(f"\n[RR-SUITE-END] {name} | {attrs['status']}\n")
+    s_name = _sanitize(name)
+    sys.stdout.write(f"\n[RR-SUITE-END] {s_name} | {attrs['status']}\n")
     sys.stdout.flush()
 
 def start_test(name, attrs):
-    doc = attrs.get('doc', '')
-    sys.stdout.write(f"\n[RR-TEST-START] {name} :: {doc}\n")
+    doc = _sanitize(attrs.get('doc', ''))
+    t_name = _sanitize(name)
+    sys.stdout.write(f"\n[RR-TEST-START] {t_name} :: {doc}\n")
     sys.stdout.flush()
 
 def end_test(name, attrs):
+    t_name = _sanitize(name)
     status = attrs.get('status', 'PASS')
-    msg = attrs.get('message', '')
-    sys.stdout.write(f"\n[RR-TEST-END] {name} | {status} | {msg}\n")
+    msg = _sanitize(attrs.get('message', ''))
+    sys.stdout.write(f"\n[RR-TEST-END] {t_name} | {status} | {msg}\n")
     sys.stdout.flush()
 
 def start_keyword(name, attrs):
