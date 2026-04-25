@@ -167,7 +167,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
             setReparseLoading(true);
             try {
                 // Try to find the detected output XML from logs first, then fallback to output.xml
-                const outputPath = session.outputDir;
+                const outputPath = session.outputDir!;
                 const detectedXml = /\.xml$/i.test(outputPath) ? outputPath : null;
                 const outputXmlPath = detectedXml || `${outputPath.replace(/[\\/]+$/, "")}/output.xml`;
                 const result = await parseXmlBackground(outputXmlPath);
@@ -290,6 +290,17 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
             return normalized.slice(0, lastSeparator);
         };
 
+        const splitNameAndDoc = (raw: string) => {
+            if (raw.includes(' :: ')) {
+                const parts = raw.split(' :: ');
+                return {
+                    name: parts[0].trim(),
+                    doc: parts.slice(1).join(' :: ').trim()
+                };
+            }
+            return { name: raw.trim(), doc: undefined };
+        };
+
         // Helper to detect output XML from logs
         const detectOutputXml = (l: string) => {
             const outputXmlPath = extractOutputXmlPath(l);
@@ -328,10 +339,11 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                     const isPrevSuite = prev?.type === 'suite-start' || prev?.type === 'suite-end';
 
                     if (last?.type === 'text' && !IS_SYSTEM(last.content) && (isPrevDouble || isPrevSuite)) {
-                        const suiteName = last.content.trim();
+                        const suiteLine = last.content.trim();
+                        const { name, doc } = splitNameAndDoc(suiteLine);
                         linearNodes.pop();
                         if (isPrevDouble) linearNodes.pop();
-                        linearNodes.push({ type: 'suite-start', name: suiteName.split(' :: ')[0], originalLine: suiteName, id: `suite-start-${processedCount + i}` });
+                        linearNodes.push({ type: 'suite-start', name, doc, originalLine: suiteLine, id: `suite-start-${processedCount + i}` });
                         continue;
                     }
 
@@ -341,15 +353,13 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                         const isPrevSingle = prevNode?.type === 'text' && IS_SINGLE(prevNode.content);
                         if (isPrevSingle) {
                             const suiteLine = last.content.trim();
-                            const parts = suiteLine.split(' :: ');
-                            const suiteName = parts[0].trim();
-                            const doc = parts.length > 1 ? parts.slice(1).join(' :: ').trim() : undefined;
+                            const { name, doc } = splitNameAndDoc(suiteLine);
                             
                             linearNodes.pop();
                             linearNodes.pop();
                             linearNodes.push({ 
                                 type: 'suite-start', 
-                                name: suiteName, 
+                                name: name, 
                                 doc,
                                 originalLine: suiteLine, 
                                 id: `sub-suite-start-${processedCount + i}` 
@@ -377,13 +387,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                                 const name = match[1].trim();
                                 const status = match[2] as 'PASS' | 'FAIL';
                                 linearNodes.splice(statusNodeIndex);
-                                let doc = undefined;
-                                let finalName = name;
-                                if (finalName.includes(' :: ')) {
-                                    const parts = finalName.split(' :: ');
-                                    finalName = parts[0].trim();
-                                    doc = parts.slice(1).join(' :: ');
-                                }
+                                const { name: finalName, doc } = splitNameAndDoc(name);
                                 linearNodes.push({ type: 'suite-end', name: finalName, status, doc, summary: summaryLine, id: `suite-end-${processedCount + i}` });
                                 continue;
                             }
@@ -391,26 +395,26 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                     }
                     linearNodes.push({ type: 'text', content: line, isSystem, id: `div-${processedCount + i}` });
                 } else if (IS_RR_SUITE_START(cleanLine)) {
-                    const name = cleanLine.replace("[RR-SUITE-START]", "").trim();
-                    const normalizedName = name.split(' :: ')[0].trim();
+                    const raw = cleanLine.replace("[RR-SUITE-START]", "").trim();
+                    const { name, doc } = splitNameAndDoc(raw);
                     const lastNode = linearNodes[linearNodes.length - 1];
                     // Check if previous node is a heuristic-detected suite-start (Parent.Child) that matches the leaf name (Child)
                     const heuristicLeaf = lastNode?.type === 'suite-start' ? lastNode.name.split('.').pop()?.trim() : null;
-                    if (heuristicLeaf === normalizedName) {
+                    if (heuristicLeaf === name) {
                         continue; // Deduplicate
                     }
-                    linearNodes.push({ type: 'suite-start', name: normalizedName, originalLine: name, id: `rr-s-start-${processedCount + i}` });
+                    linearNodes.push({ type: 'suite-start', name, doc, originalLine: raw, id: `rr-s-start-${processedCount + i}` });
                 } else if (IS_RR_SUITE_END(cleanLine)) {
                     const raw = cleanLine.replace("[RR-SUITE-END]", "").trim();
                     const parts = raw.split(" | ");
-                    const name = parts[0].trim();
+                    const { name, doc } = splitNameAndDoc(parts[0]);
                     const status = (parts[1] || 'PASS').trim() as 'PASS' | 'FAIL';
-                    linearNodes.push({ type: 'suite-end', name: name.split(' :: ')[0], status: status, summary: '', id: `rr-s-end-${processedCount + i}` });
+                    linearNodes.push({ type: 'suite-end', name, doc, status: status, summary: '', id: `rr-s-end-${processedCount + i}` });
                 } else if (IS_RR_TEST_END(cleanLine)) {
                     const parts = cleanLine.replace("[RR-TEST-END]", "").split(" | ");
-                    const name = parts[0].trim();
+                    const { name, doc } = splitNameAndDoc(parts[0]);
                     const status = (parts[1] || 'PASS').trim() as 'PASS' | 'FAIL';
-                    linearNodes.push({ type: 'test-end', name: name, status: status, id: `rr-t-end-${processedCount + i}` });
+                    linearNodes.push({ type: 'test-end', name, doc, status: status, id: `rr-t-end-${processedCount + i}` });
                 } else if (IS_MAESTRO_SUITE_START(line)) {
                     linearNodes.push({ type: 'suite-start', name: 'Maestro Suite', originalLine: line, id: `m-suite-start-${processedCount + i}` });
                 } else if (IS_MAESTRO_SUITE_END(line)) {
@@ -472,6 +476,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                     type: 'suite',
                     id: nodeId,
                     name: node.name,
+                    doc: node.doc,
                     status: 'RUNNING',
                     summary: '',
                     children: [],
@@ -505,6 +510,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
             } else if (node.type === 'test-end') {
                 if (currentTest) {
                     currentTest.status = node.status;
+                    if (node.doc) currentTest.doc = node.doc;
                     const suite = activeSuite();
                     if (suite && suite.stats) {
                         if (node.status === 'PASS') suite.stats.passed++;
@@ -637,13 +643,13 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                                 }
                             }
 
-                            const nameOnly = cleanLineText.trim().split(' :: ')[0].trim();
+                            const { name: nameOnly } = splitNameAndDoc(cleanLineText);
                             const isTestNameLine = nameOnly === currentTest.name || (statusMatch?.[1].trim() === currentTest.name);
                             if (!isMarker && !isTestNameLine) currentTest.logs.push(line);
                         } else {
                             if (IS_ROBOT_RUNNER_TEST_START(line)) {
                                 const rawName = line.replace("[RR-TEST-START]", "").replace("[RobotRunner-Test-Start]", "").trim();
-                                const name = rawName.split(' :: ')[0].trim();
+                                const { name, doc } = splitNameAndDoc(rawName);
 
                                 // Check if a test was already started by heuristic-matching just before
                                 const suiteChildren = activeSuite()?.children;
@@ -657,6 +663,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                                 const newTest: TestNode = {
                                     type: 'test',
                                     name: name,
+                                    doc: doc,
                                     status: 'RUNNING',
                                     logs: [],
                                     id: `test-started-${nodeId}`
@@ -667,8 +674,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                             } else {
                                 const isMaestroSuite = activeSuite()?.name.includes('Maestro');
                                 if (line.trim().length > 0 && !isMaestroSuite && !line.includes('[RobotRunner-Test-Start]') && !line.includes('[RR-TEST-START]') && !IS_STATUS(line)) {
-                                    let name = line.trim();
-                                    if (name.includes(' :: ')) name = name.split(' :: ')[0].trim();
+                                    const { name, doc } = splitNameAndDoc(line);
                                     const statusMatch = cleanAnsi(name).match(/^(.*?)\s*\|\s+(PASS|FAIL|SKIP)\s+\|/);
                                     if (statusMatch) {
                                         // It's a status line. Try to apply it to the last test instead of starting a new one.
@@ -707,6 +713,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                                     const newTest: TestNode = {
                                         type: 'test',
                                         name: name,
+                                        doc,
                                         status: 'RUNNING',
                                         logs: [line],
                                         id: `test-${nodeId}`
