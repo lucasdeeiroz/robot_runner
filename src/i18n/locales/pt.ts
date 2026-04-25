@@ -855,7 +855,8 @@ export const pt = {
                 open_toolbox: "Abrir Caixa de Ferramentas"
             },
             console: {
-                documentation: "Documentação: ",
+                documentation: "Documentação",
+                return_value: "Valor de Retorno",
                 error_message: "Mensagem de Erro",
                 screenshot: "Captura de Tela",
                 artifacts: "Artefatos",

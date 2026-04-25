@@ -856,7 +856,8 @@ export const en = {
                 open_toolbox: "Open Toolbox"
             },
             console: {
-                documentation: "Documentation: ",
+                documentation: "Documentation",
+                return_value: "Return Value",
                 error_message: "Error Message",
                 screenshot: "Screenshot",
                 artifacts: "Artifacts",
