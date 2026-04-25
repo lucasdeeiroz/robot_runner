@@ -23,7 +23,11 @@ static RE_SUITE: Lazy<Regex> =
 static RE_STAT: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"<stat pass="(\d+)" fail="(\d+)".*>All Tests</stat>"#).unwrap());
 static RE_TIME: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"(?:generated|starttime)=["']([^"']+)["']"#).unwrap());
+    Lazy::new(|| Regex::new(r#"(?:generated|starttime|timestamp)=["']([^"']+)["']"#).unwrap());
+static RE_ROBOT_GENERATED: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r#"<robot [^>]*generated=["']([^"']+)["']"#).unwrap());
+static RE_ROBOT_SUITE_START: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r#"<suite [^>]*starttime=["']([^"']+)["']"#).unwrap());
 static RE_ELAPSED: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"<status\s+[^>]*elapsed="([^"]+)""#).unwrap());
 static RE_STATUS_TIME: Lazy<Regex> =
@@ -288,10 +292,12 @@ fn parse_log_entry(folder_path: &Path, xml_path: &Path, mtime: u64) -> Option<Te
         let status = if fail > 0 { "FAIL" } else { "PASS" }.to_string();
 
         let timestamp = if let Some(ts) = meta_timestamp {
-            ts
+            normalize_robot_timestamp(&ts)
         } else {
-            let extracted = RE_TIME
+            let extracted = RE_ROBOT_GENERATED
                 .captures(&content)
+                .or_else(|| RE_ROBOT_SUITE_START.captures(&content))
+                .or_else(|| RE_TIME.captures(&content))
                 .map(|c| c.get(1).map_or("", |m| m.as_str()))
                 .unwrap_or("");
             
@@ -510,6 +516,11 @@ fn format_seconds(seconds: f64) -> String {
 
 /// Converts Robot Framework's "YYYYMMDD HH:MM:SS.mmm" to ISO 8601
 fn normalize_robot_timestamp(ts: &str) -> String {
+    // Already in ISO 8601? (Rough check: 2024-04-25T...)
+    if ts.contains('T') && ts.contains('-') && ts.len() >= 19 {
+        return ts.to_string();
+    }
+
     // Handle "YYYYMMDD-HHMMSS" (filename format) vs "YYYYMMDD HH:MM:SS.mmm" (XML format)
     let cleaned_ts = if ts.contains('-') && !ts.contains(':') && ts.len() >= 15 {
         // Convert 20260425-140852 to 20260425 14:08:52.000
@@ -527,7 +538,7 @@ fn normalize_robot_timestamp(ts: &str) -> String {
                 Some(ldt) => ldt.to_rfc3339(),
                 None => {
                     // Fallback to simple string manipulation if timezone conversion fails
-                    if cleaned_ts.len() >= 15 {
+                    if cleaned_ts.len() >= 15 && cleaned_ts.chars().all(|c| c.is_numeric() || c == ' ' || c == ':' || c == '.') {
                         format!(
                             "{}-{}-{}T{}:{}:{}",
                             &cleaned_ts[0..4], &cleaned_ts[4..6], &cleaned_ts[6..8],
@@ -539,7 +550,16 @@ fn normalize_robot_timestamp(ts: &str) -> String {
                 }
             }
         }
-        Err(_) => cleaned_ts.to_string(),
+        Err(_) => {
+            // Final attempt: maybe it's just "YYYY-MM-DD HH:MM:SS"
+            let fmt2 = "%Y-%m-%d %H:%M:%S";
+            if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(&cleaned_ts, fmt2) {
+                if let Some(ldt) = chrono::Local.from_local_datetime(&dt).earliest() {
+                    return ldt.to_rfc3339();
+                }
+            }
+            cleaned_ts.to_string()
+        }
     }
 }
 

@@ -208,6 +208,7 @@ export const en = {
             error_occurred: "An error occurred: {{error}}",
             delete: "Delete",
             edit: "Edit",
+            go_to_settings: "Go to Settings",
             ok: "OK",
             search: "Search...",
             loading: "Loading...",
@@ -420,7 +421,11 @@ export const en = {
             cancel: "Cancel",
             select_file: "Select File",
             select_folder: "Select Folder",
-            select_generic: "Select"
+            select_generic: "Select",
+            not_configured: "Path not configured",
+            configure_tests: "Please configure the Tests Directory in Settings or select it below.",
+            configure_suites: "Please configure the Suites Directory in Settings or select it below.",
+            select_folder_btn: "Select Folder"
         },
         inspector: {
             overlay: {
@@ -575,7 +580,10 @@ export const en = {
             select_device: "Select a device to view logs",
             ai_analyze_button: "Analyze with AI",
             ai_analysis_title: "AI Analysis Result",
-            analyzing: "Analyzing logs..."
+            analyzing: "Analyzing logs...",
+            not_saving: "Not saving to file",
+            configure_path: "Configure Path",
+            select_dir_title: "Select Directory for Logcat"
         },
         mapper: {
             title: "Mapper",
@@ -839,7 +847,9 @@ export const en = {
             },
             actions: {
                 force_enable: "Force Enable"
-            }
+            },
+            manual_save_hint: "Note: Recordings will use a manual 'Save As' dialog if the logs path is missing. Configure it in Settings for automatic saving.",
+            select_dir_title: "Select Directory for Performance Reports"
         },
         run_tab: {
             launcher: "Launcher",
@@ -1086,6 +1096,12 @@ export const en = {
                 title: "Tool Options",
                 allow_actions_during_test: "Allow actions during test",
                 allow_actions_during_test_desc: "Enable Logcat, Performance Monitoring, and other tools even while a test is running"
+            },
+        },
+        settings_page: {
+            path_auto_updated: "Path automatically updated: {{path}}",
+            paths: {
+                logs_desc: "Configure the directory where Robot Framework logs are saved to view execution history."
             }
         },
         sidebar: {
@@ -1181,7 +1197,9 @@ export const en = {
             },
             alerts: {
                 busy: "The following devices are currently busy running a test:\n{{devices}}\n\nPlease wait for them to finish.",
-                server_not_ready: "The Appium server is not ready"
+                server_not_ready: "The Appium server is not ready",
+                missing_paths: "Configuration Required",
+                missing_paths_desc: "Both 'Automation Root' and 'Logs Directory' must be configured in Settings to execute tests and generate reports."
             },
             options: {
                 dont_overwrite: "Save Logs"

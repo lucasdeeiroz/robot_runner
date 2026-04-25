@@ -308,7 +308,13 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                 return;
             }
 
-            const outputDir = getDirectoryFromFilePath(outputXmlPath);
+            let outputDir = getDirectoryFromFilePath(outputXmlPath);
+            
+            // If outputDir is empty or same as file (edge cases), use parent
+            if (outputDir && outputDir.toLowerCase().endsWith('.xml')) {
+                outputDir = getDirectoryFromFilePath(outputDir);
+            }
+
             // Save both separately: the XML file for parsing, and its directory for the 'Open Folder' button
             setSessionTree(runId, undefined, undefined, outputDir, outputXmlPath);
         };
@@ -416,20 +422,21 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                     const raw = cleanLine.replace("[RR-SUITE-START]", "").trim();
                     const { name, doc } = splitNameAndDoc(raw);
                     // Deduplicate: check if this suite was already added by the standard output parser
-                    // We look back skipping text nodes.
-                    let lastSuite: any = null;
-                    for (let j = linearNodes.length - 1; j >= 0; j--) {
-                        if (linearNodes[j].type === 'suite-start') {
-                            lastSuite = linearNodes[j];
-                            break;
+                    // Look back through recent nodes to find a matching suite-start
+                    let alreadyExists = false;
+                    for (let j = linearNodes.length - 1; j >= Math.max(0, linearNodes.length - 10); j--) {
+                        const node = linearNodes[j];
+                        if (node.type === 'suite-start') {
+                            const nodeLeaf = node.name.split('.').pop()?.trim();
+                            if (nodeLeaf === name) {
+                                if (doc && !node.doc) node.doc = doc;
+                                alreadyExists = true;
+                                break;
+                            }
                         }
                     }
 
-                    const heuristicLeaf = lastSuite?.name.split('.').pop()?.trim();
-                    if (heuristicLeaf === name) {
-                        if (doc) lastSuite.doc = doc;
-                        continue; // Deduplicate
-                    }
+                    if (alreadyExists) continue;
                     linearNodes.push({ type: 'suite-start', name, doc, originalLine: raw, id: `rr-s-start-${processedCount + i}` });
                 } else if (IS_RR_SUITE_END(cleanLine)) {
                     const raw = cleanLine.replace("[RR-SUITE-END]", "").trim();
@@ -801,12 +808,12 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                                 <button
                                     onClick={async () => {
                                         let path = session.outputDir!;
-                                        // Safety check: if outputDir was somehow set to a file, take its parent directory
-                                        if (path.toLowerCase().endsWith('.xml')) {
+                                        // Safety check: ensure we open a directory, not a file
+                                        if (path.toLowerCase().endsWith('.xml') || path.toLowerCase().endsWith('.html')) {
                                             const normalized = path.replace(/[\\/]+$/, "");
                                             const lastSeparator = Math.max(normalized.lastIndexOf("/"), normalized.lastIndexOf("\\"));
-                                            if (lastSeparator > 0) {
-                                                path = normalized.slice(0, lastSeparator);
+                                            if (lastSeparator >= 0) {
+                                                path = normalized.slice(0, lastSeparator) || normalized;
                                             }
                                         }
                                         try {

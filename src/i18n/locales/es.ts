@@ -208,6 +208,7 @@ export const es = {
             error_occurred: "Ocurrió un error: {{error}}",
             delete: "Eliminar",
             edit: "Editar",
+            go_to_settings: "Ir a Configuración",
             ok: "Aceptar",
             search: "Buscar...",
             loading: "Cargando...",
@@ -420,7 +421,11 @@ export const es = {
             cancel: "Cancelar",
             select_file: "Seleccionar Archivo",
             select_folder: "Seleccionar Carpeta",
-            select_generic: "Seleccionar"
+            select_generic: "Seleccionar",
+            not_configured: "Ruta no configurada",
+            configure_tests: "Configure el Directorio de Pruebas en Ajustes o selecciónelo a continuación.",
+            configure_suites: "Configure el Directorio de Suites en Ajustes o selecciónelo a continuación.",
+            select_folder_btn: "Seleccionar Carpeta"
         },
         inspector: {
             overlay: {
@@ -581,7 +586,10 @@ export const es = {
             select_device: "Seleccione un dispositivo para ver logs",
             ai_analyze_button: "Analizar con IA",
             ai_analysis_title: "Resultado del Análisis",
-            analyzing: "Analizando logs..."
+            analyzing: "Analizando logs...",
+            not_saving: "No se está guardando en un archivo",
+            configure_path: "Configurar Ruta",
+            select_dir_title: "Seleccionar Directorio para Logcat"
         },
         mapper: {
             title: "Mapeador",
@@ -844,7 +852,9 @@ export const es = {
             },
             actions: {
                 force_enable: "Forzar Activación"
-            }
+            },
+            manual_save_hint: "Nota: Las grabaciones usarán un diálogo manual 'Guardar como' si falta la ruta de los logs. Configúrela en Ajustes para el guardado automático.",
+            select_dir_title: "Seleccionar Directorio para Informes de Rendimiento"
         },
         run_tab: {
             launcher: "Lanzador",
@@ -1091,6 +1101,12 @@ export const es = {
                 title: "Opciones de Herramientas",
                 allow_actions_during_test: "Permitir acciones durante la prueba",
                 allow_actions_during_test_desc: "Habilita Logcat, Monitor de Performance y otras herramientas incluso mientras se ejecuta una prueba"
+            },
+        },
+        settings_page: {
+            path_auto_updated: "Ruta actualizada automáticamente: {{path}}",
+            paths: {
+                logs_desc: "Configure el directorio donde se guardan los logs de Robot Framework para ver el historial de ejecución."
             }
         },
         sidebar: {
@@ -1186,7 +1202,9 @@ export const es = {
             },
             alerts: {
                 busy: "Los siguientes dispositivos están ocupados:\n{{devices}}\n\nEspere a que terminen.",
-                server_not_ready: "El servidor Appium no está listo"
+                server_not_ready: "El servidor Appium no está listo",
+                missing_paths: "Configuración Requerida",
+                missing_paths_desc: "Tanto la 'Raíz de Automatización' como el 'Directorio de Logs' deben estar configurados en Ajustes para ejecutar pruebas y generar informes."
             },
             options: {
                 dont_overwrite: "Guardar Logs"

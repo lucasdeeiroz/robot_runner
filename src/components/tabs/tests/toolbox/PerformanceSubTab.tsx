@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { AlertTriangle, Activity, Cpu, Battery, CircuitBoard, Play, Square, Package as PackageIcon, Eye, RefreshCw, Zap } from "lucide-react";
+import { open } from "@tauri-apps/plugin-dialog";
+import { AlertTriangle, Activity, Cpu, Battery, CircuitBoard, Play, Square, Package as PackageIcon, Eye, RefreshCw, Zap, FolderSearch, Settings } from "lucide-react";
 import clsx from "clsx";
 import { useSettings } from "@/lib/settings";
 import { feedback } from "@/lib/feedback";
@@ -32,6 +33,7 @@ interface PerformanceSubTabProps {
     isLoading?: boolean;
     forceEnable?: boolean;
     setForceEnable?: (val: boolean) => void;
+    onNavigate?: (page: string) => void;
 }
 
 export function PerformanceSubTab({
@@ -52,11 +54,28 @@ export function PerformanceSubTab({
     onRefresh,
     isLoading = false,
     forceEnable = false,
-    setForceEnable
+    setForceEnable,
+    onNavigate
 }: PerformanceSubTabProps) {
     const { t } = useTranslation();
-    const { settings } = useSettings();
+    const { settings, updateSetting } = useSettings();
     const [showHighImpactWarning, setShowHighImpactWarning] = useState(false);
+
+    const handleConfigurePath = async () => {
+        const selected = await open({
+            directory: true,
+            multiple: false,
+            defaultPath: settings.paths.automationRoot || undefined
+        });
+
+        if (selected && typeof selected === 'string') {
+            await updateSetting('paths', {
+                ...settings.paths,
+                logcat: selected
+            });
+            feedback.toast.success(t('settings_page.path_auto_updated', { path: selected }));
+        }
+    };
 
     // Responsive State
     const containerRef = useRef<HTMLDivElement>(null);
@@ -121,31 +140,55 @@ export function PerformanceSubTab({
                 icon={Activity}
                 variant="transparent"
                 status={
-                    <div className="flex items-center gap-2">
-                        <Button
-                            onClick={onRefresh}
-                            variant="ghost"
-                            size="sm"
-                            className="p-1.5 hover:bg-surface-variant/30 rounded transition-all active:scale-95 h-auto"
-                            title={t('performance.refresh')}
-                        >
-                            {isLoading ? (
-                                <ExpressiveLoading size="xsm" variant="circular" className="text-on-surface-variant/80" />
-                            ) : (
-                                <RefreshCw size={16} className="text-on-surface-variant/80" />
-                            )}
-                        </Button>
-                        <Button
-                            onClick={() => setAutoRefresh(!autoRefresh)}
-                            variant="ghost"
-                            size="sm"
-                            className={clsx(
-                                "text-xs px-2 py-1 rounded border transition-all active:scale-95 h-auto",
-                                autoRefresh ? "bg-primary/10 text-primary dark:text-primary/80 border-primary/20" : "bg-surface/50 text-on-surface-variant/80 border-outline-variant"
-                            )}
-                        >
-                            {t('performance.auto', "Auto")}
-                        </Button>
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                            <Button
+                                onClick={onRefresh}
+                                variant="ghost"
+                                size="sm"
+                                className="p-1.5 hover:bg-surface-variant/30 rounded transition-all active:scale-95 h-auto"
+                                title={t('performance.refresh')}
+                            >
+                                {isLoading ? (
+                                    <ExpressiveLoading size="xsm" variant="circular" className="text-on-surface-variant/80" />
+                                ) : (
+                                    <RefreshCw size={16} className="text-on-surface-variant/80" />
+                                )}
+                            </Button>
+                            <Button
+                                onClick={() => setAutoRefresh(!autoRefresh)}
+                                variant="ghost"
+                                size="sm"
+                                className={clsx(
+                                    "text-xs px-2 py-1 rounded border transition-all active:scale-95 h-auto",
+                                    autoRefresh ? "bg-primary/10 text-primary dark:text-primary/80 border-primary/20" : "bg-surface/50 text-on-surface-variant/80 border-outline-variant"
+                                )}
+                            >
+                                {t('performance.auto', "Auto")}
+                            </Button>
+                        </div>
+
+                        {!settings.paths.logcat && (
+                            <div className="flex items-center gap-2 px-3 py-1 bg-warning/10 text-warning rounded-2xl text-[11px] font-medium border border-warning/20">
+                                <FolderSearch size={14} />
+                                <span>{t('logcat.not_saving')}</span>
+                                <button
+                                    onClick={handleConfigurePath}
+                                    className="underline hover:text-warning/80 ml-1"
+                                >
+                                    {t('logcat.configure_path')}
+                                </button>
+                                {onNavigate && (
+                                    <button
+                                        onClick={() => onNavigate?.('settings')}
+                                        className="flex items-center gap-1 hover:text-warning/80 ml-2 border-l border-warning/20 pl-2"
+                                    >
+                                        <Settings size={12} />
+                                        {t('common.go_to_settings')}
+                                    </button>
+                                )}
+                            </div>
+                        )}
                     </div>
                 }
                 menus={!isNarrow ? (

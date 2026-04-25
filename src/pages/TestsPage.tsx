@@ -22,7 +22,7 @@ interface TestsPageProps {
     onNavigate?: (page: string) => void;
 }
 
-export function TestsPage({ onNavigate: _onNavigate }: TestsPageProps) {
+export function TestsPage({ onNavigate }: TestsPageProps) {
     const { t } = useTranslation();
     const { settings, updateSetting } = useSettings();
     const { sessions, activeSessionId, setActiveSessionId, clearSession } = useTestSessions();
@@ -366,7 +366,7 @@ export function TestsPage({ onNavigate: _onNavigate }: TestsPageProps) {
                     <div className="h-full flex-1 min-h-0 flex flex-col relative font-inter">
                         {subTab === 'history' && !isExplorer ? (
                             <div className="flex-1 flex flex-col">
-                                <HistorySubTab />
+                                <HistorySubTab onNavigate={onNavigate} />
                             </div>
                         ) : activeSession ? (
                             <div className="flex-1 min-h-0 flex flex-col">

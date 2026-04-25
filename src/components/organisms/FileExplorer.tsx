@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Folder, File as FileIcon, ChevronRight, CornerLeftUp, FileText, FileCode } from "lucide-react";
+import { open } from "@tauri-apps/plugin-dialog";
+import { Folder, File as FileIcon, ChevronRight, CornerLeftUp, FileText, FileCode, FolderSearch, Settings } from "lucide-react";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
@@ -25,6 +26,8 @@ interface FileExplorerProps {
     allowHideFooter?: boolean;
     renderEntryExtra?: (entry: FileEntry, isSelected: boolean) => React.ReactNode;
     isMultiSelect?: boolean;
+    fallbackType?: 'tests' | 'suites';
+    onNavigate?: (page: string) => void;
 }
 
 export function FileExplorer({ 
@@ -36,11 +39,13 @@ export function FileExplorer({
     onSelectionChange, 
     allowHideFooter = false, 
     renderEntryExtra,
-    isMultiSelect = true
+    isMultiSelect = true,
+    fallbackType,
+    onNavigate
 }: FileExplorerProps) {
     const { t } = useTranslation();
     const { toggleItem, isSelected: checkIsSelected } = useSelection();
-    const { settings } = useSettings();
+    const { settings, updateSetting } = useSettings();
     const rootPath = settings.paths.automationRoot;
     const [currentPath, setCurrentPath] = useState(initialPath);
     const [entries, setEntries] = useState<FileEntry[]>([]);
@@ -154,6 +159,28 @@ export function FileExplorer({
         }
     };
 
+    const handleSelectFolder = async () => {
+        const selected = await open({
+            directory: true,
+            multiple: false,
+            defaultPath: rootPath || undefined
+        });
+
+        if (selected && typeof selected === 'string') {
+            if (fallbackType) {
+                const key = fallbackType === 'tests' ? 'tests' : 'suites';
+                await updateSetting('paths', {
+                    ...settings.paths,
+                    [key]: selected
+                });
+                feedback.toast.success(t('settings_page.path_auto_updated', { path: selected }));
+            }
+            setCurrentPath(selected);
+        }
+    };
+
+    const isPathUnconfigured = fallbackType && (!initialPath || initialPath === "." || initialPath.trim() === "");
+
     return (
         <div className="flex flex-col h-full">
             <WarningModal
@@ -163,87 +190,126 @@ export function FileExplorer({
                 description={warningModal.message}
             />
             {/* Header / Breadcrumb */}
-            <div className="flex items-center gap-2 mb-2 p-2 bg-transparent backdrop-blur-md rounded-2xl border border-outline-variant/30 shrink-0">
-                <button
-                    onClick={handleUp}
-                    disabled={currentPath === rootPath}
-                    className="p-1 hover:bg-surface-variant/50 rounded transition-colors text-on-surface-variant/80 disabled:opacity-30 disabled:cursor-not-allowed"
-                    title={t('file_explorer.up')}
-                >
-                    <CornerLeftUp size={18} />
-                </button>
-                <div className="flex-1 font-mono text-sm truncate px-2 text-on-surface/80">
-                    {rootPath && currentPath.startsWith(rootPath) 
-                        ? (currentPath === rootPath ? './' : currentPath.replace(rootPath, '').replace(/^[\\/]/, ''))
-                        : currentPath}
+            {!isPathUnconfigured && (
+                <div className="flex items-center gap-2 mb-2 p-2 bg-transparent backdrop-blur-md rounded-2xl border border-outline-variant/30 shrink-0">
+                    <button
+                        onClick={handleUp}
+                        disabled={currentPath === rootPath}
+                        className="p-1 hover:bg-surface-variant/50 rounded transition-colors text-on-surface-variant/80 disabled:opacity-30 disabled:cursor-not-allowed"
+                        title={t('file_explorer.up')}
+                    >
+                        <CornerLeftUp size={18} />
+                    </button>
+                    <div className="flex-1 font-mono text-sm truncate px-2 text-on-surface/80">
+                        {rootPath && currentPath.startsWith(rootPath) 
+                            ? (currentPath === rootPath ? './' : currentPath.replace(rootPath, '').replace(/^[\\/]/, ''))
+                            : currentPath}
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto border border-outline-variant/30 rounded-2xl bg-transparent backdrop-blur-md p-1 min-h-0">
-                {loading && (
-                    <div className="flex flex-col items-center justify-center h-full text-on-surface/80">
-                        <ExpressiveLoading size="md" variant="circular" className="mb-2" />
-                        <span className="text-xs">{t('file_explorer.loading')}</span>
-                    </div>
-                )}
-
-                {error && (
-                    <div className="flex flex-col items-center justify-center h-full text-error">
-                        <span className="text-sm">{error}</span>
-                        <button onClick={() => loadDirectory(".")} className="mt-4 text-xs underline">
-                            {t('file_explorer.reset')}
+                {isPathUnconfigured ? (
+                    <div className="flex flex-col items-center justify-center h-full text-center p-6 space-y-4">
+                        <div className="p-4 bg-primary/10 rounded-full text-primary">
+                            <FolderSearch size={48} />
+                        </div>
+                        <div className="space-y-2">
+                            <h3 className="text-lg font-medium text-on-surface">
+                                {t('file_explorer.not_configured')}
+                            </h3>
+                            <p className="text-sm text-on-surface-variant max-w-xs mx-auto">
+                                {fallbackType === 'tests' 
+                                    ? t('file_explorer.configure_tests')
+                                    : t('file_explorer.configure_suites')}
+                            </p>
+                        </div>
+                        <button
+                            onClick={handleSelectFolder}
+                            className="flex items-center gap-2 px-6 py-2.5 bg-primary text-on-primary rounded-2xl text-sm font-medium hover:bg-primary/90 transition-all shadow-md active:scale-95"
+                        >
+                            <Folder size={18} />
+                            {t('file_explorer.select_folder_btn')}
                         </button>
-                    </div>
-                )}
 
-                {!loading && !error && (
-                    <div className="flex flex-col gap-0.5">
-                        {entries.map(entry => {
-                            const isSelected = checkIsSelected(entry.path);
-                            const isActive = selectedEntry?.path === entry.path;
-                            return (
-                                <div
-                                    key={entry.path}
-                                    onClick={() => handleEntryClick(entry)}
-                                    onDoubleClick={() => entry.is_dir ? handleNavigate(entry.path) : (onSelect && onSelect(entry.path))}
-                                    className={clsx(
-                                        "flex items-center gap-3 px-3 py-2 rounded-2xl cursor-pointer text-sm select-none transition-all",
-                                        isSelected 
-                                            ? "bg-secondary-container/50 text-on-secondary-container ring-1 ring-primary/30"
-                                            : isActive
-                                                ? "bg-secondary-container/30 text-on-secondary-container"
-                                                : "hover:bg-surface-variant/30 text-on-surface/80"
-                                    )}
-                                >
-                                    {entry.is_dir ? (
-                                        <Folder size={18} className={clsx(
-                                            "shrink-0",
-                                            isSelected ? "text-primary fill-primary/20" : "text-warning-container fill-warning-container/50"
-                                        )} />
-                                    ) : (
-                                        (() => {
-                                            const Icon = entry.name.endsWith('.robot') ? FileCode : (entry.name.endsWith('.args') || entry.name.endsWith('.txt')) ? FileText : FileIcon;
-                                            return <Icon size={18} className={clsx(
-                                                "shrink-0",
-                                                isSelected ? "text-primary" : "text-on-surface/80"
-                                            )} />;
-                                        })()
-                                    )}
-                                    <span className={clsx("truncate flex-1", isSelected && "text-primary font-medium")}>
-                                        {entry.name}
-                                    </span>
-                                    {renderEntryExtra && renderEntryExtra(entry, isSelected)}
-                                    {entry.is_dir && <ChevronRight size={14} className="text-on-surface/80 opacity-50" />}
-                                </div>
-                            );
-                        })}
-                        {entries.length === 0 && (
-                            <div className="text-center text-on-surface/80 py-8 text-xs italic">
-                                {t('file_explorer.empty')}
-                            </div>
+                        {onNavigate && (
+                            <button
+                                onClick={() => onNavigate?.('settings')}
+                                className="flex items-center gap-2 px-6 py-2 text-on-surface-variant/60 hover:text-primary transition-all text-sm"
+                            >
+                                <Settings size={14} />
+                                {t('common.go_to_settings', "Go to Settings")}
+                            </button>
                         )}
                     </div>
+                ) : (
+                    <>
+                        {loading && (
+                            <div className="flex flex-col items-center justify-center h-full text-on-surface/80">
+                                <ExpressiveLoading size="md" variant="circular" className="mb-2" />
+                                <span className="text-xs">{t('file_explorer.loading')}</span>
+                            </div>
+                        )}
+
+                        {error && (
+                            <div className="flex flex-col items-center justify-center h-full text-error">
+                                <span className="text-sm">{error}</span>
+                                <button onClick={() => loadDirectory(".")} className="mt-4 text-xs underline">
+                                    {t('file_explorer.reset')}
+                                </button>
+                            </div>
+                        )}
+
+                        {!loading && !error && (
+                            <div className="flex flex-col gap-0.5">
+                                {entries.map(entry => {
+                                    const isSelected = checkIsSelected(entry.path);
+                                    const isActive = selectedEntry?.path === entry.path;
+                                    return (
+                                        <div
+                                            key={entry.path}
+                                            onClick={() => handleEntryClick(entry)}
+                                            onDoubleClick={() => entry.is_dir ? handleNavigate(entry.path) : (onSelect && onSelect(entry.path))}
+                                            className={clsx(
+                                                "flex items-center gap-3 px-3 py-2 rounded-2xl cursor-pointer text-sm select-none transition-all",
+                                                isSelected 
+                                                    ? "bg-secondary-container/50 text-on-secondary-container ring-1 ring-primary/30"
+                                                    : isActive
+                                                        ? "bg-secondary-container/30 text-on-secondary-container"
+                                                        : "hover:bg-surface-variant/30 text-on-surface/80"
+                                            )}
+                                        >
+                                            {entry.is_dir ? (
+                                                <Folder size={18} className={clsx(
+                                                    "shrink-0",
+                                                    isSelected ? "text-primary fill-primary/20" : "text-warning-container fill-warning-container/50"
+                                                )} />
+                                            ) : (
+                                                (() => {
+                                                    const Icon = entry.name.endsWith('.robot') ? FileCode : (entry.name.endsWith('.args') || entry.name.endsWith('.txt')) ? FileText : FileIcon;
+                                                    return <Icon size={18} className={clsx(
+                                                        "shrink-0",
+                                                        isSelected ? "text-primary" : "text-on-surface/80"
+                                                    )} />;
+                                                })()
+                                            )}
+                                            <span className={clsx("truncate flex-1", isSelected && "text-primary font-medium")}>
+                                                {entry.name}
+                                            </span>
+                                            {renderEntryExtra && renderEntryExtra(entry, isSelected)}
+                                            {entry.is_dir && <ChevronRight size={14} className="text-on-surface/80 opacity-50" />}
+                                        </div>
+                                    );
+                                })}
+                                {entries.length === 0 && (
+                                    <div className="text-center text-on-surface/80 py-8 text-xs italic">
+                                        {t('file_explorer.empty')}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
 

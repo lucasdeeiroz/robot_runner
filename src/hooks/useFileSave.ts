@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { save } from '@tauri-apps/plugin-dialog';
-import { join } from '@tauri-apps/api/path';
+import { join, dirname } from '@tauri-apps/api/path';
 import { AppSettings, useSettings } from '@/lib/settings';
 import { feedback } from '@/lib/feedback';
 import { useTranslation } from 'react-i18next';
@@ -13,7 +13,7 @@ interface UseFileSaveOptions {
 }
 
 export function useFileSave({ fileType, extensions, defaultNamePrefix, settingPathKey }: UseFileSaveOptions) {
-    const { settings } = useSettings();
+    const { settings, updateSetting } = useSettings();
     const { t } = useTranslation();
     const [lastSavedPath, setLastSavedPath] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
@@ -50,19 +50,36 @@ export function useFileSave({ fileType, extensions, defaultNamePrefix, settingPa
             }
 
             // 2. Fallback to Dialog
+            let dialogUsed = false;
             if (!filePath) {
                 filePath = await save({
                     filters: [{ name: fileType, extensions }],
                     defaultPath: filename
                 });
+                if (filePath) dialogUsed = true;
             }
 
             // 3. Execute Action
             if (filePath) {
                 await actionCallback(filePath);
+
+                // 4. Persist Path if chosen via Dialog
+                if (dialogUsed && settingPathKey) {
+                    try {
+                        const newPath = await dirname(filePath);
+                        const currentPaths = settings.paths || {};
+                        await updateSetting('paths', {
+                            ...currentPaths,
+                            [settingPathKey]: newPath
+                        });
+                        feedback.toast.success(t('settings_page.path_auto_updated', { path: newPath }));
+                    } catch (e) {
+                        console.error("Failed to persist auto-selected path", e);
+                    }
+                }
+
                 setLastSavedPath(filePath);
                 feedback.toast.success(successMessageKey);
-                // Optionally notify generic 'saved to' if needed, but feedback component usually handles display
                 return filePath;
             }
         } catch (e) {
