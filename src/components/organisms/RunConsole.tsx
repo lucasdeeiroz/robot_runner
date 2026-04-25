@@ -167,8 +167,9 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
             setReparseLoading(true);
             try {
                 // Try to find the detected output XML from logs first, then fallback to output.xml
-                const detectedXml = session.outputDir?.includes('.xml') ? session.outputDir : null;
-                const outputXmlPath = detectedXml || `${session.outputDir}/output.xml`.replace(/\//g, '\\');
+                const outputPath = session.outputDir;
+                const detectedXml = /\.xml$/i.test(outputPath) ? outputPath : null;
+                const outputXmlPath = detectedXml || `${outputPath.replace(/[\\/]+$/, "")}/output.xml`;
                 const result = await parseXmlBackground(outputXmlPath);
                 if (!cancelled && result) {
                     setTree([result.rootSuite]);
