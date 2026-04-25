@@ -168,8 +168,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
             try {
                 // Try to find the detected output XML from logs first, then fallback to output.xml
                 const outputPath = session.outputDir!;
-                const detectedXml = /\.xml$/i.test(outputPath) ? outputPath : null;
-                const outputXmlPath = detectedXml || `${outputPath.replace(/[\\/]+$/, "")}/output.xml`;
+                const outputXmlPath = session.outputXmlPath || `${outputPath.replace(/[\\/]+$/, "")}/output.xml`;
                 const result = await parseXmlBackground(outputXmlPath);
                 if (!cancelled && result) {
                     setTree([result.rootSuite]);
@@ -309,9 +308,8 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
             }
 
             const outputDir = getDirectoryFromFilePath(outputXmlPath);
-            if (outputDir) {
-                setSessionTree(runId, undefined, undefined, outputDir);
-            }
+            // Save both separately: the XML file for parsing, and its directory for the 'Open Folder' button
+            setSessionTree(runId, undefined, undefined, outputDir, outputXmlPath);
         };
 
         if (currentCount > processedCount) {
@@ -773,7 +771,15 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                             {session?.outputDir && (
                                 <button
                                     onClick={async () => {
-                                        const path = session.outputDir!;
+                                        let path = session.outputDir!;
+                                        // Safety check: if outputDir was somehow set to a file, take its parent directory
+                                        if (path.toLowerCase().endsWith('.xml')) {
+                                            const normalized = path.replace(/[\\/]+$/, "");
+                                            const lastSeparator = Math.max(normalized.lastIndexOf("/"), normalized.lastIndexOf("\\"));
+                                            if (lastSeparator > 0) {
+                                                path = normalized.slice(0, lastSeparator);
+                                            }
+                                        }
                                         try {
                                             await invoke('open_log_folder', { path });
                                         } catch (e) {

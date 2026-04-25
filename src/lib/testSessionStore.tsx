@@ -26,6 +26,7 @@ export interface TestSession {
     repopulatedTree?: any; // To avoid circular imports or complex types, using any for LogNode
     parsedDbPath?: string;
     outputDir?: string;
+    outputXmlPath?: string;
     artifactPaths?: { log?: string, report?: string, output?: string };
 }
 
@@ -49,7 +50,7 @@ interface TestSessionContextType {
     activeSessionId: string | 'dashboard';
     setActiveSessionId: (id: string | 'dashboard') => void;
     setSessionActiveTool: (runId: string, tool: string) => void;
-    setSessionTree: (runId: string, tree?: any, dbPath?: string, outputDir?: string) => void;
+    setSessionTree: (runId: string, tree?: any, dbPath?: string, outputDir?: string, outputXmlPath?: string) => void;
     updateSessionArtifacts: (runId: string, paths: Partial<NonNullable<TestSession['artifactPaths']>>) => void;
     appiumRunning: boolean;
 }
@@ -404,12 +405,13 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
         setSessions(prev => prev.map(s => s.runId === runId ? { ...s, lastActiveTool: tool } : s));
     }, []);
 
-    const setSessionTree = useCallback((runId: string, tree?: any, dbPath?: string, outputDir?: string) => {
+    const setSessionTree = useCallback((runId: string, tree?: any, dbPath?: string, outputDir?: string, outputXmlPath?: string) => {
         setSessions(prev => prev.map(s => s.runId === runId ? { 
             ...s, 
             ...(tree !== undefined ? { repopulatedTree: tree } : {}),
             ...(dbPath !== undefined ? { parsedDbPath: dbPath } : {}),
-            ...(outputDir !== undefined ? { outputDir } : {})
+            ...(outputDir !== undefined ? { outputDir } : {}),
+            ...(outputXmlPath !== undefined ? { outputXmlPath } : {})
         } : s));
     }, []);
 
