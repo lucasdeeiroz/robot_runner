@@ -408,7 +408,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                     const raw = cleanLine.replace("[RR-SUITE-END]", "").trim();
                     const parts = raw.split(" | ");
                     const { name, doc } = splitNameAndDoc(parts[0]);
-                    const status = (parts[1] || 'PASS').trim() as 'PASS' | 'FAIL';
+                    const status = (parts[1] || 'PASS').trim() as 'PASS' | 'FAIL' | 'SKIP';
                     linearNodes.push({ type: 'suite-end', name, doc, status: status, summary: '', id: `rr-s-end-${processedCount + i}` });
                 } else if (IS_RR_TEST_END(cleanLine)) {
                     const parts = cleanLine.replace("[RR-TEST-END]", "").split(" | ");
