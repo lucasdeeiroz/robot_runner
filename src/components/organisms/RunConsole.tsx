@@ -275,14 +275,31 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
         const IS_RR_TEST_END = (l: string) => l.startsWith("[RR-TEST-END]");
         const IS_REDUNDANT_SYSTEM = (l: string) => l.trim().startsWith('[System]') || /^\s*(Output|Log|Report):/.test(l) || IS_STATUS(l) || l.startsWith("[RR-");
 
+        const extractOutputXmlPath = (l: string): string | undefined => {
+            const clean = cleanAnsi(l).trim();
+            const match = clean.match(/^\s*Output:\s*["']?(.+?\.xml)\b["']?(?:\s+.*)?$/i);
+            return match?.[1]?.trim();
+        };
+
+        const getDirectoryFromFilePath = (filePath: string): string | undefined => {
+            const normalized = filePath.trim().replace(/[\\/]+$/, "");
+            const lastSeparator = Math.max(normalized.lastIndexOf("/"), normalized.lastIndexOf("\\"));
+            if (lastSeparator <= 0) {
+                return lastSeparator === 0 ? normalized.slice(0, 1) : undefined;
+            }
+            return normalized.slice(0, lastSeparator);
+        };
+
         // Helper to detect output XML from logs
         const detectOutputXml = (l: string) => {
-            const clean = cleanAnsi(l).trim();
-            if (clean.startsWith('Output:') && clean.endsWith('.xml')) {
-                const path = clean.replace('Output:', '').trim();
-                if (path) {
-                    setSessionTree(runId, undefined, undefined, path); // Use setSessionTree to update outputDir/xml path
-                }
+            const outputXmlPath = extractOutputXmlPath(l);
+            if (!outputXmlPath) {
+                return;
+            }
+
+            const outputDir = getDirectoryFromFilePath(outputXmlPath);
+            if (outputDir) {
+                setSessionTree(runId, undefined, undefined, outputDir);
             }
         };
 
