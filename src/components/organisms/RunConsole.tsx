@@ -166,8 +166,9 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
         const parseOutputXml = async () => {
             setReparseLoading(true);
             try {
-                // Robot Framework always creates output.xml in the output directory
-                const outputXmlPath = `${session.outputDir}/output.xml`.replace(/\//g, '\\');
+                // Try to find the detected output XML from logs first, then fallback to output.xml
+                const detectedXml = session.outputDir?.includes('.xml') ? session.outputDir : null;
+                const outputXmlPath = detectedXml || `${session.outputDir}/output.xml`.replace(/\//g, '\\');
                 const result = await parseXmlBackground(outputXmlPath);
                 if (!cancelled && result) {
                     setTree([result.rootSuite]);
@@ -273,6 +274,17 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
         const IS_RR_TEST_END = (l: string) => l.startsWith("[RR-TEST-END]");
         const IS_REDUNDANT_SYSTEM = (l: string) => l.trim().startsWith('[System]') || /^\s*(Output|Log|Report):/.test(l) || IS_STATUS(l) || l.startsWith("[RR-");
 
+        // Helper to detect output XML from logs
+        const detectOutputXml = (l: string) => {
+            const clean = cleanAnsi(l).trim();
+            if (clean.startsWith('Output:') && clean.endsWith('.xml')) {
+                const path = clean.replace('Output:', '').trim();
+                if (path) {
+                    setSessionTree(runId, undefined, undefined, path); // Use setSessionTree to update outputDir/xml path
+                }
+            }
+        };
+
         if (currentCount > processedCount) {
             const newLogs = logs.slice(processedCount);
             const linearNodes = parsedNodesRef.current;
@@ -281,6 +293,8 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                 let line = newLogs[i];
                 const cleanLine = line.replace(/\x1b\[[0-9;]*m/g, '').replace(/[\x00-\x1f\x7f-\x9f]/g, '').trim();
                 const isSystem = IS_SYSTEM(line);
+
+                if (isSystem) detectOutputXml(line);
 
 
                 if (IS_MAESTRO_VERBOSE(line)) {
@@ -658,7 +672,15 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                                     }
 
                                     // Conservative heuristic: only start a new test if the line doesn't look like a log/status line
-                                    const isLikelyLog = name.startsWith('|') || name.startsWith('...') || name.startsWith('Arguments:');
+                                    // Also check for common error prefixes and length
+                                    const isLikelyLog = name.startsWith('|') || 
+                                                       name.startsWith('...') || 
+                                                       name.startsWith('Arguments:') ||
+                                                       name.startsWith('Traceback') ||
+                                                       name.startsWith('TypeError') ||
+                                                       name.length > 100 ||
+                                                       name.includes('did not appear in');
+                                    
                                     if (isLikelyLog) {
                                         addToCurrentContext({ type: 'text', content: line, id: nodeId });
                                         return;
