@@ -8,7 +8,7 @@ import {
     ChevronRight, ChevronDown, CheckCircle2, XCircle, MinusCircle,
     Layers, BugPlay, CirclePlay, Repeat, IterationCcw, Workflow,
     Infinity, Split, StepForward, CalendarCog, Maximize2,
-    ShieldAlert, Anchor, Hand, CircleSlash
+    ShieldAlert, Anchor, Hand, CircleSlash, Info, CornerDownRight
 } from "lucide-react";
 import { LogNode, TestNode, KeywordNode, SuiteNode } from "@/lib/robotParser";
 import { LinkRenderer } from "../molecules/LinkRenderer";
@@ -78,7 +78,19 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({
 
     const isInterrupted = computedStatus === 'FAIL' && failureMessage.includes('Execution terminated by signal');
 
+    const hasChildrenArray = (node as any).children && (node as any).children.length > 0;
+    const hasLazyChildren = lazyChildren && lazyChildren.length > 0;
+    const hasMetadata = !!((node as any).doc || (node as any).ret || (node as any).aiAnalysis);
+    const hasFailure = node.type === 'test' && !!(node as TestNode).failureDetail;
+    const hasLogs = node.type === 'test' && (node as TestNode).logs && (node as TestNode).logs.length > 0;
+    const hasScreenshot = (node.type === 'keyword' && !!(node as KeywordNode).screenshotPath) || 
+                          (node.type === 'test' && !!(node as TestNode).failureDetail?.screenshotPath);
+
+    // A node can be expanded if it has any children, lazy-load flag, documentation, return values, logs, failure details or screenshots
+    const canExpand = (node as any).hasChildren || hasChildrenArray || hasLazyChildren || hasMetadata || hasFailure || hasLogs || hasScreenshot;
+
     const toggleOpen = () => {
+        if (!canExpand) return;
         if (isFlatRow) {
             onToggleExpand?.(node.id, !isExpanded);
         } else {
@@ -221,7 +233,8 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({
         >
             <div
                 className={clsx(
-                    "flex items-center gap-2 p-2 cursor-pointer hover:bg-on-surface/5 min-w-0 relative",
+                    "flex items-center gap-2 p-2 min-w-0 relative",
+                    canExpand ? "cursor-pointer hover:bg-on-surface/5" : "cursor-default",
                     !isFlatRow && "rounded-t-xl",
                     isFlatRow && depth === 0 && "rounded-t-xl",
                     (node.type === 'suite' || node.type === 'test') && "pl-4"
@@ -235,7 +248,11 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({
                     )} />
                 )}
                 <div className="flex items-center gap-2 flex-1 min-w-0">
-                    {isOpen ? <ChevronDown size={14} className="text-on-surface-variant/80 shrink-0" /> : <ChevronRight size={14} className="text-on-surface-variant/80 shrink-0" />}
+                    {canExpand ? (
+                        isOpen ? <ChevronDown size={14} className="text-on-surface-variant/80 shrink-0" /> : <ChevronRight size={14} className="text-on-surface-variant/80 shrink-0" />
+                    ) : (
+                        <div className="w-[14px] h-[14px] shrink-0" /> // Spacer for alignment
+                    )}
 
                     {node.type === 'suite' && <Layers size={14} className="opacity-70 shrink-0" />}
                     {node.type === 'test' && <BugPlay size={14} className="opacity-70 shrink-0" />}
@@ -327,6 +344,31 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({
                     "flex flex-col gap-1 p-2 pl-4 border-t border-on-surface/5",
                     isFlatRow && "bg-on-surface/[0.02]"
                 )}>
+                    {/* Documentation Section */}
+                    {(node as any).doc && (
+                        <div className="mb-2 p-2.5 bg-on-surface/[0.03] border border-on-surface/5 rounded-lg text-[11px] animate-in fade-in slide-in-from-top-1">
+                            <div className="flex items-center gap-1.5 opacity-40 font-bold uppercase tracking-wider mb-1">
+                                <Info size={10} />
+                                {t('run_tab.console.documentation', 'Documentation')}
+                            </div>
+                            <div className="text-on-surface-variant/80 italic whitespace-pre-wrap leading-relaxed font-medium">
+                                {(node as any).doc}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Return Value Section */}
+                    {(node.type === 'keyword' || node.type === 'test') && (node as any).ret && (
+                        <div className="mb-2 p-2.5 bg-success/5 border border-success/10 rounded-lg text-[11px] animate-in fade-in slide-in-from-top-1">
+                            <div className="flex items-center gap-1.5 text-success/60 font-bold uppercase tracking-wider mb-1">
+                                <CornerDownRight size={10} />
+                                {t('run_tab.console.return_value', 'Return Value')}
+                            </div>
+                            <div className="font-mono text-success/90 break-all bg-success/10 p-1.5 rounded border border-success/5">
+                                {(node as KeywordNode).ret}
+                            </div>
+                        </div>
+                    )}
                     {node.type === 'test' && (isFailed || isFatalError) && (node as TestNode).failureDetail && (
                         <div className={clsx(
                             "mb-2 p-2 border rounded-xl text-xs animate-in fade-in slide-in-from-top-1 flex flex-col gap-4",

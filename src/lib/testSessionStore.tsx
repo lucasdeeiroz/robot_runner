@@ -25,6 +25,7 @@ export interface TestSession {
     sessionEpoch: number; // Incremented on recycle to force RunConsole remount
     repopulatedTree?: any; // To avoid circular imports or complex types, using any for LogNode
     parsedDbPath?: string;
+    outputDir?: string;
     artifactPaths?: { log?: string, report?: string, output?: string };
 }
 
@@ -40,7 +41,7 @@ interface TestFinishedPayload {
 
 interface TestSessionContextType {
     sessions: TestSession[];
-    addSession: (runId: string, deviceUdid: string, deviceName: string, testPath: string, framework: 'robot' | 'maestro' | 'appium', timestampOutputs: boolean, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string, selectedTests?: string[]) => void;
+    addSession: (runId: string, deviceUdid: string, deviceName: string, testPath: string, framework: 'robot' | 'maestro' | 'appium', timestampOutputs: boolean, outputDir?: string, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string, selectedTests?: string[]) => void;
     addToolboxSession: (deviceUdid: string, deviceName: string, deviceModel?: string, androidVersion?: string) => void; // New action
     rerunSession: (runId: string, rerunFailedFrom?: string) => Promise<void>;
     stopSession: (runId: string) => Promise<void>;
@@ -48,7 +49,7 @@ interface TestSessionContextType {
     activeSessionId: string | 'dashboard';
     setActiveSessionId: (id: string | 'dashboard') => void;
     setSessionActiveTool: (runId: string, tool: string) => void;
-    setSessionTree: (runId: string, tree: any, dbPath: string) => void;
+    setSessionTree: (runId: string, tree?: any, dbPath?: string, outputDir?: string) => void;
     updateSessionArtifacts: (runId: string, paths: Partial<NonNullable<TestSession['artifactPaths']>>) => void;
     appiumRunning: boolean;
 }
@@ -129,7 +130,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
 
 
 
-    const addSession = useCallback((runId: string, deviceUdid: string, deviceName: string, testPath: string, framework: 'robot' | 'maestro' | 'appium', timestampOutputs: boolean, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string, selectedTests?: string[]) => {
+    const addSession = useCallback((runId: string, deviceUdid: string, deviceName: string, testPath: string, framework: 'robot' | 'maestro' | 'appium', timestampOutputs: boolean, outputDir?: string, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string, selectedTests?: string[]) => {
         setSessions(prev => {
             // Check for recycling
             if (settings.recycleDeviceViews) {
@@ -150,6 +151,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                         testPath,
                         logs: [`[System] Starting test session: ${runId}`, `[System] Device: ${deviceName}`, `[System] Suite: ${testPath}`, '----------------------------------------'],
                         status: 'running',
+                        outputDir,
                         argumentsFile,
                         deviceModel,
                         androidVersion,
@@ -181,6 +183,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     timestampOutputs,
                     logs: [`[System] Starting test session: ${runId}`, `[System] Device: ${deviceName}`, `[System] Suite: ${testPath}`, '----------------------------------------'],
                     status: 'running',
+                    outputDir,
                     argumentsFile: argumentsFile,
                     deviceModel,
                     androidVersion,
@@ -308,7 +311,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
         }
 
         // Add new session immediately
-        addSession(newRunId, session.deviceUdid, session.deviceName, session.testPath, session.framework, session.timestampOutputs || false, session.argumentsFile, session.deviceModel, session.androidVersion, session.selectedTests);
+        addSession(newRunId, session.deviceUdid, session.deviceName, session.testPath, session.framework, session.timestampOutputs || false, outputDir, session.argumentsFile, session.deviceModel, session.androidVersion, session.selectedTests);
 
         try {
             // Check Appium (Skip for Maestro)
@@ -401,8 +404,13 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
         setSessions(prev => prev.map(s => s.runId === runId ? { ...s, lastActiveTool: tool } : s));
     }, []);
 
-    const setSessionTree = useCallback((runId: string, tree: any, dbPath: string) => {
-        setSessions(prev => prev.map(s => s.runId === runId ? { ...s, repopulatedTree: tree, parsedDbPath: dbPath } : s));
+    const setSessionTree = useCallback((runId: string, tree?: any, dbPath?: string, outputDir?: string) => {
+        setSessions(prev => prev.map(s => s.runId === runId ? { 
+            ...s, 
+            ...(tree !== undefined ? { repopulatedTree: tree } : {}),
+            ...(dbPath !== undefined ? { parsedDbPath: dbPath } : {}),
+            ...(outputDir !== undefined ? { outputDir } : {})
+        } : s));
     }, []);
 
     const updateSessionArtifacts = useCallback((runId: string, paths: Partial<NonNullable<TestSession['artifactPaths']>>) => {

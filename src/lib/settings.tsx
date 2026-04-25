@@ -150,7 +150,7 @@ interface SettingsContextType {
     deleteProfile: (id: string) => void;
     loading: boolean;
     systemVersions: SystemVersions | null;
-    checkSystemVersions: (forceUsageMode?: 'explorer' | 'automator') => Promise<void>;
+    checkSystemVersions: (forceUsageMode?: 'explorer' | 'automator', forceFramework?: 'robot' | 'appium' | 'maestro') => Promise<void>;
     systemCheckStatus: SystemCheckStatus;
     updateInfo: UpdateInfo | null;
     checkForAppUpdate: (manual?: boolean) => Promise<void>;
@@ -389,13 +389,17 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         missingTunnelling: []
     });
 
-    const checkSystemVersions = async () => {
+    const checkSystemVersions = async (forceUsageMode?: 'explorer' | 'automator', forceFramework?: 'robot' | 'appium' | 'maestro') => {
         setSystemCheckStatus(prev => ({ ...prev, loading: true }));
         try {
+            // Use provided overrides or fall back to current settings
+            const mode = forceUsageMode || activeProfile.settings.usageMode;
+            const framework = forceFramework || activeProfile.settings.automationFramework || 'robot';
+
             // Conditionally skip ngrok and automator dependencies checks
             const versions = await invoke<SystemVersions>('get_system_versions', {
-                checkAutomator: activeProfile.settings.usageMode !== 'explorer',
-                framework: activeProfile.settings.automationFramework,
+                checkAutomator: mode !== 'explorer',
+                framework: framework,
                 checkNgrok: isNgrokEnabled
             });
 

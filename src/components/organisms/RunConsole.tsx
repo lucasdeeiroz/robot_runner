@@ -2,11 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { Virtuoso, VirtuosoHandle } from "react-virtuoso";
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
-import { Star, ExternalLink, FileOutput, Eye, EyeOff, Terminal, X } from "lucide-react";
-import { openPath } from "@tauri-apps/plugin-opener";
+import { Star, Eye, EyeOff, Terminal, X, FolderOpen } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { parseXmlBackground } from "@/lib/xmlParseCache";
-import { Button } from "@/components/atoms/Button";
 import {
     LogNode,
     LinearNode, SuiteNode, TestNode, TextNode
@@ -31,7 +29,7 @@ interface RunConsoleProps {
 
 export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath }: RunConsoleProps) {
     const { t, i18n } = useTranslation();
-    const { sessions, setSessionTree, updateSessionArtifacts } = useTestSessions();
+    const { sessions, setSessionTree } = useTestSessions();
     const session = sessions.find(s => s.runId === runId);
 
     const [isRawMode, setIsRawMode] = useState(false);
@@ -49,7 +47,6 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
     const containerRef = useRef<HTMLDivElement>(null);
     const [tree, setTree] = useState<LogNode[]>(() => session?.repopulatedTree ? [session.repopulatedTree] : []);
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-    const [artifactPaths, setArtifactPaths] = useState(() => session?.artifactPaths || {});
 
     const handleToggleExpand = useCallback((id: string, expanded: boolean) => {
         setExpandedIds(prev => {
@@ -90,10 +87,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
         if (session?.repopulatedTree && tree.length === 0) {
             setTree([session.repopulatedTree]);
         }
-        if (session?.artifactPaths && JSON.stringify(session.artifactPaths) !== JSON.stringify(artifactPaths)) {
-            setArtifactPaths(session.artifactPaths);
-        }
-    }, [session?.repopulatedTree, session?.artifactPaths]);
+    }, [session?.repopulatedTree]);
 
     // Auto-scroll logic for tree (Non-virtualized part)
     useEffect(() => {
@@ -165,14 +159,18 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
 
     useEffect(() => {
         // Skip if running, or no output path, or tree is already officially repopulated
-        if (isRunning || !artifactPaths.output || !!session?.repopulatedTree) return;
+        if (isRunning || !session?.outputDir || !!session?.repopulatedTree) return;
 
         let cancelled = false;
 
         const parseOutputXml = async () => {
             setReparseLoading(true);
             try {
-                const result = await parseXmlBackground(artifactPaths.output!);
+                // Try to find the detected output XML from logs first, then fallback to output.xml
+                const outputPath = session.outputDir;
+                const detectedXml = /\.xml$/i.test(outputPath) ? outputPath : null;
+                const outputXmlPath = detectedXml || `${outputPath.replace(/[\\/]+$/, "")}/output.xml`;
+                const result = await parseXmlBackground(outputXmlPath);
                 if (!cancelled && result) {
                     setTree([result.rootSuite]);
                     setSessionTree(runId, result.rootSuite, result.dbPath);
@@ -186,7 +184,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
 
         parseOutputXml();
         return () => { cancelled = true; };
-    }, [isRunning, artifactPaths.output, session?.repopulatedTree]);
+    }, [isRunning, session?.outputDir, session?.repopulatedTree]);
 
     const handleSummarize = async (customPrompt?: string) => {
         if (tree.length === 0 || isSummarizing) return;
@@ -232,7 +230,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
     // Parse incremental logs
     useEffect(() => {
         // Skip log parsing if we already have a repopped tree and the test is finished
-        if (!isRunning && tree.length > 0 && (session?.repopulatedTree || artifactPaths.output)) {
+        if (!isRunning && tree.length > 0 && (session?.repopulatedTree || session?.outputDir)) {
             processedCountRef.current = logs.length; // Mark all as processed
             return;
         }
@@ -246,7 +244,6 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
             processedCountRef.current = 0;
             bufferRef.current = [];
             pendingSuiteStartRef.current = false;
-            setArtifactPaths({});
             setTree([]);
             return;
         }
@@ -278,6 +275,34 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
         const IS_RR_TEST_END = (l: string) => l.startsWith("[RR-TEST-END]");
         const IS_REDUNDANT_SYSTEM = (l: string) => l.trim().startsWith('[System]') || /^\s*(Output|Log|Report):/.test(l) || IS_STATUS(l) || l.startsWith("[RR-");
 
+        const extractOutputXmlPath = (l: string): string | undefined => {
+            const clean = cleanAnsi(l).trim();
+            const match = clean.match(/^\s*Output:\s*["']?(.+?\.xml)\b["']?(?:\s+.*)?$/i);
+            return match?.[1]?.trim();
+        };
+
+        const getDirectoryFromFilePath = (filePath: string): string | undefined => {
+            const normalized = filePath.trim().replace(/[\\/]+$/, "");
+            const lastSeparator = Math.max(normalized.lastIndexOf("/"), normalized.lastIndexOf("\\"));
+            if (lastSeparator <= 0) {
+                return lastSeparator === 0 ? normalized.slice(0, 1) : undefined;
+            }
+            return normalized.slice(0, lastSeparator);
+        };
+
+        // Helper to detect output XML from logs
+        const detectOutputXml = (l: string) => {
+            const outputXmlPath = extractOutputXmlPath(l);
+            if (!outputXmlPath) {
+                return;
+            }
+
+            const outputDir = getDirectoryFromFilePath(outputXmlPath);
+            if (outputDir) {
+                setSessionTree(runId, undefined, undefined, outputDir);
+            }
+        };
+
         if (currentCount > processedCount) {
             const newLogs = logs.slice(processedCount);
             const linearNodes = parsedNodesRef.current;
@@ -287,32 +312,8 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                 const cleanLine = line.replace(/\x1b\[[0-9;]*m/g, '').replace(/[\x00-\x1f\x7f-\x9f]/g, '').trim();
                 const isSystem = IS_SYSTEM(line);
 
-                const outputMatch = cleanLine.match(/Output:\s+["']?(.*\.xml)["']?/i);
-                if (outputMatch) {
-                    setArtifactPaths(prev => {
-                        const next = { ...prev, output: outputMatch[1].trim() };
-                        updateSessionArtifacts(runId, next);
-                        return next;
-                    });
-                }
+                if (isSystem) detectOutputXml(line);
 
-                const logMatch = cleanLine.match(/Log:\s+["']?(.*\.html)["']?/i);
-                if (logMatch) {
-                    setArtifactPaths(prev => {
-                        const next = { ...prev, log: logMatch[1].trim() };
-                        updateSessionArtifacts(runId, next);
-                        return next;
-                    });
-                }
-
-                const reportMatch = cleanLine.match(/Report:\s+["']?(.*\.html)["']?/i);
-                if (reportMatch) {
-                    setArtifactPaths(prev => {
-                        const next = { ...prev, report: reportMatch[1].trim() };
-                        updateSessionArtifacts(runId, next);
-                        return next;
-                    });
-                }
 
                 if (IS_MAESTRO_VERBOSE(line)) {
                     line = line.replace(/.*disableAnsi=false.*?\]\)\s*/, '').trim();
@@ -339,10 +340,20 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                         const prevNode = linearNodes[linearNodes.length - 2];
                         const isPrevSingle = prevNode?.type === 'text' && IS_SINGLE(prevNode.content);
                         if (isPrevSingle) {
-                            const suiteName = last.content.trim();
+                            const suiteLine = last.content.trim();
+                            const parts = suiteLine.split(' :: ');
+                            const suiteName = parts[0].trim();
+                            const doc = parts.length > 1 ? parts.slice(1).join(' :: ').trim() : undefined;
+                            
                             linearNodes.pop();
                             linearNodes.pop();
-                            linearNodes.push({ type: 'suite-start', name: suiteName.split(' :: ')[0], originalLine: suiteName, id: `sub-suite-start-${processedCount + i}` });
+                            linearNodes.push({ 
+                                type: 'suite-start', 
+                                name: suiteName, 
+                                doc,
+                                originalLine: suiteLine, 
+                                id: `sub-suite-start-${processedCount + i}` 
+                            });
                             continue;
                         }
                     }
@@ -373,7 +384,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                                     finalName = parts[0].trim();
                                     doc = parts.slice(1).join(' :: ');
                                 }
-                                linearNodes.push({ type: 'suite-end', name: finalName, status, documentation: doc, summary: summaryLine, id: `suite-end-${processedCount + i}` });
+                                linearNodes.push({ type: 'suite-end', name: finalName, status, doc, summary: summaryLine, id: `suite-end-${processedCount + i}` });
                                 continue;
                             }
                         }
@@ -488,7 +499,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                     const suite = suiteStack[matchIndex];
                     suite.status = node.status;
                     suite.summary = node.summary;
-                    suite.documentation = node.documentation;
+                    if ((node as any).doc) suite.doc = (node as any).doc;
                     suiteStack.splice(matchIndex);
                 }
             } else if (node.type === 'test-end') {
@@ -679,7 +690,15 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                                     }
 
                                     // Conservative heuristic: only start a new test if the line doesn't look like a log/status line
-                                    const isLikelyLog = name.startsWith('|') || name.startsWith('...') || name.startsWith('Arguments:');
+                                    // Also check for common error prefixes and length
+                                    const isLikelyLog = name.startsWith('|') || 
+                                                       name.startsWith('...') || 
+                                                       name.startsWith('Arguments:') ||
+                                                       name.startsWith('Traceback') ||
+                                                       name.startsWith('TypeError') ||
+                                                       name.length > 100 ||
+                                                       name.includes('did not appear in');
+                                    
                                     if (isLikelyLog) {
                                         addToCurrentContext({ type: 'text', content: line, id: nodeId });
                                         return;
@@ -741,51 +760,35 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                         {isKeepAwake ? <Eye size={14} /> : <EyeOff size={14} />}
                     </button>
                     {!isRunning && tree.length > 0 && (
-                        <div className="h-4 w-px bg-outline-variant/30 mx-1" />
-                    )}
-                    {!isRunning && tree.length > 0 && (
-                        <AiButton
-                            id="run_summary"
-                            isLoading={isSummarizing}
-                            onClick={(_e, customPrompt) => handleSummarize(customPrompt)}
-                            label={t('run_tab.console.summarize_run')}
-                            variant="primary"
-                            className="h-6"
-                        />
+                        <div className="flex items-center gap-1">
+                            {session?.outputDir && (
+                                <button
+                                    onClick={async () => {
+                                        const path = session.outputDir!;
+                                        try {
+                                            await invoke('open_log_folder', { path });
+                                        } catch (e) {
+                                            console.error("Failed to open log folder:", e);
+                                        }
+                                    }}
+                                    className="p-1 hover:bg-surface-variant/30 rounded transition-colors text-on-surface-variant/80 hover:text-primary"
+                                    title={t('run_tab.console.open_output_dir')}
+                                >
+                                    <FolderOpen size={14} />
+                                </button>
+                            )}
+                            <AiButton
+                                id="run_summary"
+                                isLoading={isSummarizing}
+                                onClick={(_e, customPrompt) => handleSummarize(customPrompt)}
+                                label={t('run_tab.console.summarize_run')}
+                                variant="primary"
+                                className="h-6"
+                            />
+                        </div>
                     )}
                 </div>
             </div>
-
-            {!isRunning && (artifactPaths.log || artifactPaths.report) && (
-                <div className="px-4 py-2 border-b border-outline-variant/30 bg-surface-variant/10 flex items-center gap-3 shrink-0">
-                    <span className="text-[10px] font-bold uppercase text-on-surface-variant/60 tracking-wider flex items-center gap-1 mr-2">
-                        <FileOutput size={12} />
-                        {t('run_tab.console.artifacts', 'Artifacts')}
-                    </span>
-                    {artifactPaths.log && (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openPath(artifactPaths.log!)}
-                            leftIcon={<ExternalLink size={14} />}
-                            className="h-7 text-xs bg-surface border border-outline-variant/30 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-all rounded-lg px-3"
-                        >
-                            {t('run_tab.console.open_log', 'Open HTML Log')}
-                        </Button>
-                    )}
-                    {artifactPaths.report && (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openPath(artifactPaths.report!)}
-                            leftIcon={<ExternalLink size={14} />}
-                            className="h-7 text-xs bg-surface border border-outline-variant/30 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-all rounded-lg px-3"
-                        >
-                            {t('run_tab.console.open_report', 'Open Report')}
-                        </Button>
-                    )}
-                </div>
-            )}
 
             <div className="flex-1 min-h-0 flex flex-col relative">
                 <div

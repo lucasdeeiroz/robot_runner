@@ -94,9 +94,10 @@ export const pt = {
                 lucide: { name: "Lucide", desc: "Biblioteca de ícones vetoriais bonita e consistente." }
             },
             legal_title: "Termos e Licença",
-            license: "Licença MIT",
-            license_desc: "A permissão é concedida, gratuitamente, a qualquer pessoa que obtenha uma cópia deste software e dos arquivos de documentação associados (o 'Software'), para lidar com o Software sem restrições, incluindo, sem limitação, os direitos de usar, copiar, modificar, mesclar, publicar, distribuir, sublicenciar e/ou vender cópias do Software, e permitir que as pessoas a quem o Software é fornecido o façam, sujeito às seguintes condições: O aviso de direitos autorais acima e este aviso de permissão devem ser incluídos em todas as cópias ou partes substanciais do Software.",
+            license: "Licença Não Comercial / Não Revenda",
+            license_desc: "Esta licença permite o uso livre, a modificação e a redistribuição gratuita do Software, mas proíbe a venda, o licenciamento de pago ou qualquer outra monetização direta do Software.\n\n**Definições:**\n\n- **'Software'** refere-se ao código fonte deste repositório e a qualquer arquivo acompanhante, além de qualquer binário/instalador compilado a partir dele, incluindo as versões modificadas.\n\n- **'Uso Não Comercial'** significa o uso sem cobrar taxas pelo Software em si. O Uso Não Comercial inclui o uso pessoal, o uso educativo e o uso interno por parte de empresas/organizações, mesmo se dito uso proporcionar um benefício comercial indireto.\n\n- **'Comercialização'** significa qualquer monetização direta do Software, que inclui:\n  (a) a venda do Software (código fonte ou binário), em sua totalidade ou em parte;\n  (b) o licenciamento ou sublicenciamento do Software a troca de uma tarifa;\n  (c) a cobrança de acesso ao Software em si, incluindo downloads com muro de pagamento;\n  (d) oferecer uma 'versão de pagamento' do Software que seja substancialmente a mesma;\n  (e) a inclusão do Software em um produto de pagamento onde o Software em si seja a razão principal do pagamento.\n\nCobrar por serviços não relacionados não está proibido (por exemplo, consultoria geral), desde que não se cobre pelo Software em si.\n\n**Permissões (concedidas sob esta licença):**\n\n1. Você pode utilizar o Software para qualquer propósito, incluindo uso interno por parte de empresas.\n2. Você pode copiar e modificar o Software.\n3. Você pode distribuir o Software (código fonte e/ou binários/instaladores) de forma gratuita.\n\n**Condições:**\n\n**A. Atribuição e Enlace de Retorno** - Qualquer redistribuição do Software (código fonte ou binário), modificado ou não, deve:\n- conservar o aviso de copyright anterior e este texto de licença; e\n- incluir de forma destacada o crédito ao autor original e um enlace ao repositório original: https://github.com/lucasdeeiroz/robot_runner\n\n**B. Indicação de Mudanças** - Se distribuir uma versão modificada, deve indicar claramente que a modificou.\n\n**Restrições:**\n\n1. Você não pode Comercializar o Software (segundo definido acima) sem permissão por escrito do titular dos direitos de autor.\n2. Você não pode remover ou ocultar os requisitos de atribuição/enlace de retorno.\n",
             disclaimer: "O software é fornecido 'como está', sem garantia de qualquer tipo, expressa ou implícita.",
+            github_repo: "Repositório no GitHub",
             update_check: "Verificar Atualizações",
             update_available: "Nova versão disponível: {{version}}",
             update_not_available: "Você está atualizado",
@@ -898,6 +899,7 @@ export const pt = {
                     "continue": "CONTINUE"
                 },
                 keep_awake: "Manter Tela Acordada",
+                open_output_dir: "Abrir Pasta de Resultados",
                 debug_on: "Ver Logs de Depuração",
                 debug_off: "Ocultar Logs de Depuração",
                 analyze_failure: "Analisar Falha",

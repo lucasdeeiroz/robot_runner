@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useTranslation } from "react-i18next";
-import { XCircle, CheckCircle2, Calendar, Clock, Smartphone } from 'lucide-react';
+import { XCircle, CheckCircle2, Calendar, Clock, Smartphone, FolderOpen } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { getCachedResult, parseXmlBackground, onParseComplete } from '@/lib/xmlParseCache';
@@ -274,7 +274,7 @@ export function HistoryDetailModal({ isOpen, onClose, log, onUpdateLog }: Histor
                 <div className="flex flex-col h-full">
                     {/* Header Info */}
                     <div className="flex flex-wrap gap-4 p-4 mb-4 bg-surface-variant/20 rounded-2xl border border-outline-variant/30">
-                        <div className="flex flex-wrap gap-4" onClick={() => openLog(log.path)}>
+                        <div className="flex flex-wrap gap-4">
                             <div className="flex items-center gap-2">
                                 <div className={clsx(
                                     "w-8 h-8 rounded-xl flex items-center justify-center shrink-0",
@@ -308,6 +308,13 @@ export function HistoryDetailModal({ isOpen, onClose, log, onUpdateLog }: Histor
                                     {log.device_udid ? ` (${log.device_udid})` : ''}
                                 </div>
                             )}
+                            <button
+                                onClick={() => openLog(log.path)}
+                                className="p-1 hover:bg-surface-variant/30 rounded transition-colors text-on-surface-variant/80 hover:text-primary"
+                                title={t('run_tab.console.open_output_dir')}
+                            >
+                                <FolderOpen size={14} />
+                            </button>
                         </div>
 
                         <div className="flex-1" />

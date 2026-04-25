@@ -457,7 +457,11 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                 const mode = e.target.value as 'explorer' | 'automator';
                                 updateSetting('usageMode', mode);
                                 if (mode === 'automator') {
-                                    checkSystemVersions(mode);
+                                    const currentFramework = settings.automationFramework || 'robot';
+                                    if (!settings.automationFramework) {
+                                        updateSetting('automationFramework', 'robot');
+                                    }
+                                    checkSystemVersions(mode, currentFramework);
                                 }
                             }}
                             label={t('onboarding.step2_title')}
@@ -475,7 +479,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                 onChange={async (e) => {
                                     const framework = e.target.value as 'robot' | 'appium' | 'maestro';
                                     updateSetting('automationFramework', framework);
-                                    checkSystemVersions('automator');
+                                    checkSystemVersions('automator', framework);
                                 }}
                                 label={t('onboarding.step3_title')}
                                 options={[

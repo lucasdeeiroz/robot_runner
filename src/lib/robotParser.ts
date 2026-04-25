@@ -10,13 +10,14 @@ export interface SuiteStartNode {
     name: string;
     originalLine: string;
     id: string;
+    doc?: string;
 }
 
 export interface TestNode {
     type: 'test';
     name: string;
-    documentation?: string;
-    status: 'PASS' | 'FAIL' | 'SKIP' | 'RUNNING';
+    doc?: string;
+    status: 'PASS' | 'FAIL' | 'SKIP' | 'RUNNING' | 'NOT_RUN';
     logs: string[];
     children?: LogNode[];
     hasChildren?: boolean;
@@ -27,12 +28,13 @@ export interface TestNode {
     };
     id: string;
     aiAnalysis?: string;
+    ret?: string;
 }
 
 export interface SuiteEndNode {
     type: 'suite-end';
     name: string;
-    documentation?: string;
+    doc?: string;
     status: 'PASS' | 'FAIL' | 'SKIP';
     summary: string;
     id: string;
@@ -42,8 +44,8 @@ export interface SuiteNode {
     type: 'suite';
     id: string;
     name: string;
-    documentation?: string;
-    status: 'PASS' | 'FAIL' | 'SKIP' | 'RUNNING';
+    doc?: string;
+    status: 'PASS' | 'FAIL' | 'SKIP' | 'RUNNING' | 'NOT_RUN';
     summary: string;
     duration?: string;
     children: LogNode[];
@@ -70,10 +72,18 @@ export interface KeywordNode {
     children: LogNode[];
     hasChildren?: boolean;
     aiAnalysis?: string;
+    doc?: string;
+    ret?: string;
 }
 
 export type LogNode = TextNode | SuiteStartNode | TestNode | SuiteNode | SuiteEndNode | KeywordNode;
-export type LinearNode = TextNode | SuiteStartNode | SuiteEndNode | { type: 'test-end', name: string, status: 'PASS' | 'FAIL' | 'SKIP', id: string };
+export type LinearNode = 
+    | TextNode 
+    | SuiteStartNode 
+    | SuiteEndNode 
+    | { type: 'test-start', name: string, id: string, doc?: string, originalLine?: string }
+    | { type: 'test-end', name: string, status: 'PASS' | 'FAIL' | 'SKIP', id: string, doc?: string, ret?: string }
+    | { type: 'maestro-suite-start' | 'maestro-suite-end' | 'maestro-test-start' | 'maestro-test-end' | 'maven-suite-start' | 'maven-suite-end' | 'maven-test-start' | 'maven-test-end', name: string, id: string, status?: any, content?: any };
 
 export const formatRobotDuration = (start: string, end: string): string => {
     if (!start || !end) return "";
@@ -342,10 +352,16 @@ export const mapXmlNode = async (
             });
         }
 
+        const normalizedSuiteStatus: 'PASS' | 'FAIL' | 'SKIP' | 'RUNNING' | 'NOT_RUN' =
+            statusStr === 'PASS' || statusStr === 'FAIL' || statusStr === 'SKIP' || statusStr === 'RUNNING' || statusStr === 'NOT_RUN' || statusStr === 'NOT RUN'
+                ? (statusStr === 'NOT RUN' ? 'NOT_RUN' : statusStr as any)
+                : 'FAIL';
+
         return { 
-            type: 'suite', id, name, status: (statusStr === 'SKIP' ? 'SKIP' : statusStr) as 'PASS' | 'FAIL' | 'SKIP', 
+            type: 'suite', id, name, status: normalizedSuiteStatus, 
             summary: '', duration, children,
-            stats: { passed, failed, skipped }
+            stats: { passed, failed, skipped },
+            doc: obj.doc ? (typeof obj.doc === 'object' ? obj.doc["#text"] : String(obj.doc)) : undefined
         };
     }
 
@@ -382,9 +398,9 @@ export const mapXmlNode = async (
         for (const w of whiles) { const n = await mapXmlNode(w, outputXmlPath, _readImageBase64, 'while'); if (n) children.push(n); }
         if (obj.teardown) { const n = await mapXmlNode(obj.teardown, outputXmlPath, _readImageBase64, 'teardown'); if (n) children.push(n); }
 
-        const normalizedStatus: 'PASS' | 'FAIL' | 'SKIP' | 'RUNNING' =
-            statusStr === 'PASS' || statusStr === 'FAIL' || statusStr === 'SKIP' || statusStr === 'RUNNING'
-                ? statusStr
+        const normalizedStatus: 'PASS' | 'FAIL' | 'SKIP' | 'RUNNING' | 'NOT_RUN' =
+            statusStr === 'PASS' || statusStr === 'FAIL' || statusStr === 'SKIP' || statusStr === 'RUNNING' || statusStr === 'NOT RUN' || statusStr === 'NOT_RUN'
+                ? (statusStr === 'NOT RUN' ? 'NOT_RUN' : statusStr as any)
                 : 'FAIL';
 
         const failures: Record<string, { message: string, screenshotPath?: string, name: string }> = {};
@@ -398,7 +414,8 @@ export const mapXmlNode = async (
         return {
             type: 'test', id, name, status: normalizedStatus, duration, children,
             logs: [],
-            failureDetail: failures[id] ? { message: failures[id].message, screenshotPath: failures[id].screenshotPath } : undefined
+            failureDetail: failures[id] ? { message: failures[id].message, screenshotPath: failures[id].screenshotPath } : undefined,
+            doc: obj.doc ? (typeof obj.doc === 'object' ? obj.doc["#text"] : String(obj.doc)) : undefined
         };
     }
 
@@ -494,6 +511,8 @@ export const mapXmlNode = async (
 
     return {
         type: 'keyword', subType: subType || 'keyword', id, name, status: kwStatus, screenshotPath, duration,
-        args, children
+        args, children,
+        doc: obj.doc ? (typeof obj.doc === 'object' ? obj.doc["#text"] : String(obj.doc)) : undefined,
+        ret: obj.ret ? (typeof obj.ret === 'object' ? obj.ret["#text"] : String(obj.ret)) : undefined
     };
 };

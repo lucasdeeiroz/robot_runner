@@ -1,21 +1,55 @@
-MIT License
+Non-Commercial / No-Resale License
+Version 1.0
 
-Copyright (c) 2025 Lucas de Eiroz Rodrigues
+Robot Runner — Copyright (c) 2026 Lucas Deiroz
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This license allows free use, modification, and free redistribution of the Software,
+but prohibits selling, paid licensing, or other direct monetization of the Software.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+Definitions
+- "Software" means the source code of this repository and any accompanying files,
+  plus any compiled binaries/installers built from it, including modified versions.
+- "Non-Commercial Use" means use without charging fees for the Software itself.
+  Non-Commercial Use includes personal use, educational use, and internal use by
+  companies/organizations, even if such use provides indirect commercial benefit.
+- "Commercialization" means any direct monetization of the Software, including:
+  (a) selling the Software (source or binary), in whole or in part;
+  (b) licensing or sublicensing the Software for a fee;
+  (c) charging for access to the Software itself, including paywalled downloads;
+  (d) offering a "paid version" of the Software that is substantially the same;
+  (e) bundling the Software into a paid product where the Software itself is a
+      primary reason for payment.
+  Charging for unrelated services is not prohibited (e.g., general consulting),
+  as long as you are not charging for the Software itself.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+Permissions (granted under this license)
+1. You may use the Software for any purpose, including internal use by companies.
+2. You may copy and modify the Software.
+3. You may distribute the Software (source code and/or binaries/installers) for free.
+
+Conditions
+A. Attribution and Link Back
+   Any redistribution of the Software (source or binary), modified or unmodified,
+   must:
+   - retain the above copyright notice and this license text; and
+   - prominently include credit to the original author and a link to the original
+     repository: https://github.com/lucasdeeiroz/robot_runner
+
+B. Marking Changes
+   If you distribute a modified version, you must clearly state that you modified it.
+
+Restrictions
+1. You may not Commercialize the Software (as defined above) without written
+   permission from the copyright holder.
+2. You may not remove or obscure the attribution/link-back requirements.
+
+No Warranty
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+Commercial Licensing
+If you want to Commercialize the Software, contact: lucas.de.eiroz@gmail.com

@@ -94,9 +94,10 @@ export const es = {
                 lucide: { name: "Lucide", desc: "Biblioteca de iconos vectoriales hermosa y consistente." }
             },
             legal_title: "Términos y Licencia",
-            license: "Licencia MIT",
-            license_desc: "Por la presente se otorga permiso, sin cargo, a cualquier persona que obtenga una copia de este software y los archivos de documentación asociados (el 'Software'), para utilizar el Software sin restricciones, incluidos, entre otros, los derechos de uso, copia, modificación, fusión, publicación, distribución, sublicencia y/o venta de copias del Software, y para permitir a las personas a quienes se les proporcione el Software que lo hagan, sujeto a las siguientes condiciones: El aviso de derechos de autor anterior y este aviso de permiso se incluirán en todas las copias o partes sustanciales del Software.",
+            license: "Licencia No Comercial / No Reventa",
+            license_desc: "Esta licencia permite el uso libre, la modificación y la redistribución gratuita del Software, pero prohíbe la venta, el licenciamiento de pago o cualquier otra monetización directa del Software.\n\n**Definiciones:**\n\n- **'Software'** se refiere al código fuente de este repositorio y a cualquier archivo acompañante, además de cualquier binario/instalador compilado a partir de él, incluidas las versiones modificadas.\n\n- **'Uso No Comercial'** significa el uso sin cobrar tasas por el Software en sí. El Uso No Comercial incluye el uso personal, el uso educativo y el uso interno por parte de empresas/organizaciones, incluso si dicho uso proporciona un beneficio comercial indirecto.\n\n- **'Comercialización'** significa cualquier monetización directa del Software, que incluye:\n  (a) la venta del Software (código fuente o binario), en su totalidad o en parte;\n  (b) el licenciamiento o sublicenciamiento del Software a cambio de una tarifa;\n  (c) el cobro de acceso al Software en sí, incluidas las descargas con muro de pago;\n  (d) ofrecer una 'versión de pago' del Software que sea substancialmente la misma;\n  (e) la inclusión del Software en un producto de pago donde el Software en sí sea la razón principal del pago.\n\nCobrar por servicios no relacionados no está prohibido (por ejemplo, consultoría general), siempre que no se cobre por el Software en sí.\n\n**Permisos (concedidos bajo esta licencia):**\n\n1. Puede utilizar el Software para cualquier propósito, incluido el uso interno por parte de empresas.\n2. Puede copiar y modificar el Software.\n3. Puede distribuir el Software (código fuente y/o binarios/instaladores) de forma gratuita.\n\n**Condiciones:**\n\n**A. Atribución y Enlace de Retorno** - Cualquier redistribución del Software (código fuente o binario), modificado o no, debe:\n- conservar el aviso de copyright anterior y este texto de licencia; y\n- incluir de forma destacada el crédito al autor original y un enlace al repositorio original: https://github.com/lucasdeeiroz/robot_runner\n\n**B. Indicación de Cambios** - Si distribuye una versión modificada, debe indicar claramente que la ha modificado.\n\n**Restricciones:**\n\n1. No puede Comercializar el Software (según se define anteriormente) sin permiso por escrito del titular de los derechos de autor.\n2. No puede eliminar ni ocultar los requisitos de atribución/enlace de retorno.",
             disclaimer: "El software se proporciona 'tal cual', sin garantía de ningún tipo, expresa o implícita.",
+            github_repo: "Repositorio en GitHub",
             update_check: "Buscar Actualizaciones",
             update_available: "Nueva versión disponible: {{version}}",
             update_not_available: "Estás actualizado",
@@ -904,6 +905,7 @@ export const es = {
                     "continue": "CONTINUE"
                 },
                 keep_awake: "Mantener Pantalla Activa",
+                open_output_dir: "Abrir Carpeta de Resultados",
                 debug_on: "Ver Logs de Depuración",
                 debug_off: "Ocultar Logs de Depuración",
                 analyze_failure: "Analizar Fallo",

@@ -351,19 +351,6 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     }
                 }
 
-                addSession(
-                    runId,
-                    deviceUdid || "local",
-                    devName,
-                    finalTestPath || finalArgsFile || suiteName,
-                    fw as 'robot' | 'maestro' | 'appium',
-                    settings.saveLogs,
-                    finalArgsFile,
-                    devModel,
-                    devVer,
-                    finalTests || undefined
-                );
-
                 const cleanModel = devModel.replace(/[^a-zA-Z0-9]/g, "");
                 const cleanVer = devVer.replace(/[^0-9.]/g, "");
                 const cleanUdid = (deviceUdid || "Local").replace(/[^a-zA-Z0-9]/g, "");
@@ -373,6 +360,20 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                 const logDir = settings.paths.logs
                     ? `${settings.paths.logs}/${legacyFolder}`
                     : `../test_results/${legacyFolder}`;
+
+                addSession(
+                    runId,
+                    deviceUdid || "local",
+                    devName,
+                    finalTestPath || finalArgsFile || suiteName,
+                    fw as 'robot' | 'maestro' | 'appium',
+                    settings.saveLogs,
+                    logDir,
+                    finalArgsFile,
+                    devModel,
+                    devVer,
+                    finalTests || undefined
+                );
 
                 if (fw === 'robot') {
                     invoke("run_robot_test", {

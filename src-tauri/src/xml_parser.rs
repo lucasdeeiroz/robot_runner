@@ -48,6 +48,8 @@ pub struct SuiteNode {
     pub stats: Option<SuiteStats>,
     #[serde(default)]
     pub ai_analysis: Option<String>,
+    #[serde(default)]
+    pub doc: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -72,6 +74,8 @@ pub struct TestNode {
     pub logs: Vec<String>,
     #[serde(default)]
     pub ai_analysis: Option<String>,
+    #[serde(default)]
+    pub doc: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -96,6 +100,10 @@ pub struct KeywordNode {
     pub has_children: bool,
     #[serde(default)]
     pub ai_analysis: Option<String>,
+    #[serde(default)]
+    pub doc: Option<String>,
+    #[serde(default)]
+    pub ret: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -341,6 +349,8 @@ struct KwState {
     condition: String,
     patterns: Vec<String>,
     variable: String,
+    doc: Option<String>,
+    ret: Option<String>,
 }
 
 fn parse_robot_xml_sax_internal<R: tauri::Runtime>(app: &tauri::AppHandle<R>, xml_path: &str, db_path: &Path, base_dir: &Path) -> AppResult<LogNode> {
@@ -356,7 +366,7 @@ fn parse_robot_xml_sax_internal<R: tauri::Runtime>(app: &tauri::AppHandle<R>, xm
     let mut root_suite: Option<SuiteNode> = None;
     
     let mut text_buffer = String::new();
-    let mut kw_states: Vec<KwState> = vec![KwState { args: vec![], vars: vec![], values: vec![], flavor: "IN".into(), condition: "".into(), patterns: vec![], variable: "".into() }];
+    let mut kw_states: Vec<KwState> = vec![KwState { args: vec![], vars: vec![], values: vec![], flavor: "IN".into(), condition: "".into(), patterns: vec![], variable: "".into(), doc: None, ret: None }];
     
     let mut order_counter = 0;
     let mut node_counter = 0;
@@ -413,7 +423,7 @@ fn parse_robot_xml_sax_internal<R: tauri::Runtime>(app: &tauri::AppHandle<R>, xm
                         let suite = SuiteNode {
                             id, name, status: "PASS".to_string(), duration: "".to_string(),
                             children: Vec::new(), has_children: false, stats: Some(SuiteStats { passed: 0, failed: 0, skipped: 0 }),
-                            ai_analysis: None
+                            ai_analysis: None, doc: None
                         };
                         stack.push(LogNode::Suite(suite));
                     },
@@ -431,7 +441,7 @@ fn parse_robot_xml_sax_internal<R: tauri::Runtime>(app: &tauri::AppHandle<R>, xm
                         let test = TestNode {
                             id, name, status: "PASS".to_string(), duration: "".to_string(),
                             children: Vec::new(), has_children: false, failure_detail: None, logs: Vec::new(),
-                            ai_analysis: None
+                            ai_analysis: None, doc: None
                         };
                         stack.push(LogNode::Test(test));
                     },
@@ -482,12 +492,14 @@ fn parse_robot_xml_sax_internal<R: tauri::Runtime>(app: &tauri::AppHandle<R>, xm
                             condition: st_condition,
                             variable: st_variable,
                             patterns: if st_pattern.is_empty() { vec![] } else { vec![st_pattern] },
+                            doc: None,
+                            ret: None,
                         });
 
                         let kw = KeywordNode {
                             id, name, sub_type, status: "PASS".to_string(), duration: "".to_string(),
                             args: Vec::new(), screenshot_path: None, children: Vec::new(), has_children: false,
-                            ai_analysis: None
+                            ai_analysis: None, doc: None, ret: None
                         };
                         stack.push(LogNode::Keyword(kw));
                     },
@@ -560,18 +572,35 @@ fn parse_robot_xml_sax_internal<R: tauri::Runtime>(app: &tauri::AppHandle<R>, xm
                 let tag_name = String::from_utf8_lossy(e.name().as_ref()).to_string();
                 
                 match tag_name.as_str() {
+                    "arg" => if let Some(st) = kw_states.last_mut() { st.args.push(text_buffer.clone()); },
+                    "var" => if let Some(st) = kw_states.last_mut() { st.vars.push(text_buffer.clone()); },
+                    "value" => if let Some(st) = kw_states.last_mut() { st.values.push(text_buffer.clone()); },
+                    "pattern" => if let Some(st) = kw_states.last_mut() { st.patterns.push(text_buffer.clone()); },
+                    "doc" => {
+                        let val = text_buffer.trim().to_string();
+                        if let Some(st) = kw_states.last_mut() { st.doc = Some(val.clone()); }
+                        if let Some(top) = stack.last_mut() {
+                            match top {
+                                LogNode::Suite(s) => s.doc = Some(val),
+                                LogNode::Test(t) => t.doc = Some(val),
+                                LogNode::Keyword(k) => k.doc = Some(val),
+                                _ => {}
+                            }
+                        }
+                    },
+                    "return" => {
+                        let val = text_buffer.trim().to_string();
+                        if let Some(st) = kw_states.last_mut() { st.ret = Some(val.clone()); }
+                        if let Some(top) = stack.last_mut() {
+                            if let LogNode::Keyword(k) = top {
+                                k.ret = Some(val);
+                            }
+                        }
+                    },
                     "suite" | "test" | "kw" | "setup" | "teardown" | "for" | "while" | "iter" | "branch" | "break" | "continue" => {
                         let mut state = None;
                         if tag_name != "suite" && tag_name != "test" {
                             state = kw_states.pop();
-                        }
-
-                        match tag_name.as_str() {
-                            "arg" => if let Some(st) = kw_states.last_mut() { st.args.push(text_buffer.clone()); },
-                            "var" => if let Some(st) = kw_states.last_mut() { st.vars.push(text_buffer.clone()); },
-                            "value" => if let Some(st) = kw_states.last_mut() { st.values.push(text_buffer.clone()); },
-                            "pattern" => if let Some(st) = kw_states.last_mut() { st.patterns.push(text_buffer.clone()); },
-                            _ => {}
                         }
 
                         if let Some(mut popped) = stack.pop() {
@@ -583,7 +612,6 @@ fn parse_robot_xml_sax_internal<R: tauri::Runtime>(app: &tauri::AppHandle<R>, xm
                                         args.push(st.condition);
                                      } 
                                      
-                                     // ESPECIAL CASE: EXCEPT branch attributes
                                      if k.sub_type == "except" {
                                          if !st.patterns.is_empty() {
                                              args.push(format!("pattern: {}", st.patterns.join(", ")));
@@ -605,12 +633,12 @@ fn parse_robot_xml_sax_internal<R: tauri::Runtime>(app: &tauri::AppHandle<R>, xm
                                          args.push(st.values.join(", "));
                                      }
                                      k.args = process_resolved_args(&k.children, args);
+                                     if k.doc.is_none() { k.doc = st.doc; }
+                                     if k.ret.is_none() { k.ret = st.ret; }
                                  }
                              }
 
-                             // Since we store children dynamically, empty it before saving!
                              popped.clear_children();
-
                              order_counter += 1;
                              let parent_id = stack.last().map(|p| p.id().to_string()).unwrap_or_default();
                              let id = popped.id().to_string();
@@ -648,6 +676,16 @@ fn parse_robot_xml_sax_internal<R: tauri::Runtime>(app: &tauri::AppHandle<R>, xm
                     "msg" => {
                         let text = clean_message(text_buffer.trim());
                         if !text.is_empty() {
+                            // Support for old Robot "Return:" messages
+                            if text.starts_with("Return:") {
+                                let ret_val = text.replace("Return:", "").trim().to_string();
+                                if let Some(top) = stack.last_mut() {
+                                    if let LogNode::Keyword(k) = top {
+                                        k.ret = Some(ret_val);
+                                    }
+                                }
+                            }
+
                             let mut screenshot = None;
                             if text.contains("src=") {
                                 if let Some(caps) = RE_SRC.captures(&text) {
@@ -661,7 +699,6 @@ fn parse_robot_xml_sax_internal<R: tauri::Runtime>(app: &tauri::AppHandle<R>, xm
                                 for node in stack.iter_mut().rev() {
                                     match node {
                                         LogNode::Keyword(k) => { 
-                                            // Assign only to the innermost keyword
                                             if !assigned_kw {
                                                 k.screenshot_path = Some(abs_src.clone()); 
                                                 assigned_kw = true;
@@ -694,9 +731,6 @@ fn parse_robot_xml_sax_internal<R: tauri::Runtime>(app: &tauri::AppHandle<R>, xm
                             }
                         }
                     },
-                    "arg" => { if let Some(st) = kw_states.last_mut() { st.args.push(text_buffer.clone()); } },
-                    "var" => { if let Some(st) = kw_states.last_mut() { st.vars.push(text_buffer.clone()); } },
-                    "value" => { if let Some(st) = kw_states.last_mut() { st.values.push(text_buffer.clone()); } },
                     _ => {}
                 }
                 text_buffer.clear();

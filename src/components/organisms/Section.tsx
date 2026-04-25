@@ -14,6 +14,7 @@ export interface SectionProps {
     children?: React.ReactNode;
     variant?: 'card' | 'transparent';
     className?: string;
+    contentClassName?: string;
 }
 
 export const Section = ({
@@ -25,7 +26,8 @@ export const Section = ({
     actions,
     children,
     variant = 'card',
-    className
+    className,
+    contentClassName
 }: SectionProps) => {
 
     const containerStyles = {
@@ -75,7 +77,7 @@ export const Section = ({
 
             {/* Content */}
             {children && (
-                <div>
+                <div className={contentClassName}>
                     {children}
                 </div>
             )}

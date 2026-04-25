@@ -151,7 +151,8 @@ from robot.libraries.BuiltIn import BuiltIn
 ROBOT_LISTENER_API_VERSION = 2
 
 def start_suite(name, attrs):
-    sys.stdout.write(f"\n[RR-SUITE-START] {name}\n")
+    doc = attrs.get('doc', '')
+    sys.stdout.write(f"\n[RR-SUITE-START] {name} :: {doc}\n")
     sys.stdout.flush()
 
 def end_suite(name, attrs):
@@ -159,11 +160,14 @@ def end_suite(name, attrs):
     sys.stdout.flush()
 
 def start_test(name, attrs):
-    sys.stdout.write(f"\n[RR-TEST-START] {name}\n")
+    doc = attrs.get('doc', '')
+    sys.stdout.write(f"\n[RR-TEST-START] {name} :: {doc}\n")
     sys.stdout.flush()
 
 def end_test(name, attrs):
-    sys.stdout.write(f"\n[RR-TEST-END] {name} | {attrs['status']}\n")
+    status = attrs.get('status', 'PASS')
+    msg = attrs.get('message', '')
+    sys.stdout.write(f"\n[RR-TEST-END] {name} | {status} | {msg}\n")
     sys.stdout.flush()
 
 def start_keyword(name, attrs):
