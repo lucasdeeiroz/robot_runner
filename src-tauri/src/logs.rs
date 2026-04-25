@@ -1,3 +1,4 @@
+use chrono::TimeZone;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -22,7 +23,7 @@ static RE_SUITE: Lazy<Regex> =
 static RE_STAT: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"<stat pass="(\d+)" fail="(\d+)".*>All Tests</stat>"#).unwrap());
 static RE_TIME: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"generated="([^"]+)""#).unwrap());
+    Lazy::new(|| Regex::new(r#"(?:generated|starttime)=["']([^"']+)["']"#).unwrap());
 static RE_ELAPSED: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"<status\s+[^>]*elapsed="([^"]+)""#).unwrap());
 static RE_STATUS_TIME: Lazy<Regex> =
@@ -289,11 +290,25 @@ fn parse_log_entry(folder_path: &Path, xml_path: &Path, mtime: u64) -> Option<Te
         let timestamp = if let Some(ts) = meta_timestamp {
             ts
         } else {
-            RE_TIME
+            let extracted = RE_TIME
                 .captures(&content)
                 .map(|c| c.get(1).map_or("", |m| m.as_str()))
-                .unwrap_or("")
-                .to_string()
+                .unwrap_or("");
+            
+            if !extracted.is_empty() {
+                normalize_robot_timestamp(extracted)
+            } else {
+                // Try to extract date from filename if it follows output-YYYYMMDD-HHMMSS pattern
+                let file_name = xml_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                if let Some(filename_ts) = extract_timestamp_from_filename(file_name) {
+                    normalize_robot_timestamp(&filename_ts)
+                } else {
+                    // Fallback to file mtime if XML doesn't have the generated attribute
+                    chrono::DateTime::<chrono::Local>::from(
+                        std::time::UNIX_EPOCH + std::time::Duration::from_secs(mtime)
+                    ).to_rfc3339()
+                }
+            }
         };
 
         // Extract duration from root suite status
@@ -378,13 +393,21 @@ fn parse_log_entry(folder_path: &Path, xml_path: &Path, mtime: u64) -> Option<Te
         xml_timestamp = caps.get(1).map(|m| m.as_str().to_string());
     }
 
-    let timestamp = xml_timestamp.or(meta_timestamp).unwrap_or_else(|| {
-        fs::metadata(xml_path)
-            .ok()
-            .and_then(|m| m.modified().ok())
-            .map(|m| chrono::DateTime::<chrono::Local>::from(m).to_rfc3339())
-            .unwrap_or_default()
-    });
+    let timestamp = xml_timestamp
+        .map(|ts| {
+            // Attempt to normalize if it looks like Robot format, otherwise keep as is
+            if ts.len() >= 8 && ts.chars().all(|c| c.is_numeric() || c == ' ' || c == ':' || c == '.') {
+                normalize_robot_timestamp(&ts)
+            } else {
+                ts
+            }
+        })
+        .or(meta_timestamp)
+        .unwrap_or_else(|| {
+            chrono::DateTime::<chrono::Local>::from(
+                std::time::UNIX_EPOCH + std::time::Duration::from_secs(mtime)
+            ).to_rfc3339()
+        });
 
     let is_fail = (content.contains("failures=\"") && !content.contains("failures=\"0\""))
         || (content.contains("errors=\"") && !content.contains("errors=\"0\""))
@@ -483,6 +506,50 @@ fn format_seconds(seconds: f64) -> String {
     } else {
         format!("{}s", seconds)
     }
+}
+
+/// Converts Robot Framework's "YYYYMMDD HH:MM:SS.mmm" to ISO 8601
+fn normalize_robot_timestamp(ts: &str) -> String {
+    // Handle "YYYYMMDD-HHMMSS" (filename format) vs "YYYYMMDD HH:MM:SS.mmm" (XML format)
+    let cleaned_ts = if ts.contains('-') && !ts.contains(':') && ts.len() >= 15 {
+        // Convert 20260425-140852 to 20260425 14:08:52.000
+        format!("{} {}:{}:{}.000", &ts[0..8], &ts[9..11], &ts[11..13], &ts[13..15])
+    } else {
+        ts.to_string()
+    };
+
+    let fmt = "%Y%m%d %H:%M:%S%.3f";
+    match chrono::NaiveDateTime::parse_from_str(&cleaned_ts, fmt) {
+        Ok(dt) => {
+            // Assume local time as Robot logs usually are
+            let local_dt = chrono::Local.from_local_datetime(&dt).earliest();
+            match local_dt {
+                Some(ldt) => ldt.to_rfc3339(),
+                None => {
+                    // Fallback to simple string manipulation if timezone conversion fails
+                    if cleaned_ts.len() >= 15 {
+                        format!(
+                            "{}-{}-{}T{}:{}:{}",
+                            &cleaned_ts[0..4], &cleaned_ts[4..6], &cleaned_ts[6..8],
+                            &cleaned_ts[9..11], &cleaned_ts[11..13], &cleaned_ts[13..15]
+                        )
+                    } else {
+                        cleaned_ts.to_string()
+                    }
+                }
+            }
+        }
+        Err(_) => cleaned_ts.to_string(),
+    }
+}
+
+/// Attempts to extract YYYYMMDD-HHMMSS from filenames like output-20260425-140852.xml
+fn extract_timestamp_from_filename(filename: &str) -> Option<String> {
+    // Look for YYYYMMDD-HHMMSS pattern (15 chars)
+    let re = Regex::new(r"(\d{8}-\d{6})").ok()?;
+    re.captures(filename)
+        .and_then(|caps| caps.get(1))
+        .map(|m| m.as_str().to_string())
 }
 
 fn normalize_path_str(path: &str) -> String {
