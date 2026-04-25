@@ -290,11 +290,12 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
         };
 
         const splitNameAndDoc = (raw: string) => {
-            if (raw.includes(' :: ')) {
-                const parts = raw.split(' :: ');
+            // Handle both "Name :: Doc" and "Name::Doc" or "Name ::"
+            const match = raw.match(/^(.+?)\s?::\s*(.*)$/);
+            if (match) {
                 return {
-                    name: parts[0].trim(),
-                    doc: parts.slice(1).join(' :: ').trim()
+                    name: match[1].trim(),
+                    doc: match[2].trim() || undefined
                 };
             }
             return { name: raw.trim(), doc: undefined };
@@ -392,13 +393,41 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                         }
                     }
                     linearNodes.push({ type: 'text', content: line, isSystem, id: `div-${processedCount + i}` });
+                } else if (IS_ROBOT_RUNNER_TEST_START(cleanLine)) {
+                    const raw = cleanLine.replace(/^\[(RobotRunner-Test-Start|RR-TEST-START)\]/, "").trim();
+                    const { name, doc } = splitNameAndDoc(raw);
+
+                    // Deduplicate against heuristic test detection (the test name line with spaces)
+                    let lastTest: any = null;
+                    for (let j = linearNodes.length - 1; j >= 0; j--) {
+                        if (linearNodes[j].type === 'test-start') {
+                            lastTest = linearNodes[j];
+                            break;
+                        }
+                    }
+
+                    if (lastTest && lastTest.name.trim() === name) {
+                        if (doc) lastTest.doc = doc;
+                        continue;
+                    }
+
+                    linearNodes.push({ type: 'test-start', name, doc, originalLine: raw, id: `rr-t-start-${processedCount + i}` });
                 } else if (IS_RR_SUITE_START(cleanLine)) {
                     const raw = cleanLine.replace("[RR-SUITE-START]", "").trim();
                     const { name, doc } = splitNameAndDoc(raw);
-                    const lastNode = linearNodes[linearNodes.length - 1];
-                    // Check if previous node is a heuristic-detected suite-start (Parent.Child) that matches the leaf name (Child)
-                    const heuristicLeaf = lastNode?.type === 'suite-start' ? lastNode.name.split('.').pop()?.trim() : null;
+                    // Deduplicate: check if this suite was already added by the standard output parser
+                    // We look back skipping text nodes.
+                    let lastSuite: any = null;
+                    for (let j = linearNodes.length - 1; j >= 0; j--) {
+                        if (linearNodes[j].type === 'suite-start') {
+                            lastSuite = linearNodes[j];
+                            break;
+                        }
+                    }
+
+                    const heuristicLeaf = lastSuite?.name.split('.').pop()?.trim();
                     if (heuristicLeaf === name) {
+                        if (doc) lastSuite.doc = doc;
                         continue; // Deduplicate
                     }
                     linearNodes.push({ type: 'suite-start', name, doc, originalLine: raw, id: `rr-s-start-${processedCount + i}` });
