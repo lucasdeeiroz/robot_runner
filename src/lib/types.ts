@@ -4,7 +4,10 @@ export interface Device {
     model: string;
     state?: string;
     is_emulator?: boolean;
-    android_version?: string | null; // Added field
+    android_version?: string | null;
+    battery_level?: number | null;
+    ram_total?: number | null;
+    ram_used?: number | null;
 }
 
 // --- Screen Mapper Types ---

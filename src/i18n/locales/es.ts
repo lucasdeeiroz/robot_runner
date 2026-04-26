@@ -194,6 +194,10 @@ export const es = {
             }
         },
         common: {
+            refresh: "Actualizar",
+            online: "En línea",
+            offline: "Desconectado",
+            try_again: "Intentar de nuevo",
             beta: "Beta",
             cancel: "Cancelar",
             save: "Guardar",
@@ -1034,6 +1038,10 @@ export const es = {
                 add_package_placeholder: "Añadir paquete (Presione Enter)",
                 ngrok_token: "Token de Autenticación Ngrok"
             },
+            adb: {
+                restart_success: "Servidor ADB reiniciado con éxito",
+                restart_error: "Error al reiniciar el servidor ADB"
+            },
             ai: {
                 title: "Integración IA",
                 provider: "Proveedor de IA",
@@ -1119,6 +1127,8 @@ export const es = {
             }
         },
         sidebar: {
+            home: "Inicio",
+            description_home: "Visão geral de dispositivos conectados e atividades de teste.",
             dashboard: "Tablero",
             adb_active: "ADB Activo",
             appium_active: "Servidor Appium Activo",
@@ -1133,6 +1143,53 @@ export const es = {
             description_settings: "Configure las preferencias e integraciones de la aplicación.",
             about: "Acerca de",
             description_about: "Información sobre Robot Runner y sus creadores."
+        },
+        home: {
+            sections: {
+                devices: "Dispositivos Conectados",
+                devices_desc: "Monitoreo en tiempo real de dispositivos Android activos.",
+                activity: "Actividad Reciente",
+                activity_desc: "Resumen de sus últimas ejecuciones de prueba y rendimiento."
+            },
+            device_menu: {
+                screenshot: "Capturar Pantalla",
+                toggle_bounds: "Límites de Diseño",
+                toggle_touches: "Mostrar Toques",
+                toggle_pointer: "Ubicación del Puntero",
+                refresh_info: "Actualizar Info",
+                reboot: "Reiniciar Dispositivo",
+                reboot_success: "Comando de reinicio enviado",
+                reboot_error: "Error al reiniciar",
+                bounds_toggled: "Límites de diseño cambiados",
+                touches_toggled: "Mostrar toques cambiado",
+                pointer_toggled: "Ubicación del puntero cambiada",
+                action_error: "Error en la acción"
+            },
+            actions: {
+                mirror: "Reflejar Pantalla",
+                toolbox: "Abrir Toolbox",
+                all_tests_stopped: "Todas las pruebas detenidas"
+            },
+            server_hub: {
+                title: "Server Hub",
+                restart_adb: "ADB Server",
+                restart_appium: "Appium",
+                kill_all: "Parar Todo"
+            },
+            stats: {
+                total_runs: "Total de Ejecuciones",
+                executions: "Ejecuciones",
+                success_rate: "Tasa de Éxito",
+                last_run: "Última Ejecución"
+            },
+            no_devices: "No se Encontraron Dispositivos",
+            no_devices_desc: "Conecte un dispositivo Android por USB o Wi-Fi para comenzar.",
+            no_history: "No se encontró historial de pruebas aún.",
+            loading_stats: "Analizando historial de pruebas...",
+            device_card: {
+                battery: "Batería",
+                ram: "RAM"
+            }
         },
         startup: {
             loading: "Inicializando aplicación...",

@@ -6,7 +6,8 @@ import {
     FileText,
     Info,
     LayoutDashboard,
-    Wrench
+    Wrench,
+    Home
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSettings } from "@/lib/settings";
@@ -62,6 +63,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
     }, []);
 
     const navItems = useMemo(() => [
+        { id: 'home', label: t('sidebar.home'), icon: Home },
         { id: 'run', label: t('sidebar.run'), icon: PlayCircle },
         {
             id: 'tests',

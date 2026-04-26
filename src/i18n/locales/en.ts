@@ -194,6 +194,10 @@ export const en = {
             }
         },
         common: {
+            refresh: "Refresh",
+            online: "Online",
+            offline: "Offline",
+            try_again: "Try Again",
             beta: "Beta",
             cancel: "Cancel",
             save: "Save",
@@ -1029,6 +1033,10 @@ export const en = {
                 add_package_placeholder: "Add package (Press Enter)",
                 ngrok_token: "Ngrok Auth Token"
             },
+            adb: {
+                restart_success: "ADB Server restarted successfully",
+                restart_error: "Failed to restart ADB Server"
+            },
             ai: {
                 title: "AI Integration",
                 provider: "AI Provider",
@@ -1114,6 +1122,8 @@ export const en = {
             }
         },
         sidebar: {
+            home: "Home",
+            description_home: "Overview of connected devices and test activities.",
             dashboard: "QA Dashboard",
             adb_active: "ADB Active",
             appium_active: "Appium Server Active",
@@ -1128,6 +1138,53 @@ export const en = {
             description_settings: "Configure application preferences and integrations.",
             about: "About",
             description_about: "Information about Robot Runner and its creators."
+        },
+        home: {
+            sections: {
+                devices: "Connected Devices",
+                devices_desc: "Real-time monitoring of active Android devices.",
+                activity: "Recent Activity",
+                activity_desc: "Overview of your latest test executions and performance."
+            },
+            device_menu: {
+                screenshot: "Take Screenshot",
+                toggle_bounds: "Layout Bounds",
+                toggle_touches: "Show Taps",
+                toggle_pointer: "Pointer Location",
+                refresh_info: "Refresh Info",
+                reboot: "Reboot Device",
+                reboot_success: "Reboot command sent",
+                reboot_error: "Failed to reboot",
+                bounds_toggled: "Layout bounds toggled",
+                touches_toggled: "Show taps toggled",
+                pointer_toggled: "Pointer location toggled",
+                action_error: "Action failed"
+            },
+            actions: {
+                mirror: "Mirror Screen",
+                toolbox: "Open Toolbox",
+                all_tests_stopped: "All tests stopped"
+            },
+            server_hub: {
+                title: "Server Hub",
+                restart_adb: "ADB Server",
+                restart_appium: "Appium",
+                kill_all: "Kill All Tasks"
+            },
+            stats: {
+                total_runs: "Total Executions",
+                executions: "Executions",
+                success_rate: "Success Rate",
+                last_run: "Last Execution"
+            },
+            no_devices: "No Devices Found",
+            no_devices_desc: "Connect an Android device via USB or Wi-Fi to get started.",
+            no_history: "No test history found yet.",
+            loading_stats: "Analyzing test history...",
+            device_card: {
+                battery: "Battery",
+                ram: "RAM"
+            }
         },
         startup: {
             loading: "Initializing application...",

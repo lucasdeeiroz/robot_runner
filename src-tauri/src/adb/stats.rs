@@ -80,7 +80,7 @@ async fn run_adb_shell(device: &str, command_str: &str) -> String {
     }
 }
 
-fn parse_battery_info(output: &str) -> Option<(u8, f32)> {
+pub fn parse_battery_info(output: &str) -> Option<(u8, f32)> {
     let mut level = 0;
     let mut temp = 0.0;
     let mut found_level = false;
@@ -111,7 +111,7 @@ fn parse_battery_info(output: &str) -> Option<(u8, f32)> {
     }
 }
 
-fn parse_mem_info(output: &str) -> Option<(u64, u64)> {
+pub fn parse_mem_info(output: &str) -> Option<(u64, u64)> {
     let mut total = 0;
     let mut available = 0;
 

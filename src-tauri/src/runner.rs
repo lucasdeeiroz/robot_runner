@@ -61,6 +61,28 @@ fn graceful_stop(child: &mut Child, output_dir: &str) -> bool {
 
 #[tauri::command]
 pub async fn stop_test(state: State<'_, TestState>, run_id: String) -> AppResult<String> {
+    if run_id == "all" {
+        let procs = {
+            let procs_map = state
+                .0
+                .lock()
+                .map_err(|e| AppError::StringError(e.to_string()))?;
+            procs_map
+                .values()
+                .map(|info| info.control_tx.clone())
+                .collect::<Vec<_>>()
+        };
+
+        if procs.is_empty() {
+            return Ok("No tests were running".to_string());
+        }
+
+        for tx in procs {
+            let _ = tx.send(ProcessCommand::Stop).await;
+        }
+        return Ok("Stop signal sent to all tests".to_string());
+    }
+
     let tx = {
         let procs = state
             .0
