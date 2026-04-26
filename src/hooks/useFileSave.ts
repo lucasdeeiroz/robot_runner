@@ -72,7 +72,7 @@ export function useFileSave({ fileType, extensions, defaultNamePrefix, settingPa
                             ...currentPaths,
                             [settingPathKey]: newPath
                         });
-                        feedback.toast.success(t('settings_page.path_auto_updated', { path: newPath }));
+                        feedback.toast.success('settings_page.path_auto_updated', { path: newPath });
                     } catch (e) {
                         console.error("Failed to persist auto-selected path", e);
                     }
@@ -84,7 +84,7 @@ export function useFileSave({ fileType, extensions, defaultNamePrefix, settingPa
             }
         } catch (e) {
             const errorMessage = e instanceof Error ? e.message : String(e);
-            feedback.toast.error(`${t('common.error_occurred')}: ${errorMessage}`);
+            feedback.toast.raw.error(`${t('common.error_occurred')}: ${errorMessage}`);
         } finally {
             setIsSaving(false);
         }

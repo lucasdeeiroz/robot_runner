@@ -25,9 +25,9 @@ export function UpdateModal({ isOpen, onClose, assets, latestVersion }: UpdateMo
         try {
             await downloadAndInstall(asset, (p) => setProgress(p));
             setDownloadedAsset(asset.name);
-            feedback.toast.success(t('about.update_downloaded', "Download complete! Opening installer..."));
+            feedback.toast.success('about.update_downloaded');
         } catch (e) {
-            feedback.toast.error(t('about.update_download_error', "Failed to download update."));
+            feedback.toast.error('about.update_download_error');
         } finally {
             setIsDownloading(false);
         }
