@@ -35,6 +35,7 @@ static RE_TS_XML: Lazy<Regex> = Lazy::new(|| Regex::new(r#"timestamp="([^"]+)""#
 static RE_TEST_FAIL: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r#"<test\s+[^>]*name="([^"]+)"[^>]*>[\s\S]*?<status\s+[^>]*status="FAIL""#).unwrap()
 });
+static RE_FILENAME_TS: Lazy<Regex> = Lazy::new(|| Regex::new(r"(\d{8}-\d{6})").unwrap());
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TestLog {
@@ -586,8 +587,8 @@ fn normalize_robot_timestamp(ts: &str) -> String {
 /// Attempts to extract YYYYMMDD-HHMMSS from filenames like output-20260425-140852.xml
 fn extract_timestamp_from_filename(filename: &str) -> Option<String> {
     // Look for YYYYMMDD-HHMMSS pattern (15 chars)
-    let re = Regex::new(r"(\d{8}-\d{6})").ok()?;
-    re.captures(filename)
+    RE_FILENAME_TS
+        .captures(filename)
         .and_then(|caps| caps.get(1))
         .map(|m| m.as_str().to_string())
 }
