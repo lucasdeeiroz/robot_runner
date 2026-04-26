@@ -43,6 +43,7 @@ quick-xml = { version = "0.39.2", features = ["serialize"] }
 rusqlite = { version = "0.39.0", features = ["bundled"] }
 futures = "0.3"
 thiserror = "2"
+tauri-plugin-os = "2"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

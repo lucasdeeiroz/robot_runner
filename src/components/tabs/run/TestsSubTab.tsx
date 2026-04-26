@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
-import { Play, FolderOpen, FileText, FileCode, History, ChartNoAxesGantt, X, Settings2, Info } from "lucide-react";
+import { Play, FolderOpen, FileText, FileCode, History, ChartNoAxesGantt, X, Settings2, Info, Settings } from "lucide-react";
 import { useSettings } from "@/lib/settings";
 import { useTestSessions } from "@/lib/testSessionStore";
 import { Device } from "@/lib/types";
@@ -30,7 +30,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
     const [mode, setMode] = useState<SelectionMode>('file');
     const [launchStatus, setLaunchStatus] = useState("");
     const [isLaunching, setIsLaunching] = useState(false);
-    const [warningModal, setWarningModal] = useState<{ isOpen: boolean, message: string }>({ isOpen: false, message: '' });
+    const [warningModal, setWarningModal] = useState<{ isOpen: boolean, message: string, showSettingsAction?: boolean }>({ isOpen: false, message: '', showSettingsAction: false });
     const { items, setTests, setArgs, clearSelection } = useSelection();
 
     // Selector state
@@ -131,6 +131,16 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
             setWarningModal({
                 isOpen: true,
                 message: t('tests.alerts.busy', { devices: conflictingDevices.join('\n') })
+            });
+            return;
+        }
+
+        // Path validation
+        if (!settings.paths.automationRoot || !settings.paths.logs) {
+            setWarningModal({
+                isOpen: true,
+                message: t('tests.alerts.missing_paths_desc'),
+                showSettingsAction: true
             });
             return;
         }
@@ -463,6 +473,14 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                 onClose={() => setWarningModal(prev => ({ ...prev, isOpen: false }))}
                 title={t('common.attention', "Attention")}
                 description={warningModal.message}
+                secondaryAction={warningModal.showSettingsAction ? {
+                    label: t('common.go_to_settings', "Go to Settings"),
+                    icon: <Settings size={16} />,
+                    onClick: () => {
+                        setWarningModal(prev => ({ ...prev, isOpen: false }));
+                        if (onNavigate) onNavigate('settings');
+                    }
+                } : undefined}
             />
 
             <div className="flex-1 min-h-0 flex gap-4">
@@ -470,8 +488,10 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     <FileExplorer
                         key={mode}
                         initialPath={getInitialPath()}
+                        fallbackType={mode === 'args' ? 'suites' : 'tests'}
                         selectionMode={mode === 'args' || mode === 'file' ? 'file' : 'directory'}
                         allowHideFooter={true}
+                        onNavigate={onNavigate}
                         renderEntryExtra={(entry, isSelected) => {
                             if (mode === 'file' && entry.name.endsWith('.robot')) {
                                 const item = items.find(i => i.path === entry.path);

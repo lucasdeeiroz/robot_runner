@@ -7,7 +7,7 @@ import { twMerge } from 'tailwind-merge';
 import { HTMLMotionProps } from 'framer-motion';
 
 export interface ButtonProps extends HTMLMotionProps<"button"> {
-    variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'warning';
+    variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'warning' | 'success';
     size?: 'sm' | 'md' | 'lg' | 'icon';
     isLoading?: boolean;
     leftIcon?: React.ReactNode;
@@ -33,6 +33,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
         ghost: 'bg-transparent text-on-surface-variant/80 hover:bg-surface-variant/30 hover:text-on-surface/80',
         danger: 'bg-error hover:bg-error/90 text-on-error shadow-sm border border-transparent',
         warning: 'bg-warning-container/20 hover:bg-warning-container/40 text-on-warning-container shadow-sm border border-warning-container/10',
+        success: 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 shadow-sm border border-transparent',
     };
 
     const sizes = {

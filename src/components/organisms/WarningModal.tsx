@@ -14,6 +14,12 @@ interface WarningModalProps {
     confirmText?: string;
     cancelText?: string;
     variant?: 'warning' | 'danger';
+    secondaryAction?: {
+        label: string;
+        onClick: () => void;
+        variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'warning' | 'outline';
+        icon?: React.ReactNode;
+    };
 }
 
 export function WarningModal({
@@ -24,7 +30,8 @@ export function WarningModal({
     description,
     confirmText,
     cancelText,
-    variant = 'warning'
+    variant = 'warning',
+    secondaryAction
 }: WarningModalProps) {
     const { t } = useTranslation();
 
@@ -71,33 +78,45 @@ export function WarningModal({
                                 {description}
                             </div>
 
-                            <div className="flex items-center gap-3">
-                                {onConfirm ? (
-                                    <>
+                            <div className="flex flex-col sm:flex-row items-center gap-3">
+                                {secondaryAction && (
+                                    <Button
+                                        variant={secondaryAction.variant || "ghost"}
+                                        className="w-full sm:flex-1 order-2 sm:order-1"
+                                        onClick={secondaryAction.onClick}
+                                        leftIcon={secondaryAction.icon}
+                                    >
+                                        {secondaryAction.label}
+                                    </Button>
+                                )}
+                                <div className="flex flex-1 w-full items-center gap-3 order-1 sm:order-2">
+                                    {onConfirm ? (
+                                        <>
+                                            <Button
+                                                variant="ghost"
+                                                className="flex-1"
+                                                onClick={onClose}
+                                            >
+                                                {cancelText || t('common.cancel', "Cancel")}
+                                            </Button>
+                                            <Button
+                                                variant={variant === 'danger' ? 'danger' : 'primary'}
+                                                className="flex-1"
+                                                onClick={onConfirm}
+                                            >
+                                                {confirmText || t('common.ok', "OK")}
+                                            </Button>
+                                        </>
+                                    ) : (
                                         <Button
-                                            variant="ghost"
-                                            className="flex-1"
+                                            variant="primary"
+                                            className="w-full"
                                             onClick={onClose}
-                                        >
-                                            {cancelText || t('common.cancel', "Cancel")}
-                                        </Button>
-                                        <Button
-                                            variant={variant === 'danger' ? 'danger' : 'primary'}
-                                            className="flex-1"
-                                            onClick={onConfirm}
                                         >
                                             {confirmText || t('common.ok', "OK")}
                                         </Button>
-                                    </>
-                                ) : (
-                                    <Button
-                                        variant="primary"
-                                        className="w-full"
-                                        onClick={onClose}
-                                    >
-                                        {confirmText || t('common.ok', "OK")}
-                                    </Button>
-                                )}
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </motion.div>

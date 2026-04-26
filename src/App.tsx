@@ -6,6 +6,7 @@ import { TestsPage } from "./pages/TestsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { AboutPage } from "./pages/AboutPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { HomePage } from "./pages/HomePage";
 import { TestSessionProvider } from "./lib/testSessionStore";
 import { Toaster } from "sonner";
 import "sonner/dist/styles.css";
@@ -22,7 +23,7 @@ import { SelectionProvider } from "./lib/selectionStore";
 import { ExpressiveLoading } from "./components/atoms/ExpressiveLoading";
 
 function App() {
-  const [activePage, setActivePage] = useState("run");
+  const [activePage, setActivePage] = useState("home");
   const { t, i18n } = useTranslation();
   const { settings, updateSetting, checkSystemVersions, systemCheckStatus, loading: settings_loading, checkForAppUpdate } = useSettings();
 
@@ -296,9 +297,10 @@ function App() {
                   >
                     {activePage === 'settings' && <SettingsPage />}
                     {activePage === 'about' && <AboutPage />}
+                    {activePage === 'home' && <HomePage onNavigate={setActivePage} />}
 
                     {/* Placeholder for other pages */}
-                    {activePage !== 'settings' && activePage !== 'about' && (
+                    {activePage !== 'settings' && activePage !== 'about' && activePage !== 'home' && (
                       <div className="p-12 text-center border-2 border-dashed border-outline-variant/30 rounded-2xl m-4">
                         <p className="text-on-surface-variant/80">{t('common.coming_soon', { module: activePage })}</p>
                       </div>

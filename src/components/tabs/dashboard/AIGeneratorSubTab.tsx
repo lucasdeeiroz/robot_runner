@@ -2,8 +2,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    Wand2, Eraser, FileDown, FileText, Copy, Trash2,
-    AlertCircle, CheckCircle2
+    Wand2, Eraser, FileDown, FileText, Copy, Trash2, AlertCircle, CheckCircle2, Settings
 } from 'lucide-react';
 import { Button } from '@/components/atoms/Button';
 import { Textarea } from '@/components/atoms/Textarea';
@@ -22,7 +21,11 @@ import { save } from '@tauri-apps/plugin-dialog';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
 import clsx from 'clsx';
 
-export function AIGeneratorSubTab() {
+interface AIGeneratorSubTabProps {
+    onNavigate?: (page: string) => void;
+}
+
+export function AIGeneratorSubTab({ onNavigate }: AIGeneratorSubTabProps) {
     const { t, i18n } = useTranslation();
     const { settings, activeProfileId } = useSettings();
 
@@ -204,9 +207,20 @@ export function AIGeneratorSubTab() {
                         </div>
 
                         {!hasApiKey ? (
-                            <div className="flex items-center gap-2 p-3 bg-error/10 border border-error/20 rounded-xl text-error text-xs">
-                                <AlertCircle size={14} />
-                                <span>{t('dashboard.generator.key_required', { provider: provider.charAt(0).toUpperCase() + provider.slice(1) })}</span>
+                            <div className="flex items-center justify-between gap-2 p-3 bg-error/10 border border-error/20 rounded-xl text-error text-xs">
+                                <div className='flex items-center gap-2'>
+                                    <AlertCircle size={14} />
+                                    <span>{t('dashboard.generator.key_required', { provider: provider.charAt(0).toUpperCase() + provider.slice(1) })}</span>
+                                </div>
+                                <Button
+                                    onClick={() => onNavigate?.('settings')}
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-on-surface-variant/60 hover:text-primary"
+                                    leftIcon={<Settings size={14} />}
+                                >
+                                    {t('common.go_to_settings', "Go to Settings")}
+                                </Button>
                             </div>
                         ) : (
                             <AiButton

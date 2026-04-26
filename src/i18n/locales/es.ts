@@ -103,7 +103,15 @@ export const es = {
             update_not_available: "Estás actualizado",
             update_error: "Fallo al buscar actualizaciones",
             checking: "Verificando...",
-            update_badge: "ACTUALIZACIÓN"
+            update_badge: "ACTUALIZACIÓN",
+            update_title: "Nueva Versión Disponible",
+            update_select_installer: "Seleccione el instalador para su sistema",
+            installer: "Instalador",
+            portable: "Portátil",
+            update_manual_hint: "El instalador se abrirá automáticamente después de la descarga.",
+            view_releases: "Ver todos los lanzamientos en GitHub",
+            update_downloaded: "¡Descarga completa! Abriendo instalador...",
+            update_download_error: "Error al descargar la actualización."
         },
         ai_page: {
             title: "Asistente IA",
@@ -186,6 +194,10 @@ export const es = {
             }
         },
         common: {
+            refresh: "Actualizar",
+            online: "En línea",
+            offline: "Desconectado",
+            try_again: "Intentar de nuevo",
             beta: "Beta",
             cancel: "Cancelar",
             save: "Guardar",
@@ -208,7 +220,9 @@ export const es = {
             error_occurred: "Ocurrió un error: {{error}}",
             delete: "Eliminar",
             edit: "Editar",
+            go_to_settings: "Ir a Configuración",
             ok: "Aceptar",
+            done: "Hecho",
             search: "Buscar...",
             loading: "Cargando...",
             select: "Seleccione...",
@@ -420,7 +434,11 @@ export const es = {
             cancel: "Cancelar",
             select_file: "Seleccionar Archivo",
             select_folder: "Seleccionar Carpeta",
-            select_generic: "Seleccionar"
+            select_generic: "Seleccionar",
+            not_configured: "Ruta no configurada",
+            configure_tests: "Configure el Directorio de Pruebas en Ajustes o selecciónelo a continuación.",
+            configure_suites: "Configure el Directorio de Suites en Ajustes o selecciónelo a continuación.",
+            select_folder_btn: "Seleccionar Carpeta"
         },
         inspector: {
             overlay: {
@@ -581,7 +599,10 @@ export const es = {
             select_device: "Seleccione un dispositivo para ver logs",
             ai_analyze_button: "Analizar con IA",
             ai_analysis_title: "Resultado del Análisis",
-            analyzing: "Analizando logs..."
+            analyzing: "Analizando logs...",
+            not_saving: "No se está guardando en un archivo",
+            configure_path: "Configurar Ruta",
+            select_dir_title: "Seleccionar Directorio para Logcat"
         },
         mapper: {
             title: "Mapeador",
@@ -844,7 +865,9 @@ export const es = {
             },
             actions: {
                 force_enable: "Forzar Activación"
-            }
+            },
+            manual_save_hint: "Nota: Las grabaciones usarán un diálogo manual 'Guardar como' si falta la ruta de los logs. Configúrela en Ajustes para el guardado automático.",
+            select_dir_title: "Seleccionar Directorio para Informes de Rendimiento"
         },
         run_tab: {
             launcher: "Lanzador",
@@ -861,7 +884,8 @@ export const es = {
                 open_toolbox: "Abrir Caja de Herramientas"
             },
             console: {
-                documentation: "Documentación: ",
+                documentation: "Documentación",
+                return_value: "Valor de Retorno",
                 error_message: "Mensaje de Error",
                 screenshot: "Captura de Pantalla",
                 artifacts: "Artefactos",
@@ -1014,6 +1038,10 @@ export const es = {
                 add_package_placeholder: "Añadir paquete (Presione Enter)",
                 ngrok_token: "Token de Autenticación Ngrok"
             },
+            adb: {
+                restart_success: "Servidor ADB reiniciado con éxito",
+                restart_error: "Error al reiniciar el servidor ADB"
+            },
             ai: {
                 title: "Integración IA",
                 provider: "Proveedor de IA",
@@ -1090,9 +1118,17 @@ export const es = {
                 title: "Opciones de Herramientas",
                 allow_actions_during_test: "Permitir acciones durante la prueba",
                 allow_actions_during_test_desc: "Habilita Logcat, Monitor de Performance y otras herramientas incluso mientras se ejecuta una prueba"
+            },
+        },
+        settings_page: {
+            path_auto_updated: "Ruta actualizada automáticamente: {{path}}",
+            paths: {
+                logs_desc: "Configure el directorio donde se guardan los logs de Robot Framework para ver el historial de ejecución."
             }
         },
         sidebar: {
+            home: "Inicio",
+            description_home: "Visão geral de dispositivos conectados e atividades de teste.",
             dashboard: "Tablero",
             adb_active: "ADB Activo",
             appium_active: "Servidor Appium Activo",
@@ -1107,6 +1143,55 @@ export const es = {
             description_settings: "Configure las preferencias e integraciones de la aplicación.",
             about: "Acerca de",
             description_about: "Información sobre Robot Runner y sus creadores."
+        },
+        home: {
+            sections: {
+                devices: "Dispositivos Conectados",
+                devices_desc: "Monitoreo en tiempo real de dispositivos Android activos.",
+                activity: "Actividad Reciente",
+                activity_desc: "Resumen de sus últimas ejecuciones de prueba y rendimiento."
+            },
+            device_menu: {
+                screenshot: "Capturar Pantalla",
+                toggle_bounds: "Límites de Diseño",
+                toggle_touches: "Mostrar Toques",
+                toggle_pointer: "Ubicación del Puntero",
+                refresh_info: "Actualizar Info",
+                reboot: "Reiniciar Dispositivo",
+                reboot_success: "Comando de reinicio enviado",
+                reboot_error: "Error al reiniciar",
+                bounds_toggled: "Límites de diseño cambiados",
+                touches_toggled: "Mostrar toques cambiado",
+                pointer_toggled: "Ubicación del puntero cambiada",
+                action_error: "Error en la acción"
+            },
+            actions: {
+                mirror: "Reflejar Pantalla",
+                toolbox: "Abrir Toolbox",
+                all_tests_stopped: "Todas las pruebas detenidas",
+                action_error: "Error en la acción",
+                stop_error: "Error al detener procesos"
+            },
+            server_hub: {
+                title: "Server Hub",
+                restart_adb: "ADB Server",
+                restart_appium: "Appium",
+                kill_all: "Parar Todo"
+            },
+            stats: {
+                total_runs: "Total de Ejecuciones",
+                executions: "Ejecuciones",
+                success_rate: "Tasa de Éxito",
+                last_run: "Última Ejecución"
+            },
+            no_devices: "No se Encontraron Dispositivos",
+            no_devices_desc: "Conecte un dispositivo Android por USB o Wi-Fi para comenzar.",
+            no_history: "No se encontró historial de pruebas aún.",
+            loading_stats: "Analizando historial de pruebas...",
+            device_card: {
+                battery: "Batería",
+                ram: "RAM"
+            }
         },
         startup: {
             loading: "Inicializando aplicación...",
@@ -1185,7 +1270,9 @@ export const es = {
             },
             alerts: {
                 busy: "Los siguientes dispositivos están ocupados:\n{{devices}}\n\nEspere a que terminen.",
-                server_not_ready: "El servidor Appium no está listo"
+                server_not_ready: "El servidor Appium no está listo",
+                missing_paths: "Configuración Requerida",
+                missing_paths_desc: "Tanto la 'Raíz de Automatización' como el 'Directorio de Logs' deben estar configurados en Ajustes para ejecutar pruebas y generar informes."
             },
             options: {
                 dont_overwrite: "Guardar Logs"

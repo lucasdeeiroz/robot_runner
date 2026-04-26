@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
-import { Play, Square, Eraser, AlignLeft, Package as PackageIcon } from "lucide-react";
+import { open } from "@tauri-apps/plugin-dialog";
+import { Play, Square, Eraser, AlignLeft, Package as PackageIcon, FolderSearch, Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import clsx from "clsx";
@@ -17,20 +18,36 @@ import * as gemini from "@/lib/dashboard/gemini";
 import * as claude from "@/lib/dashboard/claude";
 import * as openai from "@/lib/dashboard/openai";
 import { Sparkles } from "lucide-react";
-
 interface LogcatSubTabProps {
     selectedDevice: string;
     isTestRunning?: boolean;
     allowActionsDuringTest?: boolean;
+    onNavigate?: (page: string) => void;
 }
 
-export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActionsDuringTest = false }: LogcatSubTabProps) {
+export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActionsDuringTest = false, onNavigate }: LogcatSubTabProps) {
     const { t, i18n } = useTranslation();
     const [isStreaming, setIsStreaming] = useState(false);
     const [logs, setLogs] = useState<string[]>([]);
     const virtuosoRef = useRef<VirtuosoHandle>(null);
-    const { settings } = useSettings();
+    const { settings, updateSetting } = useSettings();
     const [currentDumpFile, setCurrentDumpFile] = useState<string | null>(null);
+
+    const handleConfigurePath = async () => {
+        const selected = await open({
+            directory: true,
+            multiple: false,
+            defaultPath: settings.paths.automationRoot || undefined
+        });
+
+        if (selected && typeof selected === 'string') {
+            await updateSetting('paths', {
+                ...settings.paths,
+                logcat: selected
+            });
+            feedback.toast.success(t('settings_page.path_auto_updated', { path: selected }));
+        }
+    };
 
     // AI State
     const [isAiLoading, setIsAiLoading] = useState(false);
@@ -138,14 +155,35 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
     }, [settings.tools.appPackage]);
 
     const startLogcat = async () => {
+        let activeLogcatPath = settings.paths.logcat;
 
+        if (!activeLogcatPath) {
+            // Prompt for path if not configured
+            const selected = await open({
+                directory: true,
+                multiple: false,
+                defaultPath: settings.paths.automationRoot || undefined
+            });
 
+            if (selected && typeof selected === 'string') {
+                await updateSetting('paths', {
+                    ...settings.paths,
+                    logcat: selected
+                });
+                feedback.toast.success(t('settings_page.path_auto_updated', { path: selected }));
+                activeLogcatPath = selected;
+            } else {
+                return; // Cancel if no path selected
+            }
+        }
+
+        const logcatPath = activeLogcatPath;
         let dumpFile = null;
-        if (settings.paths.logcat) {
+        if (logcatPath) {
             // Sanitize device ID for filename
             const sanDevice = selectedDevice.replace(/[^a-z0-9]/gi, '_');
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            dumpFile = `${settings.paths.logcat}/logcat_${sanDevice}_${timestamp}.txt`;
+            dumpFile = `${logcatPath}/logcat_${sanDevice}_${timestamp}.txt`;
         }
         setCurrentDumpFile(dumpFile);
 
@@ -263,17 +301,40 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
                 variant="transparent"
                 className="pb-2 mb-2 p-2"
                 status={
-                    <div className="text-xs text-on-surface/80">
-                        {logs.length} {t('logcat.lines')}
-                        <Button
-                            onClick={() => { setLogs([]); }}
-                            variant="ghost"
-                            size="sm"
-                            className="px-3 py-1.5 ml-2 rounded-2xl text-xs font-medium items-center justify-center gap-2 bg-surface text-on-surface/80 border border-outline-variant/30 hover:bg-surface-variant/50 transition-colors h-auto"
-                            title={t('logcat.clear')}
-                        >
-                            <Eraser size={14} />
-                        </Button>
+                    <div className="flex items-center gap-3">
+                        {!settings.paths.logcat && (
+                            <div className="flex items-center gap-2 px-3 py-1 bg-warning/10 text-warning rounded-2xl text-[11px] font-medium border border-warning/20">
+                                <FolderSearch size={14} />
+                                <span>{t('logcat.not_saving')}</span>
+                                <button
+                                    onClick={handleConfigurePath}
+                                    className="underline hover:text-warning/80 ml-1"
+                                >
+                                    {t('logcat.configure_path')}
+                                </button>
+                                {onNavigate && (
+                                    <button
+                                        onClick={() => onNavigate?.('settings')}
+                                        className="flex items-center gap-1 hover:text-warning/80 ml-2 border-l border-warning/20 pl-2"
+                                    >
+                                        <Settings size={12} />
+                                        {t('common.go_to_settings')}
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                        <div className="text-xs text-on-surface/80">
+                            {logs.length} {t('logcat.lines')}
+                            <Button
+                                onClick={() => { setLogs([]); }}
+                                variant="ghost"
+                                size="sm"
+                                className="px-3 py-1.5 ml-2 rounded-2xl text-xs font-medium items-center justify-center gap-2 bg-surface text-on-surface/80 border border-outline-variant/30 hover:bg-surface-variant/50 transition-colors h-auto"
+                                title={t('logcat.clear')}
+                            >
+                                <Eraser size={14} />
+                            </Button>
+                        </div>
                     </div>
                 }
                 menus={!isNarrow ? (

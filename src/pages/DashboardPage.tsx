@@ -91,7 +91,7 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
             <div className="flex-1 min-h-0 bg-surface p-4 border border-outline-variant/30 rounded-2xl relative z-10 flex flex-col">
                 {/* SCENARIOS TAB */}
                 <div className={clsx("flex-1 min-h-0", activeTab === 'scenarios' ? "flex flex-col" : "hidden")}>
-                    <AIGeneratorSubTab />
+                    <AIGeneratorSubTab onNavigate={onNavigate} />
                 </div>
 
                 {/* IMAGES TAB */}

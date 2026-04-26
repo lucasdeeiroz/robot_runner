@@ -1,12 +1,31 @@
 
 import { getVersion } from '@tauri-apps/api/app';
-
 import { gt } from 'semver';
+import { platform } from '@tauri-apps/plugin-os';
+import { tempDir, join } from '@tauri-apps/api/path';
+import { writeFile } from '@tauri-apps/plugin-fs';
+import { openPath } from '@tauri-apps/plugin-opener';
+import { fetch } from '@tauri-apps/plugin-http';
+
+interface GitHubAsset {
+    name: string;
+    browser_download_url: string;
+    size: number;
+}
 
 interface GitHubRelease {
     tag_name: string;
     html_url: string;
     body: string;
+    assets: GitHubAsset[];
+}
+
+export interface UpdateAsset {
+    name: string;
+    url: string;
+    size: number;
+    isCompatible: boolean;
+    type: 'installer' | 'portable' | 'other';
 }
 
 export interface UpdateInfo {
@@ -15,19 +34,21 @@ export interface UpdateInfo {
     latestVersion: string;
     url: string;
     notes: string;
+    assets: UpdateAsset[];
 }
+
 
 export async function checkForUpdates(): Promise<UpdateInfo> {
     let currentVersion = '0.0.0';
     try {
         currentVersion = await getVersion();
-        // feedback.toast.info("updater.version_check", currentVersion);
     } catch (e) {
-        // feedback.toast.error("updater.version_check_error", e);
+        console.error("Failed to get version:", e);
     }
 
     try {
-        // Use Tauri's fetch to avoid CORS if possible, though GitHub API allows CORS
+        const currentPlatform = platform();
+
         const response = await fetch('https://api.github.com/repos/lucasdeeiroz/robot_runner/releases/latest', {
             method: 'GET',
             headers: {
@@ -40,25 +61,106 @@ export async function checkForUpdates(): Promise<UpdateInfo> {
         }
 
         const data = await response.json() as GitHubRelease;
-        const latestTag = data.tag_name.replace(/^v/, ''); // Remove 'v' prefix if present
+        const latestTag = data.tag_name.replace(/^v/, ''); 
 
         const available = gt(latestTag, currentVersion);
+
+        // Map and filter assets
+        const assets: UpdateAsset[] = data.assets.map(asset => {
+            const name = asset.name.toLowerCase();
+            let isCompatible = false;
+            let type: 'installer' | 'portable' | 'other' = 'other';
+
+            // Platform check
+            if (currentPlatform === 'windows') {
+                if (name.includes('windows') && (name.includes('x64') || name.includes('x86_64'))) {
+                    isCompatible = true;
+                    if (name.includes('setup.exe') || name.includes('.msi')) type = 'installer';
+                    else if (name.includes('portable.exe')) type = 'portable';
+                }
+            } else if (currentPlatform === 'linux') {
+                if (name.includes('linux') && (name.includes('amd64') || name.includes('x86_64'))) {
+                    isCompatible = true;
+                    if (name.includes('.deb') || name.includes('.rpm')) type = 'installer';
+                    else if (name.includes('.appimage')) type = 'portable';
+                }
+            } else if (currentPlatform === 'macos') {
+                if (name.includes('macos') || name.includes('darwin')) {
+                    isCompatible = true;
+                    if (name.includes('.dmg')) type = 'installer';
+                    else if (name.includes('.tar.gz')) type = 'portable';
+                }
+            }
+
+            return {
+                name: asset.name,
+                url: asset.browser_download_url,
+                size: asset.size,
+                isCompatible,
+                type
+            };
+        }).filter(a => a.isCompatible);
 
         return {
             available,
             currentVersion,
             latestVersion: latestTag,
             url: data.html_url,
-            notes: data.body
+            notes: data.body,
+            assets
         };
     } catch (e) {
-        // console.error("Failed to check updates:", e);
         return {
             available: false,
-            currentVersion, // Return the actual version even if update check fails
+            currentVersion,
             latestVersion: currentVersion,
             url: '',
-            notes: `Error check: ${e instanceof Error ? e.message : String(e)}`
+            notes: `Error check: ${e instanceof Error ? e.message : String(e)}`,
+            assets: []
         };
+    }
+}
+
+export async function downloadAndInstall(asset: UpdateAsset, onProgress?: (p: number) => void): Promise<void> {
+    try {
+        const response = await fetch(asset.url);
+        if (!response.ok) throw new Error("Failed to download update");
+
+        const contentLength = response.headers.get('content-length');
+        const total = contentLength ? parseInt(contentLength, 10) : 0;
+
+        const reader = response.body?.getReader();
+        if (!reader) throw new Error("Failed to get reader");
+
+        let received = 0;
+        const chunks: Uint8Array[] = [];
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            chunks.push(value);
+            received += value.length;
+            if (total > 0 && onProgress) {
+                onProgress(Math.round((received / total) * 100));
+            }
+        }
+
+        const data = new Uint8Array(received);
+        let offset = 0;
+        for (const chunk of chunks) {
+            data.set(chunk, offset);
+            offset += chunk.length;
+        }
+
+        const temp = await tempDir();
+        const filePath = await join(temp, asset.name);
+
+        await writeFile(filePath, data);
+
+        // Open the installer
+        await openPath(filePath);
+    } catch (e) {
+        console.error("Update download failed:", e);
+        throw e;
     }
 }

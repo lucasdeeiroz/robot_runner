@@ -3,7 +3,7 @@ import { AnimatePresence } from 'framer-motion';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useSettings } from "@/lib/settings";
 import { HistoryCharts } from "@/components/organisms/HistoryCharts";
-import { XCircle, Calendar, ChevronDown, ChevronRight, CheckCircle, Clock, PieChart, Search, RefreshCw } from 'lucide-react';
+import { XCircle, Calendar, ChevronDown, ChevronRight, CheckCircle, Clock, PieChart, Search, RefreshCw, Settings } from 'lucide-react';
 import clsx from 'clsx';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from "react-i18next";
@@ -37,9 +37,13 @@ const formatDate = (dateStr: string) => {
 };
 
 
-export function HistorySubTab() {
+interface HistorySubTabProps {
+    onNavigate?: (page: string) => void;
+}
+
+export function HistorySubTab({ onNavigate }: HistorySubTabProps) {
     const { t } = useTranslation();
-    const { settings } = useSettings();
+    const { settings, updateSetting } = useSettings();
     const [history, setHistory] = useState<TestLog[]>(getCachedHistory());
     const [filterText, setFilterText] = useState("");
     const [filterPeriod, setFilterPeriod] = useState("all_time");
@@ -406,11 +410,61 @@ export function HistorySubTab() {
                     </div>
                 )}
 
-                {/* Empty State */}
+                {/* Empty State / Not Configured */}
                 {!loadingHistory && filteredHistory.length === 0 && (
-                    <div className="h-64 flex flex-col items-center justify-center text-on-surface/80 border-2 border-dashed border-outline-variant/30 rounded-2xl m-4">
-                        <Calendar className="mb-4 opacity-20" size={48} />
-                        <p className="font-medium opacity-60">{t('tests_page.no_logs')}</p>
+                    <div className="flex flex-col items-center justify-center text-on-surface/80 border-2 border-dashed border-outline-variant/30 rounded-2xl m-4 p-6 text-center">
+                        {!settings.paths.logs ? (
+                            <>
+                                <div className="p-4 bg-primary/10 rounded-full text-primary mb-4">
+                                    <PieChart size={48} className="opacity-40" />
+                                </div>
+                                <h3 className="text-lg font-medium text-on-surface mb-2">
+                                    {t('file_explorer.not_configured')}
+                                </h3>
+                                <p className="text-sm text-on-surface-variant max-w-xs mx-auto mb-6">
+                                    {t('settings_page.paths.logs_desc', "Configure o diretório onde os logs do Robot Framework são salvos para visualizar o histórico.")}
+                                </p>
+                                <div className="flex gap-4">
+                                    <Button
+                                        onClick={async () => {
+                                            const { open } = await import("@tauri-apps/plugin-dialog");
+                                            const selected = await open({
+                                                directory: true,
+                                                multiple: false,
+                                                defaultPath: settings.paths.automationRoot || undefined
+                                            });
+
+                                            if (selected && typeof selected === 'string') {
+                                                updateSetting('paths', {
+                                                    ...settings.paths,
+                                                    logs: selected
+                                                });
+                                                feedback.toast.success(t('settings_page.path_auto_updated', { path: selected }));
+                                            }
+                                        }}
+                                        variant="primary"
+                                        leftIcon={<Calendar size={18} />}
+                                    >
+                                        {t('file_explorer.select_folder_btn')}
+                                    </Button>
+
+                                    {onNavigate && (
+                                        <Button
+                                            variant="secondary"
+                                            onClick={() => onNavigate('settings')}
+                                            leftIcon={<Settings size={18} />}
+                                        >
+                                            {t('common.go_to_settings')}
+                                        </Button>
+                                    )}
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <Calendar className="mb-4 opacity-20" size={48} />
+                                <p className="font-medium opacity-60">{t('tests_page.no_logs')}</p>
+                            </>
+                        )}
                     </div>
                 )}
 

@@ -5,6 +5,7 @@ import { join } from "@tauri-apps/api/path";
 import { save } from "@tauri-apps/plugin-dialog";
 import { useSettings } from "@/lib/settings";
 import { feedback } from "@/lib/feedback";
+import { useFileSave } from "./useFileSave";
 
 export interface AppStats {
     cpu_usage: number;
@@ -38,9 +39,15 @@ export function usePerformanceRecorder(
     const [forceEnable, setForceEnable] = useState(false);
 
     // Recording State
-    const [lastSaved, setLastSaved] = useState<string | null>(null);
     const [isRecording, setIsRecording] = useState(false);
     const [recordingPath, setRecordingPath] = useState<string | null>(null);
+
+    const { saveFile, lastSavedPath: lastSaved, clearFeedback } = useFileSave({
+        fileType: 'CSV',
+        extensions: ['csv'],
+        defaultNamePrefix: 'performance',
+        settingPathKey: 'logcat' // As requested: save to logcat directory
+    });
 
     // Fetch Stats Loop
     useEffect(() => {
@@ -113,39 +120,22 @@ export function usePerformanceRecorder(
 
     const toggleRecording = async () => {
         if (isRecording) {
-            if (recordingPath) {
-                // Just notify stopped, file is already written incrementally
-                setLastSaved(recordingPath);
-                feedback.toast.success('feedback.performance_saved');
-            }
             setIsRecording(false);
             setRecordingPath(null);
+            // useFileSave handles the success feedback via lastSavedPath
         } else {
             // Start Recording: Create File
             const header = "Timestamp,System_CPU_%,System_RAM_KB,Battery_%,Battery_Temp_C" +
                 (selectedPackage ? ",App_CPU_%,App_RAM_KB,FPS" : "") + "\n";
 
             try {
-                let savePath = "";
-                const filename = `performance_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
+                const path = await saveFile(async (filePath) => {
+                    await invoke('save_file', { path: filePath, content: header, append: false });
+                }, 'feedback.recording_started');
 
-                if (settings.paths.logs) {
-                    savePath = await join(settings.paths.logs, filename);
-                } else {
-                    // Fallback: use save dialog when no log path is configured.
-                    const selected = await save({
-                        filters: [{ name: 'CSV', extensions: ['csv'] }],
-                        defaultPath: filename
-                    });
-                    if (selected) savePath = selected;
-                }
-
-                if (savePath) {
-                    await invoke('save_file', { path: savePath, content: header, append: false });
-                    setRecordingPath(savePath);
+                if (path) {
+                    setRecordingPath(path);
                     setIsRecording(true);
-                    setLastSaved(null);
-                    feedback.toast.success('feedback.recording_started');
                 }
             } catch (e) {
                 feedback.toast.error("performance.record_error", e);
@@ -163,7 +153,7 @@ export function usePerformanceRecorder(
         isRecording,
         toggleRecording,
         lastSaved,
-        setLastSaved,
+        setLastSaved: clearFeedback,
         fetchStats,
         isLoading,
         forceEnable,

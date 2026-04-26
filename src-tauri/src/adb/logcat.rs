@@ -1,3 +1,4 @@
+use crate::cmd_utils::new_std_command;
 use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Write};
@@ -7,7 +8,6 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 use tauri::State;
-use crate::cmd_utils::new_std_command;
 
 // Structure to hold the process and the shared buffer
 pub struct LogcatProcess {
@@ -39,11 +39,14 @@ pub fn start_logcat(
     let buffer = Arc::new(Mutex::new(Vec::new()));
     match output_file.clone() {
         Some(path) => {
-             // Add header to buffer
-             if let Ok(mut b) = buffer.lock() {
-                 b.push(format!("--- Logcat started for device: {} (Writing to {}) ---", device, path));
-             }
-        },
+            // Add header to buffer
+            if let Ok(mut b) = buffer.lock() {
+                b.push(format!(
+                    "--- Logcat started for device: {} (Writing to {}) ---",
+                    device, path
+                ));
+            }
+        }
         None => {
             if let Ok(mut b) = buffer.lock() {
                 b.push(format!("--- Logcat started for device: {} ---", device));
@@ -76,24 +79,26 @@ pub fn start_logcat(
             if let Some(ref package) = pkg {
                 // Try to find PID
                 match get_pid(&device_id, package) {
-                     Ok(Some(pid)) => {
-                         current_pid = Some(pid);
-                     },
-                     Ok(None) => {
-                         // App not running, wait and retry
-                         // println!("Logcat: App {} not running, waiting...", package);
-                     },
-                     Err(_) => {
-                         // Error checking
-                     }
+                    Ok(Some(pid)) => {
+                        current_pid = Some(pid);
+                    }
+                    Ok(None) => {
+                        // App not running, wait and retry
+                        // println!("Logcat: App {} not running, waiting...", package);
+                    }
+                    Err(_) => {
+                        // Error checking
+                    }
                 }
             }
-            
+
             // If we have a package filter but no PID, wait and continue
             if pkg.is_some() && current_pid.is_none() {
-                 if thread_should_stop.load(Ordering::Relaxed) { break; }
-                 thread::sleep(Duration::from_millis(1500));
-                 continue;
+                if thread_should_stop.load(Ordering::Relaxed) {
+                    break;
+                }
+                thread::sleep(Duration::from_millis(1500));
+                continue;
             }
 
             // 2. Start Logcat Process
@@ -104,7 +109,7 @@ pub fn start_logcat(
             }
             args.push("-v");
             args.push("threadtime");
-            
+
             let level_arg = format!("*:{}", lvl);
             args.push(&level_arg);
 
@@ -115,141 +120,152 @@ pub fn start_logcat(
 
             match cmd.spawn() {
                 Ok(mut child_proc) => {
-                     // println!("Logcat: Started process for PID {:?}", current_pid);
-                     let stdout = child_proc.stdout.take();
-                     
-                     // Store child
-                     {
-                         let mut lock = thread_child_mutex.lock().unwrap();
-                         *lock = Some(child_proc);
-                     }
+                    // println!("Logcat: Started process for PID {:?}", current_pid);
+                    let stdout = child_proc.stdout.take();
 
-                     // SPAWN READER THREAD
-                     // We need a separate thread because reader.lines() blocks
-                     if let Some(out) = stdout {
-                         let reader_buffer = thread_buffer.clone();
-                         let reader_output_file = thread_output_file.clone();
-                         let reader_should_stop = thread_should_stop.clone();
-                         
-                         thread::spawn(move || {
-                             let reader = BufReader::new(out);
-                             let mut file_writer = if let Some(ref path) = reader_output_file {
+                    // Store child
+                    {
+                        let mut lock = thread_child_mutex.lock().unwrap();
+                        *lock = Some(child_proc);
+                    }
+
+                    // SPAWN READER THREAD
+                    // We need a separate thread because reader.lines() blocks
+                    if let Some(out) = stdout {
+                        let reader_buffer = thread_buffer.clone();
+                        let reader_output_file = thread_output_file.clone();
+                        let reader_should_stop = thread_should_stop.clone();
+
+                        thread::spawn(move || {
+                            let reader = BufReader::new(out);
+                            let mut file_writer = if let Some(ref path) = reader_output_file {
                                 OpenOptions::new().create(true).append(true).open(path).ok()
-                             } else { None };
+                            } else {
+                                None
+                            };
 
-                             for line in reader.lines() {
-                                 // Stop reading if global stop is requested
-                                 if reader_should_stop.load(Ordering::Relaxed) { break; }
-                                 
-                                 if let Ok(l) = line {
-                                     // Write file
-                                     if let Some(ref mut f) = file_writer {
-                                         let _ = writeln!(f, "{}", l);
-                                     }
-                                     // Buffer
-                                     if let Ok(mut b) = reader_buffer.lock() {
-                                         b.push(l);
-                                         if b.len() > 10000 {
-                                             b.drain(0..1000);
-                                         }
-                                     }
-                                 } else {
-                                     break; // Stream broken or process killed
-                                 }
-                             }
-                         });
-                     }
-                     
-                     // MONITOR LOOP
-                     // Watch the child and the App PID
-                     loop {
-                         if thread_should_stop.load(Ordering::Relaxed) { break; }
-                         thread::sleep(Duration::from_millis(1000));
+                            for line in reader.lines() {
+                                // Stop reading if global stop is requested
+                                if reader_should_stop.load(Ordering::Relaxed) {
+                                    break;
+                                }
 
-                         // 1. Check if child is still running
-                         let mut child_dead = false;
-                         {
-                             let mut lock = thread_child_mutex.lock().unwrap();
-                             if let Some(child) = lock.as_mut() {
-                                 match child.try_wait() {
-                                     Ok(Some(_)) => child_dead = true, // Exited naturally
-                                     Ok(None) => {}, // Still running
-                                     Err(_) => child_dead = true,
-                                 }
-                             } else {
-                                 child_dead = true; // No child?
-                             }
-                         }
+                                if let Ok(l) = line {
+                                    // Write file
+                                    if let Some(ref mut f) = file_writer {
+                                        let _ = writeln!(f, "{}", l);
+                                    }
+                                    // Buffer
+                                    if let Ok(mut b) = reader_buffer.lock() {
+                                        b.push(l);
+                                        if b.len() > 10000 {
+                                            b.drain(0..1000);
+                                        }
+                                    }
+                                } else {
+                                    break; // Stream broken or process killed
+                                }
+                            }
+                        });
+                    }
 
-                         if child_dead {
-                             // println!("Logcat: Child exited naturally or error.");
-                             break; // Go back to start of supervisor loop to restart
-                         }
+                    // MONITOR LOOP
+                    // Watch the child and the App PID
+                    loop {
+                        if thread_should_stop.load(Ordering::Relaxed) {
+                            break;
+                        }
+                        thread::sleep(Duration::from_millis(1000));
 
-                         // 2. Check if App PID changed (Only if we are filtering by package)
-                         if let Some(ref package) = pkg {
-                              // If we knew a PID, check if it's stillvalid
-                              if let Some(ref old_pid) = current_pid {
-                                  match get_pid(&device_id, package) {
-                                      Ok(Some(new_pid)) => {
-                                          if new_pid != *old_pid {
-                                              // PID Changed! App restarted.
-                                              // println!("Logcat: PID changed from {} to {}. Restarting...", old_pid, new_pid);
-                                              
-                                              // Kill current child to force restart
-                                              let mut lock = thread_child_mutex.lock().unwrap();
-                                              if let Some(mut child) = lock.take() {
-                                                  let _ = child.kill();
-                                              }
-                                              break; // Monitor loop ends -> Supervisor loop restarts
-                                          }
-                                      },
-                                      Ok(None) => {
-                                          // App died (returns None). 
-                                          // Keep waiting? Or kill logcat?
-                                          // If app died, logcat --pid might stay alive waiting.
-                                          // Better to kill and go back to searching.
-                                          // println!("Logcat: App died. Killing logcat waiting for restart.");
-                                          let mut lock = thread_child_mutex.lock().unwrap();
-                                          if let Some(mut child) = lock.take() {
-                                              let _ = child.kill();
-                                          }
-                                          break;
-                                      },
-                                      Err(_) => {}
-                                  }
-                              }
-                         }
-                     }
-                     
-                     // Cleanup child handle (ensure it's cleared if we broke out)
-                     {
-                         let mut lock = thread_child_mutex.lock().unwrap();
-                         *lock = None;
-                     }
-                },
+                        // 1. Check if child is still running
+                        let mut child_dead = false;
+                        {
+                            let mut lock = thread_child_mutex.lock().unwrap();
+                            if let Some(child) = lock.as_mut() {
+                                match child.try_wait() {
+                                    Ok(Some(_)) => child_dead = true, // Exited naturally
+                                    Ok(None) => {}                    // Still running
+                                    Err(_) => child_dead = true,
+                                }
+                            } else {
+                                child_dead = true; // No child?
+                            }
+                        }
+
+                        if child_dead {
+                            // println!("Logcat: Child exited naturally or error.");
+                            break; // Go back to start of supervisor loop to restart
+                        }
+
+                        // 2. Check if App PID changed (Only if we are filtering by package)
+                        if let Some(ref package) = pkg {
+                            // If we knew a PID, check if it's stillvalid
+                            if let Some(ref old_pid) = current_pid {
+                                match get_pid(&device_id, package) {
+                                    Ok(Some(new_pid)) => {
+                                        if new_pid != *old_pid {
+                                            // PID Changed! App restarted.
+                                            // println!("Logcat: PID changed from {} to {}. Restarting...", old_pid, new_pid);
+
+                                            // Kill current child to force restart
+                                            let mut lock = thread_child_mutex.lock().unwrap();
+                                            if let Some(mut child) = lock.take() {
+                                                let _ = child.kill();
+                                            }
+                                            break; // Monitor loop ends -> Supervisor loop restarts
+                                        }
+                                    }
+                                    Ok(None) => {
+                                        // App died (returns None).
+                                        // Keep waiting? Or kill logcat?
+                                        // If app died, logcat --pid might stay alive waiting.
+                                        // Better to kill and go back to searching.
+                                        // println!("Logcat: App died. Killing logcat waiting for restart.");
+                                        let mut lock = thread_child_mutex.lock().unwrap();
+                                        if let Some(mut child) = lock.take() {
+                                            let _ = child.kill();
+                                        }
+                                        break;
+                                    }
+                                    Err(_) => {}
+                                }
+                            }
+                        }
+                    }
+
+                    // Cleanup child handle (ensure it's cleared if we broke out)
+                    {
+                        let mut lock = thread_child_mutex.lock().unwrap();
+                        *lock = None;
+                    }
+                }
                 Err(_e) => {
                     // println!("Logcat: Failed to spawn adb: {}", e);
                     thread::sleep(Duration::from_secs(2));
                 }
             }
-            
-            // If we are just running global logcat (no filter), and it exits, we probably shouldn't restart immediately loop hard, 
+
+            // If we are just running global logcat (no filter), and it exits, we probably shouldn't restart immediately loop hard,
             // but `adb logcat` usually runs forever. If it crashes, restart is fine.
             if pkg.is_none() {
-                 if thread_should_stop.load(Ordering::Relaxed) { break; }
-                 thread::sleep(Duration::from_secs(1));
+                if thread_should_stop.load(Ordering::Relaxed) {
+                    break;
+                }
+                thread::sleep(Duration::from_secs(1));
             }
         }
         // println!("Logcat: Supervisor thread exiting for {}", device_id);
     });
- 
-    procs.insert(device, LogcatProcess { 
-        child: child_mutex, 
-        should_stop, 
-        buffer, 
-        output_file 
-    });
+
+    procs.insert(
+        device,
+        LogcatProcess {
+            child: child_mutex,
+            should_stop,
+            buffer,
+            output_file,
+        },
+    );
 
     Ok("Logcat started".to_string())
 }
@@ -264,13 +280,21 @@ fn get_pid(device: &str, pkg: &str) -> Result<Option<String>, String> {
             if pid.is_empty() {
                 return Ok(None);
             }
-            
+
             // Check process state (zombie/cached check)
             let mut oom_cmd = new_std_command("adb");
-            oom_cmd.args(&["-s", device, "shell", "cat", &format!("/proc/{}/oom_score_adj", pid)]);
+            oom_cmd.args(&[
+                "-s",
+                device,
+                "shell",
+                "cat",
+                &format!("/proc/{}/oom_score_adj", pid),
+            ]);
 
             if let Ok(oom_output) = oom_cmd.output() {
-                let score_str = String::from_utf8_lossy(&oom_output.stdout).trim().to_string();
+                let score_str = String::from_utf8_lossy(&oom_output.stdout)
+                    .trim()
+                    .to_string();
                 if let Ok(score) = score_str.parse::<i32>() {
                     // 900+ is cached
                     if score >= 900 {
@@ -279,8 +303,8 @@ fn get_pid(device: &str, pkg: &str) -> Result<Option<String>, String> {
                 }
             }
             Ok(Some(pid))
-        },
-        Err(e) => Err(e.to_string())
+        }
+        Err(e) => Err(e.to_string()),
     }
 }
 
@@ -297,7 +321,7 @@ pub fn stop_logcat(state: State<'_, LogcatState>, device: String) -> Result<Stri
         if let Some(mut child) = child_lock.take() {
             let _ = child.kill();
         }
-        
+
         return Ok("Logcat stopped".to_string());
     }
 
@@ -322,7 +346,7 @@ pub fn get_logcat_details(
     device: String,
 ) -> Result<LogcatDetails, String> {
     let procs = state.0.lock().map_err(|_e| _e.to_string())?;
-    
+
     if let Some(process) = procs.get(&device) {
         Ok(LogcatDetails {
             is_active: true,
@@ -346,12 +370,12 @@ pub fn fetch_logcat_buffer(
 
     if let Some(process) = procs.get(&device) {
         let buf = process.buffer.lock().map_err(|_e| _e.to_string())?;
-        
+
         let len = buf.len();
         if offset >= len {
             return Ok((Vec::new(), len));
         }
-        
+
         let new_lines = buf[offset..].to_vec();
         Ok((new_lines, len))
     } else {

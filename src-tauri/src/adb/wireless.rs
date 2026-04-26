@@ -1,5 +1,5 @@
-use tauri::command;
 use crate::cmd_utils::new_tokio_command;
+use tauri::command;
 
 #[command]
 pub async fn adb_connect(ip: String, port: String) -> Result<String, String> {

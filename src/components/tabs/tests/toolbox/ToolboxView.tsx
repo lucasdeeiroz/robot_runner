@@ -22,11 +22,12 @@ import { TabBar } from "@/components/organisms/TabBar";
 interface ToolboxViewProps {
     session: TestSession;
     isCompact?: boolean;
+    onNavigate?: (page: string) => void;
 }
 
 type ToolTab = 'console' | 'logcat' | 'performance' | 'commands' | 'apps';
 
-export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
+export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxViewProps) {
     const { stopSession, rerunSession, setSessionActiveTool } = useTestSessions();
     const { t } = useTranslation();
     const { settings, systemCheckStatus } = useSettings();
@@ -469,7 +470,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                                     {tool === 'console' && (
                                         <RunConsole key={`console-${session.runId}-${session.sessionEpoch}`} runId={session.runId} logs={session.logs} isSessionRunning={session.status === 'running' || session.status === 'stopping'} testPath={session.testPath} />
                                     )}
-                                    {tool === 'logcat' && <LogcatSubTab key={session.deviceUdid} selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
+                                    {tool === 'logcat' && <LogcatSubTab key={session.deviceUdid} selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} onNavigate={onNavigate} />}
                                     {tool === 'commands' && <CommandsSubTab selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
                                     {tool === 'performance' && (
                                         <PerformanceSubTab
@@ -480,6 +481,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                                             allowActionsDuringTest={settings.allowActionsDuringTest}
                                             forceEnable={performanceState.forceEnable}
                                             setForceEnable={performanceState.setForceEnable}
+                                            onNavigate={onNavigate}
                                         />
                                     )}
                                     {tool === 'apps' && <AppsSubTab isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
@@ -495,7 +497,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                     </div>
 
                     <div className={clsx("h-full flex-1 min-h-0 flex flex-col", activeTool === 'logcat' ? "flex" : "hidden")}>
-                        <LogcatSubTab key={session.deviceUdid} selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />
+                        <LogcatSubTab key={session.deviceUdid} selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} onNavigate={onNavigate} />
                     </div>
 
                     <div className={clsx("h-full flex-1 min-h-0 flex flex-col", activeTool === 'commands' ? "flex" : "hidden")}>
@@ -511,6 +513,7 @@ export function ToolboxView({ session, isCompact = false }: ToolboxViewProps) {
                             allowActionsDuringTest={settings.allowActionsDuringTest}
                             forceEnable={performanceState.forceEnable}
                             setForceEnable={performanceState.setForceEnable}
+                            onNavigate={onNavigate}
                         />
                     </div>
 

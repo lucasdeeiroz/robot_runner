@@ -103,7 +103,15 @@ export const en = {
             update_not_available: "You are up to date",
             update_error: "Failed to check for updates",
             checking: "Checking...",
-            update_badge: "UPDATE"
+            update_badge: "UPDATE",
+            update_title: "New Version Available",
+            update_select_installer: "Select the installer for your system",
+            installer: "Installer",
+            portable: "Portable",
+            update_manual_hint: "The installer will open automatically after download.",
+            view_releases: "View all releases on GitHub",
+            update_downloaded: "Download complete! Opening installer...",
+            update_download_error: "Failed to download update."
         },
         ai_page: {
             title: "AI Assistant",
@@ -186,6 +194,10 @@ export const en = {
             }
         },
         common: {
+            refresh: "Refresh",
+            online: "Online",
+            offline: "Offline",
+            try_again: "Try Again",
             beta: "Beta",
             cancel: "Cancel",
             save: "Save",
@@ -208,7 +220,9 @@ export const en = {
             error_occurred: "An error occurred: {{error}}",
             delete: "Delete",
             edit: "Edit",
+            go_to_settings: "Go to Settings",
             ok: "OK",
+            done: "Done",
             search: "Search...",
             loading: "Loading...",
             select: "Select...",
@@ -420,7 +434,11 @@ export const en = {
             cancel: "Cancel",
             select_file: "Select File",
             select_folder: "Select Folder",
-            select_generic: "Select"
+            select_generic: "Select",
+            not_configured: "Path not configured",
+            configure_tests: "Please configure the Tests Directory in Settings or select it below.",
+            configure_suites: "Please configure the Suites Directory in Settings or select it below.",
+            select_folder_btn: "Select Folder"
         },
         inspector: {
             overlay: {
@@ -575,7 +593,10 @@ export const en = {
             select_device: "Select a device to view logs",
             ai_analyze_button: "Analyze with AI",
             ai_analysis_title: "AI Analysis Result",
-            analyzing: "Analyzing logs..."
+            analyzing: "Analyzing logs...",
+            not_saving: "Not saving to file",
+            configure_path: "Configure Path",
+            select_dir_title: "Select Directory for Logcat"
         },
         mapper: {
             title: "Mapper",
@@ -839,7 +860,9 @@ export const en = {
             },
             actions: {
                 force_enable: "Force Enable"
-            }
+            },
+            manual_save_hint: "Note: Recordings will use a manual 'Save As' dialog if the logs path is missing. Configure it in Settings for automatic saving.",
+            select_dir_title: "Select Directory for Performance Reports"
         },
         run_tab: {
             launcher: "Launcher",
@@ -856,7 +879,8 @@ export const en = {
                 open_toolbox: "Open Toolbox"
             },
             console: {
-                documentation: "Documentation: ",
+                documentation: "Documentation",
+                return_value: "Return Value",
                 error_message: "Error Message",
                 screenshot: "Screenshot",
                 artifacts: "Artifacts",
@@ -1009,6 +1033,10 @@ export const en = {
                 add_package_placeholder: "Add package (Press Enter)",
                 ngrok_token: "Ngrok Auth Token"
             },
+            adb: {
+                restart_success: "ADB Server restarted successfully",
+                restart_error: "Failed to restart ADB Server"
+            },
             ai: {
                 title: "AI Integration",
                 provider: "AI Provider",
@@ -1085,9 +1113,17 @@ export const en = {
                 title: "Tool Options",
                 allow_actions_during_test: "Allow actions during test",
                 allow_actions_during_test_desc: "Enable Logcat, Performance Monitoring, and other tools even while a test is running"
+            },
+        },
+        settings_page: {
+            path_auto_updated: "Path automatically updated: {{path}}",
+            paths: {
+                logs_desc: "Configure the directory where Robot Framework logs are saved to view execution history."
             }
         },
         sidebar: {
+            home: "Home",
+            description_home: "Overview of connected devices and test activities.",
             dashboard: "QA Dashboard",
             adb_active: "ADB Active",
             appium_active: "Appium Server Active",
@@ -1102,6 +1138,55 @@ export const en = {
             description_settings: "Configure application preferences and integrations.",
             about: "About",
             description_about: "Information about Robot Runner and its creators."
+        },
+        home: {
+            sections: {
+                devices: "Connected Devices",
+                devices_desc: "Real-time monitoring of active Android devices.",
+                activity: "Recent Activity",
+                activity_desc: "Overview of your latest test executions and performance."
+            },
+            device_menu: {
+                screenshot: "Take Screenshot",
+                toggle_bounds: "Layout Bounds",
+                toggle_touches: "Show Taps",
+                toggle_pointer: "Pointer Location",
+                refresh_info: "Refresh Info",
+                reboot: "Reboot Device",
+                reboot_success: "Reboot command sent",
+                reboot_error: "Failed to reboot",
+                bounds_toggled: "Layout bounds toggled",
+                touches_toggled: "Show taps toggled",
+                pointer_toggled: "Pointer location toggled",
+                action_error: "Action failed"
+            },
+            actions: {
+                mirror: "Mirror Screen",
+                toolbox: "Open Toolbox",
+                all_tests_stopped: "All tests stopped",
+                action_error: "Action failed",
+                stop_error: "Failed to stop processes"
+            },
+            server_hub: {
+                title: "Server Hub",
+                restart_adb: "ADB Server",
+                restart_appium: "Appium",
+                kill_all: "Kill All Tasks"
+            },
+            stats: {
+                total_runs: "Total Executions",
+                executions: "Executions",
+                success_rate: "Success Rate",
+                last_run: "Last Execution"
+            },
+            no_devices: "No Devices Found",
+            no_devices_desc: "Connect an Android device via USB or Wi-Fi to get started.",
+            no_history: "No test history found yet.",
+            loading_stats: "Analyzing test history...",
+            device_card: {
+                battery: "Battery",
+                ram: "RAM"
+            }
         },
         startup: {
             loading: "Initializing application...",
@@ -1180,7 +1265,9 @@ export const en = {
             },
             alerts: {
                 busy: "The following devices are currently busy running a test:\n{{devices}}\n\nPlease wait for them to finish.",
-                server_not_ready: "The Appium server is not ready"
+                server_not_ready: "The Appium server is not ready",
+                missing_paths: "Configuration Required",
+                missing_paths_desc: "Both 'Automation Root' and 'Logs Directory' must be configured in Settings to execute tests and generate reports."
             },
             options: {
                 dont_overwrite: "Save Logs"

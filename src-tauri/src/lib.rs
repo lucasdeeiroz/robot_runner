@@ -1,23 +1,23 @@
 mod adb;
+mod ai_context;
 mod appium;
+pub mod cmd_utils;
+mod db;
+pub mod errors;
 mod inspector;
 mod logs;
+mod monitor;
 mod ngrok;
 mod runner;
 mod system;
 mod xml_parser;
-mod ai_context;
-mod db;
-pub mod cmd_utils;
-pub mod errors;
-mod monitor;
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
 
-mod files;
 mod cmd_registry;
+mod files;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -27,6 +27,7 @@ fn greet(name: &str) -> String {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_fs::init())
@@ -37,9 +38,7 @@ pub fn run() {
         .manage(runner::TestState(Arc::new(Mutex::new(HashMap::new()))))
         .manage(appium::AppiumState(Arc::new(Mutex::new(None))))
         .manage(ngrok::NgrokState(Mutex::new(None)))
-        .manage(adb::logcat::LogcatState(Mutex::new(
-            HashMap::new(),
-        )))
+        .manage(adb::logcat::LogcatState(Mutex::new(HashMap::new())))
         .manage(system::WakelockState(std::sync::Mutex::new(None)))
         .setup(|app| {
             monitor::start_heartbeat_monitor(app.handle().clone());

@@ -22,37 +22,100 @@
     "dialog:default",
     "store:default",
     "fs:default",
-    "fs:allow-read-file",
-    "fs:allow-read-text-file",
-    "fs:allow-exists",
-    "fs:allow-write-text-file",
-    "fs:allow-create",
-    "fs:allow-remove",
+    {
+      "identifier": "fs:allow-write-file",
+      "allow": [
+        { "path": "$APPLOCALDATA/**" },
+        { "path": "$CACHE/**" },
+        { "path": "$TEMP/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-read-file",
+      "allow": [
+        { "path": "$APPLOCALDATA/**" },
+        { "path": "$CACHE/**" },
+        { "path": "$TEMP/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-read-text-file",
+      "allow": [
+        { "path": "$APPLOCALDATA/**" },
+        { "path": "$CACHE/**" },
+        { "path": "$TEMP/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-write-text-file",
+      "allow": [
+        { "path": "$APPLOCALDATA/**" },
+        { "path": "$CACHE/**" },
+        { "path": "$TEMP/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-exists",
+      "allow": [
+        { "path": "$APPLOCALDATA/**" },
+        { "path": "$CACHE/**" },
+        { "path": "$TEMP/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-create",
+      "allow": [
+        { "path": "$APPLOCALDATA/**" },
+        { "path": "$CACHE/**" },
+        { "path": "$TEMP/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-read-dir",
+      "allow": [
+        { "path": "$APPLOCALDATA/**" },
+        { "path": "$CACHE/**" },
+        { "path": "$TEMP/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-mkdir",
+      "allow": [
+        { "path": "$APPLOCALDATA/**" },
+        { "path": "$CACHE/**" },
+        { "path": "$TEMP/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-remove",
+      "allow": [
+        { "path": "$APPLOCALDATA/**" },
+        { "path": "$CACHE/**" },
+        { "path": "$TEMP/**" }
+      ]
+    },
     "fs:allow-applocaldata-write-recursive",
     "notification:default",
     {
       "identifier": "http:default",
       "allow": [
-        { "url": "https://api.github.com/**" },
-        { "url": "https://api.openai.com/**" },
-        { "url": "https://api.anthropic.com/**" }
-      ]
-    }
-  ],
-  "scopes": [
-    {
-      "identifier": "fs:scope",
-      "allow": [
         {
-          "path": "$APPLOCALDATA/**"
+          "url": "https://api.github.com/**"
         },
         {
-          "path": "$CACHE/**"
+          "url": "https://github.com/**"
         },
         {
-          "path": "$TEMP/**"
+          "url": "https://objects.githubusercontent.com/**"
+        },
+        {
+          "url": "https://api.openai.com/**"
+        },
+        {
+          "url": "https://api.anthropic.com/**"
         }
       ]
-    }
+    },
+    "os:default"
   ]
 }

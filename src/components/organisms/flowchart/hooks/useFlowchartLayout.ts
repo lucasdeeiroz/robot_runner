@@ -25,16 +25,11 @@ export function useFlowchartLayout({ maps, activeProfileId, onRefresh, settings 
     const [missedScreens, setMissedScreens] = useState<string[]>([]);
     
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-    const skipReloadRef = useRef(false);
 
     const mapsRef = useRef(maps);
     mapsRef.current = maps;
 
     const loadLayout = useCallback(async () => {
-        if (skipReloadRef.current) {
-            skipReloadRef.current = false;
-            return;
-        }
         setLoading(true);
         try {
             const centralLayout = await loadFlowchartLayout(activeProfileId);
@@ -61,6 +56,25 @@ export function useFlowchartLayout({ maps, activeProfileId, onRefresh, settings 
                         newLayout.nodes[map.name] = { gridX: legacy.gridX, gridY: legacy.gridY };
                     }
                 }
+            }
+
+            // --- AUTO-PLACEMENT FOR NEW SCREENS ---
+            let nextX = 0;
+            Object.values(newLayout.nodes).forEach(n => {
+                if (n.gridX >= nextX) nextX = n.gridX + 1;
+            });
+
+            let addedNew = false;
+            for (const map of maps) {
+                if (!newLayout.nodes[map.name]) {
+                    newLayout.nodes[map.name] = { gridX: nextX, gridY: 0 };
+                    nextX++;
+                    addedNew = true;
+                }
+            }
+
+            if (addedNew) {
+                setIsDirty(true);
             }
 
             setLayout(newLayout);
@@ -111,8 +125,6 @@ export function useFlowchartLayout({ maps, activeProfileId, onRefresh, settings 
 
             setIsDirty(false);
             if (manual) feedback.toast.success(t('mapper.flowchart.save_success'));
-            // Skip the next loadLayout triggered by onRefresh changing maps
-            skipReloadRef.current = true;
             if (onRefresh) onRefresh();
         } catch (error) {
             console.error('Failed to save layout:', error);
