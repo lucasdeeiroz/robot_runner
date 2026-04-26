@@ -424,42 +424,40 @@ export function HistorySubTab({ onNavigate }: HistorySubTabProps) {
                                 <p className="text-sm text-on-surface-variant max-w-xs mx-auto mb-6">
                                     {t('settings_page.paths.logs_desc', "Configure o diretório onde os logs do Robot Framework são salvos para visualizar o histórico.")}
                                 </p>
-                                <Button
-                                    onClick={async () => {
-                                        const { open } = await import("@tauri-apps/plugin-dialog");
-                                        const selected = await open({
-                                            directory: true,
-                                            multiple: false,
-                                            defaultPath: settings.paths.automationRoot || undefined
-                                        });
-
-                                        if (selected && typeof selected === 'string') {
-                                            updateSetting('paths', {
-                                                ...settings.paths,
-                                                logs: selected
-                                            });
-                                            // The useEffect hook will trigger loadHistory automatically
-                                            feedback.toast.success(t('settings_page.path_auto_updated', { path: selected }));
-                                        }
-                                    }}
-                                    className="flex items-center gap-2 px-6"
-                                    variant="primary"
-                                >
-                                    <Calendar size={18} />
-                                    {t('file_explorer.select_folder_btn')}
-                                </Button>
-
-                                {onNavigate && (
+                                <div className="flex gap-4">
                                     <Button
-                                        onClick={() => onNavigate?.('settings')}
-                                        variant="ghost"
-                                        size="sm"
-                                        className="mt-2 text-on-surface-variant/60 hover:text-primary"
-                                        leftIcon={<Settings size={14} />}
+                                        onClick={async () => {
+                                            const { open } = await import("@tauri-apps/plugin-dialog");
+                                            const selected = await open({
+                                                directory: true,
+                                                multiple: false,
+                                                defaultPath: settings.paths.automationRoot || undefined
+                                            });
+
+                                            if (selected && typeof selected === 'string') {
+                                                updateSetting('paths', {
+                                                    ...settings.paths,
+                                                    logs: selected
+                                                });
+                                                feedback.toast.success(t('settings_page.path_auto_updated', { path: selected }));
+                                            }
+                                        }}
+                                        variant="primary"
+                                        leftIcon={<Calendar size={18} />}
                                     >
-                                        {t('common.go_to_settings', "Go to Settings")}
+                                        {t('file_explorer.select_folder_btn')}
                                     </Button>
-                                )}
+
+                                    {onNavigate && (
+                                        <Button
+                                            variant="secondary"
+                                            onClick={() => onNavigate('settings')}
+                                            leftIcon={<Settings size={18} />}
+                                        >
+                                            {t('common.go_to_settings')}
+                                        </Button>
+                                    )}
+                                </div>
                             </>
                         ) : (
                             <>

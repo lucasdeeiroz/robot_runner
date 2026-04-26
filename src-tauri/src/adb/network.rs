@@ -5,7 +5,7 @@ pub async fn get_device_ip(serial: String) -> Result<String, String> {
     // Strategy 1: ip route (reliable on most modern Androids)
     let mut cmd_route = new_tokio_command("adb");
     cmd_route.args(&["-s", &serial, "shell", "ip", "route"]);
-    
+
     let output = cmd_route.output().await.map_err(|e| e.to_string())?;
 
     if output.status.success() {
@@ -27,7 +27,7 @@ pub async fn get_device_ip(serial: String) -> Result<String, String> {
     // Strategy 2: ifconfig (older devices)
     let mut cmd_ifconfig = new_tokio_command("adb");
     cmd_ifconfig.args(&["-s", &serial, "shell", "ifconfig", "wlan0"]);
-    
+
     let output_ifconfig = cmd_ifconfig.output().await.map_err(|e| e.to_string())?;
 
     if output_ifconfig.status.success() {

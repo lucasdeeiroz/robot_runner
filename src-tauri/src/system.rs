@@ -1,11 +1,11 @@
+use crate::cmd_utils::new_std_command;
+use crate::errors::{AppError, AppResult};
+use nosleep::{NoSleep, NoSleepType};
 use regex::Regex;
 use serde::Serialize;
 use serde_json::Value;
-use tauri::{command, State};
 use std::sync::Mutex;
-use nosleep::{NoSleep, NoSleepType};
-use crate::cmd_utils::new_std_command;
-use crate::errors::{AppError, AppResult};
+use tauri::{command, State};
 
 #[derive(Debug, Serialize)]
 pub struct SystemVersions {
@@ -26,14 +26,17 @@ pub struct SystemVersions {
 pub struct WakelockState(pub Mutex<Option<NoSleep>>);
 
 #[command]
-pub async fn sync_workspace_permissions(app_handle: tauri::AppHandle, paths: Vec<String>) -> AppResult<()> {
+pub async fn sync_workspace_permissions(
+    app_handle: tauri::AppHandle,
+    paths: Vec<String>,
+) -> AppResult<()> {
     use tauri_plugin_fs::FsExt;
-    
+
     for path in paths {
         if path.is_empty() {
             continue;
         }
-        
+
         let path_obj = std::path::Path::new(&path);
         if path_obj.exists() {
             let _ = app_handle.fs_scope().allow_directory(&path, true);
@@ -46,12 +49,17 @@ pub async fn sync_workspace_permissions(app_handle: tauri::AppHandle, paths: Vec
 
 #[command]
 pub async fn toggle_wakelock(enabled: bool, state: State<'_, WakelockState>) -> AppResult<()> {
-    let mut lock_guard = state.0.lock().map_err(|e| AppError::StringError(e.to_string()))?;
-    
+    let mut lock_guard = state
+        .0
+        .lock()
+        .map_err(|e| AppError::StringError(e.to_string()))?;
+
     if enabled {
         if lock_guard.is_none() {
             let mut nosleep = NoSleep::new().map_err(|e| AppError::StringError(e.to_string()))?;
-            nosleep.start(NoSleepType::PreventUserIdleDisplaySleep).map_err(|e| AppError::StringError(e.to_string()))?;
+            nosleep
+                .start(NoSleepType::PreventUserIdleDisplaySleep)
+                .map_err(|e| AppError::StringError(e.to_string()))?;
             *lock_guard = Some(nosleep);
         }
     } else {
@@ -63,7 +71,11 @@ pub async fn toggle_wakelock(enabled: bool, state: State<'_, WakelockState>) -> 
 }
 
 #[command]
-pub async fn get_system_versions(check_automator: bool, framework: Option<String>, check_ngrok: bool) -> SystemVersions {
+pub async fn get_system_versions(
+    check_automator: bool,
+    framework: Option<String>,
+    check_ngrok: bool,
+) -> SystemVersions {
     let adb_raw = get_version("adb", &["--version"]);
     let adb = extract_version(&adb_raw, r"Android Debug Bridge version ([\d\.]+)");
 
@@ -84,13 +96,14 @@ pub async fn get_system_versions(check_automator: bool, framework: Option<String
         let fw = framework.unwrap_or_else(|| "robot".to_string());
         if fw == "appium" || fw == "robot" {
             // Check Appium and determine command
-            let (appium_raw, appium_cmd) = if let Some(v) = try_get_version("appium", &["--version"]) {
-                (v, "appium")
-            } else if let Some(v) = try_get_version("appium.cmd", &["--version"]) {
-                (v, "appium.cmd")
-            } else {
-                ("Not Found".to_string(), "appium")
-            };
+            let (appium_raw, appium_cmd) =
+                if let Some(v) = try_get_version("appium", &["--version"]) {
+                    (v, "appium")
+                } else if let Some(v) = try_get_version("appium.cmd", &["--version"]) {
+                    (v, "appium.cmd")
+                } else {
+                    ("Not Found".to_string(), "appium")
+                };
             appium = appium_raw;
 
             // Check UiAutomator2 using the found Appium command
@@ -104,17 +117,17 @@ pub async fn get_system_versions(check_automator: bool, framework: Option<String
             let java_raw = get_version("java", &["-version"]);
             java = extract_version(&java_raw, r#"version "([^"]+)""#);
             if java == "Not Found" {
-                 // Fallback for newer java versions or different output format
-                 java = extract_version(&java_raw, r"openjdk ([\d\.]+)");
+                // Fallback for newer java versions or different output format
+                java = extract_version(&java_raw, r"openjdk ([\d\.]+)");
             }
 
             let maven_raw = get_version("mvn", &["-version"]);
             maven = extract_version(&maven_raw, r"Apache Maven ([\d\.]+)");
         }
-        
+
         if fw == "maestro" {
-             let maestro_raw = get_version("maestro", &["--version"]);
-             maestro = extract_version(&maestro_raw, r"([\d\.]+)");
+            let maestro_raw = get_version("maestro", &["--version"]);
+            maestro = extract_version(&maestro_raw, r"([\d\.]+)");
         }
         if fw == "robot" {
             let python_raw = get_version("python", &["--version"]);
@@ -128,7 +141,7 @@ pub async fn get_system_versions(check_automator: bool, framework: Option<String
                 "Not Found".to_string()
             };
             robot = extract_version(&robot_raw, r"Robot Framework ([\d\.]+)");
-    
+
             // Check robotframework-appiumlibrary using direct python import
             appium_lib = get_version("python", &[
                 "-c", 
@@ -163,7 +176,6 @@ pub async fn get_system_versions(check_automator: bool, framework: Option<String
     }
 }
 
-
 fn extract_version(input: &str, pattern: &str) -> String {
     if input == "Not Found" {
         return input.to_string();
@@ -175,7 +187,7 @@ fn extract_version(input: &str, pattern: &str) -> String {
             }
         }
     }
-    
+
     // Filter out common Windows CMD error messages
     // This handles cases where `strict=false` allows shell errors to pass through
     let lower_input = input.to_lowercase();

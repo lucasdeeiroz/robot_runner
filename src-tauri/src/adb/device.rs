@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use crate::cmd_utils::new_tokio_command;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Device {
@@ -24,7 +24,9 @@ pub async fn get_connected_devices() -> AppResult<Vec<Device>> {
         .map_err(|e| AppError::AdbError(format!("Failed to execute adb: {}", e)))?;
 
     if !output.status.success() {
-        return Err(AppError::AdbError(String::from_utf8_lossy(&output.stderr).to_string()));
+        return Err(AppError::AdbError(
+            String::from_utf8_lossy(&output.stderr).to_string(),
+        ));
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);

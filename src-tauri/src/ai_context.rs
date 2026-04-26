@@ -1,7 +1,7 @@
-use roxmltree;
-use serde::{Deserialize, Serialize};
 use crate::db::LogDb;
 use crate::files::read_file_tail_internal;
+use roxmltree;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 use tauri::Manager;
@@ -49,23 +49,23 @@ pub async fn get_ai_context(
 fn get_history_analysis_context(params: AiContextParams) -> Result<AiContextResponse, String> {
     let db_path = params.db_path.ok_or("Missing db_path")?;
     let db = LogDb::new(&db_path).map_err(|e| e.to_string())?;
-    
+
     let limit = params.failures_limit.unwrap_or(20);
     let mut failures = db.get_failures().map_err(|e| e.to_string())?;
-    
+
     if failures.len() > limit {
         failures.truncate(limit);
     }
-    
+
     let mut context = String::new();
     context.push_str("### FAILURE ANALYSIS CONTEXT\n\n");
-    
+
     if failures.is_empty() {
         context.push_str("No failures found in the database.\n");
     } else {
         for (i, fail_json) in failures.iter().enumerate() {
             context.push_str(&format!("--- FAILURE {} ---\n", i + 1));
-            
+
             // Token Optimization: Strip massive UI hierarchies or excessive raw logs
             if let Ok(mut parsed) = serde_json::from_str::<serde_json::Value>(fail_json) {
                 if let Some(obj) = parsed.as_object_mut() {
@@ -100,7 +100,7 @@ fn get_history_analysis_context(params: AiContextParams) -> Result<AiContextResp
             context.push_str("\n\n");
         }
     }
-    
+
     // Read performance CSVs if directory exists
     if let Some(db_p) = Path::new(&db_path).parent() {
         if let Ok(entries) = fs::read_dir(db_p) {
@@ -109,24 +109,38 @@ fn get_history_analysis_context(params: AiContextParams) -> Result<AiContextResp
                 let path = entry.path();
                 if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("csv") {
                     if let Ok(tail) = read_file_tail_internal(&path.to_string_lossy(), 10000) {
-                        context.push_str(&format!("Performance Data ({}):\n{}\n\n", path.file_name().unwrap().to_string_lossy(), tail));
+                        context.push_str(&format!(
+                            "Performance Data ({}):\n{}\n\n",
+                            path.file_name().unwrap().to_string_lossy(),
+                            tail
+                        ));
                     }
                 }
             }
         }
     }
-    
+
     // Read relevant logs if available (e.g. system traces), but SKIP heavy XML or HTML files
     if let Some(log_paths) = params.log_paths {
         context.push_str("### SYSTEM LOGS (TAIL)\n\n");
         let mut log_count = 0;
         for path in log_paths {
-            let extension = Path::new(&path).extension().and_then(|s| s.to_str()).unwrap_or("");
+            let extension = Path::new(&path)
+                .extension()
+                .and_then(|s| s.to_str())
+                .unwrap_or("");
             if extension == "xml" || extension == "html" {
                 continue; // Skip execution artifacts that are already covered by DB or don't add value
             }
-            if let Ok(tail) = read_file_tail_internal(&path, 5000) { // Limit to 5KB per extra log
-                context.push_str(&format!("--- Log: {} ---\n", Path::new(&path).file_name().unwrap_or_default().to_string_lossy()));
+            if let Ok(tail) = read_file_tail_internal(&path, 5000) {
+                // Limit to 5KB per extra log
+                context.push_str(&format!(
+                    "--- Log: {} ---\n",
+                    Path::new(&path)
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                ));
                 context.push_str(&tail);
                 context.push_str("\n\n");
                 log_count += 1;
@@ -137,7 +151,7 @@ fn get_history_analysis_context(params: AiContextParams) -> Result<AiContextResp
             }
         }
     }
-    
+
     Ok(AiContextResponse {
         context,
         metadata: serde_json::json!({ "failure_count": failures.len() }),
@@ -151,11 +165,11 @@ fn get_exploration_context(params: AiContextParams) -> Result<AiContextResponse,
     if let Some(xml) = params.current_xml {
         context.push_str("### UI HIERARCHY (Simplified XML)\n\n");
         let doc = roxmltree::Document::parse(&xml).map_err(|e| e.to_string())?;
-        
+
         // Simple heuristic for interactive elements to keep XML tiny
         let mut simplified = String::new();
         simplified.push_str("<hierarchy>\n");
-        
+
         let mut short_id_map = serde_json::Map::new();
         let mut count = 0;
 
@@ -163,9 +177,11 @@ fn get_exploration_context(params: AiContextParams) -> Result<AiContextResponse,
             if node.is_element() {
                 let tag = node.tag_name().name();
                 // Interactive elements or those with text content
-                let clickable = node.attribute("clickable") == Some("true") || node.attribute("long-clickable") == Some("true");
-                let has_text = node.attribute("text").is_some() && node.attribute("text") != Some("");
-                
+                let clickable = node.attribute("clickable") == Some("true")
+                    || node.attribute("long-clickable") == Some("true");
+                let has_text =
+                    node.attribute("text").is_some() && node.attribute("text") != Some("");
+
                 if clickable || has_text || tag == "hierarchy" {
                     count += 1;
                     let short_id = format!("e{}", count);
@@ -173,8 +189,13 @@ fn get_exploration_context(params: AiContextParams) -> Result<AiContextResponse,
                     short_id_map.insert(short_id.clone(), serde_json::json!(xpath));
 
                     let text = node.attribute("text").unwrap_or("");
-                    let resource_id = node.attribute("resource-id").unwrap_or("").split('/').last().unwrap_or("");
-                    
+                    let resource_id = node
+                        .attribute("resource-id")
+                        .unwrap_or("")
+                        .split('/')
+                        .last()
+                        .unwrap_or("");
+
                     simplified.push_str(&format!(
                         "  <{tag} id='{}' text='{}' res='{}' clickable='{}' />\n",
                         short_id, text, resource_id, clickable
@@ -184,32 +205,33 @@ fn get_exploration_context(params: AiContextParams) -> Result<AiContextResponse,
         }
         simplified.push_str("</hierarchy>");
         context.push_str(&simplified);
-        
+
         metadata = serde_json::json!({
             "has_xml": true,
             "element_count": count,
             "short_id_map": short_id_map
         });
     }
-    
-    Ok(AiContextResponse {
-        context,
-        metadata,
-    })
+
+    Ok(AiContextResponse { context, metadata })
 }
 
 fn generate_basic_xpath(node: &roxmltree::Node) -> String {
     let mut path = Vec::new();
     let mut current = *node;
-    
+
     while let Some(parent) = current.parent() {
-        if parent.is_root() { break; }
+        if parent.is_root() {
+            break;
+        }
         let tag = current.tag_name().name();
-        
+
         // Find index among siblings with same tag
         let mut index = 1;
         for sibling in parent.children() {
-            if sibling == current { break; }
+            if sibling == current {
+                break;
+            }
             if sibling.is_element() && sibling.tag_name().name() == tag {
                 index += 1;
             }
@@ -217,18 +239,24 @@ fn generate_basic_xpath(node: &roxmltree::Node) -> String {
         path.push(format!("{}[{}]", tag, index));
         current = parent;
     }
-    
+
     path.reverse();
     format!("/{}", path.join("/"))
 }
 
-fn get_artifact_generation_context(app_handle: tauri::AppHandle, params: AiContextParams) -> Result<AiContextResponse, String> {
+fn get_artifact_generation_context(
+    app_handle: tauri::AppHandle,
+    params: AiContextParams,
+) -> Result<AiContextResponse, String> {
     let profile_id = params.profile_id.ok_or("Missing profile_id")?;
-    
+
     // Resolve base path for app local data
-    let base_path = app_handle.path().app_local_data_dir().map_err(|e| e.to_string())?;
+    let base_path = app_handle
+        .path()
+        .app_local_data_dir()
+        .map_err(|e| e.to_string())?;
     let maps_path = base_path.join("maps").join(&profile_id).join("screens");
-    
+
     // Check if directory exists
     if !maps_path.exists() {
         return Ok(AiContextResponse {
@@ -254,11 +282,20 @@ fn get_artifact_generation_context(app_handle: tauri::AppHandle, params: AiConte
             let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
             if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
                 screen_count += 1;
-                let screen_name = val.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown Screen");
+                let screen_name = val
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown Screen");
                 let screen_type = val.get("type").and_then(|v| v.as_str()).unwrap_or("screen");
-                let screen_desc = val.get("description").and_then(|v| v.as_str()).unwrap_or("");
+                let screen_desc = val
+                    .get("description")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
 
-                context.push_str(&format!("- Screen: \"{}\" ({})\n", screen_name, screen_type));
+                context.push_str(&format!(
+                    "- Screen: \"{}\" ({})\n",
+                    screen_name, screen_type
+                ));
                 if !screen_desc.is_empty() {
                     context.push_str(&format!("  Description: {}\n", screen_desc));
                 }
@@ -266,17 +303,20 @@ fn get_artifact_generation_context(app_handle: tauri::AppHandle, params: AiConte
                 if let Some(elements) = val.get("elements").and_then(|v| v.as_array()) {
                     let mut found_elements = false;
                     for el in elements {
-                        let el_name = el.get("name").and_then(|v| v.as_str()).unwrap_or("Unnamed Element");
+                        let el_name = el
+                            .get("name")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("Unnamed Element");
                         // Only include potentially meaningful elements for artifact generation
                         let el_type = el.get("type").and_then(|v| v.as_str()).unwrap_or("unknown");
-                        
+
                         if !found_elements {
                             context.push_str("  Elements:\n");
                             found_elements = true;
                         }
 
                         let mut el_info = format!("    · {} [{}]", el_name, el_type);
-                        
+
                         // Check for navigation (simplified)
                         if let Some(nav) = el.get("navigates_to") {
                             if let Some(dest) = nav.get("destination").and_then(|v| v.as_str()) {
@@ -284,7 +324,8 @@ fn get_artifact_generation_context(app_handle: tauri::AppHandle, params: AiConte
                                     el_info.push_str(&format!(" → {}", dest));
                                 }
                             } else if let Some(arr) = nav.as_array() {
-                                let destinations: Vec<&str> = arr.iter()
+                                let destinations: Vec<&str> = arr
+                                    .iter()
                                     .filter_map(|n| n.get("destination").and_then(|v| v.as_str()))
                                     .filter(|d| !d.is_empty())
                                     .collect();
@@ -312,13 +353,19 @@ fn get_artifact_generation_context(app_handle: tauri::AppHandle, params: AiConte
     })
 }
 
-fn get_flowchart_layout_context(app_handle: tauri::AppHandle, params: AiContextParams) -> Result<AiContextResponse, String> {
+fn get_flowchart_layout_context(
+    app_handle: tauri::AppHandle,
+    params: AiContextParams,
+) -> Result<AiContextResponse, String> {
     let profile_id = params.profile_id.ok_or("Missing profile_id")?;
-    
+
     // Resolve base path for app local data
-    let base_path = app_handle.path().app_local_data_dir().map_err(|e| e.to_string())?;
+    let base_path = app_handle
+        .path()
+        .app_local_data_dir()
+        .map_err(|e| e.to_string())?;
     let maps_path = base_path.join("maps").join(&profile_id).join("screens");
-    
+
     // Check if directory exists
     if !maps_path.exists() {
         return Ok(AiContextResponse {
@@ -344,10 +391,16 @@ fn get_flowchart_layout_context(app_handle: tauri::AppHandle, params: AiContextP
             let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
             if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
                 screen_count += 1;
-                let screen_name = val.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown Screen");
+                let screen_name = val
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown Screen");
                 let screen_type = val.get("type").and_then(|v| v.as_str()).unwrap_or("screen");
 
-                context.push_str(&format!("- Screen: \"{}\" ({})\n", screen_name, screen_type));
+                context.push_str(&format!(
+                    "- Screen: \"{}\" ({})\n",
+                    screen_name, screen_type
+                ));
 
                 let mut destinations = Vec::new();
                 if let Some(elements) = val.get("elements").and_then(|v| v.as_array()) {
@@ -359,8 +412,12 @@ fn get_flowchart_layout_context(app_handle: tauri::AppHandle, params: AiContextP
                                 }
                             } else if let Some(arr) = nav.as_array() {
                                 for n in arr {
-                                    if let Some(dest) = n.get("destination").and_then(|v| v.as_str()) {
-                                        if !dest.is_empty() && !destinations.contains(&dest.to_string()) {
+                                    if let Some(dest) =
+                                        n.get("destination").and_then(|v| v.as_str())
+                                    {
+                                        if !dest.is_empty()
+                                            && !destinations.contains(&dest.to_string())
+                                        {
                                             destinations.push(dest.to_string());
                                         }
                                     }

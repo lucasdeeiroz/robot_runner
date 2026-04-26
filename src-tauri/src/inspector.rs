@@ -1,6 +1,6 @@
+use crate::cmd_utils::new_tokio_command;
 use base64::{engine::general_purpose, Engine as _};
 use tauri::command;
-use crate::cmd_utils::new_tokio_command;
 
 #[command]
 pub async fn get_screenshot(device_id: String) -> Result<String, String> {
@@ -33,10 +33,10 @@ pub async fn get_xml_dump(device_id: String) -> Result<String, String> {
     // 1. Run uiautomator dump (with retries)
     let mut attempts = 0;
     let max_attempts = 4; // Increased to 4 to allow comprehensive cleanup
-    
+
     loop {
         attempts += 1;
-        
+
         let mut cmd = new_tokio_command("adb");
         cmd.args(&[
             "-s",
@@ -46,7 +46,7 @@ pub async fn get_xml_dump(device_id: String) -> Result<String, String> {
             "dump",
             "/data/local/tmp/window_dump.xml",
         ]);
-        
+
         match cmd.output().await {
             Ok(output) => {
                 if output.status.success() {
@@ -54,40 +54,63 @@ pub async fn get_xml_dump(device_id: String) -> Result<String, String> {
                 } else {
                     let stderr = String::from_utf8_lossy(&output.stderr);
                     let stdout = String::from_utf8_lossy(&output.stdout);
-                    
+
                     if attempts >= max_attempts {
                         return Err(format!("uiautomator dump failed: {} {}", stderr, stdout));
                     }
 
                     // cleanup before retry
                     let _ = new_tokio_command("adb")
-                        .args(&["-s", &device_id, "shell", "rm", "/data/local/tmp/window_dump.xml"])
+                        .args(&[
+                            "-s",
+                            &device_id,
+                            "shell",
+                            "rm",
+                            "/data/local/tmp/window_dump.xml",
+                        ])
                         .output()
                         .await;
                     let _ = new_tokio_command("adb")
                         .args(&["-s", &device_id, "shell", "pkill", "uiautomator"])
                         .output()
                         .await;
-                    
+
                     // Also try to stop appium server if it's hanging
                     let _ = new_tokio_command("adb")
-                        .args(&["-s", &device_id, "shell", "am", "force-stop", "io.appium.uiautomator2.server"])
+                        .args(&[
+                            "-s",
+                            &device_id,
+                            "shell",
+                            "am",
+                            "force-stop",
+                            "io.appium.uiautomator2.server",
+                        ])
                         .output()
                         .await;
                     let _ = new_tokio_command("adb")
-                        .args(&["-s", &device_id, "shell", "am", "force-stop", "io.appium.uiautomator2.server.test"])
+                        .args(&[
+                            "-s",
+                            &device_id,
+                            "shell",
+                            "am",
+                            "force-stop",
+                            "io.appium.uiautomator2.server.test",
+                        ])
                         .output()
                         .await;
                 }
             }
             Err(e) => {
-                eprintln!("Failed to execute adb command (attempt {}/{}): {}", attempts, max_attempts, e);
+                eprintln!(
+                    "Failed to execute adb command (attempt {}/{}): {}",
+                    attempts, max_attempts, e
+                );
                 if attempts >= max_attempts {
                     return Err(format!("Failed to execute uiautomator dump command: {}", e));
                 }
             }
         }
-        
+
         // Wait a bit before retry using tokio sleep for async functions
         tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
     }
@@ -101,7 +124,7 @@ pub async fn get_xml_dump(device_id: String) -> Result<String, String> {
         "cat",
         "/data/local/tmp/window_dump.xml",
     ]);
-    
+
     let cat_cmd = cmd_cat
         .output()
         .await

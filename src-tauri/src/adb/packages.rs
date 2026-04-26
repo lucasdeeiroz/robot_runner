@@ -1,5 +1,5 @@
-use tauri::command;
 use crate::cmd_utils::new_tokio_command;
+use tauri::command;
 
 #[derive(serde::Serialize)]
 pub struct PackageInfo {
@@ -12,10 +12,19 @@ pub struct PackageInfo {
 #[command]
 pub async fn get_installed_packages(device: String) -> Result<Vec<PackageInfo>, String> {
     // 1. Get All Packages with Path (-f)
-    let output_all = run_adb(device.clone(), vec!["shell", "pm", "list", "packages", "-f"]).await?;
-    
+    let output_all = run_adb(
+        device.clone(),
+        vec!["shell", "pm", "list", "packages", "-f"],
+    )
+    .await?;
+
     // 2. Get Disabled Packages (-d)
-    let output_disabled = run_adb(device.clone(), vec!["shell", "pm", "list", "packages", "-d"]).await.unwrap_or_default();
+    let output_disabled = run_adb(
+        device.clone(),
+        vec!["shell", "pm", "list", "packages", "-d"],
+    )
+    .await
+    .unwrap_or_default();
     let disabled_set: std::collections::HashSet<String> = output_disabled
         .lines()
         .filter_map(|line| line.strip_prefix("package:").map(|s| s.trim().to_string()))
@@ -29,15 +38,18 @@ pub async fn get_installed_packages(device: String) -> Result<Vec<PackageInfo>, 
             if let Some((path, name)) = record.rsplit_once('=') {
                 let name = name.trim().to_string();
                 let path = path.trim().to_string();
-                
-                let is_system = path.starts_with("/system") || path.starts_with("/product") || path.starts_with("/vendor") || path.starts_with("/apex");
+
+                let is_system = path.starts_with("/system")
+                    || path.starts_with("/product")
+                    || path.starts_with("/vendor")
+                    || path.starts_with("/apex");
                 let is_disabled = disabled_set.contains(&name);
 
                 packages.push(PackageInfo {
                     name,
                     path,
                     is_system,
-                    is_disabled
+                    is_disabled,
                 });
             }
         }
@@ -63,7 +75,11 @@ pub async fn enable_package(device: String, package: String) -> Result<String, S
 #[command]
 pub async fn disable_package(device: String, package: String) -> Result<String, String> {
     // pm disable-user --user 0 <pkg>
-    run_adb(device, vec!["shell", "pm", "disable-user", "--user", "0", &package]).await
+    run_adb(
+        device,
+        vec!["shell", "pm", "disable-user", "--user", "0", &package],
+    )
+    .await
 }
 
 #[command]
@@ -82,20 +98,20 @@ pub async fn get_focused_package(device: String) -> Result<String, String> {
     // Extract package from dumpsys window
     // Format usually: mCurrentFocus=Window{... com.package.name/com.package.name.Activity}
     let output = run_adb(device, vec!["shell", "dumpsys", "window"]).await?;
-    
+
     if let Some(pos) = output.find("u0 ") {
         let rest = &output[pos + 3..];
         if let Some(slash_pos) = rest.find('/') {
             return Ok(rest[..slash_pos].trim().to_string());
         }
     }
-    
+
     // Fallback search if u0 is not present or format differs
     for line in output.lines() {
         if line.contains("mCurrentFocus") || line.contains("mFocusedApp") {
             if let Some(start) = line.find('{') {
                 if let Some(end) = line.find('}') {
-                    let content = &line[start+1..end];
+                    let content = &line[start + 1..end];
                     let parts: Vec<&str> = content.split_whitespace().collect();
                     if let Some(pkg_activity) = parts.last() {
                         if let Some((pkg, _)) = pkg_activity.split_once('/') {
@@ -112,7 +128,19 @@ pub async fn get_focused_package(device: String) -> Result<String, String> {
 
 #[command]
 pub async fn launch_package(device: String, package: String) -> Result<String, String> {
-    run_adb(device, vec!["shell", "monkey", "-p", &package, "-c", "android.intent.category.LAUNCHER", "1"]).await
+    run_adb(
+        device,
+        vec![
+            "shell",
+            "monkey",
+            "-p",
+            &package,
+            "-c",
+            "android.intent.category.LAUNCHER",
+            "1",
+        ],
+    )
+    .await
 }
 
 #[command]
@@ -124,7 +152,7 @@ pub async fn set_stay_on(device: String, enabled: bool) -> Result<String, String
 // Internal Helper
 async fn run_adb(device: String, args: Vec<&str>) -> Result<String, String> {
     let mut command = new_tokio_command("adb");
-    
+
     // Select device
     if !device.is_empty() {
         command.arg("-s").arg(&device);
@@ -132,7 +160,10 @@ async fn run_adb(device: String, args: Vec<&str>) -> Result<String, String> {
 
     command.args(&args);
 
-    let output = command.output().await.map_err(|e| format!("Failed to execute adb: {}", e))?;
+    let output = command
+        .output()
+        .await
+        .map_err(|e| format!("Failed to execute adb: {}", e))?;
 
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())

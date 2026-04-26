@@ -1,5 +1,5 @@
-use serde::Serialize;
 use crate::cmd_utils::new_tokio_command;
+use serde::Serialize;
 
 #[derive(Debug, Serialize, Default)]
 pub struct AppStats {
@@ -29,11 +29,7 @@ pub async fn get_device_stats(
     let top_task = run_adb_shell(&device, "top -n 1 -m 5");
 
     // Start these in parallel
-    let (bat_output, mem_output, top_output) = tokio::join!(
-        battery_task,
-        meminfo_task,
-        top_task
-    );
+    let (bat_output, mem_output, top_output) = tokio::join!(battery_task, meminfo_task, top_task);
 
     let (battery_level, temperature) = parse_battery_info(&bat_output).unwrap_or((0, 0.0));
     let (ram_total, ram_used) = parse_mem_info(&mem_output).unwrap_or((0, 0));
@@ -44,13 +40,13 @@ pub async fn get_device_stats(
     if let Some(pkg) = package {
         if !pkg.is_empty() {
             let app_cpu = parse_app_cpu(&top_output, &pkg).unwrap_or(0.0);
-            
+
             // These still call adb individually but we can parallelize them too
             let ram_task = get_app_ram(&device, &pkg);
             let fps_task = get_app_fps(&device, &pkg);
-            
+
             let (app_ram_res, app_fps_res) = tokio::join!(ram_task, fps_task);
-            
+
             app_stats = Some(AppStats {
                 cpu_usage: app_cpu,
                 ram_used: app_ram_res.unwrap_or(0),
@@ -75,7 +71,7 @@ async fn run_adb_shell(device: &str, command_str: &str) -> String {
 
     let mut cmd = new_tokio_command("adb");
     cmd.arg("-s").arg(device).arg("shell").args(&shell_args);
-    
+
     let output = cmd.output().await;
 
     match output {
@@ -99,7 +95,7 @@ fn parse_battery_info(output: &str) -> Option<(u8, f32)> {
                 }
             }
         } else if trimmed.starts_with("temperature:") {
-             if let Some(val_str) = trimmed.split(':').nth(1) {
+            if let Some(val_str) = trimmed.split(':').nth(1) {
                 if let Ok(val) = val_str.trim().parse::<f32>() {
                     // Convert tenths to celsius
                     temp = val / 10.0;
@@ -174,7 +170,7 @@ fn parse_cpu_usage(output: &str) -> Option<f32> {
 }
 
 fn parse_app_cpu(top_output: &str, package: &str) -> Option<f32> {
-    let mut cpu_idx = 8; 
+    let mut cpu_idx = 8;
 
     for line in top_output.lines() {
         if line.contains("PID") && (line.contains("%CPU") || line.contains("[%CPU]")) {
@@ -208,7 +204,7 @@ async fn get_app_ram(device: &str, package: &str) -> Option<u64> {
         if trimmed.starts_with("TOTAL") || trimmed.starts_with("Total PSS:") {
             if let Some(val_str) = trimmed.split_whitespace().nth(1) {
                 if let Ok(val) = val_str.parse::<u64>() {
-                    return Some(val); 
+                    return Some(val);
                 }
             }
         }

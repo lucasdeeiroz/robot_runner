@@ -1,10 +1,10 @@
-use std::sync::{Arc, Mutex};
-use tauri::{State, Emitter, AppHandle, Manager};
-use tokio::io::{AsyncBufReadExt, BufReader as TokioBufReader, AsyncWriteExt};
-use tokio::process::Child;
-use std::process::Stdio;
 use crate::cmd_utils::new_tokio_command;
 use crate::errors::{AppError, AppResult};
+use std::process::Stdio;
+use std::sync::{Arc, Mutex};
+use tauri::{AppHandle, Emitter, Manager, State};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader as TokioBufReader};
+use tokio::process::Child;
 
 // State to hold the Appium process
 pub struct AppiumState(pub Arc<Mutex<Option<Child>>>);
@@ -52,7 +52,7 @@ pub async fn get_appium_status(
 
     // Guard: skip network check if test is already running to avoid ADB contention
     let is_ready = if is_test_running.unwrap_or(false) {
-        false 
+        false
     } else if let (Some(h), Some(p)) = (host, port) {
         check_appium_ready(&h, p, base_path.as_deref().unwrap_or("")).await
     } else {
@@ -102,12 +102,11 @@ async fn check_appium_ready(host: &str, port: u32, base_path: &str) -> bool {
             }
             // Parse JSON to verify { "value": { "ready": true } }
             match resp.json::<serde_json::Value>().await {
-                Ok(json) => {
-                    json.get("value")
-                        .and_then(|v| v.get("ready"))
-                        .and_then(|r| r.as_bool())
-                        .unwrap_or(false)
-                }
+                Ok(json) => json
+                    .get("value")
+                    .and_then(|v| v.get("ready"))
+                    .and_then(|r| r.as_bool())
+                    .unwrap_or(false),
                 Err(_) => false,
             }
         }
@@ -124,12 +123,17 @@ pub async fn start_appium_server(
     args: String, // Extra args string
     app_handle: AppHandle,
 ) -> AppResult<String> {
-    let mut child_guard = state.0.lock().map_err(|e| AppError::ProcessError(e.to_string()))?;
+    let mut child_guard = state
+        .0
+        .lock()
+        .map_err(|e| AppError::ProcessError(e.to_string()))?;
 
     // Check if already running
     if let Some(child) = &mut *child_guard {
         if matches!(child.try_wait(), Ok(None)) {
-            return Err(AppError::ProcessError("Appium is already running".to_string()));
+            return Err(AppError::ProcessError(
+                "Appium is already running".to_string(),
+            ));
         }
     }
 
@@ -144,7 +148,7 @@ pub async fn start_appium_server(
     // Add Host and Port
     command.arg("--address").arg(&host);
     command.arg("--port").arg(&port.to_string());
-    
+
     // Robust base path handling
     let trimmed_base = base_path.trim();
     if !trimmed_base.is_empty() && trimmed_base != "/" {
@@ -191,7 +195,12 @@ pub async fn start_appium_server(
                 tokio::spawn(async move {
                     let mut reader = TokioBufReader::new(out).lines();
                     let mut file = if let Some(p) = &log_path {
-                        tokio::fs::OpenOptions::new().create(true).append(true).open(p).await.ok()
+                        tokio::fs::OpenOptions::new()
+                            .create(true)
+                            .append(true)
+                            .open(p)
+                            .await
+                            .ok()
                     } else {
                         None
                     };
@@ -209,7 +218,12 @@ pub async fn start_appium_server(
                 tokio::spawn(async move {
                     let mut reader = TokioBufReader::new(err).lines();
                     let mut file = if let Some(p) = &log_path {
-                        tokio::fs::OpenOptions::new().create(true).append(true).open(p).await.ok()
+                        tokio::fs::OpenOptions::new()
+                            .create(true)
+                            .append(true)
+                            .open(p)
+                            .await
+                            .ok()
                     } else {
                         None
                     };
@@ -224,7 +238,10 @@ pub async fn start_appium_server(
 
             Ok("Appium started".to_string())
         }
-        Err(e) => Err(AppError::ProcessError(format!("Failed to spawn Appium process: {}. Ensure Appium is installed and available in PATH.", e))),
+        Err(e) => Err(AppError::ProcessError(format!(
+            "Failed to spawn Appium process: {}. Ensure Appium is installed and available in PATH.",
+            e
+        ))),
     }
 }
 
@@ -278,7 +295,10 @@ async fn kill_process_by_port(_host: &str, port: u32) -> AppResult<()> {
         for line in stdout.lines() {
             // Typical line: TCP    0.0.0.0:4723           0.0.0.0:0              LISTENING       1234
             let parts: Vec<&str> = line.split_whitespace().collect();
-            if parts.len() >= 5 && parts[1].ends_with(&format!(":{}", port)) && parts[3] == "LISTENING" {
+            if parts.len() >= 5
+                && parts[1].ends_with(&format!(":{}", port))
+                && parts[3] == "LISTENING"
+            {
                 if let Ok(pid) = parts[4].parse::<u32>() {
                     // Kill the process and its children
                     let _ = std::process::Command::new("taskkill")
@@ -310,7 +330,10 @@ pub fn open_appium_log_terminal(app_handle: AppHandle) -> AppResult<()> {
         .join("appium.log");
 
     if !log_path.exists() {
-        return Err(AppError::FileSystemError("appium.log file does not exist. Appium might not have been started internally.".to_string()));
+        return Err(AppError::FileSystemError(
+            "appium.log file does not exist. Appium might not have been started internally."
+                .to_string(),
+        ));
     }
 
     #[cfg(target_os = "windows")]
@@ -328,7 +351,10 @@ pub fn open_appium_log_terminal(app_handle: AppHandle) -> AppResult<()> {
             .spawn()
         {
             Ok(_) => Ok(()),
-            Err(e) => Err(AppError::ProcessError(format!("Failed to open terminal: {}", e))),
+            Err(e) => Err(AppError::ProcessError(format!(
+                "Failed to open terminal: {}",
+                e
+            ))),
         }
     }
     #[cfg(not(target_os = "windows"))]
@@ -343,7 +369,10 @@ pub fn open_appium_log_terminal(app_handle: AppHandle) -> AppResult<()> {
             .spawn()
         {
             Ok(_) => Ok(()),
-            Err(e) => Err(AppError::ProcessError(format!("Failed to open terminal: {}", e))),
+            Err(e) => Err(AppError::ProcessError(format!(
+                "Failed to open terminal: {}",
+                e
+            ))),
         }
     }
 }
@@ -353,7 +382,7 @@ pub fn start_appium_in_terminal(
     host: String,
     port: u32,
     base_path: String,
-    args: String, 
+    args: String,
 ) -> AppResult<String> {
     #[cfg(target_os = "windows")]
     let cmd = "appium.cmd";
@@ -363,8 +392,13 @@ pub fn start_appium_in_terminal(
     #[cfg(target_os = "windows")]
     {
         // Build arguments vector safely
-        let mut full_args = vec!["/c".to_string(), "start".to_string(), "cmd".to_string(), "/k".to_string()];
-        
+        let mut full_args = vec![
+            "/c".to_string(),
+            "start".to_string(),
+            "cmd".to_string(),
+            "/k".to_string(),
+        ];
+
         let mut appium_cmd = format!("{} --address {} --port {}", cmd, host, port);
         let trimmed_base = base_path.trim();
         if !trimmed_base.is_empty() && trimmed_base != "/" {
@@ -375,7 +409,7 @@ pub fn start_appium_in_terminal(
             };
             appium_cmd.push_str(&format!(" --base-path {}", final_base));
         }
-        
+
         // Add extra args safely by splitting them for the terminal execution
         if !args.trim().is_empty() {
             appium_cmd.push_str(&format!(" {}", args));
@@ -383,12 +417,12 @@ pub fn start_appium_in_terminal(
 
         full_args.push(appium_cmd);
 
-        match std::process::Command::new("cmd")
-            .args(&full_args)
-            .spawn()
-        {
+        match std::process::Command::new("cmd").args(&full_args).spawn() {
             Ok(_) => Ok("Appium started in new terminal".to_string()),
-            Err(e) => Err(AppError::ProcessError(format!("Failed to start terminal: {}", e))),
+            Err(e) => Err(AppError::ProcessError(format!(
+                "Failed to start terminal: {}",
+                e
+            ))),
         }
     }
     #[cfg(not(target_os = "windows"))]
@@ -404,7 +438,7 @@ pub fn start_appium_in_terminal(
             appium_cmd.push_str(&format!(" --base-path {}", final_base));
         }
         if !args.trim().is_empty() {
-             appium_cmd.push_str(&format!(" {}", args));
+            appium_cmd.push_str(&format!(" {}", args));
         }
 
         match std::process::Command::new("x-terminal-emulator")
@@ -415,7 +449,10 @@ pub fn start_appium_in_terminal(
             .spawn()
         {
             Ok(_) => Ok("Appium started in new terminal".to_string()),
-            Err(e) => Err(AppError::ProcessError(format!("Failed to start terminal: {}", e))),
+            Err(e) => Err(AppError::ProcessError(format!(
+                "Failed to start terminal: {}",
+                e
+            ))),
         }
     }
 }

@@ -8,6 +8,7 @@ import { Button } from "@/components/atoms/Button";
 import { Section } from "@/components/organisms/Section";
 import { InfoCard } from "@/components/molecules/InfoCard";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
+import { UpdateModal } from "@/components/organisms/UpdateModal";
 import ReactMarkdown from 'react-markdown';
 
 
@@ -33,6 +34,7 @@ export function AboutPage({ onNavigate: _onNavigate }: AboutPageProps) {
     const appVersion = packageJson.version;
     const { checkForAppUpdate, updateInfo } = useSettings();
     const [isChecking, setIsChecking] = useState(false);
+    const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
 
     // Check global state
     const updateAvailable = updateInfo?.available || false;
@@ -86,14 +88,14 @@ export function AboutPage({ onNavigate: _onNavigate }: AboutPageProps) {
                             </Button>
 
                             {updateAvailable && (
-                                <a
-                                    href="https://github.com/lucasdeeiroz/robot_runner/releases/latest"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="ml-2 text-[10px] bg-primary text-on-primary px-2 py-0.5 rounded-2xl font-bold hover:bg-primary/90 transition-colors animate-pulse no-underline"
+                                <Button
+                                    variant="primary"
+                                    size="sm"
+                                    onClick={() => setIsUpdateModalOpen(true)}
+                                    className="ml-2 h-6 px-2 py-0 text-[10px] rounded-2xl font-bold animate-pulse"
                                 >
                                     {t('about.update_badge')}
-                                </a>
+                                </Button>
                             )}
                         </div>
                         <p className="mt-6 text-on-surface-variant/80 max-w-lg mx-auto leading-relaxed">
@@ -201,6 +203,12 @@ export function AboutPage({ onNavigate: _onNavigate }: AboutPageProps) {
                     </div>
                 </div>
             </div>
+            <UpdateModal
+                isOpen={isUpdateModalOpen}
+                onClose={() => setIsUpdateModalOpen(false)}
+                assets={updateInfo?.assets || []}
+                latestVersion={updateInfo?.latestVersion || ''}
+            />
         </div>
     );
 }

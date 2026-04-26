@@ -1,6 +1,6 @@
+use crate::cmd_utils::new_tokio_command;
 use std::fs::File;
 use std::io::Write;
-use crate::cmd_utils::new_tokio_command;
 use tokio::time::{sleep, Duration};
 
 #[tauri::command]
@@ -57,7 +57,7 @@ pub async fn stop_screen_recording(device: String, local_path: String) -> Result
 
     let mut cmd_kill = new_tokio_command("adb");
     cmd_kill.args(&["-s", &device, "shell", "pkill", "-2", "screenrecord"]);
-    
+
     let kill_output = cmd_kill
         .output()
         .await
@@ -82,7 +82,7 @@ pub async fn stop_screen_recording(device: String, local_path: String) -> Result
         "/sdcard/robot_runner_rec.mp4",
         &local_path,
     ]);
-    
+
     let pull_output = cmd_pull
         .output()
         .await

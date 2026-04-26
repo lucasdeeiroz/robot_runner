@@ -1,8 +1,8 @@
 use chrono;
 use serde::Serialize;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 use std::process::Stdio;
+use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, State};
 use tokio::io::AsyncBufReadExt;
 use tokio::process::{Child, Command};
@@ -43,7 +43,7 @@ fn graceful_stop(child: &mut Child, output_dir: &str) -> bool {
                 .stdout(std::process::Stdio::null())
                 .stderr(std::process::Stdio::null())
                 .spawn();
-            
+
             return true;
         }
 
@@ -62,7 +62,10 @@ fn graceful_stop(child: &mut Child, output_dir: &str) -> bool {
 #[tauri::command]
 pub async fn stop_test(state: State<'_, TestState>, run_id: String) -> AppResult<String> {
     let tx = {
-        let procs = state.0.lock().map_err(|e| AppError::StringError(e.to_string()))?;
+        let procs = state
+            .0
+            .lock()
+            .map_err(|e| AppError::StringError(e.to_string()))?;
         procs.get(&run_id).map(|info| info.control_tx.clone())
     };
 
@@ -70,7 +73,10 @@ pub async fn stop_test(state: State<'_, TestState>, run_id: String) -> AppResult
         let _ = tx.send(ProcessCommand::Stop).await;
         Ok(format!("Stop signal sent to test {}", run_id))
     } else {
-        Err(AppError::ProcessError(format!("No running test found for id: {}", run_id)))
+        Err(AppError::ProcessError(format!(
+            "No running test found for id: {}",
+            run_id
+        )))
     }
 }
 
@@ -197,15 +203,27 @@ t = threading.Thread(target=_monitor_stop, daemon=True)
 t.start()
 "#;
     // Ensure dir exists before writing and fail clearly if we cannot set up the listener
-    std::fs::create_dir_all(&abs_output_dir)
-        .map_err(|e| AppError::IoError(format!("Failed to create output directory '{}': {}", abs_output_dir, e)))?;
-    std::fs::write(&listener_path, listener_code)
-        .map_err(|e| AppError::IoError(format!("Failed to write listener file '{}': {}", listener_path.display(), e)))?;
+    std::fs::create_dir_all(&abs_output_dir).map_err(|e| {
+        AppError::IoError(format!(
+            "Failed to create output directory '{}': {}",
+            abs_output_dir, e
+        ))
+    })?;
+    std::fs::write(&listener_path, listener_code).map_err(|e| {
+        AppError::IoError(format!(
+            "Failed to write listener file '{}': {}",
+            listener_path.display(),
+            e
+        ))
+    })?;
 
     args.push("--listener");
-    let listener_str = listener_path
-        .to_str()
-        .ok_or_else(|| AppError::IoError(format!("Listener path '{}' is not valid UTF-8", listener_path.display())))?;
+    let listener_str = listener_path.to_str().ok_or_else(|| {
+        AppError::IoError(format!(
+            "Listener path '{}' is not valid UTF-8",
+            listener_path.display()
+        ))
+    })?;
     args.push(listener_str);
 
     // Rerunning logic: Must appear before any Datasource (which might come from -A)
@@ -246,7 +264,8 @@ t.start()
     // Add selected tests if any
     let test_specific_args: Vec<String>;
     if let Some(tests) = &selected_tests {
-        test_specific_args = tests.iter()
+        test_specific_args = tests
+            .iter()
             .map(|t| {
                 // Robot uses glob patterns for --test, escape [ and ]
                 let escaped = t.replace("[", "[[]").replace("]", "[]]");
@@ -283,7 +302,9 @@ t.start()
 
     let metadata = RunMetadata {
         run_id: run_id.clone(),
-        device_udid: device.clone().unwrap_or_else(|| "Local/Unknown".to_string()),
+        device_udid: device
+            .clone()
+            .unwrap_or_else(|| "Local/Unknown".to_string()),
         test_path: test_path.clone().unwrap_or_default(),
         timestamp: chrono::Local::now().to_rfc3339(),
         device_model: device_model.unwrap_or_default(),
@@ -328,7 +349,7 @@ pub async fn run_maestro_test(
         let timestamp = chrono::Local::now().format("%Y%m%d-%H%M%S").to_string();
         report_filename = format!("output-maestro-{}.xml", timestamp);
     }
-    
+
     // Metadata
     #[derive(Serialize)]
     struct RunMetadata {
@@ -351,12 +372,12 @@ pub async fn run_maestro_test(
     }
 
     let mut cmd_args = vec![];
-    
+
     // maestro [args] test [path] --udid [udid] --output [report_path]
     if let Some(args) = maestro_args {
         if !args.is_empty() {
             for arg in args.split_whitespace() {
-                 cmd_args.push(arg.to_string());
+                cmd_args.push(arg.to_string());
             }
         }
     }
@@ -386,7 +407,7 @@ pub async fn run_maestro_test(
             cmd.arg(arg);
         }
     }
-    
+
     #[cfg(not(target_os = "windows"))]
     {
         cmd = new_tokio_command("maestro");
@@ -449,11 +470,11 @@ pub async fn run_appium_test(
 
     if let Some(args) = appium_java_args {
         if !args.is_empty() {
-             for arg in args.split_whitespace() {
-                 cmd.arg(arg);
-             }
+            for arg in args.split_whitespace() {
+                cmd.arg(arg);
+            }
         } else {
-             cmd.arg("test");
+            cmd.arg("test");
         }
     } else {
         cmd.arg("test");
@@ -461,7 +482,15 @@ pub async fn run_appium_test(
 
     cmd.env("JAVA_TOOL_OPTIONS", "-Dfile.encoding=UTF-8");
 
-    spawn_and_monitor(app, state, run_id, cmd, Some(abs_project_path), abs_output_dir).await
+    spawn_and_monitor(
+        app,
+        state,
+        run_id,
+        cmd,
+        Some(abs_project_path),
+        abs_output_dir,
+    )
+    .await
 }
 
 async fn spawn_and_monitor(
@@ -493,8 +522,14 @@ async fn spawn_and_monitor(
         .map_err(|e| AppError::ProcessError(format!("Failed to spawn process: {}", e)))?;
 
     let mut child = child;
-    let stdout = child.stdout.take().ok_or_else(|| AppError::ProcessError("Failed to open stdout".to_string()))?;
-    let stderr = child.stderr.take().ok_or_else(|| AppError::ProcessError("Failed to open stderr".to_string()))?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| AppError::ProcessError("Failed to open stdout".to_string()))?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| AppError::ProcessError("Failed to open stderr".to_string()))?;
 
     // Streaming tasks
     let app_handle = app.clone();
@@ -530,14 +565,23 @@ async fn spawn_and_monitor(
     // Store process info
     let (control_tx, mut control_rx) = tokio::sync::mpsc::channel::<ProcessCommand>(10);
     {
-        let mut procs = state.0.lock().map_err(|e| AppError::StringError(e.to_string()))?;
+        let mut procs = state
+            .0
+            .lock()
+            .map_err(|e| AppError::StringError(e.to_string()))?;
         if procs.contains_key(&run_id) {
             let _ = child.start_kill();
-            return Err(AppError::ProcessError(format!("Process with run_id '{}' already exists", run_id)));
+            return Err(AppError::ProcessError(format!(
+                "Process with run_id '{}' already exists",
+                run_id
+            )));
         }
-        procs.insert(run_id.clone(), ProcessInfo {
-            control_tx: control_tx.clone(),
-        });
+        procs.insert(
+            run_id.clone(),
+            ProcessInfo {
+                control_tx: control_tx.clone(),
+            },
+        );
     }
 
     // Monitor for finish (Reactive Wait)
@@ -545,10 +589,10 @@ async fn spawn_and_monitor(
     let rid_mon = run_id.clone();
     let state_mon = state.0.clone();
     let output_dir_mon = output_dir.clone();
-    
+
     tokio::spawn(async move {
         let mut final_status: Option<std::process::ExitStatus> = None;
-        
+
         loop {
             tokio::select! {
                 status = child.wait() => {
@@ -631,7 +675,12 @@ pub async fn get_robot_test_cases(path: String) -> AppResult<Vec<String>> {
             continue;
         }
 
-        if in_test_cases && !line.is_empty() && !line.starts_with(" ") && !line.starts_with("\t") && !trimmed.starts_with("#") {
+        if in_test_cases
+            && !line.is_empty()
+            && !line.starts_with(" ")
+            && !line.starts_with("\t")
+            && !trimmed.starts_with("#")
+        {
             tests.push(trimmed.to_string());
         }
     }

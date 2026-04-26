@@ -8,18 +8,14 @@ use std::process::Command;
 use tauri::command;
 
 // Pre-compiled regexes (compiled once per app lifecycle)
-static RE_FW: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#""framework"\s*:\s*"([^"]+)""#).unwrap());
-static RE_DEV: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#""device_udid"\s*:\s*"([^"]+)""#).unwrap());
-static RE_TS: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#""timestamp"\s*:\s*"([^"]+)""#).unwrap());
+static RE_FW: Lazy<Regex> = Lazy::new(|| Regex::new(r#""framework"\s*:\s*"([^"]+)""#).unwrap());
+static RE_DEV: Lazy<Regex> = Lazy::new(|| Regex::new(r#""device_udid"\s*:\s*"([^"]+)""#).unwrap());
+static RE_TS: Lazy<Regex> = Lazy::new(|| Regex::new(r#""timestamp"\s*:\s*"([^"]+)""#).unwrap());
 static RE_MODEL: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#""device_model"\s*:\s*"([^"]+)""#).unwrap());
 static RE_VER: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#""android_version"\s*:\s*"([^"]+)""#).unwrap());
-static RE_SUITE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"<suite.*name="([^"]+)""#).unwrap());
+static RE_SUITE: Lazy<Regex> = Lazy::new(|| Regex::new(r#"<suite.*name="([^"]+)""#).unwrap());
 static RE_STAT: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"<stat pass="(\d+)" fail="(\d+)".*>All Tests</stat>"#).unwrap());
 static RE_TIME: Lazy<Regex> =
@@ -34,10 +30,8 @@ static RE_STATUS_TIME: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"<status\s+[^>]*starttime="([^"]+)"\s+endtime="([^"]+)""#).unwrap());
 static RE_SUITE_XML: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"<testsuite\s+[^>]*name="([^"]+)""#).unwrap());
-static RE_TIME_XML: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"time="([^"]+)""#).unwrap());
-static RE_TS_XML: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"timestamp="([^"]+)""#).unwrap());
+static RE_TIME_XML: Lazy<Regex> = Lazy::new(|| Regex::new(r#"time="([^"]+)""#).unwrap());
+static RE_TS_XML: Lazy<Regex> = Lazy::new(|| Regex::new(r#"timestamp="([^"]+)""#).unwrap());
 static RE_TEST_FAIL: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r#"<test\s+[^>]*name="([^"]+)"[^>]*>[\s\S]*?<status\s+[^>]*status="FAIL""#).unwrap()
 });
@@ -300,7 +294,7 @@ fn parse_log_entry(folder_path: &Path, xml_path: &Path, mtime: u64) -> Option<Te
                 .or_else(|| RE_TIME.captures(&content))
                 .map(|c| c.get(1).map_or("", |m| m.as_str()))
                 .unwrap_or("");
-            
+
             if !extracted.is_empty() {
                 normalize_robot_timestamp(extracted)
             } else {
@@ -311,8 +305,9 @@ fn parse_log_entry(folder_path: &Path, xml_path: &Path, mtime: u64) -> Option<Te
                 } else {
                     // Fallback to file mtime if XML doesn't have the generated attribute
                     chrono::DateTime::<chrono::Local>::from(
-                        std::time::UNIX_EPOCH + std::time::Duration::from_secs(mtime)
-                    ).to_rfc3339()
+                        std::time::UNIX_EPOCH + std::time::Duration::from_secs(mtime),
+                    )
+                    .to_rfc3339()
                 }
             }
         };
@@ -402,7 +397,11 @@ fn parse_log_entry(folder_path: &Path, xml_path: &Path, mtime: u64) -> Option<Te
     let timestamp = xml_timestamp
         .map(|ts| {
             // Attempt to normalize if it looks like Robot format, otherwise keep as is
-            if ts.len() >= 8 && ts.chars().all(|c| c.is_numeric() || c == ' ' || c == ':' || c == '.') {
+            if ts.len() >= 8
+                && ts
+                    .chars()
+                    .all(|c| c.is_numeric() || c == ' ' || c == ':' || c == '.')
+            {
                 normalize_robot_timestamp(&ts)
             } else {
                 ts
@@ -411,8 +410,9 @@ fn parse_log_entry(folder_path: &Path, xml_path: &Path, mtime: u64) -> Option<Te
         .or(meta_timestamp)
         .unwrap_or_else(|| {
             chrono::DateTime::<chrono::Local>::from(
-                std::time::UNIX_EPOCH + std::time::Duration::from_secs(mtime)
-            ).to_rfc3339()
+                std::time::UNIX_EPOCH + std::time::Duration::from_secs(mtime),
+            )
+            .to_rfc3339()
         });
 
     let is_fail = (content.contains("failures=\"") && !content.contains("failures=\"0\""))
@@ -443,7 +443,11 @@ fn parse_log_entry(folder_path: &Path, xml_path: &Path, mtime: u64) -> Option<Te
 }
 
 #[command]
-pub async fn save_test_summary(xml_path: String, summary: String, custom_path: Option<String>) -> Result<(), String> {
+pub async fn save_test_summary(
+    xml_path: String,
+    summary: String,
+    custom_path: Option<String>,
+) -> Result<(), String> {
     tokio::task::spawn_blocking(move || {
         let mut candidates = Vec::new();
 
@@ -466,18 +470,20 @@ pub async fn save_test_summary(xml_path: String, summary: String, custom_path: O
         };
 
         if !cache_path.exists() {
-            return Err("History cache file does not exist. Please refresh history first.".to_string());
+            return Err(
+                "History cache file does not exist. Please refresh history first.".to_string(),
+            );
         }
 
         let file = fs::File::open(&cache_path).map_err(|e| e.to_string())?;
         let reader = std::io::BufReader::new(file);
         let mut logs: Vec<TestLog> = serde_json::from_reader(reader).map_err(|e| e.to_string())?;
-        
+
         let mut found = false;
-        
+
         // Normalize the targeted xml_path for comparison
         let normalized_target = normalize_path_str(&xml_path);
-        
+
         for log in &mut logs {
             let normalized_log_path = normalize_path_str(&log.xml_path);
             if normalized_log_path == normalized_target {
@@ -524,7 +530,13 @@ fn normalize_robot_timestamp(ts: &str) -> String {
     // Handle "YYYYMMDD-HHMMSS" (filename format) vs "YYYYMMDD HH:MM:SS.mmm" (XML format)
     let cleaned_ts = if ts.contains('-') && !ts.contains(':') && ts.len() >= 15 {
         // Convert 20260425-140852 to 20260425 14:08:52.000
-        format!("{} {}:{}:{}.000", &ts[0..8], &ts[9..11], &ts[11..13], &ts[13..15])
+        format!(
+            "{} {}:{}:{}.000",
+            &ts[0..8],
+            &ts[9..11],
+            &ts[11..13],
+            &ts[13..15]
+        )
     } else {
         ts.to_string()
     };
@@ -538,11 +550,19 @@ fn normalize_robot_timestamp(ts: &str) -> String {
                 Some(ldt) => ldt.to_rfc3339(),
                 None => {
                     // Fallback to simple string manipulation if timezone conversion fails
-                    if cleaned_ts.len() >= 15 && cleaned_ts.chars().all(|c| c.is_numeric() || c == ' ' || c == ':' || c == '.') {
+                    if cleaned_ts.len() >= 15
+                        && cleaned_ts
+                            .chars()
+                            .all(|c| c.is_numeric() || c == ' ' || c == ':' || c == '.')
+                    {
                         format!(
                             "{}-{}-{}T{}:{}:{}",
-                            &cleaned_ts[0..4], &cleaned_ts[4..6], &cleaned_ts[6..8],
-                            &cleaned_ts[9..11], &cleaned_ts[11..13], &cleaned_ts[13..15]
+                            &cleaned_ts[0..4],
+                            &cleaned_ts[4..6],
+                            &cleaned_ts[6..8],
+                            &cleaned_ts[9..11],
+                            &cleaned_ts[11..13],
+                            &cleaned_ts[13..15]
                         )
                     } else {
                         cleaned_ts.to_string()

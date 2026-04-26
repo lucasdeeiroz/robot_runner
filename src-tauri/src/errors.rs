@@ -1,23 +1,23 @@
-use thiserror::Error;
 use serde::Serialize;
+use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum AppError {
     #[error("ADB error: {0}")]
     AdbError(String),
-    
+
     #[error("Process error: {0}")]
     ProcessError(String),
-    
+
     #[error("IO error: {0}")]
     IoError(String),
-    
+
     #[error("XML Parser error: {0}")]
     ParserError(String),
-    
+
     #[error("Database error: {0}")]
     DbError(String),
-    
+
     #[error("Unauthorized: {0}")]
     AuthError(String),
 

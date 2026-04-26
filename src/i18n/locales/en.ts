@@ -103,7 +103,15 @@ export const en = {
             update_not_available: "You are up to date",
             update_error: "Failed to check for updates",
             checking: "Checking...",
-            update_badge: "UPDATE"
+            update_badge: "UPDATE",
+            update_title: "New Version Available",
+            update_select_installer: "Select the installer for your system",
+            installer: "Installer",
+            portable: "Portable",
+            update_manual_hint: "The installer will open automatically after download.",
+            view_releases: "View all releases on GitHub",
+            update_downloaded: "Download complete! Opening installer...",
+            update_download_error: "Failed to download update."
         },
         ai_page: {
             title: "AI Assistant",
@@ -210,6 +218,7 @@ export const en = {
             edit: "Edit",
             go_to_settings: "Go to Settings",
             ok: "OK",
+            done: "Done",
             search: "Search...",
             loading: "Loading...",
             select: "Select...",

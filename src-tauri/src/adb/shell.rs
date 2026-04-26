@@ -1,11 +1,11 @@
+use crate::cmd_utils::new_tokio_command;
+use crate::errors::{AppError, AppResult};
 use std::collections::HashMap;
+use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 use tauri::{command, AppHandle, Emitter, State};
 use tokio::io::{AsyncBufReadExt, BufReader as TokioBufReader};
 use tokio::process::Child;
-use std::process::Stdio;
-use crate::cmd_utils::new_tokio_command;
-use crate::errors::{AppError, AppResult};
 
 pub struct ShellState {
     pub running_commands: Arc<Mutex<HashMap<String, Child>>>,
@@ -26,11 +26,16 @@ pub async fn get_adb_version() -> AppResult<String> {
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     } else {
-        Err(AppError::AdbError(String::from_utf8_lossy(&output.stderr).to_string()))
+        Err(AppError::AdbError(
+            String::from_utf8_lossy(&output.stderr).to_string(),
+        ))
     }
 }
 
-async fn execute_adb_with_recovery(device: Option<&str>, args: Vec<String>) -> AppResult<std::process::Output> {
+async fn execute_adb_with_recovery(
+    device: Option<&str>,
+    args: Vec<String>,
+) -> AppResult<std::process::Output> {
     let mut cmd = new_tokio_command("adb");
     if let Some(d) = device {
         cmd.arg("-s").arg(d);
@@ -45,24 +50,23 @@ async fn execute_adb_with_recovery(device: Option<&str>, args: Vec<String>) -> A
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         // Common connection error patterns
-        if stderr.contains("daemon not running") 
-            || stderr.contains("cannot connect to daemon") 
-            || stderr.contains("error: device not found") 
+        if stderr.contains("daemon not running")
+            || stderr.contains("cannot connect to daemon")
+            || stderr.contains("error: device not found")
             || stderr.contains("adb: error: failed to get feature set")
         {
             // Attempt restart
             let _ = restart_adb_server_internal().await;
-            
+
             // Retry once
             let mut retry_cmd = new_tokio_command("adb");
             if let Some(d) = device {
                 retry_cmd.arg("-s").arg(d);
             }
             retry_cmd.args(&args);
-            return retry_cmd
-                .output()
-                .await
-                .map_err(|e| AppError::AdbError(format!("Failed to execute adb after restart: {}", e)));
+            return retry_cmd.output().await.map_err(|e| {
+                AppError::AdbError(format!("Failed to execute adb after restart: {}", e))
+            });
         }
     }
     Ok(output)
@@ -75,7 +79,9 @@ pub async fn run_adb_command(device: String, args: Vec<String>) -> AppResult<Str
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
     } else {
-        Err(AppError::AdbError(String::from_utf8_lossy(&output.stderr).trim().to_string()))
+        Err(AppError::AdbError(
+            String::from_utf8_lossy(&output.stderr).trim().to_string(),
+        ))
     }
 }
 
@@ -97,7 +103,10 @@ pub async fn start_adb_command(
     cmd.stderr(Stdio::piped());
 
     let mut child = cmd.spawn().map_err(|e| AppError::AdbError(e.to_string()))?;
-    let stdout = child.stdout.take().ok_or_else(|| AppError::AdbError("Failed to open stdout".to_string()))?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| AppError::AdbError("Failed to open stdout".to_string()))?;
 
     let id_clone = id.clone();
     let app_clone = app.clone();
@@ -111,14 +120,21 @@ pub async fn start_adb_command(
         let _ = app_clone.emit(&format!("cmd-close-{}", id_clone), "Process finished");
     });
 
-    state.running_commands.lock().map_err(|e| AppError::StringError(e.to_string()))?.insert(id, child);
+    state
+        .running_commands
+        .lock()
+        .map_err(|e| AppError::StringError(e.to_string()))?
+        .insert(id, child);
     Ok(())
 }
 
 #[command]
 pub async fn stop_adb_command(state: State<'_, ShellState>, id: String) -> AppResult<()> {
     let child = {
-        let mut commands = state.running_commands.lock().map_err(|e| AppError::StringError(e.to_string()))?;
+        let mut commands = state
+            .running_commands
+            .lock()
+            .map_err(|e| AppError::StringError(e.to_string()))?;
         commands.remove(&id)
     };
 
@@ -191,7 +207,10 @@ pub async fn kill_adb_server() -> AppResult<String> {
     let mut cmd = new_tokio_command("adb");
     cmd.arg("kill-server");
 
-    let output = cmd.output().await.map_err(|e| AppError::AdbError(e.to_string()))?;
+    let output = cmd
+        .output()
+        .await
+        .map_err(|e| AppError::AdbError(e.to_string()))?;
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
@@ -200,6 +219,9 @@ pub async fn start_adb_server() -> AppResult<String> {
     let mut cmd = new_tokio_command("adb");
     cmd.arg("start-server");
 
-    let output = cmd.output().await.map_err(|e| AppError::AdbError(e.to_string()))?;
+    let output = cmd
+        .output()
+        .await
+        .map_err(|e| AppError::AdbError(e.to_string()))?;
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }

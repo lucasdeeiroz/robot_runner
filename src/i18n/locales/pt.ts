@@ -103,7 +103,15 @@ export const pt = {
             update_not_available: "Você está atualizado",
             update_error: "Falha ao verificar atualizações",
             checking: "Verificando...",
-            update_badge: "ATUALIZAÇÃO"
+            update_badge: "ATUALIZAÇÃO",
+            update_title: "Nova Versão Disponível",
+            update_select_installer: "Selecione o instalador para seu sistema",
+            installer: "Instalador",
+            portable: "Portátil",
+            update_manual_hint: "O instalador abrirá automaticamente após o download.",
+            view_releases: "Ver todos os releases no GitHub",
+            update_downloaded: "Download concluído! Abrindo instalador...",
+            update_download_error: "Falha ao baixar atualização."
         },
         ai_page: {
             title: "Assistente IA",
@@ -210,6 +218,7 @@ export const pt = {
             edit: "Editar",
             go_to_settings: "Ir para Configurações",
             ok: "OK",
+            done: "Concluído",
             search: "Buscar...",
             loading: "Carregando...",
             select: "Selecione...",
