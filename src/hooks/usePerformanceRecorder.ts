@@ -1,9 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
-import { join } from "@tauri-apps/api/path";
-import { save } from "@tauri-apps/plugin-dialog";
-import { useSettings } from "@/lib/settings";
 import { feedback } from "@/lib/feedback";
 import { useFileSave } from "./useFileSave";
 
@@ -30,7 +27,6 @@ export function usePerformanceRecorder(
     allowActionsDuringTest: boolean = false
 ) {
     const { t } = useTranslation();
-    const { settings } = useSettings();
     const [stats, setStats] = useState<DeviceStats | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [autoRefresh, setAutoRefresh] = useState(initialAutoRefresh);
