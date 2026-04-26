@@ -1163,7 +1163,9 @@ export const en = {
             actions: {
                 mirror: "Mirror Screen",
                 toolbox: "Open Toolbox",
-                all_tests_stopped: "All tests stopped"
+                all_tests_stopped: "All tests stopped",
+                action_error: "Action failed",
+                stop_error: "Failed to stop processes"
             },
             server_hub: {
                 title: "Server Hub",

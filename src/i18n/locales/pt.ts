@@ -1156,12 +1156,15 @@ export const pt = {
                 reboot_error: "Falha ao reiniciar",
                 bounds_toggled: "Limites de layout alternados",
                 touches_toggled: "Mostrar toques alternado",
+                pointer_toggled: "Localização do cursor alternada",
                 action_error: "Falha na ação"
             },
             actions: {
                 mirror: "Espelhar Tela",
                 toolbox: "Abrir Toolbox",
-                all_tests_stopped: "Todos os testes parados"
+                all_tests_stopped: "Todos os testes parados",
+                action_error: "Falha na ação",
+                stop_error: "Falha ao parar processos"
             },
             server_hub: {
                 title: "Server Hub",

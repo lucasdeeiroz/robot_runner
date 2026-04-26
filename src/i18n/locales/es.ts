@@ -1168,7 +1168,9 @@ export const es = {
             actions: {
                 mirror: "Reflejar Pantalla",
                 toolbox: "Abrir Toolbox",
-                all_tests_stopped: "Todas las pruebas detenidas"
+                all_tests_stopped: "Todas las pruebas detenidas",
+                action_error: "Error en la acción",
+                stop_error: "Error al detener procesos"
             },
             server_hub: {
                 title: "Server Hub",
