@@ -5,6 +5,7 @@ import { Button } from '@/components/atoms/Button';
 import { Download, CheckCircle2, AlertCircle, ExternalLink } from 'lucide-react';
 import { UpdateAsset, downloadAndInstall } from '@/lib/updater';
 import { feedback } from '@/lib/feedback';
+import { openUrl } from '@tauri-apps/plugin-opener';
 
 interface UpdateModalProps {
     isOpen: boolean;
@@ -107,7 +108,7 @@ export function UpdateModal({ isOpen, onClose, assets, latestVersion }: UpdateMo
                         variant="ghost"
                         size="sm"
                         className="text-xs"
-                        onClick={() => window.open('https://github.com/lucasdeeiroz/robot_runner/releases/latest', '_blank')}
+                        onClick={() => openUrl('https://github.com/lucasdeeiroz/robot_runner/releases/latest')}
                         rightIcon={<ExternalLink size={12} />}
                     >
                         {t('about.view_releases', "View on GitHub")}
