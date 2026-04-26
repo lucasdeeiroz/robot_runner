@@ -155,7 +155,9 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
     }, [settings.tools.appPackage]);
 
     const startLogcat = async () => {
-        if (!settings.paths.logcat) {
+        let activeLogcatPath = settings.paths.logcat;
+
+        if (!activeLogcatPath) {
             // Prompt for path if not configured
             const selected = await open({
                 directory: true,
@@ -169,14 +171,13 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
                     logcat: selected
                 });
                 feedback.toast.success(t('settings_page.path_auto_updated', { path: selected }));
-                // Continue with the new path
+                activeLogcatPath = selected;
             } else {
                 return; // Cancel if no path selected
             }
         }
 
-        // Get the latest settings after potential update
-        const logcatPath = settings.paths.logcat;
+        const logcatPath = activeLogcatPath;
         let dumpFile = null;
         if (logcatPath) {
             // Sanitize device ID for filename
