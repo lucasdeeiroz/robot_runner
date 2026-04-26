@@ -124,7 +124,8 @@ export const AiButton: React.FC<AiButtonProps> = ({
         secondary: "bg-outline-variant",
         ghost: "bg-outline-variant/30",
         outline: "bg-outline-variant/30",
-        warning: "bg-on-warning-container/20"
+        warning: "bg-on-warning-container/20",
+        success: "bg-success/20"
     };
 
     const sizeHeights: Record<string, string> = {
