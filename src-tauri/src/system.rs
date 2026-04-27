@@ -10,14 +10,19 @@ use walkdir::WalkDir;
 
 #[command]
 pub async fn get_folder_size(path: String) -> AppResult<u64> {
-    let mut total_size = 0;
-    for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
-        if let Ok(metadata) = entry.metadata() {
-            if metadata.is_file() {
-                total_size += metadata.len();
+    let total_size = tokio::task::spawn_blocking(move || {
+        let mut total_size = 0;
+        for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
+            if let Ok(metadata) = entry.metadata() {
+                if metadata.is_file() {
+                    total_size += metadata.len();
+                }
             }
         }
-    }
+        total_size
+    })
+    .await
+    .map_err(|e| AppError::from(format!("Failed to calculate folder size: {}", e)))?;
     Ok(total_size)
 }
 
