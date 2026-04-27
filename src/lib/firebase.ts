@@ -18,7 +18,16 @@ import { getFirestore } from "firebase/firestore";
 import { getRemoteConfig } from "firebase/remote-config";
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
+let app: any;
+try {
+  if (!firebaseConfig.apiKey) {
+    throw new Error("VITE_FIREBASE_API_KEY is undefined. Check environment variables.");
+  }
+  app = initializeApp(firebaseConfig);
+} catch (error) {
+  console.error("Firebase init error:", error);
+  throw error;
+}
 
 // Initialize Auth
 export const auth = getAuth(app);
