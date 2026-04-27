@@ -194,6 +194,8 @@ export const en = {
             }
         },
         common: {
+            loading_taking_too_long: "Loading is taking longer than expected...",
+            continue_anyway: "Continue anyway",
             refresh: "Refresh",
             online: "Online",
             cloud_sync: "Synced to Cloud",
@@ -1416,6 +1418,7 @@ export const en = {
             login_error: "Authentication failed. Please try again.",
             logout_success: "Successfully signed out.",
             logout_error: "Failed to sign out.",
+            config_missing: "Cloud features are disabled or missing configuration (Check .env or GitHub Secrets).",
             terms_and_privacy: "By signing in, you agree to our Terms of Service and Privacy Policy."
         }
     }

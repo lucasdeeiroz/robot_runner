@@ -194,6 +194,8 @@ export const pt = {
             }
         },
         common: {
+            loading_taking_too_long: "O carregamento está demorando mais que o esperado...",
+            continue_anyway: "Continuar mesmo assim",
             refresh: "Atualizar",
             online: "Online",
             cloud_sync: "Sincronizado na Nuvem",
@@ -1416,6 +1418,7 @@ export const pt = {
             popup_blocked: "O popup de login foi bloqueado pelo sistema. Verifique as configurações.",
             logout_success: "Sessão encerrada com sucesso.",
             logout_error: "Falha ao encerrar sessão.",
+            config_missing: "Recursos de nuvem desabilitados ou configuração ausente (Verifique .env ou GitHub Secrets).",
             terms_and_privacy: "Ao entrar, você concorda com nossos Termos de Serviço e Política de Privacidade."
         }
     }

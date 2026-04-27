@@ -194,6 +194,8 @@ export const es = {
             }
         },
         common: {
+            loading_taking_too_long: "La carga está tardando más de lo esperado...",
+            continue_anyway: "Continuar de todos modos",
             refresh: "Actualizar",
             online: "En línea",
             cloud_sync: "Sincronizado en la Nube",
@@ -1421,6 +1423,7 @@ export const es = {
             login_error: "Error de autenticación. Inténtalo de nuevo.",
             logout_success: "Sesión cerrada correctamente.",
             logout_error: "Error al cerrar sesión.",
+            config_missing: "Funciones de nube deshabilitadas o falta configuración (Verifique .env o GitHub Secrets).",
             terms_and_privacy: "Al iniciar sesión, aceptas nuestros Términos de Servicio y Política de Privacidad."
         }
     }

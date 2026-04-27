@@ -24,6 +24,7 @@ import { ExpressiveLoading } from "./components/atoms/ExpressiveLoading";
 import { AuthProvider, useAuth } from "./lib/authStore";
 import { LoginPage } from "./pages/LoginPage";
 import { RemoteConfigProvider } from "./lib/RemoteConfigProvider";
+import { Button } from "./components/atoms/Button";
 
 function App() {
   return (
@@ -225,10 +226,47 @@ function AppContent() {
   }, [settings_loading]);
 
   // Prevent rendering (and thus flash) until settings are loaded
-  if (settings_loading || auth_loading) {
+  // Diagnostics for loading
+  const [loadingTime, setLoadingTime] = useState(0);
+  useEffect(() => {
+    let timer: any;
+    if (settings_loading || auth_loading) {
+      timer = setInterval(() => {
+        setLoadingTime(prev => prev + 1);
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [settings_loading, auth_loading]);
+
+  const forceBypassLoading = () => {
+    console.warn("[App] Manual loading bypass triggered.");
+    setLoadingTime(-1); // Special state to bypass
+  };
+
+  if ((settings_loading || auth_loading) && loadingTime !== -1) {
     return (
-      <div className="w-screen h-screen flex flex-col items-center justify-center bg-surface text-primary dark:text-primary/80">
-        <ExpressiveLoading variant="circular" size="lg" />
+      <div className="w-screen h-screen flex flex-col items-center justify-center bg-surface text-primary dark:text-primary/80 gap-8 p-6">
+        <div className="relative">
+          <ExpressiveLoading variant="circular" size="lg" />
+          {/* Diagnostic info is now hidden but the logic remains active */}
+        </div>
+        
+        {loadingTime > 10 && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }} 
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col items-center gap-4 max-w-sm text-center"
+          >
+            <p className="text-sm text-on-surface-variant/60">
+              {t('common.loading_taking_too_long')}
+            </p>
+            <Button variant="outline" size="sm" onClick={forceBypassLoading}>
+              {t('common.continue_anyway')}
+            </Button>
+          </motion.div>
+        )}
       </div>
     );
   }

@@ -1,6 +1,8 @@
-import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { initializeApp, FirebaseApp } from "firebase/app";
+import { getAuth, Auth } from "firebase/auth";
 import { getAnalytics, isSupported } from "firebase/analytics";
+import { Firestore, getFirestore } from "firebase/firestore";
+import { RemoteConfig, getRemoteConfig } from "firebase/remote-config";
 
 // Firebase configuration using Vite environment variables
 // Note: These must be prefixed with VITE_ to be accessible in the client
@@ -14,22 +16,30 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
-import { getFirestore } from "firebase/firestore";
-import { getRemoteConfig } from "firebase/remote-config";
+// Initialize Firebase with safety checks
+let app: FirebaseApp | null = null;
+let auth: Auth | null = null;
+let db: Firestore | null = null;
+let remoteConfig: RemoteConfig | null = null;
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+try {
+  if (firebaseConfig.apiKey) {
+    app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = getFirestore(app);
+    remoteConfig = getRemoteConfig(app);
+    console.log("[Firebase] Initialized successfully.");
+  } else {
+    console.warn("[Firebase] API Key is missing. Cloud features will be disabled.");
+  }
+} catch (error) {
+  console.error("[Firebase] Initialization failed:", error);
+}
 
-// Initialize Auth
-export const auth = getAuth(app);
+// Exported instances (might be null if key is missing)
+export { auth, db, remoteConfig };
 
-// Initialize Firestore
-export const db = getFirestore(app);
-
-// Initialize Remote Config
-export const remoteConfig = getRemoteConfig(app);
-
-// Initialize Analytics (checking if supported in the current environment)
-export const analytics = isSupported().then(yes => yes ? getAnalytics(app) : null);
+// Initialize Analytics (checking if supported and if app exists)
+export const analytics = isSupported().then(yes => (yes && app) ? getAnalytics(app) : null);
 
 export default app;
