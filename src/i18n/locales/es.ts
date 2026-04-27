@@ -1420,7 +1420,7 @@ export const es = {
             login_success: "¡Inicio de sesión exitoso!",
             login_error: "Error de autenticación. Inténtalo de nuevo.",
             logout_success: "Sesión cerrada correctamente.",
-            logout_error: "Error ao cerrar sesión.",
+            logout_error: "Error al cerrar sesión.",
             terms_and_privacy: "Al iniciar sesión, aceptas nuestros Térmos de Servicio y Política de Privacidad."
         }
     }
