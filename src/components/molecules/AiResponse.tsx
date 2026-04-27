@@ -106,7 +106,7 @@ export const AiResponse: React.FC<AiResponseProps> = React.memo(({
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); onRetry(); }}
                                     className="p-1 text-primary/40 hover:text-primary transition-colors hover:bg-primary/10 rounded"
-                                    title={t('common.retry')}
+                                    title={t('common.try_again')}
                                 >
                                     <RotateCcw size={14} />
                                 </button>
