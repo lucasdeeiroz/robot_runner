@@ -24,6 +24,7 @@ import { ExpressiveLoading } from "./components/atoms/ExpressiveLoading";
 import { AuthProvider, useAuth } from "./lib/authStore";
 import { LoginPage } from "./pages/LoginPage";
 import { RemoteConfigProvider } from "./lib/RemoteConfigProvider";
+import { Button } from "./components/atoms/Button";
 
 function App() {
   return (
@@ -225,10 +226,54 @@ function AppContent() {
   }, [settings_loading]);
 
   // Prevent rendering (and thus flash) until settings are loaded
-  if (settings_loading || auth_loading) {
+  // Diagnostics for loading
+  const [loadingTime, setLoadingTime] = useState(0);
+  useEffect(() => {
+    if (settings_loading || auth_loading) {
+      const timer = setInterval(() => setLoadingTime(prev => prev + 1), 1000);
+      return () => clearInterval(timer);
+    } else {
+      setLoadingTime(0);
+    }
+  }, [settings_loading, auth_loading]);
+
+  const forceBypassLoading = () => {
+    console.warn("[App] Manual loading bypass triggered.");
+    setLoadingTime(-1); // Special state to bypass
+  };
+
+  if ((settings_loading || auth_loading) && loadingTime !== -1) {
     return (
-      <div className="w-screen h-screen flex flex-col items-center justify-center bg-surface text-primary dark:text-primary/80">
-        <ExpressiveLoading variant="circular" size="lg" />
+      <div className="w-screen h-screen flex flex-col items-center justify-center bg-surface text-primary dark:text-primary/80 gap-6">
+        <div className="relative">
+          <ExpressiveLoading variant="circular" size="lg" />
+          {loadingTime > 5 && (
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }}
+              className="absolute -bottom-12 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs text-on-surface-variant/60 font-mono"
+            >
+              {settings_loading ? "Settings: Loading..." : "Settings: Ready"}
+              <br />
+              {auth_loading ? "Auth: Loading..." : "Auth: Ready"}
+            </motion.div>
+          )}
+        </div>
+        
+        {loadingTime > 12 && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }} 
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col items-center gap-4 max-w-sm text-center px-6"
+          >
+            <p className="text-sm text-on-surface-variant/80">
+              {t('common.loading_taking_too_long')}
+            </p>
+            <Button variant="outline" size="sm" onClick={forceBypassLoading}>
+              {t('common.continue_anyway')}
+            </Button>
+          </motion.div>
+        )}
       </div>
     );
   }

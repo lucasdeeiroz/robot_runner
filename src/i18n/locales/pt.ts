@@ -194,6 +194,8 @@ export const pt = {
             }
         },
         common: {
+            loading_taking_too_long: "O carregamento está demorando mais que o esperado...",
+            continue_anyway: "Continuar mesmo assim",
             refresh: "Atualizar",
             online: "Online",
             cloud_sync: "Sincronizado na Nuvem",

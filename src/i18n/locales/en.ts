@@ -194,6 +194,8 @@ export const en = {
             }
         },
         common: {
+            loading_taking_too_long: "Loading is taking longer than expected...",
+            continue_anyway: "Continue anyway",
             refresh: "Refresh",
             online: "Online",
             cloud_sync: "Synced to Cloud",
