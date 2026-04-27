@@ -1414,7 +1414,7 @@ export const es = {
         },
         auth: {
             welcome_title: "Bienvenido a Robot Runner",
-            welcome_subtitle: "Inicia sesión para acceder a todas las funciones e sincronización en la nube.",
+            welcome_subtitle: "Inicia sesión para acceder a todas las funciones y sincronización en la nube.",
             sign_in_with_google: "Iniciar sesión con Google",
             logout: "Cerrar sesión",
             login_success: "¡Inicio de sesión exitoso!",
