@@ -28,12 +28,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loginLoading, setLoginLoading] = useState(false);
 
   useEffect(() => {
+    // Safety timeout: if Firebase Auth takes more than 10s to respond, stop loading
+    const safetyTimer = setTimeout(() => {
+      console.warn("[Auth] Firebase Auth took too long to initialize, bypassing loading...");
+      setLoading(false);
+    }, 10000);
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      clearTimeout(safetyTimer);
       setUser(user);
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      clearTimeout(safetyTimer);
+      unsubscribe();
+    };
   }, []);
 
   const signInWithGoogle = async () => {

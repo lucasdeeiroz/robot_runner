@@ -16,13 +16,21 @@ remoteConfig.settings.minimumFetchIntervalMillis = import.meta.env.DEV ? 0 : 360
 
 /**
  * Initializes and fetches the remote configuration from Firebase.
+ * Includes a timeout to prevent blocking the app initialization indefinitely.
  */
 export async function initRemoteConfig() {
     try {
-        await fetchAndActivate(remoteConfig);
+        // Add a 5-second timeout to the fetch operation
+        const fetchPromise = fetchAndActivate(remoteConfig);
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error("RemoteConfig timeout")), 5000)
+        );
+
+        await Promise.race([fetchPromise, timeoutPromise]);
         console.log("[RemoteConfig] Config fetched and activated.");
     } catch (err) {
         console.error("[RemoteConfig] Failed to fetch remote config:", err);
+        // We continue anyway as defaults are already set
     }
 }
 
