@@ -241,7 +241,9 @@ export function HomeSubTab({ onNavigate }: HomeSubTabProps) {
 
     const isMaintenance = getRemoteBool('maintenance_mode');
     const minVersion = getRemoteString('min_app_version');
-    const isUpdateRequired = semver.lt(pkg.version, minVersion);
+    const currentVersion = semver.valid(pkg.version);
+    const requiredMinVersion = semver.valid(minVersion);
+    const isUpdateRequired = !!(currentVersion && requiredMinVersion && semver.lt(currentVersion, requiredMinVersion));
     const showHomeStats = getRemoteBool('show_home_stats');
 
     return (
