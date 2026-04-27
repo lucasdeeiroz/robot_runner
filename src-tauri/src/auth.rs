@@ -10,6 +10,11 @@ pub struct AuthResponse {
     pub code: String,
 }
 
+#[derive(Debug, Serialize, Clone)]
+struct PortPayload {
+    port: u16,
+}
+
 #[command]
 pub async fn start_auth_server<R: Runtime>(
     handle: AppHandle<R>,
@@ -24,7 +29,7 @@ pub async fn start_auth_server<R: Runtime>(
                 let _ = listener.set_nonblocking(true);
                 
                 // Tell the frontend we are ready and on which port
-                let _ = handle.emit("auth-server-ready", port);
+                let _ = handle.emit("auth-server-ready", PortPayload { port });
 
                 let start_time = std::time::Instant::now();
                 let timeout_duration = std::time::Duration::from_secs(300); // 5 minutes
