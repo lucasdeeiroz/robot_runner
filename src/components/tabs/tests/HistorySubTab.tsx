@@ -111,7 +111,7 @@ export function HistorySubTab({ onNavigate }: HistorySubTabProps) {
             let combinedLogs = [...localLogs];
 
             // 2. Fetch Global Logs from Firestore if logged in
-            const currentUser = auth.currentUser;
+            const currentUser = auth?.currentUser;
             if (currentUser && activeProfileId) {
                 try {
                     const globalLogs = await fetchGlobalHistory(currentUser.uid, activeProfileId);
