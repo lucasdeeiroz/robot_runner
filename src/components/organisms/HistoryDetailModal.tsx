@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useTranslation } from "react-i18next";
-import { XCircle, CheckCircle2, Calendar, Clock, Smartphone, FolderOpen } from 'lucide-react';
+import { XCircle, CheckCircle2, Calendar, Clock, Smartphone, FolderOpen, Cloud } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { getCachedResult, parseXmlBackground, onParseComplete } from '@/lib/xmlParseCache';
@@ -289,6 +289,12 @@ export function HistoryDetailModal({ isOpen, onClose, log, onUpdateLog }: Histor
 
                             <div className="flex items-center gap-2 text-xs text-on-surface-variant/80">
                                 <Calendar size={14} /> {formatDate(log.timestamp)}
+                                {log.is_remote && (
+                                    <div className="flex items-center gap-1 text-primary/60" title={t('common.cloud_sync')}>
+                                        <Cloud size={14} />
+                                        <span className="text-[10px] font-bold uppercase tracking-tighter">Cloud</span>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="flex items-center gap-2 text-xs text-on-surface-variant/80">
@@ -310,8 +316,12 @@ export function HistoryDetailModal({ isOpen, onClose, log, onUpdateLog }: Histor
                             )}
                             <button
                                 onClick={() => openLog(log.path)}
-                                className="p-1 hover:bg-surface-variant/30 rounded transition-colors text-on-surface-variant/80 hover:text-primary"
-                                title={t('run_tab.console.open_output_dir')}
+                                disabled={log.is_remote && !log.xml_path}
+                                className={clsx(
+                                    "p-1 rounded transition-colors text-on-surface-variant/80",
+                                    log.is_remote && !log.xml_path ? "opacity-20 cursor-not-allowed" : "hover:bg-surface-variant/30 hover:text-primary"
+                                )}
+                                title={log.is_remote && !log.xml_path ? t('tests_page.local_only_action', "Ação disponível apenas localmente") : t('run_tab.console.open_output_dir')}
                             >
                                 <FolderOpen size={14} />
                             </button>
@@ -390,6 +400,33 @@ export function HistoryDetailModal({ isOpen, onClose, log, onUpdateLog }: Histor
                                         onChildrenLoaded={handleChildrenLoaded}
                                     />
                                 ))}
+                            </div>
+                        ) : log.is_remote && !log.xml_path ? (
+                            <div className="h-full flex flex-col items-center justify-center gap-6 text-center px-8">
+                                <div className="p-8 bg-primary/5 rounded-full text-primary/30 relative">
+                                    <Cloud size={64} strokeWidth={1} />
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <div className="w-16 h-16 border-2 border-primary/20 rounded-full animate-ping opacity-20" />
+                                    </div>
+                                </div>
+                                <div className="max-w-md">
+                                    <h3 className="text-xl font-semibold text-on-surface mb-2">
+                                        {t('tests_page.remote_log_title', "Resumo de Execução na Nuvem")}
+                                    </h3>
+                                    <p className="text-sm text-on-surface-variant leading-relaxed">
+                                        {t('tests_page.remote_log_desc', "Este teste foi executado em outro dispositivo e sincronizado via nuvem. O detalhamento passo-a-passo e as screenshots estão disponíveis apenas na máquina de origem.")}
+                                    </p>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4 w-full max-w-sm mt-4">
+                                    <div className="bg-surface p-4 rounded-2xl border border-outline-variant/30 flex flex-col items-center gap-1">
+                                        <span className="text-[10px] uppercase font-bold text-on-surface-variant/60 tracking-widest">Status</span>
+                                        <span className={clsx("text-lg font-bold", log.status === 'PASS' ? "text-success" : "text-error")}>{log.status}</span>
+                                    </div>
+                                    <div className="bg-surface p-4 rounded-2xl border border-outline-variant/30 flex flex-col items-center gap-1">
+                                        <span className="text-[10px] uppercase font-bold text-on-surface-variant/60 tracking-widest">Duração</span>
+                                        <span className="text-lg font-bold text-on-surface">{log.duration}</span>
+                                    </div>
+                                </div>
                             </div>
                         ) : (
                             <div className="h-full flex flex-col items-center justify-center gap-2 text-on-surface-variant opacity-50">

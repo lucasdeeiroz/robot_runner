@@ -7,7 +7,9 @@ import {
     Info,
     LayoutDashboard,
     Wrench,
-    Home
+    Home,
+    LogOut,
+    User as UserIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSettings } from "@/lib/settings";
@@ -18,6 +20,7 @@ import packageJson from '../../../package.json';
 import { CustomLogo } from '../molecules/CustomLogo';
 import { useDevices } from "@/lib/deviceStore";
 import { useTestSessions } from "@/lib/testSessionStore";
+import { useAuth } from '@/lib/authStore';
 
 interface SidebarProps {
     activePage: string;
@@ -28,6 +31,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
     const { settings, updateInfo, updateSetting } = useSettings();
     const { sessions, appiumRunning } = useTestSessions();
     const { devices } = useDevices();
+    const { user, signOut } = useAuth();
     const [collapsed, setCollapsed] = useState(false);
     const [clickCount, setClickCount] = useState(0);
     const [lastClickTime, setLastClickTime] = useState(0);
@@ -162,6 +166,37 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                     </button>
                 ))}
             </nav>
+            
+            {/* User Profile */}
+            <div className="px-2 pb-2">
+                <div className={cn(
+                    "flex items-center gap-3 p-2 rounded-2xl bg-surface-variant/20 border border-outline-variant/30",
+                    collapsed ? "justify-center" : "px-3"
+                )}>
+                    {user?.photoURL ? (
+                        <img src={user.photoURL} alt="User" className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20" />
+                    ) : (
+                        <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+                            <UserIcon size={16} />
+                        </div>
+                    )}
+                    {!collapsed && (
+                        <div className="flex-1 min-w-0 overflow-hidden">
+                            <p className="text-xs font-bold text-on-surface truncate">{user?.displayName || user?.email?.split('@')[0]}</p>
+                            <p className="text-[10px] text-on-surface-variant truncate">{user?.email}</p>
+                        </div>
+                    )}
+                    {!collapsed && (
+                        <button 
+                            onClick={signOut}
+                            className="p-1.5 hover:bg-error/10 text-on-surface-variant hover:text-error rounded-xl transition-all active:scale-95"
+                            title={t('auth.logout')}
+                        >
+                            <LogOut size={16} />
+                        </button>
+                    )}
+                </div>
+            </div>
 
             {/* Footer */}
             <div className="p-4 mb-2.5">

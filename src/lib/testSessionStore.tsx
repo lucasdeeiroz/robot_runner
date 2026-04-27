@@ -4,6 +4,9 @@ import { invoke } from '@tauri-apps/api/core';
 import { useSettings } from './settings';
 import { v4 as uuidv4 } from 'uuid';
 import { feedback } from './feedback';
+import { logDataFootprint } from './metrics';
+import { db, auth as firebaseAuth } from './firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 export interface TestSession {
     runId: string;
@@ -28,6 +31,7 @@ export interface TestSession {
     outputDir?: string;
     outputXmlPath?: string;
     artifactPaths?: { log?: string, report?: string, output?: string };
+    startTime: number;
 }
 
 interface TestOutputPayload {
@@ -61,7 +65,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
     const [sessions, setSessions] = useState<TestSession[]>([]);
     const [activeSessionId, setActiveSessionId] = useState<string | 'dashboard'>('dashboard');
     const [appiumRunning, setAppiumRunning] = useState(false);
-    const { settings } = useSettings();
+    const { settings, activeProfileId } = useSettings();
     const isTestRunning = useMemo(() => sessions.some(s => s.status === 'running'), [sessions]);
 
     // Periodic Appium Status Check
@@ -111,6 +115,59 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                         feedback.notify('feedback.test_failed', 'feedback.details.device', { device: s.deviceName });
                     }
 
+                    // 1. Telemetry: Log the data footprint size
+                    if (s.outputDir) {
+                        logDataFootprint(s.outputDir);
+                    }
+
+                    // 2. Global History: Save a light summary to Firestore
+                    const currentUser = firebaseAuth.currentUser;
+                    if (currentUser) {
+                        const historyRef = collection(db, `users/${currentUser.uid}/history`);
+                        
+                        // Attempt to extract metrics from streaming logs
+                        const lastLogs = s.logs.slice(-50).join('\n');
+                        const passMatch = lastLogs.match(/Tests Passed:\s*(\d+)/i) || lastLogs.match(/PASS:\s*(\d+)/i);
+                        const failMatch = lastLogs.match(/Tests Failed:\s*(\d+)/i) || lastLogs.match(/FAIL:\s*(\d+)/i);
+                        
+                        // Enhanced Duration capture (from RR-SUITE-END or RR-TEST-END)
+                        let duration = 'N/A';
+                        const suiteEndMatch = lastLogs.match(/\[RR-SUITE-END\].*?\|\s*(\d+)\s*$/m);
+                        if (suiteEndMatch) {
+                            const ms = parseInt(suiteEndMatch[1]);
+                            duration = ms > 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
+                        } else {
+                            // Fallback to manual calculation
+                            const ms = Date.now() - s.startTime;
+                            duration = ms > 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
+                        }
+
+                        const extractedSuiteName = s.testPath.split(/[\\/]/).pop()?.split('.')[0] || 'Unknown';
+                        console.log("[Firestore] Saving history record:", { 
+                            runId: s.runId, 
+                            suiteName: extractedSuiteName, 
+                            testPath: s.testPath 
+                        });
+
+                        addDoc(historyRef, {
+                            runId: s.runId,
+                            logsPath: activeProfileId, // Use Profile ID as the partition key
+                            testPath: s.testPath,
+                            suiteName: extractedSuiteName,
+                            status: exit_code === 0 ? 'passed' : 'failed',
+                            exitCode: exit_code,
+                            timestamp: serverTimestamp(),
+                            deviceName: s.deviceName,
+                            deviceModel: s.deviceModel || null,
+                            deviceUdid: s.deviceUdid || null,
+                            androidVersion: s.androidVersion || null,
+                            framework: s.framework,
+                            passCount: passMatch ? parseInt(passMatch[1]) : (exit_code === 0 ? 1 : 0),
+                            failCount: failMatch ? parseInt(failMatch[1]) : (exit_code !== 0 ? 1 : 0),
+                            duration: duration
+                        }).catch(err => console.error("[Firebase] History sync failed:", err));
+                    }
+
                     return {
                         ...s,
                         status: 'finished',
@@ -127,7 +184,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
             unlistenOutputPromise.then(f => f());
             unlistenFinishedPromise.then(f => f());
         };
-    }, []);
+    }, [activeProfileId, settings.paths.logs]);
 
 
 
@@ -162,7 +219,8 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                         exitCode: undefined,
                         repopulatedTree: undefined,
                         artifactPaths: {},
-                        sessionEpoch: (existing.sessionEpoch || 0) + 1 // Force RunConsole remount
+                        sessionEpoch: (existing.sessionEpoch || 0) + 1, // Force RunConsole remount
+                        startTime: Date.now()
                     };
 
                     setTimeout(() => setActiveSessionId(existing.runId), 0); // Focus it
@@ -189,7 +247,8 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     deviceModel,
                     androidVersion,
                     selectedTests,
-                    sessionEpoch: 0
+                    sessionEpoch: 0,
+                    startTime: Date.now()
                 }
             ];
         });
@@ -231,7 +290,8 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     androidVersion,
                     framework: 'robot',
                     timestampOutputs: false,
-                    sessionEpoch: 0
+                    sessionEpoch: 0,
+                    startTime: Date.now()
                 }
             ];
         });
@@ -340,6 +400,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     runId: newRunId,
                     testPath: session.testPath === session.argumentsFile ? null : session.testPath,
                     outputDir: outputDir,
+                    logs_path: settings.paths.logs,
                     device: session.deviceUdid === 'local' ? null : session.deviceUdid,
                     argumentsFile: session.argumentsFile,
                     deviceModel: session.deviceModel,
@@ -353,6 +414,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     runId: newRunId,
                     testPath: session.testPath,
                     outputDir: outputDir,
+                    logs_path: settings.paths.logs,
                     device: session.deviceUdid === 'local' ? null : session.deviceUdid,
                     maestroArgs: settings.tools.maestroArgs,
                     working_dir: settings.paths.automationRoot,
@@ -363,6 +425,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     runId: newRunId,
                     projectPath: session.testPath,
                     outputDir: outputDir,
+                    logs_path: settings.paths.logs,
                     appiumJavaArgs: settings.tools.appiumJavaArgs
                 });
             }

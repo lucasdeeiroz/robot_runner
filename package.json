@@ -29,6 +29,7 @@
     "docx": "^9.5.3",
     "fast-xml-parser": "^5.3.3",
     "file-saver": "^2.0.5",
+    "firebase": "^12.12.1",
     "framer-motion": "^12.29.2",
     "html-to-image": "^1.11.13",
     "i18next": "^25.7.3",

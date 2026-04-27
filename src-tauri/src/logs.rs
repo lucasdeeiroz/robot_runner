@@ -39,6 +39,8 @@ static RE_FILENAME_TS: Lazy<Regex> = Lazy::new(|| Regex::new(r"(\d{8}-\d{6})").u
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TestLog {
+    run_id: Option<String>,
+    logs_path: Option<String>,
     path: String,
     suite_name: String,
     status: String,
@@ -215,6 +217,8 @@ fn parse_log_entry(folder_path: &Path, xml_path: &Path, mtime: u64) -> Option<Te
 
     // Read metadata.json (uses pre-compiled regexes)
     let metadata_path = folder_path.join("metadata.json");
+    let mut run_id = None;
+    let mut logs_path = None;
     let mut device_udid = None;
     let mut meta_timestamp = None;
     let mut device_model = None;
@@ -223,6 +227,16 @@ fn parse_log_entry(folder_path: &Path, xml_path: &Path, mtime: u64) -> Option<Te
 
     if metadata_path.exists() {
         if let Ok(meta_content) = fs::read_to_string(&metadata_path) {
+            // New regex for run_id and logs_path
+            let re_run = Regex::new(r#""run_id"\s*:\s*"([^"]+)""#).unwrap();
+            let re_lp = Regex::new(r#""logs_path"\s*:\s*"([^"]+)""#).unwrap();
+
+            if let Some(caps) = re_run.captures(&meta_content) {
+                run_id = caps.get(1).map(|m| m.as_str().to_string());
+            }
+            if let Some(caps) = re_lp.captures(&meta_content) {
+                logs_path = caps.get(1).map(|m| m.as_str().to_string());
+            }
             if let Some(caps) = RE_FW.captures(&meta_content) {
                 framework = caps
                     .get(1)
@@ -354,6 +368,8 @@ fn parse_log_entry(folder_path: &Path, xml_path: &Path, mtime: u64) -> Option<Te
         }
 
         return Some(TestLog {
+            run_id,
+            logs_path,
             path: abs_folder_path.to_string_lossy().to_string(),
             xml_path: xml_path.to_string_lossy().to_string(),
             suite_name,
@@ -425,6 +441,8 @@ fn parse_log_entry(folder_path: &Path, xml_path: &Path, mtime: u64) -> Option<Te
     let fail_count = if is_fail { 1 } else { 0 };
 
     Some(TestLog {
+        run_id,
+        logs_path,
         path: abs_folder_path.to_string_lossy().to_string(),
         xml_path: xml_path.to_string_lossy().to_string(),
         suite_name: format!("[{}] {}", framework.to_uppercase(), suite_name),

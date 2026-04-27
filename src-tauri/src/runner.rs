@@ -136,6 +136,7 @@ pub async fn run_robot_test(
     run_id: String,
     test_path: Option<String>,
     output_dir: String,
+    logs_path: Option<String>,
     device: Option<String>,
     device_model: Option<String>,
     android_version: Option<String>,
@@ -191,7 +192,8 @@ def start_suite(name, attrs):
 
 def end_suite(name, attrs):
     s_name = _sanitize(name)
-    sys.stdout.write(f"\n[RR-SUITE-END] {s_name} | {attrs['status']}\n")
+    elapsed = attrs.get('elapsedtime', '0')
+    sys.stdout.write(f"\n[RR-SUITE-END] {s_name} | {attrs['status']} | {elapsed}\n")
     sys.stdout.flush()
 
 def start_test(name, attrs):
@@ -204,7 +206,8 @@ def end_test(name, attrs):
     t_name = _sanitize(name)
     status = attrs.get('status', 'PASS')
     msg = _sanitize(attrs.get('message', ''))
-    sys.stdout.write(f"\n[RR-TEST-END] {t_name} | {status} | {msg}\n")
+    elapsed = attrs.get('elapsedtime', '0')
+    sys.stdout.write(f"\n[RR-TEST-END] {t_name} | {status} | {msg} | {elapsed}\n")
     sys.stdout.flush()
 
 def start_keyword(name, attrs):
@@ -315,6 +318,7 @@ t.start()
     #[derive(Serialize)]
     struct RunMetadata {
         run_id: String,
+        logs_path: Option<String>,
         device_udid: String,
         test_path: String,
         timestamp: String,
@@ -324,6 +328,7 @@ t.start()
 
     let metadata = RunMetadata {
         run_id: run_id.clone(),
+        logs_path: logs_path.clone(),
         device_udid: device
             .clone()
             .unwrap_or_else(|| "Local/Unknown".to_string()),
@@ -357,6 +362,7 @@ pub async fn run_maestro_test(
     device: Option<String>,
     maestro_args: Option<String>,
     working_dir: Option<String>,
+    logs_path: Option<String>,
     timestamp_outputs: Option<bool>,
 ) -> AppResult<String> {
     let abs_output_dir = std::fs::canonicalize(&output_dir)
@@ -376,6 +382,7 @@ pub async fn run_maestro_test(
     #[derive(Serialize)]
     struct RunMetadata {
         run_id: String,
+        logs_path: Option<String>,
         framework: String,
         test_path: String,
         timestamp: String,
@@ -383,6 +390,7 @@ pub async fn run_maestro_test(
 
     let metadata = RunMetadata {
         run_id: run_id.clone(),
+        logs_path: logs_path.clone(),
         framework: "maestro".to_string(),
         test_path: test_path.clone(),
         timestamp: chrono::Local::now().to_rfc3339(),
@@ -448,6 +456,7 @@ pub async fn run_appium_test(
     run_id: String,
     project_path: String,
     output_dir: String,
+    logs_path: Option<String>,
     appium_java_args: Option<String>,
 ) -> AppResult<String> {
     let abs_project_path = std::fs::canonicalize(&project_path)
@@ -464,12 +473,14 @@ pub async fn run_appium_test(
     #[derive(Serialize)]
     struct RunMetadata {
         run_id: String,
+        logs_path: Option<String>,
         framework: String,
         timestamp: String,
     }
 
     let metadata = RunMetadata {
         run_id: run_id.clone(),
+        logs_path: logs_path.clone(),
         framework: "appium".to_string(),
         timestamp: chrono::Local::now().to_rfc3339(),
     };

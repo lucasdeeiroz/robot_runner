@@ -6,6 +6,20 @@ use serde::Serialize;
 use serde_json::Value;
 use std::sync::Mutex;
 use tauri::{command, State};
+use walkdir::WalkDir;
+
+#[command]
+pub async fn get_folder_size(path: String) -> AppResult<u64> {
+    let mut total_size = 0;
+    for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
+        if let Ok(metadata) = entry.metadata() {
+            if metadata.is_file() {
+                total_size += metadata.len();
+            }
+        }
+    }
+    Ok(total_size)
+}
 
 #[derive(Debug, Serialize)]
 pub struct SystemVersions {
