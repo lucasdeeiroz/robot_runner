@@ -54,7 +54,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signInWithGoogle = async () => {
     if (!auth) {
-      feedback.toast.error("Firebase Auth is disabled or missing configuration.");
+      feedback.toast.error("auth.config_missing");
       return;
     }
     setLoginLoading(true);

@@ -7,6 +7,7 @@ import { TestLog } from './historyCache';
  * filtered by the current logs path (Project/Profile).
  */
 export async function fetchGlobalHistory(uid: string, profileId: string, maxItems: number = 50): Promise<TestLog[]> {
+    if (!db) return [];
     try {
         const historyRef = collection(db, `users/${uid}/history`);
         

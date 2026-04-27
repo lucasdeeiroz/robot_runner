@@ -149,6 +149,7 @@ interface SettingsContextType {
     renameProfile: (id: string, name: string) => void;
     deleteProfile: (id: string) => void;
     loading: boolean;
+    hasHydrated: boolean;
     systemVersions: SystemVersions | null;
     checkSystemVersions: (forceUsageMode?: 'explorer' | 'automator', forceFramework?: 'robot' | 'appium' | 'maestro') => Promise<void>;
     systemCheckStatus: SystemCheckStatus;
@@ -168,6 +169,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         }
     });
     const [loading, setLoading] = useState(true);
+    const [hasHydrated, setHasHydrated] = useState(false);
     const [isNgrokEnabled, setIsNgrokEnabled] = useState(false);
 
     const enableNgrok = () => {
@@ -279,6 +281,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             feedback.toast.error("settings.load_error", e);
         } finally {
             clearTimeout(safetyTimer);
+            setHasHydrated(true);
             setLoading(false);
         }
     };
@@ -511,6 +514,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             renameProfile,
             deleteProfile,
             loading,
+            hasHydrated,
             systemVersions,
             checkSystemVersions,
             systemCheckStatus,

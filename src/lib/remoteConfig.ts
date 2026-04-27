@@ -1,15 +1,17 @@
 import { remoteConfig } from "./firebase";
 import { fetchAndActivate, getValue } from "firebase/remote-config";
 
-// Default configuration
+// Default configuration shared between Firebase and Local Fallback
+const DEFAULT_CONFIG: Record<string, any> = {
+    "is_ai_analysis_enabled": true,
+    "min_app_version": "2.2.0",
+    "maintenance_mode": false,
+    "storage_retention_days": 15,
+    "show_home_stats": true
+};
+
 if (remoteConfig) {
-    remoteConfig.defaultConfig = {
-        "is_ai_analysis_enabled": true,
-        "min_app_version": "2.2.0",
-        "maintenance_mode": false,
-        "storage_retention_days": 15,
-        "show_home_stats": true
-    };
+    remoteConfig.defaultConfig = DEFAULT_CONFIG;
     remoteConfig.settings.minimumFetchIntervalMillis = import.meta.env.DEV ? 0 : 3600000;
 }
 
@@ -22,33 +24,43 @@ export async function initRemoteConfig() {
         console.warn("[RemoteConfig] Skipping fetch: Remote Config is not initialized.");
         return;
     }
+
+    let timeoutId: any;
     try {
         const fetchPromise = fetchAndActivate(remoteConfig);
-        const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error("RemoteConfig timeout")), 5000)
-        );
+        const timeoutPromise = new Promise((_, reject) => {
+            timeoutId = setTimeout(() => reject(new Error("RemoteConfig timeout")), 5000);
+        });
 
         await Promise.race([fetchPromise, timeoutPromise]);
         console.log("[RemoteConfig] Config fetched and activated.");
     } catch (err) {
         console.error("[RemoteConfig] Failed to fetch remote config:", err);
+    } finally {
+        if (timeoutId) clearTimeout(timeoutId);
     }
 }
 
 /**
- * Gets a boolean value from Remote Config.
+ * Gets a boolean value from Remote Config with a safe local fallback.
  */
 export function getRemoteBool(key: string): boolean {
-    if (!remoteConfig) return true; // Fallback default
+    if (!remoteConfig) return DEFAULT_CONFIG[key] ?? false;
     return getValue(remoteConfig, key).asBoolean();
 }
 
+/**
+ * Gets a string value from Remote Config with a safe local fallback.
+ */
 export function getRemoteString(key: string): string {
-    if (!remoteConfig) return ""; // Fallback default
+    if (!remoteConfig) return DEFAULT_CONFIG[key] ?? "";
     return getValue(remoteConfig, key).asString();
 }
 
+/**
+ * Gets a number value from Remote Config with a safe local fallback.
+ */
 export function getRemoteNumber(key: string): number {
-    if (!remoteConfig) return 0; // Fallback default
+    if (!remoteConfig) return DEFAULT_CONFIG[key] ?? 0;
     return getValue(remoteConfig, key).asNumber();
 }

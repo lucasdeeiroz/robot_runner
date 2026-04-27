@@ -1,6 +1,8 @@
-import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { initializeApp, FirebaseApp } from "firebase/app";
+import { getAuth, Auth } from "firebase/auth";
 import { getAnalytics, isSupported } from "firebase/analytics";
+import { Firestore, getFirestore } from "firebase/firestore";
+import { RemoteConfig, getRemoteConfig } from "firebase/remote-config";
 
 // Firebase configuration using Vite environment variables
 // Note: These must be prefixed with VITE_ to be accessible in the client
@@ -14,14 +16,11 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
-import { getFirestore } from "firebase/firestore";
-import { getRemoteConfig } from "firebase/remote-config";
-
 // Initialize Firebase with safety checks
-let app: any = null;
-let auth: any = null;
-let db: any = null;
-let remoteConfig: any = null;
+let app: FirebaseApp | null = null;
+let auth: Auth | null = null;
+let db: Firestore | null = null;
+let remoteConfig: RemoteConfig | null = null;
 
 try {
   if (firebaseConfig.apiKey) {
@@ -35,7 +34,6 @@ try {
   }
 } catch (error) {
   console.error("[Firebase] Initialization failed:", error);
-  // We do NOT re-throw here to allow the app to boot in "offline/local" mode
 }
 
 // Exported instances (might be null if key is missing)
