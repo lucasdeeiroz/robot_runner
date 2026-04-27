@@ -42,31 +42,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log("Starting External Browser Auth Flow...");
       
       // 1. Set up listeners for the Rust loopback server events
-      const unlistenReady = await listen<number>('auth-server-ready', async (event) => {
-        const port = event.payload;
-        const apiKey = import.meta.env.VITE_FIREBASE_API_KEY;
-        const projectID = import.meta.env.VITE_FIREBASE_PROJECT_ID;
-        
-        // Build the bridge URL. Note: You need to have a login.html on your Firebase Hosting.
-        // For development, we'll open the browser and let the user know.
-        const bridgeUrl = `https://${projectID}.firebaseapp.com/login.html?port=${port}&apiKey=${apiKey}`;
-        console.log("Opening bridge URL:", bridgeUrl);
-        await openUrl(bridgeUrl);
-      });
-
-      // 2. Create a promise that resolves when the code is received from Rust
       const authPromise = new Promise<string>((resolve, reject) => {
-        let timeout = setTimeout(() => reject(new Error("Timeout")), 300000); // 5 min
-        
-        listen<{ code: string }>('auth-code-received', (event) => {
+        let timeout = setTimeout(() => {
+          cleanup();
+          reject(new Error("Timeout"));
+        }, 300000); // 5 min
+
+        const unlistenReady = listen<{ port: number }>('auth-server-ready', (event) => {
+          const { port } = event.payload;
+          const projectID = import.meta.env.VITE_FIREBASE_PROJECT_ID;
+          const apiKey = import.meta.env.VITE_FIREBASE_API_KEY;
+          
+          const bridgeUrl = `https://${projectID}.firebaseapp.com/login.html?port=${port}&apiKey=${apiKey}`;
+          console.log("Opening bridge URL:", bridgeUrl);
+          openUrl(bridgeUrl);
+        });
+
+        const unlistenSuccess = listen<{ code: string }>('auth-code-received', (event) => {
           clearTimeout(timeout);
+          cleanup();
           resolve(event.payload.code);
         });
 
-        listen<string>('auth-error', (event) => {
+        const unlistenError = listen<string>('auth-error', (event) => {
           clearTimeout(timeout);
+          cleanup();
           reject(new Error(event.payload));
         });
+
+        const cleanup = async () => {
+          (await unlistenReady)();
+          (await unlistenSuccess)();
+          (await unlistenError)();
+        };
       });
 
       // 3. Start the Rust server
@@ -74,7 +82,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // 4. Wait for the token
       const idToken = await authPromise;
-      unlistenReady();
 
       // 5. Sign in to Firebase using the received ID Token
       const credential = GoogleAuthProvider.credential(idToken);

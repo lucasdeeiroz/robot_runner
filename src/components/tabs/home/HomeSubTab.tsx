@@ -1,10 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-    Smartphone, RefreshCw,
-    History, Activity, Zap
-} from 'lucide-react';
+import { Smartphone, RefreshCw, History, Activity, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDevices } from '@/lib/deviceStore';
 import { DeviceCard } from '@/components/molecules/DeviceCard';
@@ -19,7 +16,7 @@ import { useTestSessions } from '@/lib/testSessionStore';
 import { Device } from '@/lib/types';
 import { useFileSave } from '@/hooks/useFileSave';
 import { Shield, Power, Gauge, AlertTriangle, ArrowUpCircle } from 'lucide-react';
-import { getRemoteBool, getRemoteString } from '@/lib/remoteConfig';
+import { useRemoteConfig } from '@/lib/RemoteConfigProvider';
 import semver from 'semver';
 import pkg from '../../../../package.json';
 import { Alert } from '@/components/atoms/Alert';
@@ -239,12 +236,11 @@ export function HomeSubTab({ onNavigate }: HomeSubTabProps) {
         }
     };
 
-    const isMaintenance = getRemoteBool('maintenance_mode');
-    const minVersion = getRemoteString('min_app_version');
-    const currentVersion = semver.valid(pkg.version);
-    const requiredMinVersion = semver.valid(minVersion);
-    const isUpdateRequired = !!(currentVersion && requiredMinVersion && semver.lt(currentVersion, requiredMinVersion));
-    const showHomeStats = getRemoteBool('show_home_stats');
+    const { getBool, getString } = useRemoteConfig();
+    const isMaintenance = getBool('maintenance_mode');
+    const minVersion = getString('min_app_version');
+    const isUpdateRequired = !!(pkg.version && minVersion && semver.lt(pkg.version, minVersion));
+    const showHomeStats = getBool('show_home_stats');
 
     return (
         <div className="flex flex-col gap-10 pb-12 pt-4">

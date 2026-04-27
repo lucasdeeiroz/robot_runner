@@ -21,7 +21,7 @@ export async function logDataFootprint(resultsPath: string) {
             logEvent(a, "test_run_data_footprint", {
                 size_bytes: sizeBytes,
                 size_mb: parseFloat(sizeMB.toFixed(2)),
-                debug_mode: true // Force appearance in Firebase DebugView
+                debug_mode: import.meta.env.DEV // Only enable for development
             });
         }
     } catch (error) {

@@ -22,7 +22,7 @@ pub async fn get_folder_size(path: String) -> AppResult<u64> {
         total_size
     })
     .await
-    .map_err(|e| AppError::from(format!("Failed to calculate folder size: {}", e)))?;
+    .map_err(|e| AppError::StringError(format!("Failed to calculate folder size: {}", e)))?;
     Ok(total_size)
 }
 

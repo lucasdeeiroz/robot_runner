@@ -40,8 +40,9 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
     const [summary, setSummary] = useState<string | null>(null);
     const [summaryError, setSummaryError] = useState<string | null>(null);
 
+    const rawContainerRef = useRef<VirtuosoHandle>(null);
+    const fancyContainerRef = useRef<HTMLDivElement>(null);
     const debugVirtuosoRef = useRef<VirtuosoHandle>(null);
-    const containerRef = useRef<HTMLDivElement>(null);
     const [tree, setTree] = useState<LogNode[]>(() => session?.repopulatedTree ? [session.repopulatedTree] : []);
 
     const handleChildrenLoaded = useCallback((id: string, children: LogNode[]) => {
@@ -76,18 +77,21 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
         }
     }, [session?.repopulatedTree]);
 
-    // Auto-scroll logic for tree (Non-virtualized part)
+    // Handle auto-scroll logic
     useEffect(() => {
-        if (!isRawMode && stickToBottom && !showDebugConsole) {
-            const el = containerRef.current;
-            if (el) {
-                const timer = setTimeout(() => {
-                    el.scrollTop = el.scrollHeight;
-                }, 100);
-                return () => clearTimeout(timer);
+        if (!stickToBottom || showDebugConsole) return;
+
+        if (isRawMode) {
+            rawContainerRef.current?.scrollToIndex({
+                index: logs.length - 1,
+                behavior: 'auto',
+            });
+        } else {
+            if (fancyContainerRef.current) {
+                fancyContainerRef.current.scrollTop = fancyContainerRef.current.scrollHeight;
             }
         }
-    }, [tree, isRawMode, stickToBottom, showDebugConsole]);
+    }, [logs.length, tree.length, isRawMode, stickToBottom, showDebugConsole]);
 
     // Keep Screen Awake Lifecycle
     useEffect(() => {
@@ -331,37 +335,44 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
 
             <div className="flex-1 min-h-0 flex flex-col relative">
                 <div
-                    ref={containerRef}
-                    onScroll={onScroll}
                     className={clsx(
-                        "flex-1 min-h-0 p-4 font-mono text-[13px] leading-relaxed overflow-y-auto scrollbar-thin scrollbar-thumb-outline-variant/30 scrollbar-track-transparent custom-scrollbar",
+                        "flex-1 min-h-0 font-mono text-[13px] leading-relaxed relative",
                         isRawMode ? "block" : "hidden"
                     )}
                 >
-                    {logs.map((line, i) => (
-                        <div key={i} className="whitespace-pre-wrap break-all hover:bg-surface-variant/10 px-2 rounded -mx-2 transition-colors border-l-2 border-transparent hover:border-primary/30">
-                            <span className="text-on-surface-variant/40 mr-3 select-none w-8 inline-block text-right tabular-nums">{i + 1}</span>
-                            <span className={clsx(
-                                line.includes('| PASS |') && "text-success font-semibold",
-                                line.includes('| FAIL |') && "text-error font-semibold",
-                                line.includes('| SKIP |') && "text-warning font-semibold",
-                                (line.includes('[System]') || line.includes('[RR-')) && "text-on-surface-variant/60 italic"
-                            )}>
-                                {line}
-                            </span>
-                        </div>
-                    ))}
-                    {isRunning && (
-                        <div className="flex items-center gap-2 text-primary/60 mt-4 px-2 animate-pulse">
-                            <Terminal size={14} className="animate-bounce" />
-                            <span className="text-xs font-bold tracking-wider uppercase italic">Streaming live output...</span>
-                        </div>
-                    )}
+                    <Virtuoso
+                        ref={rawContainerRef}
+                        data={logs}
+                        followOutput="auto"
+                        onScroll={onScroll}
+                        className="custom-scrollbar"
+                        itemContent={(i, line) => (
+                            <div className="whitespace-pre-wrap break-all hover:bg-surface-variant/10 px-6 py-0.5 rounded transition-colors border-l-2 border-transparent hover:border-primary/30">
+                                <span className="text-on-surface-variant/40 mr-3 select-none w-8 inline-block text-right tabular-nums">{i + 1}</span>
+                                <span className={clsx(
+                                    line.includes('| PASS |') && "text-success font-semibold",
+                                    line.includes('| FAIL |') && "text-error font-semibold",
+                                    line.includes('| SKIP |') && "text-warning font-semibold",
+                                    (line.includes('[System]') || line.includes('[RR-')) && "text-on-surface-variant/60 italic"
+                                )}>
+                                    {line}
+                                </span>
+                            </div>
+                        )}
+                        components={{
+                            Footer: () => isRunning ? (
+                                <div className="flex items-center gap-2 text-primary/60 my-4 px-6 animate-pulse">
+                                    <Terminal size={14} className="animate-bounce" />
+                                    <span className="text-xs font-bold tracking-wider uppercase italic">Streaming live output...</span>
+                                </div>
+                            ) : <div className="h-10" />
+                        }}
+                    />
                 </div>
 
                 {!isRawMode && (
                     <div className="flex-1 min-h-0 flex flex-col">
-                        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar" ref={containerRef} onScroll={onScroll}>
+                        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar" ref={fancyContainerRef} onScroll={onScroll}>
                             <div className="p-4 min-h-full">
                                 {tree.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-on-surface-variant/40 gap-4">

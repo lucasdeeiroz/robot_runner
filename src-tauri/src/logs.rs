@@ -11,6 +11,8 @@ use tauri::command;
 static RE_FW: Lazy<Regex> = Lazy::new(|| Regex::new(r#""framework"\s*:\s*"([^"]+)""#).unwrap());
 static RE_DEV: Lazy<Regex> = Lazy::new(|| Regex::new(r#""device_udid"\s*:\s*"([^"]+)""#).unwrap());
 static RE_TS: Lazy<Regex> = Lazy::new(|| Regex::new(r#""timestamp"\s*:\s*"([^"]+)""#).unwrap());
+static RE_RUN: Lazy<Regex> = Lazy::new(|| Regex::new(r#""run_id"\s*:\s*"([^"]+)""#).unwrap());
+static RE_LP: Lazy<Regex> = Lazy::new(|| Regex::new(r#""logs_path"\s*:\s*"([^"]+)""#).unwrap());
 static RE_MODEL: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#""device_model"\s*:\s*"([^"]+)""#).unwrap());
 static RE_VER: Lazy<Regex> =
@@ -227,14 +229,10 @@ fn parse_log_entry(folder_path: &Path, xml_path: &Path, mtime: u64) -> Option<Te
 
     if metadata_path.exists() {
         if let Ok(meta_content) = fs::read_to_string(&metadata_path) {
-            // New regex for run_id and logs_path
-            let re_run = Regex::new(r#""run_id"\s*:\s*"([^"]+)""#).unwrap();
-            let re_lp = Regex::new(r#""logs_path"\s*:\s*"([^"]+)""#).unwrap();
-
-            if let Some(caps) = re_run.captures(&meta_content) {
+            if let Some(caps) = RE_RUN.captures(&meta_content) {
                 run_id = caps.get(1).map(|m| m.as_str().to_string());
             }
-            if let Some(caps) = re_lp.captures(&meta_content) {
+            if let Some(caps) = RE_LP.captures(&meta_content) {
                 logs_path = caps.get(1).map(|m| m.as_str().to_string());
             }
             if let Some(caps) = RE_FW.captures(&meta_content) {

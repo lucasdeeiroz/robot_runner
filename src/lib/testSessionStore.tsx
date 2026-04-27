@@ -100,24 +100,27 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
 
         const unlistenFinishedPromise = listen<TestFinishedPayload>('test-finished', (event) => {
             const { run_id, exit_code } = event.payload;
-            setSessions(prev => prev.map(s => {
-                if (s.runId === run_id || s.activeRunId === run_id) {
+            
+            // Find the session before state update to trigger side effects
+            setSessions(prev => {
+                const sessionToFinish = prev.find(s => s.runId === run_id || s.activeRunId === run_id);
+                
+                if (sessionToFinish) {
                     // Guard: if session was recycled and is already running a NEW test, skip stale event
-                    if (s.activeRunId && s.activeRunId !== run_id && s.status === 'running') {
-                        return s;
+                    if (sessionToFinish.activeRunId && sessionToFinish.activeRunId !== run_id && sessionToFinish.status === 'running') {
+                        return prev;
                     }
 
-                    // Feedback
-                    const statusStr = `Exit Code: ${exit_code}`;
+                    // Side Effects (Outside state update logic)
                     if (exit_code === 0) {
-                        feedback.notify('feedback.test_passed', 'feedback.details.device', { device: s.deviceName });
+                        feedback.notify('feedback.test_passed', 'feedback.details.device', { device: sessionToFinish.deviceName });
                     } else {
-                        feedback.notify('feedback.test_failed', 'feedback.details.device', { device: s.deviceName });
+                        feedback.notify('feedback.test_failed', 'feedback.details.device', { device: sessionToFinish.deviceName });
                     }
 
                     // 1. Telemetry: Log the data footprint size
-                    if (s.outputDir) {
-                        logDataFootprint(s.outputDir);
+                    if (sessionToFinish.outputDir) {
+                        logDataFootprint(sessionToFinish.outputDir);
                     }
 
                     // 2. Global History: Save a light summary to Firestore
@@ -126,58 +129,60 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                         const historyRef = collection(db, `users/${currentUser.uid}/history`);
                         
                         // Attempt to extract metrics from streaming logs
-                        const lastLogs = s.logs.slice(-50).join('\n');
+                        const lastLogs = sessionToFinish.logs.slice(-50).join('\n');
                         const passMatch = lastLogs.match(/Tests Passed:\s*(\d+)/i) || lastLogs.match(/PASS:\s*(\d+)/i);
                         const failMatch = lastLogs.match(/Tests Failed:\s*(\d+)/i) || lastLogs.match(/FAIL:\s*(\d+)/i);
                         
-                        // Enhanced Duration capture (from RR-SUITE-END or RR-TEST-END)
+                        // Enhanced Duration capture
                         let duration = 'N/A';
                         const suiteEndMatch = lastLogs.match(/\[RR-SUITE-END\].*?\|\s*(\d+)\s*$/m);
                         if (suiteEndMatch) {
                             const ms = parseInt(suiteEndMatch[1]);
                             duration = ms > 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
                         } else {
-                            // Fallback to manual calculation
-                            const ms = Date.now() - s.startTime;
+                            const ms = Date.now() - sessionToFinish.startTime;
                             duration = ms > 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
                         }
 
-                        const extractedSuiteName = s.testPath.split(/[\\/]/).pop()?.split('.')[0] || 'Unknown';
-                        console.log("[Firestore] Saving history record:", { 
-                            runId: s.runId, 
-                            suiteName: extractedSuiteName, 
-                            testPath: s.testPath 
-                        });
-
+                        const extractedSuiteName = sessionToFinish.testPath.split(/[\\/]/).pop()?.split('.')[0] || 'Unknown';
+                        
                         addDoc(historyRef, {
-                            runId: s.runId,
-                            logsPath: activeProfileId, // Use Profile ID as the partition key
-                            testPath: s.testPath,
+                            runId: sessionToFinish.runId,
+                            logsPath: activeProfileId,
+                            testPath: sessionToFinish.testPath,
                             suiteName: extractedSuiteName,
                             status: exit_code === 0 ? 'passed' : 'failed',
                             exitCode: exit_code,
                             timestamp: serverTimestamp(),
-                            deviceName: s.deviceName,
-                            deviceModel: s.deviceModel || null,
-                            deviceUdid: s.deviceUdid || null,
-                            androidVersion: s.androidVersion || null,
-                            framework: s.framework,
+                            deviceName: sessionToFinish.deviceName,
+                            deviceModel: sessionToFinish.deviceModel || null,
+                            deviceUdid: sessionToFinish.deviceUdid || null,
+                            androidVersion: sessionToFinish.androidVersion || null,
+                            framework: sessionToFinish.framework,
                             passCount: passMatch ? parseInt(passMatch[1]) : (exit_code === 0 ? 1 : 0),
                             failCount: failMatch ? parseInt(failMatch[1]) : (exit_code !== 0 ? 1 : 0),
                             duration: duration
                         }).catch(err => console.error("[Firebase] History sync failed:", err));
                     }
-
-                    return {
-                        ...s,
-                        status: 'finished',
-                        exitCode: String(exit_code),
-                        activeRunId: undefined, // Clean up: clear activeRunId after test finishes
-                        logs: [...s.logs, `\n[System] Finished: ${statusStr}`]
-                    };
                 }
-                return s;
-            }));
+
+                // Return updated state
+                return prev.map(s => {
+                    if (s.runId === run_id || s.activeRunId === run_id) {
+                        if (s.activeRunId && s.activeRunId !== run_id && s.status === 'running') {
+                            return s;
+                        }
+                        return {
+                            ...s,
+                            status: 'finished',
+                            exitCode: String(exit_code),
+                            activeRunId: undefined,
+                            logs: [...s.logs, `\n[System] Finished: Exit Code: ${exit_code}`]
+                        };
+                    }
+                    return s;
+                });
+            });
         });
 
         return () => {

@@ -28,7 +28,7 @@ export async function fetchGlobalHistory(uid: string, profileId: string, maxItem
                 id: doc.id,
                 run_id: data.runId || null,
                 path: data.testPath || '',
-                suite_name: data.suiteName || data.testPath?.split('/').pop() || 'Unknown',
+                suite_name: data.suiteName || data.testPath?.split(/[\\/]/).pop() || 'Unknown',
                 status: data.status === 'passed' ? 'PASS' : 'FAIL',
                 device_udid: data.deviceUdid || null,
                 device_model: data.deviceModel || null,

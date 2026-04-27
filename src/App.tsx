@@ -23,12 +23,14 @@ import { SelectionProvider } from "./lib/selectionStore";
 import { ExpressiveLoading } from "./components/atoms/ExpressiveLoading";
 import { AuthProvider, useAuth } from "./lib/authStore";
 import { LoginPage } from "./pages/LoginPage";
-import { initRemoteConfig } from "./lib/remoteConfig";
+import { RemoteConfigProvider } from "./lib/RemoteConfigProvider";
 
 function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <RemoteConfigProvider>
+        <AppContent />
+      </RemoteConfigProvider>
     </AuthProvider>
   );
 }
@@ -39,12 +41,7 @@ function AppContent() {
   const { settings, updateSetting, checkSystemVersions, systemCheckStatus, loading: settings_loading, checkForAppUpdate } = useSettings();
   const { user, loading: auth_loading } = useAuth();
 
-  // Initialize Remote Config once authenticated
-  useEffect(() => {
-    if (user) {
-      initRemoteConfig();
-    }
-  }, [user]);
+  // Initialize Remote Config once authenticated (now handled by RemoteConfigProvider)
 
   // State to track if we should show the overlay or if it has been dismissed/handled
   const [initialCheckDismissed, setInitialCheckDismissed] = useState(false);
