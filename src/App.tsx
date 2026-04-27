@@ -247,31 +247,25 @@ function AppContent() {
 
   if ((settings_loading || auth_loading) && loadingTime !== -1) {
     return (
-      <div className="w-screen h-screen flex flex-col items-center justify-center bg-[#121212] text-white gap-8 p-6">
-        <div className="flex flex-col items-center gap-4">
+      <div className="w-screen h-screen flex flex-col items-center justify-center bg-surface text-primary dark:text-primary/80 gap-8 p-6">
+        <div className="relative">
           <ExpressiveLoading variant="circular" size="lg" />
-          <div className="text-sm font-mono opacity-80 bg-white/5 p-3 rounded-lg border border-white/10">
-            <div className={settings_loading ? "text-amber-400" : "text-emerald-400"}>
-              Settings: {settings_loading ? "LOADING..." : "READY"}
-            </div>
-            <div className={auth_loading ? "text-amber-400" : "text-emerald-400"}>
-              Auth: {auth_loading ? "LOADING..." : "READY"}
-            </div>
-            <div className="text-xs mt-2 opacity-50">
-              Time: {loadingTime}s | v{import.meta.env.VITE_APP_VERSION || '2.2.x'}
-            </div>
-          </div>
+          {/* Diagnostic info is now hidden but the logic remains active */}
         </div>
         
-        {loadingTime > 8 && (
-          <div className="flex flex-col items-center gap-4 max-w-sm text-center animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <p className="text-sm text-white/60">
+        {loadingTime > 10 && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }} 
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col items-center gap-4 max-w-sm text-center"
+          >
+            <p className="text-sm text-on-surface-variant/60">
               {t('common.loading_taking_too_long')}
             </p>
-            <Button variant="outline" size="sm" onClick={forceBypassLoading} className="border-white/20 hover:bg-white/10 text-white">
+            <Button variant="outline" size="sm" onClick={forceBypassLoading}>
               {t('common.continue_anyway')}
             </Button>
-          </div>
+          </motion.div>
         )}
       </div>
     );

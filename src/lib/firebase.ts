@@ -17,28 +17,31 @@ const firebaseConfig = {
 import { getFirestore } from "firebase/firestore";
 import { getRemoteConfig } from "firebase/remote-config";
 
-// Initialize Firebase
-let app: any;
+// Initialize Firebase with safety checks
+let app: any = null;
+let auth: any = null;
+let db: any = null;
+let remoteConfig: any = null;
+
 try {
-  if (!firebaseConfig.apiKey) {
-    throw new Error("VITE_FIREBASE_API_KEY is undefined. Check environment variables.");
+  if (firebaseConfig.apiKey) {
+    app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = getFirestore(app);
+    remoteConfig = getRemoteConfig(app);
+    console.log("[Firebase] Initialized successfully.");
+  } else {
+    console.warn("[Firebase] API Key is missing. Cloud features will be disabled.");
   }
-  app = initializeApp(firebaseConfig);
 } catch (error) {
-  console.error("Firebase init error:", error);
-  throw error;
+  console.error("[Firebase] Initialization failed:", error);
+  // We do NOT re-throw here to allow the app to boot in "offline/local" mode
 }
 
-// Initialize Auth
-export const auth = getAuth(app);
+// Exported instances (might be null if key is missing)
+export { auth, db, remoteConfig };
 
-// Initialize Firestore
-export const db = getFirestore(app);
-
-// Initialize Remote Config
-export const remoteConfig = getRemoteConfig(app);
-
-// Initialize Analytics (checking if supported in the current environment)
-export const analytics = isSupported().then(yes => yes ? getAnalytics(app) : null);
+// Initialize Analytics (checking if supported and if app exists)
+export const analytics = isSupported().then(yes => (yes && app) ? getAnalytics(app) : null);
 
 export default app;

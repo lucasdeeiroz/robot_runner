@@ -125,7 +125,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
 
                     // 2. Global History: Save a light summary to Firestore
                     const currentUser = firebaseAuth.currentUser;
-                    if (currentUser) {
+                    if (currentUser && db) {
                         const historyRef = collection(db, `users/${currentUser.uid}/history`);
                         
                         // Attempt to extract metrics from streaming logs

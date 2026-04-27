@@ -28,6 +28,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loginLoading, setLoginLoading] = useState(false);
 
   useEffect(() => {
+    if (!auth) {
+      console.warn("[Auth] Firebase Auth is not initialized. Skipping auth listener.");
+      setLoading(false);
+      return;
+    }
+
     // Safety timeout: if Firebase Auth takes more than 10s to respond, stop loading
     const safetyTimer = setTimeout(() => {
       console.warn("[Auth] Firebase Auth took too long to initialize, bypassing loading...");
@@ -47,6 +53,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signInWithGoogle = async () => {
+    if (!auth) {
+      feedback.toast.error("Firebase Auth is disabled or missing configuration.");
+      return;
+    }
     setLoginLoading(true);
     try {
       console.log("Starting External Browser Auth Flow...");
@@ -108,6 +118,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    if (!auth) return;
     try {
       await firebaseSignOut(auth);
       feedback.toast.success('auth.logout_success');
