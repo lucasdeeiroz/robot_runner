@@ -196,6 +196,7 @@ export const en = {
         common: {
             refresh: "Refresh",
             online: "Online",
+            cloud_sync: "Synced to Cloud",
             offline: "Offline",
             try_again: "Try Again",
             beta: "Beta",
@@ -1140,6 +1141,14 @@ export const en = {
             description_about: "Information about Robot Runner and its creators."
         },
         home: {
+            maintenance: {
+                title: "System Maintenance",
+                description: "We are currently performing scheduled maintenance. Some features might be temporarily unavailable."
+            },
+            update: {
+                title: "Update Required",
+                description: "A newer version of Robot Runner is available ({{version}}). Please update to ensure compatibility."
+            },
             sections: {
                 devices: "Connected Devices",
                 devices_desc: "Real-time monitoring of active Android devices.",
@@ -1397,6 +1406,17 @@ export const en = {
                     description: "YAML-based flows. Best for ultra-fast UI testing and simplicity."
                 }
             }
+        },
+        auth: {
+            welcome_title: "Welcome to Robot Runner",
+            welcome_subtitle: "Please sign in to access all features and cloud synchronization.",
+            sign_in_with_google: "Sign in with Google",
+            logout: "Sign Out",
+            login_success: "Successfully signed in!",
+            login_error: "Authentication failed. Please try again.",
+            logout_success: "Successfully signed out.",
+            logout_error: "Failed to sign out.",
+            terms_and_privacy: "By signing in, you agree to our Terms of Service and Privacy Policy."
         }
     }
 };

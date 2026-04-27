@@ -4,6 +4,9 @@ import { invoke } from '@tauri-apps/api/core';
 import { useSettings } from './settings';
 import { v4 as uuidv4 } from 'uuid';
 import { feedback } from './feedback';
+import { logDataFootprint } from './metrics';
+import { db, auth as firebaseAuth } from './firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 export interface TestSession {
     runId: string;
@@ -28,6 +31,7 @@ export interface TestSession {
     outputDir?: string;
     outputXmlPath?: string;
     artifactPaths?: { log?: string, report?: string, output?: string };
+    startTime: number;
 }
 
 interface TestOutputPayload {
@@ -61,7 +65,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
     const [sessions, setSessions] = useState<TestSession[]>([]);
     const [activeSessionId, setActiveSessionId] = useState<string | 'dashboard'>('dashboard');
     const [appiumRunning, setAppiumRunning] = useState(false);
-    const { settings } = useSettings();
+    const { settings, activeProfileId } = useSettings();
     const isTestRunning = useMemo(() => sessions.some(s => s.status === 'running'), [sessions]);
 
     // Periodic Appium Status Check
@@ -96,38 +100,96 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
 
         const unlistenFinishedPromise = listen<TestFinishedPayload>('test-finished', (event) => {
             const { run_id, exit_code } = event.payload;
-            setSessions(prev => prev.map(s => {
-                if (s.runId === run_id || s.activeRunId === run_id) {
+            
+            // Find the session before state update to trigger side effects
+            setSessions(prev => {
+                const sessionToFinish = prev.find(s => s.runId === run_id || s.activeRunId === run_id);
+                
+                if (sessionToFinish) {
                     // Guard: if session was recycled and is already running a NEW test, skip stale event
-                    if (s.activeRunId && s.activeRunId !== run_id && s.status === 'running') {
-                        return s;
+                    if (sessionToFinish.activeRunId && sessionToFinish.activeRunId !== run_id && sessionToFinish.status === 'running') {
+                        return prev;
                     }
 
-                    // Feedback
-                    const statusStr = `Exit Code: ${exit_code}`;
+                    // Side Effects (Outside state update logic)
                     if (exit_code === 0) {
-                        feedback.notify('feedback.test_passed', 'feedback.details.device', { device: s.deviceName });
+                        feedback.notify('feedback.test_passed', 'feedback.details.device', { device: sessionToFinish.deviceName });
                     } else {
-                        feedback.notify('feedback.test_failed', 'feedback.details.device', { device: s.deviceName });
+                        feedback.notify('feedback.test_failed', 'feedback.details.device', { device: sessionToFinish.deviceName });
                     }
 
-                    return {
-                        ...s,
-                        status: 'finished',
-                        exitCode: String(exit_code),
-                        activeRunId: undefined, // Clean up: clear activeRunId after test finishes
-                        logs: [...s.logs, `\n[System] Finished: ${statusStr}`]
-                    };
+                    // 1. Telemetry: Log the data footprint size
+                    if (sessionToFinish.outputDir) {
+                        logDataFootprint(sessionToFinish.outputDir);
+                    }
+
+                    // 2. Global History: Save a light summary to Firestore
+                    const currentUser = firebaseAuth.currentUser;
+                    if (currentUser) {
+                        const historyRef = collection(db, `users/${currentUser.uid}/history`);
+                        
+                        // Attempt to extract metrics from streaming logs
+                        const lastLogs = sessionToFinish.logs.slice(-50).join('\n');
+                        const passMatch = lastLogs.match(/Tests Passed:\s*(\d+)/i) || lastLogs.match(/PASS:\s*(\d+)/i);
+                        const failMatch = lastLogs.match(/Tests Failed:\s*(\d+)/i) || lastLogs.match(/FAIL:\s*(\d+)/i);
+                        
+                        // Enhanced Duration capture
+                        let duration = 'N/A';
+                        const suiteEndMatch = lastLogs.match(/\[RR-SUITE-END\].*?\|\s*(\d+)\s*$/m);
+                        if (suiteEndMatch) {
+                            const ms = parseInt(suiteEndMatch[1]);
+                            duration = ms > 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
+                        } else {
+                            const ms = Date.now() - sessionToFinish.startTime;
+                            duration = ms > 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
+                        }
+
+                        const extractedSuiteName = sessionToFinish.testPath.split(/[\\/]/).pop()?.split('.')[0] || 'Unknown';
+                        
+                        addDoc(historyRef, {
+                            runId: sessionToFinish.runId,
+                            logsPath: activeProfileId,
+                            testPath: sessionToFinish.testPath,
+                            suiteName: extractedSuiteName,
+                            status: exit_code === 0 ? 'passed' : 'failed',
+                            exitCode: exit_code,
+                            timestamp: serverTimestamp(),
+                            deviceName: sessionToFinish.deviceName,
+                            deviceModel: sessionToFinish.deviceModel || null,
+                            deviceUdid: sessionToFinish.deviceUdid || null,
+                            androidVersion: sessionToFinish.androidVersion || null,
+                            framework: sessionToFinish.framework,
+                            passCount: passMatch ? parseInt(passMatch[1]) : (exit_code === 0 ? 1 : 0),
+                            failCount: failMatch ? parseInt(failMatch[1]) : (exit_code !== 0 ? 1 : 0),
+                            duration: duration
+                        }).catch(err => console.error("[Firebase] History sync failed:", err));
+                    }
                 }
-                return s;
-            }));
+
+                // Return updated state
+                return prev.map(s => {
+                    if (s.runId === run_id || s.activeRunId === run_id) {
+                        if (s.activeRunId && s.activeRunId !== run_id && s.status === 'running') {
+                            return s;
+                        }
+                        return {
+                            ...s,
+                            status: 'finished',
+                            exitCode: String(exit_code),
+                            activeRunId: undefined,
+                            logs: [...s.logs, `\n[System] Finished: Exit Code: ${exit_code}`]
+                        };
+                    }
+                    return s;
+                });
+            });
         });
 
         return () => {
             unlistenOutputPromise.then(f => f());
             unlistenFinishedPromise.then(f => f());
         };
-    }, []);
+    }, [activeProfileId, settings.paths.logs]);
 
 
 
@@ -162,7 +224,8 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                         exitCode: undefined,
                         repopulatedTree: undefined,
                         artifactPaths: {},
-                        sessionEpoch: (existing.sessionEpoch || 0) + 1 // Force RunConsole remount
+                        sessionEpoch: (existing.sessionEpoch || 0) + 1, // Force RunConsole remount
+                        startTime: Date.now()
                     };
 
                     setTimeout(() => setActiveSessionId(existing.runId), 0); // Focus it
@@ -189,7 +252,8 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     deviceModel,
                     androidVersion,
                     selectedTests,
-                    sessionEpoch: 0
+                    sessionEpoch: 0,
+                    startTime: Date.now()
                 }
             ];
         });
@@ -231,7 +295,8 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     androidVersion,
                     framework: 'robot',
                     timestampOutputs: false,
-                    sessionEpoch: 0
+                    sessionEpoch: 0,
+                    startTime: Date.now()
                 }
             ];
         });
@@ -340,6 +405,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     runId: newRunId,
                     testPath: session.testPath === session.argumentsFile ? null : session.testPath,
                     outputDir: outputDir,
+                    logs_path: settings.paths.logs,
                     device: session.deviceUdid === 'local' ? null : session.deviceUdid,
                     argumentsFile: session.argumentsFile,
                     deviceModel: session.deviceModel,
@@ -353,6 +419,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     runId: newRunId,
                     testPath: session.testPath,
                     outputDir: outputDir,
+                    logs_path: settings.paths.logs,
                     device: session.deviceUdid === 'local' ? null : session.deviceUdid,
                     maestroArgs: settings.tools.maestroArgs,
                     working_dir: settings.paths.automationRoot,
@@ -363,6 +430,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     runId: newRunId,
                     projectPath: session.testPath,
                     outputDir: outputDir,
+                    logs_path: settings.paths.logs,
                     appiumJavaArgs: settings.tools.appiumJavaArgs
                 });
             }

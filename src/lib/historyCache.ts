@@ -1,4 +1,7 @@
 export interface TestLog {
+    id?: string; // For Firestore document ID
+    run_id?: string | null;
+    logs_path?: string | null;
     path: string;
     suite_name: string;
     status: 'PASS' | 'FAIL';
@@ -13,6 +16,8 @@ export interface TestLog {
     log_html_path: string;
     mtime: number;
     ai_summary?: string | null;
+    is_remote?: boolean; // Indicates if this is a cloud-only record
+    has_remote_sync?: boolean; // Indicates if a local record is also in the cloud
 }
 
 let cachedHistory: TestLog[] = [];

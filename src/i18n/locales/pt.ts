@@ -196,6 +196,7 @@ export const pt = {
         common: {
             refresh: "Atualizar",
             online: "Online",
+            cloud_sync: "Sincronizado na Nuvem",
             offline: "Offline",
             try_again: "Tentar Novamente",
             beta: "Beta",
@@ -1139,6 +1140,14 @@ export const pt = {
             description_about: "Informações sobre o Robot Runner e seus criadores."
         },
         home: {
+            maintenance: {
+                title: "Manutenção do Sistema",
+                description: "Estamos realizando uma manutenção programada. Algumas funcionalidades podem estar temporariamente indisponíveis."
+            },
+            update: {
+                title: "Atualização Necessária",
+                description: "Uma nova versão do Robot Runner está disponível ({{version}}). Por favor, atualize para garantir a compatibilidade."
+            },
             sections: {
                 devices: "Dispositivos Conectados",
                 devices_desc: "Monitoramento em tempo real de dispositivos Android ativos.",
@@ -1396,6 +1405,18 @@ export const pt = {
                     description: "Fluxos baseados em YAML. Ideal para testes de UI ultra-rápidos e simplicidade."
                 }
             }
+        },
+        auth: {
+            welcome_title: "Bem-vindo ao Robot Runner",
+            welcome_subtitle: "Faça login para acessar todos os recursos e sincronização na nuvem.",
+            sign_in_with_google: "Entrar com Google",
+            logout: "Sair",
+            login_success: "Login realizado com sucesso!",
+            login_error: "Falha na autenticação. Tente novamente.",
+            popup_blocked: "O popup de login foi bloqueado pelo sistema. Verifique as configurações.",
+            logout_success: "Sessão encerrada com sucesso.",
+            logout_error: "Falha ao encerrar sessão.",
+            terms_and_privacy: "Ao entrar, você concorda com nossos Termos de Serviço e Política de Privacidade."
         }
     }
 };

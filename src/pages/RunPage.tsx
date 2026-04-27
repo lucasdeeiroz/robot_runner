@@ -11,6 +11,7 @@ import { useDevices } from '@/lib/deviceStore'; // Import Global Store
 
 import { useSettings } from "@/lib/settings";
 import { Device } from "@/lib/types";
+import { logEvent } from "@/lib/analytics";
 
 // Atoms & Molecules
 import { TabItem } from "@/components/molecules/Tabs";
@@ -133,6 +134,7 @@ export function RunPage({ onNavigate, initialTab }: RunPageProps) {
                     if (id === 'tests' && isLauncherDisabled) return;
                     if (id === 'inspector' && isInspectorDisabled) return;
                     setActiveTab(id as TabType);
+                    logEvent('run_tab_changed', { tab: id });
                 }}
                 variant="pills"
                 className="z-20 relative"

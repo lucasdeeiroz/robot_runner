@@ -21,11 +21,27 @@ import { argbFromHex, themeFromSourceColor, TonalPalette } from "@material/mater
 import { DeviceProvider } from "./lib/deviceStore";
 import { SelectionProvider } from "./lib/selectionStore";
 import { ExpressiveLoading } from "./components/atoms/ExpressiveLoading";
+import { AuthProvider, useAuth } from "./lib/authStore";
+import { LoginPage } from "./pages/LoginPage";
+import { RemoteConfigProvider } from "./lib/RemoteConfigProvider";
 
 function App() {
+  return (
+    <AuthProvider>
+      <RemoteConfigProvider>
+        <AppContent />
+      </RemoteConfigProvider>
+    </AuthProvider>
+  );
+}
+
+function AppContent() {
   const [activePage, setActivePage] = useState("home");
   const { t, i18n } = useTranslation();
   const { settings, updateSetting, checkSystemVersions, systemCheckStatus, loading: settings_loading, checkForAppUpdate } = useSettings();
+  const { user, loading: auth_loading } = useAuth();
+
+  // Initialize Remote Config once authenticated (now handled by RemoteConfigProvider)
 
   // State to track if we should show the overlay or if it has been dismissed/handled
   const [initialCheckDismissed, setInitialCheckDismissed] = useState(false);
@@ -209,12 +225,16 @@ function App() {
   }, [settings_loading]);
 
   // Prevent rendering (and thus flash) until settings are loaded
-  if (settings_loading) {
+  if (settings_loading || auth_loading) {
     return (
       <div className="w-screen h-screen flex flex-col items-center justify-center bg-surface text-primary dark:text-primary/80">
         <ExpressiveLoading variant="circular" size="lg" />
       </div>
     );
+  }
+
+  if (!user) {
+    return <LoginPage />;
   }
 
   return (

@@ -11,6 +11,8 @@ import { twMerge } from 'tailwind-merge';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
+import { useRemoteConfig } from '@/lib/RemoteConfigProvider';
+
 interface AiButtonProps extends Omit<ButtonProps, 'leftIcon' | 'children' | 'onClick'> {
     id?: string;
     label?: string;
@@ -108,7 +110,9 @@ export const AiButton: React.FC<AiButtonProps> = ({
         };
     }, [isDropdownOpen]);
 
-    if (!hasApiKey) return null;
+    const { getBool } = useRemoteConfig();
+    const isAiEnabled = getBool('is_ai_analysis_enabled');
+    if (!hasApiKey || !isAiEnabled) return null;
 
     const isTooltipNeeded = !showTextAlways && (!expandable || !isHovered);
     const isExpanded = showTextAlways || (expandable && isHovered) || isDropdownOpen;

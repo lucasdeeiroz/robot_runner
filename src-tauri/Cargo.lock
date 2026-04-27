@@ -3560,7 +3560,7 @@ dependencies = [
 
 [[package]]
 name = "robot_runner"
-version = "2.2.45"
+version = "2.2.51"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -3589,6 +3589,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.17",
  "tokio",
+ "url",
  "walkdir",
  "zstd",
 ]

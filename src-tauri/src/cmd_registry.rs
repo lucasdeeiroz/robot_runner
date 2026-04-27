@@ -68,7 +68,9 @@ macro_rules! generate_robot_runner_handler {
             crate::xml_parser::get_node_ai_analysis,
             crate::logs::save_test_summary,
             crate::system::toggle_wakelock,
-            crate::system::sync_workspace_permissions
+            crate::system::sync_workspace_permissions,
+            crate::auth::start_auth_server,
+            crate::system::get_folder_size
         ]
     };
 }
