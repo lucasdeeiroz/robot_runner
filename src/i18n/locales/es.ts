@@ -78,7 +78,7 @@ export const es = {
             developed_by: "Desarrollado por",
             lead: "Desarrollador Principal",
             dev_collaborator: "Desarrollador Colaborador",
-            qa_collaborator: "QA Colaboradors",
+            qa_collaborator: "QA Colaborador",
             powered_by: "Desarrollado con",
             tools_title: "Herramientas Utilizadas",
             tools_desc: "Robot Runner está construido sobre gigantes de código abierto:",
