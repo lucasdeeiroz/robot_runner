@@ -196,7 +196,31 @@ export function AboutPage({ onNavigate: _onNavigate }: AboutPageProps) {
                                         </div>
                                     }
                                 >
-                                    {t('about.collaborator')}
+                                    {t('about.dev_collaborator')}
+                                </InfoCard>
+                                <InfoCard
+                                    title="Sarah Shelly Da Silva Farias"
+                                    href="https://github.com/sarahssf"
+                                    headerRight={<span>↗</span>}
+                                    icon={
+                                        <div className="w-12 h-12 bg-surface-variant/30 rounded-2xl flex items-center justify-center text-on-surface-variant/80">
+                                            <User size={24} />
+                                        </div>
+                                    }
+                                >
+                                    {t('about.qa_collaborator')}
+                                </InfoCard>
+                                <InfoCard
+                                    title="Abel Freire de Andrade"
+                                    href="https://github.com/abelandrad"
+                                    headerRight={<span>↗</span>}
+                                    icon={
+                                        <div className="w-12 h-12 bg-surface-variant/30 rounded-2xl flex items-center justify-center text-on-surface-variant/80">
+                                            <User size={24} />
+                                        </div>
+                                    }
+                                >
+                                    {t('about.qa_collaborator')}
                                 </InfoCard>
                             </div>
                         </Section>
