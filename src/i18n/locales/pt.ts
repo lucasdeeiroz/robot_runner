@@ -847,6 +847,7 @@ export const pt = {
             start_record: "Iniciar Gravação",
             stop_record: "Parar Gravação",
             recording: "Gravando...",
+            recording_started: "Gravando estatísticas de desempenho...",
             select_device: "Selecione um dispositivo para ver estatísticas de desempenho.",
             system_only: "Sistema Inteiro",
             device_stats: "Desempenho do Dispositivo",
