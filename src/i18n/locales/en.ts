@@ -848,6 +848,7 @@ export const en = {
             start_record: "Start Recording",
             stop_record: "Stop Recording",
             recording: "Recording...",
+            recording_started: "Recording performance stats...",
             select_device: "Select a device to view performance stats.",
             system_only: "Entire System",
             device_stats: "Device Performance",

@@ -16,6 +16,7 @@ pub struct DeviceStats {
     pub battery_level: u8,
     pub temperature: f32, // Celsius
     pub app_stats: Option<AppStats>,
+    pub foreground_activity: Option<String>,
 }
 
 #[tauri::command]
@@ -27,13 +28,15 @@ pub async fn get_device_stats(
     let battery_task = run_adb_shell(&device, "dumpsys battery");
     let meminfo_task = run_adb_shell(&device, "cat /proc/meminfo");
     let top_task = run_adb_shell(&device, "top -n 1 -m 5");
+    let activity_task = run_adb_shell(&device, "dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity|ResumedActivity|mCurrentFocus'");
 
     // Start these in parallel
-    let (bat_output, mem_output, top_output) = tokio::join!(battery_task, meminfo_task, top_task);
+    let (bat_output, mem_output, top_output, act_output) = tokio::join!(battery_task, meminfo_task, top_task, activity_task);
 
     let (battery_level, temperature) = parse_battery_info(&bat_output).unwrap_or((0, 0.0));
     let (ram_total, ram_used) = parse_mem_info(&mem_output).unwrap_or((0, 0));
     let cpu_usage = parse_cpu_usage(&top_output).unwrap_or(0.0);
+    let foreground_activity = parse_foreground_activity(&act_output);
 
     // 2. Prepare app stats if package provided
     let mut app_stats = None;
@@ -62,6 +65,7 @@ pub async fn get_device_stats(
         battery_level,
         temperature,
         app_stats,
+        foreground_activity,
     })
 }
 
@@ -109,6 +113,25 @@ pub fn parse_battery_info(output: &str) -> Option<(u8, f32)> {
     } else {
         None
     }
+}
+
+pub fn parse_foreground_activity(output: &str) -> Option<String> {
+    for line in output.lines() {
+        if line.contains("topResumedActivity=ActivityRecord{") 
+            || line.contains("mResumedActivity: ActivityRecord{") 
+            || line.contains("ResumedActivity: ActivityRecord{") 
+            || line.contains("mCurrentFocus=Window{") 
+        {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            for part in parts.iter().rev() {
+                if part.contains("/") {
+                    let clean = part.replace("}", "");
+                    return Some(clean);
+                }
+            }
+        }
+    }
+    None
 }
 
 pub fn parse_mem_info(output: &str) -> Option<(u64, u64)> {
