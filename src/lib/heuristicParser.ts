@@ -341,9 +341,13 @@ export function parseHeuristicLogs(
                     suiteStack.forEach(s => { if (s.status === 'RUNNING') s.status = finalStatus; });
                 }
             } else if (activeSuite()) {
-                activeSuite()!.children.push({ type: 'text', content: node.content, id: nodeId });
+                if (!IS_REDUNDANT_SYSTEM(node.content)) {
+                    activeSuite()!.children.push({ type: 'text', content: node.content, id: nodeId });
+                }
             } else {
-                root.push({ type: 'text', content: node.content, id: nodeId });
+                if (!IS_REDUNDANT_SYSTEM(node.content)) {
+                    root.push({ type: 'text', content: node.content, id: nodeId });
+                }
             }
         }
     });
