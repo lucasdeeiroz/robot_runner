@@ -157,7 +157,7 @@ export function usePerformanceRecorder(
             setIsRecording(true);
 
             // Optional: Provide visual feedback that recording started (without file dialog)
-            feedback.toast.info(t('performance.recording_started', 'Recording performance stats...'));
+            feedback.toast.info("performance.recording_started");
         }
     };
 
