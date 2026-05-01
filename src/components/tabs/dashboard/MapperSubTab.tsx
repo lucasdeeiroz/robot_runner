@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import {
-    Check, Scan, Home, ArrowLeft, Rows, X, Save, GitGraph, Trash2, Plus, FileClock, FileInput, SearchCode, ChevronDown, ChevronUp, ChevronRight,
+    Check, Scan, Home, ArrowLeft, Rows, X, GitGraph, Trash2, Plus, FileClock, SearchCode, ChevronDown, ChevronUp, ChevronRight,
     FileCode, FileStack, Upload, Download, Eye, EyeClosed
 } from 'lucide-react';
 import { XMLParser } from 'fast-xml-parser';
@@ -225,41 +225,25 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         setAiError(null);
     }, [selectedNode, mappedElements]);
 
-    // Helper to update current element state
+    // Helper to update current element state and auto-update mapping
     const updateElement = (key: keyof UIElementMap, value: any) => {
-        setCurrentElement(prev => ({ ...prev, [key]: value }));
-    };
-
-    const saveElementMapping = () => {
-        if (!currentElement.name) {
-            feedback.toast.error(t('mapper.error.missing_name'));
-            return;
-        }
-
-        if (!selectedNode && !currentElement.id) {
-            feedback.toast.error(t('mapper.error.no_element_selected'));
-            return;
-        }
-
-        // Clone and sanitize
-        const elementToSave = { ...currentElement };
-        if (elementToSave.type === 'menu' && Array.isArray(elementToSave.menu_options)) {
-            elementToSave.menu_options = elementToSave.menu_options
-                .map(s => s.trim())
-                .filter(Boolean);
-        }
-
-        const newElement = elementToSave as UIElementMap;
-        setMappedElements(prev => {
-            const idx = prev.findIndex(e => e.id === newElement.id);
-            if (idx >= 0) {
-                const updated = [...prev];
-                updated[idx] = newElement;
-                return updated;
+        setCurrentElement(prev => {
+            const next = { ...prev, [key]: value } as UIElementMap;
+            
+            // Auto-update mappedElements list if this element has a name and ID
+            if (next.name && next.id) {
+                setMappedElements(list => {
+                    const idx = list.findIndex(e => e.id === next.id);
+                    if (idx >= 0) {
+                        const updated = [...list];
+                        updated[idx] = next;
+                        return updated;
+                    }
+                    return [...list, next];
+                });
             }
-            return [...prev, newElement];
+            return next;
         });
-        feedback.toast.success(t('mapper.feedback.mapped'));
     };
 
     const removeElementMapping = (id?: string) => {
@@ -277,35 +261,43 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         feedback.toast.success(t('mapper.feedback.removed'));
     };
 
-    // Screen Actions
-    const handleSaveScreen = async () => {
-        if (!screenName) {
-            feedback.toast.error(t('mapper.error.missing_screen_name'));
-            return;
-        }
-        if (mappedElements.length === 0) {
-            feedback.toast.info(t('mapper.feedback.empty_map'));
-            // allowing save even if empty, but warning is good
-        }
+    // Auto-save logic
+    const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
 
-        const map: ScreenMap = {
-            id: screenName.toLowerCase().replace(/\s+/g, '_'),
-            name: screenName,
-            type: screenType,
-            description: screenDescription || undefined,
-            tags: screenTags.length > 0 ? screenTags : undefined,
-            elements: mappedElements,
-            base64_preview: screenshot || undefined
+    useEffect(() => {
+        if (!screenName) return;
+        
+        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+        
+        debounceTimerRef.current = setTimeout(async () => {
+            setIsSaving(true);
+            const map: ScreenMap = {
+                id: screenName.toLowerCase().replace(/\\s+/g, '_'),
+                name: screenName,
+                type: screenType,
+                description: screenDescription || undefined,
+                tags: screenTags.length > 0 ? screenTags : undefined,
+                elements: mappedElements,
+                base64_preview: screenshot || undefined
+            };
+            try {
+                await saveScreenMap(activeProfileId, map);
+                // Refresh silently
+                const maps = await listScreenMaps(activeProfileId);
+                setSavedMaps(maps);
+            } catch (e) {
+                console.error("Auto-save failed", e);
+            } finally {
+                setIsSaving(false);
+            }
+        }, 1000);
+        
+        return () => {
+            if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
         };
+    }, [screenName, screenType, screenDescription, screenTags, mappedElements, screenshot, activeProfileId]);
 
-        try {
-            await saveScreenMap(activeProfileId, map);
-            feedback.toast.success(t('mapper.feedback.saved'));
-            loadSavedMaps(); // Refresh list
-        } catch (e) {
-            feedback.toast.error(t('mapper.error.save_failed'), e);
-        }
-    };
 
     const handleLoadScreen = (map: ScreenMap) => {
         setScreenName(map.name);
@@ -313,7 +305,9 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         setScreenDescription(map.description || "");
         setScreenTags(map.tags || []);
         setMappedElements(map.elements);
-        // We don't necessarily update screenshot here because it should be live
+        if (map.base64_preview) {
+            setViewportScreenshot(map.base64_preview);
+        }
         setShowLoadMenu(false);
         feedback.toast.success(t('mapper.feedback.loaded'));
     };
@@ -938,6 +932,8 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         setTimeout(() => setCopied(null), 2000);
     };
 
+    const hasElementFocus = !!selectedNode || !!currentElement.id;
+
     return (
         <div ref={setContainerRef} className="flex-1 min-h-[700px] flex flex-col space-y-4">
             {!selectedDevice ? (
@@ -1080,9 +1076,18 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                         </div>
 
                         {/* Properties Panel */}
-                        <div className="bg-surface border border-outline-variant/30 rounded-2xl flex flex-col overflow-hidden shadow-sm flex-1">
-                            {/* Screen Settings */}
-                            <div className="p-4 border-t border-outline-variant/30 bg-surface/50 space-y-3">
+                        <div className="bg-surface border border-outline-variant/30 rounded-2xl flex flex-col overflow-hidden shadow-sm flex-1 relative">
+                            {isSaving && (
+                                <div className="absolute top-2 right-2 flex items-center gap-1.5 text-[10px] text-on-surface-variant/50 font-medium px-2 py-1 bg-surface rounded-full shadow-sm border border-outline-variant/20 z-10">
+                                    <ExpressiveLoading size="xsm" variant="circular" />
+                                    {t('mapper.status.saving', 'Saving...')}
+                                </div>
+                            )}
+
+                            {!hasElementFocus ? (
+                                <div className="flex-1 flex flex-col overflow-hidden">
+                                    {/* Screen Settings */}
+                                    <div className="p-4 border-t border-outline-variant/30 bg-surface/50 space-y-3">
                                 <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-start">
                                     <Combobox
                                         label={t('mapper.screen_name')}
@@ -1136,9 +1141,6 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                     />
                                 </div>
                                 <div className="flex gap-2">
-                                    <Button onClick={() => { handleSaveScreen(); refreshAll(); }} variant="primary" className="hover:bg-secondary-container">
-                                        <Save size={16} className="mr-2" /> {t('mapper.action.save_screen')}
-                                    </Button>
                                     <Button
                                         variant="outline"
                                         onClick={() => {
@@ -1423,16 +1425,21 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                 </div>
                                             </div>
                                         )}
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <Button onClick={saveElementMapping} variant="primary" size="sm" className="hover:bg-secondary-container">
-                                            <FileInput size={16} className="mr-2" />
-                                            {mappedElements.find(e => e.id === currentElement.id) ? t('mapper.action.update') : t('mapper.action.add')}
-                                        </Button>
-                                    </div>
                                 </div>
                             </div>
-                            <div className="flex items-center justify-between border-b border-outline-variant/30 shrink-0 bg-surface/50 pr-2">
+                        </div>
+                        </div>
+                    ) : (
+                        <div className="flex-1 flex flex-col overflow-hidden">
+                            <div className="flex items-center justify-between border-b border-outline-variant/30 shrink-0 bg-surface/50 px-2 py-1.5">
+                                <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    onClick={() => { setSelectedNode(null); setCurrentElement({}); }} 
+                                    className="text-on-surface-variant/80 hover:text-on-surface/90 gap-1.5 px-2"
+                                >
+                                    <ArrowLeft size={16} /> {t('mapper.action.back_to_screen', 'Back to Screen')}
+                                </Button>
                                 {availableNodes.length > 1 ? (
                                     <div className="flex overflow-x-auto custom-scrollbar flex-1">
                                         {availableNodes.map((node) => (
@@ -1603,6 +1610,8 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                     )}
                                 </div>
                             </div>
+                        </div>
+                    )}
                         </div>
                     </div>
                 </>

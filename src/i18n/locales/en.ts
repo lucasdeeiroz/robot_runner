@@ -738,7 +738,9 @@ export const en = {
                 tap: "Tap Mode",
                 swipe: "Swipe Mode"
             },
+
             status: {
+                saving: "Saving...",
                 fetching: "Fetching device state...",
                 ready: "Ready",
                 loading: "Loading...",
@@ -782,6 +784,7 @@ export const en = {
                 screen_description: "Description for AI context..."
             },
             action: {
+                back_to_screen: "Back to Screen",
                 add: "Add Element",
                 update: "Update Element",
                 remove: "Remove Element",

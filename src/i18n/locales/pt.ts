@@ -739,7 +739,9 @@ export const pt = {
                 tap: "Modo Toque",
                 swipe: "Modo Deslize"
             },
+
             status: {
+                saving: "Salvando...",
                 fetching: "Buscando estado do dispositivo...",
                 ready: "Pronto",
                 loading: "Carregando...",
@@ -781,6 +783,7 @@ export const pt = {
                 element_description: "Descrição do elemento (Apenas IA)"
             },
             action: {
+                back_to_screen: "Voltar para Tela",
                 add: "Adicionar Elemento",
                 update: "Atualizar Elemento",
                 remove: "Remover Elemento",

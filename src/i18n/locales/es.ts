@@ -745,7 +745,9 @@ export const es = {
                 tap: "Modo Toque",
                 swipe: "Modo Deslizar"
             },
+
             status: {
+                saving: "Guardando...",
                 fetching: "Obteniendo estado del dispositivo...",
                 ready: "Listo",
                 loading: "Cargando...",
@@ -787,6 +789,7 @@ export const es = {
                 element_description: "Descripción del elemento (Solo IA)"
             },
             action: {
+                back_to_screen: "Volver a la Pantalla",
                 add: "Añadir Elemento",
                 update: "Actualizar Elemento",
                 remove: "Eliminar Elemento",
