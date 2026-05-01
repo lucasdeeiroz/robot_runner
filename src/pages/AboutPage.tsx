@@ -1,4 +1,4 @@
-import { Github, Bot, RefreshCcw, Cpu, Users, Info, User } from "lucide-react";
+import { Scale, GitBranch, Bot, RefreshCcw, Cpu, Users, Info, User } from "lucide-react";
 import { PageHeader } from "@/components/organisms/PageHeader";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
@@ -129,7 +129,7 @@ export function AboutPage({ onNavigate: _onNavigate }: AboutPageProps) {
                         {/* Legal & License (Now Right/Top) */}
                         <Section
                             title={t('about.legal_title')}
-                            icon={Github}
+                            icon={Scale}
                         >
                             <div className="space-y-4">
                                 <div className="p-4 bg-surface/50 rounded-2xl border border-outline-variant/30">
@@ -162,7 +162,7 @@ export function AboutPage({ onNavigate: _onNavigate }: AboutPageProps) {
 
                             <div className="flex justify-center pt-6 text-on-surface-variant/80 text-sm gap-6 mt-auto">
                                 <a href="https://github.com/lucasdeeiroz/robot_runner" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors flex items-center gap-2">
-                                    <Github size={16} /> {t('about.github_repo')}
+                                    <GitBranch size={16} /> {t('about.github_repo')}
                                 </a>
                             </div>
                         </Section>
@@ -196,7 +196,31 @@ export function AboutPage({ onNavigate: _onNavigate }: AboutPageProps) {
                                         </div>
                                     }
                                 >
-                                    {t('about.collaborator')}
+                                    {t('about.dev_collaborator')}
+                                </InfoCard>
+                                <InfoCard
+                                    title="Sarah Shelly Da Silva Farias"
+                                    href="https://github.com/sarahssf"
+                                    headerRight={<span>↗</span>}
+                                    icon={
+                                        <div className="w-12 h-12 bg-surface-variant/30 rounded-2xl flex items-center justify-center text-on-surface-variant/80">
+                                            <User size={24} />
+                                        </div>
+                                    }
+                                >
+                                    {t('about.qa_collaborator')}
+                                </InfoCard>
+                                <InfoCard
+                                    title="Abel Freire de Andrade"
+                                    href="https://github.com/abelandrad"
+                                    headerRight={<span>↗</span>}
+                                    icon={
+                                        <div className="w-12 h-12 bg-surface-variant/30 rounded-2xl flex items-center justify-center text-on-surface-variant/80">
+                                            <User size={24} />
+                                        </div>
+                                    }
+                                >
+                                    {t('about.qa_collaborator')}
                                 </InfoCard>
                             </div>
                         </Section>
