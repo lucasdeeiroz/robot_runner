@@ -340,10 +340,17 @@ export function parseHeuristicLogs(
                     currentTest = null;
                     suiteStack.forEach(s => { if (s.status === 'RUNNING') s.status = finalStatus; });
                 }
-            } else if (activeSuite()) {
-                activeSuite()!.children.push({ type: 'text', content: node.content, id: nodeId });
             } else {
-                root.push({ type: 'text', content: node.content, id: nodeId });
+                const currentSuite = activeSuite();
+                if (currentSuite) {
+                    if (!IS_REDUNDANT_SYSTEM(node.content)) {
+                        currentSuite.children.push({ type: 'text', content: node.content, id: nodeId });
+                    }
+                } else {
+                    if (!IS_REDUNDANT_SYSTEM(node.content)) {
+                        root.push({ type: 'text', content: node.content, id: nodeId });
+                    }
+                }
             }
         }
     });
