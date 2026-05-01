@@ -4,6 +4,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { feedback } from "@/lib/feedback";
 import { useFileSave } from "./useFileSave";
 
+// Number of CSV lines to accumulate before flushing to disk during recording
+const FLUSH_THRESHOLD = 100;
+
 export interface AppStats {
     cpu_usage: number;
     ram_used: number;
@@ -109,17 +112,21 @@ export function usePerformanceRecorder(
 
 
     const recordedLinesRef = useRef<string[]>([]);
+    // Stores the path of the file being recorded to so periodic flushes can append to it
+    const recordingFilePathRef = useRef<string | null>(null);
+    // Tracks whether app-stat columns were included in the header (set at recording start)
+    const recordingHasAppColumnsRef = useRef<boolean>(false);
 
-    // Recording Logic - Accumulate Data
+    // Recording Logic - Accumulate Data and flush periodically to keep memory bounded
     useEffect(() => {
-        if (isRecording && stats) {
+        if (isRecording && stats && recordingFilePathRef.current) {
             let line = `${new Date().toISOString()},${stats.cpu_usage.toFixed(2)},${stats.ram_used},${stats.battery_level},${stats.temperature.toFixed(1)}`;
 
-            // Add App stats if present
+            // Add App stats if present, or empty placeholders to maintain column alignment
             if (stats.app_stats) {
                 line += `,${stats.app_stats.cpu_usage.toFixed(2)},${stats.app_stats.ram_used},${stats.app_stats.fps}`;
-            } else {
-                line += ""; // Empty placeholders
+            } else if (recordingHasAppColumnsRef.current) {
+                line += ",,,"; // Maintain column count when app stats are temporarily unavailable
             }
 
             // Add Foreground Activity
@@ -128,36 +135,65 @@ export function usePerformanceRecorder(
             line += "\n";
 
             recordedLinesRef.current.push(line);
+
+            // Flush to disk when threshold is reached to keep memory bounded
+            if (recordedLinesRef.current.length >= FLUSH_THRESHOLD) {
+                const pathToFlush = recordingFilePathRef.current;
+                const linesToFlush = recordedLinesRef.current;
+                recordedLinesRef.current = [];
+                invoke('save_file', { path: pathToFlush, content: linesToFlush.join(""), append: true }).catch((e: unknown) => {
+                    // Restore lines to the front of the buffer so they are not lost on flush failure
+                    recordedLinesRef.current = [...linesToFlush, ...recordedLinesRef.current];
+                    console.error("Failed to flush recording data to disk:", e);
+                });
+            }
         }
     }, [stats, isRecording]);
 
     const toggleRecording = async () => {
         if (isRecording) {
-            // Stop Recording: Prompt for save and write all accumulated data
+            // Stop Recording: Flush any remaining buffered lines then report success
             setIsRecording(false);
 
-            const content = recordedLinesRef.current.join("");
+            const filePath = recordingFilePathRef.current;
+            const remainingLines = recordedLinesRef.current;
+            recordedLinesRef.current = [];
+            recordingFilePathRef.current = null;
+            recordingHasAppColumnsRef.current = false;
+
+            if (filePath && remainingLines.length > 0) {
+                try {
+                    await invoke('save_file', { path: filePath, content: remainingLines.join(""), append: true });
+                } catch (e) {
+                    feedback.toast.error("performance.save_error", e);
+                }
+            }
+
+            if (filePath) {
+                feedback.toast.success('feedback.saved');
+            }
+        } else {
+            // Start Recording: Prompt for file path, write header, then begin accumulating
+            const hasAppColumns = !!selectedPackage;
+            const header = "Timestamp,System_CPU_%,System_RAM_KB,Battery_%,Battery_Temp_C" +
+                (hasAppColumns ? ",App_CPU_%,App_RAM_KB,FPS" : "") + ",Foreground_Activity\n";
+
+            recordedLinesRef.current = [];
 
             try {
-                await saveFile(async (filePath) => {
-                    await invoke('save_file', { path: filePath, content: content, append: false });
-                }, 'feedback.saved');
+                const savedPath = await saveFile(async (filePath) => {
+                    await invoke('save_file', { path: filePath, content: header, append: false });
+                }, 'performance.recording_started');
+
+                if (savedPath) {
+                    recordingFilePathRef.current = savedPath;
+                    recordingHasAppColumnsRef.current = hasAppColumns;
+                    setIsRecording(true);
+                }
+                // If savedPath is null the user cancelled the dialog — do not start recording
             } catch (e) {
                 feedback.toast.error("performance.save_error", e);
             }
-
-            // Clear memory
-            recordedLinesRef.current = [];
-        } else {
-            // Start Recording: Initialize memory array
-            const header = "Timestamp,System_CPU_%,System_RAM_KB,Battery_%,Battery_Temp_C" +
-                (selectedPackage ? ",App_CPU_%,App_RAM_KB,FPS" : "") + ",Foreground_Activity\n";
-
-            recordedLinesRef.current = [header];
-            setIsRecording(true);
-
-            // Optional: Provide visual feedback that recording started (without file dialog)
-            feedback.toast.info("performance.recording_started");
         }
     };
 
