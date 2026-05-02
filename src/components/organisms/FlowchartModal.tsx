@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { exportMapperData, importMapperData } from '@/lib/dashboard/mapperPersistence';
 import { feedback } from '@/lib/feedback';
 import { save, open } from '@tauri-apps/plugin-dialog';
-import { toPng } from 'html-to-image';
+// import { toPng } from 'html-to-image'; // Removed in favor of dynamic toBlob
 import { useSettings } from '@/lib/settings';
 
 // Hooks
@@ -23,8 +23,8 @@ import { FlowNode } from './flowchart/FlowNode';
 import { FlowEdgeLine, FlowEdgeControls } from './flowchart/FlowEdge';
 import { FlowPort } from './flowchart/FlowPort';
 
-import { 
-    NODE_PORTS 
+import {
+    NODE_PORTS
 } from './flowchart/types';
 
 interface FlowchartModalProps {
@@ -45,6 +45,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
     const [showUnsavedChangesModal, setShowUnsavedChangesModal] = useState(false);
     const [isQuickConnectOpen, setIsQuickConnectOpen] = useState(false);
     const [quickConnectData, setQuickConnectData] = useState<{ sourceNodeId: string; sourcePortId: string } | null>(null);
+    const [isExporting, setIsExporting] = useState(false);
 
     const [isSpacePressed, setIsSpacePressed] = useState(false);
     useEffect(() => {
@@ -60,16 +61,16 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
 
     const view = useFlowchartView(containerRef);
     const layoutHook = useFlowchartLayout({ maps, activeProfileId, onRefresh, settings });
-    const { 
-        layout, setLayout, isDirty, setIsDirty, 
-        isReorganizing, missedScreens, allTags, gridBounds, 
-        saveLayout, autoReorganizeLayout, handleClearAllCurvatures 
+    const {
+        layout, setLayout, isDirty, setIsDirty,
+        isReorganizing, missedScreens, allTags, gridBounds,
+        saveLayout, autoReorganizeLayout, handleClearAllCurvatures
     } = layoutHook;
 
     const interaction = useFlowchartInteraction({
         layout, setLayout, viewTransform: view.viewTransform,
         setOffset: view.setOffset, performZoom: view.performZoom,
-        setIsDirty, containerRef, 
+        setIsDirty, containerRef,
         getPixelCoords: view.getPixelCoords, getPortCoords: view.getPortCoords,
         snapToLanes: view.snapToLanes, getClosestLane: view.getClosestLane
     });
@@ -107,14 +108,46 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
     };
 
     const handleExportImage = async () => {
-        if (!contentRef.current) return;
-        try {
-            const dataUrl = await toPng(contentRef.current, { backgroundColor: '#ffffff', skipAutoScale: true });
-            const link = document.createElement('a');
-            link.download = `flowchart-${activeProfileId}.png`;
-            link.href = dataUrl;
-            link.click();
-        } catch (error) { feedback.toast.error(t('mapper.flowchart.export_image_error')); }
+        if (!contentRef.current || isExporting) return;
+
+        const { toBlob } = await import('html-to-image');
+        
+        setIsExporting(true);
+        feedback.toast.info(t('mapper.flowchart.exporting_image'));
+
+        // Use a small timeout to allow the toast and UI to update before heavy processing starts
+        setTimeout(async () => {
+            try {
+                // Use toBlob for better memory handling with large images
+                const blob = await toBlob(contentRef.current!, { 
+                    backgroundColor: settings.theme === 'dark' ? '#0f1115' : '#ffffff',
+                    pixelRatio: 2, // Higher quality
+                    skipAutoScale: false,
+                    style: {
+                        transform: 'none', // Reset transform for capture
+                        transformOrigin: '0 0'
+                    }
+                });
+
+                if (!blob) throw new Error("Failed to generate image blob");
+
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.download = `flowchart-${activeProfileId}-${new Date().getTime()}.png`;
+                link.href = url;
+                link.click();
+                
+                // Clean up the URL object after a short delay
+                setTimeout(() => URL.revokeObjectURL(url), 100);
+                
+                feedback.toast.success(t('mapper.flowchart.export_image_success'));
+            } catch (error) { 
+                console.error("Export Image Error:", error);
+                feedback.toast.error(t('mapper.flowchart.export_image_error')); 
+            } finally {
+                setIsExporting(false);
+            }
+        }, 150);
     };
 
     // viewportBounds logic removed as it was unused
@@ -263,9 +296,9 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
     return createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-surface w-[90vw] h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-outline-variant/30">
-                <FlowchartHeader 
+                <FlowchartHeader
                     missedScreensCount={missedScreens.length}
-                    isReorganizing={isReorganizing}
+                    isReorganizing={isReorganizing || isExporting}
                     onAutoReorganize={autoReorganizeLayout}
                     onImport={handleImport}
                     onExport={handleExport}
@@ -280,6 +313,18 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                     scale={view.scale}
                     onClose={handleClose}
                 />
+
+                {isExporting && (
+                    <div className="absolute inset-0 z-[10000] bg-black/20 backdrop-blur-[2px] flex items-center justify-center animate-in fade-in duration-300">
+                        <div className="bg-surface p-6 rounded-2xl shadow-xl border border-outline-variant/30 flex flex-col items-center gap-4">
+                            <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                            <div className="flex flex-col items-center gap-1">
+                                <span className="text-sm font-bold text-on-surface">{t('mapper.flowchart.exporting_image')}</span>
+                                <span className="text-[10px] text-on-surface-variant animate-pulse">{t('common.please_wait', 'Please wait...')}</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 <FlowchartCanvas
                     containerRef={containerRef}
@@ -302,26 +347,26 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
                     </FlowchartSVG>
                     <FlowchartSVG zIndex={50}>
                         {sortedEdgeLayouts.map(e => (
-                            <FlowEdgeControls 
-                                key={`${e.edgeId}-ctrl`} 
-                                edgeId={e.edgeId} 
-                                points={e.points} 
-                                startPoint={e.startPoint} 
-                                endPoint={e.endPoint} 
-                                elName={e.elName} 
-                                isVisible={matchesFilter(e.sourceName) && matchesFilter(e.targetName)} 
-                                isInteracting={interaction.state.type !== 'IDLE'} 
-                                hoveredEdge={interaction.hoveredEdge} 
+                            <FlowEdgeControls
+                                key={`${e.edgeId}-ctrl`}
+                                edgeId={e.edgeId}
+                                points={e.points}
+                                startPoint={e.startPoint}
+                                endPoint={e.endPoint}
+                                elName={e.elName}
+                                isVisible={matchesFilter(e.sourceName) && matchesFilter(e.targetName)}
+                                isInteracting={interaction.state.type !== 'IDLE'}
+                                hoveredEdge={interaction.hoveredEdge}
                                 isDraggingConnection={interaction.state.type === 'DRAGGING_CONNECTION' || interaction.state.type === 'DRAGGING_SOURCE' || interaction.state.type === 'DRAGGING_TARGET'}
-                                isDraggingEdge={interaction.state.type !== 'IDLE'} 
-                                isSpacePressed={isSpacePressed} 
-                                onMouseEnter={() => interaction.setHoveredEdge(e.edgeId)} 
-                                onMouseLeave={() => interaction.setHoveredEdge(null)} 
-                                onSegmentMouseDown={(idx) => interaction.dispatch({ type: 'START_SEGMENT_DRAG', id: e.edgeId, index: idx, points: e.points })} 
+                                isDraggingEdge={interaction.state.type !== 'IDLE'}
+                                isSpacePressed={isSpacePressed}
+                                onMouseEnter={() => interaction.setHoveredEdge(e.edgeId)}
+                                onMouseLeave={() => interaction.setHoveredEdge(null)}
+                                onSegmentMouseDown={(idx) => interaction.dispatch({ type: 'START_SEGMENT_DRAG', id: e.edgeId, index: idx, points: e.points })}
                                 onSegmentDoubleClick={(idx, ev) => interaction.handleSegmentDoubleClick(idx, ev, e.edgeId)}
-                                onSourceMouseDown={() => interaction.dispatch({ type: 'START_SOURCE_DRAG', id: e.edgeId })} 
-                                onTargetMouseDown={() => interaction.dispatch({ type: 'START_TARGET_DRAG', id: e.edgeId })} 
-                                onVertexMouseDown={(idx) => interaction.dispatch({ type: 'START_VERTEX_DRAG', id: e.edgeId, index: idx })} 
+                                onSourceMouseDown={() => interaction.dispatch({ type: 'START_SOURCE_DRAG', id: e.edgeId })}
+                                onTargetMouseDown={() => interaction.dispatch({ type: 'START_TARGET_DRAG', id: e.edgeId })}
+                                onVertexMouseDown={(idx) => interaction.dispatch({ type: 'START_VERTEX_DRAG', id: e.edgeId, index: idx })}
                                 onVertexDoubleClick={(idx) => interaction.handleVertexDoubleClick(idx, e.edgeId)}
                             />
                         ))}

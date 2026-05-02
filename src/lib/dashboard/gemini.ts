@@ -17,6 +17,7 @@ interface GeminiResponse {
 import { ScreenMap, UIElementMap } from '@/lib/types';
 import { DeepAnalysisContext } from "./historyAnalysisUtils";
 import { getExplorationPrompt, formatExistingMaps, getRefinedTestCasesPrompt, getRefinedPBIPrompt, getRefinedImprovementPrompt, getRefinedBugPrompt, getRefinedRobotScriptPrompt, getFlowchartLayoutPrompt, getElementNamingPrompt, getScreenTaggingPrompt, getTestHistoryAnalysisPrompt, getExecutionSummaryPrompt, getQAAssistantWrapper } from "./prompts";
+import { fetch } from '@tauri-apps/plugin-http';
 
 export type AIGenerationType = 'test_case' | 'pbi' | 'improvement' | 'bug' | 'element_name' | 'robot_script' | 'exploration';
 
@@ -555,16 +556,13 @@ export async function exploreScreen(
     const systemInstruction = getExplorationPrompt(language, customPrompt);
 
     const actionLogs = sessionHistory.filter(log =>
-        log.includes("--- Step") ||
-        log.includes("Clicking element:") ||
-        log.includes("Swiping") ||
-        log.includes("Navigating back") ||
-        log.includes("AI mapped:") ||
-        log.includes("Typing text on:") ||
-        log.includes("Loop detected") ||
-        log.includes("Exploration stopped") ||
-        log.includes("App exit detected") ||
-        log.includes("Exploration finished")
+        log.includes("---") ||
+        log.includes("ACTION:") ||
+        log.includes("AI:") ||
+        log.includes("RATIONALE:") ||
+        log.includes("ERROR:") ||
+        log.includes("WARNING:") ||
+        log.includes("FINISHED:")
     );
 
     const prompt = `
@@ -572,7 +570,7 @@ EXISTING MAPS (Mapped screens so far):
 ${formatExistingMaps(existingMaps)}
 
 SESSION HISTORY (Action logs):
-${actionLogs.slice(-50).join('\n')}
+${actionLogs.slice(-30).join('\n')}
 
 XML DUMP:
 ${xmlDump.substring(0, 15000)}
@@ -633,35 +631,45 @@ export async function reorganizeFlowchartLayout(
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     try {
+        console.log("[Gemini] Reorganizing flowchart layout with model:", model);
+        const requestBody = JSON.stringify({
+            contents: [{
+                role: 'user',
+                parts: [{ text: `Current Application Mapping:\n${mappingContext}` }]
+            }],
+            system_instruction: {
+                parts: [{ text: systemInstruction }]
+            },
+            generationConfig: {
+                temperature: 0.1,
+                responseMimeType: "application/json",
+                maxOutputTokens: 8192
+            }
+        });
+
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             signal,
-            body: JSON.stringify({
-                contents: [{
-                    role: 'user',
-                    parts: [{ text: `Current Application Mapping:\n${mappingContext}` }]
-                }],
-                system_instruction: {
-                    parts: [{ text: systemInstruction }]
-                },
-                generationConfig: {
-                    temperature: 0.1,
-                    responseMimeType: "application/json",
-                    maxOutputTokens: 8192
-                }
-            })
+            body: requestBody
         });
 
         if (!response.ok) {
             const errData = await response.json().catch(() => ({}));
+            console.error("[Gemini] API Error Response:", errData);
             throw new Error(errData.error?.message || `API Error: ${response.statusText}`);
         }
 
         const resData = await response.json();
-        const resText = resData.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!resText) throw new Error("Empty response from Gemini");
+        console.log("[Gemini] Raw Response Data:", resData);
 
+        const resText = resData.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!resText) {
+            console.error("[Gemini] Empty or invalid response structure:", resData);
+            throw new Error("Empty response from Gemini");
+        }
+
+        console.log("[Gemini] Extracted response text:", resText);
         return safeParseJson(resText);
     } catch (error: any) {
         console.error("Gemini reorganizeFlowchartLayout Error:", error);

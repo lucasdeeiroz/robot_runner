@@ -113,6 +113,9 @@
         },
         {
           "url": "https://api.anthropic.com/**"
+        },
+        {
+          "url": "https://generativelanguage.googleapis.com/**"
         }
       ]
     },

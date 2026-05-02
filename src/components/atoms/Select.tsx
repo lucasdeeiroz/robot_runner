@@ -51,6 +51,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(({
                         "focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/80",
                         "disabled:cursor-not-allowed disabled:opacity-50",
                         "transition-all duration-200",
+                        "dark:[color-scheme:dark]",
                         leftIcon && "pl-9",
                         error && "border-error focus:border-error focus:ring-error/20",
                         className
@@ -58,7 +59,11 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(({
                     {...props}
                 >
                     {options.map((option) => (
-                        <option key={option.value} value={option.value}>
+                        <option 
+                            key={option.value} 
+                            value={option.value} 
+                            className="bg-surface text-on-surface dark:bg-[#1C1B1F] dark:text-[#E6E1E5]"
+                        >
                             {option.label}
                         </option>
                     ))}
