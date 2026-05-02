@@ -1037,6 +1037,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                                         type="button"
                                                         className="w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0" 
                                                         onMouseDown={() => { updateSetting('openaiModel', model); setShowModelList(false); }}
+                                                        onClick={() => { updateSetting('openaiModel', model); setShowModelList(false); }}
                                                     >
                                                         {model}
                                                     </button>
