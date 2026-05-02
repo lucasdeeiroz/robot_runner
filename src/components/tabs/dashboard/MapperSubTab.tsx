@@ -33,6 +33,7 @@ import { AiResponse } from "@/components/molecules/AiResponse";
 import * as gemini from '@/lib/dashboard/gemini';
 import * as claude from '@/lib/dashboard/claude';
 import * as openai from '@/lib/dashboard/openai';
+import * as claudeCli from '@/lib/dashboard/claudeCode';
 import { AutonomousExplorer, LogEntry, ExplorationAction } from '@/lib/dashboard/explorationEngine';
 import { getAiContext } from '@/lib/dashboard/historyAnalysisUtils';
 import { ExplorationLogTree } from '@/components/molecules/ExplorationLogTree';
@@ -102,8 +103,9 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         if (provider === 'gemini') return !!settings.geminiApiKey;
         if (provider === 'claude') return !!settings.claudeApiKey;
         if (provider === 'openai') return !!settings.openaiApiKey;
+        if (provider === 'claude-code') return true; // Always allow, as CLI may be pre-authenticated
         return false;
-    }, [settings.aiProvider, settings.geminiApiKey, settings.claudeApiKey, settings.openaiApiKey]);
+    }, [settings.aiProvider, settings.geminiApiKey, settings.claudeApiKey, settings.openaiApiKey, settings.claudeCodeToken]);
     const [isStayOn, setIsStayOn] = useState(false);
     const [isExploring, setIsExploring] = useState(false);
     const isExploringRef = useRef(false);
@@ -298,7 +300,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         return () => {
             if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
         };
-    }, [screenName, screenType, screenDescription, screenTags, mappedElements, screenshot, activeProfileId, savedMaps]);
+    }, [screenName, screenType, screenDescription, screenTags, mappedElements, screenshot, activeProfileId]);
 
 
     const handleLoadScreen = (map: ScreenMap) => {
@@ -383,7 +385,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         const apiKey = aiProvider === 'gemini' ? geminiApiKey : aiProvider === 'claude' ? claudeApiKey : openaiApiKey;
         const model = aiProvider === 'gemini' ? geminiModel : aiProvider === 'claude' ? claudeModel : openaiModel;
 
-        if (!apiKey) {
+        if (!apiKey && aiProvider !== 'claude-code') {
             feedback.toast.error(t('dashboard.generator.key_required', { provider: aiProvider.toUpperCase() }));
             return;
         }
@@ -424,11 +426,13 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             console.log(`[AI Debug] Prompt Context Size: ~${JSON.stringify(criticalAttrs).length + JSON.stringify(optimizedMaps).length} chars`);
 
             if (aiProvider === 'gemini') {
-                result = await gemini.suggestElementName(criticalAttrs as any, screenName, apiKey, model, lang, optimizedMaps as any, undefined, customPrompt);
+                result = await gemini.suggestElementName(criticalAttrs as any, screenName, apiKey!, model, lang, optimizedMaps as any, undefined, customPrompt);
             } else if (aiProvider === 'openai') {
-                result = await openai.suggestElementName(criticalAttrs as any, screenName, apiKey, model, lang, optimizedMaps as any, undefined, customPrompt);
+                result = await openai.suggestElementName(criticalAttrs as any, screenName, apiKey!, model, lang, optimizedMaps as any, undefined, customPrompt);
             } else if (aiProvider === 'claude') {
-                result = await claude.suggestElementName(criticalAttrs as any, screenName, apiKey, model, lang, optimizedMaps as any, undefined, customPrompt);
+                result = await claude.suggestElementName(criticalAttrs as any, screenName, apiKey!, model, lang, optimizedMaps as any, undefined, customPrompt);
+            } else if (aiProvider === 'claude-code') {
+                result = await claudeCli.suggestElementName(criticalAttrs as any, screenName, settings.paths.automationRoot || '', lang, optimizedMaps as any, undefined, customPrompt, settings.claudeCodeToken);
             }
 
             if (result && result.name) {
@@ -436,7 +440,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 setAiJustification(result.justification);
                 feedback.toast.success(t('mapper.feedback.ai_success'));
             } else {
-                throw new Error("Empty suggestion");
+                throw new Error("Empty suggestion or invalid format returned by AI");
             }
         } catch (error: any) {
             console.error("AI Suggestion Error:", error);
@@ -455,7 +459,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         const apiKey = aiProvider === 'gemini' ? geminiApiKey : aiProvider === 'claude' ? claudeApiKey : openaiApiKey;
         const model = aiProvider === 'gemini' ? geminiModel : aiProvider === 'claude' ? claudeModel : openaiModel;
 
-        if (!apiKey) {
+        if (!apiKey && aiProvider !== 'claude-code') {
             feedback.toast.error(t('dashboard.generator.key_required', { provider: aiProvider.toUpperCase() }));
             return;
         }
@@ -469,17 +473,28 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             const elementsContext = mappedElements.map(el => ({ name: el.name, type: el.type }));
 
             if (aiProvider === 'gemini') {
-                tags = await gemini.suggestScreenTags(screenName || "Current Screen", elementsContext, apiKey, model, lang, screenshot || undefined, undefined, customPrompt);
+                tags = await gemini.suggestScreenTags(screenName || "Current Screen", elementsContext, apiKey!, model, lang, screenshot || undefined, undefined, customPrompt);
             } else if (aiProvider === 'openai') {
-                tags = await openai.suggestScreenTags(screenName || "Current Screen", elementsContext, apiKey, model, lang, screenshot || undefined, undefined, customPrompt);
+                tags = await openai.suggestScreenTags(screenName || "Current Screen", elementsContext, apiKey!, model, lang, screenshot || undefined, undefined, customPrompt);
             } else if (aiProvider === 'claude') {
-                tags = await claude.suggestScreenTags(screenName || "Current Screen", elementsContext, apiKey, model, lang, screenshot || undefined, undefined, customPrompt);
+                tags = await claude.suggestScreenTags(screenName || "Current Screen", elementsContext, apiKey!, model, lang, screenshot || undefined, undefined, customPrompt);
+            } else if (aiProvider === 'claude-code') {
+                tags = await claudeCli.suggestScreenTags(screenName || "Current Screen", elementsContext, settings.paths.automationRoot || '', lang, undefined, undefined, customPrompt, settings.claudeCodeToken);
             }
 
-            if (tags && tags.length > 0) {
-                // Merge with existing tags, ensuring uniqueness
-                setScreenTags(prev => [...new Set([...prev, ...tags])]);
-                feedback.toast.success(t('mapper.feedback.ai_success'));
+            if (tags && Array.isArray(tags) && tags.length > 0) {
+                // Merge with existing tags, ensuring uniqueness and checking if anything changed
+                const existingTagsSet = new Set(screenTags);
+                const trulyNewTags = tags.filter(tag => tag && !existingTagsSet.has(tag));
+                
+                if (trulyNewTags.length > 0) {
+                    setScreenTags(prev => [...new Set([...prev, ...trulyNewTags])]);
+                    feedback.toast.success(t('mapper.feedback.ai_success'));
+                } else {
+                    feedback.toast.info(t('mapper.feedback.ai_no_new_tags', 'No new tags found'));
+                }
+            } else if (tags && Array.isArray(tags)) {
+                feedback.toast.info(t('mapper.feedback.ai_no_tags', 'No tags suggested for this screen'));
             }
         } catch (error) {
             console.error("AI Tag Suggestion Error:", error);
@@ -571,11 +586,11 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
             // 2. AI Analysis
             const { aiProvider, geminiApiKey, claudeApiKey, openaiApiKey, geminiModel, claudeModel, openaiModel, language } = settings;
-            const apiKey = aiProvider === 'gemini' ? geminiApiKey : aiProvider === 'claude' ? claudeApiKey : openaiApiKey;
-            const model = aiProvider === 'gemini' ? geminiModel : aiProvider === 'claude' ? claudeModel : openaiModel;
+            const apiKey = aiProvider === 'gemini' ? geminiApiKey : aiProvider === 'claude' ? claudeApiKey : aiProvider === 'openai' ? openaiApiKey : 'CLI';
+            const model = aiProvider === 'gemini' ? geminiModel : aiProvider === 'claude' ? claudeModel : aiProvider === 'openai' ? openaiModel : 'claude-code';
             const lang = language || i18n.language || 'en';
 
-            if (!apiKey) throw new Error("API Key missing");
+            if (!apiKey && aiProvider !== 'claude-code') throw new Error("API Key missing");
 
             explorer.addLog(t('mapper.exploration.analyzing_screen', { provider: aiProvider }), 'ai');
             setExplorationLogs([...explorer.getLogs()]);
@@ -590,11 +605,13 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 try {
                     const customPrompt = explorationPromptRef.current;
                     if (aiProvider === 'gemini') {
-                        result = await gemini.exploreScreen(simplifiedXml, screenshot || "", apiKey, model, lang, maps, explorer.getFormattedLogs(), undefined, customPrompt);
+                        result = await gemini.exploreScreen(simplifiedXml, screenshot || "", apiKey as string, model, lang, maps, explorer.getFormattedLogs(), undefined, customPrompt);
                     } else if (aiProvider === 'openai') {
-                        result = await openai.exploreScreen(simplifiedXml, screenshot || "", apiKey, model, lang, maps, explorer.getFormattedLogs(), undefined, customPrompt);
+                        result = await openai.exploreScreen(simplifiedXml, screenshot || "", apiKey as string, model, lang, maps, explorer.getFormattedLogs(), undefined, customPrompt);
                     } else if (aiProvider === 'claude') {
-                        result = await claude.exploreScreen(simplifiedXml, screenshot || "", apiKey, model, lang, maps, explorer.getFormattedLogs(), undefined, customPrompt);
+                        result = await claude.exploreScreen(simplifiedXml, screenshot || "", apiKey as string, model, lang, maps, explorer.getFormattedLogs(), undefined, customPrompt);
+                    } else if (aiProvider === 'claude-code') {
+                        result = await claudeCli.exploreScreen(simplifiedXml, settings.paths.automationRoot || '', lang, maps, explorer.getFormattedLogs(), customPrompt, settings.claudeCodeToken);
                     }
                     break; // Success
                 } catch (parseError: any) {

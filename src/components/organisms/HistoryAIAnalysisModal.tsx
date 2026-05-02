@@ -9,6 +9,7 @@ import { getAiContext } from '@/lib/dashboard/historyAnalysisUtils';
 import { analyzeTestHistory as analyzeGemini } from '@/lib/dashboard/gemini';
 import { analyzeTestHistory as analyzeOpenAI } from '@/lib/dashboard/openai';
 import { analyzeTestHistory as analyzeClaude } from '@/lib/dashboard/claude';
+import { analyzeTestHistory as analyzeClaudeCode } from '@/lib/dashboard/claudeCode';
 import { load } from '@tauri-apps/plugin-store';
 import { BrainCircuit, Info, Sparkles, History as HistoryIcon } from 'lucide-react';
 
@@ -107,7 +108,7 @@ const HistoryAIAnalysisModal: React.FC<HistoryAIAnalysisModalProps> = ({
                     ? settings.claudeApiKey
                     : settings.openaiApiKey;
 
-            if (!apiKey) {
+            if (!apiKey && provider !== 'claude-code') {
                 throw new Error(t('dashboard.generator.key_required', { provider: provider.charAt(0).toUpperCase() + provider.slice(1) }));
             }
 
@@ -139,11 +140,13 @@ const HistoryAIAnalysisModal: React.FC<HistoryAIAnalysisModalProps> = ({
             let result = "";
 
             if (provider === 'gemini') {
-                result = await analyzeGemini(historyData, apiKey, model, lang, deepContext, controller.signal, customPrompt);
+                result = await analyzeGemini(historyData, apiKey!, model, lang, deepContext, controller.signal, customPrompt);
             } else if (provider === 'openai') {
-                result = await analyzeOpenAI(historyData, apiKey, model, lang, deepContext, controller.signal, customPrompt);
+                result = await analyzeOpenAI(historyData, apiKey!, model, lang, deepContext, controller.signal, customPrompt);
             } else if (provider === 'claude') {
-                result = await analyzeClaude(historyData, apiKey, model, lang, deepContext, controller.signal, customPrompt);
+                result = await analyzeClaude(historyData, apiKey!, model, lang, deepContext, controller.signal, customPrompt);
+            } else if (provider === 'claude-code') {
+                result = await analyzeClaudeCode(historyData, settings.paths.automationRoot || '', lang, deepContext, controller.signal, customPrompt, settings.claudeCodeToken);
             }
 
             if (!controller.signal.aborted) {

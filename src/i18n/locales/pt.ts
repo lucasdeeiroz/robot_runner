@@ -1097,8 +1097,15 @@ export const pt = {
                 },
                 openai: {
                     title: "OpenAI ChatGPT",
-                    placeholder: "Digite a Chave de API da OpenAI",
-                    help: "Obtenha sua Chave de API na"
+                    placeholder: "Insira a API Key da OpenAI",
+                    help: "Obtenha sua API Key em"
+                },
+                claude_code: {
+                    title: "Claude Code (CLI)",
+                    help: "Este provedor utiliza o comando local 'claude'. Nenhuma API Key é necessária, pois utiliza a autenticação do sistema (planos Team/Enterprise).",
+                    check_install: "Verificar Instalação",
+                    installed: "Claude CLI detectado! Versão: {{version}}",
+                    not_installed: "Claude CLI não encontrado. Instale via 'npm install -g @anthropic-ai/claude-code'."
                 },
                 max_exploration_steps: "Limite de Passos de Exploração",
                 max_exploration_steps_help: "Número máximo de ações autônomas que a IA realizará antes de interromper a exploração."

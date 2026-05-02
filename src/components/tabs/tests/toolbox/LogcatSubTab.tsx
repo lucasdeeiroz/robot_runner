@@ -17,6 +17,7 @@ import { AiResponse } from "@/components/molecules/AiResponse";
 import * as gemini from "@/lib/dashboard/gemini";
 import * as claude from "@/lib/dashboard/claude";
 import * as openai from "@/lib/dashboard/openai";
+import * as claudeCli from "@/lib/dashboard/claudeCode";
 import { Sparkles } from "lucide-react";
 interface LogcatSubTabProps {
     selectedDevice: string;
@@ -264,6 +265,8 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
                 result = await claude.askClaude(prompt, settings.claudeApiKey || '', settings.claudeModel, systemInstruction);
             } else if (provider === 'openai') {
                 result = await openai.askOpenAI(prompt, settings.openaiApiKey || '', settings.openaiModel, systemInstruction);
+            } else if (provider === 'claude-code') {
+                result = await claudeCli.askClaudeCode(prompt, settings.paths.automationRoot || '', systemInstruction, settings.claudeCodeToken);
             } else {
                 throw new Error("No AI provider configured");
             }

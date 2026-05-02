@@ -62,6 +62,10 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
 
     const [isRestartingADB, setIsRestartingADB] = useState(false);
 
+    const claudeCodeVersion = systemVersions?.claude_code;
+    const isClaudeCodeInstalled = !!claudeCodeVersion && claudeCodeVersion !== 'Not Found';
+
+
     const handleRestartADB = async () => {
         try {
             setIsRestartingADB(true);
@@ -864,7 +868,8 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                     options={[
                                         { value: 'gemini', label: t('settings.ai.gemini.title') },
                                         { value: 'claude', label: t('settings.ai.claude.title') },
-                                        { value: 'openai', label: t('settings.ai.openai.title') }
+                                        { value: 'openai', label: t('settings.ai.openai.title') },
+                                        { value: 'claude-code', label: t('settings.ai.claude_code.title') }
                                     ]}
                                 />
                             </div>
@@ -1050,6 +1055,60 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                             )}
                                         </div>
                                     )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Claude Code CLI Config */}
+                        {settings.aiProvider === 'claude-code' && (
+                            <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
+                                <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 space-y-3">
+                                    <div className="flex items-start gap-3">
+                                        <div className="mt-0.5 p-2 rounded-xl bg-primary/10 text-primary">
+                                            <Terminal size={18} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="text-sm font-medium text-on-surface">
+                                                {t('settings.ai.claude_code.title')}
+                                            </p>
+                                            <p className="text-xs text-on-surface-variant leading-relaxed">
+                                                {t('settings.ai.claude_code.help')}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="pt-2 flex items-center justify-between gap-4">
+                                        <div className="flex items-center gap-2">
+                                            <div className={`w-2 h-2 rounded-full ${isClaudeCodeInstalled ? 'bg-success' : 'bg-error animate-pulse'}`} />
+                                            <span className="text-xs font-medium text-on-surface-variant">
+                                                {isClaudeCodeInstalled
+                                                    ? t('settings.ai.claude_code.installed', { version: claudeCodeVersion }) 
+                                                    : t('settings.ai.claude_code.not_installed')
+                                                }
+                                            </span>
+                                        </div>
+                                        <Button 
+                                            variant="secondary" 
+                                            size="sm" 
+                                            onClick={() => checkSystemVersions()}
+                                            className="h-8 px-3 text-[11px]"
+                                        >
+                                            {t('settings.ai.claude_code.check_install')}
+                                        </Button>
+                                    </div>
+
+                                    <div className="pt-2">
+                                        <Input
+                                            label="OAuth Token (Optional)"
+                                            type="password"
+                                            value={settings.claudeCodeToken || ''}
+                                            onChange={(e) => updateSetting('claudeCodeToken', e.target.value)}
+                                            placeholder="Paste token from 'claude setup-token'"
+                                        />
+                                        <p className="text-[10px] text-on-surface-variant/80 mt-1">
+                                            If your CLI reports "Not logged in", paste the token generated by running <code>claude setup-token</code> in your terminal.
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
                         )}

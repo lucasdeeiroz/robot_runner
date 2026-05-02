@@ -18,6 +18,7 @@ import { TestLog } from '@/lib/historyCache';
 import * as gemini from '@/lib/dashboard/gemini';
 import * as openai from '@/lib/dashboard/openai';
 import * as claude from '@/lib/dashboard/claude';
+import * as claudeCli from '@/lib/dashboard/claudeCode';
 import clsx from 'clsx';
 
 
@@ -201,7 +202,7 @@ export function HistoryDetailModal({ isOpen, onClose, log, onUpdateLog }: Histor
                 model = settings.geminiModel;
             }
 
-            if (!apiKey) {
+            if (!apiKey && provider !== 'claude-code') {
                 throw new Error("Missing API Key");
             }
 
@@ -219,11 +220,13 @@ export function HistoryDetailModal({ isOpen, onClose, log, onUpdateLog }: Histor
             }
 
             if (provider === 'openai') {
-                result = await openai.summarizeExecution(tree, apiKey, model, language, failureContext, undefined, customPrompt);
+                result = await openai.summarizeExecution(tree, apiKey!, model!, language, failureContext, undefined, customPrompt);
             } else if (provider === 'claude') {
-                result = await claude.summarizeExecution(tree, apiKey, model, language, failureContext, undefined, customPrompt);
+                result = await claude.summarizeExecution(tree, apiKey!, model!, language, failureContext, undefined, customPrompt);
+            } else if (provider === 'claude-code') {
+                result = await claudeCli.summarizeExecution(tree, settings.paths.automationRoot || '', language, failureContext?.map(f => f.message) || [], failureContext, customPrompt, settings.claudeCodeToken);
             } else {
-                result = await gemini.summarizeExecution(tree, apiKey, model, language, failureContext, undefined, customPrompt);
+                result = await gemini.summarizeExecution(tree, apiKey!, model!, language, failureContext, undefined, customPrompt);
             }
 
             setSummary(result);

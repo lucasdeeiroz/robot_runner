@@ -79,17 +79,33 @@ fn get_history_analysis_context(params: AiContextParams) -> Result<AiContextResp
                             }
                         }
                     }
-                    // CRITICAL: Strip base64 screenshot data which eats up megabytes in token limit
+                    // STRIP only if it looks like base64 data to save tokens, keep if it's a file path
                     if let Some(fail_detail) = obj.get_mut("failureDetail") {
                         if let Some(fd_obj) = fail_detail.as_object_mut() {
-                            fd_obj.remove("screenshotPath");
-                            fd_obj.remove("screenshot_path");
+                            if let Some(val) = fd_obj.get("screenshotPath").and_then(|v| v.as_str()) {
+                                if val.starts_with("data:") || val.len() > 1024 {
+                                    fd_obj.remove("screenshotPath");
+                                }
+                            }
+                            if let Some(val) = fd_obj.get("screenshot_path").and_then(|v| v.as_str()) {
+                                if val.starts_with("data:") || val.len() > 1024 {
+                                    fd_obj.remove("screenshot_path");
+                                }
+                            }
                         }
                     }
                     if let Some(fail_detail) = obj.get_mut("failure_detail") {
                         if let Some(fd_obj) = fail_detail.as_object_mut() {
-                            fd_obj.remove("screenshotPath");
-                            fd_obj.remove("screenshot_path");
+                            if let Some(val) = fd_obj.get("screenshotPath").and_then(|v| v.as_str()) {
+                                if val.starts_with("data:") || val.len() > 1024 {
+                                    fd_obj.remove("screenshotPath");
+                                }
+                            }
+                            if let Some(val) = fd_obj.get("screenshot_path").and_then(|v| v.as_str()) {
+                                if val.starts_with("data:") || val.len() > 1024 {
+                                    fd_obj.remove("screenshot_path");
+                                }
+                            }
                         }
                     }
                 }

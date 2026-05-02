@@ -1101,6 +1101,13 @@ export const en = {
                     placeholder: "Enter OpenAI API Key",
                     help: "Get your API Key at"
                 },
+                claude_code: {
+                    title: "Claude Code (CLI)",
+                    help: "This provider uses the local 'claude' command. No API Key is required as it uses your system's Claude authentication (Team/Enterprise plans).",
+                    check_install: "Check Installation",
+                    installed: "Claude CLI detected! Version: {{version}}",
+                    not_installed: "Claude CLI not found. Please install it using 'npm install -g @anthropic-ai/claude-code'."
+                },
                 max_exploration_steps: "Max Exploration Steps",
                 max_exploration_steps_help: "Maximum number of autonomous actions the AI will perform before stopping exploration."
             },

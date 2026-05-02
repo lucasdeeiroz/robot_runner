@@ -17,6 +17,7 @@ import { useSettings } from "@/lib/settings";
 import { askGemini } from "@/lib/dashboard/gemini";
 import { askClaude } from "@/lib/dashboard/claude";
 import { askOpenAI } from "@/lib/dashboard/openai";
+import { askClaudeCode } from "@/lib/dashboard/claudeCode";
 import { feedback } from "@/lib/feedback";
 import { AiButton } from "../atoms/AiButton";
 import { AiResponse } from "./AiResponse";
@@ -411,6 +412,11 @@ Error Message: ${(node as TestNode).failureDetail?.message}
                                                             result = await askClaude(prompt, settings.claudeApiKey || '', settings.claudeModel, systemInstruction, screenshot);
                                                         } else if (provider === 'openai') {
                                                             result = await askOpenAI(prompt, settings.openaiApiKey || '', settings.openaiModel, systemInstruction, screenshot);
+                                                        } else if (provider === 'claude-code') {
+                                                            const path = node.type === 'test' 
+                                                                ? (node as TestNode).failureDetail?.screenshotPath 
+                                                                : (node as any).screenshotPath;
+                                                            result = await askClaudeCode(prompt, settings.paths.automationRoot || '', systemInstruction, settings.claudeCodeToken, path);
                                                         } else {
                                                             throw new Error("No AI provider configured");
                                                         }

@@ -1,4 +1,5 @@
 mod adb;
+mod ai;
 mod auth;
 mod ai_context;
 mod appium;
