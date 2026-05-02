@@ -266,7 +266,8 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
             } else if (provider === 'openai') {
                 result = await openai.askOpenAI(prompt, settings.openaiApiKey || '', settings.openaiModel, systemInstruction);
             } else if (provider === 'claude-code') {
-                result = await claudeCli.askClaudeCode(prompt, settings.paths.automationRoot || '', systemInstruction, settings.claudeCodeToken);
+                const response = await claudeCli.askClaudeCode(prompt, settings.paths.automationRoot || '', systemInstruction, settings.claudeCodeToken);
+                result = typeof response === 'string' ? response : response.result;
             } else {
                 throw new Error("No AI provider configured");
             }
