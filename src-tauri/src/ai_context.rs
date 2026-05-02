@@ -168,9 +168,32 @@ fn get_history_analysis_context(params: AiContextParams) -> Result<AiContextResp
         }
     }
 
+    let first_screenshot = failures.iter().find_map(|f| {
+        let parsed: serde_json::Value = serde_json::from_str(f).ok()?;
+        // Check multiple possible keys for screenshot path
+        parsed.get("failureDetail")
+            .and_then(|fd| fd.get("screenshotPath"))
+            .and_then(|s| s.as_str())
+            .map(|s| s.to_string())
+            .or_else(|| {
+                parsed.get("failure_detail")
+                    .and_then(|fd| fd.get("screenshot_path"))
+                    .and_then(|s| s.as_str())
+                    .map(|s| s.to_string())
+            })
+            .or_else(|| {
+                parsed.get("screenshotPath")
+                    .and_then(|s| s.as_str())
+                    .map(|s| s.to_string())
+            })
+    });
+
     Ok(AiContextResponse {
         context,
-        metadata: serde_json::json!({ "failure_count": failures.len() }),
+        metadata: serde_json::json!({ 
+            "failure_count": failures.len(),
+            "first_screenshot": first_screenshot
+        }),
     })
 }
 

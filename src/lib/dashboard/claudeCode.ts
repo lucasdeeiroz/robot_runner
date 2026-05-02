@@ -42,54 +42,70 @@ function safeParseJson<T>(content: string): T {
     }
 }
 
+export interface ClaudeResponse {
+    result: string;
+    structured_output?: any;
+    session_id?: string;
+    usage?: any;
+}
+
 export async function askClaudeCode(
     prompt: string,
     projectRoot: string,
     systemInstruction?: string,
     token?: string,
-    screenshotPath?: string
-): Promise<string> {
-    const formatReminder = "\n\nIMPORTANT: Respond ONLY with the requested format. Do NOT include greetings, pleasantries, or introductory text.";
+    options?: {
+        allowedTools?: string[];
+        jsonSchema?: any;
+        resumeSessionId?: string;
+        imageBase64?: string;
+    }
+): Promise<string | ClaudeResponse> {
+    const formatReminder = options?.jsonSchema 
+        ? "" // No need for reminder if we have a schema
+        : "\n\nIMPORTANT: Respond ONLY with the requested format. Do NOT include greetings, pleasantries, or introductory text.";
 
     let fullPrompt = systemInstruction
         ? `SYSTEM_INSTRUCTIONS:\n${systemInstruction}${formatReminder}\n\nUSER_REQUEST:\n${prompt}`
         : prompt + formatReminder;
 
-    if (screenshotPath) {
-        fullPrompt += `\n\nNote: A screenshot is available at: ${screenshotPath}`;
-    }
-
     try {
-        const result = await invoke<string>('call_claude_code_cli', {
+        const rawResult = await invoke<string>('call_claude_code_cli', {
             prompt: fullPrompt,
             projectRoot,
             token,
-            screenshotPath
+            imageBase64: options?.imageBase64,
+            allowedTools: options?.allowedTools,
+            jsonSchema: options?.jsonSchema ? JSON.stringify(options.jsonSchema) : undefined,
+            resumeSessionId: options?.resumeSessionId
         });
 
-        if (!result) return "";
+        if (!rawResult) return "";
 
-        const parsed = safeParseJson<any>(result);
+        const parsed = safeParseJson<any>(rawResult);
         if (parsed && typeof parsed === 'object') {
-            // Priority 1: The "result" field from Claude Code CLI --output-format json
+            // If we used a schema, return the structured output
+            if (options?.jsonSchema && parsed.structured_output) {
+                return {
+                    result: parsed.result || "",
+                    structured_output: parsed.structured_output,
+                    session_id: parsed.session_id,
+                    usage: parsed.usage
+                };
+            }
+
+            // Fallback: The "result" field from Claude Code CLI --output-format json
             if (parsed.result !== undefined) {
                 return String(parsed.result);
             }
+            
             // Priority 2: Common AI completion fields
             const content = parsed.completion || parsed.text || parsed.content;
             if (content && typeof content === 'string') {
                 return content;
             }
-            // Priority 3: Error results
-            if (parsed.is_error && parsed.result) {
-                return String(parsed.result);
-            }
-            // If it's a small object that isn't the metadata wrapper, stringify it
-            if (Object.keys(parsed).length < 5) {
-                return JSON.stringify(parsed);
-            }
         }
-        return String(result);
+        return String(rawResult);
     } catch (error: any) {
         console.error("[Claude CLI] Invocation failed:", error);
         const errorStr = String(error);
@@ -134,7 +150,8 @@ export async function generateRefinedTestCases(
 
     const fullPrompt = `${getQAAssistantWrapper(promptString, !!appMapping, mappingContext, customPrompt)}\n\nINPUT REQUIREMENTS:\n${requirements}`;
 
-    return await askClaudeCode(fullPrompt, projectRoot, undefined, token);
+    const response = await askClaudeCode(fullPrompt, projectRoot, undefined, token);
+    return typeof response === 'string' ? response : response.result;
 }
 
 export async function exploreScreen(
@@ -144,12 +161,16 @@ export async function exploreScreen(
     existingMaps: ScreenMap[],
     sessionHistory: string[],
     customPrompt?: string,
-    token?: string
+    token?: string,
+    resumeSessionId?: string,
+    imageBase64?: string
 ): Promise<{
-    screen: Partial<ScreenMap>;
+    screen: { name: string; type: string; description?: string; tags?: string[] };
     elements: UIElementMap[];
     nextAction: { type: 'click' | 'back' | 'swipe' | 'finish' | 'type_text'; targetId?: string; direction?: 'up' | 'down' | 'left' | 'right'; text?: string; details?: string };
     rationale: string;
+    thought?: string;
+    session_id?: string;
 }> {
     const systemInstruction = getExplorationPrompt(language, customPrompt);
 
@@ -176,8 +197,63 @@ XML DUMP:
 ${xmlDump.substring(0, 15000)}
 `.trim();
 
-    const responseText = await askClaudeCode(prompt, projectRoot, undefined, token);
-    return safeParseJson(responseText);
+    const schema = {
+        type: "object",
+        properties: {
+            screen: {
+                type: "object",
+                properties: {
+                    name: { type: "string" },
+                    type: { type: "string" },
+                    description: { type: "string" },
+                    tags: { type: "array", items: { type: "string" } }
+                }
+            },
+            elements: {
+                type: "array",
+                items: {
+                    type: "object",
+                    properties: {
+                        name: { type: "string" },
+                        type: { type: "string" },
+                        selector: { type: "string" },
+                        id: { type: "string" }
+                    }
+                }
+            },
+            nextAction: {
+                type: "object",
+                properties: {
+                    type: { type: "string", enum: ["click", "back", "swipe", "finish", "type_text"] },
+                    targetId: { type: "string" },
+                    direction: { type: "string" },
+                    text: { type: "string" },
+                    details: { type: "string" }
+                }
+            },
+            rationale: { type: "string" },
+            thought: { type: "string" }
+        },
+        required: ["screen", "elements", "nextAction", "rationale"]
+    };
+
+    const response = await askClaudeCode(prompt, projectRoot, undefined, token, {
+        allowedTools: ["Read"],
+        jsonSchema: schema,
+        resumeSessionId,
+        imageBase64
+    });
+
+    let result: any;
+    if (typeof response !== 'string' && response.structured_output) {
+        result = response.structured_output;
+        if (response.session_id) {
+            result.session_id = response.session_id;
+        }
+    } else {
+        result = safeParseJson(typeof response === 'string' ? response : response.result);
+    }
+    return result;
 }
 
 export async function summarizeExecution(
@@ -187,7 +263,8 @@ export async function summarizeExecution(
     failures: string[] = [],
     failureContext?: any[],
     customPrompt?: string,
-    token?: string
+    token?: string,
+    imageBase64?: string
 ): Promise<string> {
     const stats = { passed: 0, failed: 0 };
     const calculateStats = (nodes: any[]) => {
@@ -224,7 +301,10 @@ DETAILED CONTEXT (Includes screenshot paths if available):
 ${failureContext ? JSON.stringify(failureContext, null, 2) : 'None'}
 `.trim();
 
-    return await askClaudeCode(prompt, projectRoot, undefined, token);
+    const response = await askClaudeCode(prompt, projectRoot, undefined, token, {
+        imageBase64
+    });
+    return typeof response === 'string' ? response : response.result;
 }
 
 export async function reorganizeFlowchartLayout(
@@ -244,8 +324,35 @@ CONTEXT DATA:
 ${context}
 `.trim();
 
-    const responseText = await askClaudeCode(prompt, projectRoot, undefined, token);
-    return safeParseJson(responseText);
+    const schema = {
+        type: "object",
+        properties: {
+            nodes: {
+                type: "object",
+                additionalProperties: {
+                    type: "object",
+                    properties: {
+                        gridX: { type: "number" },
+                        gridY: { type: "number" }
+                    }
+                }
+            },
+            missed: {
+                type: "array",
+                items: { type: "string" }
+            }
+        },
+        required: ["nodes", "missed"]
+    };
+
+    const response = await askClaudeCode(prompt, projectRoot, undefined, token, {
+        jsonSchema: schema
+    });
+
+    if (typeof response !== 'string' && response.structured_output) {
+        return response.structured_output;
+    }
+    return safeParseJson(typeof response === 'string' ? response : response.result);
 }
 
 export async function suggestElementName(
@@ -254,9 +361,9 @@ export async function suggestElementName(
     projectRoot: string,
     language: string,
     existingMaps: any[],
-    _model?: string,
     customPrompt?: string,
-    token?: string
+    token?: string,
+    imageBase64?: string
 ): Promise<{ name: string; justification: string }> {
     const prompt = `
 You are a Senior QA Automation Engineer. Suggest a clean, descriptive name for a UI element in CamelCase, in ${language}.
@@ -269,16 +376,27 @@ EXISTING MAPS (context):
 ${JSON.stringify(existingMaps.slice(-5), null, 2)}
 
 ${customPrompt ? `ADDITIONAL INSTRUCTIONS:\n${customPrompt}` : ""}
-
-RESPOND ONLY IN JSON FORMAT:
-{
-  "name": "SuggestedName",
-  "justification": "Short reason why"
-}
 `.trim();
 
-    const responseText = await askClaudeCode(prompt, projectRoot, undefined, token);
-    return safeParseJson(responseText);
+    const schema = {
+        type: "object",
+        properties: {
+            name: { type: "string" },
+            justification: { type: "string" }
+        },
+        required: ["name", "justification"]
+    };
+
+    const response = await askClaudeCode(prompt, projectRoot, undefined, token, {
+        allowedTools: ["Read"],
+        jsonSchema: schema,
+        imageBase64
+    });
+
+    if (typeof response !== 'string' && response.structured_output) {
+        return response.structured_output;
+    }
+    return safeParseJson(typeof response === 'string' ? response : response.result);
 }
 
 export async function suggestScreenTags(
@@ -286,10 +404,9 @@ export async function suggestScreenTags(
     elements: any[],
     projectRoot: string,
     language: string,
-    screenshotPath?: string,
-    _model?: string,
     customPrompt?: string,
-    token?: string
+    token?: string,
+    imageBase64?: string
 ): Promise<string[]> {
     const prompt = `
 Suggest 3 to 5 relevant tags (keywords) for this application screen based on its name and elements, in ${language}.
@@ -297,13 +414,23 @@ Screen Name: "${screenName}"
 Elements: ${JSON.stringify(elements.slice(0, 20), null, 2)}
 
 ${customPrompt ? `ADDITIONAL INSTRUCTIONS:\n${customPrompt}` : ""}
-
-RESPOND ONLY IN JSON FORMAT:
-["tag1", "tag2", "tag3"]
 `.trim();
 
-    const responseText = await askClaudeCode(prompt, projectRoot, undefined, token, screenshotPath);
-    return safeParseJson(responseText);
+    const schema = {
+        type: "array",
+        items: { type: "string" },
+        minItems: 1
+    };
+
+    const response = await askClaudeCode(prompt, projectRoot, undefined, token, {
+        imageBase64,
+        jsonSchema: schema
+    });
+
+    if (typeof response !== 'string' && response.structured_output) {
+        return response.structured_output;
+    }
+    return safeParseJson(typeof response === 'string' ? response : response.result);
 }
 
 export async function analyzeTestHistory(
@@ -313,7 +440,8 @@ export async function analyzeTestHistory(
     deepContext?: string,
     _signal?: AbortSignal,
     customPrompt?: string,
-    token?: string
+    token?: string,
+    imageBase64?: string
 ): Promise<string> {
     const prompt = `
 You are an expert Test Lead. Analyze the following test execution history and identify patterns, common failures, and potential risks.
@@ -328,6 +456,9 @@ ${deepContext || "No additional context available."}
 ${customPrompt ? `USER SPECIFIC REQUEST:\n${customPrompt}` : "Provide a comprehensive executive summary of the execution health."}
 `.trim();
 
-    return await askClaudeCode(prompt, projectRoot, undefined, token);
+    const response = await askClaudeCode(prompt, projectRoot, undefined, token, {
+        allowedTools: ["Read"],
+        imageBase64
+    });
+    return typeof response === 'string' ? response : response.result;
 }
-

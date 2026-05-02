@@ -412,11 +412,9 @@ Error Message: ${(node as TestNode).failureDetail?.message}
                                                             result = await askClaude(prompt, settings.claudeApiKey || '', settings.claudeModel, systemInstruction, screenshot);
                                                         } else if (provider === 'openai') {
                                                             result = await askOpenAI(prompt, settings.openaiApiKey || '', settings.openaiModel, systemInstruction, screenshot);
-                                                        } else if (provider === 'claude-code') {
-                                                            const path = node.type === 'test' 
-                                                                ? (node as TestNode).failureDetail?.screenshotPath 
-                                                                : (node as any).screenshotPath;
-                                                            result = await askClaudeCode(prompt, settings.paths.automationRoot || '', systemInstruction, settings.claudeCodeToken, path);
+                                                         } else if (provider === 'claude-code') {
+                                                            const response = await askClaudeCode(prompt, settings.paths.automationRoot || '', systemInstruction, settings.claudeCodeToken, { imageBase64: screenshot });
+                                                            result = typeof response === 'string' ? response : response.result;
                                                         } else {
                                                             throw new Error("No AI provider configured");
                                                         }

@@ -7,10 +7,11 @@ pub async fn call_claude_code_cli(
     prompt: String, 
     project_root: String, 
     token: Option<String>,
-    screenshot_path: Option<String>
+    image_base_64: Option<String>,
+    allowed_tools: Option<Vec<String>>,
+    json_schema: Option<String>,
+    resume_session_id: Option<String>
 ) -> AppResult<String> {
-    let _ = screenshot_path; 
-    
     #[cfg(target_os = "windows")]
     let mut command = {
         use std::os::windows::process::CommandExt;
@@ -22,10 +23,36 @@ pub async fn call_claude_code_cli(
     #[cfg(not(target_os = "windows"))]
     let mut command = tokio::process::Command::new("claude");
 
-    // Using JSON output format for reliable parsing
+    // -p is the programmatic mode
+    command.arg("-p");
     command.args(&["--output-format", "json"]);
+
+    // Feature: Allowed Tools
+    if let Some(tools) = allowed_tools {
+        if !tools.is_empty() {
+            command.arg("--allowedTools");
+            command.arg(tools.join(","));
+        }
+    }
+
+    // Feature: JSON Schema for structured output
+    if let Some(schema) = json_schema {
+        if !schema.is_empty() {
+            command.arg("--json-schema");
+            command.arg(schema);
+        }
+    }
+
+    // Feature: Session Continuity
+    if let Some(session_id) = resume_session_id {
+        if !session_id.is_empty() {
+            command.arg("--resume");
+            command.arg(session_id);
+        }
+    }
+
     
-    // Inject all possible token environment variables if a token is provided
+    // Authentication
     if let Some(ref t) = token {
         let trimmed_token = t.trim();
         if !trimmed_token.is_empty() {
@@ -33,7 +60,6 @@ pub async fn call_claude_code_cli(
             command.env("CLAUDE_CODE_TOKEN", trimmed_token);
             command.env("ANTHROPIC_OAUTH_TOKEN", trimmed_token);
             
-            // If it looks like a regular API key, set that too
             if !trimmed_token.starts_with("sk-ant-oat01-") {
                 command.env("ANTHROPIC_API_KEY", trimmed_token);
             }
@@ -50,11 +76,22 @@ pub async fn call_claude_code_cli(
 
     let mut child = command.spawn().map_err(|e| AppError::ProcessError(format!("Failed to start Claude CLI: {}. Make sure 'claude' is installed and in your PATH.", e)))?;
     
-    // Write prompt to stdin
     if let Some(mut stdin) = child.stdin.take() {
         use tokio::io::AsyncWriteExt;
-        stdin.write_all(prompt.as_bytes()).await.map_err(|e| AppError::ProcessError(format!("Failed to write to Claude CLI stdin: {}", e)))?;
-        drop(stdin); // Close stdin so Claude knows we are done
+        
+        let mut full_prompt = prompt.clone();
+        if let Some(b64) = image_base_64 {
+            if !b64.is_empty() {
+                full_prompt = format!(
+                    "{}\n\n[VISUAL CONTEXT]: The following is a base64 encoded screenshot of the current screen. Please use it for visual analysis if your model supports decoding or acknowledging base64 images within text prompts:\n\nDATA:image/png;base64,{}",
+                    full_prompt,
+                    b64
+                );
+            }
+        }
+
+        stdin.write_all(full_prompt.as_bytes()).await.map_err(|e| AppError::ProcessError(format!("Failed to write to Claude CLI stdin: {}", e)))?;
+        drop(stdin);
     }
 
     let output = child.wait_with_output().await.map_err(|e| AppError::ProcessError(format!("Failed to wait for Claude CLI: {}", e)))?;
@@ -73,7 +110,6 @@ pub async fn call_claude_code_cli(
             "Claude CLI exited with error but no message was provided.".to_string()
         };
 
-        // If it's a login error and we passed a token, mention it
         if (error_msg.contains("Not logged in") || error_msg.contains("/login")) && token.is_some() && !token.as_ref().unwrap().trim().is_empty() {
              error_msg = format!("{} (Token was provided in settings, it might be invalid or expired)", error_msg);
         }

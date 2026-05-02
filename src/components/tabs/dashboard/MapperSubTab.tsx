@@ -432,7 +432,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             } else if (aiProvider === 'claude') {
                 result = await claude.suggestElementName(criticalAttrs as any, screenName, apiKey!, model, lang, optimizedMaps as any, undefined, customPrompt);
             } else if (aiProvider === 'claude-code') {
-                result = await claudeCli.suggestElementName(criticalAttrs as any, screenName, settings.paths.automationRoot || '', lang, optimizedMaps as any, undefined, customPrompt, settings.claudeCodeToken);
+                result = await claudeCli.suggestElementName(criticalAttrs as any, screenName, settings.paths.automationRoot || '', lang, optimizedMaps as any, customPrompt, settings.claudeCodeToken, screenshot || undefined);
             }
 
             if (result && result.name) {
@@ -479,14 +479,14 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             } else if (aiProvider === 'claude') {
                 tags = await claude.suggestScreenTags(screenName || "Current Screen", elementsContext, apiKey!, model, lang, screenshot || undefined, undefined, customPrompt);
             } else if (aiProvider === 'claude-code') {
-                tags = await claudeCli.suggestScreenTags(screenName || "Current Screen", elementsContext, settings.paths.automationRoot || '', lang, undefined, undefined, customPrompt, settings.claudeCodeToken);
+                tags = await claudeCli.suggestScreenTags(screenName || "Current Screen", elementsContext, settings.paths.automationRoot || '', lang, customPrompt, settings.claudeCodeToken, screenshot || undefined);
             }
 
             if (tags && Array.isArray(tags) && tags.length > 0) {
                 // Merge with existing tags, ensuring uniqueness and checking if anything changed
                 const existingTagsSet = new Set(screenTags);
                 const trulyNewTags = tags.filter(tag => tag && !existingTagsSet.has(tag));
-                
+
                 if (trulyNewTags.length > 0) {
                     setScreenTags(prev => [...new Set([...prev, ...trulyNewTags])]);
                     feedback.toast.success(t('mapper.feedback.ai_success'));
@@ -611,7 +611,10 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                     } else if (aiProvider === 'claude') {
                         result = await claude.exploreScreen(simplifiedXml, screenshot || "", apiKey as string, model, lang, maps, explorer.getFormattedLogs(), undefined, customPrompt);
                     } else if (aiProvider === 'claude-code') {
-                        result = await claudeCli.exploreScreen(simplifiedXml, settings.paths.automationRoot || '', lang, maps, explorer.getFormattedLogs(), customPrompt, settings.claudeCodeToken);
+                        result = await claudeCli.exploreScreen(simplifiedXml, settings.paths.automationRoot || '', lang, maps, explorer.getFormattedLogs(), customPrompt, settings.claudeCodeToken, explorer.getSessionId(), screenshot || undefined);
+                        if (result.session_id) {
+                            explorer.setSessionId(result.session_id);
+                        }
                     }
                     break; // Success
                 } catch (parseError: any) {
@@ -1132,27 +1135,6 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                     placeholder={t('mapper.placeholder.screen_name')}
                                                 />
                                             </div>
-                                            <div className="w-full xl:w-72 flex items-end gap-1">
-                                                <div className="flex-1">
-                                                    <TagInput
-                                                        label={t('mapper.screen_tags')}
-                                                        tags={screenTags}
-                                                        assistant={
-                                                            <AiButton
-                                                                id="mapper_suggest_tags"
-                                                                isLoading={isAISuggestingTags}
-                                                                onClick={handleAISuggestTags}
-                                                                label={t('mapper.action.ai_suggest_tags')}
-                                                                variant="ghost"
-                                                                className="mb-0 mr-0 ml-0 h-3 p-0 text-[8px] bg-transparent hover:bg-transparent"
-                                                            />
-                                                        }
-                                                        onChange={setScreenTags}
-                                                        suggestions={[...new Set(savedMaps.flatMap(m => m.tags || []))]}
-                                                        placeholder={t('mapper.placeholder.screen_tags')}
-                                                    />
-                                                </div>
-                                            </div>
                                             <div className="w-full xl:w-40">
                                                 <div className="text-xs font-medium text-on-surface-variant/80 ml-1 mb-1">
                                                     {t('mapper.screen_type')}
@@ -1167,7 +1149,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                 />
                                             </div>
                                         </div>
-                                        <div className="px-4 pb-2">
+                                        <div className="flex flex-col xl:flex-row gap-2 pb-2">
                                             <Textarea
                                                 label={t('mapper.input.screen_description')}
                                                 value={screenDescription}
@@ -1175,6 +1157,28 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                 placeholder={t('mapper.placeholder.screen_description')}
                                                 className="h-16"
                                             />
+                                            <div className="w-full xl:w-72 flex gap-1 text-[8px]">
+                                                <div className="flex-1">
+                                                    <TagInput
+                                                        label={t('mapper.screen_tags')}
+                                                        tags={screenTags}
+                                                        assistant={
+                                                            <AiButton
+                                                                id="mapper_suggest_tags"
+                                                                isLoading={isAISuggestingTags}
+                                                                onClick={handleAISuggestTags}
+                                                                label={t('mapper.action.ai_suggest_tags')}
+                                                                variant="ghost"
+                                                                className="text-[6px] bg-transparent hover:bg-transparent mt-0"
+                                                            />
+                                                        }
+                                                        onChange={setScreenTags}
+                                                        suggestions={[...new Set(savedMaps.flatMap(m => m.tags || []))]}
+                                                        placeholder={t('mapper.placeholder.screen_tags')}
+                                                        className="mt-0 p-0 h-auto"
+                                                    />
+                                                </div>
+                                            </div>
                                         </div>
                                         <div className="flex gap-2">
                                             <Button
@@ -1192,7 +1196,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                 <Plus size={16} /> {t('mapper.action.new')}
                                             </Button>
                                             <div className="relative group" ref={loadMenuRef}>
-                                                <Button variant="ghost" size="icon" onClick={() => setShowLoadMenu(!showLoadMenu)}><FileClock size={16} /></Button>
+                                                <Button variant="ghost" onClick={() => setShowLoadMenu(!showLoadMenu)} className="gap-2"><FileClock size={16} /> {t('mapper.saved_screens')}</Button>
                                                 {showLoadMenu && (
                                                     <div className="absolute top-full left-0 mt-2 w-80 bg-surface rounded-xl shadow-xl border border-outline-variant/30 overflow-hidden z-[100] flex flex-col max-h-80">
                                                         <div className="p-2 border-b border-outline-variant/30 bg-surface-variant/5 flex flex-col gap-2">
@@ -1313,12 +1317,10 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                             <div className="relative group" ref={elementsMenuRef}>
                                                 <Button
                                                     variant="ghost"
-                                                    size="icon"
                                                     onClick={() => setShowElementsMenu(!showElementsMenu)}
-                                                    className={clsx(showElementsMenu ? "text-primary dark:text-primary/80 bg-primary/10" : "text-on-surface-variant/80")}
-                                                    title={t('mapper.saved_elements', 'Saved Elements')}
+                                                    className={clsx(showElementsMenu ? "text-primary dark:text-primary/80 bg-primary/10" : "text-on-surface-variant/80", "gap-2")}
                                                 >
-                                                    <FileClock size={16} />
+                                                    <FileClock size={16} /> {t('mapper.saved_elements')}
                                                 </Button>
 
                                                 {showElementsMenu && (

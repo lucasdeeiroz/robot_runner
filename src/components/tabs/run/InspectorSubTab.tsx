@@ -242,14 +242,45 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
             let result = "";
             const provider = settings.aiProvider;
 
-            if (provider === 'gemini') {
+            if (provider === 'claude-code') {
+                const schema = {
+                    type: "object",
+                    properties: {
+                        selector: { type: "string" },
+                        rationale: { type: "string" }
+                    },
+                    required: ["selector", "rationale"]
+                };
+
+                const response = await claudeCli.askClaudeCode(prompt, settings.paths.automationRoot || '', systemInstruction, settings.claudeCodeToken, {
+                    allowedTools: ["Read"],
+                    jsonSchema: schema
+                });
+
+                if (typeof response !== 'string' && response.structured_output) {
+                    setAiSuggestion(response.structured_output.selector);
+                    setAiRationale(response.structured_output.rationale);
+                    
+                    if (selectedNode.id) {
+                        setAiCache(prev => ({
+                            ...prev,
+                            [selectedNode.id]: {
+                                suggestion: response.structured_output.selector,
+                                rationale: response.structured_output.rationale
+                            }
+                        }));
+                    }
+                    setIsAiLoading(false);
+                    return;
+                }
+                
+                result = typeof response === 'string' ? response : response.result;
+            } else if (provider === 'gemini') {
                 result = await gemini.askGemini(prompt, settings.geminiApiKey || '', settings.geminiModel, systemInstruction);
             } else if (provider === 'claude') {
                 result = await claude.askClaude(prompt, settings.claudeApiKey || '', settings.claudeModel, systemInstruction);
             } else if (provider === 'openai') {
                 result = await openai.askOpenAI(prompt, settings.openaiApiKey || '', settings.openaiModel, systemInstruction);
-            } else if (provider === 'claude-code') {
-                result = await claudeCli.askClaudeCode(prompt, settings.paths.automationRoot || '', systemInstruction, settings.claudeCodeToken);
             } else {
                 throw new Error("No AI provider configured");
             }
