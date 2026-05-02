@@ -540,11 +540,12 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             // 1. Capture Current State
             explorer.addLog(t('mapper.exploration.capturing_screen'), 'transition');
             setExplorationLogs([...explorer.getLogs()]);
-            // Re-fetch using refreshAll logic isn't ideal here due to async nature, 
+            // Re-fetch using refreshAll logic isn't ideal here due to async nature,
             // but we can reuse the logic in the explorer
             const xml = await invoke<string>('get_xml_dump', { deviceId: selectedDevice });
-            const screenshotBase64 = await invoke<string>('get_screenshot', { deviceId: selectedDevice });
-            setScreenshot(screenshotBase64);
+            const freshScreenshotBase64 = await invoke<string>('get_screenshot', { deviceId: selectedDevice });
+            setScreenshot(freshScreenshotBase64);
+            const screenshot = freshScreenshotBase64;
             if (!isExploringRef.current) return;
 
             // 2. Prepare Context (Backend-powered)
