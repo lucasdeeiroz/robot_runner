@@ -218,14 +218,14 @@ export function useFlowchartLayout({ maps, activeProfileId, onRefresh, settings 
     }, [
         activeProfileId,
         isReorganizing,
-        settings.ai_provider,
+        settings.aiProvider,
         settings.language,
-        settings.openai_api_key,
-        settings.openai_model,
-        settings.claude_api_key,
-        settings.claude_model,
-        settings.gemini_api_key,
-        settings.gemini_model,
+        settings.openaiApiKey,
+        settings.openaiModel,
+        settings.claudeApiKey,
+        settings.claudeModel,
+        settings.geminiApiKey,
+        settings.geminiModel,
         t
     ]);
 

@@ -272,6 +272,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
         debounceTimerRef.current = setTimeout(async () => {
             setIsSaving(true);
+            const existingMap = savedMaps.find(m => m.id === screenName.toLowerCase().replace(/\s+/g, '_'));
             const map: ScreenMap = {
                 id: screenName.toLowerCase().replace(/\s+/g, '_'),
                 name: screenName,
@@ -279,7 +280,8 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 description: screenDescription || undefined,
                 tags: screenTags.length > 0 ? screenTags : undefined,
                 elements: mappedElements,
-                base64_preview: screenshot || undefined
+                base64_preview: screenshot || undefined,
+                layout: existingMap?.layout
             };
             try {
                 await saveScreenMap(activeProfileId, map);
@@ -296,7 +298,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         return () => {
             if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
         };
-    }, [screenName, screenType, screenDescription, screenTags, mappedElements, screenshot, activeProfileId]);
+    }, [screenName, screenType, screenDescription, screenTags, mappedElements, screenshot, activeProfileId, savedMaps]);
 
 
     const handleLoadScreen = (map: ScreenMap) => {
