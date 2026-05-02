@@ -73,6 +73,11 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     const [mappedElements, setMappedElements] = useState<UIElementMap[]>([]);
     const [currentElement, setCurrentElement] = useState<Partial<UIElementMap>>({});
     const [savedMaps, setSavedMaps] = useState<ScreenMap[]>([]);
+    const savedMapsRef = useRef<ScreenMap[]>([]);
+
+    useEffect(() => {
+        savedMapsRef.current = savedMaps;
+    }, [savedMaps]);
     const [showLoadMenu, setShowLoadMenu] = useState(false);
     const loadMenuRef = useRef<HTMLDivElement>(null);
     const [showElementsMenu, setShowElementsMenu] = useState(false);
@@ -274,7 +279,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
         debounceTimerRef.current = setTimeout(async () => {
             setIsSaving(true);
-            const existingMap = savedMaps.find(m => m.id === screenName.toLowerCase().replace(/\s+/g, '_'));
+            const existingMap = savedMapsRef.current.find(m => m.id === screenName.toLowerCase().replace(/\s+/g, '_'));
             const map: ScreenMap = {
                 id: screenName.toLowerCase().replace(/\s+/g, '_'),
                 name: screenName,
