@@ -8,11 +8,7 @@ import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 
-interface LogEntry {
-    text: string;
-    type: 'action' | 'info' | 'debug' | 'error' | 'ai' | 'rationale' | 'transition' | 'finished' | 'stopped';
-    timestamp?: number;
-}
+import { LogEntry } from '@/lib/dashboard/explorationEngine';
 
 interface ExplorationStep {
     number: number;
@@ -22,7 +18,7 @@ interface ExplorationStep {
 }
 
 interface ExplorationLogTreeProps {
-    logs: string[];
+    logs: LogEntry[];
 }
 
 export const ExplorationLogTree: React.FC<ExplorationLogTreeProps> = ({ logs }) => {
@@ -34,26 +30,23 @@ export const ExplorationLogTree: React.FC<ExplorationLogTreeProps> = ({ logs }) 
         const parsedSteps: ExplorationStep[] = [];
         let currentStep: ExplorationStep | null = null;
 
-        logs.forEach((log) => {
+        logs.forEach((entry) => {
             // New Step Detection
-            const stepMatch = log.match(/--- Step (\d+) ---/);
-            if (stepMatch) {
+            if (entry.type === 'step') {
                 if (currentStep) {
-                    // Update status of previous step if it wasn't marked as fail
                     if (currentStep.status === 'running') currentStep.status = 'pass';
                     parsedSteps.push(currentStep);
                 }
                 currentStep = {
-                    number: parseInt(stepMatch[1], 10),
+                    number: entry.stepNumber || 0,
                     status: 'running',
-                    title: t('mapper.exploration.step_title', { number: stepMatch[1], defaultValue: `Step ${stepMatch[1]}` }),
+                    title: t('mapper.exploration.step_title', { number: entry.stepNumber, defaultValue: `Step ${entry.stepNumber}` }),
                     entries: []
                 };
                 return;
             }
 
             if (!currentStep) {
-                // Initial or preamble logs
                 currentStep = {
                     number: 0,
                     status: 'pass',
@@ -62,33 +55,18 @@ export const ExplorationLogTree: React.FC<ExplorationLogTreeProps> = ({ logs }) 
                 };
             }
 
-            // Entry Categorization
-            let entry: LogEntry;
-            if (log.match(/Rationale:/)) {
-                entry = { text: log.replace('Rationale:', '').trim(), type: 'rationale' };
-            } else if (log.match(/AI mapped:/)) {
-                entry = { text: log.replace('AI mapped:', '').replace('with', t('mapper.exploration.with_text')).replace('elements', t('mapper.exploration.elements_text')).trim(), type: 'ai' };
-            } else if (log.match(/Debug/)) {
-                entry = { text: log.replace('[Debug]', '').trim(), type: 'debug' };
-            } else if (log.toLowerCase().includes('error') && !log.includes('Exploration stopped:')) {
-                entry = { text: log.replace('Error during exploration:', '').trim(), type: 'error' };
+            // Entry Categorization and cleaning (if needed)
+            const processedEntry = { ...entry };
+
+            if (entry.type === 'error') {
                 currentStep.status = 'fail';
-            } else if (log.match(/Clicking|Swiping|Typing|Navigating/)) {
-                entry = { text: log.replace('Clicking', t('mapper.exploration.clicking')).replace('Swiping', t('mapper.exploration.swiping')).replace('Typing', t('mapper.exploration.typing')).replace('Navigating', t('mapper.exploration.navigating')).replace('element:', t('mapper.exploration.element_text')).replace('(', '- ').replace(')', '').trim(), type: 'action' };
-            } else if (log.match(/Capturing|Preparing|Analyzing/)) {
-                entry = { text: log.trim(), type: 'transition' };
-            } else if (log.match(/Exploration finished by AI./)) {
-                entry = { text: log.replace('Exploration finished by AI.', '').trim(), type: 'finished' };
+            } else if (entry.type === 'finished') {
                 currentStep.status = 'pass';
-            } else if (log.match(/Exploration stopped:/)) {
-                entry = { text: log.replace('Exploration stopped:', '').trim(), type: 'stopped' };
+            } else if (entry.type === 'stopped') {
                 currentStep.status = 'fail';
-            } else {
-                entry = { text: log.trim(), type: 'info' };
             }
 
-
-            currentStep.entries.push(entry);
+            currentStep.entries.push(processedEntry);
         });
 
         if (currentStep) {
@@ -307,6 +285,18 @@ const LogEntryItem: React.FC<{ entry: LogEntry }> = ({ entry }) => {
                 <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-error/80">
                     <XCircle size={12} />
                     {t('mapper.exploration.stopped_title')}
+                </div>
+                <div className="text-[11px] leading-relaxed text-on-surface/80 italic">
+                    {entry.text}
+                </div>
+            </div>
+        );
+    } else if (entry.type === 'warning') {
+        return (
+            <div className="my-1 p-2 bg-warning/5 rounded-lg border border-warning/10 flex flex-col gap-1.5">
+                <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-warning/80">
+                    <AlertCircle size={12} />
+                    {t('mapper.exploration.warning_title', 'Warning')}
                 </div>
                 <div className="text-[11px] leading-relaxed text-on-surface/80 italic">
                     {entry.text}

@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RefreshCw, Maximize } from 'lucide-react';
+import { RefreshCw, Maximize, Scan } from 'lucide-react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { InspectorNode, getHighlighterStyle } from '@/lib/inspectorUtils';
@@ -35,6 +35,7 @@ interface DeviceViewportProps {
     };
 
     // Customization
+    isExploring?: boolean;
     hoverColor?: string;
     selectionColor?: string;
     searchColor?: string;
@@ -55,6 +56,7 @@ export const DeviceViewport: React.FC<DeviceViewportProps> = ({
     swipes,
     onRefresh,
     handlers,
+    isExploring = false,
     hoverColor = '#60a5fa',
     selectionColor = '#ef4444',
     searchColor = '#22c55e',
@@ -140,6 +142,26 @@ export const DeviceViewport: React.FC<DeviceViewportProps> = ({
                         <GestureOverlay />
                     </motion.div>
                 )}
+                {isExploring && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute inset-0 z-[55] bg-primary/10 backdrop-blur-[1px] pointer-events-none flex flex-col items-center justify-end pb-8"
+                    >
+                        <div className="bg-primary/90 text-surface text-[10px] font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-2 animate-pulse mb-4">
+                            <Scan size={12} />
+                            {t('mapper.flowchart.exploration_active')}
+                        </div>
+                        <div className="w-full h-1 bg-surface/20 relative overflow-hidden">
+                            <motion.div
+                                className="absolute top-0 bottom-0 bg-primary w-1/3"
+                                animate={{ x: ["-100%", "300%"] }}
+                                transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
+                            />
+                        </div>
+                    </motion.div>
+                )}
             </AnimatePresence>
 
             <img
@@ -170,8 +192,8 @@ export const DeviceViewport: React.FC<DeviceViewportProps> = ({
 
             {/* Animation Layers - Swipes (Advanced SVG) */}
             {swipes.map(swipe => (
-                <motion.svg 
-                    key={swipe.id} 
+                <motion.svg
+                    key={swipe.id}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
@@ -228,7 +250,7 @@ export const DeviceViewport: React.FC<DeviceViewportProps> = ({
                     opacity: 1,
                     scale: [1, 1.02, 1],
                 } as any : { opacity: 0 }}
-                transition={{ 
+                transition={{
                     scale: { repeat: Infinity, duration: 2, ease: "easeInOut" },
                     default: { duration: 0.15 }
                 }}

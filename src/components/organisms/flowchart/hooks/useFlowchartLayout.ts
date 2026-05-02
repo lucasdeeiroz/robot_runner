@@ -149,25 +149,36 @@ export function useFlowchartLayout({ maps, activeProfileId, onRefresh, settings 
         setMissedScreens([]);
 
         try {
+            console.log("[Flowchart] Fetching AI context for layout...");
             const { context } = await getAiContext('flowchart_layout', { profile_id: activeProfileId });
-            const provider = settings.ai_provider || 'gemini';
             
-            let result;
-            const language = settings.language || 'en';
+            if (!context || context.trim() === "") {
+                console.warn("[Flowchart] AI context is empty. Reorganization might fail or do nothing.");
+            } else {
+                console.log("[Flowchart] AI Context acquired (length):", context.length);
+            }
 
+            const provider = settings.aiProvider || 'gemini';
+            const language = settings.language || 'en';
+            
+            console.log(`[Flowchart] Using provider: ${provider}`);
+
+            let result;
             if (provider === 'openai') {
-                const apiKey = settings.openai_api_key;
-                const model = settings.openai_model || 'gpt-4o';
+                const apiKey = settings.openaiApiKey;
+                const model = settings.openaiModel || 'gpt-4o';
                 result = await reorganizeWithOpenAI(context, apiKey, model, language, undefined, customPrompt);
             } else if (provider === 'claude') {
-                const apiKey = settings.claude_api_key;
-                const model = settings.claude_model || 'claude-3-5-sonnet-20240620';
+                const apiKey = settings.claudeApiKey;
+                const model = settings.claudeModel || 'claude-3-5-sonnet-20240620';
                 result = await reorganizeWithClaude(context, apiKey, model, language, undefined, customPrompt);
             } else {
-                const apiKey = settings.gemini_api_key;
-                const model = settings.gemini_model || 'gemini-1.5-pro';
+                const apiKey = settings.geminiApiKey;
+                const model = settings.geminiModel || 'gemini-1.5-pro';
                 result = await reorganizeWithGemini(context, apiKey, model, language, undefined, customPrompt);
             }
+
+            console.log("[Flowchart] AI Reorganization result:", result);
 
             if (result && result.nodes) {
                 setLayout(prev => {
@@ -179,6 +190,8 @@ export function useFlowchartLayout({ maps, activeProfileId, onRefresh, settings 
                         };
                     });
 
+                    console.log("[Flowchart] Applying new layout nodes:", Object.keys(newNodes).length);
+
                     return {
                         ...prev,
                         nodes: newNodes,
@@ -186,11 +199,19 @@ export function useFlowchartLayout({ maps, activeProfileId, onRefresh, settings 
                     };
                 });
                 setIsDirty(true);
-                if (result.missed) setMissedScreens(result.missed);
+                if (result.missed) {
+                    console.log("[Flowchart] Screens missed by AI:", result.missed);
+                    setMissedScreens(result.missed);
+                }
+                feedback.toast.success(t('mapper.flowchart.reorganize_success'));
+            } else {
+                console.warn("[Flowchart] AI returned no nodes or invalid format:", result);
+                throw new Error("AI returned no nodes or invalid format");
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('AI Reorganization failed:', error);
-            feedback.toast.error(t('mapper.flowchart.reorganize_error'));
+            const errorMessage = error?.message || String(error);
+            feedback.toast.error(`${t('mapper.flowchart.reorganize_error')}: ${errorMessage}`);
         } finally {
             setIsReorganizing(false);
         }

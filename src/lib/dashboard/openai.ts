@@ -563,16 +563,13 @@ export async function exploreScreen(
     const systemInstruction = getExplorationPrompt(language, customPrompt);
 
     const actionLogs = sessionHistory.filter(log =>
-        log.includes("--- Step") ||
-        log.includes("Clicking element:") ||
-        log.includes("Swiping") ||
-        log.includes("Navigating back") ||
-        log.includes("AI mapped:") ||
-        log.includes("Typing text on:") ||
-        log.includes("Loop detected") ||
-        log.includes("Exploration stopped") ||
-        log.includes("App exit detected") ||
-        log.includes("Exploration finished")
+        log.includes("---") ||
+        log.includes("ACTION:") ||
+        log.includes("AI:") ||
+        log.includes("RATIONALE:") ||
+        log.includes("ERROR:") ||
+        log.includes("WARNING:") ||
+        log.includes("FINISHED:")
     );
 
     const prompt = `
@@ -580,7 +577,7 @@ EXISTING MAPS (Mapped screens so far):
 ${formatExistingMaps(existingMaps)}
 
 SESSION HISTORY (Action logs):
-${actionLogs.slice(-50).join('\n')}
+${actionLogs.slice(-30).join('\n')}
 
 XML DUMP:
 ${xmlDump.substring(0, 15000)}

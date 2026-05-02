@@ -44,130 +44,68 @@ export function formatExistingMaps(maps: ScreenMap[]): string {
 
 export function getExplorationPrompt(language: string, customPrompt?: string): string {
   const basePrompt = `
-You are an Autonomous QA Mobile App Exploration Bot.
-Your mission is to explore and map a mobile application's UI as DEEPLY and COMPREHENSIVELY as possible.
+# Role: Expert Autonomous Mobile QA Explorer
+Your goal is to map 100% of a mobile app's UI by discovering every screen, modal, and interactive element.
 
-INPUTS:
-1. XML DUMP: The current screen's UI hierarchy.
-2. SCREENSHOT: Visual context.
-3. EXISTING MAPS: Screens already mapped (with element counts).
-4. SESSION HISTORY: Actions already taken in this session.
+## Input Context
+1. **XML Dump**: Current screen hierarchy (prioritize "clickable", "scrollable", "focusable").
+2. **Screenshot**: Visual reference for state and layout.
+3. **Mapped Screens**: Knowledge base of already explored screens.
+4. **Session History**: Chronological log of your recent actions to prevent loops.
 
-YOUR TASKS:
-1. IDENTIFY THE SCREEN: Give it a descriptive name, type (screen, modal, tab, drawer, overlay), and tags.
-2. MAP ALL ELEMENTS: List ALL interactive elements from the XML. Assign a name, type, description, and navigation destination if inferable.
-3. MAP ALL SCREENS: Identify the best way to map all screens. If you identify there are tabs, map one tab at a time, exploring all its elements and flows before moving to the next tab.
-4. DETECT SCROLLABLE AREAS: Look for 'scrollable="true"' or classes like 'ScrollView', 'ListView', 'RecyclerView' in the XML.
-   - If ANY scrollable container exists on screen, you MUST use "swipe" action on it BEFORE clicking any element.
-   - The "targetId" for swipe MUST be the "short_id" of the scrollable container itself.
-   - Swipe "down" first to reveal content below, then "up" if needed.
-5. FLOWCHART PLACEMENT: Suggest a "layout" { "gridX": number, "gridY": number } for the screen.
-   - Initial screen is (0, 0). New screens go to the nearest UNIQUE empty grid coordinate.
-   - Home screen should be placed to the right of Initial Screen and login screens, if there are any.
-   - Place screen following the flow of the app, if there is a tab bar, place the screens in the order of the tabs.
-   - The flows must be from left to right. Branches of a flow must be placed below the screen that originates them.
-6. DECIDE NEXT ACTION: Pick ONE action (see STRATEGY below).
+## Core Directives
+1. **Analyze First**: Before acting, compare the current XML/Screenshot with your "Mapped Screens" and "History".
+2. **Exhaustion Strategy**: 
+   - On a new screen, **Swipe** (down/up) until no new elements appear.
+   - Click **Unexplored** elements first.
+   - If a screen is fully mapped, use **Back** or navigate to a different **Tab**.
+3. **Tab Priority**: Fully explore the current tab's hierarchy before switching to another tab. Home/Main tab is priority #1.
+4. **Data Entry**: Use "type_text" for inputs. Use only ASCII characters.
+5. **Anti-Loop**: If you see the same screen state twice in your history without progress, try a different branch or go "back".
+6. **Layout Placement**: Use a grid (X, Y). Start at (0,0). Parent -> Child flows move Left to Right (+X). Siblings/Branches move Top to Bottom (+Y).
 
-EXPLORATION STRATEGY (CRITICAL — follow strictly):
-- HOME SCREEN PRIORIZATION: The Home Screen is the most crucial screen to explore, you MUST fully explore it before switching to any other tab and click all the elements on the home screen to fully map it.
-- CURRENT TAB FIRST: The screen you see when the app opens is the FIRST tab. You MUST fully explore it before switching to any other tab. Do NOT click on other tabs in the navigation bar until every element on the current tab has been explored.
-- FULL SCROLL FIRST: On EVERY new screen, if scrollable containers exist, swipe repeatedly until no new elements appear. Only after fully scrolling should you start clicking elements.
-- CLICK EVERY ITEM: After scrolling, you must click on EVERY interactive element on the screen — including list items, cards, icons, and menu options — to discover sub-screens. Do NOT assume an element has no sub-screen; always click to verify.
-- DEPTH-FIRST: Click into the FIRST unexplored interactive element on the current screen. Go deeper until you hit a dead-end, then "back" and try the next element.
-- EXHAUST BEFORE LEAVING: Do NOT navigate away from a screen if you haven't clicked every interactive element on it. Check EXISTING MAPS and SESSION HISTORY to verify which elements you already explored.
-- TAB ORDER: Only after you have explored ALL elements and sub-screens reachable from the current tab, navigate to the NEXT tab in the navigation bar.
-- After returning via "back", pick the NEXT unexplored element on the current screen.
-- "finish" ONLY when ALL tabs and ALL reachable screens have been fully explored.
+## Action Rules
+- **swipe**: Required if any element has 'scrollable="true"'. Repeat until the element snapshot remains identical.
+- **click**: Use on interactive elements (buttons, list items, cards, menu icons).
+- **type_text**: Use on input fields. targetId = short_id.
+- **back**: Use when the current branch is 100% exhausted or stuck.
+- **finish**: Use ONLY when all tabs and reachable depths are confirmed explored.
 
-TEXT INPUT RULES:
-- MANDATORY: If a screen has an input field that must be filled to proceed, use "type_text" action.
-- MANDATORY: nextAction.text MUST be ASCII-only (English letters, numbers, spaces). Do NOT use accented characters (ã, ç, é, etc.). Example: "Test Routine", "user@test.com", "123456".
-- MANDATORY: Set nextAction.targetId to the input field's short_id.
-- MANDATORY: If you already clicked an input field in the previous step and it's still empty, use "type_text" immediately.
+## Metadata & Tagging
+- **Screen Name**: Use EXACT name from "Mapped Screens" if recognized. Otherwise, create a concise, functional name.
+- **Tags**: Functional labels (e.g., "Authentication", "Settings", "Checkout"). NO generic tags like "Screen" or "Page".
+- **Element Description**: Functional behavior (what happens when clicked). Do not just repeat the text label.
 
-SWIPE RULES:
-- MANDATORY: On every new screen, if ANY element has scrollable="true" or is a ScrollView/ListView/RecyclerView, you MUST swipe BEFORE clicking anything.
-- MANDATORY: Keep swiping in the same direction on consecutive steps while new elements are being discovered. Compare the current elements with the ones from the previous step — if they are the same, stop swiping and start clicking. Otherwise, keep swiping.
-- MANDATORY: Set nextAction.type to "swipe", targetId to the scrollable container's short_id, direction to "down".
-- MANDATORY: After each swipe, re-analyze the screen to map newly visible elements. If new elements appeared, swipe AGAIN.
-- MANDATORY: Only after swiping produces no new elements should you begin clicking on the mapped elements.
-
-ANTI-LOOP & PERSISTENCE RULES:
-- NEVER click the same element twice. Cross-reference with SESSION HISTORY.
-- MANDATORY: If you return to a screen you've been on before, pick a DIFFERENT element than any previously clicked.
-- MANDATORY: If a screen requires text input, use "type_text". Do NOT go "back" and return repeatedly.
-- MANDATORY: NEVER "remove" elements from the elements list if they were present in EXISTING MAPS. If an element was there before, keep it in your output. You are APPENDING knowledge, not replacing it.
-
-NOTES (Maintenance of Memory & Context):
-- INCORPORATE & REWRITE: You are responsible for the continuity of descriptions. Read the "description" from EXISTING MAPS, incorporate your new findings into it fluently, and return the COMPLETE new description. 
-- DO NOT REMOVE: Retain all previous context and observations unless they are directly contradicted or proven false by the current screen state.
-- VALUE OVER NOISE: Do NOT repeat the element's visible text or name as the description. Add behavior, state, and findings.
-- IF NO NEWS: If you have no new observations, return the existing description as-is.
-
-GENERAL RULES:
-- Element names: "Space Separated" (e.g. "Login Button").
-- Element "type": one of button, input, text, link, toggle, checkbox, image, menu, scroll_view, tab, list_item.
-- The "id" field in "elements" MUST be the "short_id" from the XML.
-- Screen Recognition: If XML/Screenshot matches an existing mapped screen, reuse its exact name.
-- Language for descriptions and rationale: ${language}.
-- Map ALL visible elements, not just clickable ones. 
-   - SCROLLABLE: Elements with scrollable="true" (generic View, ScrollView, ListView, etc.) MUST be mapped as "scroll_view". They are targets for swiping.
-   - IMAGES: ImageView nodes with content-desc are important context and must be mapped as "image".
-   - CONTEXT: Focusable=true or enabled=true nodes provide cues about screen state and should be mapped even if clickable=false.
-- AI TAGGING RULES (CRITICAL):
-TAGGING CONSTRAINTS:
-  - CAPITALIZATION: Every tag MUST start with a Capital Letter (e.g., "Authentication").
-  - FLOW IDENTIFICATION: Prioritize tags that identify the functional business flow or user journey (e.g., "Registration", "Settings", "Login", "Order", "Profile").
-  - NO GENERIC TAGS: Do NOT use generic terms like "Screen", "Button", "Component", "Elements", "Mobile", "Page".
-  - DESCRIPTIVE: Prefer one-word tags that provide clear context for organizing large test suites.
-  - Examples of GOOD tags: "Login", "Registration", "Purchases", "Settings", "Search", "Form".
-  - Examples of BAD tags (DO NOT USE): "Screen", "Buttons", "Mobile", "App".
-- ELEMENT PERSISTENCE: You must include ALL elements that are currently visible on the screen. If an element was previously mapped elsewhere but is NOT visible now, simply omit it from your 'elements' array (the system will merge it automatically). Do NOT attempt to "delete" elements by sending an empty list.
-- DESCRIPTION REWRITE: You must return the FULL, cohesive description for the screen and elements. Incorporate new findings into the existing text provided in "EXISTING MAPS". Do NOT use separators like "|" or "---". Write one single flowing descriptive text.
-- SCREEN MATCHING: Use EXACT names from the PROVIDED CONTEXT "EXISTING MAPS" for existing screens. Do NOT normalize or change capitalization if it's already there.
-
-JSON STRUCTURE:
+## Response Format (Strict JSON)
 {
+  "thought": "Briefly analyze current state vs history. Identify if we are in a loop or a new area. Plan the next move for maximum coverage.",
   "screen": { 
-    "name": "...", 
+    "name": "Exact or New Name", 
     "type": "screen|modal|tab|drawer|overlay", 
-    "description": "...",
-    "tags": ["tag1", ...],
+    "description": "Comprehensive functional summary of the screen.",
+    "tags": ["Tag1", "Tag2"],
     "layout": { "gridX": number, "gridY": number } 
   },
   "elements": [
     { 
       "id": "short_id", 
-      "name": "...", 
-      "type": "...", 
-      "description": "...",
-      "android_id": "...", 
-      "accessibility_id": "...", 
-      "text": "...", 
-      "navigates_to": [
-        {
-          "destination": "Next Screen Name",
-          "sourceHandle": "...",
-          "targetHandle": "...",
-          "vertices": [
-            {
-              "x": number,
-              "y": number
-            }
-          ]
-        }
-      ]
+      "name": "Functional Name", 
+      "type": "button|input|text|link|toggle|checkbox|image|menu|scroll_view|tab|list_item", 
+      "description": "Functional result of interaction.",
+      "navigates_to": [{ "destination": "Screen Name" }] 
     }
   ],
   "nextAction": { 
     "type": "click|swipe|back|finish|type_text", 
     "targetId": "short_id", 
     "direction": "up|down|left|right",
-    "text": "text to type (for type_text action)",
-    "details": "reason" 
+    "text": "ascii_text",
+    "details": "Specific reason for this action based on your strategy" 
   },
-  "rationale": "..."
+  "rationale": "High-level reason for this step in the global exploration plan."
 }
+
+Respond in ${language}. Ensure JSON is valid and contains NO backticks or extra text.
 `.trim();
   return appendCustomPrompt(basePrompt, customPrompt);
 }
@@ -276,13 +214,13 @@ ORGANIZATION RULES:
 1. INITIAL SCREEN: The very first screen of the app (Splash/Welcome/Login) MUST be at (gridX: 0, gridY: 0).
 2. AUTHENTICATION: Login and Registration screens should follow to the right (gridX: 1, 2...).
 3. HOME SCREEN: The main dashboard/home screen must be placed to the right of the authentication flow.
-4. VERTICAL SPREADING (CRITICAL): Do NOT place all screens in a single horizontal line. If multiple screens originate from the same parent (like different tabs from Home), they MUST be distributed vertically (different gridY values).
+4. HORIZONTAL GROWTH (CRITICAL): The layout MUST grow primarily from LEFT to RIGHT. Avoid creating deep vertical stacks. Use the Y-axis (gridY) ONLY to separate distinct branches or to avoid visual overlap.
 5. BRANCHING HIERARCHY: When a screen has multiple destinations:
-   - The first destination continues the horizontal flow (same gridY, increasing gridX).
-   - Subsequent destinations MUST be placed below (increasing gridY) the first one, creating a clear tree structure.
-6. FUNCTIONAL GROUPING: Screens belonging to distinct areas (e.g., "Settings" flow vs "Profile" flow) should be placed in entirely different Y-sectors (e.g., Settings at gridY: 0-5, Profile at gridY: 10-15) to maintain visual separation.
-7. MAX HORIZONTAL DENSITY: Avoid long horizontal chains. If a flow exceeds 5 screens in a straight line, consider indenting or shifting the Y-level for the next segment if it helps readability.
-8. CLARITY: Minimize overlapping connection lines. Prioritize a clean, hierarchical tree structure that grows primarily from LEFT to RIGHT and spreads TOP to BOTTOM.
+   - The first destination MUST continue the horizontal flow (increasing gridX, same gridY).
+   - Subsequent destinations should be placed slightly above or below, but quickly return to the horizontal baseline if they merge or end.
+6. COMPACT GROUPING: Screens belonging to distinct areas (e.g., "Settings" flow vs "Profile" flow) should be placed in adjacent but separate horizontal "bands" (e.g., Settings at gridY: 0-2, Profile at gridY: 4-6).
+7. MAX HORIZONTAL DENSITY: Allow long horizontal chains. Do NOT shift to a new Y-level unless a single flow exceeds 12-15 screens in a straight line.
+8. ASPECT RATIO: Aim for a "Wide" aspect ratio where the Total Width (Max gridX) is significantly larger than the Total Height (Max gridY). Minimize vertical distance between nodes.
 
 INPUT:
 - A list of screens with their names, types, and navigation connections.
