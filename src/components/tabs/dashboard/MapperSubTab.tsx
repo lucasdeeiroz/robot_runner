@@ -560,9 +560,11 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             // Re-fetch using refreshAll logic isn't ideal here due to async nature,
             // but we can reuse the logic in the explorer
             const xml = await invoke<string>('get_xml_dump', { deviceId: selectedDevice });
-            const freshScreenshotBase64 = await invoke<string>('get_screenshot', { deviceId: selectedDevice });
-            setScreenshot(freshScreenshotBase64);
-            const screenshot = freshScreenshotBase64;
+            const freshScreenshotBase64 = await invoke<string>('get_compressed_screenshot', { deviceId: selectedDevice, maxWidth: 1024, maxHeight: 1024 });
+            const prefix = 'data:image/jpeg;base64,';
+            const fullScreenshot = freshScreenshotBase64.startsWith('data:') ? freshScreenshotBase64 : `${prefix}${freshScreenshotBase64}`;
+            setScreenshot(fullScreenshot);
+            const screenshot = fullScreenshot;
             if (!isExploringRef.current) return;
 
             // 2. Prepare Context (Backend-powered)

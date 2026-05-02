@@ -83,7 +83,7 @@ pub async fn call_claude_code_cli(
         if let Some(b64) = image_base_64 {
             if !b64.is_empty() {
                 full_prompt = format!(
-                    "{}\n\n[VISUAL CONTEXT]: The following is a base64 encoded screenshot of the current screen. Please use it for visual analysis if your model supports decoding or acknowledging base64 images within text prompts:\n\nDATA:image/png;base64,{}",
+                    "{}\n\n[VISUAL CONTEXT]: The following is a base64 encoded screenshot of the current screen. Please use it for visual analysis:\n\n<screenshot_base64>\n{}\n</screenshot_base64>",
                     full_prompt,
                     b64
                 );

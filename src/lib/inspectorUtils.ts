@@ -39,37 +39,22 @@ export function transformBounds(
     actualImgWidth: number,
     actualImgHeight: number
 ): { x: number; y: number; w: number; h: number } {
-    // Detect if we need to swap/rotate
-    const xmlIsPortrait = xmlRootHeight > xmlRootWidth;
-    const imgIsPortrait = actualImgHeight > actualImgWidth;
+    if (xmlRootWidth === 0 || xmlRootHeight === 0) return bounds;
 
-    if (xmlIsPortrait !== imgIsPortrait) {
-        // Simple swap for orientation mismatch (Landscape screenshot vs Portrait XML)
-        // This assumes the coordinates are relative to the top-left in the current orientation
-        // but the bounds themselves might need swapping if it's a 90deg rotation.
+    // Calculate normalized positions (0-1) relative to the original XML resolution
+    const nx = bounds.x / xmlRootWidth;
+    const ny = bounds.y / xmlRootHeight;
+    const nw = bounds.w / xmlRootWidth;
+    const nh = bounds.h / xmlRootHeight;
 
-        // Usually, Android dumps in portrait (e.g. 1080x2400) even if rotated,
-        // but some systems might dump in the current orientation (2400x1080).
-        // If we have a mismatch, we likely need to "project" the portrait coordinates onto a landscape canvas.
-
-        // Calculate normalized positions (0-1)
-        const nx = bounds.x / xmlRootWidth;
-        const ny = bounds.y / xmlRootHeight;
-        const nw = bounds.w / xmlRootWidth;
-        const nh = bounds.h / xmlRootHeight;
-
-        // Project onto landscape
-        // Note: Simple scaling might be enough if the "stretched" look is just a scaling bug,
-        // but sometimes the axes are swapped.
-        return {
-            x: nx * actualImgWidth,
-            y: ny * actualImgHeight,
-            w: nw * actualImgWidth,
-            h: nh * actualImgHeight
-        };
-    }
-
-    return bounds;
+    // Project onto actual image dimensions (which might be resized/compressed)
+    // This handles scaling and orientation alignment by mapping normalized coordinates.
+    return {
+        x: nx * actualImgWidth,
+        y: ny * actualImgHeight,
+        w: nw * actualImgWidth,
+        h: nh * actualImgHeight
+    };
 }
 
 /**

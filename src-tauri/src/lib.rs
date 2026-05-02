@@ -13,6 +13,7 @@ mod ngrok;
 mod runner;
 mod system;
 mod xml_parser;
+mod image_utils;
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};

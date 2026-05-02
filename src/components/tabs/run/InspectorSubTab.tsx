@@ -254,7 +254,8 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
 
                 const response = await claudeCli.askClaudeCode(prompt, settings.paths.automationRoot || '', systemInstruction, settings.claudeCodeToken, {
                     allowedTools: ["Read"],
-                    jsonSchema: schema
+                    jsonSchema: schema,
+                    imageBase64: screenshot || undefined
                 });
 
                 if (typeof response !== 'string' && response.structured_output) {
@@ -276,11 +277,11 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                 
                 result = typeof response === 'string' ? response : response.result;
             } else if (provider === 'gemini') {
-                result = await gemini.askGemini(prompt, settings.geminiApiKey || '', settings.geminiModel, systemInstruction);
+                result = await gemini.askGemini(prompt, settings.geminiApiKey || '', settings.geminiModel, systemInstruction, screenshot || undefined);
             } else if (provider === 'claude') {
-                result = await claude.askClaude(prompt, settings.claudeApiKey || '', settings.claudeModel, systemInstruction);
+                result = await claude.askClaude(prompt, settings.claudeApiKey || '', settings.claudeModel, systemInstruction, screenshot || undefined);
             } else if (provider === 'openai') {
-                result = await openai.askOpenAI(prompt, settings.openaiApiKey || '', settings.openaiModel, systemInstruction);
+                result = await openai.askOpenAI(prompt, settings.openaiApiKey || '', settings.openaiModel, systemInstruction, screenshot || undefined);
             } else {
                 throw new Error("No AI provider configured");
             }

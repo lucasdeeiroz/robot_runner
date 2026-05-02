@@ -41,12 +41,16 @@ export function useDeviceViewport({
 
     const [availableNodes, setAvailableNodes] = useState<InspectorNode[]>([]);
 
-    const refreshAll = useCallback(async () => {
+    const refreshAll = useCallback(async (compressed: boolean = true) => {
         if (!deviceId) return;
         setLoading(true);
         try {
-            const b64 = await invoke<string>('get_screenshot', { deviceId });
-            setScreenshot(b64);
+            const b64 = compressed 
+                ? await invoke<string>('get_compressed_screenshot', { deviceId, maxWidth: 1024, maxHeight: 1024 })
+                : await invoke<string>('get_screenshot', { deviceId });
+            
+            const prefix = compressed ? 'data:image/jpeg;base64,' : 'data:image/png;base64,';
+            setScreenshot(b64.startsWith('data:') ? b64 : `${prefix}${b64}`);
 
             const xml = await invoke<string>('get_xml_dump', { deviceId });
             const parser = new XMLParser({
@@ -83,7 +87,7 @@ export function useDeviceViewport({
         if (isActive && !isBusy) {
             if (wasBusy) {
                 // Device just finished a busy task, wait a bit for system to settle
-                const timer = setTimeout(refreshAll, 1500);
+                const timer = setTimeout(() => refreshAll(), 1500);
                 return () => clearTimeout(timer);
             } else {
                 refreshAll();
@@ -93,21 +97,25 @@ export function useDeviceViewport({
 
     const addTapAnimation = useCallback((x: number, y: number) => {
         const id = Date.now();
-        if (!imgRef.current) return;
+        if (!imgRef.current || !rootNode?.bounds) return;
         const rect = imgRef.current.getBoundingClientRect();
-        const scaleX = rect.width / imgRef.current.naturalWidth;
-        const scaleY = rect.height / imgRef.current.naturalHeight;
+        
+        // Scale from XML space to screen space
+        const scaleX = rect.width / rootNode.bounds.w;
+        const scaleY = rect.height / rootNode.bounds.h;
 
         setTaps(prev => [...prev, { id, x: x * scaleX, y: y * scaleY }]);
         setTimeout(() => setTaps(prev => prev.filter(t => t.id !== id)), 500);
-    }, []);
+    }, [rootNode]);
 
     const addSwipeAnimation = useCallback((startX: number, startY: number, endX: number, endY: number) => {
         const id = Date.now();
-        if (!imgRef.current) return;
+        if (!imgRef.current || !rootNode?.bounds) return;
         const rect = imgRef.current.getBoundingClientRect();
-        const scaleX = rect.width / imgRef.current.naturalWidth;
-        const scaleY = rect.height / imgRef.current.naturalHeight;
+        
+        // Scale from XML space to screen space
+        const scaleX = rect.width / rootNode.bounds.w;
+        const scaleY = rect.height / rootNode.bounds.h;
 
         setSwipes(prev => [...prev, {
             id,
@@ -117,14 +125,14 @@ export function useDeviceViewport({
             endY: endY * scaleY
         }]);
         setTimeout(() => setSwipes(prev => prev.filter(s => s.id !== id)), 600);
-    }, []);
+    }, [rootNode]);
 
     const sendAdbInput = useCallback(async (cmd: string) => {
         if (!deviceId || isBusy) return;
         const args = ['shell', 'input', ...cmd.split(' ')];
         try {
             await invoke('run_adb_command', { device: deviceId, args });
-            setTimeout(refreshAll, 1500);
+            setTimeout(() => refreshAll(), 1500);
         } catch (e) {
             feedback.toast.error("inspector.input_error", e);
         }
@@ -133,13 +141,33 @@ export function useDeviceViewport({
     const getCoords = useCallback((e: React.MouseEvent<HTMLImageElement>) => {
         if (!imgRef.current) return null;
         const rect = imgRef.current.getBoundingClientRect();
+        
+        // Coords in Natural Image space (the resized dimensions)
         const scaleX = imgRef.current.naturalWidth / rect.width;
         const scaleY = imgRef.current.naturalHeight / rect.height;
+        const naturalX = (e.clientX - rect.left) * scaleX;
+        const naturalY = (e.clientY - rect.top) * scaleY;
+
+        // If we have a rootNode, we should scale back to its coordinate system (original device size)
+        if (rootNode?.bounds) {
+            const xmlW = rootNode.bounds.w;
+            const xmlH = rootNode.bounds.h;
+            const imgW = imgRef.current.naturalWidth;
+            const imgH = imgRef.current.naturalHeight;
+
+            if (imgW > 0 && imgH > 0) {
+                return {
+                    x: Math.round((naturalX / imgW) * xmlW),
+                    y: Math.round((naturalY / imgH) * xmlH)
+                };
+            }
+        }
+
         return {
-            x: Math.round((e.clientX - rect.left) * scaleX),
-            y: Math.round((e.clientY - rect.top) * scaleY)
+            x: Math.round(naturalX),
+            y: Math.round(naturalY)
         };
-    }, []);
+    }, [rootNode]);
 
     const processInteractionAt = useCallback((coords: { x: number, y: number }, isHover: boolean) => {
         if (!rootNode) return;

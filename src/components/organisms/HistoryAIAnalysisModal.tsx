@@ -140,22 +140,23 @@ const HistoryAIAnalysisModal: React.FC<HistoryAIAnalysisModalProps> = ({
             const deepContext = contextResponse.context;
             let result = "";
 
-            if (provider === 'gemini') {
-                result = await analyzeGemini(historyData, apiKey!, model, lang, deepContext, controller.signal, customPrompt);
-            } else if (provider === 'openai') {
-                result = await analyzeOpenAI(historyData, apiKey!, model, lang, deepContext, controller.signal, customPrompt);
-            } else if (provider === 'claude') {
-                result = await analyzeClaude(historyData, apiKey!, model, lang, deepContext, controller.signal, customPrompt);
-            } else if (provider === 'claude-code') {
-                const screenshotPath = (contextResponse.metadata as any)?.first_screenshot;
-                let base64Screenshot: string | undefined = undefined;
-                if (screenshotPath) {
-                    try {
-                        base64Screenshot = await invoke<string>('read_image_base64', { path: screenshotPath });
-                    } catch (err) {
-                        console.warn("Failed to read screenshot as base64 for history analysis:", err);
-                    }
+            const screenshotPath = (contextResponse.metadata as any)?.first_screenshot;
+            let base64Screenshot: string | undefined = undefined;
+            if (screenshotPath) {
+                try {
+                    base64Screenshot = await invoke<string>('read_compressed_image_base64', { path: screenshotPath });
+                } catch (err) {
+                    console.warn("Failed to read compressed screenshot for history analysis:", err);
                 }
+            }
+
+            if (provider === 'gemini') {
+                result = await analyzeGemini(historyData, apiKey!, model, lang, deepContext, controller.signal, customPrompt, base64Screenshot);
+            } else if (provider === 'openai') {
+                result = await analyzeOpenAI(historyData, apiKey!, model, lang, deepContext, controller.signal, customPrompt, base64Screenshot);
+            } else if (provider === 'claude') {
+                result = await analyzeClaude(historyData, apiKey!, model, lang, deepContext, controller.signal, customPrompt, base64Screenshot);
+            } else if (provider === 'claude-code') {
                 result = await analyzeClaudeCode(historyData, settings.paths.automationRoot || '', lang, deepContext, controller.signal, customPrompt, settings.claudeCodeToken, base64Screenshot);
             }
 

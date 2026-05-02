@@ -166,7 +166,7 @@ export const DeviceViewport: React.FC<DeviceViewportProps> = ({
 
             <img
                 ref={imgRef}
-                src={`data:image/png;base64,${screenshot}`}
+                src={screenshot}
                 alt="Device Screenshot"
                 className="block w-auto h-auto max-w-full select-none rounded-lg"
                 style={{ maxHeight }}

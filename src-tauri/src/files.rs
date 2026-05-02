@@ -122,6 +122,14 @@ pub fn read_image_base64(path: String) -> AppResult<String> {
 }
 
 #[command]
+pub fn read_compressed_image_base64(path: String, max_width: Option<u32>, max_height: Option<u32>) -> AppResult<String> {
+    use crate::image_utils;
+    let w = max_width.unwrap_or(800);
+    let h = max_height.unwrap_or(800);
+    image_utils::compress_image_path(&path, w, h, 80)
+}
+
+#[command]
 pub fn save_image(path: String, content: Vec<u8>) -> AppResult<()> {
     use std::io::Write;
     let mut file = fs::File::create(&path).map_err(|e| AppError::FileSystemError(e.to_string()))?;

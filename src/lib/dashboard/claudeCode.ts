@@ -70,11 +70,15 @@ export async function askClaudeCode(
         : prompt + formatReminder;
 
     try {
+        const cleanBase64 = options?.imageBase64?.includes('base64,') 
+            ? options.imageBase64.split('base64,')[1] 
+            : options?.imageBase64;
+
         const rawResult = await invoke<string>('call_claude_code_cli', {
             prompt: fullPrompt,
             projectRoot,
             token,
-            imageBase64: options?.imageBase64,
+            imageBase64: cleanBase64,
             allowedTools: options?.allowedTools,
             jsonSchema: options?.jsonSchema ? JSON.stringify(options.jsonSchema) : undefined,
             resumeSessionId: options?.resumeSessionId

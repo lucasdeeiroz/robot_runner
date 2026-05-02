@@ -157,7 +157,7 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({
                 return;
             }
             try {
-                const b64 = await invoke<string>('read_image_base64', { path });
+                const b64 = await invoke<string>('read_compressed_image_base64', { path });
                 const ext = path.split('.').pop()?.toLowerCase() || 'png';
                 const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' :
                     ext === 'gif' ? 'image/gif' :
