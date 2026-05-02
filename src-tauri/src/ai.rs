@@ -1,4 +1,3 @@
-use crate::cmd_utils::new_tokio_command;
 use crate::errors::{AppResult, AppError};
 use tauri::command;
 use std::process::Stdio;
@@ -8,21 +7,36 @@ pub async fn call_claude_code_cli(
     prompt: String, 
     project_root: String, 
     token: Option<String>,
-    _screenshot_path: Option<String>
+    screenshot_path: Option<String>
 ) -> AppResult<String> {
-    // Run: claude --output-format json --bare
-    // --bare avoids loading plugins/MCPs for speed in automated calls
-    #[cfg(target_os = "windows")]
-    let mut command = new_tokio_command("claude.cmd");
-    #[cfg(not(target_os = "windows"))]
-    let mut command = new_tokio_command("claude");
-
-    command.args(&["--output-format", "json", "--bare"]);
+    let _ = screenshot_path; 
     
+    #[cfg(target_os = "windows")]
+    let mut command = {
+        use std::os::windows::process::CommandExt;
+        let mut cmd = tokio::process::Command::new("cmd");
+        cmd.args(&["/C", "claude.cmd"]);
+        cmd.as_std_mut().creation_flags(0x08000000); // CREATE_NO_WINDOW
+        cmd
+    };
+    #[cfg(not(target_os = "windows"))]
+    let mut command = tokio::process::Command::new("claude");
+
+    // Using JSON output format for reliable parsing
+    command.args(&["--output-format", "json"]);
+    
+    // Inject all possible token environment variables if a token is provided
     if let Some(ref t) = token {
         let trimmed_token = t.trim();
         if !trimmed_token.is_empty() {
             command.env("CLAUDE_CODE_OAUTH_TOKEN", trimmed_token);
+            command.env("CLAUDE_CODE_TOKEN", trimmed_token);
+            command.env("ANTHROPIC_OAUTH_TOKEN", trimmed_token);
+            
+            // If it looks like a regular API key, set that too
+            if !trimmed_token.starts_with("sk-ant-oat01-") {
+                command.env("ANTHROPIC_API_KEY", trimmed_token);
+            }
         }
     }
     
@@ -45,12 +59,12 @@ pub async fn call_claude_code_cli(
 
     let output = child.wait_with_output().await.map_err(|e| AppError::ProcessError(format!("Failed to wait for Claude CLI: {}", e)))?;
     
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    
     if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        Ok(stdout)
     } else {
-        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        
         let mut error_msg = if !stderr.is_empty() {
             stderr
         } else if !stdout.is_empty() {
