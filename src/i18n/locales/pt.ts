@@ -1105,7 +1105,10 @@ export const pt = {
                     help: "Este provedor utiliza o comando local 'claude'. Nenhuma API Key é necessária, pois utiliza a autenticação do sistema (planos Team/Enterprise).",
                     check_install: "Verificar Instalação",
                     installed: "Claude CLI detectado! Versão: {{version}}",
-                    not_installed: "Claude CLI não encontrado. Instale via 'npm install -g @anthropic-ai/claude-code'."
+                    not_installed: "Claude CLI não encontrado. Instale via 'npm install -g @anthropic-ai/claude-code'.",
+                    token_label: "Token OAuth (Opcional)",
+                    token_placeholder: "Cole o token de 'claude setup-token'",
+                    token_help: "Se o seu CLI reportar \"Not logged in\", cole o token gerado ao executar 'claude setup-token' no seu terminal."
                 },
                 max_exploration_steps: "Limite de Passos de Exploração",
                 max_exploration_steps_help: "Número máximo de ações autônomas que a IA realizará antes de interromper a exploração."
