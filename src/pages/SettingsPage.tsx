@@ -120,6 +120,13 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
         return () => observer.disconnect();
     }, []);
 
+    // Clear available models when provider changes
+    useEffect(() => {
+        setAvailableModels([]);
+        setModelFetchError(null);
+        setShowModelList(false);
+    }, [settings.aiProvider]);
+
 
 
     const handleLogoUpload = async (key: 'customLogoLight' | 'customLogoDark') => {
@@ -853,6 +860,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                 <Select
                                     value={settings.aiProvider || 'gemini'}
                                     onChange={(e) => updateSetting('aiProvider', e.target.value as any)}
+                                    containerClassName="w-48"
                                     options={[
                                         { value: 'gemini', label: t('settings.ai.gemini.title') },
                                         { value: 'claude', label: t('settings.ai.claude.title') },
@@ -903,7 +911,14 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                                 </div>
                                             ) : availableModels.length > 0 ? (
                                                 availableModels.map(model => (
-                                                    <button key={model} className="w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0" onClick={() => { updateSetting('geminiModel', model); setShowModelList(false); }}>{model}</button>
+                                                    <button 
+                                                        key={model} 
+                                                        type="button"
+                                                        className="w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0" 
+                                                        onMouseDown={() => { updateSetting('geminiModel', model); setShowModelList(false); }}
+                                                    >
+                                                        {model}
+                                                    </button>
                                                 ))
                                             ) : (
                                                 <div className="px-3 py-4 text-sm text-on-surface-variant/60 italic text-center">
@@ -956,7 +971,14 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                                 </div>
                                             ) : availableModels.length > 0 ? (
                                                 availableModels.map(model => (
-                                                    <button key={model} className="w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0" onClick={() => { updateSetting('claudeModel', model); setShowModelList(false); }}>{model}</button>
+                                                    <button 
+                                                        key={model} 
+                                                        type="button"
+                                                        className="w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0" 
+                                                        onMouseDown={() => { updateSetting('claudeModel', model); setShowModelList(false); }}
+                                                    >
+                                                        {model}
+                                                    </button>
                                                 ))
                                             ) : (
                                                 <div className="px-3 py-4 text-sm text-on-surface-variant/60 italic text-center">
@@ -1009,7 +1031,14 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                                 </div>
                                             ) : availableModels.length > 0 ? (
                                                 availableModels.map(model => (
-                                                    <button key={model} className="w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0" onClick={() => { updateSetting('openaiModel', model); setShowModelList(false); }}>{model}</button>
+                                                    <button 
+                                                        key={model} 
+                                                        type="button"
+                                                        className="w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0" 
+                                                        onMouseDown={() => { updateSetting('openaiModel', model); setShowModelList(false); }}
+                                                    >
+                                                        {model}
+                                                    </button>
                                                 ))
                                             ) : (
                                                 <div className="px-3 py-4 text-sm text-on-surface-variant/60 italic text-center">
