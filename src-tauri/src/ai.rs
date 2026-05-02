@@ -14,14 +14,12 @@ pub async fn call_claude_code_cli(
 ) -> AppResult<String> {
     #[cfg(target_os = "windows")]
     let mut command = {
-        use std::os::windows::process::CommandExt;
-        let mut cmd = tokio::process::Command::new("cmd");
+        let mut cmd = crate::cmd_utils::new_tokio_command("cmd");
         cmd.args(&["/C", "claude.cmd"]);
-        cmd.as_std_mut().creation_flags(0x08000000); // CREATE_NO_WINDOW
         cmd
     };
     #[cfg(not(target_os = "windows"))]
-    let mut command = tokio::process::Command::new("claude");
+    let mut command = crate::cmd_utils::new_tokio_command("claude");
 
     // -p is the programmatic mode
     command.arg("-p");
