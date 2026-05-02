@@ -14,6 +14,7 @@ macro_rules! generate_robot_runner_handler {
             crate::runner::run_appium_test,
             crate::runner::stop_test,
             crate::inspector::get_screenshot,
+            crate::inspector::get_compressed_screenshot,
             crate::inspector::get_xml_dump,
             crate::logs::get_test_history,
             crate::logs::open_log_folder,
@@ -49,6 +50,7 @@ macro_rules! generate_robot_runner_handler {
             crate::files::read_file,
             crate::files::read_file_tail,
             crate::files::read_image_base64,
+            crate::files::read_compressed_image_base64,
             crate::files::save_image,
             crate::ai_context::get_ai_context,
             crate::adb::packages::get_installed_packages,
@@ -70,7 +72,8 @@ macro_rules! generate_robot_runner_handler {
             crate::system::toggle_wakelock,
             crate::system::sync_workspace_permissions,
             crate::auth::start_auth_server,
-            crate::system::get_folder_size
+            crate::system::get_folder_size,
+            crate::ai::call_claude_code_cli
         ]
     };
 }

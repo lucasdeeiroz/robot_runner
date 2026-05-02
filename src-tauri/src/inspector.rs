@@ -29,6 +29,33 @@ pub async fn get_screenshot(device_id: String) -> Result<String, String> {
 }
 
 #[command]
+pub async fn get_compressed_screenshot(device_id: String, max_width: Option<u32>, max_height: Option<u32>) -> Result<String, String> {
+    use crate::cmd_utils::new_tokio_command;
+    use crate::image_utils;
+
+    let mut cmd = new_tokio_command("adb");
+    cmd.args(&["-s", &device_id, "exec-out", "screencap", "-p"]);
+
+    let output = cmd
+        .output()
+        .await
+        .map_err(|e| format!("Failed to execute adb screencap: {}", e))?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "ADB screencap failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+
+    let w = max_width.unwrap_or(800);
+    let h = max_height.unwrap_or(800);
+    
+    image_utils::compress_and_resize_image(output.stdout, w, h, 80)
+        .map_err(|e| format!("Image processing failed: {}", e))
+}
+
+#[command]
 pub async fn get_xml_dump(device_id: String) -> Result<String, String> {
     // 1. Run uiautomator dump (with retries)
     let mut attempts = 0;

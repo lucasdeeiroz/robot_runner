@@ -40,6 +40,7 @@ pub struct SystemVersions {
     pub maven: String,
     pub maestro: String,
     pub ngrok: String,
+    pub claude_code: String,
 }
 
 pub struct WakelockState(pub Mutex<Option<NoSleep>>);
@@ -179,6 +180,8 @@ pub async fn get_system_versions(
         "Not Checked".to_string()
     };
 
+    let claude_code = get_version("claude", &["--version"]);
+
     SystemVersions {
         adb,
         appium,
@@ -192,6 +195,7 @@ pub async fn get_system_versions(
         maven,
         maestro,
         ngrok,
+        claude_code,
     }
 }
 

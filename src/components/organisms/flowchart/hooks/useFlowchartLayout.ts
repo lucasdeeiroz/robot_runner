@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { reorganizeFlowchartLayout as reorganizeWithGemini } from '@/lib/dashboard/gemini';
 import { reorganizeFlowchartLayout as reorganizeWithOpenAI } from '@/lib/dashboard/openai';
 import { reorganizeFlowchartLayout as reorganizeWithClaude } from '@/lib/dashboard/claude';
+import { reorganizeFlowchartLayout as reorganizeWithClaudeCode } from '@/lib/dashboard/claudeCode';
 import { getAiContext } from '@/lib/dashboard/historyAnalysisUtils';
 
 
@@ -172,6 +173,8 @@ export function useFlowchartLayout({ maps, activeProfileId, onRefresh, settings 
                 const apiKey = settings.claudeApiKey;
                 const model = settings.claudeModel || 'claude-3-5-sonnet-20240620';
                 result = await reorganizeWithClaude(context, apiKey, model, language, undefined, customPrompt);
+            } else if (provider === 'claude-code') {
+                result = await reorganizeWithClaudeCode(context, settings.paths.automationRoot || '', language, undefined, customPrompt, settings.claudeCodeToken);
             } else {
                 const apiKey = settings.geminiApiKey;
                 const model = settings.geminiModel || 'gemini-1.5-pro';

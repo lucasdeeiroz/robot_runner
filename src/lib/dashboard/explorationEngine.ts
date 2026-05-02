@@ -16,6 +16,7 @@ export interface ExplorationState {
     previousScreenName?: string;
     previousActionTargetId?: string; // short_id of the element clicked on the previous screen
     previousActionType?: string; // type of action (click, etc.)
+    sessionId?: string; // Session ID for Claude Code continuity
 }
 
 export interface ExplorationAction {
@@ -193,5 +194,13 @@ export class AutonomousExplorer {
         this.state.previousScreenName = undefined;
         this.state.previousActionTargetId = undefined;
         this.state.previousActionType = undefined;
+    }
+
+    public setSessionId(sessionId: string) {
+        this.state.sessionId = sessionId;
+    }
+
+    public getSessionId(): string | undefined {
+        return this.state.sessionId;
     }
 }

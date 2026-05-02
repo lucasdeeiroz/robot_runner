@@ -17,6 +17,7 @@ import { useSettings } from "@/lib/settings";
 import { askGemini } from "@/lib/dashboard/gemini";
 import { askClaude } from "@/lib/dashboard/claude";
 import { askOpenAI } from "@/lib/dashboard/openai";
+import { askClaudeCode } from "@/lib/dashboard/claudeCode";
 import { feedback } from "@/lib/feedback";
 import { AiButton } from "../atoms/AiButton";
 import { AiResponse } from "./AiResponse";
@@ -156,7 +157,7 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({
                 return;
             }
             try {
-                const b64 = await invoke<string>('read_image_base64', { path });
+                const b64 = await invoke<string>('read_compressed_image_base64', { path });
                 const ext = path.split('.').pop()?.toLowerCase() || 'png';
                 const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' :
                     ext === 'gif' ? 'image/gif' :
@@ -411,6 +412,9 @@ Error Message: ${(node as TestNode).failureDetail?.message}
                                                             result = await askClaude(prompt, settings.claudeApiKey || '', settings.claudeModel, systemInstruction, screenshot);
                                                         } else if (provider === 'openai') {
                                                             result = await askOpenAI(prompt, settings.openaiApiKey || '', settings.openaiModel, systemInstruction, screenshot);
+                                                         } else if (provider === 'claude-code') {
+                                                            const response = await askClaudeCode(prompt, settings.paths.automationRoot || '', systemInstruction, settings.claudeCodeToken, { imageBase64: screenshot });
+                                                            result = typeof response === 'string' ? response : response.result;
                                                         } else {
                                                             throw new Error("No AI provider configured");
                                                         }

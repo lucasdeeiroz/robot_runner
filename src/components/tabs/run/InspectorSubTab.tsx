@@ -14,6 +14,7 @@ import { useSettings } from "@/lib/settings";
 import * as gemini from "@/lib/dashboard/gemini";
 import * as claude from "@/lib/dashboard/claude";
 import * as openai from "@/lib/dashboard/openai";
+import * as claudeCli from "@/lib/dashboard/claudeCode";
 import { AiButton } from "@/components/atoms/AiButton";
 import { AiResponse } from "@/components/molecules/AiResponse";
 import { getSmartSelectorPrompt } from "@/lib/dashboard/prompts";
@@ -241,39 +242,85 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
             let result = "";
             const provider = settings.aiProvider;
 
-            if (provider === 'gemini') {
-                result = await gemini.askGemini(prompt, settings.geminiApiKey || '', settings.geminiModel, systemInstruction);
+            if (provider === 'claude-code') {
+                const schema = {
+                    type: "object",
+                    properties: {
+                        selector: { type: "string" },
+                        rationale: { type: "string" }
+                    },
+                    required: ["selector", "rationale"]
+                };
+
+                const response = await claudeCli.askClaudeCode(prompt, settings.paths.automationRoot || '', systemInstruction, settings.claudeCodeToken, {
+                    allowedTools: ["Read"],
+                    jsonSchema: schema,
+                    imageBase64: screenshot || undefined
+                });
+
+                if (typeof response !== 'string' && response.structured_output) {
+                    setAiSuggestion(response.structured_output.selector);
+                    setAiRationale(response.structured_output.rationale);
+                    
+                    if (selectedNode.id) {
+                        setAiCache(prev => ({
+                            ...prev,
+                            [selectedNode.id]: {
+                                suggestion: response.structured_output.selector,
+                                rationale: response.structured_output.rationale
+                            }
+                        }));
+                    }
+                    setIsAiLoading(false);
+                    return;
+                }
+                
+                result = typeof response === 'string' ? response : response.result;
+            } else if (provider === 'gemini') {
+                result = await gemini.askGemini(prompt, settings.geminiApiKey || '', settings.geminiModel, systemInstruction, screenshot || undefined);
             } else if (provider === 'claude') {
-                result = await claude.askClaude(prompt, settings.claudeApiKey || '', settings.claudeModel, systemInstruction);
+                result = await claude.askClaude(prompt, settings.claudeApiKey || '', settings.claudeModel, systemInstruction, screenshot || undefined);
             } else if (provider === 'openai') {
-                result = await openai.askOpenAI(prompt, settings.openaiApiKey || '', settings.openaiModel, systemInstruction);
+                result = await openai.askOpenAI(prompt, settings.openaiApiKey || '', settings.openaiModel, systemInstruction, screenshot || undefined);
             } else {
                 throw new Error("No AI provider configured");
             }
 
             // Simple parsing of "Selector: " and "Rationale: "
-            const selectorMatch = result.match(/Selector:\s*([^\n]*)/i);
-            const rationaleMatch = result.match(/Rationale:\s*([\s\S]*)/i);
+            // Improved parsing: handle cases where the AI might not include prefixes or includes metadata
+            const selectorMatch = result.match(/Selector:\s*([^\n\r"]*)/i);
+            const rationaleMatch = result.match(/Rationale:\s*([\s\S]*?)(?=\s*","|$)/i);
 
+            let cleanSelector = "";
             if (selectorMatch) {
-                setAiSuggestion(selectorMatch[1].trim().replace(/`|"/g, ''));
+                cleanSelector = selectorMatch[1].trim().replace(/`|"/g, '');
             } else {
-                // fallback if AI didn't follow format exactly
-                setAiSuggestion(result.split('\n')[0]);
+                // If no "Selector:" prefix, try to get the first line but stop if it looks like metadata
+                const firstLine = result.split('\n')[0].trim();
+                cleanSelector = firstLine.split('","')[0].replace(/`|"/g, '');
+            }
+            let cleanRationale = "";
+            if (rationaleMatch) {
+                cleanRationale = rationaleMatch[1].trim();
+            } else {
+                // If no "Rationale:" prefix, use the whole result but exclude the selector line
+                const lines = result.split('\n');
+                if (lines.length > 1) {
+                    cleanRationale = lines.slice(1).join('\n').trim().split('","')[0];
+                } else {
+                    cleanRationale = result.split('","')[0];
+                }
             }
 
-            if (rationaleMatch) {
-                setAiRationale(rationaleMatch[1].trim());
-            } else {
-                setAiRationale(result);
-            }
+            setAiSuggestion(cleanSelector);
+            setAiRationale(cleanRationale);
 
             // Save to cache
             setAiCache(prev => ({
                 ...prev,
                 [selectedNode.id]: {
-                    suggestion: selectorMatch ? selectorMatch[1].trim().replace(/`|"/g, '') : result.split('\n')[0],
-                    rationale: rationaleMatch ? rationaleMatch[1].trim() : result
+                    suggestion: cleanSelector,
+                    rationale: cleanRationale
                 }
             }));
 

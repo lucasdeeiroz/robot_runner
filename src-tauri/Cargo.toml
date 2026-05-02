@@ -45,6 +45,7 @@ rusqlite = { version = "0.39.0", features = ["bundled"] }
 futures = "0.3"
 thiserror = "2"
 tauri-plugin-os = "2.3.2"
+image = "0.25"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

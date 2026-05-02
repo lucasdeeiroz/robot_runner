@@ -14,6 +14,7 @@ import { AiButton } from "@/components/atoms/AiButton";
 import { generateRefinedTestCases as generateWithGemini, AIGenerationType } from '@/lib/dashboard/gemini';
 import { generateRefinedTestCases as generateWithClaude } from '@/lib/dashboard/claude';
 import { generateRefinedTestCases as generateWithOpenAI } from '@/lib/dashboard/openai';
+import { generateRefinedTestCases as generateWithClaudeCode } from '@/lib/dashboard/claudeCode';
 import { getAiContext } from '@/lib/dashboard/historyAnalysisUtils';
 import { exportToXlsx, exportToDocx } from '@/lib/dashboard/export';
 import { addToHistory } from './HistoryPanel';
@@ -36,9 +37,9 @@ export function AIGeneratorSubTab({ onNavigate }: AIGeneratorSubTabProps) {
     const [isGenerating, setIsGenerating] = useState(false);
 
     const provider = settings.aiProvider || 'gemini';
-    const apiKey = provider === 'gemini' ? settings.geminiApiKey : provider === 'claude' ? settings.claudeApiKey : settings.openaiApiKey;
-    const model = provider === 'gemini' ? settings.geminiModel : provider === 'claude' ? settings.claudeModel : settings.openaiModel;
-    const hasApiKey = !!apiKey;
+    const apiKey = provider === 'gemini' ? settings.geminiApiKey : provider === 'claude' ? settings.claudeApiKey : provider === 'openai' ? settings.openaiApiKey : 'CLI_MODE';
+    const model = provider === 'gemini' ? settings.geminiModel : provider === 'claude' ? settings.claudeModel : provider === 'openai' ? settings.openaiModel : 'claude-code';
+    const hasApiKey = provider === 'claude-code' ? true : !!apiKey;
 
     const handleGenerate = async (customPrompt?: string) => {
         if (!requirements.trim() || !hasApiKey) return;
@@ -62,6 +63,8 @@ export function AIGeneratorSubTab({ onNavigate }: AIGeneratorSubTabProps) {
                 aiResponse = await generateWithClaude(requirements, apiKey as string, model, currentLang, mapsContext as any, genType, undefined, customPrompt);
             } else if (provider === 'openai') {
                 aiResponse = await generateWithOpenAI(requirements, apiKey as string, model, currentLang, mapsContext as any, genType, undefined, customPrompt);
+            } else if (provider === 'claude-code') {
+                aiResponse = await generateWithClaudeCode(requirements, settings.paths.automationRoot || '', currentLang, mapsContext as any, genType, customPrompt, settings.claudeCodeToken);
             }
 
             setGeneratedContent(aiResponse);

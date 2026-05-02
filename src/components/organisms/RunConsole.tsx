@@ -16,6 +16,7 @@ import { useSettings } from "@/lib/settings";
 import * as gemini from "@/lib/dashboard/gemini";
 import * as openai from "@/lib/dashboard/openai";
 import * as claude from "@/lib/dashboard/claude";
+import * as claudeCli from "@/lib/dashboard/claudeCode";
 import { useCallback } from "react";
 
 interface RunConsoleProps {
@@ -197,13 +198,15 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
 
             if (provider === 'gemini') {
                 if (!settings.geminiApiKey) throw new Error("Missing Gemini API Key");
-                result = await gemini.summarizeExecution(tree, settings.geminiApiKey, settings.geminiModel || '', language, failureContext, undefined, customPrompt);
+                result = await gemini.summarizeExecution(tree, settings.geminiApiKey as string, settings.geminiModel || '', language, failureContext, undefined, customPrompt);
             } else if (provider === 'openai') {
                 if (!settings.openaiApiKey) throw new Error("Missing OpenAI API Key");
-                result = await openai.summarizeExecution(tree, settings.openaiApiKey, settings.openaiModel || '', language, failureContext, undefined, customPrompt);
+                result = await openai.summarizeExecution(tree, settings.openaiApiKey as string, settings.openaiModel || '', language, failureContext, undefined, customPrompt);
             } else if (provider === 'claude') {
                 if (!settings.claudeApiKey) throw new Error("Missing Claude API Key");
-                result = await claude.summarizeExecution(tree, settings.claudeApiKey, settings.claudeModel || '', language, failureContext, undefined, customPrompt);
+                result = await claude.summarizeExecution(tree, settings.claudeApiKey as string, settings.claudeModel || '', language, failureContext, undefined, customPrompt);
+            } else if (provider === 'claude-code') {
+                result = await claudeCli.summarizeExecution(tree, settings.paths.automationRoot || '', language, failureContext?.map(f => f.message) || [], failureContext, customPrompt, settings.claudeCodeToken);
             }
 
             setSummary(result);

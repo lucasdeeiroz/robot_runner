@@ -384,9 +384,6 @@ ${elements.map(el => `- Name: "${el.name}" (Type: ${el.type})`).join('\n')}
     }
 }
 
-/**
- * Analyzes test history for flakiness and trends.
- */
 export async function analyzeTestHistory(
     history: any[],
     apiKey: string,
@@ -394,7 +391,8 @@ export async function analyzeTestHistory(
     language: string,
     deepContext?: Record<string, DeepAnalysisContext> | string,
     signal?: AbortSignal,
-    customPrompt?: string
+    customPrompt?: string,
+    imageBase64?: string
 ): Promise<string> {
     const systemInstruction = getTestHistoryAnalysisPrompt(language, customPrompt);
 
@@ -428,7 +426,7 @@ export async function analyzeTestHistory(
     const prompt = `History Data (JSON):\n${JSON.stringify(historySummary)}${deepContextStr}`;
 
     try {
-        return await askClaude(prompt, apiKey, model, systemInstruction, undefined, signal);
+        return await askClaude(prompt, apiKey, model, systemInstruction, imageBase64, signal);
     } catch (e) {
         console.error("Claude analyzeTestHistory failure:", e);
         throw e;
@@ -445,7 +443,8 @@ export async function summarizeExecution(
     language: string,
     failureContext?: any[],
     signal?: AbortSignal,
-    customPrompt?: string
+    customPrompt?: string,
+    imageBase64?: string
 ): Promise<string> {
     const cleanAnsi = (l: string) => l.replace(/\x1b\[[0-9;]*m/g, '').replace(/[\x00-\x1f\x7f-\x9f]/g, '');
 
@@ -532,7 +531,7 @@ export async function summarizeExecution(
     const prompt = `Execution Tree Structure:\n${JSON.stringify(simplify(tree))}${overallStats}${failureContextStr}`;
 
     try {
-        return await askClaude(prompt, apiKey, model, systemInstruction, undefined, signal);
+        return await askClaude(prompt, apiKey, model, systemInstruction, imageBase64, signal);
     } catch (e) {
         console.error("Claude summarizeExecution failure:", e);
         throw e;

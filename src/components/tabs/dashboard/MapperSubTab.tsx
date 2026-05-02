@@ -33,6 +33,7 @@ import { AiResponse } from "@/components/molecules/AiResponse";
 import * as gemini from '@/lib/dashboard/gemini';
 import * as claude from '@/lib/dashboard/claude';
 import * as openai from '@/lib/dashboard/openai';
+import * as claudeCli from '@/lib/dashboard/claudeCode';
 import { AutonomousExplorer, LogEntry, ExplorationAction } from '@/lib/dashboard/explorationEngine';
 import { getAiContext } from '@/lib/dashboard/historyAnalysisUtils';
 import { ExplorationLogTree } from '@/components/molecules/ExplorationLogTree';
@@ -72,6 +73,11 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     const [mappedElements, setMappedElements] = useState<UIElementMap[]>([]);
     const [currentElement, setCurrentElement] = useState<Partial<UIElementMap>>({});
     const [savedMaps, setSavedMaps] = useState<ScreenMap[]>([]);
+    const savedMapsRef = useRef<ScreenMap[]>([]);
+
+    useEffect(() => {
+        savedMapsRef.current = savedMaps;
+    }, [savedMaps]);
     const [showLoadMenu, setShowLoadMenu] = useState(false);
     const loadMenuRef = useRef<HTMLDivElement>(null);
     const [showElementsMenu, setShowElementsMenu] = useState(false);
@@ -102,8 +108,9 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         if (provider === 'gemini') return !!settings.geminiApiKey;
         if (provider === 'claude') return !!settings.claudeApiKey;
         if (provider === 'openai') return !!settings.openaiApiKey;
+        if (provider === 'claude-code') return true; // Always allow, as CLI may be pre-authenticated
         return false;
-    }, [settings.aiProvider, settings.geminiApiKey, settings.claudeApiKey, settings.openaiApiKey]);
+    }, [settings.aiProvider, settings.geminiApiKey, settings.claudeApiKey, settings.openaiApiKey, settings.claudeCodeToken]);
     const [isStayOn, setIsStayOn] = useState(false);
     const [isExploring, setIsExploring] = useState(false);
     const isExploringRef = useRef(false);
@@ -272,7 +279,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
         debounceTimerRef.current = setTimeout(async () => {
             setIsSaving(true);
-            const existingMap = savedMaps.find(m => m.id === screenName.toLowerCase().replace(/\s+/g, '_'));
+            const existingMap = savedMapsRef.current.find(m => m.id === screenName.toLowerCase().replace(/\s+/g, '_'));
             const map: ScreenMap = {
                 id: screenName.toLowerCase().replace(/\s+/g, '_'),
                 name: screenName,
@@ -298,7 +305,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         return () => {
             if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
         };
-    }, [screenName, screenType, screenDescription, screenTags, mappedElements, screenshot, activeProfileId, savedMaps]);
+    }, [screenName, screenType, screenDescription, screenTags, mappedElements, screenshot, activeProfileId]);
 
 
     const handleLoadScreen = (map: ScreenMap) => {
@@ -383,7 +390,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         const apiKey = aiProvider === 'gemini' ? geminiApiKey : aiProvider === 'claude' ? claudeApiKey : openaiApiKey;
         const model = aiProvider === 'gemini' ? geminiModel : aiProvider === 'claude' ? claudeModel : openaiModel;
 
-        if (!apiKey) {
+        if (!apiKey && aiProvider !== 'claude-code') {
             feedback.toast.error(t('dashboard.generator.key_required', { provider: aiProvider.toUpperCase() }));
             return;
         }
@@ -424,11 +431,13 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             console.log(`[AI Debug] Prompt Context Size: ~${JSON.stringify(criticalAttrs).length + JSON.stringify(optimizedMaps).length} chars`);
 
             if (aiProvider === 'gemini') {
-                result = await gemini.suggestElementName(criticalAttrs as any, screenName, apiKey, model, lang, optimizedMaps as any, undefined, customPrompt);
+                result = await gemini.suggestElementName(criticalAttrs as any, screenName, apiKey!, model, lang, optimizedMaps as any, undefined, customPrompt);
             } else if (aiProvider === 'openai') {
-                result = await openai.suggestElementName(criticalAttrs as any, screenName, apiKey, model, lang, optimizedMaps as any, undefined, customPrompt);
+                result = await openai.suggestElementName(criticalAttrs as any, screenName, apiKey!, model, lang, optimizedMaps as any, undefined, customPrompt);
             } else if (aiProvider === 'claude') {
-                result = await claude.suggestElementName(criticalAttrs as any, screenName, apiKey, model, lang, optimizedMaps as any, undefined, customPrompt);
+                result = await claude.suggestElementName(criticalAttrs as any, screenName, apiKey!, model, lang, optimizedMaps as any, undefined, customPrompt);
+            } else if (aiProvider === 'claude-code') {
+                result = await claudeCli.suggestElementName(criticalAttrs as any, screenName, settings.paths.automationRoot || '', lang, optimizedMaps as any, customPrompt, settings.claudeCodeToken, screenshot || undefined);
             }
 
             if (result && result.name) {
@@ -436,7 +445,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 setAiJustification(result.justification);
                 feedback.toast.success(t('mapper.feedback.ai_success'));
             } else {
-                throw new Error("Empty suggestion");
+                throw new Error("Empty suggestion or invalid format returned by AI");
             }
         } catch (error: any) {
             console.error("AI Suggestion Error:", error);
@@ -455,7 +464,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         const apiKey = aiProvider === 'gemini' ? geminiApiKey : aiProvider === 'claude' ? claudeApiKey : openaiApiKey;
         const model = aiProvider === 'gemini' ? geminiModel : aiProvider === 'claude' ? claudeModel : openaiModel;
 
-        if (!apiKey) {
+        if (!apiKey && aiProvider !== 'claude-code') {
             feedback.toast.error(t('dashboard.generator.key_required', { provider: aiProvider.toUpperCase() }));
             return;
         }
@@ -469,17 +478,28 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             const elementsContext = mappedElements.map(el => ({ name: el.name, type: el.type }));
 
             if (aiProvider === 'gemini') {
-                tags = await gemini.suggestScreenTags(screenName || "Current Screen", elementsContext, apiKey, model, lang, screenshot || undefined, undefined, customPrompt);
+                tags = await gemini.suggestScreenTags(screenName || "Current Screen", elementsContext, apiKey!, model, lang, screenshot || undefined, undefined, customPrompt);
             } else if (aiProvider === 'openai') {
-                tags = await openai.suggestScreenTags(screenName || "Current Screen", elementsContext, apiKey, model, lang, screenshot || undefined, undefined, customPrompt);
+                tags = await openai.suggestScreenTags(screenName || "Current Screen", elementsContext, apiKey!, model, lang, screenshot || undefined, undefined, customPrompt);
             } else if (aiProvider === 'claude') {
-                tags = await claude.suggestScreenTags(screenName || "Current Screen", elementsContext, apiKey, model, lang, screenshot || undefined, undefined, customPrompt);
+                tags = await claude.suggestScreenTags(screenName || "Current Screen", elementsContext, apiKey!, model, lang, screenshot || undefined, undefined, customPrompt);
+            } else if (aiProvider === 'claude-code') {
+                tags = await claudeCli.suggestScreenTags(screenName || "Current Screen", elementsContext, settings.paths.automationRoot || '', lang, customPrompt, settings.claudeCodeToken, screenshot || undefined);
             }
 
-            if (tags && tags.length > 0) {
-                // Merge with existing tags, ensuring uniqueness
-                setScreenTags(prev => [...new Set([...prev, ...tags])]);
-                feedback.toast.success(t('mapper.feedback.ai_success'));
+            if (tags && Array.isArray(tags) && tags.length > 0) {
+                // Merge with existing tags, ensuring uniqueness and checking if anything changed
+                const existingTagsSet = new Set(screenTags);
+                const trulyNewTags = tags.filter(tag => tag && !existingTagsSet.has(tag));
+
+                if (trulyNewTags.length > 0) {
+                    setScreenTags(prev => [...new Set([...prev, ...trulyNewTags])]);
+                    feedback.toast.success(t('mapper.feedback.ai_success'));
+                } else {
+                    feedback.toast.raw.info(t('mapper.feedback.ai_no_new_tags', 'No new tags found'));
+                }
+            } else if (tags && Array.isArray(tags)) {
+                feedback.toast.raw.info(t('mapper.feedback.ai_no_tags', 'No tags suggested for this screen'));
             }
         } catch (error) {
             console.error("AI Tag Suggestion Error:", error);
@@ -545,9 +565,11 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             // Re-fetch using refreshAll logic isn't ideal here due to async nature,
             // but we can reuse the logic in the explorer
             const xml = await invoke<string>('get_xml_dump', { deviceId: selectedDevice });
-            const freshScreenshotBase64 = await invoke<string>('get_screenshot', { deviceId: selectedDevice });
-            setScreenshot(freshScreenshotBase64);
-            const screenshot = freshScreenshotBase64;
+            const freshScreenshotBase64 = await invoke<string>('get_compressed_screenshot', { deviceId: selectedDevice, maxWidth: 1024, maxHeight: 1024 });
+            const prefix = 'data:image/jpeg;base64,';
+            const fullScreenshot = freshScreenshotBase64.startsWith('data:') ? freshScreenshotBase64 : `${prefix}${freshScreenshotBase64}`;
+            setScreenshot(fullScreenshot);
+            const screenshot = fullScreenshot;
             if (!isExploringRef.current) return;
 
             // 2. Prepare Context (Backend-powered)
@@ -571,11 +593,11 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
             // 2. AI Analysis
             const { aiProvider, geminiApiKey, claudeApiKey, openaiApiKey, geminiModel, claudeModel, openaiModel, language } = settings;
-            const apiKey = aiProvider === 'gemini' ? geminiApiKey : aiProvider === 'claude' ? claudeApiKey : openaiApiKey;
-            const model = aiProvider === 'gemini' ? geminiModel : aiProvider === 'claude' ? claudeModel : openaiModel;
+            const apiKey = aiProvider === 'gemini' ? geminiApiKey : aiProvider === 'claude' ? claudeApiKey : aiProvider === 'openai' ? openaiApiKey : 'CLI';
+            const model = aiProvider === 'gemini' ? geminiModel : aiProvider === 'claude' ? claudeModel : aiProvider === 'openai' ? openaiModel : 'claude-code';
             const lang = language || i18n.language || 'en';
 
-            if (!apiKey) throw new Error("API Key missing");
+            if (!apiKey && aiProvider !== 'claude-code') throw new Error("API Key missing");
 
             explorer.addLog(t('mapper.exploration.analyzing_screen', { provider: aiProvider }), 'ai');
             setExplorationLogs([...explorer.getLogs()]);
@@ -590,11 +612,16 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 try {
                     const customPrompt = explorationPromptRef.current;
                     if (aiProvider === 'gemini') {
-                        result = await gemini.exploreScreen(simplifiedXml, screenshot || "", apiKey, model, lang, maps, explorer.getFormattedLogs(), undefined, customPrompt);
+                        result = await gemini.exploreScreen(simplifiedXml, screenshot || "", apiKey as string, model, lang, maps, explorer.getFormattedLogs(), undefined, customPrompt);
                     } else if (aiProvider === 'openai') {
-                        result = await openai.exploreScreen(simplifiedXml, screenshot || "", apiKey, model, lang, maps, explorer.getFormattedLogs(), undefined, customPrompt);
+                        result = await openai.exploreScreen(simplifiedXml, screenshot || "", apiKey as string, model, lang, maps, explorer.getFormattedLogs(), undefined, customPrompt);
                     } else if (aiProvider === 'claude') {
-                        result = await claude.exploreScreen(simplifiedXml, screenshot || "", apiKey, model, lang, maps, explorer.getFormattedLogs(), undefined, customPrompt);
+                        result = await claude.exploreScreen(simplifiedXml, screenshot || "", apiKey as string, model, lang, maps, explorer.getFormattedLogs(), undefined, customPrompt);
+                    } else if (aiProvider === 'claude-code') {
+                        result = await claudeCli.exploreScreen(simplifiedXml, settings.paths.automationRoot || '', lang, maps, explorer.getFormattedLogs(), customPrompt, settings.claudeCodeToken, explorer.getSessionId(), screenshot || undefined);
+                        if (result.session_id) {
+                            explorer.setSessionId(result.session_id);
+                        }
                     }
                     break; // Success
                 } catch (parseError: any) {
@@ -1115,27 +1142,6 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                     placeholder={t('mapper.placeholder.screen_name')}
                                                 />
                                             </div>
-                                            <div className="w-full xl:w-72 flex items-end gap-1">
-                                                <div className="flex-1">
-                                                    <TagInput
-                                                        label={t('mapper.screen_tags')}
-                                                        tags={screenTags}
-                                                        assistant={
-                                                            <AiButton
-                                                                id="mapper_suggest_tags"
-                                                                isLoading={isAISuggestingTags}
-                                                                onClick={handleAISuggestTags}
-                                                                label={t('mapper.action.ai_suggest_tags')}
-                                                                variant="ghost"
-                                                                className="mb-0 mr-0 ml-0 h-3 p-0 text-[8px] bg-transparent hover:bg-transparent"
-                                                            />
-                                                        }
-                                                        onChange={setScreenTags}
-                                                        suggestions={[...new Set(savedMaps.flatMap(m => m.tags || []))]}
-                                                        placeholder={t('mapper.placeholder.screen_tags')}
-                                                    />
-                                                </div>
-                                            </div>
                                             <div className="w-full xl:w-40">
                                                 <div className="text-xs font-medium text-on-surface-variant/80 ml-1 mb-1">
                                                     {t('mapper.screen_type')}
@@ -1150,7 +1156,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                 />
                                             </div>
                                         </div>
-                                        <div className="px-4 pb-2">
+                                        <div className="flex flex-col xl:flex-row gap-2 pb-2">
                                             <Textarea
                                                 label={t('mapper.input.screen_description')}
                                                 value={screenDescription}
@@ -1158,6 +1164,28 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                 placeholder={t('mapper.placeholder.screen_description')}
                                                 className="h-16"
                                             />
+                                            <div className="w-full xl:w-72 flex gap-1 text-[8px]">
+                                                <div className="flex-1">
+                                                    <TagInput
+                                                        label={t('mapper.screen_tags')}
+                                                        tags={screenTags}
+                                                        assistant={
+                                                            <AiButton
+                                                                id="mapper_suggest_tags"
+                                                                isLoading={isAISuggestingTags}
+                                                                onClick={handleAISuggestTags}
+                                                                label={t('mapper.action.ai_suggest_tags')}
+                                                                variant="ghost"
+                                                                className="text-[6px] bg-transparent hover:bg-transparent mt-0"
+                                                            />
+                                                        }
+                                                        onChange={setScreenTags}
+                                                        suggestions={[...new Set(savedMaps.flatMap(m => m.tags || []))]}
+                                                        placeholder={t('mapper.placeholder.screen_tags')}
+                                                        className="mt-0 p-0 h-auto"
+                                                    />
+                                                </div>
+                                            </div>
                                         </div>
                                         <div className="flex gap-2">
                                             <Button
@@ -1175,7 +1203,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                 <Plus size={16} /> {t('mapper.action.new')}
                                             </Button>
                                             <div className="relative group" ref={loadMenuRef}>
-                                                <Button variant="ghost" size="icon" onClick={() => setShowLoadMenu(!showLoadMenu)}><FileClock size={16} /></Button>
+                                                <Button variant="ghost" onClick={() => setShowLoadMenu(!showLoadMenu)} className="gap-2"><FileClock size={16} /> {t('mapper.saved_screens')}</Button>
                                                 {showLoadMenu && (
                                                     <div className="absolute top-full left-0 mt-2 w-80 bg-surface rounded-xl shadow-xl border border-outline-variant/30 overflow-hidden z-[100] flex flex-col max-h-80">
                                                         <div className="p-2 border-b border-outline-variant/30 bg-surface-variant/5 flex flex-col gap-2">
@@ -1296,12 +1324,10 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                             <div className="relative group" ref={elementsMenuRef}>
                                                 <Button
                                                     variant="ghost"
-                                                    size="icon"
                                                     onClick={() => setShowElementsMenu(!showElementsMenu)}
-                                                    className={clsx(showElementsMenu ? "text-primary dark:text-primary/80 bg-primary/10" : "text-on-surface-variant/80")}
-                                                    title={t('mapper.saved_elements', 'Saved Elements')}
+                                                    className={clsx(showElementsMenu ? "text-primary dark:text-primary/80 bg-primary/10" : "text-on-surface-variant/80", "gap-2")}
                                                 >
-                                                    <FileClock size={16} />
+                                                    <FileClock size={16} /> {t('mapper.saved_elements')}
                                                 </Button>
 
                                                 {showElementsMenu && (

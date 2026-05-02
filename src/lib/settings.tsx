@@ -18,6 +18,7 @@ export interface SystemVersions {
     maestro: string;
     scrcpy: string;
     ngrok: string;
+    claude_code: string;
 }
 
 // Initialize the store
@@ -64,7 +65,7 @@ export interface AppSettings {
     };
 
     // AI
-    aiProvider: 'gemini' | 'claude' | 'openai';
+    aiProvider: 'gemini' | 'claude' | 'openai' | 'claude-code';
     geminiApiKey?: string;
     geminiModel: string;
     claudeApiKey?: string;
@@ -74,6 +75,7 @@ export interface AppSettings {
     maxExplorationSteps?: number;
     presentationEnabled: boolean;
     zoomFactor: number;
+    claudeCodeToken?: string;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -114,7 +116,8 @@ const DEFAULT_SETTINGS: AppSettings = {
     },
     maxExplorationSteps: 30,
     presentationEnabled: false,
-    zoomFactor: 1.0
+    zoomFactor: 1.0,
+    claudeCodeToken: ''
 };
 
 export interface Profile {
