@@ -491,10 +491,10 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                     setScreenTags(prev => [...new Set([...prev, ...trulyNewTags])]);
                     feedback.toast.success(t('mapper.feedback.ai_success'));
                 } else {
-                    feedback.toast.info(t('mapper.feedback.ai_no_new_tags', 'No new tags found'));
+                    feedback.toast.raw.info(t('mapper.feedback.ai_no_new_tags', 'No new tags found'));
                 }
             } else if (tags && Array.isArray(tags)) {
-                feedback.toast.info(t('mapper.feedback.ai_no_tags', 'No tags suggested for this screen'));
+                feedback.toast.raw.info(t('mapper.feedback.ai_no_tags', 'No tags suggested for this screen'));
             }
         } catch (error) {
             console.error("AI Tag Suggestion Error:", error);
