@@ -273,7 +273,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         debounceTimerRef.current = setTimeout(async () => {
             setIsSaving(true);
             const map: ScreenMap = {
-                id: screenName.toLowerCase().replace(/\\s+/g, '_'),
+                id: screenName.toLowerCase().replace(/\s+/g, '_'),
                 name: screenName,
                 type: screenType,
                 description: screenDescription || undefined,
