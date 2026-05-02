@@ -684,6 +684,7 @@ export const es = {
                 }
             },
             properties: "Propiedades",
+            properties_screen: "Pantalla",
             properties_element: "Elemento",
             clear_selection: "Limpiar Selección",
             section_title: "Mapeador de Pantalla",
