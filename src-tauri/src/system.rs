@@ -41,6 +41,7 @@ pub struct SystemVersions {
     pub maestro: String,
     pub ngrok: String,
     pub claude_code: String,
+    pub gemini_code: String,
 }
 
 pub struct WakelockState(pub Mutex<Option<NoSleep>>);
@@ -181,6 +182,7 @@ pub async fn get_system_versions(
     };
 
     let claude_code = get_version("claude", &["--version"]);
+    let gemini_code = get_version("gemini", &["--version"]);
 
     SystemVersions {
         adb,
@@ -196,6 +198,7 @@ pub async fn get_system_versions(
         maestro,
         ngrok,
         claude_code,
+        gemini_code,
     }
 }
 

@@ -105,11 +105,13 @@ const HistoryAIAnalysisModal: React.FC<HistoryAIAnalysisModalProps> = ({
             const provider = settings.aiProvider;
             const apiKey = provider === 'gemini'
                 ? settings.geminiApiKey
-                : provider === 'claude'
-                    ? settings.claudeApiKey
-                    : settings.openaiApiKey;
+                : provider === 'openai'
+                    ? settings.openaiApiKey
+                    : provider === 'gemini-code'
+                        ? settings.geminiCodeApiKey
+                        : settings.claudeApiKey;
 
-            if (!apiKey && provider !== 'claude-code') {
+            if (!apiKey && provider !== 'claude-code' && provider !== 'gemini-code') {
                 throw new Error(t('dashboard.generator.key_required', { provider: provider.charAt(0).toUpperCase() + provider.slice(1) }));
             }
 
@@ -158,6 +160,9 @@ const HistoryAIAnalysisModal: React.FC<HistoryAIAnalysisModalProps> = ({
                 result = await analyzeClaude(historyData, apiKey!, model, lang, deepContext, controller.signal, customPrompt, base64Screenshot);
             } else if (provider === 'claude-code') {
                 result = await analyzeClaudeCode(historyData, settings.paths.automationRoot || '', lang, deepContext, controller.signal, customPrompt, settings.claudeCodeToken, base64Screenshot);
+            } else if (provider === 'gemini-code') {
+                const { analyzeTestHistory } = await import('@/lib/dashboard/geminiCode');
+                result = await analyzeTestHistory(historyData, settings.paths.automationRoot || '', lang, deepContext, controller.signal, customPrompt, settings.geminiCodeApiKey, base64Screenshot);
             }
 
             if (!controller.signal.aborted) {

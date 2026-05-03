@@ -1110,6 +1110,16 @@ export const pt = {
                     token_placeholder: "Cole o token de 'claude setup-token'",
                     token_help: "Se o seu CLI reportar \"Not logged in\", cole o token gerado ao executar 'claude setup-token' no seu terminal."
                 },
+                gemini_code: {
+                    title: "Gemini CLI",
+                    help: "Este provedor utiliza o comando local 'gemini'. Certifique-se de ter o Gemini CLI instalado e configurado.",
+                    check_install: "Verificar Instalação",
+                    installed: "Gemini CLI detectado! Versão: {{version}}",
+                    not_installed: "Gemini CLI não encontrado. Instale via 'npm install -g @google/gemini-cli'.",
+                    token_label: "Chave API",
+                    token_placeholder: "Digite a Chave API Gemini",
+                    token_help: "A Chave API será usada para autenticar suas solicitações via Gemini CLI."
+                },
                 max_exploration_steps: "Limite de Passos de Exploração",
                 max_exploration_steps_help: "Número máximo de ações autônomas que a IA realizará antes de interromper a exploração."
             },
@@ -1128,7 +1138,9 @@ export const pt = {
                     maven: "Maven",
                     maestro: "Maestro",
                     scrcpy: "Scrcpy",
-                    ngrok: "Ngrok (Tunnelling)"
+                    ngrok: "Ngrok (Tunnelling)",
+                    claude_code: "Claude Code CLI",
+                    gemini_code: "Gemini CLI"
                 }
             },
             folder_select: "Selecionar Pasta",
