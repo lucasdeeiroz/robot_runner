@@ -73,7 +73,8 @@ macro_rules! generate_robot_runner_handler {
             crate::system::sync_workspace_permissions,
             crate::auth::start_auth_server,
             crate::system::get_folder_size,
-            crate::ai::call_claude_code_cli
+            crate::ai::call_claude_code_cli,
+            crate::ai::call_gemini_cli
         ]
     };
 }

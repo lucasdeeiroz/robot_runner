@@ -19,7 +19,7 @@ import { Input } from "@/components/atoms/Input";
 import { Textarea } from "@/components/atoms/Textarea";
 import { useTestSessions } from '@/lib/testSessionStore';
 import { UIElementType, UIElementMap, ScreenMap, NavigationData } from '@/lib/types';
-import { saveScreenMap, listScreenMaps, deleteScreenMap, exportMapperData, importMapperData } from '@/lib/dashboard/mapperPersistence';
+import { saveScreenMap, loadScreenMap, listScreenMaps, deleteScreenMap, exportMapperData, importMapperData } from '@/lib/dashboard/mapperPersistence';
 import { useSettings } from '@/lib/settings';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { ConfirmationModal } from '@/components/organisms/ConfirmationModal';
@@ -73,11 +73,6 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     const [mappedElements, setMappedElements] = useState<UIElementMap[]>([]);
     const [currentElement, setCurrentElement] = useState<Partial<UIElementMap>>({});
     const [savedMaps, setSavedMaps] = useState<ScreenMap[]>([]);
-    const savedMapsRef = useRef<ScreenMap[]>([]);
-
-    useEffect(() => {
-        savedMapsRef.current = savedMaps;
-    }, [savedMaps]);
     const [showLoadMenu, setShowLoadMenu] = useState(false);
     const loadMenuRef = useRef<HTMLDivElement>(null);
     const [showElementsMenu, setShowElementsMenu] = useState(false);
@@ -108,7 +103,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         if (provider === 'gemini') return !!settings.geminiApiKey;
         if (provider === 'claude') return !!settings.claudeApiKey;
         if (provider === 'openai') return !!settings.openaiApiKey;
-        if (provider === 'claude-code') return true; // Always allow, as CLI may be pre-authenticated
+        if (provider === 'claude-code' || provider === 'gemini-code') return true; // Always allow, as CLI may be pre-authenticated
         return false;
     }, [settings.aiProvider, settings.geminiApiKey, settings.claudeApiKey, settings.openaiApiKey, settings.claudeCodeToken]);
     const [isStayOn, setIsStayOn] = useState(false);
@@ -279,9 +274,19 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
         debounceTimerRef.current = setTimeout(async () => {
             setIsSaving(true);
-            const existingMap = savedMapsRef.current.find(m => m.id === screenName.toLowerCase().replace(/\s+/g, '_'));
+            const screenId = screenName.toLowerCase().replace(/\s+/g, '_');
+            
+            // Fetch from latest source (disk) to avoid overwriting newer data (like layout)
+            // from other components/tabs
+            let existingMap: ScreenMap | null = null;
+            try {
+                existingMap = await loadScreenMap(activeProfileId, screenId);
+            } catch (e) {
+                // Map doesn't exist yet, which is fine
+            }
+
             const map: ScreenMap = {
-                id: screenName.toLowerCase().replace(/\s+/g, '_'),
+                id: screenId,
                 name: screenName,
                 type: screenType,
                 description: screenDescription || undefined,
@@ -292,9 +297,8 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             };
             try {
                 await saveScreenMap(activeProfileId, map);
-                // Refresh silently
-                const maps = await listScreenMaps(activeProfileId);
-                setSavedMaps(maps);
+                // Refresh list
+                loadSavedMaps();
             } catch (e) {
                 console.error("Auto-save failed", e);
             } finally {
@@ -390,7 +394,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         const apiKey = aiProvider === 'gemini' ? geminiApiKey : aiProvider === 'claude' ? claudeApiKey : openaiApiKey;
         const model = aiProvider === 'gemini' ? geminiModel : aiProvider === 'claude' ? claudeModel : openaiModel;
 
-        if (!apiKey && aiProvider !== 'claude-code') {
+        if (!apiKey && aiProvider !== 'claude-code' && aiProvider !== 'gemini-code') {
             feedback.toast.error(t('dashboard.generator.key_required', { provider: aiProvider.toUpperCase() }));
             return;
         }
@@ -438,6 +442,9 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 result = await claude.suggestElementName(criticalAttrs as any, screenName, apiKey!, model, lang, optimizedMaps as any, undefined, customPrompt);
             } else if (aiProvider === 'claude-code') {
                 result = await claudeCli.suggestElementName(criticalAttrs as any, screenName, settings.paths.automationRoot || '', lang, optimizedMaps as any, customPrompt, settings.claudeCodeToken, screenshot || undefined);
+            } else if (aiProvider === 'gemini-code') {
+                const { suggestElementName } = await import('@/lib/dashboard/geminiCode');
+                result = await suggestElementName(criticalAttrs as any, screenName, settings.paths.automationRoot || '', lang, optimizedMaps as any, customPrompt, settings.geminiCodeApiKey, screenshot || undefined);
             }
 
             if (result && result.name) {
@@ -464,7 +471,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         const apiKey = aiProvider === 'gemini' ? geminiApiKey : aiProvider === 'claude' ? claudeApiKey : openaiApiKey;
         const model = aiProvider === 'gemini' ? geminiModel : aiProvider === 'claude' ? claudeModel : openaiModel;
 
-        if (!apiKey && aiProvider !== 'claude-code') {
+        if (!apiKey && aiProvider !== 'claude-code' && aiProvider !== 'gemini-code') {
             feedback.toast.error(t('dashboard.generator.key_required', { provider: aiProvider.toUpperCase() }));
             return;
         }
@@ -485,6 +492,9 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 tags = await claude.suggestScreenTags(screenName || "Current Screen", elementsContext, apiKey!, model, lang, screenshot || undefined, undefined, customPrompt);
             } else if (aiProvider === 'claude-code') {
                 tags = await claudeCli.suggestScreenTags(screenName || "Current Screen", elementsContext, settings.paths.automationRoot || '', lang, customPrompt, settings.claudeCodeToken, screenshot || undefined);
+            } else if (aiProvider === 'gemini-code') {
+                const { suggestScreenTags } = await import('@/lib/dashboard/geminiCode');
+                tags = await suggestScreenTags(screenName || "Current Screen", elementsContext, settings.paths.automationRoot || '', lang, customPrompt, settings.geminiCodeApiKey, screenshot || undefined);
             }
 
             if (tags && Array.isArray(tags) && tags.length > 0) {
@@ -597,7 +607,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             const model = aiProvider === 'gemini' ? geminiModel : aiProvider === 'claude' ? claudeModel : aiProvider === 'openai' ? openaiModel : 'claude-code';
             const lang = language || i18n.language || 'en';
 
-            if (!apiKey && aiProvider !== 'claude-code') throw new Error("API Key missing");
+            if (!apiKey && aiProvider !== 'claude-code' && aiProvider !== 'gemini-code') throw new Error("API Key missing");
 
             explorer.addLog(t('mapper.exploration.analyzing_screen', { provider: aiProvider }), 'ai');
             setExplorationLogs([...explorer.getLogs()]);
@@ -619,6 +629,12 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                         result = await claude.exploreScreen(simplifiedXml, screenshot || "", apiKey as string, model, lang, maps, explorer.getFormattedLogs(), undefined, customPrompt);
                     } else if (aiProvider === 'claude-code') {
                         result = await claudeCli.exploreScreen(simplifiedXml, settings.paths.automationRoot || '', lang, maps, explorer.getFormattedLogs(), customPrompt, settings.claudeCodeToken, explorer.getSessionId(), screenshot || undefined);
+                        if (result.session_id) {
+                            explorer.setSessionId(result.session_id);
+                        }
+                    } else if (aiProvider === 'gemini-code') {
+                        const { exploreScreen } = await import('@/lib/dashboard/geminiCode');
+                        result = await exploreScreen(simplifiedXml, settings.paths.automationRoot || '', lang, maps, explorer.getFormattedLogs(), customPrompt, settings.geminiCodeApiKey, explorer.getSessionId(), screenshot || undefined);
                         if (result.session_id) {
                             explorer.setSessionId(result.session_id);
                         }

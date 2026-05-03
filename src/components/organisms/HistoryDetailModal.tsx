@@ -197,12 +197,15 @@ export function HistoryDetailModal({ isOpen, onClose, log, onUpdateLog }: Histor
             } else if (provider === 'claude') {
                 apiKey = settings.claudeApiKey;
                 model = settings.claudeModel;
+            } else if (provider === 'gemini-code') {
+                apiKey = settings.geminiCodeApiKey;
+                model = 'gemini-code';
             } else {
                 apiKey = settings.geminiApiKey;
                 model = settings.geminiModel;
             }
 
-            if (!apiKey && provider !== 'claude-code') {
+            if (!apiKey && provider !== 'claude-code' && provider !== 'gemini-code') {
                 throw new Error("Missing API Key");
             }
 
@@ -237,6 +240,9 @@ export function HistoryDetailModal({ isOpen, onClose, log, onUpdateLog }: Histor
                 result = await claude.summarizeExecution(tree, apiKey!, model!, language, failureContext, undefined, customPrompt, base64Screenshot);
             } else if (provider === 'claude-code') {
                 result = await claudeCli.summarizeExecution(tree, settings.paths.automationRoot || '', language, failureContext?.map(f => f.message) || [], failureContext, customPrompt, settings.claudeCodeToken, base64Screenshot);
+            } else if (provider === 'gemini-code') {
+                const { summarizeExecution } = await import('@/lib/dashboard/geminiCode');
+                result = await summarizeExecution(tree, settings.paths.automationRoot || '', language, failureContext?.map(f => f.message) || [], failureContext, customPrompt, settings.geminiCodeApiKey, base64Screenshot);
             } else {
                 result = await gemini.summarizeExecution(tree, apiKey!, model!, language, failureContext, undefined, customPrompt, base64Screenshot);
             }

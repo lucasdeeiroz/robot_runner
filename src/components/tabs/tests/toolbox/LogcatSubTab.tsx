@@ -13,6 +13,8 @@ import { Section } from "@/components/organisms/Section";
 import { Button } from "@/components/atoms/Button";
 import { Select } from "@/components/atoms/Select";
 import { Modal } from "@/components/organisms/Modal";
+import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
+import { AiButton } from '@/components/atoms/AiButton';
 import { AiResponse } from "@/components/molecules/AiResponse";
 import * as gemini from "@/lib/dashboard/gemini";
 import * as claude from "@/lib/dashboard/claude";
@@ -268,6 +270,10 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
             } else if (provider === 'claude-code') {
                 const response = await claudeCli.askClaudeCode(prompt, settings.paths.automationRoot || '', systemInstruction, settings.claudeCodeToken);
                 result = typeof response === 'string' ? response : response.result;
+            } else if (provider === 'gemini-code') {
+                const { askGeminiCode } = await import('@/lib/dashboard/geminiCode');
+                const response = await askGeminiCode(prompt, settings.paths.automationRoot || '', systemInstruction, settings.geminiCodeApiKey);
+                result = typeof response === 'string' ? response : response.result;
             } else {
                 throw new Error("No AI provider configured");
             }
@@ -386,17 +392,17 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
                         >
                             {!isNarrow && t(isStreaming ? 'logcat.stop' : 'logcat.start')}
                         </Button>
-                        <Button
+                        <AiButton
+                            id="logcat_analysis"
+                            isLoading={isAiLoading}
                             onClick={handleAiAnalyze}
-                            variant="outline"
+                            label={t('logcat.ai_analyze_button', 'Analyze with AI')}
+                            variant="secondary"
                             size="sm"
                             disabled={logs.length === 0 || isAiLoading}
                             className="bg-primary/5 border-primary/20 text-primary hover:bg-primary/10"
-                            title={t('logcat.ai_analyze_button', 'Analyze with AI')}
-                        >
-                            <Sparkles size={14} className={clsx("mr-1", isAiLoading && "animate-pulse")} />
-                            {!isNarrow && t('logcat.ai_analyze_button', 'Analyze with AI')}
-                        </Button>
+                            allowCustomPrompt={true}
+                        />
                     </div>
                 }
             />

@@ -115,3 +115,101 @@ pub async fn call_claude_code_cli(
         Err(AppError::ProcessError(format!("Claude CLI error: {}", error_msg)))
     }
 }
+
+#[command]
+pub async fn call_gemini_cli(
+    prompt: String,
+    project_root: String,
+    api_key: Option<String>,
+    system_instruction: Option<String>,
+    image_base_64: Option<String>,
+    _json_schema: Option<String>,
+    resume_session_id: Option<String>
+) -> AppResult<String> {
+    #[cfg(target_os = "windows")]
+    let mut command = {
+        let mut cmd = crate::cmd_utils::new_tokio_command("cmd");
+        cmd.args(&["/C", "gemini"]);
+        cmd
+    };
+    #[cfg(not(target_os = "windows"))]
+    let mut command = crate::cmd_utils::new_tokio_command("gemini");
+
+    // Headless/Programmatic mode
+    // Note: Gemini CLI requires an argument for -p. We pass an empty string 
+    // to enable headless mode while reading the full prompt from stdin.
+    command.args(&["-p", ""]);
+    command.args(&["--output-format", "json"]);
+    command.args(&["--approval-mode", "yolo"]);
+
+    // Session Continuity
+    if let Some(session_id) = resume_session_id {
+        if !session_id.is_empty() {
+            command.arg("--resume");
+            command.arg(session_id);
+        }
+    }
+
+    // Authentication
+    if let Some(key) = api_key {
+        let trimmed = key.trim();
+        if !trimmed.is_empty() {
+            command.env("GEMINI_API_KEY", trimmed);
+        }
+    }
+
+    // System Instructions are now prepended to the prompt to avoid file path errors in Gemini CLI
+    // (The CLI treats GEMINI_SYSTEM_MD as a file path if it's too long or complex)
+
+    if !project_root.is_empty() {
+        command.current_dir(project_root);
+    }
+
+    command.stdin(Stdio::piped());
+    command.stdout(Stdio::piped());
+    command.stderr(Stdio::piped());
+
+    let mut child = command.spawn().map_err(|e| AppError::ProcessError(format!("Failed to start Gemini CLI: {}. Make sure 'gemini' is installed and in your PATH.", e)))?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        use tokio::io::AsyncWriteExt;
+        
+        let mut full_prompt = String::new();
+        
+        // Add System Instruction if present
+        if let Some(ref sys) = system_instruction {
+            if !sys.is_empty() {
+                full_prompt.push_str("### SYSTEM INSTRUCTION ###\n");
+                full_prompt.push_str(sys);
+                full_prompt.push_str("\n\n### USER QUERY ###\n");
+            }
+        }
+        
+        full_prompt.push_str(&prompt);
+
+        if let Some(b64) = image_base_64 {
+            if !b64.is_empty() {
+                full_prompt = format!(
+                    "{}\n\n[VISUAL CONTEXT]: <screenshot_base64>\n{}\n</screenshot_base64>",
+                    full_prompt,
+                    b64
+                );
+            }
+        }
+
+        stdin.write_all(full_prompt.as_bytes()).await.map_err(|e| AppError::ProcessError(format!("Failed to write to Gemini CLI stdin: {}", e)))?;
+        drop(stdin);
+    }
+
+    let output = child.wait_with_output().await.map_err(|e| AppError::ProcessError(format!("Failed to wait for Gemini CLI: {}", e)))?;
+    
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    
+    if output.status.success() {
+        Ok(stdout)
+    } else {
+        let error_msg = if !stderr.is_empty() { stderr } else if !stdout.is_empty() { stdout } else { "Gemini CLI exited with error but no message was provided.".to_string().into() };
+        Err(AppError::ProcessError(format!("Gemini CLI error: {}", error_msg)))
+    }
+}

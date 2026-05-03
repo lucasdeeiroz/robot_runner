@@ -276,6 +276,40 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                 }
                 
                 result = typeof response === 'string' ? response : response.result;
+            } else if (provider === 'gemini-code') {
+                const schema = {
+                    type: "object",
+                    properties: {
+                        selector: { type: "string" },
+                        rationale: { type: "string" }
+                    },
+                    required: ["selector", "rationale"]
+                };
+
+                const { askGeminiCode } = await import('@/lib/dashboard/geminiCode');
+                const response = await askGeminiCode(prompt, settings.paths.automationRoot || '', systemInstruction, settings.geminiCodeApiKey, {
+                    jsonSchema: schema,
+                    imageBase64: screenshot || undefined
+                });
+
+                if (typeof response !== 'string' && response.structured_output) {
+                    setAiSuggestion(response.structured_output.selector);
+                    setAiRationale(response.structured_output.rationale);
+                    
+                    if (selectedNode.id) {
+                        setAiCache(prev => ({
+                            ...prev,
+                            [selectedNode.id]: {
+                                suggestion: response.structured_output.selector,
+                                rationale: response.structured_output.rationale
+                            }
+                        }));
+                    }
+                    setIsAiLoading(false);
+                    return;
+                }
+                
+                result = typeof response === 'string' ? response : response.result;
             } else if (provider === 'gemini') {
                 result = await gemini.askGemini(prompt, settings.geminiApiKey || '', settings.geminiModel, systemInstruction, screenshot || undefined);
             } else if (provider === 'claude') {

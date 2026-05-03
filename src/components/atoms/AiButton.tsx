@@ -79,7 +79,8 @@ export const AiButton: React.FC<AiButtonProps> = ({
         if (provider === 'gemini') return !!settings.geminiApiKey;
         if (provider === 'claude') return !!settings.claudeApiKey;
         if (provider === 'openai') return !!settings.openaiApiKey;
-        if (provider === 'claude-code') return true;
+        // CLI providers handle their own authentication, so we treat them as always "having" a key for visibility purposes
+        if (provider === 'claude-code' || provider === 'gemini-code') return true;
         return false;
     }, [settings.aiProvider, settings.geminiApiKey, settings.claudeApiKey, settings.openaiApiKey]);
 
@@ -113,6 +114,8 @@ export const AiButton: React.FC<AiButtonProps> = ({
 
     const { getBool } = useRemoteConfig();
     const isAiEnabled = getBool('is_ai_analysis_enabled');
+
+    // If AI is disabled via remote config, we hide.
     if (!hasApiKey || !isAiEnabled) return null;
 
     const isTooltipNeeded = !showTextAlways && (!expandable || !isHovered);

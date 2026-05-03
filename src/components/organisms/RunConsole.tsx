@@ -207,6 +207,9 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                 result = await claude.summarizeExecution(tree, settings.claudeApiKey as string, settings.claudeModel || '', language, failureContext, undefined, customPrompt);
             } else if (provider === 'claude-code') {
                 result = await claudeCli.summarizeExecution(tree, settings.paths.automationRoot || '', language, failureContext?.map(f => f.message) || [], failureContext, customPrompt, settings.claudeCodeToken);
+            } else if (provider === 'gemini-code') {
+                const { summarizeExecution } = await import('@/lib/dashboard/geminiCode');
+                result = await summarizeExecution(tree, settings.paths.automationRoot || '', language, failureContext?.map(f => f.message) || [], failureContext, customPrompt, settings.geminiCodeApiKey);
             }
 
             setSummary(result);

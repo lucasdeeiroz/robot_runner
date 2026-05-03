@@ -19,6 +19,7 @@ export interface SystemVersions {
     scrcpy: string;
     ngrok: string;
     claude_code: string;
+    gemini_code: string;
 }
 
 // Initialize the store
@@ -65,8 +66,9 @@ export interface AppSettings {
     };
 
     // AI
-    aiProvider: 'gemini' | 'claude' | 'openai' | 'claude-code';
+    aiProvider: 'gemini' | 'claude' | 'openai' | 'claude-code' | 'gemini-code';
     geminiApiKey?: string;
+    geminiCodeApiKey?: string;
     geminiModel: string;
     claudeApiKey?: string;
     claudeModel: string;
@@ -84,6 +86,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     primaryColor: 'blue',
     aiProvider: 'gemini',
     geminiApiKey: '',
+    geminiCodeApiKey: '',
     geminiModel: 'gemini-1.5-flash',
     claudeApiKey: '',
     claudeModel: 'claude-3-5-sonnet-20240620',
