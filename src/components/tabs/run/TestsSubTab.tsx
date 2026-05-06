@@ -460,9 +460,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
         }
     };
 
-    useEffect(() => {
-        handleRunRef.current = handleRun;
-    });
+    handleRunRef.current = handleRun;
 
     const getInitialPath = () => {
         if (mode === 'args') return settings.paths.suites;
