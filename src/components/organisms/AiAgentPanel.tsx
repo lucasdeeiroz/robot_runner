@@ -10,6 +10,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { useDevices } from '@/lib/deviceStore';
 import { useFileSave } from '@/hooks/useFileSave';
 import { useSelection } from '@/lib/selectionStore';
+import { useTestSessions } from '@/lib/testSessionStore';
 import packageJson from '../../../package.json';
 
 interface AiAgentPanelProps {
@@ -21,6 +22,7 @@ interface Message {
     role: 'user' | 'agent';
     content: string;
     actions?: AgentAction[];
+    suggestedPrompts?: string[];
 }
 
 export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
@@ -28,6 +30,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
     const { updateSetting, settings } = useSettings();
     const { devices, selectedDevices, setSelectedDevices } = useDevices();
     const { clearSelection, addItem } = useSelection();
+    const { addToolboxSession, setActiveSessionId } = useTestSessions();
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [messages, setMessages] = useState<Message[]>(() => {
@@ -143,7 +146,8 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                 id: (Date.now() + 1).toString(),
                 role: 'agent',
                 content: response.response.reply,
-                actions: response.response.actions
+                actions: response.response.actions,
+                suggestedPrompts: response.response.suggested_prompts
             };
 
             setMessages(prev => [...prev, agentMsg]);
@@ -169,7 +173,24 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
         switch (action.type) {
             case 'navigate':
                 if (action.target) {
-                    onNavigate(action.target);
+                    if (action.target === 'inspector' || action.target === 'run/inspector') {
+                        onNavigate('run');
+                        setTimeout(() => {
+                            window.dispatchEvent(new CustomEvent('ai_navigate_run_subtab', { detail: 'inspector' }));
+                        }, 100);
+                    } else if (action.target === 'connect' || action.target === 'run/connect') {
+                        onNavigate('run');
+                        setTimeout(() => {
+                            window.dispatchEvent(new CustomEvent('ai_navigate_run_subtab', { detail: 'connect' }));
+                        }, 100);
+                    } else if (action.target === 'launcher' || action.target === 'run/launcher' || action.target === 'tests_sub_tab') {
+                        onNavigate('run');
+                        setTimeout(() => {
+                            window.dispatchEvent(new CustomEvent('ai_navigate_run_subtab', { detail: 'tests' }));
+                        }, 100);
+                    } else {
+                        onNavigate(action.target);
+                    }
                 }
                 break;
             case 'change_setting':
@@ -189,7 +210,11 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                 }
                 if (action.command) {
                     try {
-                        const args = action.command.split(' ').filter(Boolean);
+                        let cleanCommand = action.command.trim();
+                        if (cleanCommand.toLowerCase().startsWith('adb ')) {
+                            cleanCommand = cleanCommand.substring(4).trim();
+                        }
+                        const args = cleanCommand.split(' ').filter(Boolean);
                         const result = await invoke<string>('run_adb_command', { device: activeDeviceUdid, args });
 
                         setMessages(prev => [...prev, {
@@ -268,6 +293,76 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                     console.log("AI_AGENT: Dispatching ai_run_test event NOW");
                     window.dispatchEvent(new CustomEvent('ai_run_test'));
                 }, 500);
+                break;
+            case 'open_toolbox':
+                let targetDevice = devices[0];
+                if (action.device) {
+                    const matched = devices.find(d => d.udid === action.device || d.model.toLowerCase().includes(action.device!.toLowerCase()));
+                    if (matched) targetDevice = matched;
+                } else if (activeDeviceUdid) {
+                    const matched = devices.find(d => d.udid === activeDeviceUdid);
+                    if (matched) targetDevice = matched;
+                }
+
+                if (!targetDevice) {
+                    feedback.toast.error("No active device to open toolbox.");
+                    return;
+                }
+
+                addToolboxSession(
+                    targetDevice.udid,
+                    targetDevice.model,
+                    targetDevice.model,
+                    targetDevice.android_version || undefined
+                );
+                setActiveSessionId(targetDevice.udid);
+                onNavigate('tests');
+                break;
+            case 'open_inspector':
+                let inspectorDevice = devices[0];
+                if (action.device) {
+                    const matched = devices.find(d => d.udid === action.device || d.model.toLowerCase().includes(action.device!.toLowerCase()));
+                    if (matched) inspectorDevice = matched;
+                } else if (activeDeviceUdid) {
+                    const matched = devices.find(d => d.udid === activeDeviceUdid);
+                    if (matched) inspectorDevice = matched;
+                }
+
+                if (!inspectorDevice) {
+                    feedback.toast.error("No active device to open inspector.");
+                    return;
+                }
+
+                setSelectedDevices([inspectorDevice.udid]);
+                onNavigate('run');
+                setTimeout(() => {
+                    window.dispatchEvent(new CustomEvent('ai_navigate_run_subtab', { detail: 'inspector' }));
+                }, 100);
+                break;
+            case 'open_scrcpy':
+                let scrcpyDevice = devices[0];
+                if (action.device) {
+                    const matched = devices.find(d => d.udid === action.device || d.model.toLowerCase().includes(action.device!.toLowerCase()));
+                    if (matched) scrcpyDevice = matched;
+                } else if (activeDeviceUdid) {
+                    const matched = devices.find(d => d.udid === activeDeviceUdid);
+                    if (matched) scrcpyDevice = matched;
+                }
+
+                if (!scrcpyDevice) {
+                    feedback.toast.error("No active device to start mirroring.");
+                    return;
+                }
+
+                try {
+                    await invoke('open_scrcpy', {
+                        device: scrcpyDevice.udid,
+                        args: settings.tools?.scrcpyArgs || null
+                    });
+                    feedback.toast.success('feedback.mirror_launched');
+                } catch (e) {
+                    feedback.toast.error("toolbox.scrcpy.open_error", e);
+                }
                 break;
             default:
                 feedback.toast.error(t('ai_agent.action_unwired', 'Action {{type}} is not yet fully wired to the backend.', { type: action.type }));
@@ -375,6 +470,20 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                                                 {t('ai_agent.confirm_execute', 'Confirm & Execute')}
                                             </button>
                                         </div>
+                                    ))}
+                                </div>
+                            )}
+                            {/* Render Suggested Prompts */}
+                            {msg.suggestedPrompts && msg.suggestedPrompts.length > 0 && (
+                                <div className="mt-2 ml-8 flex flex-wrap gap-2 w-full max-w-[85%]">
+                                    {msg.suggestedPrompts.map((prompt, idx) => (
+                                        <button
+                                            key={idx}
+                                            onClick={() => handleSend(prompt)}
+                                            className="text-xs px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary text-primary hover:text-on-primary transition-all font-semibold border border-primary/20 shadow-sm"
+                                        >
+                                            {prompt}
+                                        </button>
                                     ))}
                                 </div>
                             )}

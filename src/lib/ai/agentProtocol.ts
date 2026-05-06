@@ -10,6 +10,8 @@ export type AgentActionType =
     | 'capture_logcat' 
     | 'take_screenshot' 
     | 'open_toolbox' 
+    | 'open_inspector'
+    | 'open_scrcpy'
     | 'change_setting';
 
 export interface AgentAction {
@@ -50,7 +52,7 @@ export const AGENT_JSON_SCHEMA = {
                 properties: {
                     type: {
                         type: "string",
-                        enum: ["navigate", "run_test", "execute_adb", "capture_logcat", "take_screenshot", "open_toolbox", "change_setting"]
+                        enum: ["navigate", "run_test", "execute_adb", "capture_logcat", "take_screenshot", "open_toolbox", "open_inspector", "open_scrcpy", "change_setting"]
                     },
                     target: { type: "string", description: "Target tab for navigate (home, run, tests, dashboard, settings, about)." },
                     path: { type: "string", description: "File path or name of the test. ALWAYS provide this if the action is run_test." },
@@ -83,6 +85,8 @@ RULES:
 6. Provide 2-3 follow-up suggestions in "suggested_prompts".
 7. The user is on a desktop app. Do not ask them to use a terminal if you can do it via an action (like execute_adb).
 8. VERY IMPORTANT: You must generate your "reply", "description", and "suggested_prompts" in the user's preferred language: ${language}.
+9. If the user asks to inspect a device, inspect an element, or open the inspector, you MUST use the "open_inspector" action instead of "open_toolbox".
+10. If the user asks to mirror the screen, control the screen, or launch screen sharing/scrcpy, you MUST use the "open_scrcpy" action.
 
 JSON SCHEMA TO FOLLOW:
 ${JSON.stringify(AGENT_JSON_SCHEMA, null, 2)}

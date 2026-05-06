@@ -73,6 +73,17 @@ export function RunPage({ onNavigate, initialTab }: RunPageProps) {
         }
     }, [initialTab, isLauncherDisabled, isInspectorDisabled]);
 
+    useEffect(() => {
+        const handleNavigateSubTab = (e: Event) => {
+            const detail = (e as CustomEvent).detail;
+            if (detail && (detail === 'tests' || detail === 'connect' || detail === 'inspector')) {
+                setActiveTab(detail as TabType);
+            }
+        };
+        window.addEventListener('ai_navigate_run_subtab', handleNavigateSubTab);
+        return () => window.removeEventListener('ai_navigate_run_subtab', handleNavigateSubTab);
+    }, []);
+
     // Define Tabs
     const tabs: TabItem[] = [
         ...(settings.usageMode === 'explorer' ? [] : [{ id: 'tests', label: !isNarrow ? t('run_tab.launcher') : '', icon: Play }]),
