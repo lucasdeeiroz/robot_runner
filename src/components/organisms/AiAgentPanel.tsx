@@ -120,7 +120,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
 
         } catch (error: any) {
             console.error("AI Agent Error:", error);
-            feedback.toast.error(t('ai_agent.error', 'Error communicating with AI: ') + error.message);
+            feedback.toast.raw.error(t('ai_agent.error', 'Error communicating with AI: ') + error.message);
             setMessages(prev => [...prev, {
                 id: (Date.now() + 1).toString(),
                 role: 'agent',
