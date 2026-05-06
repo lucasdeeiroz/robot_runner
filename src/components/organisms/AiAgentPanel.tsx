@@ -179,7 +179,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                 }, 'feedback.screenshot_saved');
                 break;
             case 'capture_logcat':
-                onNavigate('run');
+                onNavigate('tests');
                 feedback.toast.info(t('ai_agent.redirect_to_tests', 'Redirecting to Tests panel to configure and run {{type}}.', { type: action.type }));
                 break;
             case 'run_test':
