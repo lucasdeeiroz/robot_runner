@@ -222,7 +222,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
 
         } catch (error: any) {
             console.error("AI Agent Error:", error);
-            feedback.toast.raw.error(t('ai_agent.error', 'Error communicating with AI: ') + error.message);
+            feedback.toast.raw.error(t('ai_agent.error', { error: error.message }));
             setMessages(prev => [...prev, {
                 id: (Date.now() + 1).toString(),
                 role: 'agent',
@@ -294,7 +294,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
             case 'change_setting':
                 if (action.setting_key && action.setting_value !== undefined) {
                     if (!ALLOWED_AGENT_SETTING_KEYS.has(action.setting_key)) {
-                        feedback.toast.raw.error(t('ai_agent.action_unwired', 'Action {{type}} is not yet fully wired to the backend.', { type: `change_setting(${action.setting_key})` }));
+                        feedback.toast.raw.error(t('ai_agent.action_unwired', { type: `change_setting(${action.setting_key})` }));
                         break;
                     }
                     updateSetting(action.setting_key as any, action.setting_value);
@@ -463,7 +463,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                 }
                 break;
             default:
-                feedback.toast.error(t('ai_agent.action_unwired', 'Action {{type}} is not yet fully wired to the backend.', { type: action.type }));
+                feedback.toast.error(t('ai_agent.action_unwired', { type: action.type }));
         }
     };
 
@@ -476,8 +476,15 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
             <div className="p-4 pt-8 h-auto flex items-center justify-between border-b border-outline-variant/20 relative z-10 shrink-0 bg-surface/80 backdrop-blur-md">
                 <div className="flex items-center gap-2">
                     <Sparkles className="text-primary animate-pulse" size={18} />
-                    <span className="font-bold text-on-surface tracking-tight">
-                        {t('ai_agent.title', 'AI Agent')}
+                    <span className="font-bold text-on-surface tracking-tight flex items-center gap-1 rai-hover-trigger cursor-default select-none">
+                        <span>Ask </span>
+                        <span className="rai-container">
+                            <span className="rai-letter-r">
+                                R
+                                <span className="rai-letter-r-ghost text-primary/70">R</span>
+                            </span>
+                            <span>AI</span>
+                        </span>
                     </span>
                     {settings.aiSessionId && (
                         <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full">{t('ai_agent.session_active', 'Session Active')}</span>
@@ -514,19 +521,19 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                         <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4 border border-primary/20 shadow-lg shadow-primary/5">
                             <Bot size={32} className="text-primary opacity-80" />
                         </div>
-                        <h3 className="text-lg font-bold text-on-surface mb-2">{t('ai_agent.welcome_title', 'Robot Runner Agent')}</h3>
+                        <h3 className="text-lg font-bold text-on-surface mb-2">Robot Runner AI</h3>
                         <p className="text-sm text-on-surface-variant max-w-[250px] mx-auto mb-6">
-                            {t('ai_agent.welcome_desc', 'Hello! I can help you analyze logs, run tests, or navigate the application.')}
+                            {t('ai_agent.welcome_desc')}
                         </p>
                         <div className="flex flex-col gap-2 w-full max-w-[280px]">
-                            <button onClick={() => handleSend(t('ai_agent.suggested_prompts.settings', '"Go to settings"'))} className="text-xs text-left p-2 rounded-lg bg-surface-variant/30 hover:bg-primary/10 text-on-surface-variant transition-colors border border-outline-variant/30">
-                                {t('ai_agent.suggested_prompts.settings', '"Go to settings"')}
+                            <button onClick={() => handleSend(t('ai_agent.suggested_prompts.settings'))} className="text-xs text-left p-2 rounded-lg bg-surface-variant/30 hover:bg-primary/10 text-on-surface-variant transition-colors border border-outline-variant/30">
+                                {t('ai_agent.suggested_prompts.settings')}
                             </button>
-                            <button onClick={() => handleSend(t('ai_agent.suggested_prompts.color', '"Change my primary color to green"'))} className="text-xs text-left p-2 rounded-lg bg-surface-variant/30 hover:bg-primary/10 text-on-surface-variant transition-colors border border-outline-variant/30">
-                                {t('ai_agent.suggested_prompts.color', '"Change my primary color to green"')}
+                            <button onClick={() => handleSend(t('ai_agent.suggested_prompts.color'))} className="text-xs text-left p-2 rounded-lg bg-surface-variant/30 hover:bg-primary/10 text-on-surface-variant transition-colors border border-outline-variant/30">
+                                {t('ai_agent.suggested_prompts.color')}
                             </button>
-                            <button onClick={() => handleSend(t('ai_agent.suggested_prompts.help', '"What can you do?"'))} className="text-xs text-left p-2 rounded-lg bg-surface-variant/30 hover:bg-primary/10 text-on-surface-variant transition-colors border border-outline-variant/30">
-                                {t('ai_agent.suggested_prompts.help', '"What can you do?"')}
+                            <button onClick={() => handleSend(t('ai_agent.suggested_prompts.help'))} className="text-xs text-left p-2 rounded-lg bg-surface-variant/30 hover:bg-primary/10 text-on-surface-variant transition-colors border border-outline-variant/30">
+                                {t('ai_agent.suggested_prompts.help')}
                             </button>
                         </div>
                     </div>
@@ -563,10 +570,9 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                                                 setCurrentlySpeakingMsgId(msg.id);
                                             }
                                         }}
-                                        title={currentlySpeakingMsgId === msg.id ? t('ai_agent.stop_speak_title', 'Stop speaking') : t('ai_agent.speak_title', 'Read response aloud')}
-                                        className={`p-1 rounded-md hover:bg-primary/10 transition-colors ${
-                                            currentlySpeakingMsgId === msg.id ? 'text-primary animate-pulse' : 'text-on-surface-variant/60 hover:text-primary'
-                                        }`}
+                                        title={currentlySpeakingMsgId === msg.id ? t('ai_agent.stop_speak_title') : t('ai_agent.speak_title')}
+                                        className={`p-1 rounded-md hover:bg-primary/10 transition-colors ${currentlySpeakingMsgId === msg.id ? 'text-primary animate-pulse' : 'text-on-surface-variant/60 hover:text-primary'
+                                            }`}
                                     >
                                         {currentlySpeakingMsgId === msg.id ? <VolumeX size={14} /> : <Volume2 size={14} />}
                                     </button>
@@ -588,7 +594,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                                                 className="mt-1 flex items-center justify-center gap-2 w-full py-1.5 bg-primary/10 hover:bg-primary text-primary hover:text-on-primary rounded-lg transition-colors text-xs font-bold"
                                             >
                                                 <Play size={12} fill="currentColor" />
-                                                {t('ai_agent.confirm_execute', 'Confirm & Execute')}
+                                                {t('ai_agent.confirm_execute')}
                                             </button>
                                         </div>
                                     ))}
@@ -615,7 +621,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                 {isLoading && (
                     <div className="flex items-center gap-2 text-on-surface-variant/60 text-sm italic ml-8">
                         <Loader2 size={14} className="animate-spin" />
-                        {t('ai_agent.thinking', 'Thinking...')}
+                        {t('ai_agent.thinking')}
                     </div>
                 )}
                 <div ref={endOfMessagesRef} />
@@ -635,7 +641,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                                 handleSend();
                             }
                         }}
-                        placeholder={t('ai_agent.placeholder', 'Ask me anything...')}
+                        placeholder={t('ai_agent.placeholder')}
                         className="w-full bg-surface-variant/30 text-on-surface rounded-xl pl-4 pr-20 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm resize-none custom-scrollbar border border-outline-variant/30"
                         rows={3}
                         disabled={isLoading}
@@ -649,12 +655,11 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                             }
                         }}
                         disabled={isLoading}
-                        title={isListening ? t('ai_agent.mic_active', 'Listening...') : t('ai_agent.mic_inactive', 'Voice input')}
-                        className={`absolute right-12 bottom-2 p-2 rounded-lg transition-all ${
-                            isListening
+                        title={isListening ? t('ai_agent.mic_active') : t('ai_agent.mic_inactive')}
+                        className={`absolute right-12 bottom-2 p-2 rounded-lg transition-all ${isListening
                                 ? 'bg-error text-on-error animate-pulse shadow-lg shadow-error/50 scale-110'
                                 : 'bg-surface-variant/50 text-on-surface-variant hover:bg-primary/20 hover:text-primary'
-                        }`}
+                            }`}
                     >
                         {isListening ? <MicOff size={16} /> : <Mic size={16} />}
                     </button>

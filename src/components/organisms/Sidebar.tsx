@@ -202,7 +202,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                                 : "bg-surface-variant/30 text-primary hover:bg-primary/10 border border-primary/20",
                             collapsed ? "justify-center" : "gap-3"
                         )}
-                        title={t('sidebar.ai_assistant', 'AI Assistant')}
+                        title="Ask RAI"
                     >
                         {/* Animated background effect */}
                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:animate-[shimmer_2s_infinite]" />
@@ -210,8 +210,15 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                         <Sparkles size={20} className={cn(settings.aiChatEnabled ? "animate-pulse" : "")} />
 
                         {!collapsed && (
-                            <span className="font-bold tracking-wide">
-                            {t('sidebar.ai_assistant', 'AI Assistant')}
+                            <span className="font-bold tracking-wide flex items-center gap-1">
+                                <span>Ask </span>
+                                <span className="rai-container">
+                                    <span className="rai-letter-r">
+                                        R
+                                        <span className={cn("rai-letter-r-ghost", settings.aiChatEnabled ? "text-on-primary/60" : "text-primary/70")}>R</span>
+                                    </span>
+                                    <span>AI</span>
+                                </span>
                             </span>
                         )}
                     </button>

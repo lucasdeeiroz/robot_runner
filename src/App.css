@@ -147,3 +147,85 @@ h6 {
   outline: none;
   box-shadow: 0 0 0 2px rgb(var(--color-primary-container)), 0 0 0 3px rgb(var(--color-on-primary-container));
 }
+
+/* RAI Chatbot "Ask RAI" Hover Shake & Ghost Effect */
+@keyframes shake-r {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+
+  25% {
+    transform: translate(0.5px, -0.2px) rotate(0.3deg);
+  }
+
+  50% {
+    transform: translate(-0.5px, 0.2px) rotate(-0.3deg);
+  }
+
+  75% {
+    transform: translate(0.3px, 0.1px) rotate(0.2deg);
+  }
+
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+}
+
+@keyframes shake-r-ghost {
+  0% {
+    transform: translate(-3px, 0) scale(1.02) rotate(0deg);
+  }
+
+  25% {
+    transform: translate(-3.5px, 0.2px) scale(1.02) rotate(-0.3deg);
+  }
+
+  50% {
+    transform: translate(-2.5px, -0.2px) scale(1.02) rotate(0.3deg);
+  }
+
+  75% {
+    transform: translate(-3.3px, -0.1px) scale(1.02) rotate(-0.2deg);
+  }
+
+  100% {
+    transform: translate(-3px, 0) scale(1.02) rotate(0deg);
+  }
+}
+
+.rai-container {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+}
+
+.rai-letter-r {
+  position: relative;
+  display: inline-block;
+  transition: color 0.2s ease;
+}
+
+.rai-letter-r-ghost {
+  position: absolute;
+  top: 0;
+  left: 0;
+  opacity: 0;
+  pointer-events: none;
+  color: currentColor;
+  /* High sharpness and visibility */
+  transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translate(0, 0) scale(1);
+}
+
+.group:hover .rai-letter-r,
+button:hover .rai-letter-r,
+.rai-hover-trigger:hover .rai-letter-r {
+  animation: shake-r 0.55s infinite ease-in-out;
+}
+
+.group:hover .rai-letter-r-ghost,
+button:hover .rai-letter-r-ghost,
+.rai-hover-trigger:hover .rai-letter-r-ghost {
+  opacity: 0.5;
+  animation: shake-r-ghost 0.55s infinite ease-in-out;
+}
