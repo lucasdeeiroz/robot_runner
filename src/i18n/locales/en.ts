@@ -135,6 +135,8 @@ export const en = {
             mic_active: "Listening...",
             mic_inactive: "Voice input",
             mic_permission_error: "Microphone permission error or not supported",
+            invalid_automation_root: "Automation root is not configured. Please set a valid automation root before running a test.",
+            no_active_device: "No active device selected.",
             suggested_prompts: {
                 settings: "\"Go to settings\"",
                 color: "\"Change my primary color to green\"",
