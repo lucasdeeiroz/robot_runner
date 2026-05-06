@@ -373,7 +373,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                     addItem({
                         path: resolvedPath,
                         name: resolvedPath.split(/[\\/]/).pop() || resolvedPath,
-                        type: isDir ? 'folder' : (resolvedPath.endsWith('.args') ? 'args' : 'file')
+                        type: isDir ? 'folder' : ((resolvedPath.endsWith('.args') || resolvedPath.endsWith('.txt')) ? 'args' : 'file')
                     });
                 }
 

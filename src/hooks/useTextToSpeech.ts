@@ -22,14 +22,36 @@ export function useTextToSpeech({ lang = 'en-US', onStart, onEnd, onError }: Use
 
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = lang;
+        utterance.rate = 1.3;
 
-        // Try to select a high quality voice matching the language
+        // Try to select a high quality female voice matching the language
         const voices = window.speechSynthesis.getVoices();
         const matchingVoices = voices.filter(v => v.lang.startsWith(lang.split('-')[0]));
         if (matchingVoices.length > 0) {
-            // Prefer natural or high-quality voices if available
-            const bestVoice = matchingVoices.find(v => v.name.toLowerCase().includes('natural') || v.name.toLowerCase().includes('google')) || matchingVoices[0];
-            utterance.voice = bestVoice;
+            const scoredVoices = matchingVoices.map(v => {
+                let score = 0;
+                const nameLower = v.name.toLowerCase();
+
+                // Prefer female voices (common names across Windows, macOS, Android, and Google)
+                const femaleKeywords = [
+                    'zira', 'maria', 'helena', 'sabina', 'laura', 'samantha', 'victoria',
+                    'hazel', 'karen', 'tessa', 'kyoko', 'anna', 'elizabeth', 'susan',
+                    'heera', 'haruka', 'yaoyao', 'huihui', 'female', 'elsa', 'luciana',
+                    'isabela', 'marta', 'conchita', 'monica', 'paulina'
+                ];
+                if (femaleKeywords.some(keyword => nameLower.includes(keyword))) {
+                    score += 10;
+                }
+
+                // Prefer natural/high-quality voices
+                if (nameLower.includes('natural')) score += 20;
+                if (nameLower.includes('google')) score += 10;
+
+                return { voice: v, score };
+            });
+
+            scoredVoices.sort((a, b) => b.score - a.score);
+            utterance.voice = scoredVoices[0].voice;
         }
 
         utterance.onstart = () => {
