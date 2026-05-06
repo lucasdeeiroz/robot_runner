@@ -9,7 +9,8 @@ import {
     Wrench,
     Home,
     LogOut,
-    User as UserIcon
+    User as UserIcon,
+    Sparkles
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSettings } from "@/lib/settings";
@@ -21,6 +22,8 @@ import { CustomLogo } from '../molecules/CustomLogo';
 import { useDevices } from "@/lib/deviceStore";
 import { useTestSessions } from "@/lib/testSessionStore";
 import { useAuth } from '@/lib/authStore';
+
+import { useRemoteConfig } from '@/lib/RemoteConfigProvider';
 
 interface SidebarProps {
     activePage: string;
@@ -41,6 +44,18 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
 
     const updateAvailable = updateInfo?.available || false;
     const appVersion = updateInfo?.currentVersion || packageJson.version;
+
+    const hasApiKey = useMemo(() => {
+        const provider = settings.aiProvider || 'gemini';
+        if (provider === 'gemini') return !!settings.geminiApiKey;
+        if (provider === 'claude') return !!settings.claudeApiKey;
+        if (provider === 'openai') return !!settings.openaiApiKey;
+        if (provider === 'claude-code' || provider === 'gemini-code') return true;
+        return false;
+    }, [settings.aiProvider, settings.geminiApiKey, settings.claudeApiKey, settings.openaiApiKey]);
+
+    const { getBool } = useRemoteConfig();
+    const isAiEnabled = getBool('is_ai_analysis_enabled');
 
     useEffect(() => {
         let timeoutId: NodeJS.Timeout;
@@ -97,9 +112,17 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
         setLastClickTime(now);
     };
 
+    const handleAiChatToggle = () => {
+        const newState = !settings.aiChatEnabled;
+        updateSetting('aiChatEnabled', newState);
+        if (newState && !collapsed) {
+            setCollapsed(true);
+        }
+    };
+
     return (
         <div className={cn(
-            "h-screen bg-surface backdrop-blur-md border-r border-outline-variant/30 transition-all duration-300 flex flex-col",
+            "h-full bg-surface backdrop-blur-md border-r border-outline-variant/30 transition-all duration-300 flex flex-col",
             collapsed ? "w-16" : "w-64"
         )}>
             {/* Header */}
@@ -145,7 +168,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                                     <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
                                 </span>
                             )}
-                            
+
                             {/* ADB Indicator */}
                             {item.id === 'run' && adbRunning && (
                                 <span className="absolute -top-1 -right-1 flex h-2 w-2" title={t('sidebar.adb_active')}>
@@ -166,7 +189,35 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                     </button>
                 ))}
             </nav>
-            
+
+            {/* AI Chat Agent Button */}
+            {hasApiKey && isAiEnabled && (
+                <div className="px-2 pb-2">
+                    <button
+                        onClick={handleAiChatToggle}
+                        className={cn(
+                            "w-full flex items-center p-2 rounded-2xl transition-all duration-200 active:scale-95 relative overflow-hidden group",
+                            settings.aiChatEnabled
+                                ? "bg-primary text-on-primary shadow-lg shadow-primary/30"
+                                : "bg-surface-variant/30 text-primary hover:bg-primary/10 border border-primary/20",
+                            collapsed ? "justify-center" : "gap-3"
+                        )}
+                        title={t('sidebar.ai_assistant', 'AI Assistant')}
+                    >
+                        {/* Animated background effect */}
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:animate-[shimmer_2s_infinite]" />
+
+                        <Sparkles size={20} className={cn(settings.aiChatEnabled ? "animate-pulse" : "")} />
+
+                        {!collapsed && (
+                            <span className="font-bold tracking-wide">
+                            {t('sidebar.ai_assistant', 'AI Assistant')}
+                            </span>
+                        )}
+                    </button>
+                </div>
+            )}
+
             {/* User Profile */}
             <div className="px-2 pb-2">
                 <div className={cn(
@@ -187,7 +238,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                         </div>
                     )}
                     {!collapsed && (
-                        <button 
+                        <button
                             onClick={signOut}
                             className="p-1.5 hover:bg-error/10 text-on-surface-variant hover:text-error rounded-xl transition-all active:scale-95"
                             title={t('auth.logout')}

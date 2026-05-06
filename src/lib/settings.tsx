@@ -78,6 +78,8 @@ export interface AppSettings {
     presentationEnabled: boolean;
     zoomFactor: number;
     claudeCodeToken?: string;
+    aiChatEnabled: boolean;
+    aiSessionId?: string;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -120,7 +122,9 @@ const DEFAULT_SETTINGS: AppSettings = {
     maxExplorationSteps: 30,
     presentationEnabled: false,
     zoomFactor: 1.0,
-    claudeCodeToken: ''
+    claudeCodeToken: '',
+    aiChatEnabled: false,
+    aiSessionId: undefined
 };
 
 export interface Profile {

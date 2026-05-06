@@ -137,3 +137,87 @@ pub fn save_image(path: String, content: Vec<u8>) -> AppResult<()> {
         .map_err(|e| AppError::FileSystemError(e.to_string()))?;
     Ok(())
 }
+#[command]
+pub fn resolve_test_path(root: String, name: String) -> AppResult<Option<String>> {
+    fn find_file_bounded(
+        root: &std::path::Path,
+        target_name: &str,
+    ) -> Option<std::path::PathBuf> {
+        const MAX_DEPTH: usize = 32;
+        const MAX_ENTRIES: usize = 10_000;
+
+        let target_lower = target_name.to_lowercase();
+        let mut visited_entries = 0usize;
+        let mut stack = vec![(root.to_path_buf(), 0usize)];
+
+        while let Some((dir, depth)) = stack.pop() {
+            if depth > MAX_DEPTH {
+                continue;
+            }
+
+            let entries = match fs::read_dir(&dir) {
+                Ok(entries) => entries,
+                Err(_) => continue,
+            };
+
+            for entry in entries.flatten() {
+                visited_entries += 1;
+                if visited_entries > MAX_ENTRIES {
+                    return None;
+                }
+
+                let path = entry.path();
+                let metadata = match fs::symlink_metadata(&path) {
+                    Ok(metadata) => metadata,
+                    Err(_) => continue,
+                };
+                let file_type = metadata.file_type();
+
+                // Do not follow symlinks to avoid cycles and unexpected traversal.
+                if file_type.is_symlink() {
+                    continue;
+                }
+
+                if file_type.is_dir() {
+                    if depth < MAX_DEPTH {
+                        stack.push((path, depth + 1));
+                    }
+                } else if let Some(file_name) = path.file_name().and_then(|s| s.to_str()) {
+                    let file_name_lower = file_name.to_lowercase();
+                    if file_name_lower == target_lower
+                        || path
+                            .file_stem()
+                            .and_then(|s| s.to_str())
+                            .map(|s| s.to_lowercase())
+                            == Some(target_lower.clone())
+                    {
+                        return Some(path);
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
+    if root.trim().is_empty() {
+        return Err(AppError::StringError(
+            "resolve_test_path: root path must not be empty".to_string(),
+        ));
+    }
+
+    let root_path = std::path::Path::new(&root);
+
+    if !root_path.exists() || !root_path.is_dir() {
+        return Err(AppError::StringError(format!(
+            "resolve_test_path: root '{}' does not exist or is not a directory",
+            root
+        )));
+    }
+
+    if let Some(found) = find_file_bounded(root_path, &name) {
+        Ok(Some(found.to_string_lossy().to_string()))
+    } else {
+        Ok(None)
+    }
+}

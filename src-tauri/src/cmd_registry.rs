@@ -52,6 +52,7 @@ macro_rules! generate_robot_runner_handler {
             crate::files::read_image_base64,
             crate::files::read_compressed_image_base64,
             crate::files::save_image,
+            crate::files::resolve_test_path,
             crate::ai_context::get_ai_context,
             crate::adb::packages::get_installed_packages,
             crate::adb::packages::uninstall_package,
