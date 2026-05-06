@@ -185,10 +185,24 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
             case 'run_test':
                 const targetPath = action.path || action.target;
                 if (targetPath) {
+                    const automationRoot = typeof settings.paths.automationRoot === 'string'
+                        ? settings.paths.automationRoot.trim()
+                        : '';
+
+                    if (!automationRoot) {
+                        feedback.toast.error(
+                            t(
+                                'ai_agent.invalid_automation_root',
+                                'Automation root is not configured. Please set a valid automation root before running a test.'
+                            )
+                        );
+                        return;
+                    }
+
                     let resolvedPath = targetPath;
                     try {
                         const resolved = await invoke<string | null>('resolve_test_path', {
-                            root: settings.paths.automationRoot || "",
+                            root: automationRoot,
                             name: targetPath
                         });
                         if (resolved) {
