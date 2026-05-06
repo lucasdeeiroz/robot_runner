@@ -9,6 +9,8 @@ export interface TabItem {
     count?: number;
     onClose?: () => void;
     selected?: boolean;
+    tooltip?: string;
+    tooltipPosition?: 'top' | 'bottom' | 'left' | 'right';
 }
 
 interface TabsProps {
@@ -75,6 +77,8 @@ export const Tabs = ({
                             // Remove rounded corners for underline vertical
                             variant === 'underline' && orientation === 'vertical' && "border-b-0 border-l-2 -ml-[1px]",
                         )}
+                        data-tooltip={tab.tooltip}
+                        data-position={tab.tooltipPosition || "top"}
                     >
                         {isActive && variant === 'pills' && (
                             <motion.div

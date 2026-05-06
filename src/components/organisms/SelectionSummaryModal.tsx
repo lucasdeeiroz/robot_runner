@@ -60,7 +60,8 @@ export function SelectionSummaryModal({ isOpen, onClose }: SelectionSummaryModal
                 <button
                     onClick={() => removeItem(item.id)}
                     className="p-2 opacity-0 group-hover:opacity-100 hover:bg-error/10 hover:text-error rounded-xl transition-all"
-                    title={t('tests.selection.remove')}
+                    data-tooltip={t('tests.selection.remove')}
+                    data-position="top"
                 >
                     <Trash2 size={16} />
                 </button>
@@ -84,6 +85,7 @@ export function SelectionSummaryModal({ isOpen, onClose }: SelectionSummaryModal
                         initial={{ opacity: 0, scale: 0.95, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                        transition={{ type: "spring", stiffness: 350, damping: 25, mass: 1 }}
                         className="bg-surface border border-outline-variant/30 rounded-3xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[80vh] relative z-10 overflow-hidden"
                     >
                         {/* Header */}
