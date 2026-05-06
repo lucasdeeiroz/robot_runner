@@ -114,6 +114,27 @@ export const en = {
             update_downloaded: "Download complete! Opening installer...",
             update_download_error: "Failed to download update."
         },
+        ai_agent: {
+            title: "AI Agent",
+            session_active: "Session Active",
+            clear_session: "Clear",
+            welcome_title: "Robot Runner Agent",
+            welcome_desc: "Hello! I can help you analyze logs, run tests, or navigate the application.",
+            placeholder: "Ask me anything...",
+            thinking: "Thinking...",
+            action_proposed: "Action Proposed",
+            confirm_execute: "Confirm & Execute",
+            error: "Error communicating with AI: ",
+            session_cleared: "Session cleared",
+            action_unwired: "Action {{type}} is not yet fully wired to the backend.",
+            settings_updated: "Updated {{key}}",
+            executing_action: "Executing Action: {{type}}",
+            suggested_prompts: {
+                settings: "\"Go to settings\"",
+                color: "\"Change my primary color to green\"",
+                help: "\"What can you do?\""
+            }
+        },
         ai_page: {
             title: "AI Assistant",
             powered_by: "Powered by Google Gemini",

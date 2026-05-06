@@ -114,6 +114,27 @@ export const es = {
             update_downloaded: "¡Descarga completa! Abriendo instalador...",
             update_download_error: "Error al descargar la actualización."
         },
+        ai_agent: {
+            title: "Agente de IA",
+            session_active: "Sesión Activa",
+            clear_session: "Limpiar",
+            welcome_title: "Agente Robot Runner",
+            welcome_desc: "¡Hola! Puedo ayudarte a analizar registros, ejecutar pruebas o navegar por la aplicación.",
+            placeholder: "Pregunta cualquier cosa...",
+            thinking: "Pensando...",
+            action_proposed: "Acción Propuesta",
+            confirm_execute: "Confirmar y Ejecutar",
+            error: "Error al comunicarse con la IA: ",
+            session_cleared: "Sesión limpiada",
+            action_unwired: "La acción {{type}} aún no está conectada al backend.",
+            settings_updated: "Actualizado {{key}}",
+            executing_action: "Ejecutando Acción: {{type}}",
+            suggested_prompts: {
+                settings: "\"Ir a configuración\"",
+                color: "\"Cambiar mi color principal a verde\"",
+                help: "\"¿Qué puedes hacer?\""
+            }
+        },
         ai_page: {
             title: "Asistente IA",
             powered_by: "Desarrollado con Google Gemini",

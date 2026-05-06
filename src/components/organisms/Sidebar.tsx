@@ -9,7 +9,8 @@ import {
     Wrench,
     Home,
     LogOut,
-    User as UserIcon
+    User as UserIcon,
+    Sparkles
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSettings } from "@/lib/settings";
@@ -97,6 +98,14 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
         setLastClickTime(now);
     };
 
+    const handleAiChatToggle = () => {
+        const newState = !settings.aiChatEnabled;
+        updateSetting('aiChatEnabled', newState);
+        if (newState && !collapsed) {
+            setCollapsed(true);
+        }
+    };
+
     return (
         <div className={cn(
             "h-screen bg-surface backdrop-blur-md border-r border-outline-variant/30 transition-all duration-300 flex flex-col",
@@ -166,6 +175,32 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                     </button>
                 ))}
             </nav>
+            
+            {/* AI Chat Agent Button */}
+            <div className="px-2 pb-2">
+                <button
+                    onClick={handleAiChatToggle}
+                    className={cn(
+                        "w-full flex items-center p-2 rounded-2xl transition-all duration-200 active:scale-95 relative overflow-hidden group",
+                        settings.aiChatEnabled
+                            ? "bg-primary text-on-primary shadow-lg shadow-primary/30"
+                            : "bg-surface-variant/30 text-primary hover:bg-primary/10 border border-primary/20",
+                        collapsed ? "justify-center" : "gap-3"
+                    )}
+                    title={t('sidebar.ai_agent', 'AI Assistant')}
+                >
+                    {/* Animated background effect */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:animate-[shimmer_2s_infinite]" />
+                    
+                    <Sparkles size={20} className={cn(settings.aiChatEnabled ? "animate-pulse" : "")} />
+                    
+                    {!collapsed && (
+                        <span className="font-bold tracking-wide">
+                            {t('sidebar.ai_agent', 'AI Assistant')}
+                        </span>
+                    )}
+                </button>
+            </div>
             
             {/* User Profile */}
             <div className="px-2 pb-2">
