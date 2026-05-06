@@ -3,6 +3,7 @@ import { AlignLeft, Terminal, Cpu, Cast, FileText, StopCircle, RefreshCcw, Camer
 import clsx from "clsx";
 import { invoke } from "@tauri-apps/api/core";
 import { useSettings } from "@/lib/settings";
+import { logEvent } from "@/lib/analytics";
 import { LogcatSubTab } from "./LogcatSubTab";
 import { AppsSubTab } from "./AppsSubTab";
 import { useTranslation } from "react-i18next";
@@ -167,8 +168,10 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                 args: settings.tools.scrcpyArgs || null
             });
             feedback.toast.success('feedback.mirror_launched');
-        } catch (e) {
+            logEvent('scrcpy_launched', { success: true });
+        } catch (e: any) {
             feedback.toast.error("toolbox.scrcpy.open_error", e);
+            logEvent('scrcpy_launch_error', { error_message: e?.message || String(e) });
         }
     };
 

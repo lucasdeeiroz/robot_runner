@@ -10,6 +10,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { TestLog, getCachedHistory, setCachedHistory } from '@/lib/historyCache';
 import { useSettings } from '@/lib/settings';
 import { feedback } from '@/lib/feedback';
+import { logEvent } from '@/lib/analytics';
 import { Button } from '@/components/atoms/Button';
 import { ExpressiveLoading } from '@/components/atoms/ExpressiveLoading';
 import { useTestSessions } from '@/lib/testSessionStore';
@@ -104,8 +105,10 @@ export function HomeSubTab({ onNavigate }: HomeSubTabProps) {
                 args: settings.tools.scrcpyArgs || null
             });
             feedback.toast.success('feedback.mirror_launched');
-        } catch (e) {
+            logEvent('scrcpy_launched', { success: true });
+        } catch (e: any) {
             feedback.toast.error("toolbox.scrcpy.open_error", e);
+            logEvent('scrcpy_launch_error', { error_message: e?.message || String(e) });
         }
     };
 
@@ -116,6 +119,7 @@ export function HomeSubTab({ onNavigate }: HomeSubTabProps) {
     };
 
     const handleDeviceAction = async (device: Device, action: string) => {
+        logEvent('device_action', { action_type: action });
         switch (action) {
             case 'screenshot':
                 await screenshotSaver.saveFile(async (path) => {

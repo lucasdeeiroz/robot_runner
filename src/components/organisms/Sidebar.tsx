@@ -15,6 +15,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useSettings } from "@/lib/settings";
 import { feedback } from '@/lib/feedback';
+import { logEvent } from '@/lib/analytics';
 
 import { useTranslation } from "react-i18next";
 import packageJson from '../../../package.json';
@@ -56,6 +57,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
 
     const { getBool } = useRemoteConfig();
     const isAiEnabled = getBool('is_ai_analysis_enabled');
+    const isAskRaiEnabled = getBool('is_ask_rai_enabled');
 
     useEffect(() => {
         let timeoutId: NodeJS.Timeout;
@@ -118,6 +120,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
         if (newState && !collapsed) {
             setCollapsed(true);
         }
+        logEvent('feature_opened', { feature_name: newState ? 'ask_rai' : 'sidebar_closed' });
     };
 
     return (
@@ -149,7 +152,10 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                 {navItems.map((item) => (
                     <button
                         key={item.id}
-                        onClick={() => onNavigate(item.id)}
+                        onClick={() => {
+                            onNavigate(item.id);
+                            logEvent('feature_opened', { feature_name: item.id });
+                        }}
                         className={cn(
                             "w-full flex items-center p-2 rounded-2xl transition-all duration-200 active:scale-95 relative",
                             activePage === item.id
@@ -191,7 +197,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
             </nav>
 
             {/* AI Chat Agent Button */}
-            {hasApiKey && isAiEnabled && (
+            {hasApiKey && isAiEnabled && isAskRaiEnabled && (
                 <div className="px-2 pb-2">
                     <button
                         onClick={handleAiChatToggle}

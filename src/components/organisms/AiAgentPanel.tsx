@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, Sparkles, Send, Loader2, Bot, Play, AlertTriangle, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 import { useSettings } from "@/lib/settings";
+import { logEvent } from '@/lib/analytics';
 import { askAgent } from '@/lib/ai/agentService';
 import { AgentAction } from '@/lib/ai/agentProtocol';
 import ReactMarkdown from 'react-markdown';
@@ -210,6 +211,12 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                 updateSetting('aiSessionId', response.sessionId);
             }
 
+            logEvent('ai_interaction', {
+                query_length: textToSend.length,
+                has_actions: Boolean(response.response.actions && response.response.actions.length > 0),
+                action_count: response.response.actions?.length || 0
+            });
+
             const agentMsg: Message = {
                 id: (Date.now() + 1).toString(),
                 role: 'agent',
@@ -222,6 +229,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
 
         } catch (error: any) {
             console.error("AI Agent Error:", error);
+            logEvent('ai_interaction_error', { error_message: error.message || 'Unknown error' });
             feedback.toast.raw.error(t('ai_agent.error', { error: error.message }));
             setMessages(prev => [...prev, {
                 id: (Date.now() + 1).toString(),
