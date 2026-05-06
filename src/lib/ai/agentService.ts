@@ -99,7 +99,7 @@ export async function askAgent(
                 {
                     jsonSchema: AGENT_JSON_SCHEMA,
                     resumeSessionId,
-                    allowedTools: ['Read', 'View'] // Allow Claude to read the workspace
+                    allowedTools: ['Read', 'View', 'Edit', 'Glob', 'Grep', 'LS', 'Bash'] // Allow Claude to fully assist with reading, writing, and executing
                 }
             );
 

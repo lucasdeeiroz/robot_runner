@@ -15,6 +15,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useSettings } from "@/lib/settings";
 import { feedback } from '@/lib/feedback';
+import { logEvent } from '@/lib/analytics';
 
 import { useTranslation } from "react-i18next";
 import packageJson from '../../../package.json';
@@ -56,6 +57,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
 
     const { getBool } = useRemoteConfig();
     const isAiEnabled = getBool('is_ai_analysis_enabled');
+    const isAskRaiEnabled = getBool('is_ask_rai_enabled');
 
     useEffect(() => {
         let timeoutId: NodeJS.Timeout;
@@ -118,6 +120,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
         if (newState && !collapsed) {
             setCollapsed(true);
         }
+        logEvent(newState ? 'feature_opened' : 'feature_closed', { feature_name: 'ask_rai' });
     };
 
     return (
@@ -149,7 +152,10 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                 {navItems.map((item) => (
                     <button
                         key={item.id}
-                        onClick={() => onNavigate(item.id)}
+                        onClick={() => {
+                            onNavigate(item.id);
+                            logEvent('feature_opened', { feature_name: item.id });
+                        }}
                         className={cn(
                             "w-full flex items-center p-2 rounded-2xl transition-all duration-200 active:scale-95 relative",
                             activePage === item.id
@@ -191,7 +197,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
             </nav>
 
             {/* AI Chat Agent Button */}
-            {hasApiKey && isAiEnabled && (
+            {hasApiKey && isAiEnabled && isAskRaiEnabled && (
                 <div className="px-2 pb-2">
                     <button
                         onClick={handleAiChatToggle}
@@ -202,7 +208,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                                 : "bg-surface-variant/30 text-primary hover:bg-primary/10 border border-primary/20",
                             collapsed ? "justify-center" : "gap-3"
                         )}
-                        title={t('sidebar.ai_assistant', 'AI Assistant')}
+                        title="Ask RAI"
                     >
                         {/* Animated background effect */}
                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:animate-[shimmer_2s_infinite]" />
@@ -210,8 +216,15 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                         <Sparkles size={20} className={cn(settings.aiChatEnabled ? "animate-pulse" : "")} />
 
                         {!collapsed && (
-                            <span className="font-bold tracking-wide">
-                            {t('sidebar.ai_assistant', 'AI Assistant')}
+                            <span className="font-bold tracking-wide flex items-center gap-1">
+                                <span>Ask </span>
+                                <span className="rai-container">
+                                    <span className="rai-letter-r">
+                                        R
+                                        <span className={cn("rai-letter-r-ghost", settings.aiChatEnabled ? "text-on-primary/60" : "text-primary/70")}>R</span>
+                                    </span>
+                                    <span>AI</span>
+                                </span>
                             </span>
                         )}
                     </button>

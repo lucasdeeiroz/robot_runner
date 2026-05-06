@@ -244,6 +244,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                     const migrated = { ...saved };
                     Object.keys(migrated.profiles).forEach(pid => {
                         migrated.profiles[pid].settings = deepMerge(DEFAULT_SETTINGS, migrated.profiles[pid].settings);
+                        migrated.profiles[pid].settings.aiChatEnabled = false;
                     });
 
                     // Validate activeProfileId
@@ -264,6 +265,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                     // It's the old flat format. Migrate to Default Profile.
                     console.info("Migrating legacy settings to Default Profile...");
                     const migratedSettings = deepMerge(DEFAULT_SETTINGS, saved);
+                    migratedSettings.aiChatEnabled = false;
                     const newStoreData: SettingsStoreData = {
                         activeProfileId: 'default',
                         profiles: {

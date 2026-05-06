@@ -4,6 +4,7 @@ import { fetchAndActivate, getValue } from "firebase/remote-config";
 // Default configuration shared between Firebase and Local Fallback
 const DEFAULT_CONFIG: Record<string, any> = {
     "is_ai_analysis_enabled": true,
+    "is_ask_rai_enabled": false,
     "min_app_version": "2.2.0",
     "maintenance_mode": false,
     "storage_retention_days": 15,

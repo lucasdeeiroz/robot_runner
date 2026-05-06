@@ -3,13 +3,15 @@
  * It provides the Types and the JSON Schema that the AI provider must adhere to.
  */
 
-export type AgentActionType = 
-    | 'navigate' 
-    | 'run_test' 
-    | 'execute_adb' 
-    | 'capture_logcat' 
-    | 'take_screenshot' 
-    | 'open_toolbox' 
+export type AgentActionType =
+    | 'navigate'
+    | 'run_test'
+    | 'execute_adb'
+    | 'capture_logcat'
+    | 'take_screenshot'
+    | 'open_toolbox'
+    | 'open_inspector'
+    | 'open_scrcpy'
     | 'change_setting';
 
 export interface AgentAction {
@@ -50,9 +52,9 @@ export const AGENT_JSON_SCHEMA = {
                 properties: {
                     type: {
                         type: "string",
-                        enum: ["navigate", "run_test", "execute_adb", "capture_logcat", "take_screenshot", "open_toolbox", "change_setting"]
+                        enum: ["navigate", "run_test", "execute_adb", "capture_logcat", "take_screenshot", "open_toolbox", "open_inspector", "open_scrcpy", "change_setting"]
                     },
-                    target: { type: "string", description: "Target tab for navigate (home, run, tests, dashboard, settings, about)." },
+                    target: { type: "string", description: "Target tab or subtab for navigate: 'home' (Home), 'run' (Executar testes/tests subtab), 'connect' (Conectar/connect subtab), 'inspector' (Inspector subtab), 'history' (Test history), 'scenarios' (Scenario Generator), 'images' (Image Editor), 'dashboard_history' (Dashboard History), 'mapper' or 'mapeador' (Device Mapper)." },
                     path: { type: "string", description: "File path or name of the test. ALWAYS provide this if the action is run_test." },
                     device: { type: "string", description: "Device name or serial. Provide this if the user specifies a device." },
                     command: { type: "string", description: "ADB command to execute." },
@@ -68,8 +70,8 @@ export const AGENT_JSON_SCHEMA = {
 };
 
 export function getAgentSystemInstruction(context: string, language: string = "en_US"): string {
-    return `You are the integrated AI Agent for Robot Runner, a desktop application for QA Mobile Automation.
-Your goal is to assist the user by answering questions, analyzing logs, and executing tasks directly within the app.
+    return `You are the integrated AI Agent for Robot Runner, a desktop application for QA Mobile Automation, called 'Rai'.
+As 'Rai', your goal is to assist the user by answering questions, analyzing logs, and executing tasks directly within the app.
 
 CURRENT CONTEXT:
 ${context}
@@ -83,6 +85,18 @@ RULES:
 6. Provide 2-3 follow-up suggestions in "suggested_prompts".
 7. The user is on a desktop app. Do not ask them to use a terminal if you can do it via an action (like execute_adb).
 8. VERY IMPORTANT: You must generate your "reply", "description", and "suggested_prompts" in the user's preferred language: ${language}.
+9. If the user asks to inspect a device, inspect an element, or open the inspector, you MUST use the "open_inspector" action instead of "open_toolbox".
+10. If the user asks to mirror the screen, control the screen, or launch screen sharing/scrcpy, you MUST use the "open_scrcpy" action.
+11. If the user asks to go to a feature, screen, or functionality, trigger a 'navigate' action with the correct target. For example:
+    - "mapeador", "mapper", "map" -> 'mapper'
+    - "gerador", "scenarios", "generator" -> 'scenarios'
+    - "editor de imagem", "editor de imagens", "images", "image editor" -> 'images'
+    - "conectar", "conexão", "connect" -> 'connect'
+    - "inspetor", "inspector", "inspect" -> 'inspector'
+    - "executar testes", "rodar testes", "run", "launcher" -> 'run'
+    - "histórico", "history" -> 'history'
+    - "configurações", "settings" -> 'settings'
+    - "sobre", "about" -> 'about'
 
 JSON SCHEMA TO FOLLOW:
 ${JSON.stringify(AGENT_JSON_SCHEMA, null, 2)}

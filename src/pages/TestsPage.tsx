@@ -30,6 +30,18 @@ export function TestsPage({ onNavigate }: TestsPageProps) {
     const initialTab = isExplorer ? (sessions.length > 0 ? sessions[0].runId : '') : 'history';
     const [subTab, setSubTab] = useState<'history' | string>(initialTab);
 
+    useEffect(() => {
+        const handleNavigateSubTab = (e: Event) => {
+            const detail = (e as CustomEvent).detail;
+            if (detail && detail === 'history') {
+                setSubTab('history');
+                setActiveSessionId('dashboard');
+            }
+        };
+        window.addEventListener('ai_navigate_tests_subtab', handleNavigateSubTab);
+        return () => window.removeEventListener('ai_navigate_tests_subtab', handleNavigateSubTab);
+    }, [setActiveSessionId]);
+
     // Settings Dropdown State
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const settingsRef = useRef<HTMLDivElement>(null);
