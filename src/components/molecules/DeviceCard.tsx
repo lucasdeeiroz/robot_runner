@@ -38,7 +38,7 @@ export function DeviceCard({ device, onMirror, onToolbox, onAction }: DeviceCard
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="group bg-surface/40 hover:bg-surface/60 border border-outline-variant/10 rounded-[32px] p-5 transition-all duration-300 hover:shadow-2xl hover:shadow-primary/5 flex gap-5 overflow-hidden relative"
+            className="group bg-surface/40 hover:bg-surface/75 border border-outline-variant/10 hover:border-primary/25 rounded-[32px] p-5 transition-all duration-300 hover:shadow-2xl hover:shadow-primary/5 flex gap-5 overflow-hidden relative"
         >
             {/* Background Accent */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-primary/10 transition-colors pointer-events-none" />

@@ -229,3 +229,31 @@ button:hover .rai-letter-r-ghost,
   opacity: 0.5;
   animation: shake-r-ghost 0.55s infinite ease-in-out;
 }
+
+/* Glassmorphism Premium Utility */
+.glassmorphic {
+  background-color: rgb(var(--md-sys-color-surface) / 0.6) !important;
+  backdrop-filter: blur(16px) !important;
+  border-bottom: 1px solid rgb(var(--md-sys-color-outline-variant) / 0.2);
+}
+
+/* Premium Shimmer Animations */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgb(var(--md-sys-color-surface-variant) / 0.3) 25%,
+    rgb(var(--md-sys-color-outline-variant) / 0.5) 50%,
+    rgb(var(--md-sys-color-surface-variant) / 0.3) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s infinite linear;
+}
