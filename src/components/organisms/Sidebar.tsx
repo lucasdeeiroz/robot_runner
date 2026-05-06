@@ -202,7 +202,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                                 : "bg-surface-variant/30 text-primary hover:bg-primary/10 border border-primary/20",
                             collapsed ? "justify-center" : "gap-3"
                         )}
-                        title={t('sidebar.ai_agent', 'AI Assistant')}
+                        title={t('sidebar.ai_assistant', 'AI Assistant')}
                     >
                         {/* Animated background effect */}
                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:animate-[shimmer_2s_infinite]" />
@@ -211,7 +211,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
 
                         {!collapsed && (
                             <span className="font-bold tracking-wide">
-                                {t('sidebar.ai_agent', 'AI Assistant')}
+                            {t('sidebar.ai_assistant', 'AI Assistant')}
                             </span>
                         )}
                     </button>

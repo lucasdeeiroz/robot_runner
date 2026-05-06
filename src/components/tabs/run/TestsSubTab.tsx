@@ -138,12 +138,12 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
 
     const handleRun = async () => {
         if (items.length === 0) {
-            feedback.toast.error(t('tests.toasts.no_items_selected', { defaultValue: 'No items selected to run.' }));
+            feedback.toast.raw.error(t('tests.toasts.no_items_selected', { defaultValue: 'No items selected to run.' }));
             return;
         }
 
         if (selectedDevices.length === 0) {
-            feedback.toast.error(t('tests.toasts.no_device_selected', { defaultValue: 'No device selected.' }));
+            feedback.toast.raw.error(t('tests.toasts.no_device_selected', { defaultValue: 'No device selected.' }));
             // We'll let it continue because targets defaults to [null] later
         }
 

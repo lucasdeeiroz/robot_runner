@@ -57,7 +57,7 @@ export const AGENT_JSON_SCHEMA = {
                     device: { type: "string", description: "Device name or serial. Provide this if the user specifies a device." },
                     command: { type: "string", description: "ADB command to execute." },
                     setting_key: { type: "string", description: "Setting key to change." },
-                    setting_value: { type: "string", description: "Setting value to apply." },
+                    setting_value: { description: "Setting value to apply. Can be a string, number, or boolean." },
                     description: { type: "string", description: "A brief, human-readable description of this action (e.g., 'Navigating to Settings')." }
                 },
                 required: ["type", "description"]

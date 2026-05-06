@@ -200,7 +200,21 @@ pub fn resolve_test_path(root: String, name: String) -> AppResult<Option<String>
         None
     }
 
+    if root.trim().is_empty() {
+        return Err(AppError::StringError(
+            "resolve_test_path: root path must not be empty".to_string(),
+        ));
+    }
+
     let root_path = std::path::Path::new(&root);
+
+    if !root_path.exists() || !root_path.is_dir() {
+        return Err(AppError::StringError(format!(
+            "resolve_test_path: root '{}' does not exist or is not a directory",
+            root
+        )));
+    }
+
     if let Some(found) = find_file_bounded(root_path, &name) {
         Ok(Some(found.to_string_lossy().to_string()))
     } else {

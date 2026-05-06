@@ -10,6 +10,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { useDevices } from '@/lib/deviceStore';
 import { useFileSave } from '@/hooks/useFileSave';
 import { useSelection } from '@/lib/selectionStore';
+import packageJson from '../../../package.json';
 
 interface AiAgentPanelProps {
     onNavigate: (page: string) => void;
@@ -31,6 +32,23 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
     const [isLoading, setIsLoading] = useState(false);
     const [messages, setMessages] = useState<Message[]>([]);
     const endOfMessagesRef = useRef<HTMLDivElement>(null);
+
+    // Allowlist of top-level AppSettings keys the AI agent is permitted to change.
+    // Excludes sensitive keys (API keys, tokens), complex objects (paths, tools),
+    // and keys that could break the app state (aiChatEnabled, aiSessionId).
+    const ALLOWED_AGENT_SETTING_KEYS = new Set<string>([
+        'theme',
+        'language',
+        'primaryColor',
+        'recycleDeviceViews',
+        'allowActionsDuringTest',
+        'saveLogs',
+        'usageMode',
+        'automationFramework',
+        'presentationEnabled',
+        'zoomFactor',
+        'maxExplorationSteps',
+    ]);
 
     const screenshotSaver = useFileSave({
         fileType: 'Image',
@@ -66,7 +84,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
         const safeSettingsContext = buildSafeSettingsContext();
 
         return `
-- App Version: 2.2.56
+- App Version: ${packageJson.version}
 - Active Workspace: ${settings.paths?.automationRoot || 'None'}
 - Active Device: ${activeDeviceUdid || 'None'}
 - Settings Summary: ${JSON.stringify(safeSettingsContext)}
@@ -133,7 +151,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
 
     const handleExecuteAction = async (action: AgentAction) => {
         if (action.type !== 'run_test' && action.type !== 'capture_logcat') {
-            feedback.toast.info(t('ai_agent.executing_action', 'Executing Action: {{type}}', { type: action.type }));
+            feedback.toast.info('ai_agent.executing_action', { type: action.type });
         }
 
         switch (action.type) {
@@ -145,8 +163,12 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                 break;
             case 'change_setting':
                 if (action.setting_key && action.setting_value !== undefined) {
+                    if (!ALLOWED_AGENT_SETTING_KEYS.has(action.setting_key)) {
+                        feedback.toast.raw.error(t('ai_agent.action_unwired', 'Action {{type}} is not yet fully wired to the backend.', { type: `change_setting(${action.setting_key})` }));
+                        break;
+                    }
                     updateSetting(action.setting_key as any, action.setting_value);
-                    feedback.toast.success(t('ai_agent.settings_updated', 'Updated {{key}}', { key: action.setting_key }));
+                    feedback.toast.success('ai_agent.settings_updated', { key: action.setting_key });
                 }
                 break;
             case 'execute_adb':
@@ -180,7 +202,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                 break;
             case 'capture_logcat':
                 onNavigate('tests');
-                feedback.toast.info(t('ai_agent.redirect_to_tests', 'Redirecting to Tests panel to configure and run {{type}}.', { type: action.type }));
+                feedback.toast.info('ai_agent.redirect_to_tests', { type: action.type });
                 break;
             case 'run_test':
                 const targetPath = action.path || action.target;
