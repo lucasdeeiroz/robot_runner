@@ -97,7 +97,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
             if (err === 'no-speech' || err === 'aborted') {
                 return;
             }
-            feedback.toast.error(t('ai_agent.mic_permission_error'));
+            feedback.toast.error('ai_agent.mic_permission_error');
         }
     });
 
@@ -110,7 +110,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                 setSentViaVoice(false);
             }
         }
-    }, [messages, sentViaVoice]);
+    }, [messages, sentViaVoice, speak]);
     const endOfMessagesRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -311,7 +311,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                 break;
             case 'execute_adb':
                 if (!activeDeviceUdid) {
-                    feedback.toast.error("No active device to execute ADB command.");
+                    feedback.toast.error('ai_agent.no_active_device');
                     return;
                 }
                 if (action.command) {
@@ -329,13 +329,13 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                             content: `**ADB Output:**\n\`\`\`\n${result || 'Success'}\n\`\`\``
                         }]);
                     } catch (e) {
-                        feedback.toast.error(`ADB Error: ${e}`);
+                        feedback.toast.raw.error(`ADB Error: ${e}`);
                     }
                 }
                 break;
             case 'take_screenshot':
                 if (!activeDeviceUdid) {
-                    feedback.toast.error("No active device to take screenshot.");
+                    feedback.toast.error('ai_agent.no_active_device');
                     return;
                 }
                 await screenshotSaver.saveFile(async (path) => {
@@ -354,12 +354,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                         : '';
 
                     if (!automationRoot) {
-                        feedback.toast.error(
-                            t(
-                                'ai_agent.invalid_automation_root',
-                                'Automation root is not configured. Please set a valid automation root before running a test.'
-                            )
-                        );
+                        feedback.toast.error('ai_agent.invalid_automation_root');
                         return;
                     }
 
@@ -411,7 +406,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                 }
 
                 if (!targetDevice) {
-                    feedback.toast.error("No active device to open toolbox.");
+                    feedback.toast.error('ai_agent.no_active_device');
                     return;
                 }
 
@@ -435,7 +430,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                 }
 
                 if (!inspectorDevice) {
-                    feedback.toast.error("No active device to open inspector.");
+                    feedback.toast.error('ai_agent.no_active_device');
                     return;
                 }
 
@@ -456,7 +451,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                 }
 
                 if (!scrcpyDevice) {
-                    feedback.toast.error("No active device to start mirroring.");
+                    feedback.toast.error('ai_agent.no_active_device');
                     return;
                 }
 
@@ -467,11 +462,11 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                     });
                     feedback.toast.success('feedback.mirror_launched');
                 } catch (e) {
-                    feedback.toast.error("toolbox.scrcpy.open_error", e);
+                    feedback.toast.error('toolbox.scrcpy.open_error');
                 }
                 break;
             default:
-                feedback.toast.error(t('ai_agent.action_unwired', { type: action.type }));
+                feedback.toast.error('ai_agent.action_unwired', { type: action.type });
         }
     };
 
@@ -506,7 +501,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                             setMessages([]);
                             localStorage.removeItem('robot_runner_ai_chat_messages');
                             updateSetting('aiSessionId', undefined);
-                            feedback.toast.success(t('ai_agent.session_cleared', 'Session cleared'));
+                            feedback.toast.success('ai_agent.session_cleared');
                         }}
                         className="text-xs text-on-surface-variant hover:text-error transition-colors"
                     >

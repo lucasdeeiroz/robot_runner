@@ -135,6 +135,8 @@ export const es = {
             mic_active: "Escuchando...",
             mic_inactive: "Entrada de voz",
             mic_permission_error: "Error de permiso de micrófono o no compatible",
+            invalid_automation_root: "La raíz de automatización no está configurada. Configure una raíz válida antes de ejecutar una prueba.",
+            no_active_device: "No hay dispositivo activo seleccionado.",
             suggested_prompts: {
                 settings: "\"Ir a configuración\"",
                 color: "\"Cambiar mi color principal a verde\"",

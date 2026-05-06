@@ -135,6 +135,8 @@ export const pt = {
             mic_active: "Ouvindo...",
             mic_inactive: "Entrada de voz",
             mic_permission_error: "Erro de permissão do microfone ou não suportado",
+            invalid_automation_root: "A raiz de automação não está configurada. Configure uma raiz válida antes de executar um teste.",
+            no_active_device: "Nenhum dispositivo ativo selecionado.",
             suggested_prompts: {
                 settings: "\"Ir para configurações\"",
                 color: "\"Mudar minha cor principal para verde\"",
