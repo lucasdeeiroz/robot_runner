@@ -50,12 +50,26 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
         updateSetting('aiChatEnabled', false);
     };
 
+    const buildSafeSettingsContext = () => {
+        return {
+            aiChatEnabled: settings.aiChatEnabled,
+            activeWorkspace: settings.paths?.automationRoot || null,
+            hasScreenshotsPath: Boolean(settings.paths?.screenshots),
+            deviceCounts: {
+                total: devices.length,
+                selected: selectedDevices.length
+            }
+        };
+    };
+
     const buildContext = () => {
+        const safeSettingsContext = buildSafeSettingsContext();
+
         return `
 - App Version: 2.2.56
-- Active Workspace: ${settings.paths.automationRoot}
+- Active Workspace: ${settings.paths?.automationRoot || 'None'}
 - Active Device: ${activeDeviceUdid || 'None'}
-- Settings: ${JSON.stringify(settings)}
+- Settings Summary: ${JSON.stringify(safeSettingsContext)}
         `;
     };
 
