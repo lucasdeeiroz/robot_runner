@@ -130,6 +130,11 @@ export const en = {
             settings_updated: "Updated {{key}}",
             executing_action: "Executing Action: {{type}}",
             redirect_to_tests: "Redirecting to Tests panel to configure and run {{type}}.",
+            speak_title: "Read response aloud",
+            stop_speak_title: "Stop speaking",
+            mic_active: "Listening...",
+            mic_inactive: "Voice input",
+            mic_permission_error: "Microphone permission error or not supported",
             suggested_prompts: {
                 settings: "\"Go to settings\"",
                 color: "\"Change my primary color to green\"",

@@ -130,6 +130,11 @@ export const es = {
             settings_updated: "Actualizado {{key}}",
             executing_action: "Ejecutando Acción: {{type}}",
             redirect_to_tests: "Redirigiendo al panel de Pruebas para configurar y ejecutar la acción {{type}}.",
+            speak_title: "Leer respuesta en voz alta",
+            stop_speak_title: "Detener reproducción",
+            mic_active: "Escuchando...",
+            mic_inactive: "Entrada de voz",
+            mic_permission_error: "Error de permiso de micrófono o no compatible",
             suggested_prompts: {
                 settings: "\"Ir a configuración\"",
                 color: "\"Cambiar mi color principal a verde\"",

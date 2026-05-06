@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Sparkles, Send, Loader2, Bot, Play, AlertTriangle } from 'lucide-react';
+import { X, Sparkles, Send, Loader2, Bot, Play, AlertTriangle, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 import { useSettings } from "@/lib/settings";
 import { askAgent } from '@/lib/ai/agentService';
 import { AgentAction } from '@/lib/ai/agentProtocol';
@@ -11,6 +11,8 @@ import { useDevices } from '@/lib/deviceStore';
 import { useFileSave } from '@/hooks/useFileSave';
 import { useSelection } from '@/lib/selectionStore';
 import { useTestSessions } from '@/lib/testSessionStore';
+import { useSpeechToText } from '@/hooks/useSpeechToText';
+import { useTextToSpeech } from '@/hooks/useTextToSpeech';
 import packageJson from '../../../package.json';
 
 interface AiAgentPanelProps {
@@ -24,6 +26,35 @@ interface Message {
     actions?: AgentAction[];
     suggestedPrompts?: string[];
 }
+
+const stripMarkdown = (text: string): string => {
+    if (!text) return '';
+    return text
+        // Remove code blocks
+        .replace(/```[\s\S]*?```/g, '')
+        // Remove inline code
+        .replace(/`([^`]+)`/g, '$1')
+        // Remove images
+        .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+        // Remove links (keep text)
+        .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+        // Remove bold/italic (double/single asterisk)
+        .replace(/\*\*([^*]+)\*\*/g, '$1')
+        .replace(/\*([^*]+)\*/g, '$1')
+        // Remove bold/italic (double/single underscore)
+        .replace(/__([^_]+)__/g, '$1')
+        .replace(/_([^_]+)_/g, '$1')
+        // Remove headers (# Header)
+        .replace(/^#{1,6}\s+/gm, '')
+        // Remove blockquotes (> quote)
+        .replace(/^\s*>\s+/gm, '')
+        // Remove list item bullets (- or * or +)
+        .replace(/^\s*[-*+]\s+/gm, '')
+        // Remove ordered list numbers (1. or 2.)
+        .replace(/^\s*\d+\.\s+/gm, '')
+        // Trim extra whitespaces
+        .trim();
+};
 
 export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
     const { t } = useTranslation();
@@ -42,6 +73,43 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
             return [];
         }
     });
+
+    const [sentViaVoice, setSentViaVoice] = useState(false);
+    const [currentlySpeakingMsgId, setCurrentlySpeakingMsgId] = useState<string | null>(null);
+
+    const { speak, stop: stopSpeaking } = useTextToSpeech({
+        lang: settings.language === 'pt_BR' ? 'pt-BR' : (settings.language === 'es_ES' ? 'es-ES' : 'en-US'),
+        onEnd: () => setCurrentlySpeakingMsgId(null),
+        onError: () => setCurrentlySpeakingMsgId(null)
+    });
+
+    const { isListening, startListening, stopListening } = useSpeechToText({
+        lang: settings.language === 'pt_BR' ? 'pt-BR' : (settings.language === 'es_ES' ? 'es-ES' : 'en-US'),
+        onResult: (text) => {
+            if (text.trim()) {
+                setInput(text);
+                setSentViaVoice(true);
+                handleSend(text);
+            }
+        },
+        onError: (err) => {
+            if (err === 'no-speech' || err === 'aborted') {
+                return;
+            }
+            feedback.toast.error(t('ai_agent.mic_permission_error'));
+        }
+    });
+
+    useEffect(() => {
+        if (messages.length > 0 && sentViaVoice) {
+            const lastMsg = messages[messages.length - 1];
+            if (lastMsg.role === 'agent') {
+                speak(stripMarkdown(lastMsg.content));
+                setCurrentlySpeakingMsgId(lastMsg.id);
+                setSentViaVoice(false);
+            }
+        }
+    }, [messages, sentViaVoice]);
     const endOfMessagesRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -389,6 +457,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                 <div className="flex items-center gap-2">
                     <button
                         onClick={() => {
+                            stopSpeaking();
                             setMessages([]);
                             localStorage.removeItem('robot_runner_ai_chat_messages');
                             updateSetting('aiSessionId', undefined);
@@ -452,6 +521,28 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                                 </div>
                             </div>
 
+                            {msg.role === 'agent' && (
+                                <div className="flex items-center gap-2 ml-8 mt-1">
+                                    <button
+                                        onClick={() => {
+                                            if (currentlySpeakingMsgId === msg.id) {
+                                                stopSpeaking();
+                                                setCurrentlySpeakingMsgId(null);
+                                            } else {
+                                                speak(stripMarkdown(msg.content));
+                                                setCurrentlySpeakingMsgId(msg.id);
+                                            }
+                                        }}
+                                        title={currentlySpeakingMsgId === msg.id ? t('ai_agent.stop_speak_title', 'Stop speaking') : t('ai_agent.speak_title', 'Read response aloud')}
+                                        className={`p-1 rounded-md hover:bg-primary/10 transition-colors ${
+                                            currentlySpeakingMsgId === msg.id ? 'text-primary animate-pulse' : 'text-on-surface-variant/60 hover:text-primary'
+                                        }`}
+                                    >
+                                        {currentlySpeakingMsgId === msg.id ? <VolumeX size={14} /> : <Volume2 size={14} />}
+                                    </button>
+                                </div>
+                            )}
+
                             {/* Render Action Cards */}
                             {msg.actions && msg.actions.length > 0 && (
                                 <div className="mt-2 ml-8 flex flex-col gap-2 w-full max-w-[85%]">
@@ -504,6 +595,8 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
             <div className="p-4 border-t border-outline-variant/20 bg-surface/80 backdrop-blur-md shrink-0 relative z-10">
                 <div className="relative">
                     <textarea
+                        id="ai_agent_prompt"
+                        name="ai_agent_prompt"
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={(e) => {
@@ -513,10 +606,28 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                             }
                         }}
                         placeholder={t('ai_agent.placeholder', 'Ask me anything...')}
-                        className="w-full bg-surface-variant/30 text-on-surface rounded-xl pl-4 pr-12 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm resize-none custom-scrollbar border border-outline-variant/30"
+                        className="w-full bg-surface-variant/30 text-on-surface rounded-xl pl-4 pr-20 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm resize-none custom-scrollbar border border-outline-variant/30"
                         rows={3}
                         disabled={isLoading}
                     />
+                    <button
+                        onClick={() => {
+                            if (isListening) {
+                                stopListening();
+                            } else {
+                                startListening();
+                            }
+                        }}
+                        disabled={isLoading}
+                        title={isListening ? t('ai_agent.mic_active', 'Listening...') : t('ai_agent.mic_inactive', 'Voice input')}
+                        className={`absolute right-12 bottom-2 p-2 rounded-lg transition-all ${
+                            isListening
+                                ? 'bg-error text-on-error animate-pulse shadow-lg shadow-error/50 scale-110'
+                                : 'bg-surface-variant/50 text-on-surface-variant hover:bg-primary/20 hover:text-primary'
+                        }`}
+                    >
+                        {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+                    </button>
                     <button
                         onClick={() => handleSend()}
                         disabled={!input.trim() || isLoading}
