@@ -3,6 +3,7 @@ import { Sidebar } from '../organisms/Sidebar';
 import { PresentationPanel } from '../organisms/presentation/PresentationPanel';
 import { AiAgentPanel } from '../organisms/AiAgentPanel';
 import { useSettings } from "@/lib/settings";
+import { useRemoteConfig } from '@/lib/RemoteConfigProvider';
 import { AnimatePresence, motion } from 'framer-motion';
 
 interface LayoutProps {
@@ -13,6 +14,8 @@ interface LayoutProps {
 
 export function Layout({ children, activePage, onNavigate }: LayoutProps) {
     const { settings } = useSettings();
+    const { getBool } = useRemoteConfig();
+    const isAskRaiEnabled = getBool('is_ask_rai_enabled');
 
     return (
         <div
@@ -31,7 +34,7 @@ export function Layout({ children, activePage, onNavigate }: LayoutProps) {
                         <PresentationPanel />
                     </motion.div>
                 )}
-                {settings.aiChatEnabled && (
+                {settings.aiChatEnabled && isAskRaiEnabled && (
                     <motion.div
                         initial={{ width: 0, opacity: 0 }}
                         animate={{ width: "24rem", opacity: 1 }} // w-96 is 24rem

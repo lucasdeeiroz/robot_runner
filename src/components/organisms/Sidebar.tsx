@@ -120,7 +120,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
         if (newState && !collapsed) {
             setCollapsed(true);
         }
-        logEvent('feature_opened', { feature_name: newState ? 'ask_rai' : 'sidebar_closed' });
+        logEvent(newState ? 'feature_opened' : 'feature_closed', { feature_name: 'ask_rai' });
     };
 
     return (
