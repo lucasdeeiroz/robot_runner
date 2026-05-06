@@ -129,6 +129,7 @@ export const pt = {
             action_unwired: "A ação {{type}} ainda não está conectada ao backend.",
             settings_updated: "Atualizado {{key}}",
             executing_action: "Executando Ação: {{type}}",
+            redirect_to_tests: "Redirecionando para o painel de Testes para configurar e executar a ação {{type}}.",
             suggested_prompts: {
                 settings: "\"Ir para configurações\"",
                 color: "\"Mudar minha cor principal para verde\"",

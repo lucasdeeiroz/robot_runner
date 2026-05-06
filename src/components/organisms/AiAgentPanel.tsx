@@ -6,6 +6,10 @@ import { askAgent } from '@/lib/ai/agentService';
 import { AgentAction } from '@/lib/ai/agentProtocol';
 import ReactMarkdown from 'react-markdown';
 import { feedback } from '@/lib/feedback';
+import { invoke } from '@tauri-apps/api/core';
+import { useDevices } from '@/lib/deviceStore';
+import { useFileSave } from '@/hooks/useFileSave';
+import { useSelection } from '@/lib/selectionStore';
 
 interface AiAgentPanelProps {
     onNavigate: (page: string) => void;
@@ -21,10 +25,21 @@ interface Message {
 export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
     const { t } = useTranslation();
     const { updateSetting, settings } = useSettings();
+    const { devices, selectedDevices, setSelectedDevices } = useDevices();
+    const { clearSelection, addItem } = useSelection();
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [messages, setMessages] = useState<Message[]>([]);
     const endOfMessagesRef = useRef<HTMLDivElement>(null);
+
+    const screenshotSaver = useFileSave({
+        fileType: 'Image',
+        extensions: ['png'],
+        defaultNamePrefix: 'screenshot',
+        settingPathKey: 'screenshots'
+    });
+
+    const activeDeviceUdid = selectedDevices[0] || (devices.length > 0 ? devices[0].udid : null);
 
     // Scroll to bottom when messages change
     useEffect(() => {
@@ -36,11 +51,10 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
     };
 
     const buildContext = () => {
-        // Here we build the context based on current app state.
-        // For now, it's basic, but can be expanded.
         return `
 - App Version: 2.2.56
 - Active Workspace: ${settings.paths.automationRoot}
+- Active Device: ${activeDeviceUdid || 'None'}
 - Settings: ${JSON.stringify(settings)}
         `;
     };
@@ -103,8 +117,10 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
         }
     };
 
-    const handleExecuteAction = (action: AgentAction) => {
-        feedback.toast.info(t('ai_agent.executing_action', 'Executing Action: {{type}}', { type: action.type }));
+    const handleExecuteAction = async (action: AgentAction) => {
+        if (action.type !== 'run_test' && action.type !== 'capture_logcat') {
+            feedback.toast.info(t('ai_agent.executing_action', 'Executing Action: {{type}}', { type: action.type }));
+        }
 
         switch (action.type) {
             case 'navigate':
@@ -119,7 +135,79 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                     feedback.toast.success(t('ai_agent.settings_updated', 'Updated {{key}}', { key: action.setting_key }));
                 }
                 break;
-            // Other actions (run_test, etc) will need IPC bindings or store actions
+            case 'execute_adb':
+                if (!activeDeviceUdid) {
+                    feedback.toast.error("No active device to execute ADB command.");
+                    return;
+                }
+                if (action.command) {
+                    try {
+                        const args = action.command.split(' ').filter(Boolean);
+                        const result = await invoke<string>('run_adb_command', { device: activeDeviceUdid, args });
+
+                        setMessages(prev => [...prev, {
+                            id: Date.now().toString(),
+                            role: 'agent',
+                            content: `**ADB Output:**\n\`\`\`\n${result || 'Success'}\n\`\`\``
+                        }]);
+                    } catch (e) {
+                        feedback.toast.error(`ADB Error: ${e}`);
+                    }
+                }
+                break;
+            case 'take_screenshot':
+                if (!activeDeviceUdid) {
+                    feedback.toast.error("No active device to take screenshot.");
+                    return;
+                }
+                await screenshotSaver.saveFile(async (path) => {
+                    await invoke('save_screenshot', { device: activeDeviceUdid, path });
+                }, 'feedback.screenshot_saved');
+                break;
+            case 'capture_logcat':
+                onNavigate('run');
+                feedback.toast.info(t('ai_agent.redirect_to_tests', 'Redirecting to Tests panel to configure and run {{type}}.', { type: action.type }));
+                break;
+            case 'run_test':
+                const targetPath = action.path || action.target;
+                if (targetPath) {
+                    let resolvedPath = targetPath;
+                    try {
+                        const resolved = await invoke<string | null>('resolve_test_path', {
+                            root: settings.paths.automationRoot || "",
+                            name: targetPath
+                        });
+                        if (resolved) {
+                            resolvedPath = resolved;
+                        }
+                    } catch (e) {
+                        console.error("AI_AGENT: Failed to resolve test path recursively:", e);
+                    }
+
+                    const isDir = !resolvedPath.includes('.');
+                    clearSelection();
+                    addItem({
+                        path: resolvedPath,
+                        name: resolvedPath.split(/[\\/]/).pop() || resolvedPath,
+                        type: isDir ? 'folder' : (resolvedPath.endsWith('.args') ? 'args' : 'file')
+                    });
+                }
+
+                if (action.device) {
+                    const matchedDevice = devices.find(d => d.udid === action.device || d.model.toLowerCase().includes(action.device!.toLowerCase()));
+                    if (matchedDevice) {
+                        setSelectedDevices([matchedDevice.udid]);
+                    }
+                }
+
+                onNavigate('run');
+
+                console.log("AI_AGENT: Navigating to run and scheduling ai_run_test event...", targetPath);
+                setTimeout(() => {
+                    console.log("AI_AGENT: Dispatching ai_run_test event NOW");
+                    window.dispatchEvent(new CustomEvent('ai_run_test'));
+                }, 500);
+                break;
             default:
                 feedback.toast.error(t('ai_agent.action_unwired', 'Action {{type}} is not yet fully wired to the backend.', { type: action.type }));
         }
@@ -131,7 +219,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
             <div className="absolute top-[-10%] right-[-10%] w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
 
             {/* Header */}
-            <div className="p-4 h-16 flex items-center justify-between border-b border-outline-variant/20 relative z-10 shrink-0 bg-surface/80 backdrop-blur-md">
+            <div className="p-4 pt-8 h-auto flex items-center justify-between border-b border-outline-variant/20 relative z-10 shrink-0 bg-surface/80 backdrop-blur-md">
                 <div className="flex items-center gap-2">
                     <Sparkles className="text-primary animate-pulse" size={18} />
                     <span className="font-bold text-on-surface tracking-tight">
@@ -196,8 +284,8 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                                     </div>
                                 )}
                                 <div className={`p-3 rounded-2xl text-sm ${msg.role === 'user'
-                                        ? 'bg-primary text-on-primary rounded-br-sm shadow-md shadow-primary/20'
-                                        : 'bg-surface-variant/40 text-on-surface rounded-bl-sm border border-outline-variant/30'
+                                    ? 'bg-primary text-on-primary rounded-br-sm shadow-md shadow-primary/20'
+                                    : 'bg-surface-variant/40 text-on-surface rounded-bl-sm border border-outline-variant/30'
                                     }`}>
                                     <div className="prose prose-sm dark:prose-invert max-w-none prose-p:leading-snug prose-pre:bg-surface-variant/50 prose-pre:p-2 prose-pre:rounded-lg">
                                         <ReactMarkdown>

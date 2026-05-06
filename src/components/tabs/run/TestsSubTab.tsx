@@ -120,8 +120,32 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
     const { settings, updateSetting } = useSettings();
     const { addSession, sessions } = useTestSessions();
 
+    const handleRunRef = useRef<(() => Promise<void>) | null>(null);
+
+    useEffect(() => {
+        const onAiRunTest = () => {
+            console.log("TESTS_SUB_TAB: Received ai_run_test event!");
+            if (handleRunRef.current) {
+                console.log("TESTS_SUB_TAB: Calling handleRunRef.current()...");
+                handleRunRef.current();
+            } else {
+                console.error("TESTS_SUB_TAB: handleRunRef.current is null!");
+            }
+        };
+        window.addEventListener('ai_run_test', onAiRunTest);
+        return () => window.removeEventListener('ai_run_test', onAiRunTest);
+    }, []);
+
     const handleRun = async () => {
-        if (items.length === 0) return;
+        if (items.length === 0) {
+            feedback.toast.error("AI Error: No items selected to run.");
+            return;
+        }
+
+        if (selectedDevices.length === 0) {
+            feedback.toast.error("AI Error: No device selected.");
+            // We'll let it continue because targets defaults to [null] later
+        }
 
         // Check for busy devices
         const busyDeviceIds = sessions.filter(s => s.status === 'running' && s.type === 'test').map(s => s.deviceUdid);
@@ -435,6 +459,10 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
             setIsLaunching(false);
         }
     };
+
+    useEffect(() => {
+        handleRunRef.current = handleRun;
+    });
 
     const getInitialPath = () => {
         if (mode === 'args') return settings.paths.suites;

@@ -137,3 +137,33 @@ pub fn save_image(path: String, content: Vec<u8>) -> AppResult<()> {
         .map_err(|e| AppError::FileSystemError(e.to_string()))?;
     Ok(())
 }
+#[command]
+pub fn resolve_test_path(root: String, name: String) -> AppResult<Option<String>> {
+    fn find_file_recursive(dir: &std::path::Path, target_name: &str) -> Option<std::path::PathBuf> {
+        if let Ok(entries) = fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    if let Some(found) = find_file_recursive(&path, target_name) {
+                        return Some(found);
+                    }
+                } else if let Some(file_name) = path.file_name().and_then(|s| s.to_str()) {
+                    let file_name_lower = file_name.to_lowercase();
+                    let target_lower = target_name.to_lowercase();
+                    if file_name_lower == target_lower || 
+                       path.file_stem().and_then(|s| s.to_str()).map(|s| s.to_lowercase()) == Some(target_lower) {
+                        return Some(path);
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    let root_path = std::path::Path::new(&root);
+    if let Some(found) = find_file_recursive(root_path, &name) {
+        Ok(Some(found.to_string_lossy().to_string()))
+    } else {
+        Ok(None)
+    }
+}
