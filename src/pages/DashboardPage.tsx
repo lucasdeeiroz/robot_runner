@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PageHeader } from '@/components/organisms/PageHeader';
 import { LayoutDashboard } from 'lucide-react';
@@ -22,6 +22,17 @@ interface DashboardPageProps {
 export function DashboardPage({ onNavigate }: DashboardPageProps) {
     const { t } = useTranslation();
     const [activeTab, setActiveTab] = useState('scenarios');
+
+    useEffect(() => {
+        const handleNavigateSubTab = (e: Event) => {
+            const detail = (e as CustomEvent).detail;
+            if (detail && (detail === 'scenarios' || detail === 'images' || detail === 'history' || detail === 'mapper')) {
+                setActiveTab(detail);
+            }
+        };
+        window.addEventListener('ai_navigate_dashboard_subtab', handleNavigateSubTab);
+        return () => window.removeEventListener('ai_navigate_dashboard_subtab', handleNavigateSubTab);
+    }, []);
 
     // Device Management (Global)
     const { devices, selectedDevices, loading: loadingDevices, loadDevices: refreshDevices, setSelectedDevices } = useDevices();

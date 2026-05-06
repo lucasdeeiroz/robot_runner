@@ -241,21 +241,51 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
         switch (action.type) {
             case 'navigate':
                 if (action.target) {
-                    if (action.target === 'inspector' || action.target === 'run/inspector') {
+                    const targetLower = action.target.toLowerCase();
+                    if (targetLower === 'inspector' || targetLower === 'run/inspector' || targetLower === 'scaneye' || targetLower === 'inspetor' || targetLower === 'inspect') {
                         onNavigate('run');
                         setTimeout(() => {
                             window.dispatchEvent(new CustomEvent('ai_navigate_run_subtab', { detail: 'inspector' }));
                         }, 100);
-                    } else if (action.target === 'connect' || action.target === 'run/connect') {
+                    } else if (targetLower === 'connect' || targetLower === 'run/connect' || targetLower === 'wifi' || targetLower === 'conectar' || targetLower === 'conexão') {
                         onNavigate('run');
                         setTimeout(() => {
                             window.dispatchEvent(new CustomEvent('ai_navigate_run_subtab', { detail: 'connect' }));
                         }, 100);
-                    } else if (action.target === 'launcher' || action.target === 'run/launcher' || action.target === 'tests_sub_tab') {
+                    } else if (targetLower === 'launcher' || targetLower === 'run/launcher' || targetLower === 'tests_sub_tab' || targetLower === 'run' || targetLower === 'run_tests' || targetLower === 'executar testes' || targetLower === 'rodar testes') {
                         onNavigate('run');
                         setTimeout(() => {
                             window.dispatchEvent(new CustomEvent('ai_navigate_run_subtab', { detail: 'tests' }));
                         }, 100);
+                    } else if (targetLower === 'history' || targetLower === 'tests/history' || targetLower === 'histórico') {
+                        onNavigate('tests');
+                        setTimeout(() => {
+                            window.dispatchEvent(new CustomEvent('ai_navigate_tests_subtab', { detail: 'history' }));
+                        }, 100);
+                    } else if (targetLower === 'scenarios' || targetLower === 'dashboard/scenarios' || targetLower === 'generator' || targetLower === 'ai_generator' || targetLower === 'gerador') {
+                        onNavigate('dashboard');
+                        setTimeout(() => {
+                            window.dispatchEvent(new CustomEvent('ai_navigate_dashboard_subtab', { detail: 'scenarios' }));
+                        }, 100);
+                    } else if (targetLower === 'images' || targetLower === 'dashboard/images' || targetLower === 'editor' || targetLower === 'image_editor' || targetLower === 'editor de imagem' || targetLower === 'editor de imagens') {
+                        onNavigate('dashboard');
+                        setTimeout(() => {
+                            window.dispatchEvent(new CustomEvent('ai_navigate_dashboard_subtab', { detail: 'images' }));
+                        }, 100);
+                    } else if (targetLower === 'dashboard_history' || targetLower === 'dashboard/history' || targetLower === 'history_panel') {
+                        onNavigate('dashboard');
+                        setTimeout(() => {
+                            window.dispatchEvent(new CustomEvent('ai_navigate_dashboard_subtab', { detail: 'history' }));
+                        }, 100);
+                    } else if (targetLower === 'mapper' || targetLower === 'dashboard/mapper' || targetLower === 'mapeador' || targetLower === 'mapper_sub_tab' || targetLower === 'map') {
+                        onNavigate('dashboard');
+                        setTimeout(() => {
+                            window.dispatchEvent(new CustomEvent('ai_navigate_dashboard_subtab', { detail: 'mapper' }));
+                        }, 100);
+                    } else if (targetLower === 'settings' || targetLower === 'configurações') {
+                        onNavigate('settings');
+                    } else if (targetLower === 'about' || targetLower === 'sobre') {
+                        onNavigate('about');
                     } else {
                         onNavigate(action.target);
                     }
