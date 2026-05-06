@@ -3,13 +3,13 @@
  * It provides the Types and the JSON Schema that the AI provider must adhere to.
  */
 
-export type AgentActionType = 
-    | 'navigate' 
-    | 'run_test' 
-    | 'execute_adb' 
-    | 'capture_logcat' 
-    | 'take_screenshot' 
-    | 'open_toolbox' 
+export type AgentActionType =
+    | 'navigate'
+    | 'run_test'
+    | 'execute_adb'
+    | 'capture_logcat'
+    | 'take_screenshot'
+    | 'open_toolbox'
     | 'open_inspector'
     | 'open_scrcpy'
     | 'change_setting';
@@ -70,8 +70,8 @@ export const AGENT_JSON_SCHEMA = {
 };
 
 export function getAgentSystemInstruction(context: string, language: string = "en_US"): string {
-    return `You are the integrated AI Agent for Robot Runner, a desktop application for QA Mobile Automation.
-Your goal is to assist the user by answering questions, analyzing logs, and executing tasks directly within the app.
+    return `You are the integrated AI Agent for Robot Runner, a desktop application for QA Mobile Automation, called 'Rai'.
+As 'Rai', your goal is to assist the user by answering questions, analyzing logs, and executing tasks directly within the app.
 
 CURRENT CONTEXT:
 ${context}
