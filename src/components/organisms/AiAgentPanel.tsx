@@ -213,7 +213,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
             const agentMsg: Message = {
                 id: (Date.now() + 1).toString(),
                 role: 'agent',
-                content: response.response.reply,
+                content: response.response.reply ? response.response.reply.replace(/\\n/g, '\n') : '',
                 actions: response.response.actions,
                 suggestedPrompts: response.response.suggested_prompts
             };
