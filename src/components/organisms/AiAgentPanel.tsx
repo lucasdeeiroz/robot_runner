@@ -30,8 +30,20 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
     const { clearSelection, addItem } = useSelection();
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [messages, setMessages] = useState<Message[]>([]);
+    const [messages, setMessages] = useState<Message[]>(() => {
+        try {
+            const stored = localStorage.getItem('robot_runner_ai_chat_messages');
+            return stored ? JSON.parse(stored) : [];
+        } catch (e) {
+            console.error("Failed to parse stored chat messages:", e);
+            return [];
+        }
+    });
     const endOfMessagesRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        localStorage.setItem('robot_runner_ai_chat_messages', JSON.stringify(messages));
+    }, [messages]);
 
     // Allowlist of top-level AppSettings keys the AI agent is permitted to change.
     // Excludes sensitive keys (API keys, tokens), complex objects (paths, tools),
@@ -158,7 +170,6 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
             case 'navigate':
                 if (action.target) {
                     onNavigate(action.target);
-                    updateSetting('aiChatEnabled', false); // Optional: close panel on navigate
                 }
                 break;
             case 'change_setting':
@@ -284,6 +295,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                     <button
                         onClick={() => {
                             setMessages([]);
+                            localStorage.removeItem('robot_runner_ai_chat_messages');
                             updateSetting('aiSessionId', undefined);
                             feedback.toast.success(t('ai_agent.session_cleared', 'Session cleared'));
                         }}
