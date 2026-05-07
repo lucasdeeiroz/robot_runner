@@ -5,6 +5,9 @@ on:
       - 'v*'
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   create-release:
     permissions:
@@ -16,7 +19,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Create Release
         id: create_release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           name: Robot Runner ${{ github.ref_name }}
           body: "See the assets to download this version and install."
@@ -153,7 +156,7 @@ jobs:
           fi
 
       - name: Upload Renamed Assets
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           files: |
@@ -188,29 +191,32 @@ jobs:
             if ($manifestDir) {
                  Write-Host "Patching manifests in $($manifestDir.FullName)"
                  
-                 # 1. Inject Metadata into locale manifest
-                 $date = Get-Date -Format "yyyy-MM-dd"
-                 $localeManifest = Get-ChildItem -Path $manifestDir.FullName -Filter "*locale.en-US.yaml"
+                  # 1. Inject Metadata into locale manifest (ReleaseNotesUrl)
+                  $date = Get-Date -Format "yyyy-MM-dd"
+                  $localeManifest = Get-ChildItem -Path $manifestDir.FullName -Filter "*locale.en-US.yaml"
                   if ($localeManifest) {
-                     $content = Get-Content $localeManifest.FullName -Raw
-                     
-                     if (-not ($content -match "ReleaseNotesUrl:")) {
-                         $releaseNotesUrl = "https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
-                         $content = $content.Trim() + "`r`nReleaseNotesUrl: $releaseNotesUrl"
-                         Write-Host "Added ReleaseNotesUrl to $($localeManifest.Name)"
-                     }
+                      $content = Get-Content $localeManifest.FullName -Raw
+                      
+                      if (-not ($content -match "ReleaseNotesUrl:")) {
+                          $releaseNotesUrl = "https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
+                          $content = $content.Trim() + "`r`nReleaseNotesUrl: $releaseNotesUrl"
+                          Write-Host "Added ReleaseNotesUrl to $($localeManifest.Name)"
+                      }
 
-                     if (-not ($content -match "ReleaseDate:")) {
-                         if ($content -match "ReleaseNotesUrl:") {
-                             $content = $content -replace "ReleaseNotesUrl:\s*([^\r\n]+)", "ReleaseNotesUrl: `$1`r`nReleaseDate: $date"
-                             Write-Host "Inserted ReleaseDate after ReleaseNotesUrl in $($localeManifest.Name)"
-                         } else {
-                             $content = $content.Trim() + "`r`nReleaseDate: $date"
-                             Write-Host "Added ReleaseDate: $date to $($localeManifest.Name)"
-                         }
-                     }
+                      Set-Content -Path $localeManifest.FullName -Value $content -Encoding utf8
+                  }
 
-                     Set-Content -Path $localeManifest.FullName -Value $content -Encoding utf8
+                  # 2. Inject Metadata into version manifest (ReleaseDate)
+                  $versionManifest = Get-ChildItem -Path $manifestDir.FullName -Filter "*.yaml" | Where-Object { $_.Name -notmatch "installer" -and $_.Name -notmatch "locale" } | Select-Object -First 1
+                  if ($versionManifest) {
+                      $content = Get-Content $versionManifest.FullName -Raw
+                      
+                      if (-not ($content -match "ReleaseDate:")) {
+                          $content = $content.Trim() + "`r`nReleaseDate: $date"
+                          Write-Host "Added ReleaseDate: $date to $($versionManifest.Name)"
+                      }
+
+                      Set-Content -Path $versionManifest.FullName -Value $content -Encoding utf8
                   }
 
                  Write-Host "Submitting manifest from $($manifestDir.FullName)"
