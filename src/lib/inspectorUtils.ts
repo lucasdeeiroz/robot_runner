@@ -282,7 +282,7 @@ export function findNodesByLocator(root: InspectorNode, locator: string): Inspec
             parentNodes.forEach(pn => {
                 const childNodes = findNodesByLocator(pn, childLocator);
                 childNodes.forEach(cn => {
-                    if (!finalResults.some(r => r.id === cn.id)) {
+                    if (cn.parent?.id === pn.id && !finalResults.some(r => r.id === cn.id)) {
                         finalResults.push(cn);
                     }
                 });
@@ -303,7 +303,7 @@ export function findNodesByLocator(root: InspectorNode, locator: string): Inspec
                 if (rn.parent) {
                     const siblingNodes = findNodesByLocator(rn.parent, siblingLocator);
                     siblingNodes.forEach(sn => {
-                        if (sn.id !== rn.id && !finalResults.some(r => r.id === sn.id)) {
+                        if (sn.parent?.id === rn.parent?.id && sn.id !== rn.id && !finalResults.some(r => r.id === sn.id)) {
                             finalResults.push(sn);
                         }
                     });
@@ -810,7 +810,7 @@ export function generateUiSelector(node: InspectorNode, options: {
             }
             if (['checkable', 'checked', 'clickable', 'long-clickable', 'longClickable', 'enabled', 'focusable', 'focused', 'scrollable', 'selected'].includes(a)) {
                 selectorArr.push(`${m}(${attrValue === 'true'})`);
-            } else if (a === 'index') {
+            } else if (a === 'index' || a === 'instance') {
                 selectorArr.push(`${m}(${parseInt(attrValue, 10) || 0})`);
             } else {
                 selectorArr.push(`${m}("${attrValue}")`);

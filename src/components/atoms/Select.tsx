@@ -67,12 +67,6 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(({
             selectRef.current.dispatchEvent(event);
         }
 
-        if (onChange) {
-            onChange({
-                target: selectRef.current || { value: String(optionValue) }
-            } as React.ChangeEvent<HTMLSelectElement>);
-        }
-
         setIsOpen(false);
     };
 
@@ -124,6 +118,8 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(({
                     onChange={onChange}
                     disabled={disabled}
                     className="sr-only"
+                    tabIndex={-1}
+                    aria-hidden="true"
                     {...props}
                 >
                     {options.map((option) => (

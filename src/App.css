@@ -262,20 +262,9 @@ button:hover .rai-letter-r-ghost,
   position: relative;
 }
 
-[data-tooltip]:hover {
+[data-tooltip]:hover,
+[data-tooltip]:focus-visible {
   z-index: 99999 !important;
-}
-
-/* Elevate stacking context for all ancestors up the tree so tooltips render on top of all page elements without triggering reflows */
-*:not(html):not(body):has([data-tooltip]:hover) {
-  z-index: 99999 !important;
-}
-
-/* Ensure immediate parents of hovered tooltips allow overflow so they are not clipped, limited to 3 levels deep to prevent layout expansion flickering */
-*:has(> [data-tooltip]:hover),
-*:has(> * > [data-tooltip]:hover),
-*:has(> * > * > [data-tooltip]:hover) {
-  overflow: visible !important;
 }
 
 [data-tooltip=""]::after,
@@ -309,7 +298,9 @@ button:hover .rai-letter-r-ghost,
   transform-origin: left center;
 }
 [data-tooltip]:not([data-position]):hover::after,
-[data-tooltip][data-position="right"]:hover::after {
+[data-tooltip]:not([data-position]):focus-visible::after,
+[data-tooltip][data-position="right"]:hover::after,
+[data-tooltip][data-position="right"]:focus-visible::after {
   opacity: 1;
   transform: translateY(-50%) scale(1);
 }
@@ -321,7 +312,8 @@ button:hover .rai-letter-r-ghost,
   transform: translateX(-50%) scale(0.85);
   transform-origin: bottom center;
 }
-[data-tooltip][data-position="top"]:hover::after {
+[data-tooltip][data-position="top"]:hover::after,
+[data-tooltip][data-position="top"]:focus-visible::after {
   opacity: 1;
   transform: translateX(-50%) scale(1);
 }
@@ -333,7 +325,8 @@ button:hover .rai-letter-r-ghost,
   transform: translateX(-50%) scale(0.85);
   transform-origin: top center;
 }
-[data-tooltip][data-position="bottom"]:hover::after {
+[data-tooltip][data-position="bottom"]:hover::after,
+[data-tooltip][data-position="bottom"]:focus-visible::after {
   opacity: 1;
   transform: translateX(-50%) scale(1);
 }
@@ -345,7 +338,8 @@ button:hover .rai-letter-r-ghost,
   transform: translateY(-50%) scale(0.85);
   transform-origin: right center;
 }
-[data-tooltip][data-position="left"]:hover::after {
+[data-tooltip][data-position="left"]:hover::after,
+[data-tooltip][data-position="left"]:focus-visible::after {
   opacity: 1;
   transform: translateY(-50%) scale(1);
 }
