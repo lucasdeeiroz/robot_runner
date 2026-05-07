@@ -17,7 +17,7 @@ interface UseFlowchartLayoutProps {
     settings: any;
 }
 
-export function useFlowchartLayout({ maps, activeProfileId, onRefresh, settings }: UseFlowchartLayoutProps) {
+export function useFlowchartLayout({ maps = [], activeProfileId, onRefresh, settings }: UseFlowchartLayoutProps) {
     const { t } = useTranslation();
     const [layout, setLayout] = useState<FlowchartLayout>({ version: 1, nodes: {}, edges: {} });
     const [loading, setLoading] = useState(true);
@@ -33,7 +33,7 @@ export function useFlowchartLayout({ maps, activeProfileId, onRefresh, settings 
     const loadLayout = useCallback(async () => {
         setLoading(true);
         try {
-            const centralLayout = await loadFlowchartLayout(activeProfileId);
+            const centralLayout = await loadFlowchartLayout(activeProfileId, settings.paths?.mappings);
             const newLayout: FlowchartLayout = { version: 1, nodes: {}, edges: {} };
             
             if (centralLayout) {
@@ -41,7 +41,7 @@ export function useFlowchartLayout({ maps, activeProfileId, onRefresh, settings 
                 newLayout.edges = { ...centralLayout.edges };
             }
 
-            for (const map of maps) {
+            for (const map of (maps || [])) {
                 if (map.layout) {
                     // Support both legacy {gridX, gridY} and new {node, edges} formats
                     if ('node' in map.layout) {
@@ -66,7 +66,7 @@ export function useFlowchartLayout({ maps, activeProfileId, onRefresh, settings 
             });
 
             let addedNew = false;
-            for (const map of maps) {
+            for (const map of (maps || [])) {
                 if (!newLayout.nodes[map.name]) {
                     newLayout.nodes[map.name] = { gridX: nextX, gridY: 0 };
                     nextX++;
@@ -96,7 +96,7 @@ export function useFlowchartLayout({ maps, activeProfileId, onRefresh, settings 
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
         
         try {
-            const savePromises = maps.map(async (map) => {
+            const savePromises = (maps || []).map(async (map) => {
                 const nodeLayout = layout.nodes[map.name];
                 if (!nodeLayout) return;
 
@@ -118,11 +118,11 @@ export function useFlowchartLayout({ maps, activeProfileId, onRefresh, settings 
                 await saveScreenMap(activeProfileId, {
                     ...map,
                     layout: { node: nodeLayout, edges: mapEdges }
-                });
+                }, settings.paths?.mappings);
             });
 
             await Promise.all(savePromises);
-            await deleteFlowchartLayout(activeProfileId);
+            await deleteFlowchartLayout(activeProfileId, settings.paths?.mappings);
 
             setIsDirty(false);
             if (manual) feedback.toast.success(t('mapper.flowchart.save_success'));

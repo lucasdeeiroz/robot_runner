@@ -751,7 +751,8 @@ export const en = {
                 drawer: "Drawer",
                 dialog: "Dialog",
                 tab_content: "Tab Content",
-                overlay: "Overlay"
+                overlay: "Overlay",
+                undefined: "Screen"
             },
             exploration: {
                 start: "AI Auto Mapping",
@@ -1048,6 +1049,10 @@ export const en = {
                 read_error: "Failed to read logo file. Please try again.",
                 select_error: "Failed to select logo"
             },
+            feedback: {
+                migration_success: "Screens migrated successfully",
+                migration_error: "Failed to migrate screens"
+            },
             appium: {
                 title: "Appium Server",
                 status_error: "Failed to get Appium status",
@@ -1206,7 +1211,8 @@ export const en = {
                 logcat: "Logcat Directory",
                 screenshots: "Screenshots Directory",
                 recordings: "Recordings Directory",
-                automationRoot: "Automation Root (Working Dir)"
+                automationRoot: "Automation Root (Working Dir)",
+                mappings: "Mappings Directory"
             },
             tool_options: {
                 title: "Tool Options",

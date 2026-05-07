@@ -27,17 +27,18 @@ export function Combobox({
     required = false
 }: ComboboxProps) {
     const [isOpen, setIsOpen] = useState(false);
-    const [searchTerm, setSearchTerm] = useState(value);
+    const [searchTerm, setSearchTerm] = useState(value || '');
     const containerRef = useRef<HTMLDivElement>(null);
 
     // Filter options based on search term
-    const filteredOptions = options.filter(option =>
-        option.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredOptions = (options || []).filter(option => {
+        if (!option || typeof option !== 'string') return false;
+        return option.toLowerCase().includes((searchTerm || '').toLowerCase());
+    });
 
     // Update search term when value prop changes (e.g. initial load or external update)
     useEffect(() => {
-        setSearchTerm(value);
+        setSearchTerm(value || '');
     }, [value]);
 
     // Close dropdown when clicking outside

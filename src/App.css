@@ -266,10 +266,15 @@ button:hover .rai-letter-r-ghost,
   z-index: 99999 !important;
 }
 
-/* Elevate stacking context and prevent clipping for all ancestors up the tree when hovering a tooltip */
-*:not(html):not(body):has([data-tooltip]:hover) {
+/* Elevate stacking context and prevent clipping for all ancestors up the tree when hovering a tooltip, except for vertically scrollable containers */
+*:not(html):not(body):not([class*="overflow-y-auto"]):not([class*="overflow-auto"]):not([class*="overflow-y-scroll"]):not([class*="overflow-scroll"]):has([data-tooltip]:hover) {
   z-index: 99999 !important;
   overflow: visible !important;
+}
+
+/* For vertically scrollable containers, only elevate z-index to avoid scroll resetting and flickering */
+*:not(html):not(body):where([class*="overflow-y-auto"], [class*="overflow-auto"], [class*="overflow-y-scroll"], [class*="overflow-scroll"]):has([data-tooltip]:hover) {
+  z-index: 99999 !important;
 }
 
 [data-tooltip=""]::after,

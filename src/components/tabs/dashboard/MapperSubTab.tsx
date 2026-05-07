@@ -195,7 +195,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     };
 
     const loadSavedMaps = async () => {
-        const maps = await listScreenMaps(activeProfileId);
+        const maps = await listScreenMaps(activeProfileId, settings.paths?.mappings);
         setSavedMaps(maps);
         return maps;
     };
@@ -280,7 +280,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             // from other components/tabs
             let existingMap: ScreenMap | null = null;
             try {
-                existingMap = await loadScreenMap(activeProfileId, screenId);
+                existingMap = await loadScreenMap(activeProfileId, screenId, settings.paths?.mappings);
             } catch (e) {
                 // Map doesn't exist yet, which is fine
             }
@@ -296,7 +296,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 layout: existingMap?.layout
             };
             try {
-                await saveScreenMap(activeProfileId, map);
+                await saveScreenMap(activeProfileId, map, settings.paths?.mappings);
                 // Refresh list
                 loadSavedMaps();
             } catch (e) {
@@ -333,7 +333,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
     const confirmDeleteScreen = async () => {
         if (screenToDelete) {
-            await deleteScreenMap(activeProfileId, screenToDelete);
+            await deleteScreenMap(activeProfileId, screenToDelete, settings.paths?.mappings);
             loadSavedMaps();
             feedback.toast.success(t('mapper.feedback.deleted'));
             setScreenToDelete(null);
@@ -352,7 +352,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
     const handleExport = async () => {
         try {
-            const data = await exportMapperData(activeProfileId);
+            const data = await exportMapperData(activeProfileId, settings.paths?.mappings);
             const path = await save({
                 filters: [{ name: 'Robot Runner Flow', extensions: ['json'] }],
                 defaultPath: `flowchart_export_${new Date().toISOString().split('T')[0]}.json`
@@ -377,7 +377,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
             if (path && typeof path === 'string') {
                 const content = await invoke<string>('read_file', { path });
-                await importMapperData(activeProfileId, content);
+                await importMapperData(activeProfileId, content, settings.paths?.mappings);
                 feedback.toast.success(t('mapper.flowchart.import_success'));
                 loadSavedMaps(); // Refresh list
             }
@@ -702,7 +702,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
                     if (updated) {
                         const updatedPrevMap = { ...prevMap, elements: updatedElements };
-                        await saveScreenMap(activeProfileId, updatedPrevMap);
+                        await saveScreenMap(activeProfileId, updatedPrevMap, settings.paths?.mappings);
                         explorer.addLog(t('mapper.exploration.back_updated', { prev: prevNav.screenName, current: aiScreen.name }), 'info');
                         // Refresh maps so subsequent logic sees the update
                         maps = await loadSavedMaps();
@@ -799,7 +799,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                     layout: resolvedLayout
                 };
 
-                await saveScreenMap(activeProfileId, map);
+                await saveScreenMap(activeProfileId, map, settings.paths?.mappings);
                 explorer.markScreenVisited(aiScreen.name);
 
                 // Update UI State if it's the current screen we're looking at

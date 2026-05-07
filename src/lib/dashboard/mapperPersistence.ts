@@ -3,44 +3,60 @@ import { BaseDirectory, readTextFile, writeTextFile, remove, exists, mkdir, read
 
 const getMapsDir = (profileId: string) => `maps/${profileId}/screens`;
 
+const getPathAndOptions = (profileId: string, customDir?: string) => {
+    if (customDir && customDir.trim() !== '') {
+        return {
+            dir: customDir,
+            options: {}
+        };
+    } else {
+        return {
+            dir: getMapsDir(profileId),
+            options: { baseDir: BaseDirectory.AppLocalData }
+        };
+    }
+};
+
 // Helper to ensure directory exists
-async function ensureDir(profileId: string) {
+async function ensureDir(profileId: string, customDir?: string) {
     try {
-        const dir = getMapsDir(profileId);
-        const dirExists = await exists(dir, { baseDir: BaseDirectory.AppLocalData });
+        const { dir, options } = getPathAndOptions(profileId, customDir);
+        const dirExists = await exists(dir, options);
         if (!dirExists) {
-            await mkdir(dir, { baseDir: BaseDirectory.AppLocalData, recursive: true });
+            await mkdir(dir, { ...options, recursive: true });
         }
     } catch (e) {
         console.error("Failed to ensure maps directory", e);
     }
 }
 
-export async function saveScreenMap(profileId: string, map: ScreenMap): Promise<void> {
-    await ensureDir(profileId);
+export async function saveScreenMap(profileId: string, map: ScreenMap, customDir?: string): Promise<void> {
+    await ensureDir(profileId, customDir);
+    const { dir, options } = getPathAndOptions(profileId, customDir);
     const fileName = `${map.id}.json`;
     const content = JSON.stringify(map, null, 2);
-    await writeTextFile(`${getMapsDir(profileId)}/${fileName}`, content, { baseDir: BaseDirectory.AppLocalData });
+    await writeTextFile(`${dir}/${fileName}`, content, options);
 }
 
-export async function loadScreenMap(profileId: string, id: string): Promise<ScreenMap> {
+export async function loadScreenMap(profileId: string, id: string, customDir?: string): Promise<ScreenMap> {
+    const { dir, options } = getPathAndOptions(profileId, customDir);
     const fileName = `${id}.json`;
-    const content = await readTextFile(`${getMapsDir(profileId)}/${fileName}`, { baseDir: BaseDirectory.AppLocalData });
+    const content = await readTextFile(`${dir}/${fileName}`, options);
     return JSON.parse(content) as ScreenMap;
 }
 
-export async function listScreenMaps(profileId: string): Promise<ScreenMap[]> {
-    await ensureDir(profileId);
+export async function listScreenMaps(profileId: string, customDir?: string): Promise<ScreenMap[]> {
+    await ensureDir(profileId, customDir);
     try {
-        const dir = getMapsDir(profileId);
-        const entries = await readDir(dir, { baseDir: BaseDirectory.AppLocalData });
+        const { dir, options } = getPathAndOptions(profileId, customDir);
+        const entries = await readDir(dir, options);
         const maps: ScreenMap[] = [];
 
         for (const entry of entries) {
             if (entry.isFile && entry.name.endsWith('.json') && entry.name !== 'flowchart_layout.json') {
                 const path = `${dir}/${entry.name}`;
                 try {
-                    const content = await readTextFile(path, { baseDir: BaseDirectory.AppLocalData });
+                    const content = await readTextFile(path, options);
                     try {
                         const map = JSON.parse(content) as ScreenMap;
                         maps.push(map);
@@ -74,31 +90,34 @@ export async function listScreenMaps(profileId: string): Promise<ScreenMap[]> {
     }
 }
 
-export async function deleteScreenMap(profileId: string, id: string): Promise<void> {
+export async function deleteScreenMap(profileId: string, id: string, customDir?: string): Promise<void> {
+    const { dir, options } = getPathAndOptions(profileId, customDir);
     const fileName = `${id}.json`;
-    await remove(`${getMapsDir(profileId)}/${fileName}`, { baseDir: BaseDirectory.AppLocalData });
+    await remove(`${dir}/${fileName}`, options);
 }
 
 // --- Flowchart Layout Persistence ---
 import { FlowchartLayout } from '@/lib/types';
 
-export async function saveFlowchartLayout(profileId: string, layout: FlowchartLayout): Promise<void> {
-    await ensureDir(profileId);
+export async function saveFlowchartLayout(profileId: string, layout: FlowchartLayout, customDir?: string): Promise<void> {
+    await ensureDir(profileId, customDir);
+    const { dir, options } = getPathAndOptions(profileId, customDir);
     const fileName = 'flowchart_layout.json';
     const content = JSON.stringify(layout, null, 2);
-    await writeTextFile(`${getMapsDir(profileId)}/${fileName}`, content, { baseDir: BaseDirectory.AppLocalData });
+    await writeTextFile(`${dir}/${fileName}`, content, options);
 }
 
-export async function loadFlowchartLayout(profileId: string): Promise<FlowchartLayout | null> {
+export async function loadFlowchartLayout(profileId: string, customDir?: string): Promise<FlowchartLayout | null> {
     try {
-        await ensureDir(profileId);
+        await ensureDir(profileId, customDir);
+        const { dir, options } = getPathAndOptions(profileId, customDir);
         const fileName = 'flowchart_layout.json';
-        const path = `${getMapsDir(profileId)}/${fileName}`;
-        const layoutExists = await exists(path, { baseDir: BaseDirectory.AppLocalData });
+        const path = `${dir}/${fileName}`;
+        const layoutExists = await exists(path, options);
 
         if (!layoutExists) return null;
 
-        const content = await readTextFile(path, { baseDir: BaseDirectory.AppLocalData });
+        const content = await readTextFile(path, options);
         return JSON.parse(content) as FlowchartLayout;
     } catch (e) {
         console.warn("Failed to load flowchart layout", e);
@@ -106,13 +125,14 @@ export async function loadFlowchartLayout(profileId: string): Promise<FlowchartL
     }
 }
 
-export async function deleteFlowchartLayout(profileId: string): Promise<void> {
+export async function deleteFlowchartLayout(profileId: string, customDir?: string): Promise<void> {
     try {
+        const { dir, options } = getPathAndOptions(profileId, customDir);
         const fileName = 'flowchart_layout.json';
-        const path = `${getMapsDir(profileId)}/${fileName}`;
-        const layoutExists = await exists(path, { baseDir: BaseDirectory.AppLocalData });
+        const path = `${dir}/${fileName}`;
+        const layoutExists = await exists(path, options);
         if (layoutExists) {
-            await remove(path, { baseDir: BaseDirectory.AppLocalData });
+            await remove(path, options);
         }
     } catch (e) {
         console.error("Failed to delete flowchart layout", e);
@@ -126,9 +146,9 @@ export interface MapperExportData {
     version?: string; // Add a version for future-proofing
 }
 
-export async function exportMapperData(profileId: string): Promise<string> {
-    const screens = await listScreenMaps(profileId);
-    const layout = await loadFlowchartLayout(profileId); // Still load it in case migration hasn't happened
+export async function exportMapperData(profileId: string, customDir?: string): Promise<string> {
+    const screens = await listScreenMaps(profileId, customDir);
+    const layout = await loadFlowchartLayout(profileId, customDir); // Still load it in case migration hasn't happened
 
     const data: MapperExportData = {
         screens,
@@ -139,7 +159,7 @@ export async function exportMapperData(profileId: string): Promise<string> {
     return JSON.stringify(data, null, 2);
 }
 
-export async function importMapperData(profileId: string, jsonContent: string): Promise<void> {
+export async function importMapperData(profileId: string, jsonContent: string, customDir?: string): Promise<void> {
     try {
         const data = JSON.parse(jsonContent) as MapperExportData;
 
@@ -150,13 +170,13 @@ export async function importMapperData(profileId: string, jsonContent: string): 
         // 1. Save all screens
         // Note: New screens already have 'layout' and 'navigation' (via navigates_to)
         for (const screen of data.screens) {
-            await saveScreenMap(profileId, screen);
+            await saveScreenMap(profileId, screen, customDir);
         }
 
         // 2. Save legacy layout if present
         // This allows older exports to be imported, where FlowchartModal will then trigger migration
         if (data.layout) {
-            await saveFlowchartLayout(profileId, data.layout);
+            await saveFlowchartLayout(profileId, data.layout, customDir);
         }
 
     } catch (e) {
@@ -164,3 +184,40 @@ export async function importMapperData(profileId: string, jsonContent: string): 
         throw e;
     }
 }
+
+export async function migrateScreenMaps(profileId: string, oldDir?: string, newDir?: string): Promise<void> {
+    const oldPathInfo = getPathAndOptions(profileId, oldDir);
+    const newPathInfo = getPathAndOptions(profileId, newDir);
+
+    // If both resolve to the same path, do nothing
+    if (oldPathInfo.dir === newPathInfo.dir && oldPathInfo.options.baseDir === newPathInfo.options.baseDir) {
+        return;
+    }
+
+    try {
+        if (await exists(oldPathInfo.dir, oldPathInfo.options)) {
+            // Ensure destination exists
+            await ensureDir(profileId, newDir);
+
+            const entries = await readDir(oldPathInfo.dir, oldPathInfo.options);
+            for (const entry of entries) {
+                if (entry.isFile && entry.name.endsWith('.json')) {
+                    const sourcePath = `${oldPathInfo.dir}/${entry.name}`;
+                    const destPath = `${newPathInfo.dir}/${entry.name}`;
+
+                    try {
+                        const content = await readTextFile(sourcePath, oldPathInfo.options);
+                        await writeTextFile(destPath, content, newPathInfo.options);
+                        await remove(sourcePath, oldPathInfo.options);
+                    } catch (fileError) {
+                        console.error(`Failed to migrate file ${entry.name}`, fileError);
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        console.error("Failed to migrate screen maps", e);
+        throw e;
+    }
+}
+

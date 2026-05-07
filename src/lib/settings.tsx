@@ -52,6 +52,7 @@ export interface AppSettings {
         screenshots: string;
         recordings: string;
         automationRoot: string;
+        mappings?: string;
     };
 
     // Tools
@@ -109,6 +110,7 @@ const DEFAULT_SETTINGS: AppSettings = {
         logcat: '',
         screenshots: '',
         recordings: '',
+        mappings: '',
     },
     tools: {
         appiumArgs: '--relaxed-security',
