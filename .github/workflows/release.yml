@@ -90,23 +90,31 @@ jobs:
         run: |
           $VERSION = "${{ github.ref_name }}".TrimStart('v')
           
-          # Rename MSI
-          $msiPath = "src-tauri/target/release/bundle/msi/Robot Runner_${VERSION}_x64_en-US.msi"
-          if (Test-Path $msiPath) {
-             Copy-Item $msiPath "Robot.Runner_${VERSION}_windows_x64_en-US.msi"
+          # Rename MSI using wildcard to locate the source
+          $msiFile = Get-ChildItem "src-tauri/target/release/bundle/msi/Robot Runner_*_x64_en-US.msi" | Select-Object -First 1
+          if ($msiFile) {
+             Copy-Item $msiFile.FullName "Robot.Runner_${VERSION}_windows_x64_en-US.msi"
+             Write-Host "Copied MSI to Robot.Runner_${VERSION}_windows_x64_en-US.msi"
+          } else {
+             Write-Warning "Source MSI file not found!"
           }
           
-          # Rename Setup EXE
-          $exePath = "src-tauri/target/release/bundle/nsis/Robot Runner_${VERSION}_x64-setup.exe"
-          if (Test-Path $exePath) {
-             Copy-Item $exePath "Robot.Runner_${VERSION}_windows_x64-setup.exe"
+          # Rename Setup EXE using wildcard to locate the source
+          $exeFile = Get-ChildItem "src-tauri/target/release/bundle/nsis/Robot Runner_*_x64-setup.exe" | Select-Object -First 1
+          if ($exeFile) {
+             Copy-Item $exeFile.FullName "Robot.Runner_${VERSION}_windows_x64-setup.exe"
+             Write-Host "Copied Setup EXE to Robot.Runner_${VERSION}_windows_x64-setup.exe"
+          } else {
+             Write-Warning "Source Setup EXE file not found!"
           }
 
           # Create Portable EXE
-          # Simply taking the raw binary. Note: sidecars must be in PATH on target machine.
           $binPath = "src-tauri/target/release/robot_runner.exe"
           if (Test-Path $binPath) {
              Copy-Item $binPath "Robot.Runner_${VERSION}_windows_x64-portable.exe"
+             Write-Host "Copied Portable EXE to Robot.Runner_${VERSION}_windows_x64-portable.exe"
+          } else {
+             Write-Warning "Source Portable EXE file not found!"
           }
 
       - name: Rename and Upload Artifacts (Linux)
@@ -183,27 +191,27 @@ jobs:
                  # 1. Inject Metadata into locale manifest
                  $date = Get-Date -Format "yyyy-MM-dd"
                  $localeManifest = Get-ChildItem -Path $manifestDir.FullName -Filter "*locale.en-US.yaml"
-                 if ($localeManifest) {
-                    $content = Get-Content $localeManifest.FullName -Raw
-                    
-                    if (-not ($content -match "ReleaseNotesUrl:")) {
-                        $releaseNotesUrl = "https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
-                        $content = $content + "`nReleaseNotesUrl: $releaseNotesUrl"
-                        Write-Host "Added ReleaseNotesUrl to $($localeManifest.Name)"
-                    }
+                  if ($localeManifest) {
+                     $content = Get-Content $localeManifest.FullName -Raw
+                     
+                     if (-not ($content -match "ReleaseNotesUrl:")) {
+                         $releaseNotesUrl = "https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
+                         $content = $content.Trim() + "`r`nReleaseNotesUrl: $releaseNotesUrl"
+                         Write-Host "Added ReleaseNotesUrl to $($localeManifest.Name)"
+                     }
 
-                    if (-not ($content -match "ReleaseDate:")) {
-                        if ($content -match "ReleaseNotesUrl:") {
-                            $content = $content -replace "(ReleaseNotesUrl: .+)", "`$1`nReleaseDate: $date"
-                            Write-Host "Inserted ReleaseDate after ReleaseNotesUrl in $($localeManifest.Name)"
-                        } else {
-                            $content = $content + "`nReleaseDate: $date"
-                            Write-Host "Added ReleaseDate: $date to $($localeManifest.Name)"
-                        }
-                    }
+                     if (-not ($content -match "ReleaseDate:")) {
+                         if ($content -match "ReleaseNotesUrl:") {
+                             $content = $content -replace "ReleaseNotesUrl:\s*([^\r\n]+)", "ReleaseNotesUrl: `$1`r`nReleaseDate: $date"
+                             Write-Host "Inserted ReleaseDate after ReleaseNotesUrl in $($localeManifest.Name)"
+                         } else {
+                             $content = $content.Trim() + "`r`nReleaseDate: $date"
+                             Write-Host "Added ReleaseDate: $date to $($localeManifest.Name)"
+                         }
+                     }
 
-                    Set-Content -Path $localeManifest.FullName -Value $content
-                 }
+                     Set-Content -Path $localeManifest.FullName -Value $content -Encoding utf8
+                  }
 
                  Write-Host "Submitting manifest from $($manifestDir.FullName)"
                  .\wingetcreate.exe submit $manifestDir.FullName --token $env:GITHUB_TOKEN
