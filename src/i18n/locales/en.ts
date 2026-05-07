@@ -549,7 +549,16 @@ export const en = {
                 attr_enabled: "Enabled",
                 attr_checked: "Checked",
                 attr_selected: "Selected",
-                attr_focusable: "Focusable"
+                attr_focusable: "Focusable",
+                attr_instance: "Instance",
+                attr_long_clickable: "Long Clickable",
+                attr_focused: "Focused",
+                attr_scrollable: "Scrollable",
+                attr_checkable: "Checkable",
+                kinship_method: "Kinship Method",
+                kinship_none: "None",
+                kinship_child_selector: "Child Selector",
+                kinship_from_parent: "From Parent"
             },
             attributes: {
                 copied: "Copied!",

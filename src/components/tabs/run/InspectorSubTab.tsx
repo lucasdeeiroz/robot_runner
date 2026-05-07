@@ -102,6 +102,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
     const [editingAttr, setEditingAttr] = useState<'resource-id' | 'content-desc' | 'xpath' | 'uiselector' | null>(null);
     const [editOptions, setEditOptions] = useState({
         type: 'equals' as 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'matches',
+        kinship: 'none' as 'none' | 'childSelector' | 'fromParent',
         useUiSelectorWrapper: true,
         xpathAttr: 'resource-id' as string,
         selectedAddons: [] as string[]
@@ -164,19 +165,21 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
             setEditOptions(newOpts);
 
             if (attr === 'xpath') {
-                setCustomLocator(generateXPath(selectedNode, initialAttr, editOptions.type, []));
+                setCustomLocator(generateXPath(selectedNode, initialAttr, newOpts.type, newOpts.kinship, []));
             } else if (attr === 'uiselector') {
                 setCustomLocator(generateUiSelector(selectedNode, {
                     attr: initialAttr as any,
-                    type: editOptions.type,
-                    useUiSelectorWrapper: editOptions.useUiSelectorWrapper,
+                    type: newOpts.type,
+                    kinship: newOpts.kinship,
+                    useUiSelectorWrapper: newOpts.useUiSelectorWrapper,
                     addons: []
                 }));
             } else {
                 setCustomLocator(generateUiSelector(selectedNode, {
                     attr: attr as any,
-                    type: editOptions.type,
-                    useUiSelectorWrapper: editOptions.useUiSelectorWrapper,
+                    type: newOpts.type,
+                    kinship: newOpts.kinship,
+                    useUiSelectorWrapper: newOpts.useUiSelectorWrapper,
                     addons: []
                 }));
             }
@@ -186,11 +189,12 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
     const updateCustomLocator = (options: typeof editOptions) => {
         if (!selectedNode || !editingAttr) return;
         if (editingAttr === 'xpath') {
-            setCustomLocator(generateXPath(selectedNode, options.xpathAttr, options.type, options.selectedAddons));
+            setCustomLocator(generateXPath(selectedNode, options.xpathAttr, options.type, options.kinship, options.selectedAddons));
         } else if (editingAttr === 'uiselector') {
             setCustomLocator(generateUiSelector(selectedNode, {
                 attr: options.xpathAttr as any,
                 type: options.type,
+                kinship: options.kinship,
                 useUiSelectorWrapper: options.useUiSelectorWrapper,
                 addons: options.selectedAddons
             }));
@@ -198,6 +202,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
             setCustomLocator(generateUiSelector(selectedNode, {
                 attr: editingAttr as any,
                 type: options.type,
+                kinship: options.kinship,
                 useUiSelectorWrapper: options.useUiSelectorWrapper,
                 addons: options.selectedAddons
             }));
@@ -261,7 +266,7 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                 if (typeof response !== 'string' && response.structured_output) {
                     setAiSuggestion(response.structured_output.selector);
                     setAiRationale(response.structured_output.rationale);
-                    
+
                     if (selectedNode.id) {
                         setAiCache(prev => ({
                             ...prev,
@@ -274,7 +279,7 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                     setIsAiLoading(false);
                     return;
                 }
-                
+
                 result = typeof response === 'string' ? response : response.result;
             } else if (provider === 'gemini-code') {
                 const schema = {
@@ -295,7 +300,7 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                 if (typeof response !== 'string' && response.structured_output) {
                     setAiSuggestion(response.structured_output.selector);
                     setAiRationale(response.structured_output.rationale);
-                    
+
                     if (selectedNode.id) {
                         setAiCache(prev => ({
                             ...prev,
@@ -308,7 +313,7 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                     setIsAiLoading(false);
                     return;
                 }
-                
+
                 result = typeof response === 'string' ? response : response.result;
             } else if (provider === 'gemini') {
                 result = await gemini.askGemini(prompt, settings.geminiApiKey || '', settings.geminiModel, systemInstruction, screenshot || undefined);
@@ -381,7 +386,7 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
         return (
             <div className="h-full flex flex-col items-center justify-center text-on-surface-variant/80 text-sm">
                 <Scan size={32} className="opacity-20 mb-2" />
-                <p>{t('inspector.status.paused_test', 'Inspector disabled during test')}</p>
+                <p>{t('inspector.status.paused_test')}</p>
             </div>
         );
     }
@@ -389,7 +394,7 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
     return (
         <div className="flex-1 min-h-[44rem] flex flex-col space-y-4">
             <Section
-                title={t('inspector.title', 'Inspector')}
+                title={t('inspector.title')}
                 icon={Scan}
                 variant="transparent"
                 className="p-0"
@@ -425,7 +430,7 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                         isSearchFocused ? "w-[28rem]" : "w-72"
                     )}>
                         <Input
-                            placeholder={t('inspector.search.placeholder', 'Search by ID, XPath, etc...')}
+                            placeholder={t('inspector.search.placeholder')}
                             value={searchQuery}
                             onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleSearch(e.target.value)}
                             onFocus={() => setIsSearchFocused(true)}
@@ -439,7 +444,7 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                                         handleSearch("");
                                     }}
                                     className="p-1 hover:bg-surface-variant/30 rounded-full transition-colors flex items-center justify-center"
-                                    title={t('inspector.search.clear', 'Clear')}
+                                    title={t('inspector.search.clear')}
                                 >
                                     <X size={14} className="opacity-50" />
                                 </button>
@@ -685,7 +690,7 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
             >
                 <div className="space-y-4">
                     <div className="space-y-1">
-                        <label className="text-xs font-medium text-on-surface-variant/80">{t('inspector.modal.match_type')}</label>
+                        <label className="text-xs font-medium text-on-surface-variant/80">{t('inspector.modal.match_type', 'Match Type')}</label>
                         <Select
                             value={editOptions.type}
                             onChange={(e) => {
@@ -704,6 +709,24 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                         />
                     </div>
 
+                    <div className="space-y-1">
+                        <label className="text-xs font-medium text-on-surface-variant/80">{t('inspector.modal.kinship_method')}</label>
+                        <Select
+                            value={editOptions.kinship}
+                            onChange={(e) => {
+                                const val = e.target.value as any;
+                                const newOpts = { ...editOptions, kinship: val };
+                                setEditOptions(newOpts);
+                                updateCustomLocator(newOpts);
+                            }}
+                            options={[
+                                { label: t('inspector.modal.kinship_none'), value: 'none' },
+                                { label: t('inspector.modal.kinship_child_selector'), value: 'childSelector' },
+                                { label: t('inspector.modal.kinship_from_parent'), value: 'fromParent' },
+                            ]}
+                        />
+                    </div>
+
                     {editingAttr !== 'xpath' && editingAttr !== 'uiselector' ? (
                         <div className="flex items-center gap-2 pt-2">
                             <input
@@ -718,7 +741,7 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                                 className="rounded border-outline-variant/30 text-primary dark:text-primary/80 focus:ring-primary/20"
                             />
                             <label htmlFor="useWrapper" className="text-xs font-medium text-on-surface-variant/80">
-                                {t('inspector.modal.use_wrapper', 'Use new UiSelector() wrapper')}
+                                {t('inspector.modal.use_wrapper')}
                             </label>
                         </div>
                     ) : (
@@ -743,19 +766,24 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                     )}
 
                     <div className="space-y-2 pt-2">
-                        <label className="text-xs font-medium text-on-surface-variant/80">{t('inspector.modal.additional_attrs', 'Additional Attributes')}</label>
+                        <label className="text-xs font-medium text-on-surface-variant/80">{t('inspector.modal.additional_attrs')}</label>
                         <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto custom-scrollbar p-1 border border-outline-variant/30 rounded-lg">
                             {[
-                                { label: t('inspector.modal.attr_resource_id', 'Resource ID'), value: 'resource-id' },
-                                { label: t('inspector.modal.attr_text', 'Text'), value: 'text' },
-                                { label: t('inspector.modal.attr_content_desc', 'Content Desc'), value: 'content-desc' },
-                                { label: t('inspector.modal.attr_class', 'Class'), value: 'class' },
-                                { label: t('inspector.modal.attr_index', 'Index'), value: 'index' },
-                                { label: t('inspector.modal.attr_clickable', 'Clickable'), value: 'clickable' },
-                                { label: t('inspector.modal.attr_enabled', 'Enabled'), value: 'enabled' },
-                                { label: t('inspector.modal.attr_checked', 'Checked'), value: 'checked' },
-                                { label: t('inspector.modal.attr_selected', 'Selected'), value: 'selected' },
-                                { label: t('inspector.modal.attr_focusable', 'Focusable'), value: 'focusable' },
+                                { label: t('inspector.modal.attr_resource_id'), value: 'resource-id' },
+                                { label: t('inspector.modal.attr_text'), value: 'text' },
+                                { label: t('inspector.modal.attr_content_desc'), value: 'content-desc' },
+                                { label: t('inspector.modal.attr_class'), value: 'class' },
+                                { label: t('inspector.modal.attr_index'), value: 'index' },
+                                { label: t('inspector.modal.attr_instance'), value: 'instance' },
+                                { label: t('inspector.modal.attr_clickable'), value: 'clickable' },
+                                { label: t('inspector.modal.attr_long_clickable'), value: 'long-clickable' },
+                                { label: t('inspector.modal.attr_enabled'), value: 'enabled' },
+                                { label: t('inspector.modal.attr_checked'), value: 'checked' },
+                                { label: t('inspector.modal.attr_selected'), value: 'selected' },
+                                { label: t('inspector.modal.attr_focusable'), value: 'focusable' },
+                                { label: t('inspector.modal.attr_focused'), value: 'focused' },
+                                { label: t('inspector.modal.attr_scrollable'), value: 'scrollable' },
+                                { label: t('inspector.modal.attr_checkable'), value: 'checkable' },
                             ].filter(opt =>
                                 selectedNode?.attributes[opt.value] !== undefined &&
                                 selectedNode?.attributes[opt.value] !== null &&

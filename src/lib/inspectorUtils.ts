@@ -140,7 +140,30 @@ export function transformXmlToTree(rawNode: any, parent?: InspectorNode, keyName
         }
     }
 
+    if (!parent) {
+        assignInstances(node);
+    }
+
     return node;
+}
+
+/**
+ * Calculates element occurrence index for its class and sets it on each node as the 'instance' attribute.
+ */
+export function assignInstances(root: InspectorNode): void {
+    const classCounts: Record<string, number> = {};
+    function traverse(node: InspectorNode) {
+        const className = node.attributes['class'] || node.tagName;
+        if (className) {
+            if (classCounts[className] === undefined) {
+                classCounts[className] = 0;
+            }
+            node.attributes['instance'] = String(classCounts[className]);
+            classCounts[className]++;
+        }
+        node.children.forEach(traverse);
+    }
+    traverse(root);
 }
 
 /**
@@ -248,16 +271,60 @@ export function findNodesByLocator(root: InspectorNode, locator: string): Inspec
         return currentResults;
     }
 
+    // 2.1 Support childSelector: parent.childSelector(child)
+    if (trimmed.includes('.childSelector')) {
+        const parts = trimmed.split('.childSelector');
+        if (parts.length === 2) {
+            const parentLocator = parts[0].trim();
+            const childLocator = parts[1].replace(/^\s*\(\s*new\s+/, '').replace(/\s*\)\s*$/, '').trim();
+            const parentNodes = findNodesByLocator(root, parentLocator);
+            const finalResults: InspectorNode[] = [];
+            parentNodes.forEach(pn => {
+                const childNodes = findNodesByLocator(pn, childLocator);
+                childNodes.forEach(cn => {
+                    if (!finalResults.some(r => r.id === cn.id)) {
+                        finalResults.push(cn);
+                    }
+                });
+            });
+            return finalResults;
+        }
+    }
+
+    // 2.2 Support fromParent: reference.fromParent(sibling)
+    if (trimmed.includes('.fromParent')) {
+        const parts = trimmed.split('.fromParent');
+        if (parts.length === 2) {
+            const refLocator = parts[0].trim();
+            const siblingLocator = parts[1].replace(/^\s*\(\s*new\s+/, '').replace(/\s*\)\s*$/, '').trim();
+            const refNodes = findNodesByLocator(root, refLocator);
+            const finalResults: InspectorNode[] = [];
+            refNodes.forEach(rn => {
+                if (rn.parent) {
+                    const siblingNodes = findNodesByLocator(rn.parent, siblingLocator);
+                    siblingNodes.forEach(sn => {
+                        if (sn.id !== rn.id && !finalResults.some(r => r.id === sn.id)) {
+                            finalResults.push(sn);
+                        }
+                    });
+                }
+            });
+            return finalResults;
+        }
+    }
+
     // 3. UiAutomator Support: new UiSelector().text("...")
     if (trimmed.includes('UiSelector()')) {
-        const methodMatch = trimmed.match(/\.\w+\s*\((\s*["'][\s\S]*?["']\s*)\)/g);
+        const methodMatch = trimmed.match(/\.\w+\s*\([^)]*\)/g);
         if (methodMatch) {
             const search = (node: InspectorNode) => {
                 let matchesAll = true;
                 methodMatch.forEach(m => {
-                    const parts = m.match(/\.(\w+)\s*\(\s*["']([\s\S]*?)["']\s*\)/);
+                    if (m.startsWith('.instance') || m.startsWith('.childSelector') || m.startsWith('.fromParent')) return;
+
+                    const parts = m.match(/\.(\w+)\s*\(\s*([\s\S]*?)\s*\)/);
                     if (parts) {
-                        const [, method, val] = parts;
+                        const [, method, rawVal] = parts;
                         let baseMethod = method;
                         let op: 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'matches' = 'equals';
 
@@ -275,26 +342,55 @@ export function findNodesByLocator(root: InspectorNode, locator: string): Inspec
                             op = 'matches';
                         }
 
+                        // Clean rawVal (could be "string", 'string', true, false, 3)
+                        let val: string | boolean | number = rawVal.trim();
+                        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+                            val = val.slice(1, -1);
+                        } else if (val === 'true') {
+                            val = true;
+                        } else if (val === 'false') {
+                            val = false;
+                        } else if (/^\d+$/.test(val)) {
+                            val = parseInt(val, 10);
+                        }
+
                         const attrMap: Record<string, string> = {
                             'resourceId': 'resource-id',
                             'description': 'content-desc',
                             'text': 'text',
-                            'className': 'class'
+                            'className': 'class',
+                            'longClickable': 'long-clickable'
                         };
-                        const attr = attrMap[baseMethod] || baseMethod;
-                        const nodeVal = node.attributes[attr] || "";
+                        const attr = attrMap[baseMethod] || baseMethod.replace(/([A-Z])/g, '-$1').toLowerCase();
+                        const nodeVal = node.attributes[attr];
 
-                        switch (op) {
-                            case 'contains': if (!nodeVal.includes(val)) matchesAll = false; break;
-                            case 'startsWith': if (!nodeVal.startsWith(val)) matchesAll = false; break;
-                            case 'endsWith': if (!nodeVal.endsWith(val)) matchesAll = false; break;
-                            case 'matches':
-                                try {
-                                    const re = new RegExp(val);
-                                    if (!re.test(nodeVal)) matchesAll = false;
-                                } catch { matchesAll = false; }
-                                break;
-                            default: if (nodeVal !== val) matchesAll = false;
+                        // If it's a boolean check
+                        if (typeof val === 'boolean') {
+                            const nodeBool = nodeVal === 'true';
+                            if (nodeBool !== val) matchesAll = false;
+                        }
+                        // If it's an integer check
+                        else if (typeof val === 'number') {
+                            if (baseMethod === 'index') {
+                                const nodeInt = parseInt(nodeVal || "0", 10);
+                                if (nodeInt !== val) matchesAll = false;
+                            }
+                        }
+                        // String checks
+                        else {
+                            const nodeString = nodeVal || "";
+                            switch (op) {
+                                case 'contains': if (!nodeString.includes(val)) matchesAll = false; break;
+                                case 'startsWith': if (!nodeString.startsWith(val)) matchesAll = false; break;
+                                case 'endsWith': if (!nodeString.endsWith(val)) matchesAll = false; break;
+                                case 'matches':
+                                    try {
+                                        const re = new RegExp(val);
+                                        if (!re.test(nodeString)) matchesAll = false;
+                                    } catch { matchesAll = false; }
+                                    break;
+                                default: if (nodeString !== val) matchesAll = false;
+                            }
                         }
                     }
                 });
@@ -302,6 +398,14 @@ export function findNodesByLocator(root: InspectorNode, locator: string): Inspec
                 node.children.forEach(search);
             };
             search(root);
+
+            // Handle instance filter
+            const instanceMatch = trimmed.match(/\.instance\s*\(\s*(\d+)\s*\)/);
+            if (instanceMatch && results.length > 0) {
+                const instanceIndex = parseInt(instanceMatch[1], 10);
+                return results[instanceIndex] ? [results[instanceIndex]] : [];
+            }
+
             if (results.length > 0) return results;
         }
     }
@@ -492,8 +596,43 @@ export function escapeXPath(val: string): string {
     return `concat(${result})`;
 }
 
-export function generateXPath(node: InspectorNode, attr?: string, type: 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'matches' = 'equals', addons: string[] = []): string {
+export function generateXPath(
+    node: InspectorNode,
+    attr?: string,
+    type: 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'matches' = 'equals',
+    kinship: 'none' | 'childSelector' | 'fromParent' = 'none',
+    addons: string[] = []
+): string {
     if (!node.parent) return '/*';
+
+    if (kinship === 'childSelector' && node.parent) {
+        const parentClass = node.parent.attributes['class'] || '*';
+        const parentPrefAttr = node.parent.attributes['resource-id'] ? 'resource-id' : node.parent.attributes['text'] ? 'text' : node.parent.attributes['content-desc'] ? 'content-desc' : undefined;
+        let parentSelector = `//${parentClass}`;
+        if (parentPrefAttr && node.parent.attributes[parentPrefAttr]) {
+            parentSelector += `[@${parentPrefAttr}=${escapeXPath(node.parent.attributes[parentPrefAttr])}]`;
+        }
+
+        const childXPath = generateXPath(node, attr, type, 'none', addons);
+        const relativeChild = childXPath.startsWith('//') ? childXPath.substring(2) : childXPath;
+        return `${parentSelector}/${relativeChild}`;
+    }
+
+    if (kinship === 'fromParent' && node.parent) {
+        const sibling = node.parent.children.find(c => c.id !== node.id && (c.attributes['text'] || c.attributes['resource-id'] || c.attributes['content-desc'])) || node.parent.children.find(c => c.id !== node.id);
+        if (sibling) {
+            const siblingClass = sibling.attributes['class'] || '*';
+            const siblingPrefAttr = sibling.attributes['resource-id'] ? 'resource-id' : sibling.attributes['text'] ? 'text' : sibling.attributes['content-desc'] ? 'content-desc' : undefined;
+            let siblingSelector = `//${siblingClass}`;
+            if (siblingPrefAttr && sibling.attributes[siblingPrefAttr]) {
+                siblingSelector += `[@${siblingPrefAttr}=${escapeXPath(sibling.attributes[siblingPrefAttr])}]`;
+            }
+
+            const targetXPath = generateXPath(node, attr, type, 'none', addons);
+            const relativeTarget = targetXPath.startsWith('//') ? targetXPath.substring(2) : targetXPath;
+            return `${siblingSelector}/../${relativeTarget}`;
+        }
+    }
 
     const attributes = node.attributes;
     const className = attributes['class'] || '*';
@@ -590,9 +729,45 @@ export function generateSimplifiedXml(node: InspectorNode): string {
 export function generateUiSelector(node: InspectorNode, options: {
     attr?: 'resource-id' | 'content-desc' | 'text' | 'class' | 'auto',
     type: 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'matches',
+    kinship?: 'none' | 'childSelector' | 'fromParent',
     useUiSelectorWrapper: boolean,
     addons?: string[]
 }): string {
+    if (options.kinship === 'childSelector' && node.parent) {
+        const parentSel = generateUiSelector(node.parent, {
+            attr: 'auto',
+            type: 'equals',
+            kinship: 'none',
+            useUiSelectorWrapper: false
+        });
+        const childSel = generateUiSelector(node, {
+            ...options,
+            kinship: 'none',
+            useUiSelectorWrapper: false
+        });
+        const full = `${parentSel}.childSelector(new UiSelector().${childSel})`;
+        return options.useUiSelectorWrapper ? `new UiSelector().${full}` : full;
+    }
+
+    if (options.kinship === 'fromParent' && node.parent) {
+        const sibling = node.parent.children.find(c => c.id !== node.id && (c.attributes['text'] || c.attributes['resource-id'] || c.attributes['content-desc'])) || node.parent.children.find(c => c.id !== node.id);
+        if (sibling) {
+            const siblingSel = generateUiSelector(sibling, {
+                attr: 'auto',
+                type: 'equals',
+                kinship: 'none',
+                useUiSelectorWrapper: false
+            });
+            const targetSel = generateUiSelector(node, {
+                ...options,
+                kinship: 'none',
+                useUiSelectorWrapper: false
+            });
+            const full = `${siblingSel}.fromParent(new UiSelector().${targetSel})`;
+            return options.useUiSelectorWrapper ? `new UiSelector().${full}` : full;
+        }
+    }
+
     const attributes = node.attributes;
     const preferredAttr = (options.attr === 'auto' || !options.attr)
         ? (attributes['resource-id'] ? 'resource-id' : attributes['content-desc'] ? 'content-desc' : attributes['text'] ? 'text' : 'class')
@@ -633,7 +808,13 @@ export function generateUiSelector(node: InspectorNode, options: {
             if (attrValue === undefined || attrValue === null || attrValue === "") {
                 return;
             }
-            selectorArr.push(`${m}("${attrValue}")`);
+            if (['checkable', 'checked', 'clickable', 'long-clickable', 'longClickable', 'enabled', 'focusable', 'focused', 'scrollable', 'selected'].includes(a)) {
+                selectorArr.push(`${m}(${attrValue === 'true'})`);
+            } else if (a === 'index') {
+                selectorArr.push(`${m}(${parseInt(attrValue, 10) || 0})`);
+            } else {
+                selectorArr.push(`${m}("${attrValue}")`);
+            }
         });
     }
 
