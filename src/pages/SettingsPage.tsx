@@ -776,9 +776,9 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                             const oldPath = settings.paths.mappings;
                                             try {
                                                 await migrateScreenMaps(activeProfileId, oldPath, path);
-                                                feedback.toast.success(t('settings.feedback.migration_success'));
+                                                feedback.toast.success('settings.feedback.migration_success');
                                             } catch (err) {
-                                                feedback.toast.error(t('settings.feedback.migration_error'), err);
+                                                feedback.toast.error('settings.feedback.migration_error', err);
                                             }
                                         }
                                         updateSetting('paths', { ...settings.paths, [key]: path });
