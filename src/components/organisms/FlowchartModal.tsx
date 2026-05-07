@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { AnimatePresence, motion } from 'framer-motion';
 import { ScreenMap } from '@/lib/types';
 import { useTranslation } from 'react-i18next';
 import { exportMapperData, importMapperData } from '@/lib/dashboard/mapperPersistence';
@@ -291,120 +292,135 @@ export function FlowchartModal({ isOpen, onClose, maps = [], onEditScreen, onRef
 
     const handleClose = () => { if (isDirty) setShowUnsavedChangesModal(true); else onClose(); };
 
-    if (!isOpen) return null;
-
     return createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-surface w-[90vw] h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-outline-variant/30">
-                <FlowchartHeader
-                    missedScreensCount={missedScreens.length}
-                    isReorganizing={isReorganizing || isExporting}
-                    onAutoReorganize={autoReorganizeLayout}
-                    onImport={handleImport}
-                    onExport={handleExport}
-                    onSave={() => saveLayout()}
-                    onClearCurvatures={handleClearAllCurvatures}
-                    onExportImage={handleExportImage}
-                    filterTag={filterTag}
-                    setFilterTag={setFilterTag}
-                    allTags={allTags}
-                    onCenterView={() => view.centerView(layout.nodes)}
-                    onZoom={view.performZoom}
-                    scale={view.scale}
-                    onClose={handleClose}
-                />
-
-                {isExporting && (
-                    <div className="absolute inset-0 z-[10000] bg-black/20 backdrop-blur-[2px] flex items-center justify-center animate-in fade-in duration-300">
-                        <div className="bg-surface p-6 rounded-2xl shadow-xl border border-outline-variant/30 flex flex-col items-center gap-4">
-                            <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-                            <div className="flex flex-col items-center gap-1">
-                                <span className="text-sm font-bold text-on-surface">{t('mapper.flowchart.exporting_image')}</span>
-                                <span className="text-[10px] text-on-surface-variant animate-pulse">{t('common.please_wait', 'Please wait...')}</span>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                <FlowchartCanvas
-                    containerRef={containerRef}
-                    contentRef={contentRef}
-                    isDraggingCanvas={interaction.isDraggingCanvas}
-                    isSpacePressed={isSpacePressed}
-                    offset={view.offset}
-                    scale={view.scale}
-                    gridBounds={gridBounds}
-                    onMouseDown={interaction.handleCanvasMouseDown}
-                    onMouseMove={interaction.handleMouseMove}
-                    onMouseUp={interaction.handleMouseUp}
-                    onMouseLeave={interaction.handleMouseUp}
-                    onWheel={interaction.handleWheel}
+        <AnimatePresence>
+            {isOpen && (
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-[150000] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
                 >
-                    <FlowchartSVG zIndex={10}>
-                        {sortedEdgeLayouts.map(e => (
-                            <FlowEdgeLine key={`${e.edgeId}-line`} edgeId={e.edgeId} points={e.points} isVisible={matchesFilter(e.sourceName) && matchesFilter(e.targetName)} isInteracting={interaction.state.type !== 'IDLE'} hoveredEdge={interaction.hoveredEdge} />
-                        ))}
-                    </FlowchartSVG>
-                    <FlowchartSVG zIndex={50}>
-                        {sortedEdgeLayouts.map(e => (
-                            <FlowEdgeControls
-                                key={`${e.edgeId}-ctrl`}
-                                edgeId={e.edgeId}
-                                points={e.points}
-                                startPoint={e.startPoint}
-                                endPoint={e.endPoint}
-                                elName={e.elName}
-                                isVisible={matchesFilter(e.sourceName) && matchesFilter(e.targetName)}
-                                isInteracting={interaction.state.type !== 'IDLE'}
-                                hoveredEdge={interaction.hoveredEdge}
-                                isDraggingConnection={interaction.state.type === 'DRAGGING_CONNECTION' || interaction.state.type === 'DRAGGING_SOURCE' || interaction.state.type === 'DRAGGING_TARGET'}
-                                isDraggingEdge={interaction.state.type !== 'IDLE'}
-                                isSpacePressed={isSpacePressed}
-                                onMouseEnter={() => interaction.setHoveredEdge(e.edgeId)}
-                                onMouseLeave={() => interaction.setHoveredEdge(null)}
-                                onSegmentMouseDown={(idx) => interaction.dispatch({ type: 'START_SEGMENT_DRAG', id: e.edgeId, index: idx, points: e.points })}
-                                onSegmentDoubleClick={(idx, ev) => interaction.handleSegmentDoubleClick(idx, ev, e.edgeId)}
-                                onSourceMouseDown={() => interaction.dispatch({ type: 'START_SOURCE_DRAG', id: e.edgeId })}
-                                onTargetMouseDown={() => interaction.dispatch({ type: 'START_TARGET_DRAG', id: e.edgeId })}
-                                onVertexMouseDown={(idx) => interaction.dispatch({ type: 'START_VERTEX_DRAG', id: e.edgeId, index: idx })}
-                                onVertexDoubleClick={(idx) => interaction.handleVertexDoubleClick(idx, e.edgeId)}
-                            />
-                        ))}
-                    </FlowchartSVG>
+                    <motion.div
+                        ref={contentRef}
+                        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                        transition={{ type: "spring", stiffness: 350, damping: 25, mass: 1 }}
+                        className="relative bg-surface w-[90vw] h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-outline-variant/30"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <FlowchartHeader
+                            missedScreensCount={missedScreens.length}
+                            isReorganizing={isReorganizing || isExporting}
+                            onAutoReorganize={autoReorganizeLayout}
+                            onImport={handleImport}
+                            onExport={handleExport}
+                            onSave={() => saveLayout()}
+                            onClearCurvatures={handleClearAllCurvatures}
+                            onExportImage={handleExportImage}
+                            filterTag={filterTag}
+                            setFilterTag={setFilterTag}
+                            allTags={allTags}
+                            onCenterView={() => view.centerView(layout.nodes)}
+                            onZoom={view.performZoom}
+                            scale={view.scale}
+                            onClose={handleClose}
+                        />
 
-                    {Object.entries(layout.nodes).map(([name, pos]) => {
-                        const data = maps.find(m => m.name === name);
-                        if (!data) return null;
-                        const pixel = view.getPixelCoords(pos.gridX, pos.gridY);
-                        const isVisible = matchesFilter(name);
-                        return (
-                            <React.Fragment key={name}>
-                                <FlowNode data={data} pixel={pixel} isVisible={isVisible} isInteracting={interaction.state.type !== 'IDLE'} isDraggingThis={interaction.state.type === 'DRAGGING_NODE' && interaction.state.id === name} isDraggingCanvas={interaction.isDraggingCanvas} onMouseDown={(e) => { if (!isSpacePressed && e.button !== 1 && isVisible) { e.preventDefault(); e.stopPropagation(); interaction.dispatch({ type: 'START_NODE_DRAG', id: name }); } }} onEditScreen={onEditScreen} />
-                                {NODE_PORTS.map(p => {
-                                    const isOccupied = portOccupancyMap[name]?.has(p.id);
-                                    const isHovered = interaction.hoveredPort?.nodeId === name && interaction.hoveredPort?.portId === p.id;
-                                    const isDraggingConn = interaction.state.type === 'DRAGGING_SOURCE' || interaction.state.type === 'DRAGGING_TARGET' || interaction.state.type === 'DRAGGING_CONNECTION';
-                                    return <FlowPort key={`${name}-${p.id}`} nodeId={name} port={p} pixel={pixel} isHovered={isHovered} isInteractive={true} showPorts={isDraggingConn || isHovered} canQuickConnect={!isDraggingConn && !isOccupied} isDraggingConnection={isDraggingConn} onMouseEnter={() => interaction.setHoveredPort({ nodeId: name, portId: p.id })} onMouseLeave={() => interaction.setHoveredPort(null)} onMouseDown={e => { e.preventDefault(); e.stopPropagation(); if (isDraggingConn) return; if (isOccupied) { const edgeInfo = portEdgeMap[`${name}::${p.id}`]; if (edgeInfo) { interaction.dispatch({ type: edgeInfo.isSource ? 'START_SOURCE_DRAG' : 'START_TARGET_DRAG', id: edgeInfo.edgeId }); } } else { interaction.dispatch({ type: 'START_CONNECTION_DRAG', nodeId: name, portId: p.id }); } }} onClick={() => { if (!isOccupied && !isDraggingConn && !interaction.justStoppedDragging) { setQuickConnectData({ sourceNodeId: name, sourcePortId: p.id }); setIsQuickConnectOpen(true); } }} />;
-                                })}
-                            </React.Fragment>
-                        );
-                    })}
-                </FlowchartCanvas>
-            </div>
+                        {isExporting && (
+                            <div className="absolute inset-0 z-[10000] bg-black/20 backdrop-blur-[2px] flex items-center justify-center animate-in fade-in duration-300">
+                                <div className="bg-surface p-6 rounded-2xl shadow-xl border border-outline-variant/30 flex flex-col items-center gap-4">
+                                    <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                                    <div className="flex flex-col items-center gap-1">
+                                        <span className="text-sm font-bold text-on-surface">{t('mapper.flowchart.exporting_image')}</span>
+                                        <span className="text-[10px] text-on-surface-variant animate-pulse">{t('common.please_wait', 'Please wait...')}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
-            {isQuickConnectOpen && quickConnectData && (
-                <QuickConnectDialog maps={maps} sourceNodeId={quickConnectData.sourceNodeId} onClose={() => setIsQuickConnectOpen(false)} onConfirm={(target, element) => {
-                    const edgeId = `${quickConnectData.sourceNodeId}-${element}-${target}`;
-                    setLayout(prev => ({ ...prev, edges: { ...prev.edges, [edgeId]: { sourceHandle: quickConnectData.sourcePortId, vertices: [] } } }));
-                    setIsDirty(true);
-                    setIsQuickConnectOpen(false);
-                }} />
+                        <FlowchartCanvas
+                            containerRef={containerRef}
+                            contentRef={contentRef}
+                            isDraggingCanvas={interaction.isDraggingCanvas}
+                            isSpacePressed={isSpacePressed}
+                            offset={view.offset}
+                            scale={view.scale}
+                            gridBounds={gridBounds}
+                            onMouseDown={interaction.handleCanvasMouseDown}
+                            onMouseMove={interaction.handleMouseMove}
+                            onMouseUp={interaction.handleMouseUp}
+                            onMouseLeave={interaction.handleMouseUp}
+                            onWheel={interaction.handleWheel}
+                        >
+                            <FlowchartSVG zIndex={10}>
+                                {sortedEdgeLayouts.map(e => (
+                                    <FlowEdgeLine key={`${e.edgeId}-line`} edgeId={e.edgeId} points={e.points} isVisible={matchesFilter(e.sourceName) && matchesFilter(e.targetName)} isInteracting={interaction.state.type !== 'IDLE'} hoveredEdge={interaction.hoveredEdge} />
+                                ))}
+                            </FlowchartSVG>
+                            <FlowchartSVG zIndex={50}>
+                                {sortedEdgeLayouts.map(e => (
+                                    <FlowEdgeControls
+                                        key={`${e.edgeId}-ctrl`}
+                                        edgeId={e.edgeId}
+                                        points={e.points}
+                                        startPoint={e.startPoint}
+                                        endPoint={e.endPoint}
+                                        elName={e.elName}
+                                        isVisible={matchesFilter(e.sourceName) && matchesFilter(e.targetName)}
+                                        isInteracting={interaction.state.type !== 'IDLE'}
+                                        hoveredEdge={interaction.hoveredEdge}
+                                        isDraggingConnection={interaction.state.type === 'DRAGGING_CONNECTION' || interaction.state.type === 'DRAGGING_SOURCE' || interaction.state.type === 'DRAGGING_TARGET'}
+                                        isDraggingEdge={interaction.state.type !== 'IDLE'}
+                                        isSpacePressed={isSpacePressed}
+                                        onMouseEnter={() => interaction.setHoveredEdge(e.edgeId)}
+                                        onMouseLeave={() => interaction.setHoveredEdge(null)}
+                                        onSegmentMouseDown={(idx) => interaction.dispatch({ type: 'START_SEGMENT_DRAG', id: e.edgeId, index: idx, points: e.points })}
+                                        onSegmentDoubleClick={(idx, ev) => interaction.handleSegmentDoubleClick(idx, ev, e.edgeId)}
+                                        onSourceMouseDown={() => interaction.dispatch({ type: 'START_SOURCE_DRAG', id: e.edgeId })}
+                                        onTargetMouseDown={() => interaction.dispatch({ type: 'START_TARGET_DRAG', id: e.edgeId })}
+                                        onVertexMouseDown={(idx) => interaction.dispatch({ type: 'START_VERTEX_DRAG', id: e.edgeId, index: idx })}
+                                        onVertexDoubleClick={(idx) => interaction.handleVertexDoubleClick(idx, e.edgeId)}
+                                    />
+                                ))}
+                            </FlowchartSVG>
+
+                            {Object.entries(layout.nodes).map(([name, pos]) => {
+                                const data = maps.find(m => m.name === name);
+                                if (!data) return null;
+                                const pixel = view.getPixelCoords(pos.gridX, pos.gridY);
+                                const isVisible = matchesFilter(name);
+                                return (
+                                    <React.Fragment key={name}>
+                                        <FlowNode data={data} pixel={pixel} isVisible={isVisible} isInteracting={interaction.state.type !== 'IDLE'} isDraggingThis={interaction.state.type === 'DRAGGING_NODE' && interaction.state.id === name} isDraggingCanvas={interaction.isDraggingCanvas} onMouseDown={(e) => { if (!isSpacePressed && e.button !== 1 && isVisible) { e.preventDefault(); e.stopPropagation(); interaction.dispatch({ type: 'START_NODE_DRAG', id: name }); } }} onEditScreen={onEditScreen} />
+                                        {NODE_PORTS.map(p => {
+                                            const isOccupied = portOccupancyMap[name]?.has(p.id);
+                                            const isHovered = interaction.hoveredPort?.nodeId === name && interaction.hoveredPort?.portId === p.id;
+                                            const isDraggingConn = interaction.state.type === 'DRAGGING_SOURCE' || interaction.state.type === 'DRAGGING_TARGET' || interaction.state.type === 'DRAGGING_CONNECTION';
+                                            return <FlowPort key={`${name}-${p.id}`} nodeId={name} port={p} pixel={pixel} isHovered={isHovered} isInteractive={true} showPorts={isDraggingConn || isHovered} canQuickConnect={!isDraggingConn && !isOccupied} isDraggingConnection={isDraggingConn} onMouseEnter={() => interaction.setHoveredPort({ nodeId: name, portId: p.id })} onMouseLeave={() => interaction.setHoveredPort(null)} onMouseDown={e => { e.preventDefault(); e.stopPropagation(); if (isDraggingConn) return; if (isOccupied) { const edgeInfo = portEdgeMap[`${name}::${p.id}`]; if (edgeInfo) { interaction.dispatch({ type: edgeInfo.isSource ? 'START_SOURCE_DRAG' : 'START_TARGET_DRAG', id: edgeInfo.edgeId }); } } else { interaction.dispatch({ type: 'START_CONNECTION_DRAG', nodeId: name, portId: p.id }); } }} onClick={() => { if (!isOccupied && !isDraggingConn && !interaction.justStoppedDragging) { setQuickConnectData({ sourceNodeId: name, sourcePortId: p.id }); setIsQuickConnectOpen(true); } }} />;
+                                        })}
+                                    </React.Fragment>
+                                );
+                            })}
+                        </FlowchartCanvas>
+                    </motion.div>
+
+                    {isQuickConnectOpen && quickConnectData && (
+                        <QuickConnectDialog maps={maps} sourceNodeId={quickConnectData.sourceNodeId} onClose={() => setIsQuickConnectOpen(false)} onConfirm={(target, element) => {
+                            const edgeId = `${quickConnectData.sourceNodeId}-${element}-${target}`;
+                            setLayout(prev => ({ ...prev, edges: { ...prev.edges, [edgeId]: { sourceHandle: quickConnectData.sourcePortId, vertices: [] } } }));
+                            setIsDirty(true);
+                            setIsQuickConnectOpen(false);
+                        }} />
+                    )}
+
+                    {showUnsavedChangesModal && (
+                        <UnsavedChangesDialog onCancel={() => setShowUnsavedChangesModal(false)} onSaveAndExit={async () => { await saveLayout(); onClose(); }} onExitWithoutSaving={onClose} />
+                    )}
+                </motion.div>
             )}
-
-            {showUnsavedChangesModal && (
-                <UnsavedChangesDialog onCancel={() => setShowUnsavedChangesModal(false)} onSaveAndExit={async () => { await saveLayout(); onClose(); }} onExitWithoutSaving={onClose} />
-            )}
-        </div>,
+        </AnimatePresence>,
         document.body
     );
 }
