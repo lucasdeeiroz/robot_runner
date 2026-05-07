@@ -549,7 +549,16 @@ export const es = {
                 attr_enabled: "Habilitado",
                 attr_checked: "Marcado",
                 attr_selected: "Seleccionado",
-                attr_focusable: "Enfocable"
+                attr_focusable: "Enfocable",
+                attr_instance: "Instancia",
+                attr_long_clickable: "Click Largo",
+                attr_focused: "Enfocado",
+                attr_scrollable: "Desplazable",
+                attr_checkable: "Marcable",
+                kinship_method: "Método de Parentesco",
+                kinship_none: "Ninguno",
+                kinship_child_selector: "Selector Hijo",
+                kinship_from_parent: "Del Padre"
             },
             attributes: {
                 copied: "¡Copiado!",

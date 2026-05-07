@@ -54,7 +54,7 @@ export function WarningModal({
                         initial={{ opacity: 0, scale: 0.95, y: 10 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                        transition={{ duration: 0.2, ease: "easeOut" }}
+                        transition={{ type: "spring", stiffness: 350, damping: 25, mass: 1 }}
                         className="bg-surface border border-outline-variant/30 rounded-3xl shadow-2xl w-full max-w-md overflow-hidden relative z-10"
                     >
                         <div className="p-6">

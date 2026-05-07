@@ -260,31 +260,36 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                         id: 'console',
                         label: (!isCompact && !isNarrow) ? t('toolbox.tabs.console') : "",
                         icon: FileText,
-                        selected: isGridView ? visibleToolsInGrid.has('console') : activeTool === 'console'
+                        selected: isGridView ? visibleToolsInGrid.has('console') : activeTool === 'console',
+                        tooltip: (isCompact || isNarrow) ? t('toolbox.tabs.console') : undefined
                     }] : []),
                     {
                         id: 'logcat',
                         label: (!isCompact && !isNarrow) ? t('toolbox.tabs.logcat') : "",
                         icon: AlignLeft,
-                        selected: isGridView ? visibleToolsInGrid.has('logcat') : activeTool === 'logcat'
+                        selected: isGridView ? visibleToolsInGrid.has('logcat') : activeTool === 'logcat',
+                        tooltip: (isCompact || isNarrow) ? t('toolbox.tabs.logcat') : undefined
                     },
                     {
                         id: 'performance',
                         label: (!isCompact && !isNarrow) ? t('toolbox.tabs.performance') : "",
                         icon: Cpu,
-                        selected: isGridView ? visibleToolsInGrid.has('performance') : activeTool === 'performance'
+                        selected: isGridView ? visibleToolsInGrid.has('performance') : activeTool === 'performance',
+                        tooltip: (isCompact || isNarrow) ? t('toolbox.tabs.performance') : undefined
                     },
                     {
                         id: 'commands',
                         label: (!isCompact && !isNarrow) ? t('toolbox.tabs.commands') : "",
                         icon: Terminal,
-                        selected: isGridView ? visibleToolsInGrid.has('commands') : activeTool === 'commands'
+                        selected: isGridView ? visibleToolsInGrid.has('commands') : activeTool === 'commands',
+                        tooltip: (isCompact || isNarrow) ? t('toolbox.tabs.commands') : undefined
                     },
                     {
                         id: 'apps',
                         label: (!isCompact && !isNarrow) ? t('toolbox.tabs.apps') : "",
                         icon: Package,
-                        selected: isGridView ? visibleToolsInGrid.has('apps') : activeTool === 'apps'
+                        selected: isGridView ? visibleToolsInGrid.has('apps') : activeTool === 'apps',
+                        tooltip: (isCompact || isNarrow) ? t('toolbox.tabs.apps') : undefined
                     }
                 ]}
                 activeId={activeTool}
@@ -309,7 +314,8 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                                     ? "bg-primary/10 text-primary dark:text-primary/80 border-none"
                                     : "text-on-surface/80 hover:text-on-surface/80 hover:bg-surface-variant/30"
                             )}
-                            title={isGridView ? t('toolbox.actions.switch_to_tabs') : t('toolbox.actions.switch_to_grid')}
+                            data-tooltip={isGridView ? t('toolbox.actions.switch_to_tabs') : t('toolbox.actions.switch_to_grid')}
+                            data-position="top"
                         >
                             <LayoutGrid size={18} />
                         </Button>
@@ -330,7 +336,8 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                                         ? "text-on-surface/80 cursor-not-allowed"
                                         : "text-on-surface/80 hover:text-primary hover:bg-primary/10"
                                 )}
-                                title={isMirrorDisabled ? t('startup.mirroring.description') : t('scrcpy.title')}
+                                data-tooltip={isMirrorDisabled ? t('startup.mirroring.description') : t('scrcpy.title')}
+                                data-position="top"
                             >
                                 <Cast size={18} />
                             </Button>
@@ -340,7 +347,8 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                                 size="icon"
                                 onClick={handleScreenshot}
                                 className="text-on-surface/80 hover:text-primary hover:bg-primary/10 transition-all h-8 w-8"
-                                title={t('toolbox.actions.screenshot')}
+                                data-tooltip={t('toolbox.actions.screenshot')}
+                                data-position="top"
                             >
                                 <Camera size={18} />
                             </Button>
@@ -353,7 +361,8 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                                         ? "bg-error-container text-on-error-container animate-pulse hover:bg-error-container/80"
                                         : "text-on-surface/80 hover:text-primary hover:bg-primary/10"
                                 )}
-                                title={isRecording ? t('toolbox.actions.stop_recording') : t('toolbox.actions.start_recording')}
+                                data-tooltip={isRecording ? t('toolbox.actions.stop_recording') : t('toolbox.actions.start_recording')}
+                                data-position="top"
                             >
                                 {isRecording ? <Square size={18} fill="currentColor" /> : <Video size={18} />}
                                 {isRecording && <span className="text-xs font-mono font-bold">{new Date(recordingTime * 1000).toISOString().substr(14, 5)}</span>}

@@ -468,13 +468,28 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
     };
 
     const tabs = [
-        { id: 'file', label: !isNarrow ? t('tests.mode.file') : '', icon: FileCode },
+        { 
+            id: 'file', 
+            label: !isNarrow ? t('tests.mode.file') : '', 
+            icon: FileCode,
+            tooltip: isNarrow ? t('tests.mode.file') : undefined,
+            tooltipPosition: 'left' as const
+        },
         {
             id: 'folder',
             label: !isNarrow ? (settings.automationFramework === 'appium' ? t('tests.mode.project') : t('tests.mode.folder')) : '',
-            icon: FolderOpen
+            icon: FolderOpen,
+            tooltip: isNarrow ? (settings.automationFramework === 'appium' ? t('tests.mode.project') : t('tests.mode.folder')) : undefined,
+            tooltipPosition: 'left' as const
         },
-        { id: 'args', label: !isNarrow ? t('tests.mode.args') : '', icon: FileText, disabled: settings.automationFramework && settings.automationFramework !== 'robot' },
+        { 
+            id: 'args', 
+            label: !isNarrow ? t('tests.mode.args') : '', 
+            icon: FileText, 
+            disabled: settings.automationFramework && settings.automationFramework !== 'robot',
+            tooltip: isNarrow ? t('tests.mode.args') : undefined,
+            tooltipPosition: 'left' as const
+        },
     ].filter(tab => {
         if (tab.id === 'args' && settings.automationFramework && settings.automationFramework !== 'robot') return false;
         if (tab.id === 'file' && settings.automationFramework === 'appium') return false;

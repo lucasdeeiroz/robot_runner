@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { useSettings } from "@/lib/settings";
 import { feedback } from '@/lib/feedback';
 import { logEvent } from '@/lib/analytics';
+import { motion, AnimatePresence } from 'framer-motion';
 
 import { useTranslation } from "react-i18next";
 import packageJson from '../../../package.json';
@@ -130,20 +131,36 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
         )}>
             {/* Header */}
             <div className="p-4 flex items-center justify-between h-16 shrink-0">
-                {!collapsed && (
-                    settings.theme === 'light' && settings.customLogoLight ? (
-                        <CustomLogo key={settings.customLogoLight} path={settings.customLogoLight} className="h-8 object-contain" />
-                    ) : settings.theme === 'dark' && settings.customLogoDark ? (
-                        <CustomLogo key={settings.customLogoDark} path={settings.customLogoDark} className="h-8 object-contain" />
-                    ) : (
-                        <span className="font-bold text-lg text-on-surface/80 tracking-tight">Robot Runner</span>
-                    )
-                )}
+                <AnimatePresence>
+                    {!collapsed && (
+                        <motion.div
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -10 }}
+                            transition={{ duration: 0.15 }}
+                            className="flex-1"
+                        >
+                            {settings.theme === 'light' && settings.customLogoLight ? (
+                                <CustomLogo key={settings.customLogoLight} path={settings.customLogoLight} className="h-8 object-contain" />
+                            ) : settings.theme === 'dark' && settings.customLogoDark ? (
+                                <CustomLogo key={settings.customLogoDark} path={settings.customLogoDark} className="h-8 object-contain" />
+                            ) : (
+                                <span className="font-bold text-lg text-on-surface/80 tracking-tight">Robot Runner</span>
+                            )}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
                 <button
                     onClick={() => setCollapsed(!collapsed)}
                     className="p-1 hover:bg-surface-variant/50 rounded-2xl text-on-surface-variant/80 hover:text-on-surface/80 transition-transform active:scale-95"
                 >
-                    <Menu size={20} />
+                    <motion.div
+                        animate={{ rotate: collapsed ? 0 : 180 }}
+                        transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                        className="flex items-center justify-center"
+                    >
+                        <Menu size={20} />
+                    </motion.div>
                 </button>
             </div>
 
@@ -157,13 +174,14 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                             logEvent('feature_opened', { feature_name: item.id });
                         }}
                         className={cn(
-                            "w-full flex items-center p-2 rounded-2xl transition-all duration-200 active:scale-95 relative",
+                            "group w-full flex items-center p-2 rounded-2xl transition-all duration-200 active:scale-95 relative",
                             activePage === item.id
                                 ? "bg-primary/10 text-primary dark:text-primary/80 shadow-primary/20"
-                                : "text-on-surface-variant/80/80 hover:bg-surface-variant/50 hover:text-on-surface/80",
+                                : "text-on-surface-variant/80 hover:bg-surface-variant/50 hover:text-on-surface/80",
                             collapsed ? "justify-center" : "gap-3"
                         )}
-                        title={collapsed ? item.label : undefined}
+                        data-tooltip={collapsed ? item.label : undefined}
+                        data-position="right"
                     >
                         <div className="relative">
                             <item.icon size={20} />
@@ -177,7 +195,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
 
                             {/* ADB Indicator */}
                             {item.id === 'run' && adbRunning && (
-                                <span className="absolute -top-1 -right-1 flex h-2 w-2" title={t('sidebar.adb_active')}>
+                                <span className="absolute -top-1 -right-1 flex h-2 w-2 cursor-help" data-tooltip={t('sidebar.adb_active')} data-position="top">
                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
                                     <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                                 </span>
@@ -185,13 +203,25 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
 
                             {/* Appium Indicator */}
                             {item.id === 'settings' && appiumRunning && (
-                                <span className="absolute -top-1 -right-1 flex h-2 w-2" title={t('sidebar.appium_active')}>
+                                <span className="absolute -top-1 -right-1 flex h-2 w-2 cursor-help" data-tooltip={t('sidebar.appium_active')} data-position="top">
                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-500 opacity-75"></span>
                                     <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
                                 </span>
                             )}
                         </div>
-                        {!collapsed && <span className="font-medium">{item.label}</span>}
+                        <AnimatePresence>
+                            {!collapsed && (
+                                <motion.span
+                                    initial={{ opacity: 0, x: -8 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: -8 }}
+                                    transition={{ duration: 0.15 }}
+                                    className="font-medium whitespace-nowrap"
+                                >
+                                    {item.label}
+                                </motion.span>
+                            )}
+                        </AnimatePresence>
                     </button>
                 ))}
             </nav>
@@ -202,41 +232,56 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                     <button
                         onClick={handleAiChatToggle}
                         className={cn(
-                            "w-full flex items-center p-2 rounded-2xl transition-all duration-200 active:scale-95 relative overflow-hidden group",
+                            "w-full flex items-center p-2 rounded-2xl transition-all duration-200 active:scale-95 relative group",
                             settings.aiChatEnabled
                                 ? "bg-primary text-on-primary shadow-lg shadow-primary/30"
                                 : "bg-surface-variant/30 text-primary hover:bg-primary/10 border border-primary/20",
                             collapsed ? "justify-center" : "gap-3"
                         )}
-                        title="Ask RAI"
+                        data-tooltip={collapsed ? "Ask RAI" : undefined}
+                        data-position="right"
                     >
-                        {/* Animated background effect */}
-                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:animate-[shimmer_2s_infinite]" />
+                        {/* Animated background effect with overflow-hidden boundary */}
+                        <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:animate-[shimmer_2s_infinite]" />
+                        </div>
 
                         <Sparkles size={20} className={cn(settings.aiChatEnabled ? "animate-pulse" : "")} />
 
-                        {!collapsed && (
-                            <span className="font-bold tracking-wide flex items-center gap-1">
-                                <span>Ask </span>
-                                <span className="rai-container">
-                                    <span className="rai-letter-r">
-                                        R
-                                        <span className={cn("rai-letter-r-ghost", settings.aiChatEnabled ? "text-on-primary/60" : "text-primary/70")}>R</span>
+                        <AnimatePresence>
+                            {!collapsed && (
+                                <motion.span
+                                    initial={{ opacity: 0, x: -8 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: -8 }}
+                                    transition={{ duration: 0.15 }}
+                                    className="font-bold tracking-wide flex items-center gap-1 whitespace-nowrap"
+                                >
+                                    <span>Ask </span>
+                                    <span className="rai-container">
+                                        <span className="rai-letter-r">
+                                            R
+                                            <span className={cn("rai-letter-r-ghost", settings.aiChatEnabled ? "text-on-primary/60" : "text-primary/70")}>R</span>
+                                        </span>
+                                        <span>AI</span>
                                     </span>
-                                    <span>AI</span>
-                                </span>
-                            </span>
-                        )}
+                                </motion.span>
+                            )}
+                        </AnimatePresence>
                     </button>
                 </div>
             )}
 
             {/* User Profile */}
             <div className="px-2 pb-2">
-                <div className={cn(
-                    "flex items-center gap-3 p-2 rounded-2xl bg-surface-variant/20 border border-outline-variant/30",
-                    collapsed ? "justify-center" : "px-3"
-                )}>
+                <div 
+                    className={cn(
+                        "group flex items-center gap-3 p-2 rounded-2xl bg-surface-variant/20 border border-outline-variant/30 relative",
+                        collapsed ? "justify-center" : "px-3"
+                    )}
+                    data-tooltip={collapsed ? (user?.displayName || user?.email?.split('@')[0]) : undefined}
+                    data-position="right"
+                >
                     {user?.photoURL ? (
                         <img src={user.photoURL} alt="User" className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20" />
                     ) : (
@@ -244,17 +289,26 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                             <UserIcon size={16} />
                         </div>
                     )}
-                    {!collapsed && (
-                        <div className="flex-1 min-w-0 overflow-hidden">
-                            <p className="text-xs font-bold text-on-surface truncate">{user?.displayName || user?.email?.split('@')[0]}</p>
-                            <p className="text-[10px] text-on-surface-variant truncate">{user?.email}</p>
-                        </div>
-                    )}
+                    <AnimatePresence>
+                        {!collapsed && (
+                            <motion.div
+                                initial={{ opacity: 0, x: -8 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: -8 }}
+                                transition={{ duration: 0.15 }}
+                                className="flex-1 min-w-0 overflow-hidden"
+                            >
+                                <p className="text-xs font-bold text-on-surface truncate">{user?.displayName || user?.email?.split('@')[0]}</p>
+                                <p className="text-[10px] text-on-surface-variant truncate">{user?.email}</p>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                     {!collapsed && (
                         <button
                             onClick={signOut}
                             className="p-1.5 hover:bg-error/10 text-on-surface-variant hover:text-error rounded-xl transition-all active:scale-95"
-                            title={t('auth.logout')}
+                            data-tooltip={t('auth.logout')}
+                            data-position="top"
                         >
                             <LogOut size={16} />
                         </button>

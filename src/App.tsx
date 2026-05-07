@@ -309,7 +309,7 @@ function AppContent() {
                   zIndex: activePage === 'run' ? 10 : 0,
                   scale: activePage === 'run' ? 1 : 0.98
                 }}
-                transition={{ duration: 0.3 }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
               >
                 <RunPage onNavigate={setActivePage} initialTab={initialSubTab} />
               </motion.div>
@@ -323,7 +323,7 @@ function AppContent() {
                   zIndex: activePage === 'dashboard' ? 10 : 0,
                   scale: activePage === 'dashboard' ? 1 : 0.98
                 }}
-                transition={{ duration: 0.3 }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
               >
                 <DashboardPage onNavigate={setActivePage} />
               </motion.div>
@@ -337,21 +337,21 @@ function AppContent() {
                   zIndex: activePage === 'tests' ? 10 : 0,
                   scale: activePage === 'tests' ? 1 : 0.98
                 }}
-                transition={{ duration: 0.3 }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
               >
                 <TestsPage onNavigate={setActivePage} />
               </motion.div>
 
               {/* Other Pages - Transitions using AnimatePresence */}
-              <AnimatePresence mode="wait">
+              <AnimatePresence mode="popLayout">
                 {activePage !== 'run' && activePage !== 'dashboard' && activePage !== 'tests' && (
                   <motion.div
                     key={activePage}
                     className="relative w-full flex flex-col z-20"
-                    initial={{ opacity: 0, scale: 0.98, x: 20 }}
-                    animate={{ opacity: 1, scale: 1, x: 0 }}
-                    exit={{ opacity: 0, scale: 0.98, x: -20, position: 'absolute' }}
-                    transition={{ duration: 0.3, ease: [0.2, 0, 0, 1] }}
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
                   >
                     {activePage === 'settings' && <SettingsPage />}
                     {activePage === 'about' && <AboutPage />}

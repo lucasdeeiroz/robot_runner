@@ -86,9 +86,9 @@ export function RunPage({ onNavigate, initialTab }: RunPageProps) {
 
     // Define Tabs
     const tabs: TabItem[] = [
-        ...(settings.usageMode === 'explorer' ? [] : [{ id: 'tests', label: !isNarrow ? t('run_tab.launcher') : '', icon: Play }]),
-        { id: 'connect', label: !isNarrow ? t('run_tab.connect') : '', icon: Wifi },
-        { id: 'inspector', label: !isNarrow ? t('run_tab.inspector') : '', icon: ScanEye },
+        ...(settings.usageMode === 'explorer' ? [] : [{ id: 'tests', label: !isNarrow ? t('run_tab.launcher') : '', icon: Play, tooltip: isNarrow ? t('run_tab.launcher') : undefined }]),
+        { id: 'connect', label: !isNarrow ? t('run_tab.connect') : '', icon: Wifi, tooltip: isNarrow ? t('run_tab.connect') : undefined },
+        { id: 'inspector', label: !isNarrow ? t('run_tab.inspector') : '', icon: ScanEye, tooltip: isNarrow ? t('run_tab.inspector') : undefined },
     ];
 
     // Global Device State

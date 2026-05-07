@@ -229,3 +229,126 @@ button:hover .rai-letter-r-ghost,
   opacity: 0.5;
   animation: shake-r-ghost 0.55s infinite ease-in-out;
 }
+
+/* Glassmorphism Premium Utility */
+.glassmorphic {
+  background-color: rgb(var(--md-sys-color-surface) / 0.6) !important;
+  backdrop-filter: blur(16px) !important;
+  border-bottom: 1px solid rgb(var(--md-sys-color-outline-variant) / 0.2);
+}
+
+/* Premium Shimmer Animations */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg,
+      rgb(var(--md-sys-color-surface-variant) / 0.3) 25%,
+      rgb(var(--md-sys-color-outline-variant) / 0.5) 50%,
+      rgb(var(--md-sys-color-surface-variant) / 0.3) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s infinite linear;
+}
+
+[data-tooltip] {
+  position: relative;
+}
+
+[data-tooltip]:hover,
+[data-tooltip]:focus-visible {
+  z-index: 99999 !important;
+}
+
+/* Elevate stacking context and prevent clipping for all ancestors up the tree when hovering a tooltip */
+*:not(html):not(body):has([data-tooltip]:hover) {
+  z-index: 99999 !important;
+  overflow: visible !important;
+}
+
+[data-tooltip=""]::after,
+[data-tooltip="undefined"]::after {
+  display: none !important;
+}
+
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  background-color: rgb(var(--md-sys-color-inverse-surface, 49 48 51));
+  color: rgb(var(--md-sys-color-inverse-on-surface, 244 239 244));
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  white-space: nowrap;
+  z-index: 99999 !important;
+  pointer-events: none;
+  opacity: 0;
+  transition: all 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Position Right (Default) */
+[data-tooltip]:not([data-position])::after,
+[data-tooltip][data-position="right"]::after {
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%) scale(0.85);
+  transform-origin: left center;
+}
+
+[data-tooltip]:not([data-position]):hover::after,
+[data-tooltip]:not([data-position]):focus-visible::after,
+[data-tooltip][data-position="right"]:hover::after,
+[data-tooltip][data-position="right"]:focus-visible::after {
+  opacity: 1;
+  transform: translateY(-50%) scale(1);
+}
+
+/* Position Top */
+[data-tooltip][data-position="top"]::after {
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) scale(0.85);
+  transform-origin: bottom center;
+}
+
+[data-tooltip][data-position="top"]:hover::after,
+[data-tooltip][data-position="top"]:focus-visible::after {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+
+/* Position Bottom */
+[data-tooltip][data-position="bottom"]::after {
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) scale(0.85);
+  transform-origin: top center;
+}
+
+[data-tooltip][data-position="bottom"]:hover::after,
+[data-tooltip][data-position="bottom"]:focus-visible::after {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+
+/* Position Left */
+[data-tooltip][data-position="left"]::after {
+  right: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%) scale(0.85);
+  transform-origin: right center;
+}
+
+[data-tooltip][data-position="left"]:hover::after,
+[data-tooltip][data-position="left"]:focus-visible::after {
+  opacity: 1;
+  transform: translateY(-50%) scale(1);
+}
