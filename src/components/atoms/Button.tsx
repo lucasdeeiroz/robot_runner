@@ -59,7 +59,6 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
                 className
             )}
             disabled={disabled || isLoading}
-            title={title}
             data-tooltip={title}
             data-position={tooltipPosition}
             {...props}
