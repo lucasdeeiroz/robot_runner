@@ -752,7 +752,8 @@ export const pt = {
                 drawer: "Gaveta",
                 dialog: "Diálogo",
                 tab_content: "Conteúdo da Aba",
-                overlay: "Sobreposição"
+                overlay: "Sobreposição",
+                undefined: "Tela"
             },
             exploration: {
                 start: "Exploração por IA",
@@ -1047,6 +1048,10 @@ export const pt = {
                 read_error: "Falha ao ler arquivo de logo. Tente novamente.",
                 select_error: "Falha ao selecionar logo"
             },
+            feedback: {
+                migration_success: "Telas migradas com sucesso",
+                migration_error: "Falha ao migrar telas"
+            },
             appium: {
                 status_error: "Falha ao obter status do Appium",
                 title: "Servidor Appium",
@@ -1205,7 +1210,8 @@ export const pt = {
                 logcat: "Diretório do Logcat",
                 screenshots: "Diretório de Capturas de Tela",
                 recordings: "Diretório de Gravações",
-                automationRoot: "Raiz da Automação (Working Dir)"
+                automationRoot: "Raiz da Automação (Working Dir)",
+                mappings: "Diretório de Mapeamento"
             },
             tool_options: {
                 title: "Opções de Ferramentas",

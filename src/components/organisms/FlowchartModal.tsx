@@ -36,7 +36,7 @@ interface FlowchartModalProps {
     activeProfileId: string;
 }
 
-export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh, activeProfileId }: FlowchartModalProps) {
+export function FlowchartModal({ isOpen, onClose, maps = [], onEditScreen, onRefresh, activeProfileId }: FlowchartModalProps) {
     const { t } = useTranslation();
     const { settings } = useSettings();
     const containerRef = useRef<HTMLDivElement>(null);
@@ -88,7 +88,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
             try {
                 const { readTextFile } = await import('@tauri-apps/plugin-fs');
                 const content = await readTextFile(selected as string);
-                await importMapperData(activeProfileId, content);
+                await importMapperData(activeProfileId, content, settings.paths?.mappings);
                 feedback.toast.success(t('mapper.flowchart.import_success'));
                 if (onRefresh) onRefresh();
             } catch (error) { feedback.toast.error(t('mapper.flowchart.import_error')); }
@@ -100,7 +100,7 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
         if (path) {
             try {
                 const { writeTextFile } = await import('@tauri-apps/plugin-fs');
-                const content = await exportMapperData(activeProfileId);
+                const content = await exportMapperData(activeProfileId, settings.paths?.mappings);
                 await writeTextFile(path, content);
                 feedback.toast.success(t('mapper.flowchart.export_success'));
             } catch (error) { feedback.toast.error(t('mapper.flowchart.export_error')); }
@@ -155,11 +155,11 @@ export function FlowchartModal({ isOpen, onClose, maps, onEditScreen, onRefresh,
     const baseEdgeLayouts = useMemo(() => {
         const layouts: any[] = [];
         const seenEdgeIds = new Set<string>();
-        maps.forEach(sourceMap => {
+        (maps || []).forEach(sourceMap => {
             const sourceLayout = layout.nodes[sourceMap.name];
             if (!sourceLayout) return;
             const sourceOrigin = view.getPixelCoords(sourceLayout.gridX, sourceLayout.gridY);
-            sourceMap.elements.forEach(el => {
+            (sourceMap.elements || []).forEach(el => {
                 const navigatesTo = el.navigates_to;
                 if (!navigatesTo) return;
                 let destinations: string[] = [];

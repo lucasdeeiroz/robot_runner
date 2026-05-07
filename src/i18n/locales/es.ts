@@ -758,7 +758,8 @@ export const es = {
                 drawer: "Cajón",
                 dialog: "Diálogo",
                 tab_content: "Contenido de Pestaña",
-                overlay: "Superposición"
+                overlay: "Superposición",
+                undefined: "Pantalla"
             },
             exploration: {
                 start: "Auto Exploración",
@@ -1053,6 +1054,10 @@ export const es = {
                 read_error: "Error al leer archivo de logo. Intente de nuevo.",
                 select_error: "Error al seleccionar logo"
             },
+            feedback: {
+                migration_success: "Pantallas migradas con éxito",
+                migration_error: "Error al migrar las pantallas"
+            },
             appium: {
                 status_error: "Error al obtener estado de Appium",
                 title: "Servidor Appium",
@@ -1211,7 +1216,8 @@ export const es = {
                 logcat: "Directorio de Logcat",
                 screenshots: "Directorio de Capturas de Pantalla",
                 recordings: "Directorio de Grabaciones",
-                automationRoot: "Raíz de Automatización (Working Dir)"
+                automationRoot: "Raíz de Automatización (Working Dir)",
+                mappings: "Directorio de Mapeos"
             },
             tool_options: {
                 title: "Opciones de Herramientas",

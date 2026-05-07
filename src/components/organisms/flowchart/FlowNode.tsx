@@ -64,7 +64,7 @@ export const FlowNode = React.memo(({
                 )}
                 {/* Type Badge - Top Right */}
                 <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-black/60 text-[10px] text-white backdrop-blur-sm z-10">
-                    {t(`mapper.screen_types.${data.type}`, data.type)}
+                    {t(`mapper.screen_types.${data.type || 'screen'}`, data.type || 'Screen')}
                 </div>
             </div>
 

@@ -15,6 +15,7 @@ import { TOOL_LINKS } from "@/lib/tools";
 import { getAvailableModels as getGeminiModels } from "@/lib/dashboard/gemini";
 import { getAvailableModels as getClaudeModels } from "@/lib/dashboard/claude";
 import { getAvailableModels as getOpenAIModels } from "@/lib/dashboard/openai";
+import { migrateScreenMaps } from "@/lib/dashboard/mapperPersistence";
 import { Modal } from "@/components/organisms/Modal";
 import { ConfirmationModal } from "@/components/organisms/ConfirmationModal";
 
@@ -761,7 +762,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                 {/* Path Configuration */}
                 <Section title={t('settings.paths.title')} icon={FolderOpen}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {(['automationRoot', 'resources', 'tests', 'suites', 'logs', 'logcat', 'screenshots', 'recordings'] as Array<keyof typeof settings.paths>).map((key) => {
+                        {(['automationRoot', 'resources', 'tests', 'suites', 'logs', 'logcat', 'screenshots', 'recordings', 'mappings'] as Array<keyof typeof settings.paths>).map((key) => {
                             const isTestingPath = ['automationRoot', 'resources', 'tests', 'suites'].includes(key);
                             if (isTestingPath && settings.usageMode === 'explorer') return null;
                             const isDisabled = isTestingPath && systemCheckStatus?.missingTesting?.length > 0;
@@ -770,7 +771,18 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                     key={key}
                                     label={t(`settings.path_labels.${key}` as any)}
                                     value={settings.paths[key] || ''}
-                                    onSelect={(path) => updateSetting('paths', { ...settings.paths, [key]: path })}
+                                    onSelect={async (path) => {
+                                        if (key === 'mappings') {
+                                            const oldPath = settings.paths.mappings;
+                                            try {
+                                                await migrateScreenMaps(activeProfileId, oldPath, path);
+                                                feedback.toast.success(t('settings.feedback.migration_success'));
+                                            } catch (err) {
+                                                feedback.toast.error(t('settings.feedback.migration_error'), err);
+                                            }
+                                        }
+                                        updateSetting('paths', { ...settings.paths, [key]: path });
+                                    }}
                                     disabled={isDisabled}
                                     placeholder={t('settings.not_set')}
                                     directory={true}

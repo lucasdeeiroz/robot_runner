@@ -13,12 +13,12 @@ interface QuickConnectDialogProps {
     onConfirm: (target: string, element: string) => void;
 }
 
-export function QuickConnectDialog({ maps, sourceNodeId, onClose, onConfirm }: QuickConnectDialogProps) {
+export function QuickConnectDialog({ maps = [], sourceNodeId, onClose, onConfirm }: QuickConnectDialogProps) {
     const { t } = useTranslation();
-    const sourceMap = maps.find(m => m.name === sourceNodeId);
+    const sourceMap = (maps || []).find(m => m.name === sourceNodeId);
 
-    const availableElements = useMemo(() => sourceMap?.elements.filter(el => !el.navigates_to) || [], [sourceMap]);
-    const availableTargets = useMemo(() => maps.filter(m => m.name !== sourceNodeId).map(m => m.name), [maps, sourceNodeId]);
+    const availableElements = useMemo(() => (sourceMap?.elements || []).filter(el => !el.navigates_to), [sourceMap]);
+    const availableTargets = useMemo(() => (maps || []).filter(m => m.name !== sourceNodeId).map(m => m.name), [maps, sourceNodeId]);
 
     const [selectedElement, setSelectedElement] = useState<string>(availableElements[0]?.name || "");
     const [selectedTarget, setSelectedTarget] = useState<string>(availableTargets[0] || "");
@@ -59,7 +59,7 @@ export function QuickConnectDialog({ maps, sourceNodeId, onClose, onConfirm }: Q
                             value={selectedTarget}
                             onChange={setSelectedTarget}
                             maps={availableTargets
-                                .map(name => maps.find(m => m.name === name))
+                                .map(name => (maps || []).find(m => m.name === name))
                                 .filter((m): m is ScreenMap => m !== undefined)}
                         />
                     </div>
