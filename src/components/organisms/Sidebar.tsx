@@ -255,6 +255,46 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                 </div>
             )}
 
+            {/* Footer */}
+            <div className="px-4 pb-2">
+                {!collapsed && <div className="text-[10px] flex justify-between items-center gap-2">
+                    <div className="flex items-center gap-1.5">
+                        <span
+                            onClick={() => onNavigate('about')}
+                            className="flex items-center gap-2 text-on-surface-variant/80 bg-surface-variant/20 px-1.5 py-0.5 rounded-2xl cursor-pointer hover:bg-surface-variant/40 transition-colors select-none"
+                        >
+                            v{displayVersion}
+                            {stageTag && (
+                                <span className="text-[9px] font-bold tracking-wider text-primary bg-primary/10 px-1.5 py-0.5 rounded-xl uppercase border border-primary/20">
+                                    {stageTag.replace(/([A-Z]+)(\d+)/i, '$1 $2')}
+                                </span>
+                            )}
+                        </span>
+                    </div>
+                    {updateAvailable && (
+                        <button
+                            onClick={() => onNavigate('about')}
+                            className="text-error font-bold bg-error-container px-1.5 py-0.5 rounded-2xl hover:bg-error-container/80 transition-colors animate-pulse cursor-pointer shrink-0"
+                        >
+                            {t('about.update_badge')}
+                        </button>
+                    )}
+                </div>}
+                {collapsed && <div className="text-[10px] flex flex-col gap-1 justify-center items-center">
+                    <span
+                        onClick={() => onNavigate('about')}
+                        className="flex flex-col items-center text-on-surface-variant/80 bg-surface-variant/20 px-1.5 py-0.5 rounded-2xl cursor-pointer select-none"
+                    >
+                        v{displayVersion}
+                        {stageTag && (
+                            <span className="text-[8px] font-bold text-primary opacity-80 uppercase text-center w-full truncate px-1">
+                                {stageTag}
+                            </span>
+                        )}
+                    </span>
+                </div>}
+            </div>
+
             {/* User Profile */}
             <div className="px-2 pb-2">
                 <div
@@ -297,46 +337,6 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                         </button>
                     )}
                 </div>
-            </div>
-
-            {/* Footer */}
-            <div className="p-4 mb-2.5">
-                {!collapsed && <div className="text-[10px] flex justify-between items-center gap-2">
-                    <div className="flex items-center gap-1.5">
-                        <span
-                            onClick={() => onNavigate('about')}
-                            className="flex items-center gap-2 text-on-surface-variant/80 bg-surface-variant/20 px-1.5 py-0.5 rounded-2xl cursor-pointer hover:bg-surface-variant/40 transition-colors select-none"
-                        >
-                            v{displayVersion}
-                            {stageTag && (
-                                <span className="text-[9px] font-bold tracking-wider text-primary bg-primary/10 px-1.5 py-0.5 rounded-xl uppercase border border-primary/20">
-                                    {stageTag.replace(/([A-Z]+)(\d+)/i, '$1 $2')}
-                                </span>
-                            )}
-                        </span>
-                    </div>
-                    {updateAvailable && (
-                        <button
-                            onClick={() => onNavigate('about')}
-                            className="text-error font-bold bg-error-container px-1.5 py-0.5 rounded-2xl hover:bg-error-container/80 transition-colors animate-pulse cursor-pointer shrink-0"
-                        >
-                            {t('about.update_badge')}
-                        </button>
-                    )}
-                </div>}
-                {collapsed && <div className="text-[10px] flex flex-col gap-1 justify-center items-center">
-                    <span
-                        onClick={() => onNavigate('about')}
-                        className="flex flex-col items-center text-on-surface-variant/80 bg-surface-variant/20 px-1.5 py-0.5 rounded-2xl cursor-pointer select-none"
-                    >
-                        v{displayVersion}
-                        {stageTag && (
-                            <span className="text-[8px] font-bold text-primary opacity-80 uppercase text-center w-full truncate px-1">
-                                {stageTag}
-                            </span>
-                        )}
-                    </span>
-                </div>}
             </div>
         </div >
     );

@@ -765,11 +765,20 @@ export const es = {
                 overlay: "Superposición",
                 undefined: "Pantalla"
             },
+            migration: {
+                title: "Migración de Mapeos",
+                message: "Detectamos que ha cambiado el directorio de mapeos, pero la nueva ubicación está vacía mientras que la antigua contiene datos. ¿Desea copiar los mapeos existentes al nuevo directorio?",
+                copy: "Copiar Archivos",
+                ignore: "Mantener Vacío",
+                success: "¡Mapeos migrados con éxito!",
+                error: "Error al migrar mapeos."
+            },
             exploration: {
                 start: "Auto Exploración",
                 stop: "Detener",
                 active: "IA Explorando...",
                 thinking: "Pensando...",
+                error_empty_guidelines: "El objetivo o directriz de exploración no puede estar vacío.",
                 step_title: "Paso {{number}}",
                 initialization: "Inicialización",
                 events_logged: "{{count}} eventos registrados",

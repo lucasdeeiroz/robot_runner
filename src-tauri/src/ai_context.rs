@@ -24,6 +24,7 @@ pub struct AiContextParams {
     pub current_xml: Option<String>,
     pub current_screenshot: Option<String>,
     pub failures_limit: Option<usize>,
+    pub automation_root: Option<String>,
 }
 
 #[derive(Serialize, Debug)]
@@ -250,6 +251,38 @@ fn get_exploration_context(params: AiContextParams) -> Result<AiContextResponse,
             "element_count": count,
             "short_id_map": short_id_map
         });
+    }
+
+    // Automation Context: Inject snippets of existing test files to help the IA understand the project style
+    if let Some(root) = params.automation_root {
+        if Path::new(&root).exists() {
+            context.push_str("\n\n### AUTOMATION CONTEXT (Existing Test Patterns)\n");
+            if let Ok(entries) = fs::read_dir(&root) {
+                let mut robot_files: Vec<_> = entries
+                    .flatten()
+                    .map(|e| e.path())
+                    .filter(|p| p.is_file() && p.extension().and_then(|s| s.to_str()) == Some("robot"))
+                    .collect();
+                
+                // Sort by date or just take first few
+                robot_files.sort_by(|a, b| b.metadata().and_then(|m| m.modified()).unwrap_or(std::time::SystemTime::UNIX_EPOCH).cmp(&a.metadata().and_then(|m| m.modified()).unwrap_or(std::time::SystemTime::UNIX_EPOCH)));
+
+                let mut count = 0;
+                for path in robot_files.iter().take(3) {
+                    if let Ok(content) = fs::read_to_string(path) {
+                        count += 1;
+                        context.push_str(&format!(
+                            "\n--- File Pattern {} ({}) ---\n",
+                            count,
+                            path.file_name().unwrap_or_default().to_string_lossy()
+                        ));
+                        // Take first 1000 chars (Settings, Variables and maybe some Keywords)
+                        context.push_str(&content.chars().take(1000).collect::<String>());
+                        context.push_str("\n");
+                    }
+                }
+            }
+        }
     }
 
     Ok(AiContextResponse { context, metadata })

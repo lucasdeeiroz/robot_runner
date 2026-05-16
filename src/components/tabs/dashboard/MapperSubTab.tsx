@@ -107,6 +107,12 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         return false;
     }, [settings.aiProvider, settings.geminiApiKey, settings.claudeApiKey, settings.openaiApiKey, settings.claudeCodeToken]);
     const [isStayOn, setIsStayOn] = useState(false);
+
+    // Migration logic
+    const prevMappingsPathRef = useRef<string | null>(settings.paths?.mappings || null);
+    const [showMigrationModal, setShowMigrationModal] = useState(false);
+    const [migrationData, setMigrationData] = useState<{ oldPath: string; newPath: string } | null>(null);
+    const [isMigrating, setIsMigrating] = useState(false);
     const [isExploring, setIsExploring] = useState(false);
     const isExploringRef = useRef(false);
     const [explorationLogs, setExplorationLogs] = useState<LogEntry[]>([]);
@@ -199,6 +205,59 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         setSavedMaps(maps);
         return maps;
     };
+
+    const handleMappingsPathChange = async (oldPath: string, newPath: string) => {
+        try {
+            const oldEntries = await invoke<any[]>('list_directory', { path: oldPath });
+            const newEntries = await invoke<any[]>('list_directory', { path: newPath });
+
+            const hasMappings = oldEntries.some(e => e.name.endsWith('.json'));
+            const isEmpty = !newEntries.some(e => e.name.endsWith('.json'));
+
+            if (hasMappings && isEmpty) {
+                setMigrationData({ oldPath, newPath });
+                setShowMigrationModal(true);
+            }
+        } catch (e) {
+            console.error("Migration check failed", e);
+        }
+    };
+
+    const performMigration = async () => {
+        if (!migrationData) return;
+        setIsMigrating(true);
+        try {
+            const { oldPath, newPath } = migrationData;
+            const oldEntries = await invoke<any[]>('list_directory', { path: oldPath });
+            const mappingFiles = oldEntries.filter(e => !e.is_dir && e.name.endsWith('.json'));
+
+            for (const entry of mappingFiles) {
+                const content = await invoke<string>('read_file', { path: entry.path });
+                await invoke('save_file', { path: `${newPath}/${entry.name}`, content, append: false });
+            }
+
+            feedback.toast.success(t('mapper.migration.success'));
+            loadSavedMaps();
+        } catch (e) {
+            console.error("Migration failed", e);
+            feedback.toast.error(t('mapper.migration.error'));
+        } finally {
+            setIsMigrating(false);
+            setShowMigrationModal(false);
+            setMigrationData(null);
+        }
+    };
+
+    useEffect(() => {
+        const currentMappingsPath = settings.paths?.mappings;
+        if (!currentMappingsPath) return;
+
+        if (prevMappingsPathRef.current && prevMappingsPathRef.current !== currentMappingsPath) {
+            handleMappingsPathChange(prevMappingsPathRef.current, currentMappingsPath);
+        }
+
+        prevMappingsPathRef.current = currentMappingsPath;
+    }, [settings.paths?.mappings]);
 
     // reset current element when selection changes
     useEffect(() => {
@@ -587,7 +646,8 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             setExplorationLogs([...explorer.getLogs()]);
 
             const contextResponse = await getAiContext('exploration', {
-                current_xml: xml
+                current_xml: xml,
+                automation_root: settings.paths?.automationRoot
             });
 
             if (!isExploringRef.current) return;
@@ -1139,6 +1199,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                         onClick={isExploring ? () => stopExploration(t('mapper.exploration.cancelled')) : (_e, prompt) => startExploration(prompt)}
                                         isLoading={isExploring}
                                         label={isExploring ? t('mapper.exploration.stop') : t('mapper.exploration.start')}
+                                        alwaysOpenModal={!isExploring}
                                     />
                                 )}
                                 <Button
@@ -1760,6 +1821,18 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 description={t('mapper.confirm.delete_desc')}
                 variant="danger"
                 confirmText={t('mapper.action.delete')}
+            />
+
+            <ConfirmationModal
+                isOpen={showMigrationModal}
+                onClose={() => setShowMigrationModal(false)}
+                onConfirm={performMigration}
+                title={t('mapper.migration.title')}
+                description={t('mapper.migration.message')}
+                confirmText={t('mapper.migration.copy')}
+                cancelText={t('mapper.migration.ignore')}
+                isLoading={isMigrating}
+                variant="warning"
             />
 
             {/* AI Exploration Log Panel */}

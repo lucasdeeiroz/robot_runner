@@ -759,11 +759,20 @@ export const pt = {
                 overlay: "Sobreposição",
                 undefined: "Tela"
             },
+            migration: {
+                title: "Migração de Mapeamentos",
+                message: "Detectamos que você alterou o diretório de mapeamentos, mas o novo local está vazio enquanto o antigo contém dados. Deseja copiar os mapeamentos existentes para o novo diretório?",
+                copy: "Copiar Arquivos",
+                ignore: "Manter Vazio",
+                success: "Mapeamentos migrados com sucesso!",
+                error: "Falha ao migrar mapeamentos."
+            },
             exploration: {
                 start: "Exploração por IA",
                 stop: "Parar",
                 active: "IA Explorando...",
                 thinking: "Pensando...",
+                error_empty_guidelines: "O objetivo ou diretriz de exploração não pode estar vazio.",
                 step_title: "Passo {{number}}",
                 initialization: "Inicialização",
                 events_logged: "{{count}} eventos registrados",

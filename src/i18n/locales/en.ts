@@ -758,11 +758,20 @@ export const en = {
                 overlay: "Overlay",
                 undefined: "Screen"
             },
+            migration: {
+                title: "Mapping Migration",
+                message: "We detected that you changed the mappings directory, but the new location is empty while the old one contains data. Do you want to copy the existing mappings to the new directory?",
+                copy: "Copy Files",
+                ignore: "Keep Empty",
+                success: "Mappings migrated successfully!",
+                error: "Failed to migrate mappings."
+            },
             exploration: {
                 start: "AI Auto Mapping",
                 stop: "Stop",
                 active: "AI Exploring...",
                 thinking: "Thinking...",
+                error_empty_guidelines: "The exploration objective or guideline cannot be empty.",
                 step_title: "Step {{number}}",
                 initialization: "Initialization",
                 events_logged: "{{count}} events logged",
