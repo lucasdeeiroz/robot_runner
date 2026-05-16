@@ -99,6 +99,10 @@ export const en = {
             license_desc: "This license allows free use, modification, and free redistribution of the Software, but prohibits selling, paid licensing, or other direct monetization of the Software.\n\n**Definitions:**\n\n- **'Software'** means the source code of this repository and any accompanying files, plus any compiled binaries/installers built from it, including modified versions.\n\n- **'Non-Commercial Use'** means use without charging fees for the Software itself. Non-Commercial Use includes personal use, educational use, and internal use by companies/organizations, even if such use provides indirect commercial benefit.\n\n- **'Commercialization'** means any direct monetization of the Software, including:\n  (a) selling the Software (source or binary), in whole or in part;\n  (b) licensing or sublicensing the Software for a fee;\n  (c) charging for access to the Software itself, including paywalled downloads;\n  (d) offering a 'paid version' of the Software that is substantially the same;\n  (e) bundling the Software into a paid product where the Software itself is a primary reason for payment.\n\nCharging for unrelated services is not prohibited (e.g., general consulting), as long as you are not charging for the Software itself.\n\n**Permissions (granted under this license):**\n\n1. You may use the Software for any purpose, including internal use by companies.\n2. You may copy and modify the Software.\n3. You may distribute the Software (source code and/or binaries/installers) for free.\n\n**Conditions:**\n\n**A. Attribution and Link Back** - Any redistribution of the Software (source or binary), modified or unmodified, must:\n- retain the above copyright notice and this license text; and\n- prominently include credit to the original author and a link to the original repository: https://github.com/lucasdeeiroz/robot_runner\n\n**B. Marking Changes** - If you distribute a modified version, you must clearly state that you modified it.\n\n**Restrictions:**\n\n1. You may not Commercialize the Software (as defined above) without written permission from the copyright holder.\n2. You may not remove or obscure the attribution/link-back requirements.",
             disclaimer: "The software is provided 'as is', without warranty of any kind, express or implied.",
             github_repo: "GitHub Repository",
+            update_channel: "Update Channel",
+            channel_stable: "Stable",
+            channel_beta: "Beta",
+            channel_alpha: "Alpha",
             update_check: "Check for Updates",
             update_available: "New version available: {{version}}",
             update_not_available: "You are up to date",
@@ -1070,7 +1074,10 @@ export const en = {
             },
             paths: {
                 title: "Path Configuration",
-                select_error: "Failed to select folder"
+                select_error: "Failed to select folder",
+                migration_title: "Migrate Directory?",
+                migration_desc: "Do you want to move the /mapper subdirectory and its files to the new destination?",
+                migration_confirm: "Yes, Move"
             },
             load_error: "Failed to load settings",
             save_error: "Failed to save settings",

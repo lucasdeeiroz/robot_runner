@@ -1,6 +1,6 @@
 [package]
 name = "robot_runner"
-version = "2.3.0"
+version = "2.3.0-beta2"
 description = "The Professional Command Center for Android Automation"
 authors = ["Lucas de Eiroz Rodrigues"]
 edition = "2024"

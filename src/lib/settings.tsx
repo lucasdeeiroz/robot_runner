@@ -81,6 +81,7 @@ export interface AppSettings {
     claudeCodeToken?: string;
     aiChatEnabled: boolean;
     aiSessionId?: string;
+    updateChannel?: 'stable' | 'beta' | 'alpha';
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -126,7 +127,8 @@ const DEFAULT_SETTINGS: AppSettings = {
     zoomFactor: 1.0,
     claudeCodeToken: '',
     aiChatEnabled: false,
-    aiSessionId: undefined
+    aiSessionId: undefined,
+    updateChannel: 'stable'
 };
 
 export interface Profile {
@@ -502,7 +504,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         if (updateInfo && !manual) return;
 
         try {
-            const info = await checkForUpdates();
+            const channel = activeProfile.settings.updateChannel || 'stable';
+            const info = await checkForUpdates(channel);
             setUpdateInfo(info);
 
             if (manual) {

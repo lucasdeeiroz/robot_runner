@@ -14,7 +14,6 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSettings } from "@/lib/settings";
-import { feedback } from '@/lib/feedback';
 import { logEvent } from '@/lib/analytics';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -38,14 +37,16 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
     const { devices } = useDevices();
     const { user, signOut } = useAuth();
     const [collapsed, setCollapsed] = useState(false);
-    const [clickCount, setClickCount] = useState(0);
-    const [lastClickTime, setLastClickTime] = useState(0);
     const { t } = useTranslation();
 
     const adbRunning = devices.length > 0;
 
     const updateAvailable = updateInfo?.available || false;
     const appVersion = updateInfo?.currentVersion || packageJson.version;
+
+    const versionParts = appVersion.match(/^(\d+\.\d+\.\d+)(?:-([a-zA-Z0-9]+))?$/);
+    const displayVersion = versionParts ? versionParts[1] : appVersion;
+    const stageTag = versionParts && versionParts[2] ? versionParts[2].toUpperCase() : null;
 
     const hasApiKey = useMemo(() => {
         const provider = settings.aiProvider || 'gemini';
@@ -96,24 +97,6 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
         { id: 'settings', label: t('sidebar.settings'), icon: Settings },
         { id: 'about', label: t('sidebar.about'), icon: Info },
     ], [t, settings.usageMode]);
-
-    const handleVersionClick = () => {
-        const now = Date.now();
-        if (now - lastClickTime < 500) { // Faster threshold: 500ms
-            const newCount = clickCount + 1;
-            if (newCount === 10) {
-                const newState = !settings.presentationEnabled;
-                updateSetting('presentationEnabled', newState);
-                feedback.toast.info(newState ? 'presentation.activated' : 'presentation.deactivated');
-                setClickCount(0);
-            } else {
-                setClickCount(newCount);
-            }
-        } else {
-            setClickCount(1);
-        }
-        setLastClickTime(now);
-    };
 
     const handleAiChatToggle = () => {
         const newState = !settings.aiChatEnabled;
@@ -274,7 +257,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
 
             {/* User Profile */}
             <div className="px-2 pb-2">
-                <div 
+                <div
                     className={cn(
                         "group flex items-center gap-3 p-2 rounded-2xl bg-surface-variant/20 border border-outline-variant/30 relative",
                         collapsed ? "justify-center" : "px-3"
@@ -318,28 +301,40 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
 
             {/* Footer */}
             <div className="p-4 mb-2.5">
-                {!collapsed && <div className="text-[10px] flex justify-between items-center">
-                    <span
-                        onClick={handleVersionClick}
-                        className="text-on-surface-variant/80 bg-surface-variant/20 px-1.5 py-0.5 rounded-2xl cursor-pointer hover:bg-surface-variant/40 transition-colors select-none"
-                    >
-                        v{appVersion}
-                    </span>
+                {!collapsed && <div className="text-[10px] flex justify-between items-center gap-2">
+                    <div className="flex items-center gap-1.5">
+                        <span
+                            onClick={() => onNavigate('about')}
+                            className="flex items-center gap-2 text-on-surface-variant/80 bg-surface-variant/20 px-1.5 py-0.5 rounded-2xl cursor-pointer hover:bg-surface-variant/40 transition-colors select-none"
+                        >
+                            v{displayVersion}
+                            {stageTag && (
+                                <span className="text-[9px] font-bold tracking-wider text-primary bg-primary/10 px-1.5 py-0.5 rounded-xl uppercase border border-primary/20">
+                                    {stageTag.replace(/([A-Z]+)(\d+)/i, '$1 $2')}
+                                </span>
+                            )}
+                        </span>
+                    </div>
                     {updateAvailable && (
                         <button
                             onClick={() => onNavigate('about')}
-                            className="text-error font-bold bg-error-container px-1.5 py-0.5 rounded-2xl hover:bg-error-container/80 transition-colors animate-pulse cursor-pointer"
+                            className="text-error font-bold bg-error-container px-1.5 py-0.5 rounded-2xl hover:bg-error-container/80 transition-colors animate-pulse cursor-pointer shrink-0"
                         >
                             {t('about.update_badge')}
                         </button>
                     )}
                 </div>}
-                {collapsed && <div className="text-[10px] flex justify-center items-center">
+                {collapsed && <div className="text-[10px] flex flex-col gap-1 justify-center items-center">
                     <span
-                        onClick={handleVersionClick}
-                        className="text-on-surface-variant/80 bg-surface-variant/20 px-1.5 py-0.5 rounded-2xl cursor-pointer select-none"
+                        onClick={() => onNavigate('about')}
+                        className="flex flex-col items-center text-on-surface-variant/80 bg-surface-variant/20 px-1.5 py-0.5 rounded-2xl cursor-pointer select-none"
                     >
-                        v{appVersion}
+                        v{displayVersion}
+                        {stageTag && (
+                            <span className="text-[8px] font-bold text-primary opacity-80 uppercase text-center w-full truncate px-1">
+                                {stageTag}
+                            </span>
+                        )}
                     </span>
                 </div>}
             </div>

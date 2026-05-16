@@ -49,6 +49,8 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
     const [showProfileModal, setShowProfileModal] = useState(false);
     const [newProfileName, setNewProfileName] = useState("");
     const [isRenaming, setIsRenaming] = useState(false);
+    const [migrationPending, setMigrationPending] = useState<{ oldPath: string, newPath: string } | null>(null);
+    const [isMigrating, setIsMigrating] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
 
     // Responsive State
@@ -321,6 +323,37 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
 
     return (
         <div ref={containerRef} className="space-y-4 animate-in fade-in duration-500">
+            {/* Migration Confirmation Modal */}
+            <ConfirmationModal
+                isOpen={!!migrationPending}
+                onClose={() => {
+                    if (migrationPending) {
+                        updateSetting('paths', { ...settings.paths, mappings: migrationPending.newPath });
+                        setMigrationPending(null);
+                    }
+                }}
+                onConfirm={async () => {
+                    if (migrationPending) {
+                        setIsMigrating(true);
+                        try {
+                            await migrateScreenMaps(activeProfileId, migrationPending.oldPath, migrationPending.newPath);
+                            feedback.toast.success('settings.feedback.migration_success');
+                        } catch (err) {
+                            feedback.toast.error('settings.feedback.migration_error', err);
+                        } finally {
+                            setIsMigrating(false);
+                            updateSetting('paths', { ...settings.paths, mappings: migrationPending.newPath });
+                            setMigrationPending(null);
+                        }
+                    }
+                }}
+                title={t('settings.paths.migration_title')}
+                description={t('settings.paths.migration_desc')}
+                confirmText={t('settings.paths.migration_confirm')}
+                variant="warning"
+                isLoading={isMigrating}
+            />
+
             {/* Delete Confirmation Modal */}
             <ConfirmationModal
                 isOpen={!!showDeleteConfirm}
@@ -774,11 +807,9 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                     onSelect={async (path) => {
                                         if (key === 'mappings') {
                                             const oldPath = settings.paths.mappings;
-                                            try {
-                                                await migrateScreenMaps(activeProfileId, oldPath, path);
-                                                feedback.toast.success('settings.feedback.migration_success');
-                                            } catch (err) {
-                                                feedback.toast.error('settings.feedback.migration_error', err);
+                                            if (oldPath && oldPath !== path) {
+                                                setMigrationPending({ oldPath, newPath: path });
+                                                return; // Do not update setting yet, wait for modal
                                             }
                                         }
                                         updateSetting('paths', { ...settings.paths, [key]: path });
