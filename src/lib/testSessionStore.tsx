@@ -32,6 +32,8 @@ export interface TestSession {
     outputXmlPath?: string;
     artifactPaths?: { log?: string, report?: string, output?: string };
     startTime: number;
+    isAiAgent?: boolean;
+    aiPrompt?: string;
 }
 
 interface TestOutputPayload {
@@ -46,7 +48,7 @@ interface TestFinishedPayload {
 
 interface TestSessionContextType {
     sessions: TestSession[];
-    addSession: (runId: string, deviceUdid: string, deviceName: string, testPath: string, framework: 'robot' | 'maestro' | 'appium', timestampOutputs: boolean, outputDir?: string, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string, selectedTests?: string[]) => void;
+    addSession: (runId: string, deviceUdid: string, deviceName: string, testPath: string, framework: 'robot' | 'maestro' | 'appium', timestampOutputs: boolean, outputDir?: string, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string, selectedTests?: string[], isAiAgent?: boolean, aiPrompt?: string) => void;
     addToolboxSession: (deviceUdid: string, deviceName: string, deviceModel?: string, androidVersion?: string) => void; // New action
     rerunSession: (runId: string, rerunFailedFrom?: string) => Promise<void>;
     stopSession: (runId: string) => Promise<void>;
@@ -56,6 +58,8 @@ interface TestSessionContextType {
     setSessionActiveTool: (runId: string, tool: string) => void;
     setSessionTree: (runId: string, tree?: any, dbPath?: string, outputDir?: string, outputXmlPath?: string) => void;
     updateSessionArtifacts: (runId: string, paths: Partial<NonNullable<TestSession['artifactPaths']>>) => void;
+    addSessionLog: (runId: string, message: string) => void;
+    markSessionFinished: (runId: string, exitCode: string) => void;
     appiumRunning: boolean;
 }
 
@@ -193,7 +197,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
 
 
 
-    const addSession = useCallback((runId: string, deviceUdid: string, deviceName: string, testPath: string, framework: 'robot' | 'maestro' | 'appium', timestampOutputs: boolean, outputDir?: string, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string, selectedTests?: string[]) => {
+    const addSession = useCallback((runId: string, deviceUdid: string, deviceName: string, testPath: string, framework: 'robot' | 'maestro' | 'appium', timestampOutputs: boolean, outputDir?: string, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string, selectedTests?: string[], isAiAgent?: boolean, aiPrompt?: string) => {
         setSessions(prev => {
             // Check for recycling
             if (settings.recycleDeviceViews) {
@@ -225,7 +229,9 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                         repopulatedTree: undefined,
                         artifactPaths: {},
                         sessionEpoch: (existing.sessionEpoch || 0) + 1, // Force RunConsole remount
-                        startTime: Date.now()
+                        startTime: Date.now(),
+                        isAiAgent,
+                        aiPrompt
                     };
 
                     setTimeout(() => setActiveSessionId(existing.runId), 0); // Focus it
@@ -253,7 +259,9 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     androidVersion,
                     selectedTests,
                     sessionEpoch: 0,
-                    startTime: Date.now()
+                    startTime: Date.now(),
+                    isAiAgent,
+                    aiPrompt
                 }
             ];
         });
@@ -495,10 +503,30 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
         }));
     }, []);
 
+    const addSessionLog = useCallback((runId: string, message: string) => {
+        setSessions(prev => prev.map(s => (s.runId === runId || s.activeRunId === runId) ? { ...s, logs: [...s.logs, message] } : s));
+    }, []);
+
+    const markSessionFinished = useCallback((runId: string, exitCode: string) => {
+        setSessions(prev => prev.map(s => {
+            if (s.runId === runId || s.activeRunId === runId) {
+                return {
+                    ...s,
+                    status: 'finished',
+                    exitCode,
+                    activeRunId: undefined,
+                    logs: [...s.logs, `\n[System] Finished: Exit Code: ${exitCode}`]
+                };
+            }
+            return s;
+        }));
+    }, []);
+
     return (
         <TestSessionContext.Provider value={{ 
             sessions, addSession, addToolboxSession, stopSession, rerunSession, clearSession, 
             activeSessionId, setActiveSessionId, setSessionActiveTool, setSessionTree, updateSessionArtifacts,
+            addSessionLog, markSessionFinished,
             appiumRunning
         }}>
             {children}

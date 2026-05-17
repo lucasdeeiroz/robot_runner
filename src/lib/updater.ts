@@ -17,6 +17,7 @@ interface GitHubRelease {
     tag_name: string;
     html_url: string;
     body: string;
+    prerelease: boolean;
     assets: GitHubAsset[];
 }
 
@@ -38,7 +39,7 @@ export interface UpdateInfo {
 }
 
 
-export async function checkForUpdates(): Promise<UpdateInfo> {
+export async function checkForUpdates(channel: 'stable' | 'beta' | 'alpha' = 'stable'): Promise<UpdateInfo> {
     let currentVersion = '0.0.0';
     try {
         currentVersion = await getVersion();
@@ -48,19 +49,34 @@ export async function checkForUpdates(): Promise<UpdateInfo> {
 
     try {
         const currentPlatform = platform();
+        let targetRelease: GitHubRelease | null = null;
 
-        const response = await fetch('https://api.github.com/repos/lucasdeeiroz/robot_runner/releases/latest', {
-            method: 'GET',
-            headers: {
-                'User-Agent': 'RobotRunner-App'
+        if (channel === 'stable') {
+            const response = await fetch('https://api.github.com/repos/lucasdeeiroz/robot_runner/releases/latest', {
+                method: 'GET',
+                headers: { 'User-Agent': 'RobotRunner-App' }
+            });
+            if (!response.ok) throw new Error(`GitHub API Error: ${response.statusText}`);
+            targetRelease = await response.json() as GitHubRelease;
+        } else {
+            const response = await fetch('https://api.github.com/repos/lucasdeeiroz/robot_runner/releases', {
+                method: 'GET',
+                headers: { 'User-Agent': 'RobotRunner-App' }
+            });
+            if (!response.ok) throw new Error(`GitHub API Error: ${response.statusText}`);
+            const releases = await response.json() as GitHubRelease[];
+            
+            targetRelease = releases.find(r => r.tag_name.toLowerCase().includes(`-${channel}`)) || null;
+            if (!targetRelease) {
+                targetRelease = releases.find(r => !r.prerelease) || releases[0] || null;
             }
-        });
-
-        if (!response.ok) {
-            throw new Error(`GitHub API Error: ${response.statusText}`);
         }
 
-        const data = await response.json() as GitHubRelease;
+        if (!targetRelease) {
+             throw new Error("No releases found");
+        }
+
+        const data = targetRelease;
         const latestTag = data.tag_name.replace(/^v/, ''); 
 
         const available = gt(latestTag, currentVersion);

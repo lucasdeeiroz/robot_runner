@@ -213,6 +213,12 @@ export function parseHeuristicLogs(
             const isFailed = !(line.includes("Failures: 0") && line.includes("Errors: 0"));
             const status = isFailed ? "FAIL" : "PASS";
             linearNodes.push({ type: 'test-end', name: 'Maven Test', status, id: `mvn-t-end-${nodeIdx}` });
+        } else if (line.startsWith('[AI Agent] Thought:')) {
+            linearNodes.push({ type: 'ai-thought', content: line.replace('[AI Agent] Thought:', '').trim(), id: `ai-thought-${nodeIdx}` } as any);
+        } else if (line.startsWith('[AI Agent] Action:')) {
+            linearNodes.push({ type: 'ai-action', content: line.replace('[AI Agent] Action:', '').trim(), id: `ai-action-${nodeIdx}` } as any);
+        } else if (line.startsWith('[ADB] Executed:')) {
+            linearNodes.push({ type: 'adb-executed', content: line.replace('[ADB] Executed:', '').trim(), id: `adb-executed-${nodeIdx}` } as any);
         } else {
             linearNodes.push({ type: 'text', content: line, isSystem, id: `txt-${nodeIdx}` });
         }
@@ -350,6 +356,19 @@ export function parseHeuristicLogs(
                     if (!IS_REDUNDANT_SYSTEM(node.content)) {
                         root.push({ type: 'text', content: node.content, id: nodeId });
                     }
+                }
+            }
+        } else if (node.type === 'ai-thought' || node.type === 'ai-action' || node.type === 'adb-executed') {
+            const aiNode = { ...node, id: nodeId } as any;
+            if (currentTest) {
+                if (!(currentTest as any).children) (currentTest as any).children = [];
+                (currentTest as any).children.push(aiNode);
+            } else {
+                const currentSuite = activeSuite();
+                if (currentSuite) {
+                    currentSuite.children.push(aiNode);
+                } else {
+                    root.push(aiNode);
                 }
             }
         }

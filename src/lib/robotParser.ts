@@ -76,14 +76,35 @@ export interface KeywordNode {
     ret?: string;
 }
 
-export type LogNode = TextNode | SuiteStartNode | TestNode | SuiteNode | SuiteEndNode | KeywordNode;
+export interface AiThoughtNode {
+    type: 'ai-thought';
+    content: string;
+    id: string;
+}
+
+export interface AiActionNode {
+    type: 'ai-action';
+    content: string;
+    id: string;
+}
+
+export interface AdbExecutedNode {
+    type: 'adb-executed';
+    content: string;
+    id: string;
+}
+
+export type LogNode = TextNode | SuiteStartNode | TestNode | SuiteNode | SuiteEndNode | KeywordNode | AiThoughtNode | AiActionNode | AdbExecutedNode;
 export type LinearNode = 
     | TextNode 
     | SuiteStartNode 
     | SuiteEndNode 
     | { type: 'test-start', name: string, id: string, doc?: string, originalLine?: string }
     | { type: 'test-end', name: string, status: 'PASS' | 'FAIL' | 'SKIP', id: string, doc?: string, ret?: string }
-    | { type: 'maestro-suite-start' | 'maestro-suite-end' | 'maestro-test-start' | 'maestro-test-end' | 'maven-suite-start' | 'maven-suite-end' | 'maven-test-start' | 'maven-test-end', name: string, id: string, status?: any, content?: any };
+    | { type: 'maestro-suite-start' | 'maestro-suite-end' | 'maestro-test-start' | 'maestro-test-end' | 'maven-suite-start' | 'maven-suite-end' | 'maven-test-start' | 'maven-test-end', name: string, id: string, status?: any, content?: any }
+    | AiThoughtNode
+    | AiActionNode
+    | AdbExecutedNode;
 
 export const formatRobotDuration = (start: string, end: string): string => {
     if (!start || !end) return "";
@@ -277,11 +298,35 @@ const parseMsgChildren = (obj: any): LogNode[] => {
         .map((m: any) => typeof m === 'object' ? (m["#text"] || "") : String(m ?? ""))
         .map((txt: string) => txt.replace(/<\?xml(?:[^>]*)?>\s*<hierarchy[\s\S]*?<\/hierarchy>/gi, '').trim())
         .filter((txt: string) => txt && !txt.includes("src="))
-        .map((txt: string, index: number) => ({
-            type: 'text' as const,
-            content: txt,
-            id: `msg-${index}-${hashString(txt)}`
-        }));
+        .map((txt: string, index: number): LogNode => {
+            const cleanTxt = txt.trim();
+            if (cleanTxt.startsWith('[AI Agent] Thought:')) {
+                return {
+                    type: 'ai-thought',
+                    content: cleanTxt.replace('[AI Agent] Thought:', '').trim(),
+                    id: `ai-thought-${index}-${hashString(txt)}`
+                };
+            }
+            if (cleanTxt.startsWith('[AI Agent] Action:')) {
+                return {
+                    type: 'ai-action',
+                    content: cleanTxt.replace('[AI Agent] Action:', '').trim(),
+                    id: `ai-action-${index}-${hashString(txt)}`
+                };
+            }
+            if (cleanTxt.startsWith('[ADB] Executed:')) {
+                return {
+                    type: 'adb-executed',
+                    content: cleanTxt.replace('[ADB] Executed:', '').trim(),
+                    id: `adb-executed-${index}-${hashString(txt)}`
+                };
+            }
+            return {
+                type: 'text',
+                content: txt,
+                id: `msg-${index}-${hashString(txt)}`
+            };
+        });
 };
 
 export const mapXmlNode = async (

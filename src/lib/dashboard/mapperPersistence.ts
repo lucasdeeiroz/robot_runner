@@ -205,6 +205,10 @@ export async function migrateScreenMaps(profileId: string, oldDir?: string, newD
                     const sourcePath = `${oldPathInfo.dir}/${entry.name}`;
                     const destPath = `${newPathInfo.dir}/${entry.name}`;
 
+                    if (await exists(destPath, newPathInfo.options)) {
+                        throw new Error(`Destination already contains mapping file: ${entry.name}`);
+                    }
+
                     try {
                         const content = await readTextFile(sourcePath, oldPathInfo.options);
                         await writeTextFile(destPath, content, newPathInfo.options);
@@ -220,4 +224,3 @@ export async function migrateScreenMaps(profileId: string, oldDir?: string, newD
         throw e;
     }
 }
-

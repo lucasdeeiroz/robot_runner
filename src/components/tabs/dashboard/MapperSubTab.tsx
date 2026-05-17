@@ -107,6 +107,12 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         return false;
     }, [settings.aiProvider, settings.geminiApiKey, settings.claudeApiKey, settings.openaiApiKey, settings.claudeCodeToken]);
     const [isStayOn, setIsStayOn] = useState(false);
+
+    // Migration logic
+    const prevMappingsPathRef = useRef<string | null>(settings.paths?.mappings || null);
+    const [showMigrationModal, setShowMigrationModal] = useState(false);
+    const [migrationData, setMigrationData] = useState<{ oldPath: string; newPath: string } | null>(null);
+    const [isMigrating, setIsMigrating] = useState(false);
     const [isExploring, setIsExploring] = useState(false);
     const isExploringRef = useRef(false);
     const [explorationLogs, setExplorationLogs] = useState<LogEntry[]>([]);
@@ -200,6 +206,59 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         return maps;
     };
 
+    const handleMappingsPathChange = async (oldPath: string, newPath: string) => {
+        try {
+            const oldEntries = await invoke<any[]>('list_directory', { path: oldPath });
+            const newEntries = await invoke<any[]>('list_directory', { path: newPath });
+
+            const hasMappings = oldEntries.some(e => e.name.endsWith('.json'));
+            const isEmpty = !newEntries.some(e => e.name.endsWith('.json'));
+
+            if (hasMappings && isEmpty) {
+                setMigrationData({ oldPath, newPath });
+                setShowMigrationModal(true);
+            }
+        } catch (e) {
+            console.error("Migration check failed", e);
+        }
+    };
+
+    const performMigration = async () => {
+        if (!migrationData) return;
+        setIsMigrating(true);
+        try {
+            const { oldPath, newPath } = migrationData;
+            const oldEntries = await invoke<any[]>('list_directory', { path: oldPath });
+            const mappingFiles = oldEntries.filter(e => !e.is_dir && e.name.endsWith('.json'));
+
+            for (const entry of mappingFiles) {
+                const content = await invoke<string>('read_file', { path: entry.path });
+                await invoke('save_file', { path: `${newPath}/${entry.name}`, content, append: false });
+            }
+
+            feedback.toast.success(t('mapper.migration.success'));
+            await loadSavedMaps();
+        } catch (e) {
+            console.error("Migration failed", e);
+            feedback.toast.error(t('mapper.migration.error'));
+        } finally {
+            setIsMigrating(false);
+            setShowMigrationModal(false);
+            setMigrationData(null);
+        }
+    };
+
+    useEffect(() => {
+        const currentMappingsPath = settings.paths?.mappings;
+        if (!currentMappingsPath) return;
+
+        if (prevMappingsPathRef.current && prevMappingsPathRef.current !== currentMappingsPath) {
+            handleMappingsPathChange(prevMappingsPathRef.current, currentMappingsPath);
+        }
+
+        prevMappingsPathRef.current = currentMappingsPath;
+    }, [settings.paths?.mappings]);
+
     // reset current element when selection changes
     useEffect(() => {
         if (selectedNode) {
@@ -275,7 +334,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         debounceTimerRef.current = setTimeout(async () => {
             setIsSaving(true);
             const screenId = screenName.toLowerCase().replace(/\s+/g, '_');
-            
+
             // Fetch from latest source (disk) to avoid overwriting newer data (like layout)
             // from other components/tabs
             let existingMap: ScreenMap | null = null;
@@ -587,7 +646,8 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             setExplorationLogs([...explorer.getLogs()]);
 
             const contextResponse = await getAiContext('exploration', {
-                current_xml: xml
+                current_xml: xml,
+                automation_root: settings.paths?.automationRoot
             });
 
             if (!isExploringRef.current) return;
@@ -884,10 +944,60 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                     await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'keyevent', '4'] });
                 } else {
                     explorer.addLog(t('mapper.exploration.swiping_action', { direction: swipeDirection }), 'action');
-                    // Logic to compute coords based on next.targetId/root
+
+                    let startX = 540;
+                    let startY = 1200;
+                    let endX = 540;
+                    let endY = swipeDirection === 'down' ? 600 : 1800;
+
+                    let scrollableNode: InspectorNode | null = null;
+
+                    if (next.targetId) {
+                        const xpath = shortIdMap[next.targetId] || next.targetId;
+                        const nodes = findNodesByLocator(root, xpath);
+                        scrollableNode = nodes.find(n => n.attributes['scrollable'] === 'true' || n.tagName.includes('ScrollView')) || nodes[0];
+                    }
+
+                    if (!scrollableNode) {
+                        const findScrollable = (n: InspectorNode): InspectorNode | null => {
+                            if (n.attributes['scrollable'] === 'true' || n.tagName.includes('ScrollView')) return n;
+                            for (const child of n.children) {
+                                const found = findScrollable(child);
+                                if (found) return found;
+                            }
+                            return null;
+                        };
+                        scrollableNode = findScrollable(root);
+                    }
+
+                    if (scrollableNode && scrollableNode.bounds) {
+                        const { x, y, w, h } = scrollableNode.bounds;
+                        startX = Math.round(x + w / 2);
+                        endX = startX;
+
+                        const padding = Math.round(h * 0.15); // 15% padding
+                        if (swipeDirection === 'down') { // Scroll down = drag finger up
+                            startY = Math.round(y + h - padding);
+                            endY = Math.round(y + padding);
+                        } else if (swipeDirection === 'up') {
+                            startY = Math.round(y + padding);
+                            endY = Math.round(y + h - padding);
+                        } else if (swipeDirection === 'left') {
+                            startY = Math.round(y + h / 2);
+                            endY = startY;
+                            startX = Math.round(x + w - padding);
+                            endX = Math.round(x + padding);
+                        } else if (swipeDirection === 'right') {
+                            startY = Math.round(y + h / 2);
+                            endY = startY;
+                            startX = Math.round(x + padding);
+                            endX = Math.round(x + w - padding);
+                        }
+                    }
+
                     await invoke('run_adb_command', {
                         device: selectedDevice,
-                        args: ['shell', 'input', 'swipe', '540', '1200', '540', swipeDirection === 'down' ? '600' : '1800', "500"]
+                        args: ['shell', 'input', 'swipe', String(startX), String(startY), String(endX), String(endY), "500"]
                     });
                 }
             } else if (next.type === 'type_text' && next.targetId && next.text) {
@@ -907,6 +1017,12 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
     const startExploration = async (customPrompt?: string) => {
         if (!selectedDevice) return;
+
+        if (!customPrompt || customPrompt.trim() === '') {
+            feedback.toast.error(t('mapper.exploration.error_empty_guidelines'));
+            return;
+        }
+
         explorerRef.current = new AutonomousExplorer(t, 9999);
         explorationPromptRef.current = customPrompt;
         setExplorationLogs([]);
@@ -1083,6 +1199,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                         onClick={isExploring ? () => stopExploration(t('mapper.exploration.cancelled')) : (_e, prompt) => startExploration(prompt)}
                                         isLoading={isExploring}
                                         label={isExploring ? t('mapper.exploration.stop') : t('mapper.exploration.start')}
+                                        alwaysOpenModal={!isExploring}
                                     />
                                 )}
                                 <Button
@@ -1704,6 +1821,18 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 description={t('mapper.confirm.delete_desc')}
                 variant="danger"
                 confirmText={t('mapper.action.delete')}
+            />
+
+            <ConfirmationModal
+                isOpen={showMigrationModal}
+                onClose={() => setShowMigrationModal(false)}
+                onConfirm={performMigration}
+                title={t('mapper.migration.title')}
+                description={t('mapper.migration.message')}
+                confirmText={t('mapper.migration.copy')}
+                cancelText={t('mapper.migration.ignore')}
+                isLoading={isMigrating}
+                variant="warning"
             />
 
             {/* AI Exploration Log Panel */}

@@ -19,6 +19,8 @@ interface AiButtonProps extends Omit<ButtonProps, 'leftIcon' | 'children' | 'onC
     expandable?: boolean;
     showTextAlways?: boolean;
     allowCustomPrompt?: boolean;
+    alwaysOpenModal?: boolean;
+    requireCustomPrompt?: boolean;
     onClick?: (e: React.MouseEvent<HTMLButtonElement>, customPrompt?: string) => void | Promise<void>;
 }
 
@@ -29,6 +31,8 @@ export const AiButton: React.FC<AiButtonProps> = ({
     expandable = true,
     showTextAlways = false,
     allowCustomPrompt = true,
+    alwaysOpenModal = false,
+    requireCustomPrompt = false,
     className,
     variant = 'primary',
     onClick,
@@ -123,7 +127,11 @@ export const AiButton: React.FC<AiButtonProps> = ({
     const showSplitLayout = isExpanded && allowCustomPrompt;
 
     const handlePrimaryClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-        if (onClick) onClick(e, customPrompt);
+        if (alwaysOpenModal && !isLoading) {
+            setIsModalOpen(true);
+        } else if (onClick) {
+            onClick(e, customPrompt);
+        }
     };
 
     const separatorStyles = {
@@ -319,6 +327,7 @@ export const AiButton: React.FC<AiButtonProps> = ({
                             </Button>
                             <Button
                                 variant="primary"
+                                disabled={requireCustomPrompt && !customPrompt.trim()}
                                 onClick={(e) => {
                                     setIsModalOpen(false);
                                     saveCustomPrompt(customPrompt);
