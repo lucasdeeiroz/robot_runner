@@ -70,7 +70,9 @@ function parseCommandArgs(command: string): string[] {
         current += char;
     }
 
-    if (escaped) current += '\\';
+    if (escaped) {
+        throw new Error('Invalid command: trailing escape character');
+    }
     if (current.length > 0) args.push(current);
     return args;
 }

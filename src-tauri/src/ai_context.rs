@@ -265,7 +265,8 @@ fn get_exploration_context(params: AiContextParams) -> Result<AiContextResponse,
             const MAX_CHARS_PER_FILE: usize = 1000;
             const MAX_TOTAL_CHARS: usize = 3000;
 
-            let mut robot_files: Vec<(std::path::PathBuf, SystemTime)> = Vec::new();
+            let mut robot_files: Vec<(std::path::PathBuf, SystemTime)> =
+                Vec::with_capacity(MAX_DISCOVERED_ROBOT_FILES);
             for entry in WalkDir::new(&root)
                 .max_depth(MAX_SCAN_DEPTH)
                 .follow_links(false)

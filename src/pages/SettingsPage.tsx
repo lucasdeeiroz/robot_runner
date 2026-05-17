@@ -816,7 +816,6 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
 
                                                     if (hasMappingsInSource && hasMappingsInDestination) {
                                                         feedback.toast.error('settings.paths.migration_destination_not_empty');
-                                                        updateSetting('paths', { ...settings.paths, [key]: path });
                                                         return;
                                                     }
                                                 } catch (error) {
