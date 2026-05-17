@@ -39,4 +39,9 @@ export default defineConfig(async () => ({
       ignored: ["**/src-tauri/**"],
     },
   },
+
+  build: {
+    // Tauri serves the bundle locally — network chunk size is irrelevant for desktop apps.
+    chunkSizeWarningLimit: 4096,
+  },
 }));
