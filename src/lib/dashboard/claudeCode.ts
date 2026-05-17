@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { ScreenMap, UIElementMap } from '@/lib/types';
-import { AIGenerationType } from './gemini';
-import { getExplorationPrompt, formatExistingMaps, getRefinedTestCasesPrompt, getRefinedPBIPrompt, getRefinedImprovementPrompt, getRefinedBugPrompt, getRefinedRobotScriptPrompt, getFlowchartLayoutPrompt, getQAAssistantWrapper, getExecutionSummaryPrompt } from "./prompts";
+import { AIGenerationType, AutonomousActionResponse } from './gemini';
+import { getExplorationPrompt, formatExistingMaps, getRefinedTestCasesPrompt, getRefinedPBIPrompt, getRefinedImprovementPrompt, getRefinedBugPrompt, getRefinedRobotScriptPrompt, getFlowchartLayoutPrompt, getQAAssistantWrapper, getExecutionSummaryPrompt, getAutonomousAgentPrompt } from "./prompts";
 
 /**
  * Robustly parses JSON from a string that might contain markdown backticks or other noise.
@@ -466,3 +466,57 @@ ${customPrompt ? `USER SPECIFIC REQUEST:\n${customPrompt}` : "Provide a comprehe
     });
     return typeof response === 'string' ? response : response.result;
 }
+
+/**
+ * Autonomous Action Generation using Claude CLI
+ */
+export async function generateAutonomousAction(
+    xmlDump: string,
+    targetScenario: string,
+    history: string[],
+    projectRoot: string,
+    language: string,
+    customPrompt?: string,
+    token?: string
+): Promise<AutonomousActionResponse> {
+    const systemInstruction = getAutonomousAgentPrompt(language, customPrompt);
+    const prompt = `
+TARGET SCENARIO:
+${targetScenario}
+
+SESSION HISTORY:
+${history.join('\n')}
+
+CURRENT XML DUMP:
+${xmlDump.substring(0, 15000)}
+`.trim();
+
+    const schema = {
+        type: "object",
+        properties: {
+            thought: { type: "string" },
+            action: {
+                type: "object",
+                properties: {
+                    type: { type: "string", enum: ["click", "type", "swipe", "back", "wait", "finish", "fail"] },
+                    command: { type: "string" },
+                    details: { type: "string" }
+                },
+                required: ["type", "command", "details"]
+            },
+            isStepCompleted: { type: "boolean" },
+            nextExpectedState: { type: "string" }
+        },
+        required: ["thought", "action", "isStepCompleted", "nextExpectedState"]
+    };
+
+    const response = await askClaudeCode(prompt, projectRoot, systemInstruction, token, {
+        jsonSchema: schema
+    });
+
+    if (typeof response !== 'string' && response.structured_output) {
+        return response.structured_output;
+    }
+    return safeParseJson<AutonomousActionResponse>(typeof response === 'string' ? response : response.result);
+}
+

@@ -99,6 +99,10 @@ export const pt = {
             license_desc: "Esta licença permite o uso livre, a modificação e a redistribuição gratuita do Software, mas proíbe a venda, o licenciamento de pago ou qualquer outra monetização direta do Software.\n\n**Definições:**\n\n- **'Software'** refere-se ao código fonte deste repositório e a qualquer arquivo acompanhante, além de qualquer binário/instalador compilado a partir dele, incluindo as versões modificadas.\n\n- **'Uso Não Comercial'** significa o uso sem cobrar taxas pelo Software em si. O Uso Não Comercial inclui o uso pessoal, o uso educativo e o uso interno por parte de empresas/organizações, mesmo se dito uso proporcionar um benefício comercial indireto.\n\n- **'Comercialização'** significa qualquer monetização direta do Software, que inclui:\n  (a) a venda do Software (código fonte ou binário), em sua totalidade ou em parte;\n  (b) o licenciamento ou sublicenciamento do Software a troca de uma tarifa;\n  (c) a cobrança de acesso ao Software em si, incluindo downloads com muro de pagamento;\n  (d) oferecer uma 'versão de pagamento' do Software que seja substancialmente a mesma;\n  (e) a inclusão do Software em um produto de pagamento onde o Software em si seja a razão principal do pagamento.\n\nCobrar por serviços não relacionados não está proibido (por exemplo, consultoria geral), desde que não se cobre pelo Software em si.\n\n**Permissões (concedidas sob esta licença):**\n\n1. Você pode utilizar o Software para qualquer propósito, incluindo uso interno por parte de empresas.\n2. Você pode copiar e modificar o Software.\n3. Você pode distribuir o Software (código fonte e/ou binários/instaladores) de forma gratuita.\n\n**Condições:**\n\n**A. Atribuição e Enlace de Retorno** - Qualquer redistribuição do Software (código fonte ou binário), modificado ou não, deve:\n- conservar o aviso de copyright anterior e este texto de licença; e\n- incluir de forma destacada o crédito ao autor original e um enlace ao repositório original: https://github.com/lucasdeeiroz/robot_runner\n\n**B. Indicação de Mudanças** - Se distribuir uma versão modificada, deve indicar claramente que a modificou.\n\n**Restrições:**\n\n1. Você não pode Comercializar o Software (segundo definido acima) sem permissão por escrito do titular dos direitos de autor.\n2. Você não pode remover ou ocultar os requisitos de atribuição/enlace de retorno.\n",
             disclaimer: "O software é fornecido 'como está', sem garantia de qualquer tipo, expressa ou implícita.",
             github_repo: "Repositório no GitHub",
+            update_channel: "Canal de Atualização",
+            channel_stable: "Estável",
+            channel_beta: "Beta",
+            channel_alpha: "Alpha",
             update_check: "Verificar Atualizações",
             update_available: "Nova versão disponível: {{version}}",
             update_not_available: "Você está atualizado",
@@ -755,11 +759,20 @@ export const pt = {
                 overlay: "Sobreposição",
                 undefined: "Tela"
             },
+            migration: {
+                title: "Migração de Mapeamentos",
+                message: "Detectamos que você alterou o diretório de mapeamentos, mas o novo local está vazio enquanto o antigo contém dados. Deseja copiar os mapeamentos existentes para o novo diretório?",
+                copy: "Copiar Arquivos",
+                ignore: "Manter Vazio",
+                success: "Mapeamentos migrados com sucesso!",
+                error: "Falha ao migrar mapeamentos."
+            },
             exploration: {
                 start: "Exploração por IA",
                 stop: "Parar",
                 active: "IA Explorando...",
                 thinking: "Pensando...",
+                error_empty_guidelines: "O objetivo ou diretriz de exploração não pode estar vazio.",
                 step_title: "Passo {{number}}",
                 initialization: "Inicialização",
                 events_logged: "{{count}} eventos registrados",
@@ -1028,6 +1041,14 @@ export const pt = {
                     loading_context: "Extraindo contexto compactado...",
                     success: "Análise de tendências concluída!",
                     persistence_note: "Esta análise ficará salva até que você solicite uma nova."
+                },
+                ai_steps: {
+                    dumping: "Extraindo hierarquia da tela...",
+                    thinking: "IA está pensando...",
+                    executing: "Executando: {{action}}",
+                    waiting: "Aguardando transição...",
+                    finished: "Objetivo concluído com sucesso!",
+                    failed: "Agente de IA falhou em concluir o objetivo."
                 }
             }
         },
@@ -1069,7 +1090,11 @@ export const pt = {
             },
             paths: {
                 select_error: "Falha ao selecionar pasta",
-                title: "Caminhos"
+                title: "Caminhos",
+                migration_title: "Migrar Diretório?",
+                migration_desc: "Deseja mover o subdiretório /mapper e seus arquivos para o novo destino?",
+                migration_confirm: "Sim, Mover",
+                migration_destination_not_empty: "O destino já possui arquivos de mapeamento. A migração foi ignorada para evitar sobrescrever dados existentes."
             },
             load_error: "Falha ao carregar configurações",
             save_error: "Falha ao salvar configurações",
@@ -1383,7 +1408,10 @@ export const pt = {
             },
             options: {
                 dont_overwrite: "Salvar Logs"
-            }
+            },
+            run_ai: "Executar Teste com IA",
+            run_ai_prompt: "Executar Teste por IA",
+            run_ai_desc: "O Agente de IA executará ações baseadas nos passos BDD gerados."
         },
         tests_page: {
             monitoring: "Monitoramento de Testes",

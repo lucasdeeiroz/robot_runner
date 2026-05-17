@@ -16,7 +16,7 @@ interface GeminiResponse {
 
 import { ScreenMap, UIElementMap } from '@/lib/types';
 import { DeepAnalysisContext } from "./historyAnalysisUtils";
-import { getExplorationPrompt, formatExistingMaps, getRefinedTestCasesPrompt, getRefinedPBIPrompt, getRefinedImprovementPrompt, getRefinedBugPrompt, getRefinedRobotScriptPrompt, getFlowchartLayoutPrompt, getElementNamingPrompt, getScreenTaggingPrompt, getTestHistoryAnalysisPrompt, getExecutionSummaryPrompt, getQAAssistantWrapper } from "./prompts";
+import { getExplorationPrompt, formatExistingMaps, getRefinedTestCasesPrompt, getRefinedPBIPrompt, getRefinedImprovementPrompt, getRefinedBugPrompt, getRefinedRobotScriptPrompt, getFlowchartLayoutPrompt, getElementNamingPrompt, getScreenTaggingPrompt, getTestHistoryAnalysisPrompt, getExecutionSummaryPrompt, getQAAssistantWrapper, getAutonomousAgentPrompt } from "./prompts";
 import { fetch } from '@tauri-apps/plugin-http';
 
 export type AIGenerationType = 'test_case' | 'pbi' | 'improvement' | 'bug' | 'element_name' | 'robot_script' | 'exploration';
@@ -283,14 +283,14 @@ export async function suggestElementName(
 
     const candidate = data.candidates?.[0];
     const content = candidate?.content?.parts?.[0]?.text;
-    
+
     // DEBUG: Always log context about the completion
     console.log("[Gemini Status] Finish Reason:", candidate?.finishReason || "UNKNOWN");
     console.log("[Gemini Raw Content]:", content);
 
     if (!content) {
         if (candidate?.finishReason === "SAFETY") {
-             throw new Error("AI response blocked by safety filters. Try a different element.");
+            throw new Error("AI response blocked by safety filters. Try a different element.");
         }
         throw new Error("Empty AI response");
     }
@@ -320,7 +320,7 @@ export async function suggestElementName(
         if (!parsed) {
             const nameMatch = content.match(/"name"\s*:\s*"([^"]+)"?/);
             const justificationMatch = content.match(/"justification"\s*:\s*"([^"]+)"?/);
-            
+
             if (nameMatch) {
                 parsed = {
                     name: nameMatch[1],
@@ -407,8 +407,8 @@ export async function analyzeTestHistory(
                 duration: log.duration,
                 pass: log.pass_count,
                 fail: log.fail_count,
-                failedTests: failedArray.length > 5 
-                    ? [...failedArray.slice(0, 5), `...and ${failedArray.length - 5} more`] 
+                failedTests: failedArray.length > 5
+                    ? [...failedArray.slice(0, 5), `...and ${failedArray.length - 5} more`]
                     : failedArray
             };
         });
@@ -677,4 +677,62 @@ export async function reorganizeFlowchartLayout(
         console.error("Gemini reorganizeFlowchartLayout Error:", error);
         throw error;
     }
+}
+
+export interface AutonomousActionResponse {
+    thought: string;
+    action: {
+        type: 'click' | 'type' | 'swipe' | 'back' | 'wait' | 'finish' | 'fail';
+        command: string;
+        details: string;
+    };
+    isStepCompleted: boolean;
+    nextExpectedState: string;
+}
+
+export async function generateAutonomousAction(
+    xmlDump: string,
+    targetScenario: string,
+    history: string[],
+    apiKey: string,
+    model: string,
+    language: string,
+    customPrompt?: string
+): Promise<AutonomousActionResponse> {
+    if (!apiKey) throw new Error("Missing Gemini API Key");
+
+    const promptString = getAutonomousAgentPrompt(language, customPrompt);
+    const body = {
+        contents: [
+            {
+                parts: [
+                    { text: promptString },
+                    { text: `TARGET SCENARIO:\n${targetScenario}` },
+                    { text: `SESSION HISTORY:\n${history.join('\n')}` },
+                    { text: `CURRENT XML DUMP:\n${xmlDump}` }
+                ]
+            }
+        ],
+        generationConfig: {
+            temperature: 0.2,
+            topP: 0.8,
+            topK: 40
+        }
+    };
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+        const errData = await response.json() as any;
+        throw new Error(errData.error?.message || `Gemini API error: ${response.status}`);
+    }
+
+    const data = await response.json() as GeminiResponse;
+    const text = data.candidates[0].content.parts[0].text;
+
+    return safeParseJson<AutonomousActionResponse>(text);
 }

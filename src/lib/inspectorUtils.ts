@@ -704,10 +704,16 @@ export function findNodeByShortId(node: InspectorNode, shortId: string): Inspect
  * Generates a simplified XML string for AI consumption, including the short_id.
  */
 export function generateSimplifiedXml(node: InspectorNode): string {
-    const attrStr = Object.entries(node.attributes)
+    // Heuristic: Ensure ScrollView is always marked as scrollable for the AI
+    const effectiveAttributes = { ...node.attributes };
+    if (node.tagName.includes('ScrollView')) {
+        effectiveAttributes['scrollable'] = 'true';
+    }
+
+    const attrStr = Object.entries(effectiveAttributes)
         .filter(([k]) => ['short_id', 'text', 'resource-id', 'content-desc', 'class', 'clickable', 'enabled', 'scrollable', 'focusable', 'long-clickable', 'checkable', 'selected'].includes(k))
         .filter(([k, v]) => v || (['clickable', 'scrollable', 'focusable'].includes(k) && v === "false")) // Include false for crucial QA flags
-        .map(([k, v]) => `${k}="${v.replace(/"/g, '&quot;')}"`)
+        .map(([k, v]) => `${k}="${(v || '').toString().replace(/"/g, '&quot;')}"`)
         .join(' ');
 
     const tagName = node.tagName.split('.').pop() || 'node'; // Use short class name

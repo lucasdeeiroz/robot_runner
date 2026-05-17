@@ -258,11 +258,11 @@ export function HomeSubTab({ onNavigate }: HomeSubTabProps) {
                     >
                         <Alert
                             variant="warning"
-                            title={t('home.maintenance.title', 'System Maintenance')}
+                            title={t('home.maintenance.title')}
                             icon={<AlertTriangle size={16} />}
                             className="rounded-[2rem] border-warning/20 bg-warning/5"
                         >
-                            {t('home.maintenance.description', 'We are currently performing scheduled maintenance. Some features might be temporarily unavailable.')}
+                            {t('home.maintenance.description', { version: minVersion })}
                         </Alert>
                     </motion.div>
                 )}
@@ -276,11 +276,12 @@ export function HomeSubTab({ onNavigate }: HomeSubTabProps) {
                     >
                         <Alert
                             variant="info"
-                            title={t('home.update.title', 'Update Required')}
+                            onClick={() => onNavigate('about')}
+                            title={t('home.update.title')}
                             icon={<ArrowUpCircle size={16} />}
                             className="rounded-[2rem] border-primary/20 bg-primary/5"
                         >
-                            {t('home.update.description', 'A newer version of Robot Runner is available ({{version}}). Please update to ensure compatibility.', { version: minVersion })}
+                            {t('home.update.description', { version: minVersion })}
                         </Alert>
                     </motion.div>
                 )}

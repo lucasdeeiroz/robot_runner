@@ -80,7 +80,9 @@ export interface AppSettings {
     zoomFactor: number;
     claudeCodeToken?: string;
     aiChatEnabled: boolean;
+    aiTestModeEnabled: boolean;
     aiSessionId?: string;
+    updateChannel?: 'stable' | 'beta' | 'alpha';
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -126,7 +128,9 @@ const DEFAULT_SETTINGS: AppSettings = {
     zoomFactor: 1.0,
     claudeCodeToken: '',
     aiChatEnabled: false,
-    aiSessionId: undefined
+    aiTestModeEnabled: false,
+    aiSessionId: undefined,
+    updateChannel: 'stable'
 };
 
 export interface Profile {
@@ -237,7 +241,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         try {
             const saved: any = await store.get('app_config');
             clearTimeout(safetyTimer);
-            
+
             if (saved) {
                 // Migration Logic
                 if (saved.profiles) {
@@ -247,6 +251,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                     Object.keys(migrated.profiles).forEach(pid => {
                         migrated.profiles[pid].settings = deepMerge(DEFAULT_SETTINGS, migrated.profiles[pid].settings);
                         migrated.profiles[pid].settings.aiChatEnabled = false;
+                        migrated.profiles[pid].settings.aiTestModeEnabled = false;
                     });
 
                     // Validate activeProfileId
@@ -268,6 +273,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                     console.info("Migrating legacy settings to Default Profile...");
                     const migratedSettings = deepMerge(DEFAULT_SETTINGS, saved);
                     migratedSettings.aiChatEnabled = false;
+                    migratedSettings.aiTestModeEnabled = false;
                     const newStoreData: SettingsStoreData = {
                         activeProfileId: 'default',
                         profiles: {
@@ -502,7 +508,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         if (updateInfo && !manual) return;
 
         try {
-            const info = await checkForUpdates();
+            const channel = activeProfile.settings.updateChannel || 'stable';
+            const info = await checkForUpdates(channel);
             setUpdateInfo(info);
 
             if (manual) {

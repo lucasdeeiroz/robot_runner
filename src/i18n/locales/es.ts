@@ -99,6 +99,10 @@ export const es = {
             license_desc: "Esta licencia permite el uso libre, la modificación y la redistribución gratuita del Software, pero prohíbe la venta, el licenciamiento de pago o cualquier otra monetización directa del Software.\n\n**Definiciones:**\n\n- **'Software'** se refiere al código fuente de este repositorio y a cualquier archivo acompañante, además de cualquier binario/instalador compilado a partir de él, incluidas las versiones modificadas.\n\n- **'Uso No Comercial'** significa el uso sin cobrar tasas por el Software en sí. El Uso No Comercial incluye el uso personal, el uso educativo y el uso interno por parte de empresas/organizaciones, incluso si dicho uso proporciona un beneficio comercial indirecto.\n\n- **'Comercialización'** significa cualquier monetización directa del Software, que incluye:\n  (a) la venta del Software (código fuente o binario), en su totalidad o en parte;\n  (b) el licenciamiento o sublicenciamiento del Software a cambio de una tarifa;\n  (c) el cobro de acceso al Software en sí, incluidas las descargas con muro de pago;\n  (d) ofrecer una 'versión de pago' del Software que sea substancialmente la misma;\n  (e) la inclusión del Software en un producto de pago donde el Software en sí sea la razón principal del pago.\n\nCobrar por servicios no relacionados no está prohibido (por ejemplo, consultoría general), siempre que no se cobre por el Software en sí.\n\n**Permisos (concedidos bajo esta licencia):**\n\n1. Puede utilizar el Software para cualquier propósito, incluido el uso interno por parte de empresas.\n2. Puede copiar y modificar el Software.\n3. Puede distribuir el Software (código fuente y/o binarios/instaladores) de forma gratuita.\n\n**Condiciones:**\n\n**A. Atribución y Enlace de Retorno** - Cualquier redistribución del Software (código fuente o binario), modificado o no, debe:\n- conservar el aviso de copyright anterior y este texto de licencia; y\n- incluir de forma destacada el crédito al autor original y un enlace al repositorio original: https://github.com/lucasdeeiroz/robot_runner\n\n**B. Indicación de Cambios** - Si distribuye una versión modificada, debe indicar claramente que la ha modificado.\n\n**Restricciones:**\n\n1. No puede Comercializar el Software (según se define anteriormente) sin permiso por escrito del titular de los derechos de autor.\n2. No puede eliminar ni ocultar los requisitos de atribución/enlace de retorno.",
             disclaimer: "El software se proporciona 'tal cual', sin garantía de ningún tipo, expresa o implícita.",
             github_repo: "Repositorio en GitHub",
+            update_channel: "Canal de Actualización",
+            channel_stable: "Estable",
+            channel_beta: "Beta",
+            channel_alpha: "Alpha",
             update_check: "Buscar Actualizaciones",
             update_available: "Nueva versión disponible: {{version}}",
             update_not_available: "Estás actualizado",
@@ -761,11 +765,20 @@ export const es = {
                 overlay: "Superposición",
                 undefined: "Pantalla"
             },
+            migration: {
+                title: "Migración de Mapeos",
+                message: "Detectamos que ha cambiado el directorio de mapeos, pero la nueva ubicación está vacía mientras que la antigua contiene datos. ¿Desea copiar los mapeos existentes al nuevo directorio?",
+                copy: "Copiar Archivos",
+                ignore: "Mantener Vacío",
+                success: "¡Mapeos migrados con éxito!",
+                error: "Error al migrar mapeos."
+            },
             exploration: {
                 start: "Auto Exploración",
                 stop: "Detener",
                 active: "IA Explorando...",
                 thinking: "Pensando...",
+                error_empty_guidelines: "El objetivo o directriz de exploración no puede estar vacío.",
                 step_title: "Paso {{number}}",
                 initialization: "Inicialización",
                 events_logged: "{{count}} eventos registrados",
@@ -1034,6 +1047,14 @@ export const es = {
                     loading_context: "Extrayendo contexto comprimido...",
                     success: "¡Análisis de tendencias completado!",
                     persistence_note: "Este análisis se guardará hasta que solicites uno nuevo."
+                },
+                ai_steps: {
+                    dumping: "Extrayendo jerarquía de la pantalla...",
+                    thinking: "La IA está pensando...",
+                    executing: "Ejecutando: {{action}}",
+                    waiting: "Esperando transición...",
+                    finished: "¡Objetivo completado con éxito!",
+                    failed: "El Agente de IA no pudo completar el objetivo."
                 }
             }
         },
@@ -1075,7 +1096,11 @@ export const es = {
             },
             paths: {
                 select_error: "Error al seleccionar carpeta",
-                title: "Rutas"
+                title: "Rutas",
+                migration_title: "¿Migrar Directorio?",
+                migration_desc: "¿Desea mover el subdirectorio /mapper y sus archivos al nuevo destino?",
+                migration_confirm: "Sí, Mover",
+                migration_destination_not_empty: "El destino ya contiene archivos de mapeo. La migración se omitió para evitar sobrescribir datos existentes."
             },
             load_error: "Error al cargar configuraciones",
             save_error: "Error al guardar configuraciones",
@@ -1389,7 +1414,10 @@ export const es = {
             },
             options: {
                 dont_overwrite: "Guardar Logs"
-            }
+            },
+            run_ai: "Ejecutar Prueba con IA",
+            run_ai_prompt: "Ejecutar Prueba por IA",
+            run_ai_desc: "El Agente de IA ejecutará acciones basadas en los pasos BDD generados."
         },
         tests_page: {
             monitoring: "Monitoreo de Pruebas",
