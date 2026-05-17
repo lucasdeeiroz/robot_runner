@@ -8,7 +8,8 @@ import {
     ChevronRight, ChevronDown, CheckCircle2, XCircle, MinusCircle,
     Layers, BugPlay, CirclePlay, Repeat, IterationCcw, Workflow,
     Infinity, Split, StepForward, CalendarCog, Maximize2,
-    ShieldAlert, Anchor, Hand, CircleSlash, Info, CornerDownRight
+    ShieldAlert, Anchor, Hand, CircleSlash, Info, CornerDownRight,
+    Bot, Play, Terminal
 } from "lucide-react";
 import { LogNode, TestNode, KeywordNode, SuiteNode } from "@/lib/robotParser";
 import { LinkRenderer } from "../molecules/LinkRenderer";
@@ -184,6 +185,36 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({
     if (node.type === 'text') {
         if (node.content.match(/^[-=]+$/)) return null;
         return <LinkRenderer key={node.id} content={node.content} />;
+    }
+
+    if (node.type === 'ai-thought' || node.type === 'ai-action' || node.type === 'adb-executed') {
+        const isThought = node.type === 'ai-thought';
+        const isAction = node.type === 'ai-action';
+        const Icon = isThought ? Bot : isAction ? Play : Terminal;
+        
+        const borderClass = isThought ? "border-primary/20" : isAction ? "border-secondary/20" : "border-tertiary/20";
+        const bgClass = isThought ? "bg-primary/5" : isAction ? "bg-secondary/5" : "bg-tertiary/5";
+        const leftBarClass = isThought ? "bg-primary/40" : isAction ? "bg-secondary/40" : "bg-tertiary/40";
+        const textIconClass = isThought ? "text-primary" : isAction ? "text-secondary" : "text-tertiary";
+        const textLabelClass = isThought ? "text-primary/80" : isAction ? "text-secondary/80" : "text-tertiary/80";
+
+        return (
+            <div
+                id={`log-node-${node.id}`}
+                className={`flex flex-col transition-all overflow-hidden border mb-1 rounded-xl ${borderClass} ${bgClass}`}
+            >
+                <div className="flex items-start gap-2 p-2 min-w-0 relative rounded-t-xl pl-4">
+                    <div className={`absolute left-0 top-0 bottom-0 w-1 rounded ${leftBarClass}`} />
+                    <Icon size={14} className={`mt-0.5 opacity-70 shrink-0 ${textIconClass}`} />
+                    <span className="text-xs font-medium text-on-surface-variant/90 break-words whitespace-pre-wrap leading-relaxed flex-1">
+                        <span className={`text-[9px] mr-1.5 uppercase font-bold tracking-tighter ${textLabelClass}`}>
+                            {isThought ? 'THOUGHT' : isAction ? 'ACTION' : 'ADB EXECUTED'}
+                        </span>
+                        {node.content}
+                    </span>
+                </div>
+            </div>
+        );
     }
 
     if (node.type === 'suite-start' || node.type === 'suite-end') return null;

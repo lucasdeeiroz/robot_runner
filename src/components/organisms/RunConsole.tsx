@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Virtuoso, VirtuosoHandle } from "react-virtuoso";
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
-import { Star, Eye, EyeOff, Terminal, X, FolderOpen } from "lucide-react";
+import { Star, Eye, EyeOff, Terminal, X, FolderOpen, Bot, Play, Pause, RefreshCw } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { parseXmlBackground } from "@/lib/xmlParseCache";
 import { parseHeuristicLogs } from "@/lib/heuristicParser";
@@ -17,6 +17,7 @@ import * as gemini from "@/lib/dashboard/gemini";
 import * as openai from "@/lib/dashboard/openai";
 import * as claude from "@/lib/dashboard/claude";
 import * as claudeCli from "@/lib/dashboard/claudeCode";
+import * as geminiCode from "@/lib/dashboard/geminiCode";
 import { useCallback } from "react";
 
 interface RunConsoleProps {
@@ -28,7 +29,7 @@ interface RunConsoleProps {
 
 export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath }: RunConsoleProps) {
     const { t, i18n } = useTranslation();
-    const { sessions, setSessionTree } = useTestSessions();
+    const { sessions, setSessionTree, addSessionLog, markSessionFinished } = useTestSessions();
     const session = sessions.find(s => s.runId === runId);
 
     const [isRawMode, setIsRawMode] = useState(false);
@@ -40,6 +41,12 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
     const [isSummarizing, setIsSummarizing] = useState(false);
     const [summary, setSummary] = useState<string | null>(null);
     const [summaryError, setSummaryError] = useState<string | null>(null);
+
+    // AI Agent State
+    const [isAiLoopActive, setIsAiLoopActive] = useState(session?.isAiAgent || false);
+    const [aiStatus, setAiStatus] = useState<string>("");
+    const [aiHistory, setAiHistory] = useState<string[]>([]);
+    const [aiStepCount, setAiStepCount] = useState(0);
 
     const rawContainerRef = useRef<VirtuosoHandle>(null);
     const fancyContainerRef = useRef<HTMLDivElement>(null);
@@ -221,6 +228,102 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
         }
     };
 
+    // AI Agent Autonomous Loop Logic
+    const runAiStep = useCallback(async () => {
+        const provider = settings.aiProvider || 'gemini';
+        
+        if (!session?.deviceUdid || !isAiLoopActive) return;
+        
+        // Key validation based on provider
+        if (provider === 'gemini' && !settings.geminiApiKey) return;
+        if (provider === 'openai' && !settings.openaiApiKey) return;
+        if (provider === 'claude' && !settings.claudeApiKey) return;
+
+        setAiStatus(t('run_tab.console.ai_steps.dumping', { defaultValue: 'Dumping screen hierarchy...' }));
+        try {
+            const xml = await invoke<string>("get_xml_dump", { deviceId: session.deviceUdid });
+            
+            setAiStatus(t('run_tab.console.ai_steps.thinking', { defaultValue: 'AI is thinking...' }));
+            
+            let response: gemini.AutonomousActionResponse;
+            const target = session.aiPrompt || session.testPath;
+            const lang = i18n.language;
+
+            if (provider === 'gemini') {
+                response = await gemini.generateAutonomousAction(xml, target, aiHistory, settings.geminiApiKey as string, settings.geminiModel || 'gemini-1.5-pro', lang);
+            } else if (provider === 'openai') {
+                response = await openai.generateAutonomousAction(xml, target, aiHistory, settings.openaiApiKey as string, settings.openaiModel || 'gpt-4o', lang);
+            } else if (provider === 'claude') {
+                response = await claude.generateAutonomousAction(xml, target, aiHistory, settings.claudeApiKey as string, settings.claudeModel || 'claude-3-5-sonnet-latest', lang);
+            } else if (provider === 'gemini-code') {
+                response = await geminiCode.generateAutonomousAction(xml, target, aiHistory, settings.paths.automationRoot || '', lang, undefined, settings.geminiCodeApiKey);
+            } else if (provider === 'claude-code') {
+                response = await claudeCli.generateAutonomousAction(xml, target, aiHistory, settings.paths.automationRoot || '', lang, undefined, settings.claudeCodeToken);
+            } else {
+                throw new Error(`Unsupported AI provider for Autonomous Agent: ${provider}`);
+            }
+
+            const actionDesc = `[Step ${aiStepCount + 1}] ${response.action.type.toUpperCase()}: ${response.action.details}`;
+            setAiHistory(prev => [...prev, actionDesc]);
+            setAiStepCount(prev => prev + 1);
+
+            addSessionLog(runId, `[AI Agent] Thought: ${response.thought}`);
+            addSessionLog(runId, `[AI Agent] Action: ${response.action.details}`);
+
+            if (response.action.type === 'finish') {
+                setIsAiLoopActive(false);
+                setAiStatus(t('run_tab.console.ai_steps.finished', { defaultValue: 'Goal completed successfully!' }));
+                addSessionLog(runId, `[System] AI Agent mission completed.`);
+                markSessionFinished(runId, '0');
+                return;
+            }
+
+            if (response.action.type === 'fail') {
+                setIsAiLoopActive(false);
+                setAiStatus(t('run_tab.console.ai_steps.failed', { defaultValue: 'AI Agent failed to complete the goal.' }));
+                addSessionLog(runId, `[Error] AI Agent aborted: ${response.action.details}`);
+                markSessionFinished(runId, '1');
+                return;
+            }
+
+            if (response.action.command) {
+                setAiStatus(t('run_tab.console.ai_steps.executing', { action: response.action.details, defaultValue: `Executing: ${response.action.details}` }));
+
+                // Parse command string to args array for run_adb_command
+                let cleanCmd = response.action.command.trim();
+                if (cleanCmd.startsWith("adb ")) cleanCmd = cleanCmd.substring(4);
+                if (cleanCmd.startsWith("-s ")) {
+                    const parts = cleanCmd.split(' ');
+                    cleanCmd = parts.slice(2).join(' ');
+                }
+
+                const args = cleanCmd.split(/\s+/);
+                await invoke("run_adb_command", { device: session.deviceUdid, args });
+                addSessionLog(runId, `[ADB] Executed: adb -s ${session.deviceUdid} ${cleanCmd}`);
+            } else if (response.action.type === 'wait') {
+                setAiStatus(t('run_tab.console.ai_steps.waiting', { defaultValue: 'Waiting for transition...' }));
+                await new Promise(r => setTimeout(r, 2000));
+            }
+
+        } catch (e: any) {
+            console.error("AI Step failed:", e);
+            const errorMsg = e.message || String(e);
+            setAiStatus(`Error: ${errorMsg}`);
+            addSessionLog(runId, `[Error] AI Step failed: ${errorMsg}`);
+            setIsAiLoopActive(false);
+            markSessionFinished(runId, '1');
+        }
+    }, [runId, session?.deviceUdid, session?.aiPrompt, session?.testPath, settings, isAiLoopActive, aiHistory, aiStepCount, i18n.language, t, addSessionLog, markSessionFinished]);
+
+    useEffect(() => {
+        let timeoutId: any;
+        if (isAiLoopActive) {
+            timeoutId = setTimeout(runAiStep, 1500); // Small delay between steps
+        }
+        return () => clearTimeout(timeoutId);
+    }, [isAiLoopActive, aiStepCount, runAiStep]);
+
+
     // Heuristic Parsing Loop
     useEffect(() => {
         // Skip log parsing if we already have a repopped tree and the test is finished
@@ -336,6 +439,35 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                             />
                         </div>
                     )}
+                    {session?.isAiAgent && (
+                        <div className="flex items-center gap-2 px-2 py-1 bg-primary/10 rounded-lg border border-primary/20 animate-pulse-slow">
+                            <Bot size={14} className="text-primary" />
+                            <span className="text-[10px] font-bold text-primary uppercase tracking-wider">AI AGENT MODE</span>
+                            <div className="h-3 w-[1px] bg-primary/20 mx-1" />
+                            <span className="text-[10px] text-on-surface-variant/70 font-medium">{aiStatus || 'Initializing...'}</span>
+                            <button
+                                onClick={() => setIsAiLoopActive(!isAiLoopActive)}
+                                className={clsx(
+                                    "ml-2 p-1 rounded-md transition-all hover:scale-110",
+                                    isAiLoopActive ? "text-error hover:bg-error/10" : "text-success hover:bg-success/10"
+                                )}
+                                title={isAiLoopActive ? t('common.pause') : t('common.start')}
+                            >
+                                {isAiLoopActive ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setAiHistory([]);
+                                    setAiStepCount(0);
+                                    setIsAiLoopActive(true);
+                                }}
+                                className="p-1 text-on-surface-variant/60 hover:text-primary rounded-md hover:bg-primary/10 transition-all"
+                                title={t('common.reset')}
+                            >
+                                <RefreshCw size={12} />
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -352,19 +484,55 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                         followOutput="auto"
                         onScroll={onScroll}
                         className="custom-scrollbar"
-                        itemContent={(i, line) => (
-                            <div className="whitespace-pre-wrap break-all hover:bg-surface-variant/10 px-6 py-0.5 rounded transition-colors border-l-2 border-transparent hover:border-primary/30">
-                                <span className="text-on-surface-variant/40 mr-3 select-none w-8 inline-block text-right tabular-nums">{i + 1}</span>
-                                <span className={clsx(
-                                    line.includes('| PASS |') && "text-success font-semibold",
-                                    line.includes('| FAIL |') && "text-error font-semibold",
-                                    line.includes('| SKIP |') && "text-warning font-semibold",
-                                    (line.includes('[System]') || line.includes('[RR-')) && "text-on-surface-variant/60 italic"
-                                )}>
-                                    {line}
-                                </span>
-                            </div>
-                        )}
+                        itemContent={(i, line) => {
+                            if (line.startsWith('[AI Agent] Thought:')) {
+                                const content = line.replace('[AI Agent] Thought:', '').trim();
+                                return (
+                                    <div className="whitespace-pre-wrap break-words hover:bg-surface-variant/10 px-6 py-0.5 rounded transition-colors border-l-2 border-transparent hover:border-primary/30 flex">
+                                        <span className="text-on-surface-variant/40 mr-3 select-none w-8 inline-block text-right tabular-nums shrink-0">{i + 1}</span>
+                                        <span className="flex-1 min-w-0 break-words text-primary font-semibold">
+                                            [AI Agent] Thought: <span className="text-primary/80 font-normal">{content}</span>
+                                        </span>
+                                    </div>
+                                );
+                            }
+                            if (line.startsWith('[AI Agent] Action:')) {
+                                const content = line.replace('[AI Agent] Action:', '').trim();
+                                return (
+                                    <div className="whitespace-pre-wrap break-words hover:bg-surface-variant/10 px-6 py-0.5 rounded transition-colors border-l-2 border-transparent hover:border-secondary/30 flex">
+                                        <span className="text-on-surface-variant/40 mr-3 select-none w-8 inline-block text-right tabular-nums shrink-0">{i + 1}</span>
+                                        <span className="flex-1 min-w-0 break-words text-secondary font-semibold">
+                                            [AI Agent] Action: <span className="text-secondary/80 font-normal">{content}</span>
+                                        </span>
+                                    </div>
+                                );
+                            }
+                            if (line.startsWith('[ADB] Executed:')) {
+                                const content = line.replace('[ADB] Executed:', '').trim();
+                                return (
+                                    <div className="whitespace-pre-wrap break-words hover:bg-surface-variant/10 px-6 py-0.5 rounded transition-colors border-l-2 border-transparent hover:border-tertiary/30 flex">
+                                        <span className="text-on-surface-variant/40 mr-3 select-none w-8 inline-block text-right tabular-nums shrink-0">{i + 1}</span>
+                                        <span className="flex-1 min-w-0 break-words text-tertiary font-semibold">
+                                            [ADB] Executed: <span className="text-tertiary/80 font-normal">{content}</span>
+                                        </span>
+                                    </div>
+                                );
+                            }
+                            return (
+                                <div className="whitespace-pre-wrap break-words hover:bg-surface-variant/10 px-6 py-0.5 rounded transition-colors border-l-2 border-transparent hover:border-primary/30 flex">
+                                    <span className="text-on-surface-variant/40 mr-3 select-none w-8 inline-block text-right tabular-nums shrink-0">{i + 1}</span>
+                                    <span className={clsx(
+                                        "flex-1 min-w-0 break-words",
+                                        line.includes('| PASS |') && "text-success font-semibold",
+                                        line.includes('| FAIL |') && "text-error font-semibold",
+                                        line.includes('| SKIP |') && "text-warning font-semibold",
+                                        (line.includes('[System]') || line.includes('[RR-')) && "text-on-surface-variant/60 italic"
+                                    )}>
+                                        {line}
+                                    </span>
+                                </div>
+                            );
+                        }}
                         components={{
                             Footer: () => isRunning ? (
                                 <div className="flex items-center gap-2 text-primary/60 my-4 px-6 animate-pulse">

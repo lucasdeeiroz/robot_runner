@@ -1,7 +1,7 @@
 import { ScreenMap, UIElementMap } from '@/lib/types';
-import { AIGenerationType } from './gemini';
+import { AIGenerationType, AutonomousActionResponse } from './gemini';
 import { DeepAnalysisContext } from "./historyAnalysisUtils";
-import { getExplorationPrompt, formatExistingMaps, getRefinedTestCasesPrompt, getRefinedPBIPrompt, getRefinedImprovementPrompt, getRefinedBugPrompt, getRefinedRobotScriptPrompt, getFlowchartLayoutPrompt, getElementNamingPrompt, getScreenTaggingPrompt, getTestHistoryAnalysisPrompt, getExecutionSummaryPrompt, getQAAssistantWrapper } from "./prompts";
+import { getExplorationPrompt, formatExistingMaps, getRefinedTestCasesPrompt, getRefinedPBIPrompt, getRefinedImprovementPrompt, getRefinedBugPrompt, getRefinedRobotScriptPrompt, getFlowchartLayoutPrompt, getElementNamingPrompt, getScreenTaggingPrompt, getTestHistoryAnalysisPrompt, getExecutionSummaryPrompt, getQAAssistantWrapper, getAutonomousAgentPrompt } from "./prompts";
 import { fetch } from '@tauri-apps/plugin-http';
 
 function extractBase64Data(imageBase64: string): { mimeType: string, data: string } {
@@ -689,6 +689,74 @@ export async function reorganizeFlowchartLayout(
         return safeParseJson(content);
     } catch (error: any) {
         console.error("Claude reorganizeFlowchartLayout Error:", error);
+        throw error;
+    }
+}
+
+
+
+
+
+/**
+ * Autonomous Action Generation
+ */
+export async function generateAutonomousAction(
+    xmlDump: string,
+    targetScenario: string,
+    history: string[],
+    apiKey: string,
+    model: string,
+    language: string,
+    customPrompt?: string
+): Promise<AutonomousActionResponse> {
+    if (!apiKey) throw new Error("Missing Claude API Key");
+
+    const systemInstruction = getAutonomousAgentPrompt(language, customPrompt);
+    const prompt = `
+TARGET SCENARIO:
+${targetScenario}
+
+SESSION HISTORY:
+${history.join('\n')}
+
+CURRENT XML DUMP:
+${xmlDump.substring(0, 15000)}
+`.trim();
+
+    const url = "https://api.anthropic.com/v1/messages";
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01',
+                'anthropic-dangerous-direct-browser-access': 'true'
+            },
+            body: JSON.stringify({
+                model: model,
+                max_tokens: 4096,
+                system: systemInstruction,
+                messages: [
+                    { role: 'user', content: prompt }
+                ],
+                temperature: 0.2
+            })
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.error?.message || `API Error: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const content = data.content?.[0]?.text;
+        if (!content) throw new Error("Empty response from Claude");
+
+        return safeParseJson<AutonomousActionResponse>(content);
+    } catch (error: any) {
+        console.error("Claude generateAutonomousAction Error:", error);
         throw error;
     }
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { Play, FolderOpen, FileText, FileCode, History, ChartNoAxesGantt, X, Settings2, Info, Settings } from "lucide-react";
@@ -13,9 +13,11 @@ import { TabBar } from "@/components/organisms/TabBar";
 import { WarningModal } from "@/components/organisms/WarningModal";
 import { feedback } from "@/lib/feedback";
 import { Button } from "@/components/atoms/Button";
+import { AiButton } from "@/components/atoms/AiButton";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 import { useSelection, SelectionItem } from "@/lib/selectionStore";
 import { SelectionCounter } from "@/components/molecules/SelectionCounter";
+import { useRemoteConfig } from '@/lib/RemoteConfigProvider';
 
 interface TestsSubTabProps {
     selectedDevices: string[];
@@ -26,6 +28,7 @@ interface TestsSubTabProps {
 type SelectionMode = 'file' | 'folder' | 'args';
 
 export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTabProps) {
+    const { settings, updateSetting } = useSettings();
     const { t } = useTranslation();
     const [mode, setMode] = useState<SelectionMode>('file');
     const [launchStatus, setLaunchStatus] = useState("");
@@ -50,6 +53,20 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
         type: 'test'
     });
 
+    // Remotaconfig
+    const hasApiKey = useMemo(() => {
+        const provider = settings.aiProvider || 'gemini';
+        if (provider === 'gemini') return !!settings.geminiApiKey;
+        if (provider === 'claude') return !!settings.claudeApiKey;
+        if (provider === 'openai') return !!settings.openaiApiKey;
+        if (provider === 'claude-code' || provider === 'gemini-code') return true;
+        return false;
+    }, [settings.aiProvider, settings.geminiApiKey, settings.claudeApiKey, settings.openaiApiKey]);
+
+    const { getBool } = useRemoteConfig();
+    const isAiEnabled = getBool('is_ai_analysis_enabled');
+    const isAiTestModeEnabled = getBool('is_ai_test_mode_enabled');
+
     const handleOpenTestSelector = async (path: string) => {
         const existingItem = items.find(i => i.path === path);
         setSelectorState({
@@ -73,6 +90,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
             setSelectorState(prev => ({ ...prev, isOpen: false, isLoading: false }));
         }
     };
+
 
     const handleOpenArgSelector = async (path: string) => {
         const existingItem = items.find(i => i.path === path);
@@ -117,8 +135,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
         return () => observer.disconnect();
     }, []);
 
-    const { settings, updateSetting } = useSettings();
-    const { addSession, sessions } = useTestSessions();
+    const { addSession, sessions, addSessionLog } = useTestSessions();
 
     const handleRunRef = useRef<(() => Promise<void>) | null>(null);
 
@@ -136,8 +153,8 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
         return () => window.removeEventListener('ai_run_test', onAiRunTest);
     }, []);
 
-    const handleRun = async () => {
-        if (items.length === 0) {
+    const handleRun = async (isAiAgent: boolean = false, aiPrompt?: string) => {
+        if (items.length === 0 && !isAiAgent) {
             feedback.toast.raw.error(t('tests.toasts.no_items_selected', { defaultValue: 'No items selected to run.' }));
             return;
         }
@@ -175,8 +192,8 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
         const fw = settings.automationFramework || 'robot';
 
         try {
-            // 1. Check/Start Appium (Skip for Maestro)
-            if (fw !== 'maestro') {
+            // 1. Check/Start Appium (Skip for Maestro or AI Agents)
+            if (fw !== 'maestro' && !isAiAgent) {
                 const status = await invoke<{ running: boolean }>('get_appium_status', {
                     host: settings.appiumHost,
                     port: Number(settings.appiumPort),
@@ -242,6 +259,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                 const suiteName = selections.length === 1
                     ? selections[0].name.split('.')[0]
                     : (() => {
+                        if (selections.length === 0) return "AI_Exploration";
                         const baseNames = selections.map(s => (s.name || "Test").split('.')[0]);
                         const joined = baseNames.join('_');
                         const truncated = joined.length > 50 ? joined.substring(0, 50) + "..." : joined;
@@ -253,7 +271,9 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                 let finalArgsFile: string | null = null;
                 let finalTests: string[] | null = null;
 
-                if (selections.length === 1 && (selections[0].tests?.length || 0) === 0 && (selections[0].args?.length || 0) === 0) {
+                if (selections.length === 0) {
+                    // No tests selected, AI mode only. Proceed without .args.
+                } else if (selections.length === 1 && (selections[0].tests?.length || 0) === 0 && (selections[0].args?.length || 0) === 0) {
                     // Simple case: single path
                     if (selections[0].type === 'args') finalArgsFile = selections[0].path;
                     else finalTestPath = selections[0].path;
@@ -406,8 +426,19 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     finalArgsFile,
                     devModel,
                     devVer,
-                    finalTests || undefined
+                    finalTests || undefined,
+                    isAiAgent,
+                    aiPrompt
                 );
+
+                if (isAiAgent) {
+                    // In AI Agent mode, we don't necessarily start a standard framework process yet.
+                    // We just let the RunConsole handle the autonomous loop.
+                    // However, we might want to emit a "start" log.
+                    addSessionLog(runId, `[System] AI Agent Mode Activated.`);
+                    addSessionLog(runId, `[System] Prompt: ${aiPrompt || 'Default'}`);
+                    continue;
+                }
 
                 if (fw === 'robot') {
                     invoke("run_robot_test", {
@@ -468,9 +499,9 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
     };
 
     const tabs = [
-        { 
-            id: 'file', 
-            label: !isNarrow ? t('tests.mode.file') : '', 
+        {
+            id: 'file',
+            label: !isNarrow ? t('tests.mode.file') : '',
             icon: FileCode,
             tooltip: isNarrow ? t('tests.mode.file') : undefined,
             tooltipPosition: 'left' as const
@@ -482,10 +513,10 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
             tooltip: isNarrow ? (settings.automationFramework === 'appium' ? t('tests.mode.project') : t('tests.mode.folder')) : undefined,
             tooltipPosition: 'left' as const
         },
-        { 
-            id: 'args', 
-            label: !isNarrow ? t('tests.mode.args') : '', 
-            icon: FileText, 
+        {
+            id: 'args',
+            label: !isNarrow ? t('tests.mode.args') : '',
+            icon: FileText,
             disabled: settings.automationFramework && settings.automationFramework !== 'robot',
             tooltip: isNarrow ? t('tests.mode.args') : undefined,
             tooltipPosition: 'left' as const
@@ -601,6 +632,20 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     className={clsx("shrink-0 gap-6 justify-between", isNarrow ? "w-fit" : "w-48")}
                     actions={
                         <>
+                            {hasApiKey && isAiEnabled && isAiTestModeEnabled && (
+                                <AiButton
+                                    id="run_ai"
+                                    label={isLaunching ? launchStatus : (items.length === 0 ? t('tests.run_ai_prompt') : t('tests.run_ai'))}
+                                    onClick={(_e, prompt) => handleRun(true, prompt)}
+                                    disabled={selectedDevices.length === 0 || isLaunching}
+                                    variant="secondary"
+                                    className="w-full mt-4"
+                                    alwaysOpenModal
+                                    showTextAlways
+                                    allowCustomPrompt={false}
+                                    requireCustomPrompt={items.length === 0}
+                                />
+                            )}
                             <Button
                                 variant="secondary"
                                 onClick={() => updateSetting('saveLogs', !settings.saveLogs)}

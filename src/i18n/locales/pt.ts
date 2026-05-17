@@ -1041,6 +1041,14 @@ export const pt = {
                     loading_context: "Extraindo contexto compactado...",
                     success: "Análise de tendências concluída!",
                     persistence_note: "Esta análise ficará salva até que você solicite uma nova."
+                },
+                ai_steps: {
+                    dumping: "Extraindo hierarquia da tela...",
+                    thinking: "IA está pensando...",
+                    executing: "Executando: {{action}}",
+                    waiting: "Aguardando transição...",
+                    finished: "Objetivo concluído com sucesso!",
+                    failed: "Agente de IA falhou em concluir o objetivo."
                 }
             }
         },
@@ -1399,7 +1407,10 @@ export const pt = {
             },
             options: {
                 dont_overwrite: "Salvar Logs"
-            }
+            },
+            run_ai: "Executar Teste com IA",
+            run_ai_prompt: "Executar Teste por IA",
+            run_ai_desc: "O Agente de IA executará ações baseadas nos passos BDD gerados."
         },
         tests_page: {
             monitoring: "Monitoramento de Testes",

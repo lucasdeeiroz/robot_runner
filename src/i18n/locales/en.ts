@@ -1042,6 +1042,14 @@ export const en = {
                     loading_context: "Extracting compressed context...",
                     success: "Trend analysis completed!",
                     persistence_note: "This analysis will be saved until you request a new one."
+                },
+                ai_steps: {
+                    dumping: "Dumping screen hierarchy...",
+                    thinking: "AI is thinking...",
+                    executing: "Executing: {{action}}",
+                    waiting: "Waiting for transition...",
+                    finished: "Goal completed successfully!",
+                    failed: "AI Agent failed to complete the goal."
                 }
             }
         },
@@ -1400,7 +1408,10 @@ export const en = {
             },
             options: {
                 dont_overwrite: "Save Logs"
-            }
+            },
+            run_ai: "Run Test with AI",
+            run_ai_prompt: "Run Test by AI",
+            run_ai_desc: "The AI Agent will execute actions based on the generated BDD steps."
         },
         tests_page: {
             monitoring: "Test Monitoring",

@@ -11,9 +11,9 @@ interface OpenAIResponse {
 }
 
 import { ScreenMap, UIElementMap } from '@/lib/types';
-import { AIGenerationType } from './gemini';
+import { AIGenerationType, AutonomousActionResponse } from './gemini';
 import { DeepAnalysisContext } from "./historyAnalysisUtils";
-import { getExplorationPrompt, formatExistingMaps, getRefinedTestCasesPrompt, getRefinedPBIPrompt, getRefinedImprovementPrompt, getRefinedBugPrompt, getRefinedRobotScriptPrompt, getFlowchartLayoutPrompt, getElementNamingPrompt, getScreenTaggingPrompt, getTestHistoryAnalysisPrompt, getExecutionSummaryPrompt, getQAAssistantWrapper } from "./prompts";
+import { getExplorationPrompt, formatExistingMaps, getRefinedTestCasesPrompt, getRefinedPBIPrompt, getRefinedImprovementPrompt, getRefinedBugPrompt, getRefinedRobotScriptPrompt, getFlowchartLayoutPrompt, getElementNamingPrompt, getScreenTaggingPrompt, getTestHistoryAnalysisPrompt, getExecutionSummaryPrompt, getQAAssistantWrapper, getAutonomousAgentPrompt } from "./prompts";
 import { fetch } from '@tauri-apps/plugin-http';
 
 function extractBase64Data(imageBase64: string): { mimeType: string, data: string } {
@@ -625,6 +625,68 @@ ${xmlDump.substring(0, 15000)}
         return safeParseJson(content);
     } catch (error: any) {
         console.error("OpenAI exploreScreen Error:", error);
+        throw error;
+    }
+}
+
+/**
+ * Autonomous Action Generation
+ */
+export async function generateAutonomousAction(
+    xmlDump: string,
+    targetScenario: string,
+    history: string[],
+    apiKey: string,
+    model: string,
+    language: string,
+    customPrompt?: string
+): Promise<AutonomousActionResponse> {
+    if (!apiKey) throw new Error("Missing OpenAI API Key");
+
+    const systemInstruction = getAutonomousAgentPrompt(language, customPrompt);
+    const prompt = `
+TARGET SCENARIO:
+${targetScenario}
+
+SESSION HISTORY:
+${history.join('\n')}
+
+CURRENT XML DUMP:
+${xmlDump.substring(0, 15000)}
+`.trim();
+
+    const url = "https://api.openai.com/v1/chat/completions";
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model,
+                messages: [
+                    { role: 'system', content: systemInstruction },
+                    { role: 'user', content: prompt }
+                ],
+                response_format: { type: "json_object" },
+                temperature: 0.2
+            })
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.error?.message || `API Error: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content;
+        if (!content) throw new Error("Empty response from OpenAI");
+
+        return safeParseJson<AutonomousActionResponse>(content);
+    } catch (error: any) {
+        console.error("OpenAI generateAutonomousAction Error:", error);
         throw error;
     }
 }

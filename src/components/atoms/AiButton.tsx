@@ -20,6 +20,7 @@ interface AiButtonProps extends Omit<ButtonProps, 'leftIcon' | 'children' | 'onC
     showTextAlways?: boolean;
     allowCustomPrompt?: boolean;
     alwaysOpenModal?: boolean;
+    requireCustomPrompt?: boolean;
     onClick?: (e: React.MouseEvent<HTMLButtonElement>, customPrompt?: string) => void | Promise<void>;
 }
 
@@ -31,6 +32,7 @@ export const AiButton: React.FC<AiButtonProps> = ({
     showTextAlways = false,
     allowCustomPrompt = true,
     alwaysOpenModal = false,
+    requireCustomPrompt = false,
     className,
     variant = 'primary',
     onClick,
@@ -325,6 +327,7 @@ export const AiButton: React.FC<AiButtonProps> = ({
                             </Button>
                             <Button
                                 variant="primary"
+                                disabled={requireCustomPrompt && !customPrompt.trim()}
                                 onClick={(e) => {
                                     setIsModalOpen(false);
                                     saveCustomPrompt(customPrompt);
