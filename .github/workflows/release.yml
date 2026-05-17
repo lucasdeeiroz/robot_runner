@@ -93,17 +93,17 @@ jobs:
         run: |
           $VERSION = "${{ github.ref_name }}".TrimStart('v')
           
-          # Rename MSI using wildcard to locate the source
-          $msiFile = Get-ChildItem "src-tauri/target/release/bundle/msi/Robot Runner_*_x64_en-US.msi" | Select-Object -First 1
+          # Rename MSI using wildcard to locate the source (directory may not exist if MSI bundle is disabled)
+          $msiFile = Get-ChildItem "src-tauri/target/release/bundle/msi/Robot Runner_*_x64_en-US.msi" -ErrorAction SilentlyContinue | Select-Object -First 1
           if ($msiFile) {
              Copy-Item $msiFile.FullName "Robot.Runner_${VERSION}_windows_x64_en-US.msi"
              Write-Host "Copied MSI to Robot.Runner_${VERSION}_windows_x64_en-US.msi"
           } else {
-             Write-Warning "Source MSI file not found!"
+             Write-Warning "Source MSI file not found, skipping MSI artifact."
           }
           
           # Rename Setup EXE using wildcard to locate the source
-          $exeFile = Get-ChildItem "src-tauri/target/release/bundle/nsis/Robot Runner_*_x64-setup.exe" | Select-Object -First 1
+          $exeFile = Get-ChildItem "src-tauri/target/release/bundle/nsis/Robot Runner_*_x64-setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
           if ($exeFile) {
              Copy-Item $exeFile.FullName "Robot.Runner_${VERSION}_windows_x64-setup.exe"
              Write-Host "Copied Setup EXE to Robot.Runner_${VERSION}_windows_x64-setup.exe"
@@ -119,6 +119,7 @@ jobs:
           } else {
              Write-Warning "Source Portable EXE file not found!"
           }
+
 
       - name: Rename and Upload Artifacts (Linux)
         if: matrix.platform == 'ubuntu-22.04'
