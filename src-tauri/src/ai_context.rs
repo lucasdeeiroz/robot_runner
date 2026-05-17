@@ -282,7 +282,8 @@ fn get_exploration_context(params: AiContextParams) -> Result<AiContextResponse,
 
                 let modified = entry
                     .metadata()
-                    .and_then(|m| m.modified())
+                    .ok()
+                    .and_then(|m| m.modified().ok())
                     .unwrap_or(SystemTime::UNIX_EPOCH);
                 robot_files.push((entry.path().to_path_buf(), modified));
 
