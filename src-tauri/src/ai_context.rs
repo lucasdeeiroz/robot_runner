@@ -4,7 +4,9 @@ use roxmltree;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
+use std::time::SystemTime;
 use tauri::Manager;
+use walkdir::WalkDir;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
@@ -257,29 +259,59 @@ fn get_exploration_context(params: AiContextParams) -> Result<AiContextResponse,
     if let Some(root) = params.automation_root {
         if Path::new(&root).exists() {
             context.push_str("\n\n### AUTOMATION CONTEXT (Existing Test Patterns)\n");
-            if let Ok(entries) = fs::read_dir(&root) {
-                let mut robot_files: Vec<_> = entries
-                    .flatten()
-                    .map(|e| e.path())
-                    .filter(|p| p.is_file() && p.extension().and_then(|s| s.to_str()) == Some("robot"))
-                    .collect();
-                
-                // Sort by date or just take first few
-                robot_files.sort_by(|a, b| b.metadata().and_then(|m| m.modified()).unwrap_or(std::time::SystemTime::UNIX_EPOCH).cmp(&a.metadata().and_then(|m| m.modified()).unwrap_or(std::time::SystemTime::UNIX_EPOCH)));
+            const MAX_SCAN_DEPTH: usize = 5;
+            const MAX_DISCOVERED_ROBOT_FILES: usize = 200;
+            const MAX_FILES_IN_CONTEXT: usize = 3;
+            const MAX_CHARS_PER_FILE: usize = 1000;
+            const MAX_TOTAL_CHARS: usize = 3000;
 
-                let mut count = 0;
-                for path in robot_files.iter().take(3) {
-                    if let Ok(content) = fs::read_to_string(path) {
-                        count += 1;
-                        context.push_str(&format!(
-                            "\n--- File Pattern {} ({}) ---\n",
-                            count,
-                            path.file_name().unwrap_or_default().to_string_lossy()
-                        ));
-                        // Take first 1000 chars (Settings, Variables and maybe some Keywords)
-                        context.push_str(&content.chars().take(1000).collect::<String>());
-                        context.push_str("\n");
-                    }
+            let mut robot_files: Vec<(std::path::PathBuf, SystemTime)> = Vec::new();
+            for entry in WalkDir::new(&root)
+                .max_depth(MAX_SCAN_DEPTH)
+                .follow_links(false)
+                .into_iter()
+                .filter_map(Result::ok)
+            {
+                if !entry.file_type().is_file() {
+                    continue;
+                }
+                if entry.path().extension().and_then(|s| s.to_str()) != Some("robot") {
+                    continue;
+                }
+
+                let modified = entry
+                    .metadata()
+                    .and_then(|m| m.modified())
+                    .unwrap_or(SystemTime::UNIX_EPOCH);
+                robot_files.push((entry.path().to_path_buf(), modified));
+
+                if robot_files.len() >= MAX_DISCOVERED_ROBOT_FILES {
+                    break;
+                }
+            }
+
+            robot_files.sort_by(|a, b| b.1.cmp(&a.1));
+
+            let mut count = 0;
+            let mut total_chars = 0;
+            for (path, _) in robot_files.iter().take(MAX_FILES_IN_CONTEXT) {
+                if total_chars >= MAX_TOTAL_CHARS {
+                    break;
+                }
+                if let Ok(content) = fs::read_to_string(path) {
+                    count += 1;
+                    context.push_str(&format!(
+                        "\n--- File Pattern {} ({}) ---\n",
+                        count,
+                        path.file_name().unwrap_or_default().to_string_lossy()
+                    ));
+
+                    let remaining_chars = MAX_TOTAL_CHARS.saturating_sub(total_chars);
+                    let file_char_limit = remaining_chars.min(MAX_CHARS_PER_FILE);
+                    let snippet = content.chars().take(file_char_limit).collect::<String>();
+                    total_chars += snippet.chars().count();
+                    context.push_str(&snippet);
+                    context.push_str("\n");
                 }
             }
         }

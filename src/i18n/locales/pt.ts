@@ -1093,7 +1093,8 @@ export const pt = {
                 title: "Caminhos",
                 migration_title: "Migrar Diretório?",
                 migration_desc: "Deseja mover o subdiretório /mapper e seus arquivos para o novo destino?",
-                migration_confirm: "Sim, Mover"
+                migration_confirm: "Sim, Mover",
+                migration_destination_not_empty: "O destino já possui arquivos de mapeamento. A migração foi ignorada para evitar sobrescrever dados existentes."
             },
             load_error: "Falha ao carregar configurações",
             save_error: "Falha ao salvar configurações",

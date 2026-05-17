@@ -30,6 +30,8 @@ interface AboutPageProps {
     onNavigate?: (page: string) => void;
 }
 
+type UpdateChannel = 'stable' | 'beta' | 'alpha';
+
 export function AboutPage({ onNavigate: _onNavigate }: AboutPageProps) {
     const { t } = useTranslation();
     const appVersion = packageJson.version;
@@ -80,7 +82,12 @@ export function AboutPage({ onNavigate: _onNavigate }: AboutPageProps) {
                                 <div className="w-28">
                                     <Select
                                         value={settings.updateChannel || 'stable'}
-                                        onChange={(e) => updateSetting('updateChannel', e.target.value as any)}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            if (value === 'stable' || value === 'beta' || value === 'alpha') {
+                                                updateSetting('updateChannel', value as UpdateChannel);
+                                            }
+                                        }}
                                         containerClassName="!space-y-0"
                                         className="!py-1 !px-2 !min-h-0 bg-transparent border-none shadow-none focus:ring-0 text-xs font-medium"
                                         options={[

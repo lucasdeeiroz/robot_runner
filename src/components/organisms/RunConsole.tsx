@@ -27,6 +27,54 @@ interface RunConsoleProps {
     testPath?: string;
 }
 
+function parseCommandArgs(command: string): string[] {
+    const args: string[] = [];
+    let current = '';
+    let quote: '"' | "'" | null = null;
+    let escaped = false;
+
+    for (const char of command) {
+        if (escaped) {
+            current += char;
+            escaped = false;
+            continue;
+        }
+
+        if (char === '\\') {
+            escaped = true;
+            continue;
+        }
+
+        if (quote) {
+            if (char === quote) {
+                quote = null;
+            } else {
+                current += char;
+            }
+            continue;
+        }
+
+        if (char === '"' || char === "'") {
+            quote = char;
+            continue;
+        }
+
+        if (/\s/.test(char)) {
+            if (current.length > 0) {
+                args.push(current);
+                current = '';
+            }
+            continue;
+        }
+
+        current += char;
+    }
+
+    if (escaped) current += '\\';
+    if (current.length > 0) args.push(current);
+    return args;
+}
+
 export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath }: RunConsoleProps) {
     const { t, i18n } = useTranslation();
     const { sessions, setSessionTree, addSessionLog, markSessionFinished } = useTestSessions();
@@ -289,17 +337,16 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
             if (response.action.command) {
                 setAiStatus(t('run_tab.console.ai_steps.executing', { action: response.action.details, defaultValue: `Executing: ${response.action.details}` }));
 
-                // Parse command string to args array for run_adb_command
-                let cleanCmd = response.action.command.trim();
-                if (cleanCmd.startsWith("adb ")) cleanCmd = cleanCmd.substring(4);
-                if (cleanCmd.startsWith("-s ")) {
-                    const parts = cleanCmd.split(' ');
-                    cleanCmd = parts.slice(2).join(' ');
+                const rawCommand = response.action.command.trim();
+                const parsedArgs = parseCommandArgs(rawCommand);
+                let args = [...parsedArgs];
+                if (args[0] === 'adb') args = args.slice(1);
+                if (args[0] === '-s' && args.length >= 2) args = args.slice(2);
+                if (args.length === 0) {
+                    throw new Error('AI returned an empty ADB command');
                 }
-
-                const args = cleanCmd.split(/\s+/);
                 await invoke("run_adb_command", { device: session.deviceUdid, args });
-                addSessionLog(runId, `[ADB] Executed: adb -s ${session.deviceUdid} ${cleanCmd}`);
+                addSessionLog(runId, `[ADB] Executed: adb -s ${session.deviceUdid} ${args.join(' ')}`);
             } else if (response.action.type === 'wait') {
                 setAiStatus(t('run_tab.console.ai_steps.waiting', { defaultValue: 'Waiting for transition...' }));
                 await new Promise(r => setTimeout(r, 2000));

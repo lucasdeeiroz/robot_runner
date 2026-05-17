@@ -1094,7 +1094,8 @@ export const en = {
                 select_error: "Failed to select folder",
                 migration_title: "Migrate Directory?",
                 migration_desc: "Do you want to move the /mapper subdirectory and its files to the new destination?",
-                migration_confirm: "Yes, Move"
+                migration_confirm: "Yes, Move",
+                migration_destination_not_empty: "The destination already has mapping files. Migration was skipped to avoid overwriting existing data."
             },
             load_error: "Failed to load settings",
             save_error: "Failed to save settings",

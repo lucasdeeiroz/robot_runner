@@ -237,7 +237,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             }
 
             feedback.toast.success(t('mapper.migration.success'));
-            loadSavedMaps();
+            await loadSavedMaps();
         } catch (e) {
             console.error("Migration failed", e);
             feedback.toast.error(t('mapper.migration.error'));

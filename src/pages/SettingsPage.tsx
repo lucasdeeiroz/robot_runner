@@ -808,6 +808,21 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                         if (key === 'mappings') {
                                             const oldPath = settings.paths.mappings;
                                             if (oldPath && oldPath !== path) {
+                                                try {
+                                                    const oldEntries = await invoke<any[]>('list_directory', { path: oldPath });
+                                                    const newEntries = await invoke<any[]>('list_directory', { path });
+                                                    const hasMappingsInSource = oldEntries.some(entry => entry.name.endsWith('.json'));
+                                                    const hasMappingsInDestination = newEntries.some(entry => entry.name.endsWith('.json'));
+
+                                                    if (hasMappingsInSource && hasMappingsInDestination) {
+                                                        feedback.toast.error('settings.paths.migration_destination_not_empty');
+                                                        updateSetting('paths', { ...settings.paths, [key]: path });
+                                                        return;
+                                                    }
+                                                } catch (error) {
+                                                    console.warn('Failed to validate mappings migration paths', error);
+                                                }
+
                                                 setMigrationPending({ oldPath, newPath: path });
                                                 return; // Do not update setting yet, wait for modal
                                             }

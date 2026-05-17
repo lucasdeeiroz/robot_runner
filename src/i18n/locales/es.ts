@@ -1099,7 +1099,8 @@ export const es = {
                 title: "Rutas",
                 migration_title: "¿Migrar Directorio?",
                 migration_desc: "¿Desea mover el subdirectorio /mapper y sus archivos al nuevo destino?",
-                migration_confirm: "Sí, Mover"
+                migration_confirm: "Sí, Mover",
+                migration_destination_not_empty: "El destino ya contiene archivos de mapeo. La migración se omitió para evitar sobrescribir datos existentes."
             },
             load_error: "Error al cargar configuraciones",
             save_error: "Error al guardar configuraciones",
