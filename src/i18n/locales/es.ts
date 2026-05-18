@@ -1140,6 +1140,8 @@ export const es = {
                 robot_args: "Argumentos Robot Framework",
                 maestro_args: "Argumentos Maestro",
                 appium_java_args: "Argumentos Appium Java",
+                cypress_args: "Argumentos Cypress",
+                selenium_args: "Argumentos Selenium",
                 app_packages: "Paquetes de Aplicaciones",
                 add_package: "Añadir Paquete",
                 add_package_placeholder: "Añadir paquete (Presione Enter)",
@@ -1516,15 +1518,27 @@ export const es = {
             description: "Vamos a configurar tu perfil para optimizar tu experiencia. Solo tomará un momento.",
             step1_title: "Selecciona tu Idioma",
             step2_title: "Elige tu Modo de Uso",
+            step2_platform_title: "Seleccione la Plataforma del Explorador",
             error_no_mode: "Por favor, seleccione un modo de uso para continuar.",
+            error_no_platform: "Por favor, seleccione una plataforma para continuar.",
+            platform: {
+                mobile: {
+                    title: "Plataforma Móvil",
+                    description: "Herramientas cotidianas para depuración y pruebas manuales de aplicaciones móviles (ADB, Scrcpy, etc.)."
+                },
+                web: {
+                    title: "Plataforma Web",
+                    description: "Herramientas cotidianas para depuración y pruebas manuales de páginas web."
+                }
+            },
             mode: {
                 explorer: {
                     title: "Explorador",
-                    description: "Herramientas cotidianas para depuración y pruebas manuales (ADB, Scrcpy, etc.). No requiere configuración."
+                    description: "Herramientas cotidianas para depuración y pruebas manuales. No requiere configuración."
                 },
                 automator: {
                     title: "Automator",
-                    description: "Desarrolle y ejecute pruebas automatizadas utilizando Robot Framework, Appium o Maestro."
+                    description: "Desarrolle y ejecute pruebas automatizadas utilizando Robot Framework, Appium, Maestro, Cypress o Selenium."
                 }
             },
             step3_title: "Seleccione su Framework",
@@ -1541,6 +1555,14 @@ export const es = {
                 maestro: {
                     title: "Maestro",
                     description: "Flujos basados en YAML. Ideal para pruebas de UI ultra rápidas y simplicidad."
+                },
+                cypress: {
+                    title: "Cypress",
+                    description: "Herramienta de pruebas front-end de próxima generación creada para la web moderna."
+                },
+                selenium: {
+                    title: "Selenium (Pytest)",
+                    description: "Automatización estándar de navegadores usando Python y pytest. Ideal para una regresión web robusta."
                 }
             }
         },

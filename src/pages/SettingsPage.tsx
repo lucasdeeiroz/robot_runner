@@ -40,7 +40,7 @@ interface SettingsPageProps {
 }
 
 export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
-    const { settings, updateSetting, loading, profiles, activeProfileId, createProfile, switchProfile, renameProfile, deleteProfile, systemVersions, checkSystemVersions, systemCheckStatus, isNgrokEnabled } = useSettings();
+    const { settings, updateSetting, loading, profiles, activeProfileId, createProfile, switchProfile, renameProfile, deleteProfile, systemVersions, checkSystemVersions, systemCheckStatus, isNgrokEnabled, is_test_mode } = useSettings();
     const { t } = useTranslation();
     const { sessions } = useTestSessions();
     const isTestRunning = sessions.some(s => s.status === 'running');
@@ -525,7 +525,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                             <Select
                                 value={settings.automationFramework || 'robot'}
                                 onChange={async (e) => {
-                                    const framework = e.target.value as 'robot' | 'appium' | 'maestro';
+                                    const framework = e.target.value as 'robot' | 'appium' | 'maestro' | 'cypress' | 'selenium';
                                     updateSetting('automationFramework', framework);
                                     checkSystemVersions('automator', framework);
                                 }}
@@ -533,7 +533,9 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                 options={[
                                     { value: "robot", label: t('onboarding.framework.robot.title') },
                                     { value: "appium", label: t('onboarding.framework.appium.title') },
-                                    { value: "maestro", label: t('onboarding.framework.maestro.title') }
+                                    { value: "maestro", label: t('onboarding.framework.maestro.title') },
+                                    { value: "cypress", label: t('onboarding.framework.cypress.title') },
+                                    { value: "selenium", label: t('onboarding.framework.selenium.title') }
                                 ]}
                             />
                         </div>
@@ -729,15 +731,20 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                         }
                     >
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {['robotArgs', 'maestroArgs', 'appiumJavaArgs', 'scrcpyArgs'].map((key) => {
+                            {['robotArgs', 'maestroArgs', 'appiumJavaArgs', 'cypressArgs', 'seleniumArgs', 'scrcpyArgs'].map((key) => {
                                 if (key === 'robotArgs' && (settings.usageMode === 'explorer' || (settings.automationFramework && settings.automationFramework !== 'robot'))) return null;
                                 if (key === 'maestroArgs' && (settings.usageMode === 'explorer' || settings.automationFramework !== 'maestro')) return null;
                                 if (key === 'appiumJavaArgs' && (settings.usageMode === 'explorer' || settings.automationFramework !== 'appium')) return null;
+                                if (key === 'cypressArgs' && (settings.usageMode === 'explorer' || settings.automationFramework !== 'cypress')) return null;
+                                if (key === 'seleniumArgs' && (settings.usageMode === 'explorer' || settings.automationFramework !== 'selenium')) return null;
+                                if (key === 'scrcpyArgs' && is_test_mode === 'web') return null;
 
                                 let isDisabled = false;
                                 if (key === 'robotArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
                                 if (key === 'maestroArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
                                 if (key === 'appiumJavaArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
+                                if (key === 'cypressArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
+                                if (key === 'seleniumArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
                                 if (key === 'scrcpyArgs' && systemCheckStatus?.missingMirroring?.length > 0) isDisabled = true;
 
                                 let labelKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);

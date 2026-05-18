@@ -20,6 +20,8 @@ export interface SystemVersions {
     ngrok: string;
     claude_code: string;
     gemini_code: string;
+    cypress: string;
+    pytest: string;
 }
 
 // Initialize the store
@@ -35,7 +37,8 @@ export interface AppSettings {
     allowActionsDuringTest: boolean; // Control whether actions are allowed during test
     saveLogs: boolean; // Persist log saving preference
     usageMode?: 'explorer' | 'automator';
-    automationFramework?: 'robot' | 'appium' | 'maestro';
+    automationFramework?: 'robot' | 'appium' | 'maestro' | 'cypress' | 'selenium';
+    explorerPlatform?: 'mobile' | 'web';
 
     // Appium
     appiumHost: string;
@@ -64,6 +67,8 @@ export interface AppSettings {
         appiumJavaArgs: string;
         appPackage: string; // for monitoring/logcat filtering
         ngrokToken: string;
+        cypressArgs: string;
+        seleniumArgs: string;
     };
 
     // AI
@@ -100,6 +105,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     recycleDeviceViews: false, // Default to false
     allowActionsDuringTest: false, // Default to false (blocking)
     saveLogs: false, // Default to false
+    explorerPlatform: 'mobile',
     appiumHost: '127.0.0.1',
     appiumPort: 4723,
     appiumBasePath: '/',
@@ -121,7 +127,9 @@ const DEFAULT_SETTINGS: AppSettings = {
         maestroArgs: '',
         appiumJavaArgs: 'test',
         appPackage: 'com.android.chrome, com.chrome.beta',
-        ngrokToken: ''
+        ngrokToken: '',
+        cypressArgs: '',
+        seleniumArgs: ''
     },
     maxExplorationSteps: 30,
     presentationEnabled: false,
@@ -167,12 +175,13 @@ interface SettingsContextType {
     loading: boolean;
     hasHydrated: boolean;
     systemVersions: SystemVersions | null;
-    checkSystemVersions: (forceUsageMode?: 'explorer' | 'automator', forceFramework?: 'robot' | 'appium' | 'maestro') => Promise<void>;
+    checkSystemVersions: (forceUsageMode?: 'explorer' | 'automator', forceFramework?: 'robot' | 'appium' | 'maestro' | 'cypress' | 'selenium') => Promise<void>;
     systemCheckStatus: SystemCheckStatus;
     updateInfo: UpdateInfo | null;
     checkForAppUpdate: (manual?: boolean) => Promise<void>;
     isNgrokEnabled: boolean;
     enableNgrok: () => void;
+    is_test_mode: 'mobile' | 'web';
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -426,7 +435,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         missingTunnelling: []
     });
 
-    const checkSystemVersions = async (forceUsageMode?: 'explorer' | 'automator', forceFramework?: 'robot' | 'appium' | 'maestro') => {
+    const checkSystemVersions = async (forceUsageMode?: 'explorer' | 'automator', forceFramework?: 'robot' | 'appium' | 'maestro' | 'cypress' | 'selenium') => {
         setSystemCheckStatus(prev => ({ ...prev, loading: true }));
         try {
             // Use provided overrides or fall back to current settings
@@ -448,38 +457,53 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             const missingMirroring: string[] = [];
             const missingTunnelling: string[] = [];
 
-            // Critical Tools
-            if (versions.adb === 'Not Found') {
-                missingCritical.push('ADB');
-            }
+            const isWebMode = mode === 'explorer'
+                ? (activeProfile.settings.explorerPlatform === 'web')
+                : ['cypress', 'selenium'].includes(framework);
 
-            // Appium Tools (Only check if not explorer)
-            if (activeProfile.settings.usageMode !== 'explorer') {
-                if (versions.node === 'Not Found') missingAppium.push('Node.js');
-
-                // Framework Specific Tools
-                if (activeProfile.settings.automationFramework === 'robot') {
-                    if (versions.appium === 'Not Found') missingAppium.push('Appium (Node.js)');
-                    if (versions.uiautomator2 === 'Not Found') missingAppium.push('UiAutomator2 (Appium)');
-                    if (versions.python === 'Not Found') missingTesting.push('Python');
-                    if (versions.robot === 'Not Found') missingTesting.push('Robot Framework (Python)');
-                    if (versions.appium_lib === 'Not Found') missingTesting.push('AppiumLibrary (Robot Framework)');
+            // Critical Tools (Skip mobile checks in web mode)
+            if (!isWebMode) {
+                if (versions.adb === 'Not Found') {
+                    missingCritical.push('ADB');
                 }
-
-                if (activeProfile.settings.automationFramework === 'appium') {
-                    if (versions.appium === 'Not Found') missingAppium.push('Appium (Node.js)');
-                    if (versions.uiautomator2 === 'Not Found') missingAppium.push('UiAutomator2 (Appium)');
-                    if (versions.java === 'Not Found') missingTesting.push('Java (JDK)');
-                    if (versions.maven === 'Not Found') missingTesting.push('Maven');
-                }
-
-                if (activeProfile.settings.automationFramework === 'maestro') {
-                    if (versions.maestro === 'Not Found') missingTesting.push('Maestro');
+                // Mirroring Tools (Skip in web mode)
+                if (versions.scrcpy === 'Not Found') {
+                    missingMirroring.push('Scrcpy');
                 }
             }
 
-            // Mirroring Tools
-            if (versions.scrcpy === 'Not Found') missingMirroring.push('Scrcpy');
+            // Appium/Web Tools (Only check if not explorer)
+            if (mode !== 'explorer') {
+                if (isWebMode) {
+                    if (framework === 'cypress') {
+                        if (versions.node === 'Not Found') missingTesting.push('Node.js (Required for Cypress)');
+                    } else if (framework === 'selenium') {
+                        if (versions.python === 'Not Found') missingTesting.push('Python');
+                    }
+                } else {
+                    if (versions.node === 'Not Found') missingAppium.push('Node.js');
+
+                    // Framework Specific Tools
+                    if (framework === 'robot') {
+                        if (versions.appium === 'Not Found') missingAppium.push('Appium (Node.js)');
+                        if (versions.uiautomator2 === 'Not Found') missingAppium.push('UiAutomator2 (Appium)');
+                        if (versions.python === 'Not Found') missingTesting.push('Python');
+                        if (versions.robot === 'Not Found') missingTesting.push('Robot Framework (Python)');
+                        if (versions.appium_lib === 'Not Found') missingTesting.push('AppiumLibrary (Robot Framework)');
+                    }
+
+                    if (framework === 'appium') {
+                        if (versions.appium === 'Not Found') missingAppium.push('Appium (Node.js)');
+                        if (versions.uiautomator2 === 'Not Found') missingAppium.push('UiAutomator2 (Appium)');
+                        if (versions.java === 'Not Found') missingTesting.push('Java (JDK)');
+                        if (versions.maven === 'Not Found') missingTesting.push('Maven');
+                    }
+
+                    if (framework === 'maestro') {
+                        if (versions.maestro === 'Not Found') missingTesting.push('Maestro');
+                    }
+                }
+            }
 
             // Tunnelling Tools
             if (isNgrokEnabled && versions.ngrok === 'Not Found') missingTunnelling.push('Ngrok');
@@ -524,6 +548,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         }
     };
 
+    const is_test_mode: 'mobile' | 'web' = activeProfile.settings.usageMode === 'explorer'
+        ? (activeProfile.settings.explorerPlatform || 'mobile')
+        : (['cypress', 'selenium'].includes(activeProfile.settings.automationFramework || 'robot') ? 'web' : 'mobile');
+
     return (
         <SettingsContext.Provider value={{
             settings: activeProfile.settings,
@@ -542,7 +570,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             updateInfo,
             checkForAppUpdate,
             isNgrokEnabled,
-            enableNgrok
+            enableNgrok,
+            is_test_mode
         }}>
             {children}
         </SettingsContext.Provider>
