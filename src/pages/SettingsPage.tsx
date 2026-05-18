@@ -44,6 +44,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
     const { t } = useTranslation();
     const { sessions } = useTestSessions();
     const isTestRunning = sessions.some(s => s.status === 'running');
+    const showAppiumSection = settings.usageMode === 'automator' && settings.automationFramework !== 'maestro' && is_test_mode !== 'web';
 
     // Profile Management Details
     const [showProfileModal, setShowProfileModal] = useState(false);
@@ -582,7 +583,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
             <div className="grid gap-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Appium Server Config & Control */}
-                    {(settings.usageMode === 'automator' && settings.automationFramework !== 'maestro') && (
+                    {showAppiumSection && (
                         <Section
                             title={t('settings.appium.title')}
                             icon={Server}
@@ -716,18 +717,20 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                     <Section
                         title={t('settings.tools')}
                         icon={Wrench}
-                        className={clsx((settings.usageMode === 'explorer' || settings.automationFramework === 'maestro') && "col-span-full")}
+                        className={clsx(!showAppiumSection && "col-span-full")}
                         menus={
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleRestartADB}
-                                disabled={isRestartingADB}
-                                leftIcon={isRestartingADB ? <ExpressiveLoading size="xsm" variant="circular" /> : <RefreshCcw size={16} />}
-                                className="text-on-surface/80 hover:text-primary hover:bg-primary/10"
-                            >
-                                {t('settings.action.restart_adb')}
-                            </Button>
+                            is_test_mode !== 'web' ? (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={handleRestartADB}
+                                    disabled={isRestartingADB}
+                                    leftIcon={isRestartingADB ? <ExpressiveLoading size="xsm" variant="circular" /> : <RefreshCcw size={16} />}
+                                    className="text-on-surface/80 hover:text-primary hover:bg-primary/10"
+                                >
+                                    {t('settings.action.restart_adb')}
+                                </Button>
+                            ) : undefined
                         }
                     >
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -764,23 +767,25 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                 );
                             })}
                             {/* App Packages List */}
-                            <div className="col-span-1 md:col-span-2">
-                                <TagInput
-                                    label={t('settings.tool_config.app_packages')}
-                                    tags={settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean)}
-                                    onAdd={(tag) => {
-                                        const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
-                                        if (!current.includes(tag)) {
-                                            updateSetting('tools', { ...settings.tools, appPackage: [...current, tag].join(', ') });
-                                        }
-                                    }}
-                                    onRemove={(tag) => {
-                                        const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
-                                        updateSetting('tools', { ...settings.tools, appPackage: current.filter(t => t !== tag).join(', ') });
-                                    }}
-                                    placeholder={t('settings.tool_config.add_package_placeholder')}
-                                />
-                            </div>
+                            {is_test_mode !== 'web' && (
+                                <div className="col-span-1 md:col-span-2">
+                                    <TagInput
+                                        label={t('settings.tool_config.app_packages')}
+                                        tags={settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean)}
+                                        onAdd={(tag) => {
+                                            const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
+                                            if (!current.includes(tag)) {
+                                                updateSetting('tools', { ...settings.tools, appPackage: [...current, tag].join(', ') });
+                                            }
+                                        }}
+                                        onRemove={(tag) => {
+                                            const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
+                                            updateSetting('tools', { ...settings.tools, appPackage: current.filter(t => t !== tag).join(', ') });
+                                        }}
+                                        placeholder={t('settings.tool_config.add_package_placeholder')}
+                                    />
+                                </div>
+                            )}
                             {isNgrokEnabled && (
                                 <div className="col-span-1 md:col-span-2">
                                     <Input
@@ -805,6 +810,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                         {(['automationRoot', 'resources', 'tests', 'suites', 'logs', 'logcat', 'screenshots', 'recordings', 'mappings'] as Array<keyof typeof settings.paths>).map((key) => {
                             const isTestingPath = ['automationRoot', 'resources', 'tests', 'suites'].includes(key);
                             if (isTestingPath && settings.usageMode === 'explorer') return null;
+                            if (key === 'logcat' && is_test_mode === 'web') return null;
                             const isDisabled = isTestingPath && systemCheckStatus?.missingTesting?.length > 0;
                             return (
                                 <PathInput
@@ -1282,6 +1288,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                             (['adb', 'node', 'appium', 'uiautomator2', 'python', 'robot', 'appium_lib', 'java', 'maven', 'maestro', 'scrcpy', 'ngrok'] as Array<keyof typeof systemVersions>)
                                 .filter(key => {
                                     if (key === 'ngrok' && !isNgrokEnabled) return false;
+                                    if (is_test_mode === 'web' && ['adb', 'scrcpy'].includes(key)) return false;
                                     if (settings.usageMode === 'explorer' && ['node', 'appium', 'uiautomator2', 'python', 'robot', 'appium_lib', 'java', 'maven', 'maestro'].includes(key)) return false;
 
                                     // Framework-specific filtering
