@@ -22,7 +22,7 @@ export interface TestSession {
     deviceModel?: string;
     androidVersion?: string;
     lastActiveTool?: string; // Persist active tool across mounts
-    framework: 'robot' | 'maestro' | 'appium';
+    framework: 'robot' | 'maestro' | 'appium' | 'cypress' | 'selenium';
     timestampOutputs?: boolean;
     selectedTests?: string[];
     sessionEpoch: number; // Incremented on recycle to force RunConsole remount
@@ -48,7 +48,7 @@ interface TestFinishedPayload {
 
 interface TestSessionContextType {
     sessions: TestSession[];
-    addSession: (runId: string, deviceUdid: string, deviceName: string, testPath: string, framework: 'robot' | 'maestro' | 'appium', timestampOutputs: boolean, outputDir?: string, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string, selectedTests?: string[], isAiAgent?: boolean, aiPrompt?: string) => void;
+    addSession: (runId: string, deviceUdid: string, deviceName: string, testPath: string, framework: 'robot' | 'maestro' | 'appium' | 'cypress' | 'selenium', timestampOutputs: boolean, outputDir?: string, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string, selectedTests?: string[], isAiAgent?: boolean, aiPrompt?: string) => void;
     addToolboxSession: (deviceUdid: string, deviceName: string, deviceModel?: string, androidVersion?: string) => void; // New action
     rerunSession: (runId: string, rerunFailedFrom?: string) => Promise<void>;
     stopSession: (runId: string) => Promise<void>;
@@ -197,7 +197,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
 
 
 
-    const addSession = useCallback((runId: string, deviceUdid: string, deviceName: string, testPath: string, framework: 'robot' | 'maestro' | 'appium', timestampOutputs: boolean, outputDir?: string, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string, selectedTests?: string[], isAiAgent?: boolean, aiPrompt?: string) => {
+    const addSession = useCallback((runId: string, deviceUdid: string, deviceName: string, testPath: string, framework: 'robot' | 'maestro' | 'appium' | 'cypress' | 'selenium', timestampOutputs: boolean, outputDir?: string, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string, selectedTests?: string[], isAiAgent?: boolean, aiPrompt?: string) => {
         setSessions(prev => {
             // Check for recycling
             if (settings.recycleDeviceViews) {
@@ -390,7 +390,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
         try {
             // Check Appium (Skip for Maestro)
             const fw = session.framework;
-            if (fw !== 'maestro') {
+            if (fw !== 'maestro' && fw !== 'cypress' && fw !== 'selenium') {
                 const status = await invoke<{ running: boolean }>('get_appium_status', {
                     host: settings.appiumHost,
                     port: Number(settings.appiumPort),
@@ -440,6 +440,24 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     outputDir: outputDir,
                     logs_path: settings.paths.logs,
                     appiumJavaArgs: settings.tools.appiumJavaArgs
+                });
+            } else if (fw === 'cypress') {
+                await invoke("run_cypress_test", {
+                    runId: newRunId,
+                    testPath: session.testPath,
+                    outputDir: outputDir,
+                    browser: session.deviceUdid || 'chrome',
+                    cypressArgs: settings.tools.cypressArgs,
+                    workingDir: settings.paths.automationRoot
+                });
+            } else if (fw === 'selenium') {
+                await invoke("run_selenium_test", {
+                    runId: newRunId,
+                    testPath: session.testPath,
+                    outputDir: outputDir,
+                    browser: session.deviceUdid || 'chrome',
+                    seleniumArgs: settings.tools.seleniumArgs,
+                    workingDir: settings.paths.automationRoot
                 });
             }
 

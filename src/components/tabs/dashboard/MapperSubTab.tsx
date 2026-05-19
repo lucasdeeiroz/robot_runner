@@ -17,7 +17,6 @@ import { Select } from "@/components/atoms/Select";
 import { TagInput } from "@/components/atoms/TagInput";
 import { Input } from "@/components/atoms/Input";
 import { Textarea } from "@/components/atoms/Textarea";
-import { useTestSessions } from '@/lib/testSessionStore';
 import { UIElementType, UIElementMap, ScreenMap, NavigationData } from '@/lib/types';
 import { saveScreenMap, loadScreenMap, listScreenMaps, deleteScreenMap, exportMapperData, importMapperData } from '@/lib/dashboard/mapperPersistence';
 import { useSettings } from '@/lib/settings';
@@ -61,7 +60,7 @@ interface MapperSubTabProps {
 }
 
 export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) {
-    const { settings } = useSettings();
+    const { settings, is_test_mode } = useSettings();
     const { t, i18n } = useTranslation();
     const { activeProfileId } = useSettings();
 
@@ -156,10 +155,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         loadSavedMaps();
     }, [activeProfileId]);
 
-    const { sessions } = useTestSessions();
-    const busyDeviceIds = sessions.filter(s => s.status === 'running' && s.type === 'test').map(s => s.deviceUdid);
     const selectedDevice = selectedDeviceId;
-    const isTestRunning = selectedDevice ? busyDeviceIds.includes(selectedDevice) : false;
 
     const {
         screenshot,
@@ -184,7 +180,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     } = useDeviceViewport({
         deviceId: selectedDevice,
         isActive,
-        isBusy: isTestRunning || isExploring
+        isBusy: isExploring
     });
 
     const toggleStayOn = async () => {
@@ -1100,12 +1096,11 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         setCopied(label);
         setTimeout(() => setCopied(null), 2000);
     };
-
     const hasElementFocus = !!selectedNode || !!currentElement.id;
 
     return (
         <div ref={setContainerRef} className="flex-1 min-h-[700px] flex flex-col space-y-4">
-            {!selectedDevice ? (
+            {!selectedDevice && is_test_mode !== 'web' ? (
                 <div className="h-full flex-1 flex flex-col items-center justify-center text-on-surface/80">
                     <Scan size={48} className="mb-4 opacity-20" />
                     <p>{t('mapper.empty')}</p>
@@ -1118,24 +1113,6 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                         }}
                         className="flex items-center gap-2 px-3 py-1.5 bg-transparent border border-primary text-primary hover:bg-primary/90 hover:text-surface rounded-2xl transition-colors shadow-sm text-sm font-medium"
                         title={t('mapper.flowchart.open', 'Open Flowchart')}
-                    >
-                        <GitGraph size={16} />
-                        <span className={clsx(isNarrow && "hidden")}>{t('mapper.flowchart.open')}</span>
-                    </Button>
-                </div>
-            ) : isTestRunning ? (
-                <div className="h-full flex-1 flex flex-col items-center justify-center text-on-surface-variant/80 text-sm">
-                    <Scan size={32} className="opacity-20 mb-2" />
-                    <p>{t('mapper.status.paused_test')}</p>
-                    <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={() => {
-                            loadSavedMaps();
-                            setIsFlowchartOpen(true);
-                        }}
-                        className="flex items-center gap-2 mt-4 px-3 py-1.5 bg-transparent border border-primary text-primary hover:bg-primary/90 hover:text-surface rounded-2xl transition-colors shadow-sm text-sm font-medium"
-                        title={t('mapper.flowchart.open')}
                     >
                         <GitGraph size={16} />
                         <span className={clsx(isNarrow && "hidden")}>{t('mapper.flowchart.open')}</span>
@@ -1241,7 +1218,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                 selectedNode={selectedNode}
                                 taps={taps}
                                 swipes={swipes}
-                                onRefresh={refreshAll}
+                                onRefresh={(forceClear, targetWebUrl) => refreshAll(true, forceClear, targetWebUrl)}
                                 handlers={handlers}
                             />
                         </div>

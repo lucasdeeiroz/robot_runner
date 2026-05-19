@@ -182,6 +182,8 @@ interface SettingsContextType {
     isNgrokEnabled: boolean;
     enableNgrok: () => void;
     is_test_mode: 'mobile' | 'web';
+    activeWebUrl: string;
+    setActiveWebUrl: (url: string) => void;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -193,6 +195,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             'default': { id: 'default', name: 'Default', settings: DEFAULT_SETTINGS }
         }
     });
+    const [activeWebUrl, setActiveWebUrl] = useState<string>('https://google.com');
     const [loading, setLoading] = useState(true);
     const [hasHydrated, setHasHydrated] = useState(false);
     const [isNgrokEnabled, setIsNgrokEnabled] = useState(false);
@@ -571,7 +574,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             checkForAppUpdate,
             isNgrokEnabled,
             enableNgrok,
-            is_test_mode
+            is_test_mode,
+            activeWebUrl,
+            setActiveWebUrl
         }}>
             {children}
         </SettingsContext.Provider>

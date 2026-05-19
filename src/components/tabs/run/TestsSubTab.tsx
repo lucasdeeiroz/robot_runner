@@ -192,8 +192,8 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
         const fw = settings.automationFramework || 'robot';
 
         try {
-            // 1. Check/Start Appium (Skip for Maestro or AI Agents)
-            if (fw !== 'maestro' && !isAiAgent) {
+            // 1. Check/Start Appium (Skip for Maestro, Cypress, Selenium or AI Agents)
+            if (fw !== 'maestro' && fw !== 'cypress' && fw !== 'selenium' && !isAiAgent) {
                 const status = await invoke<{ running: boolean }>('get_appium_status', {
                     host: settings.appiumHost,
                     port: Number(settings.appiumPort),
@@ -420,7 +420,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     deviceUdid || "local",
                     devName,
                     finalTestPath || finalArgsFile || suiteName,
-                    fw as 'robot' | 'maestro' | 'appium',
+                    fw as 'robot' | 'maestro' | 'appium' | 'cypress' | 'selenium',
                     settings.saveLogs,
                     logDir,
                     finalArgsFile,
@@ -471,6 +471,28 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                         projectPath: finalTestPath,
                         outputDir: logDir,
                         appiumJavaArgs: settings.tools.appiumJavaArgs
+                    }).catch(e => {
+                        feedback.toast.error("tests.launch_failed", e);
+                    });
+                } else if (fw === 'cypress') {
+                    invoke("run_cypress_test", {
+                        runId,
+                        testPath: finalTestPath,
+                        outputDir: logDir,
+                        browser: deviceUdid || 'chrome',
+                        cypressArgs: settings.tools.cypressArgs,
+                        workingDir
+                    }).catch(e => {
+                        feedback.toast.error("tests.launch_failed", e);
+                    });
+                } else if (fw === 'selenium') {
+                    invoke("run_selenium_test", {
+                        runId,
+                        testPath: finalTestPath,
+                        outputDir: logDir,
+                        browser: deviceUdid || 'chrome',
+                        seleniumArgs: settings.tools.seleniumArgs,
+                        workingDir
                     }).catch(e => {
                         feedback.toast.error("tests.launch_failed", e);
                     });

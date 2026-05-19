@@ -517,7 +517,11 @@ export const pt = {
                 ready: "Pronto",
                 loading: "Carregando...",
                 no_screenshot: "Sem captura de tela",
-                paused_test: "Inspector desabilitado durante o teste"
+                paused_test: "Inspector desabilitado durante o teste",
+                web_mode_title: "Inspetor Otimizado para Mobile",
+                web_mode_desc: "O Inspetor Visual é otimizado para Automação Mobile (Android e iOS). Para aplicações Web, por favor utilize as ferramentas de desenvolvedor nativas do navegador (ex: Chrome DevTools) ou o painel interativo do Cypress Test Runner para inspecionar elementos em tempo real.",
+                web_mode_action: "Abrir DevTools",
+                web_mode_info: "Abra o Chrome DevTools pressionando F12 ou Clique com o Botão Direito > Inspecionar em seu navegador web."
             },
             properties: "Propriedades do Nó",
             select_element: "Selecione um elemento na tela",
@@ -648,6 +652,10 @@ export const pt = {
         mapper: {
             title: "Mapeador",
             empty: "Selecione um dispositivo para iniciar o mapeamento",
+            web_mode_title: "Mapeador Otimizado para Mobile",
+            web_mode_desc: "O Mapeador de Elementos é otimizado para Automação Mobile (Android e iOS). Para aplicações Web, recomendamos estruturar seus elementos diretamente em seus modelos de objetos de página (POMs) ou bibliotecas de localizadores.",
+            web_mode_action: "Saiba Mais",
+            web_mode_info: "Elementos web são definidos diretamente em suas specs do Cypress ou page objects.",
             refresh: "Atualizar Fonte",
             screen_description: "Descrição da Tela",
             description: "Descrição",

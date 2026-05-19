@@ -720,3 +720,169 @@ pub async fn get_robot_test_cases(path: String) -> AppResult<Vec<String>> {
 
     Ok(tests)
 }
+
+#[tauri::command]
+pub async fn run_cypress_test(
+    app: AppHandle,
+    state: State<'_, TestState>,
+    run_id: String,
+    test_path: String,
+    output_dir: String,
+    browser: Option<String>,
+    cypress_args: Option<String>,
+    working_dir: Option<String>,
+) -> AppResult<String> {
+    let abs_output_dir = std::fs::canonicalize(&output_dir)
+        .map(|p| p.to_string_lossy().to_string().replace(r"\\?\", ""))
+        .unwrap_or_else(|_| output_dir.clone());
+
+    let _ = std::fs::create_dir_all(&abs_output_dir);
+
+    // Metadata
+    #[derive(Serialize)]
+    struct RunMetadata {
+        run_id: String,
+        framework: String,
+        test_path: String,
+        timestamp: String,
+    }
+
+    let metadata = RunMetadata {
+        run_id: run_id.clone(),
+        framework: "cypress".to_string(),
+        test_path: test_path.clone(),
+        timestamp: chrono::Local::now().to_rfc3339(),
+    };
+
+    let metadata_path = std::path::Path::new(&abs_output_dir).join("metadata.json");
+    if let Ok(json) = serde_json::to_string_pretty(&metadata) {
+        let _ = std::fs::write(metadata_path, json);
+    }
+
+    let mut cmd;
+    #[cfg(target_os = "windows")]
+    {
+        cmd = new_tokio_command("cmd");
+        cmd.arg("/C").arg("npx").arg("cypress").arg("run");
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        cmd = new_tokio_command("npx");
+        cmd.arg("cypress").arg("run");
+    }
+
+    // Spec path
+    if !test_path.is_empty() {
+        cmd.arg("--spec").arg(&test_path);
+    }
+
+    // Browser
+    if let Some(b) = browser {
+        cmd.arg("--browser").arg(b);
+    }
+
+    // Additional cypress args
+    if let Some(args) = cypress_args {
+        if !args.is_empty() {
+            for arg in args.split_whitespace() {
+                cmd.arg(arg);
+            }
+        }
+    }
+
+    spawn_and_monitor(app, state, run_id, cmd, working_dir, abs_output_dir).await
+}
+
+#[tauri::command]
+pub async fn run_selenium_test(
+    app: AppHandle,
+    state: State<'_, TestState>,
+    run_id: String,
+    test_path: String,
+    output_dir: String,
+    browser: Option<String>,
+    selenium_args: Option<String>,
+    working_dir: Option<String>,
+) -> AppResult<String> {
+    let abs_output_dir = std::fs::canonicalize(&output_dir)
+        .map(|p| p.to_string_lossy().to_string().replace(r"\\?\", ""))
+        .unwrap_or_else(|_| output_dir.clone());
+
+    let _ = std::fs::create_dir_all(&abs_output_dir);
+
+    // Metadata
+    #[derive(Serialize)]
+    struct RunMetadata {
+        run_id: String,
+        framework: String,
+        test_path: String,
+        timestamp: String,
+    }
+
+    let metadata = RunMetadata {
+        run_id: run_id.clone(),
+        framework: "selenium".to_string(),
+        test_path: test_path.clone(),
+        timestamp: chrono::Local::now().to_rfc3339(),
+    };
+
+    let metadata_path = std::path::Path::new(&abs_output_dir).join("metadata.json");
+    if let Ok(json) = serde_json::to_string_pretty(&metadata) {
+        let _ = std::fs::write(metadata_path, json);
+    }
+
+    let mut cmd;
+    let is_python = test_path.ends_with(".py");
+    let is_js = test_path.ends_with(".js") || test_path.ends_with(".ts");
+
+    if is_python {
+        #[cfg(target_os = "windows")]
+        {
+            cmd = new_tokio_command("cmd");
+            cmd.arg("/C").arg("python").arg(&test_path);
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            cmd = new_tokio_command("python");
+            cmd.arg(&test_path);
+        }
+    } else if is_js {
+        #[cfg(target_os = "windows")]
+        {
+            cmd = new_tokio_command("cmd");
+            cmd.arg("/C").arg("node").arg(&test_path);
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            cmd = new_tokio_command("node");
+            cmd.arg(&test_path);
+        }
+    } else {
+        #[cfg(target_os = "windows")]
+        {
+            cmd = new_tokio_command("cmd");
+            cmd.arg("/C").arg(&test_path);
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            cmd = new_tokio_command("sh");
+            cmd.arg("-c").arg(&test_path);
+        }
+    }
+
+    // Browser
+    if let Some(b) = browser {
+        cmd.env("SELENIUM_BROWSER", b);
+    }
+
+    // Additional selenium args
+    if let Some(args) = selenium_args {
+        if !args.is_empty() {
+            for arg in args.split_whitespace() {
+                cmd.arg(arg);
+            }
+        }
+    }
+
+    spawn_and_monitor(app, state, run_id, cmd, working_dir, abs_output_dir).await
+}

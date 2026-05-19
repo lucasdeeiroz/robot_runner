@@ -517,7 +517,11 @@ export const en = {
                 ready: "Ready",
                 loading: "Loading...",
                 no_screenshot: "No screenshot",
-                paused_test: "Inspector disabled during test"
+                paused_test: "Inspector disabled during test",
+                web_mode_title: "Mobile-Optimized Inspector",
+                web_mode_desc: "Visual Inspector is optimized for Mobile Automation (Android & iOS). For Web applications, please use the browser's native developer tools (e.g., Chrome DevTools) or the Cypress Test Runner's interactive panel to inspect elements in real-time.",
+                web_mode_action: "Launch DevTools",
+                web_mode_info: "Open Chrome DevTools by pressing F12 or Right Click > Inspect in your web browser."
             },
             properties: "Node Properties",
             select_element: "Select an element on the screenshot",
@@ -648,6 +652,10 @@ export const en = {
         mapper: {
             title: "Mapper",
             empty: "Select a device to start mapping",
+            web_mode_title: "Mobile-Optimized Mapper",
+            web_mode_desc: "Element Mapper is optimized for Mobile Automation (Android & iOS). For Web applications, we recommend structuring your elements directly within your page object models (POMs) or locator libraries.",
+            web_mode_action: "Learn More",
+            web_mode_info: "Web elements are defined directly in your Cypress specs or page objects.",
             refresh: "Refresh Source",
             screen_description: "Screen Description",
             grouping: {

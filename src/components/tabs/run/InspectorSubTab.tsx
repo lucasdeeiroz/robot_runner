@@ -73,7 +73,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
     const [copied, setCopied] = useState<string | null>(null);
 
     // AI Suggestion State
-    const { settings } = useSettings();
+    const { settings, is_test_mode } = useSettings();
     const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
     const [aiRationale, setAiRationale] = useState<string | null>(null);
     const [aiError, setAiError] = useState<string | null>(null);
@@ -373,7 +373,7 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
     };
 
 
-    if (!selectedDevice) {
+    if (!selectedDevice && is_test_mode !== 'web') {
         return (
             <div className="h-full flex flex-col items-center justify-center text-on-surface/80">
                 <Scan size={48} className="mb-4 opacity-20" />
@@ -476,7 +476,7 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                         searchResults={searchResults}
                         taps={taps}
                         swipes={swipes}
-                        onRefresh={refreshAll}
+                        onRefresh={(forceClear, targetWebUrl) => refreshAll(true, forceClear, targetWebUrl)}
                         handlers={handlers}
                     />
                 </div>
