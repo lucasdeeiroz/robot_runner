@@ -62,14 +62,23 @@ async function run() {
     const ws = new WebSocket(wsUrl);
     let id = 1;
     const pending = new Map();
+    const activeRequests = new Set();
 
     ws.onmessage = (event) => {
         const res = JSON.parse(event.data);
-        if (pending.has(res.id)) {
+        if (res.id !== undefined && pending.has(res.id)) {
             const { resolve, reject } = pending.get(res.id);
             pending.delete(res.id);
             if (res.error) reject(res.error);
             else resolve(res.result);
+        } else if (res.method) {
+            if (res.method === 'Network.requestWillBeSent') {
+                const reqId = res.params.requestId;
+                activeRequests.add(reqId);
+            } else if (res.method === 'Network.loadingFinished' || res.method === 'Network.loadingFailed') {
+                const reqId = res.params.requestId;
+                activeRequests.delete(reqId);
+            }
         }
     };
 
@@ -83,12 +92,82 @@ async function run() {
 
     await new Promise((resolve) => ws.onopen = resolve);
 
-    // Enable Page and Input domains, and bring the active tab to front to focus it
+    // Setup Page, Network, and Runtime domains
     await sendCmd('Page.enable');
+    try {
+        await sendCmd('Network.enable');
+    } catch (e) {}
+    try {
+        await sendCmd('Runtime.enable');
+    } catch (e) {}
+
     try {
         await sendCmd('Page.bringToFront');
     } catch (err) {
         // Fallback or ignore if bringToFront is restricted
+    }
+
+    async function waitForDomStable(timeout = 5000) {
+        const startTime = Date.now();
+        let lastCount = 0;
+        let stableTicks = 0;
+        
+        while (Date.now() - startTime < timeout) {
+            let readyState = 'loading';
+            let currentCount = 0;
+            try {
+                const evalRes = await sendCmd('Runtime.evaluate', {
+                    expression: `(() => {
+                        return {
+                            readyState: document.readyState,
+                            elementCount: document.getElementsByTagName('*').length
+                        };
+                    })()`,
+                    returnByValue: true
+                });
+                if (evalRes && evalRes.result && evalRes.result.value) {
+                    readyState = evalRes.result.value.readyState;
+                    currentCount = evalRes.result.value.elementCount;
+                }
+            } catch (e) {
+                // ignore
+            }
+            
+            if (readyState === 'complete') {
+                if (currentCount === lastCount && currentCount > 0) {
+                    stableTicks++;
+                    if (stableTicks >= 3) {
+                        break;
+                    }
+                } else {
+                    stableTicks = 0;
+                    lastCount = currentCount;
+                }
+            } else {
+                stableTicks = 0;
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+    }
+
+    async function waitForNetworkIdle(timeout = 5000, idleTime = 400) {
+        return new Promise((resolve) => {
+            const startTime = Date.now();
+            let lastActiveTime = Date.now();
+            
+            const interval = setInterval(() => {
+                const now = Date.now();
+                if (activeRequests.size > 0) {
+                    lastActiveTime = now;
+                }
+                
+                if (now - lastActiveTime >= idleTime || now - startTime >= timeout) {
+                    clearInterval(interval);
+                    resolve();
+                }
+            }, 100);
+        });
     }
 
     if (ACTION === 'click') {
@@ -121,6 +200,12 @@ async function run() {
             buttons: 1,
             clickCount: 1
         });
+
+        // 4. Wait briefly for browser to react, then block on stabilization
+        await new Promise(r => setTimeout(r, 150));
+        await waitForDomStable(6000);
+        await waitForNetworkIdle(6000, 400);
+        await new Promise(r => setTimeout(r, 200)); // Layout settle
     } else if (ACTION === 'scroll') {
         // Delta calculation: swipe from start to end (so scroll direction is X1-X2, Y1-Y2)
         const deltaX = X1 - X2;
@@ -174,6 +259,7 @@ async function run() {
         await sendCmd('Runtime.evaluate', {
             expression: scrollScript,
         });
+        await new Promise(r => setTimeout(r, 400)); // Settle scrolling animation
     } else if (ACTION === 'navigate') {
         if (!WEB_URL) {
             console.error(JSON.stringify({ error: "Missing navigation URL parameter." }));
@@ -182,7 +268,7 @@ async function run() {
         await sendCmd('Page.navigate', { url: WEB_URL });
         // Wait for page load
         await new Promise((resolve) => {
-            const timer = setTimeout(resolve, 6000); // 6s timeout max for load
+            const timer = setTimeout(resolve, 8000); // 8s timeout max for load
             const handler = (e) => {
                 const msg = JSON.parse(e.data);
                 if (msg.method === 'Page.loadEventFired') {
@@ -193,6 +279,10 @@ async function run() {
             };
             ws.addEventListener('message', handler);
         });
+        // Run stabilization checks
+        await waitForDomStable(6000);
+        await waitForNetworkIdle(6000, 400);
+        await new Promise(r => setTimeout(r, 200)); // Layout settle
     }
 
     ws.close();

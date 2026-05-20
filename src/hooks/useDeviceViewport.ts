@@ -284,7 +284,7 @@ export function useDeviceViewport({
                         endY: end.y,
                         webUrl: activeWebUrl || undefined
                     }).then(() => {
-                        setTimeout(() => refreshAll(), 1000);
+                        setTimeout(() => refreshAll(), 100);
                     }).catch(e => {
                         setLoading(false);
                         feedback.toast.error("inspector.input_error", e);
@@ -322,8 +322,7 @@ export function useDeviceViewport({
                     y: coords.y,
                     webUrl: activeWebUrl || undefined
                 }).then(() => {
-                    // Page might take time to start navigation/render
-                    setTimeout(() => refreshAll(), 1500);
+                    setTimeout(() => refreshAll(), 100);
                 }).catch(e => {
                     setLoading(false);
                     feedback.toast.error("inspector.input_error", e);

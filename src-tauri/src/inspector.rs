@@ -5,8 +5,7 @@ use std::sync::Mutex;
 use once_cell::sync::Lazy;
 
 struct WebCaptureCache {
-    url: String,           // Actual URL from browser
-    requested_url: String, // URL the frontend asked for
+    requested_url: String,
     screenshot: String,
     xml: String,
     timestamp: std::time::Instant,
@@ -125,7 +124,6 @@ async fn perform_web_capture(url: &str, browser: &str) -> Result<(String, String
     struct CaptureResult {
         screenshot: Option<String>,
         xml: Option<String>,
-        url: Option<String>,
         error: Option<String>,
     }
 
@@ -138,13 +136,11 @@ async fn perform_web_capture(url: &str, browser: &str) -> Result<(String, String
 
     let screenshot = result.screenshot.ok_or_else(|| "Missing screenshot in web capture output".to_string())?;
     let xml = result.xml.ok_or_else(|| "Missing xml in web capture output".to_string())?;
-    let actual_url = result.url.unwrap_or_else(|| url.to_string());
 
     // 3. Update cache
     {
         let mut cache_lock = CAPTURE_CACHE.lock().unwrap();
         *cache_lock = Some(WebCaptureCache {
-            url: actual_url,
             requested_url: url.to_string(),
             screenshot: screenshot.clone(),
             xml: xml.clone(),
@@ -347,6 +343,15 @@ pub async fn get_xml_dump(device_id: String, web_url: Option<String>) -> Result<
 
 #[command]
 pub async fn send_web_input(action_type: String, x: i32, y: i32, end_x: Option<i32>, end_y: Option<i32>, web_url: Option<String>) -> Result<(), String> {
+    // Invalidate the cache's timestamp to force a fresh capture on the next refresh,
+    // but preserve the requested_url to avoid triggering a forced navigate back.
+    {
+        let mut cache_lock = CAPTURE_CACHE.lock().unwrap();
+        if let Some(ref mut cache) = *cache_lock {
+            cache.timestamp = std::time::Instant::now() - std::time::Duration::from_secs(60);
+        }
+    }
+
     let mut script_path = std::path::PathBuf::from("scripts/web_interaction.cjs");
     if !script_path.exists() {
         let parent_path = std::path::PathBuf::from("../scripts/web_interaction.cjs");
