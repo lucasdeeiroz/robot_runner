@@ -1028,6 +1028,7 @@ export const pt = {
                 analyze_failure: "Analisar Falha",
                 analyzing: "Analisando...",
                 ai_insight: "Análise da IA",
+                ai_analysis: "Análise de IA",
                 ai_analysis_header: "Análise Detalhada",
                 summarize_run: "Resumir Execução",
                 summary_title: "Resumo da Execução",

@@ -52,6 +52,16 @@ export function AboutPage({ onNavigate: _onNavigate }: AboutPageProps) {
         }
     };
 
+    const [clickCount, setClickCount] = useState(0);
+    const handleTitleClick = () => {
+        const newCount = clickCount + 1;
+        setClickCount(newCount);
+        if (newCount >= 5) {
+            updateSetting('presentationEnabled', true);
+            setClickCount(0);
+        }
+    };
+
     return (
         <div className="h-full flex flex-col gap-4 overflow-hidden">
             <PageHeader
@@ -69,7 +79,10 @@ export function AboutPage({ onNavigate: _onNavigate }: AboutPageProps) {
                             <Bot size={40} className="text-primary" />
                         </div>
 
-                        <h2 className="text-2xl font-bold text-on-surface/80 mb-2">
+                        <h2 
+                            className="text-2xl font-bold text-on-surface/80 mb-2 select-none cursor-default"
+                            onClick={handleTitleClick}
+                        >
                             Robot Runner
                         </h2>
                         <p className="mt-6 text-on-surface-variant/80 max-w-lg mx-auto leading-relaxed">

@@ -1029,6 +1029,7 @@ export const en = {
                 analyze_failure: "Analyze Failure",
                 analyzing: "Analyzing...",
                 ai_insight: "AI Insight",
+                ai_analysis: "AI Analysis",
                 ai_analysis_header: "Detailed Analysis",
                 summarize_run: "Summarize Execution",
                 summary_title: "Execution Summary",

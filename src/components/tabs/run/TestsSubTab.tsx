@@ -669,6 +669,12 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     variant="pills"
                     orientation="vertical"
                     className={clsx("shrink-0 gap-6 justify-between", isNarrow ? "w-fit" : "w-48")}
+                    menus={
+                        <>
+                        <SelectionCounter/>
+                        <div className="mt-6 border-t border-outline-variant/30"/>
+                        </>
+                    }
                     actions={
                         <>
                             {hasApiKey && isAiEnabled && isAiTestModeEnabled && (
@@ -710,10 +716,6 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                         </>
                     }
                 />
-            </div>
-
-            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
-                <SelectionCounter />
             </div>
 
             {selectorState.isOpen && createPortal(

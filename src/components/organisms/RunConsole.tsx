@@ -641,7 +641,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
 
                 {/* Floating Summary UI */}
                 {(summary || isSummarizing || summaryError) && (
-                    <div className="absolute bottom-6 left-6 right-6 z-50 animate-in slide-in-from-bottom-8 fade-in duration-500">
+                    <div className="absolute bottom-0 left-0 right-3 z-50 animate-in slide-in-from-bottom-8 fade-in duration-500 bg-surface">
                         <AiResponse
                             response={summary}
                             isLoading={isSummarizing}

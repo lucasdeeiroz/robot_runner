@@ -1034,6 +1034,7 @@ export const es = {
                 analyze_failure: "Analizar Fallo",
                 analyzing: "Analizando...",
                 ai_insight: "Análisis de IA",
+                ai_analysis: "Análisis de IA",
                 ai_analysis_header: "Análisis Detallado",
                 summarize_run: "Resumir Ejecución",
                 summary_title: "Resumen de la Ejecución",
