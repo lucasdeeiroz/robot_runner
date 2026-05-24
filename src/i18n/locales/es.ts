@@ -1503,7 +1503,8 @@ export const es = {
                 commands: "Comandos",
                 mirror: "Espejo",
                 performance: "Rendimiento",
-                apps: "Apps"
+                apps: "Apps",
+                webview: "Webview"
             },
             actions: {
                 screenshot: "Capturar Pantalla",

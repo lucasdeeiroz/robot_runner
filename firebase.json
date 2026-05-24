@@ -12,5 +12,11 @@
         "destination": "/index.html"
       }
     ]
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "remoteconfig": {
+    "template": "remote_config.json"
   }
 }

@@ -116,8 +116,8 @@ export const AiButton: React.FC<AiButtonProps> = ({
         };
     }, [isDropdownOpen]);
 
-    const { getBool } = useRemoteConfig();
-    const isAiEnabled = getBool('is_ai_analysis_enabled');
+    const remoteConfig = useRemoteConfig();
+    const isAiEnabled = (remoteConfig as any)?.isFeatureEnabled?.('is_ai_analysis_enabled') ?? true;
 
     // If AI is disabled via remote config, we hide.
     if (!hasApiKey || !isAiEnabled) return null;

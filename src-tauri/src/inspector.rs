@@ -13,6 +13,14 @@ struct WebCaptureCache {
 
 static CAPTURE_CACHE: Lazy<Mutex<Option<WebCaptureCache>>> = Lazy::new(|| Mutex::new(None));
 
+struct WebRecordingState {
+    child: tokio::process::Child,
+    frames_dir: std::path::PathBuf,
+    stop_file: std::path::PathBuf,
+}
+
+static WEB_RECORDING_STATE: Lazy<Mutex<Option<WebRecordingState>>> = Lazy::new(|| Mutex::new(None));
+
 fn is_web_device(device_id: &str) -> bool {
     let id = device_id.to_lowercase();
     id == "chrome"
@@ -406,6 +414,147 @@ pub async fn send_web_input(action_type: String, x: i32, y: i32, end_x: Option<i
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         return Err(format!("Web interaction script failed: {}", stderr));
+    }
+
+    Ok(())
+}
+
+#[command]
+pub async fn save_web_screenshot(device_id: String, path: String) -> Result<(), String> {
+    let url = {
+        let cache = CAPTURE_CACHE.lock().unwrap();
+        cache.as_ref()
+            .map(|c| c.requested_url.clone())
+            .unwrap_or_else(|| "https://google.com".to_string())
+    };
+
+    let (screenshot, _) = perform_web_capture(&url, &device_id).await?;
+
+    let img_bytes = general_purpose::STANDARD.decode(&screenshot)
+        .map_err(|e| format!("Failed to decode screenshot: {}", e))?;
+
+    std::fs::write(&path, &img_bytes)
+        .map_err(|e| format!("Failed to save screenshot: {}", e))?;
+
+    Ok(())
+}
+
+fn find_script(name: &str) -> Result<std::path::PathBuf, String> {
+    let direct = std::path::PathBuf::from(format!("scripts/{}", name));
+    if direct.exists() {
+        return Ok(direct);
+    }
+    let parent = std::path::PathBuf::from(format!("../scripts/{}", name));
+    if parent.exists() {
+        return Ok(parent);
+    }
+    let current = std::env::current_dir()
+        .map_err(|_| format!("Failed to get current directory to locate {}", name))?;
+    let mut p = current.clone();
+    for _ in 0..4 {
+        let candidate = p.join(format!("scripts/{}", name));
+        if candidate.exists() {
+            return Ok(candidate);
+        }
+        if !p.pop() {
+            break;
+        }
+    }
+    Err(format!("Could not find scripts/{}. Current dir: {:?}", name, current))
+}
+
+#[command]
+pub async fn start_web_recording() -> Result<(), String> {
+    {
+        let guard = WEB_RECORDING_STATE.lock().unwrap();
+        if guard.is_some() {
+            return Err("Web recording is already in progress.".to_string());
+        }
+    }
+
+    let script_path = find_script("web_record.cjs")?;
+
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    let temp_base = std::env::temp_dir().join(format!("web_rec_{}", timestamp));
+    std::fs::create_dir_all(&temp_base)
+        .map_err(|e| format!("Failed to create temp dir: {}", e))?;
+
+    let frames_dir = temp_base.join("frames");
+    let stop_file = temp_base.join("stop.signal");
+    std::fs::create_dir_all(&frames_dir)
+        .map_err(|e| format!("Failed to create frames dir: {}", e))?;
+
+    let child = new_tokio_command("node")
+        .arg(script_path.to_string_lossy().as_ref())
+        .arg(frames_dir.to_string_lossy().as_ref())
+        .arg(stop_file.to_string_lossy().as_ref())
+        .spawn()
+        .map_err(|e| format!("Failed to start web recording: {}", e))?;
+
+    let mut guard = WEB_RECORDING_STATE.lock().unwrap();
+    *guard = Some(WebRecordingState { child, frames_dir, stop_file });
+
+    Ok(())
+}
+
+#[command]
+pub async fn stop_web_recording(output_path: String) -> Result<(), String> {
+    let state = {
+        let mut guard = WEB_RECORDING_STATE.lock().unwrap();
+        guard.take()
+    };
+
+    let WebRecordingState { mut child, frames_dir, stop_file } =
+        state.ok_or_else(|| "No web recording in progress.".to_string())?;
+
+    // Signal the recording script to stop
+    std::fs::write(&stop_file, b"stop")
+        .map_err(|e| format!("Failed to write stop signal: {}", e))?;
+
+    // Wait up to 15s for the script to finish writing frames and exit
+    let _ = tokio::time::timeout(
+        std::time::Duration::from_secs(15),
+        child.wait()
+    ).await;
+
+    let _ = std::fs::remove_file(&stop_file);
+
+    // Verify frames were captured
+    let has_frames = std::fs::read_dir(&frames_dir)
+        .map(|mut d| d.any(|e| e.map(|f| f.file_name().to_string_lossy().ends_with(".jpg")).unwrap_or(false)))
+        .unwrap_or(false);
+
+    if !has_frames {
+        let _ = std::fs::remove_dir_all(&frames_dir);
+        return Err("Recording produced no frames. Make sure the browser is open and accessible on port 9222.".to_string());
+    }
+
+    let frames_pattern = frames_dir.join("frame_%06d.jpg");
+
+    let ffmpeg_output = new_tokio_command("ffmpeg")
+        .args([
+            "-y",
+            "-framerate", "15",
+            "-i", &frames_pattern.to_string_lossy(),
+            "-c:v", "libx264",
+            "-pix_fmt", "yuv420p",
+            "-preset", "fast",
+            "-crf", "23",
+            &output_path,
+        ])
+        .output()
+        .await
+        .map_err(|_| "ffmpeg not found. Install ffmpeg (e.g. `winget install Gyan.FFmpeg`) to enable web video recording.".to_string())?;
+
+    let _ = std::fs::remove_dir_all(&frames_dir);
+
+    if !ffmpeg_output.status.success() {
+        let stderr = String::from_utf8_lossy(&ffmpeg_output.stderr);
+        let tail = &stderr[stderr.len().saturating_sub(600)..];
+        return Err(format!("ffmpeg encoding failed: {}", tail));
     }
 
     Ok(())

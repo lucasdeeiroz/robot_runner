@@ -41,6 +41,7 @@ interface DeviceViewportProps {
     searchColor?: string;
     maxHeight?: string;
     className?: string;
+    isWeb?: boolean;
 }
 
 export const DeviceViewport: React.FC<DeviceViewportProps> = ({
@@ -61,11 +62,12 @@ export const DeviceViewport: React.FC<DeviceViewportProps> = ({
     selectionColor = '#ef4444',
     searchColor = '#22c55e',
     maxHeight = '650px',
-    className
+    className,
+    isWeb: isWebOverride
 }) => {
     const { t } = useTranslation();
     const { is_test_mode, activeWebUrl, setActiveWebUrl } = useSettings();
-    const isWeb = is_test_mode === 'web';
+    const isWeb = isWebOverride !== undefined ? isWebOverride : is_test_mode === 'web';
 
     const [urlInput, setUrlInput] = React.useState(activeWebUrl);
 

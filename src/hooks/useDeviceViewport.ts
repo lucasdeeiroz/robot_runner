@@ -13,6 +13,7 @@ interface DeviceViewportOptions {
     onRefreshSuccess?: () => void;
     onNodeSelected?: (node: InspectorNode | null) => void;
     onNodeHovered?: (node: InspectorNode | null) => void;
+    isWeb?: boolean;
 }
 
 export function useDeviceViewport({
@@ -21,15 +22,17 @@ export function useDeviceViewport({
     isBusy = false,
     onRefreshSuccess,
     onNodeSelected,
-    onNodeHovered
+    onNodeHovered,
+    isWeb: isWebOverride
 }: DeviceViewportOptions) {
     const { activeWebUrl, is_test_mode, setActiveWebUrl } = useSettings();
+    const isWeb = isWebOverride !== undefined ? isWebOverride : is_test_mode === 'web';
     const getHeadlessBrowser = (id: string | null): string => {
         if (!id) return 'headless-chrome';
         if (id.includes('firefox')) return 'headless-firefox';
         return 'headless-chrome';
     };
-    const deviceId = is_test_mode === 'web'
+    const deviceId = isWeb
         ? getHeadlessBrowser(initialDeviceId)
         : initialDeviceId;
     const [screenshot, setScreenshot] = useState<string | null>(null);
@@ -68,7 +71,7 @@ export function useDeviceViewport({
         }
 
         try {
-            const webUrlParam = targetWebUrl || (is_test_mode === 'web' ? activeWebUrl : undefined);
+            const webUrlParam = targetWebUrl || (isWeb ? activeWebUrl : undefined);
             const b64 = compressed 
                 ? await invoke<string>('get_compressed_screenshot', { deviceId, maxWidth: 1024, maxHeight: 1024, webUrl: webUrlParam })
                 : await invoke<string>('get_screenshot', { deviceId, webUrl: webUrlParam });
@@ -86,7 +89,7 @@ export function useDeviceViewport({
             const root = jsonObj.hierarchy ? transformXmlToTree(jsonObj.hierarchy) : transformXmlToTree(jsonObj);
             setRootNode(root);
 
-            if (is_test_mode === 'web' && root && root.attributes && root.attributes.currentUrl) {
+            if (isWeb && root && root.attributes && root.attributes.currentUrl) {
                 const browserUrl = root.attributes.currentUrl;
                 if (browserUrl && browserUrl !== activeWebUrl) {
                     setActiveWebUrl(browserUrl);
@@ -159,7 +162,7 @@ export function useDeviceViewport({
     }, [rootNode]);
 
     const sendAdbInput = useCallback(async (cmd: string) => {
-        if (!deviceId || isBusy || is_test_mode === 'web') return;
+        if (!deviceId || isBusy || isWeb) return;
         const args = ['shell', 'input', ...cmd.split(' ')];
         try {
             await invoke('run_adb_command', { device: deviceId, args });
@@ -267,7 +270,7 @@ export function useDeviceViewport({
         if (swipeStart) {
             const end = getCoords(e);
             if (end && isDragging) {
-                if (is_test_mode === 'web') {
+                if (isWeb) {
                     setLoading(true);
                     // Immediately clear selection and hover elements to avoid showing stale highlighter boundaries
                     setSelectedNode(null);
@@ -307,7 +310,7 @@ export function useDeviceViewport({
     const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLImageElement>) => {
         const coords = getCoords(e);
         if (coords) {
-            if (is_test_mode === 'web') {
+            if (isWeb) {
                 setLoading(true);
                 // Immediately clear selection and hover elements to avoid showing stale highlighter boundaries
                 setSelectedNode(null);

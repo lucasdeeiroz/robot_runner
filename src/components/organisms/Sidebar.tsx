@@ -57,9 +57,9 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
         return false;
     }, [settings.aiProvider, settings.geminiApiKey, settings.claudeApiKey, settings.openaiApiKey]);
 
-    const { getBool } = useRemoteConfig();
-    const isAiEnabled = getBool('is_ai_analysis_enabled');
-    const isAskRaiEnabled = getBool('is_ask_rai_enabled');
+    const { isFeatureEnabled } = useRemoteConfig();
+    const isAiEnabled = isFeatureEnabled('is_ai_analysis_enabled');
+    const isAskRaiEnabled = isFeatureEnabled('is_ask_rai_enabled');
 
     useEffect(() => {
         let timeoutId: NodeJS.Timeout;

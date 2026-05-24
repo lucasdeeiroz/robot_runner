@@ -28,7 +28,7 @@ interface TestsSubTabProps {
 type SelectionMode = 'file' | 'folder' | 'args';
 
 export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTabProps) {
-    const { settings, updateSetting } = useSettings();
+    const { settings, updateSetting, is_test_mode } = useSettings();
     const { t } = useTranslation();
     const [mode, setMode] = useState<SelectionMode>('file');
     const [launchStatus, setLaunchStatus] = useState("");
@@ -63,9 +63,13 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
         return false;
     }, [settings.aiProvider, settings.geminiApiKey, settings.claudeApiKey, settings.openaiApiKey]);
 
-    const { getBool } = useRemoteConfig();
-    const isAiEnabled = getBool('is_ai_analysis_enabled');
-    const isAiTestModeEnabled = getBool('is_ai_test_mode_enabled');
+    const remoteConfig = useRemoteConfig() as {
+        isFeatureEnabled?: (featureKey: string) => boolean;
+        features?: Record<string, boolean>;
+    };
+    const isFeatureEnabled = remoteConfig.isFeatureEnabled ?? ((featureKey: string) => !!remoteConfig.features?.[featureKey]);
+    const isAiEnabled = isFeatureEnabled('is_ai_analysis_enabled');
+    const isAiTestModeEnabled = isFeatureEnabled('is_ai_test_mode_enabled');
 
     const handleOpenTestSelector = async (path: string) => {
         const existingItem = items.find(i => i.path === path);
@@ -245,14 +249,27 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
             for (const deviceUdid of targets) {
                 const runId = uuidv4();
                 const deviceObj = devices.find((d: Device) => d.udid === deviceUdid);
-                const devModel = deviceObj ? deviceObj.model.replace(/\s+/g, '') : "UnknownModel";
-                const devVer = deviceObj ? deviceObj.android_version || "0" : "0";
+                const isWebSession = is_test_mode === 'web';
 
-                let devName = deviceObj?.model || "Device";
-                if (deviceUdid && deviceUdid !== 'local') {
-                    devName = `${devName} (${deviceObj?.android_version ? `Android ${deviceObj.android_version}` : deviceUdid})`;
+                const devModel = isWebSession
+                    ? (deviceUdid || 'browser')
+                    : (deviceObj ? deviceObj.model.replace(/\s+/g, '') : "UnknownModel");
+                const devVer = isWebSession
+                    ? 'web'
+                    : (deviceObj ? deviceObj.android_version || "0" : "0");
+
+                let devName: string;
+                if (isWebSession) {
+                    devName = deviceUdid
+                        ? deviceUdid.charAt(0).toUpperCase() + deviceUdid.slice(1)
+                        : 'Browser';
                 } else {
-                    devName = "Local/Web";
+                    devName = deviceObj?.model || "Device";
+                    if (deviceUdid && deviceUdid !== 'local') {
+                        devName = `${devName} (${deviceObj?.android_version ? `Android ${deviceObj.android_version}` : deviceUdid})`;
+                    } else {
+                        devName = "Local/Web";
+                    }
                 }
 
                 // Determine suite name for UI and execution

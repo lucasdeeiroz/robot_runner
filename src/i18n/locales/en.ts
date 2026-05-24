@@ -1498,7 +1498,8 @@ export const en = {
                 commands: "Commands",
                 mirror: "Mirror",
                 performance: "Performance",
-                apps: "Apps"
+                apps: "Apps",
+                webview: "Webview"
             },
             actions: {
                 screenshot: "Take Screenshot",

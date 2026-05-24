@@ -35,6 +35,8 @@ import { InfoCard } from "@/components/molecules/InfoCard";
 import { LogoInput } from "@/components/molecules/LogoInput";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 
+import { useRemoteConfig } from "@/lib/RemoteConfigProvider";
+
 interface SettingsPageProps {
     onNavigate?: (page: string) => void;
 }
@@ -71,6 +73,10 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
 
     const geminiCodeVersion = systemVersions?.gemini_code;
     const isGeminiCodeInstalled = !!geminiCodeVersion && geminiCodeVersion !== 'Not Found';
+
+    const { isFeatureEnabled } = useRemoteConfig();
+    const isCypressEnabled = isFeatureEnabled('is_cypress_enabled');
+    const isSeleniumEnabled = isFeatureEnabled('is_selenium_enabled');
 
 
     const handleRestartADB = async () => {
@@ -535,8 +541,8 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                     { value: "robot", label: t('onboarding.framework.robot.title') },
                                     { value: "appium", label: t('onboarding.framework.appium.title') },
                                     { value: "maestro", label: t('onboarding.framework.maestro.title') },
-                                    { value: "cypress", label: t('onboarding.framework.cypress.title') },
-                                    { value: "selenium", label: t('onboarding.framework.selenium.title') }
+                                    ...(isCypressEnabled ? [{ value: "cypress", label: t('onboarding.framework.cypress.title') }] : []),
+                                    ...(isSeleniumEnabled ? [{ value: "selenium", label: t('onboarding.framework.selenium.title') }] : [])
                                 ]}
                             />
                         </div>

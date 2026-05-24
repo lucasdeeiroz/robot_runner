@@ -1497,7 +1497,8 @@ export const pt = {
                 commands: "Comandos",
                 mirror: "Espelhamento",
                 performance: "Performance",
-                apps: "Apps"
+                apps: "Apps",
+                webview: "Webview"
             },
             actions: {
                 screenshot: "Capturar Tela",
