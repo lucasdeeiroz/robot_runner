@@ -297,16 +297,31 @@ export async function initRemoteConfig() {
  */
 function applyRemoteTranslations() {
     const langs = ['en', 'pt', 'es'];
+    let appliedAny = false;
+
+    const currentFullLang = i18n.language;
+    console.log(`[RemoteConfig] i18n Refresh. Current full language: "${currentFullLang}"`);
 
     langs.forEach(lang => {
-        const cloudJson = getRemoteString(`i18n_${lang}`);
+        const key = `i18n_${lang}`;
+        const cloudJson = getRemoteString(key);
+        
         if (cloudJson && cloudJson.trim().startsWith('{')) {
             try {
                 const resources = JSON.parse(cloudJson);
-                // addResourceBundle merges the cloud resources into the existing ones
-                // the third param 'true' enables deep merge, the fourth 'true' makes it the active bundle
-                i18n.addResourceBundle(lang, 'translation', resources.translation, true, true);
-                console.log(`[RemoteConfig] Applied cloud translations for: ${lang}`);
+                const translationData = resources.translation || resources;
+                
+                if (translationData && typeof translationData === 'object' && Object.keys(translationData).length > 0) {
+                    // Log keys found to help debugging
+                    console.log(`[RemoteConfig] Keys found in "${key}":`, Object.keys(translationData));
+                    
+                    // Add to base and current variant
+                    i18n.addResourceBundle(lang, 'translation', translationData, true, true);
+                    if (currentFullLang.startsWith(lang) && currentFullLang !== lang) {
+                        i18n.addResourceBundle(currentFullLang, 'translation', translationData, true, true);
+                    }
+                    appliedAny = true;
+                }
             } catch (e) {
                 console.warn(`[RemoteConfig] Failed to parse translations for ${lang}:`, e);
             }
@@ -388,7 +403,8 @@ export function getRemoteBool(key: string): boolean {
  */
 export function getRemoteString(key: string): string {
     if (!remoteConfig) return DEFAULT_CONFIG[key] ?? "";
-    return getValue(remoteConfig, key).asString();
+    const val = getValue(remoteConfig, key).asString();
+    return val || DEFAULT_CONFIG[key] || "";
 }
 
 /**

@@ -18,14 +18,11 @@ export const RemoteConfigProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     useEffect(() => {
         const init = async () => {
-            console.log("[RemoteConfigProvider] Initializing...");
             try {
                 await initRemoteConfig();
-                console.log("[RemoteConfigProvider] Initialization complete, setting isReady=true");
                 setIsReady(true);
             } catch (e) {
                 console.error("[RemoteConfigProvider] Initialization failed:", e);
-                // Still set ready so app can at least use defaults
                 setIsReady(true); 
             }
         };
