@@ -517,7 +517,11 @@ export const en = {
                 ready: "Ready",
                 loading: "Loading...",
                 no_screenshot: "No screenshot",
-                paused_test: "Inspector disabled during test"
+                paused_test: "Inspector disabled during test",
+                web_mode_title: "Mobile-Optimized Inspector",
+                web_mode_desc: "Visual Inspector is optimized for Mobile Automation (Android & iOS). For Web applications, please use the browser's native developer tools (e.g., Chrome DevTools) or the Cypress Test Runner's interactive panel to inspect elements in real-time.",
+                web_mode_action: "Launch DevTools",
+                web_mode_info: "Open Chrome DevTools by pressing F12 or Right Click > Inspect in your web browser."
             },
             properties: "Node Properties",
             select_element: "Select an element on the screenshot",
@@ -648,6 +652,10 @@ export const en = {
         mapper: {
             title: "Mapper",
             empty: "Select a device to start mapping",
+            web_mode_title: "Mobile-Optimized Mapper",
+            web_mode_desc: "Element Mapper is optimized for Mobile Automation (Android & iOS). For Web applications, we recommend structuring your elements directly within your page object models (POMs) or locator libraries.",
+            web_mode_action: "Learn More",
+            web_mode_info: "Web elements are defined directly in your Cypress specs or page objects.",
             refresh: "Refresh Source",
             screen_description: "Screen Description",
             grouping: {
@@ -1135,6 +1143,8 @@ export const en = {
                 robot_args: "Robot Framework Arguments",
                 maestro_args: "Maestro Arguments",
                 appium_java_args: "Appium Java Arguments",
+                cypress_args: "Cypress Arguments",
+                selenium_args: "Selenium Arguments",
                 app_packages: "App Packages",
                 add_package: "Add Package",
                 add_package_placeholder: "Add package (Press Enter)",
@@ -1488,7 +1498,8 @@ export const en = {
                 commands: "Commands",
                 mirror: "Mirror",
                 performance: "Performance",
-                apps: "Apps"
+                apps: "Apps",
+                webview: "Webview"
             },
             actions: {
                 screenshot: "Take Screenshot",
@@ -1511,15 +1522,27 @@ export const en = {
             description: "Let's set up your profile to optimize your experience. This will only take a moment.",
             step1_title: "Select your Language",
             step2_title: "Choose your Usage Mode",
+            step2_platform_title: "Select Explorer Platform",
             error_no_mode: "Please select a usage mode to continue.",
+            error_no_platform: "Please select a platform to continue.",
+            platform: {
+                mobile: {
+                    title: "Mobile Platform",
+                    description: "Everyday tools for debugging and manual testing of mobile apps (ADB, Scrcpy, etc.)."
+                },
+                web: {
+                    title: "Web Platform",
+                    description: "Everyday tools for debugging and manual testing of web pages."
+                }
+            },
             mode: {
                 explorer: {
                     title: "Explorer",
-                    description: "Everyday tools for debugging and manual testing (ADB, Scrcpy, etc.). No setup required."
+                    description: "Everyday tools for debugging and manual testing. No setup required."
                 },
                 automator: {
                     title: "Automator",
-                    description: "Develop and run automated tests using Robot Framework, Appium, or Maestro."
+                    description: "Develop and run automated tests using Robot Framework, Appium, Maestro, Cypress, or Selenium."
                 }
             },
             step3_title: "Select your Framework",
@@ -1536,6 +1559,14 @@ export const en = {
                 maestro: {
                     title: "Maestro",
                     description: "YAML-based flows. Best for ultra-fast UI testing and simplicity."
+                },
+                cypress: {
+                    title: "Cypress",
+                    description: "Next-generation front-end testing tool built for the modern web."
+                },
+                selenium: {
+                    title: "Selenium (Pytest)",
+                    description: "Standard browser automation using Python & pytest. Best for robust web regression."
                 }
             }
         },

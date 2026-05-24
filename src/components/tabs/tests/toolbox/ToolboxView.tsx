@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { AlignLeft, Terminal, Cpu, Cast, FileText, StopCircle, RefreshCcw, Camera, Video, Square, LayoutGrid, Minimize2, Maximize2, Package } from "lucide-react";
+import { AlignLeft, Terminal, Cpu, Cast, FileText, StopCircle, RefreshCcw, Camera, Video, Square, LayoutGrid, Minimize2, Maximize2, Package, Globe } from "lucide-react";
 import clsx from "clsx";
 import { invoke } from "@tauri-apps/api/core";
 import { useSettings } from "@/lib/settings";
@@ -19,6 +19,8 @@ import { SplitButton } from "@/components/molecules/SplitButton";
 import { usePerformanceRecorder } from "@/hooks/usePerformanceRecorder";
 import { Button } from "@/components/atoms/Button";
 import { TabBar } from "@/components/organisms/TabBar";
+import { useDeviceViewport } from "@/hooks/useDeviceViewport";
+import { DeviceViewport } from "@/components/organisms/DeviceViewport";
 
 interface ToolboxViewProps {
     session: TestSession;
@@ -26,21 +28,22 @@ interface ToolboxViewProps {
     onNavigate?: (page: string) => void;
 }
 
-type ToolTab = 'console' | 'logcat' | 'performance' | 'commands' | 'apps';
+type ToolTab = 'console' | 'logcat' | 'performance' | 'commands' | 'apps' | 'webview';
 
 export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxViewProps) {
     const { stopSession, rerunSession, setSessionActiveTool } = useTestSessions();
     const { t } = useTranslation();
     const { settings, systemCheckStatus } = useSettings();
     const isMirrorDisabled = systemCheckStatus?.missingMirroring?.length > 0;
+    const isWebMode = session.androidVersion === 'web';
 
-    // Default to 'console' if it's a test session, otherwise 'logcat' or 'performance'
     const [activeTool, setActiveTool] = useState<ToolTab>(
-        (session.lastActiveTool as ToolTab) || (session.type === 'test' ? 'console' : 'logcat')
+        (session.lastActiveTool as ToolTab) || (session.type === 'test' ? 'console' : (isWebMode ? 'webview' : 'logcat'))
     );
     const [isGridView, setIsGridView] = useState(false);
-    // Default visible tools in grid: Console and Logcat
-    const [visibleToolsInGrid, setVisibleToolsInGrid] = useState<Set<ToolTab>>(new Set(['console', 'logcat', 'performance']));
+    const [visibleToolsInGrid, setVisibleToolsInGrid] = useState<Set<ToolTab>>(
+        isWebMode ? new Set(['console', 'webview']) : new Set(['console', 'logcat', 'performance'])
+    );
 
     // Responsive State
     const containerRef = useRef<HTMLDivElement>(null);
@@ -76,9 +79,9 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
     // Safety: Enforce valid tool for Toolbox mode
     useEffect(() => {
         if (session.type === 'toolbox' && activeTool === 'console') {
-            setActiveTool('logcat');
+            setActiveTool(isWebMode ? 'webview' : 'logcat');
         }
-    }, [session.type, activeTool]);
+    }, [session.type, activeTool, isWebMode]);
 
     // Sync state for tab persistence
     useEffect(() => {
@@ -118,9 +121,12 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
     const handleScreenshot = async () => {
         try {
             await screenshotSaver.saveFile(async (path) => {
-                await invoke('save_screenshot', { device: session.deviceUdid, path });
+                if (isWebMode) {
+                    await invoke('save_web_screenshot', { deviceId: session.deviceUdid, path });
+                } else {
+                    await invoke('save_screenshot', { device: session.deviceUdid, path });
+                }
             }, 'feedback.screenshot_saved');
-            // Clear recording feedback so this one shows
             recordingSaver.clearFeedback();
         } catch (e) {
             const message = e instanceof Error ? e.message : String(e);
@@ -130,28 +136,30 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
 
     const handleToggleRecording = async () => {
         if (isRecording) {
-            // Stop recording - Prompt for save path
             try {
                 const path = await recordingSaver.saveFile(async (p) => {
-                    await invoke('stop_screen_recording', { device: session.deviceUdid, localPath: p });
+                    if (isWebMode) {
+                        await invoke('stop_web_recording', { outputPath: p });
+                    } else {
+                        await invoke('stop_screen_recording', { device: session.deviceUdid, localPath: p });
+                    }
                 }, 'feedback.recording_saved');
 
                 if (path) {
-                    // Clear screenshot feedback if any, though activeSavedPath priority usually handles the latest if we structure right.
-                    // But explicitly clearing ensures we see THIS feedback.
                     screenshotSaver.clearFeedback();
                     setIsRecording(false);
                 }
             } catch (e) {
                 feedback.toast.error("toolbox.recording.stop_error", e);
-
-                // Ensure the UI does not remain stuck in the "recording" state after a failure.
                 setIsRecording(false);
             }
         } else {
-            // Start
             try {
-                await invoke('start_screen_recording', { device: session.deviceUdid });
+                if (isWebMode) {
+                    await invoke('start_web_recording');
+                } else {
+                    await invoke('start_screen_recording', { device: session.deviceUdid });
+                }
                 setIsRecording(true);
             } catch (e) {
                 feedback.toast.error("toolbox.recording.start_error", e);
@@ -215,9 +223,9 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                 setActiveTool(tool);
             }
             // Reset grid visibility
-            setVisibleToolsInGrid(new Set(['console', 'logcat', 'commands', 'performance']));
+            setVisibleToolsInGrid(isWebMode ? new Set(['console', 'webview']) : new Set(['console', 'logcat', 'commands', 'performance']));
         }
-    }, [isGridView, visibleToolsInGrid.size, session.type]);
+    }, [isGridView, visibleToolsInGrid.size, session.type, isWebMode]);
 
     // Performance Hook
     // Determine active state for performance hook:
@@ -237,6 +245,35 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
         settings.allowActionsDuringTest
     );
 
+    // Webview Viewport Hook
+    const webViewport = useDeviceViewport({
+        deviceId: session.deviceUdid,
+        isActive: isWebMode && (activeTool === 'webview' || (isGridView && visibleToolsInGrid.has('webview'))),
+        isBusy: false,
+        isWeb: true
+    });
+
+    // Stable ref polling for live web updates during active test runs
+    const refreshRef = useRef(webViewport.refreshAll);
+    useEffect(() => {
+        refreshRef.current = webViewport.refreshAll;
+    }, [webViewport.refreshAll]);
+
+    useEffect(() => {
+        if (!isWebMode) return;
+
+        const isTabVisible = activeTool === 'webview' || (isGridView && visibleToolsInGrid.has('webview'));
+        const isRunning = session.status === 'running';
+
+        if (isTabVisible && isRunning) {
+            const interval = setInterval(() => {
+                refreshRef.current(true, false);
+            }, 2500);
+
+            return () => clearInterval(interval);
+        }
+    }, [isWebMode, activeTool, isGridView, visibleToolsInGrid, session.status]);
+
     // Combine feedback paths (add performance saved path)
     const activeSavedPath = screenshotSaver.lastSavedPath || recordingSaver.lastSavedPath;
 
@@ -255,7 +292,22 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
             {/* Tool Selection Header */}
             <TabBar
                 layoutId={`toolbox-view-tabs-${session.runId}`}
-                tabs={[
+                tabs={isWebMode ? [
+                    ...(session.type === 'test' ? [{
+                        id: 'console',
+                        label: (!isCompact && !isNarrow) ? t('toolbox.tabs.console') : "",
+                        icon: FileText,
+                        selected: isGridView ? visibleToolsInGrid.has('console') : activeTool === 'console',
+                        tooltip: (isCompact || isNarrow) ? t('toolbox.tabs.console') : undefined
+                    }] : []),
+                    {
+                        id: 'webview',
+                        label: (!isCompact && !isNarrow) ? t('toolbox.tabs.webview', 'Webview') : "",
+                        icon: Globe,
+                        selected: isGridView ? visibleToolsInGrid.has('webview') : activeTool === 'webview',
+                        tooltip: (isCompact || isNarrow) ? t('toolbox.tabs.webview', 'Webview') : undefined
+                    }
+                ] : [
                     ...(session.type === 'test' ? [{
                         id: 'console',
                         label: (!isCompact && !isNarrow) ? t('toolbox.tabs.console') : "",
@@ -303,7 +355,9 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                             size="icon"
                             onClick={() => {
                                 if (!isGridView) {
-                                    const defaults: ToolTab[] = ['console', 'logcat', 'performance'];
+                                    const defaults: ToolTab[] = isWebMode
+                                        ? ['console', 'webview']
+                                        : ['console', 'logcat', 'performance'];
                                     setVisibleToolsInGrid(new Set([...defaults, activeTool]));
                                 }
                                 setIsGridView(!isGridView);
@@ -324,24 +378,30 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                 actions={
                     <div className="flex items-center gap-2">
                         {/* Session Controls */}
-                        <div className="flex bg-surface p-1 rounded-2xl border border-outline-variant/30">
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={handleScrcpy}
-                                disabled={isMirrorDisabled}
-                                className={clsx(
-                                    "p-1.5 rounded-2xl transition-all h-8 w-8",
-                                    isMirrorDisabled
-                                        ? "text-on-surface/80 cursor-not-allowed"
-                                        : "text-on-surface/80 hover:text-primary hover:bg-primary/10"
-                                )}
-                                data-tooltip={isMirrorDisabled ? t('startup.mirroring.description') : t('scrcpy.title')}
-                                data-position="top"
-                            >
-                                <Cast size={18} />
-                            </Button>
-                            <div className="w-px h-4 bg-surface/80 mx-1 self-center" />
+                        <div className="flex bg-surface p-1 rounded-2xl border border-outline-variant/30 items-center">
+                            {isWebMode ? (
+                                <div className="flex items-center gap-1.5 shrink-0"/>
+                            ) : (
+                                <>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={handleScrcpy}
+                                        disabled={isMirrorDisabled}
+                                        className={clsx(
+                                            "p-1.5 rounded-2xl transition-all h-8 w-8",
+                                            isMirrorDisabled
+                                                ? "text-on-surface/80 cursor-not-allowed"
+                                                : "text-on-surface/80 hover:text-primary hover:bg-primary/10"
+                                        )}
+                                        data-tooltip={isMirrorDisabled ? t('startup.mirroring.description') : t('scrcpy.title')}
+                                        data-position="top"
+                                    >
+                                        <Cast size={18} />
+                                    </Button>
+                                    <div className="w-px h-4 bg-surface/80 mx-1 self-center" />
+                                </>
+                            )}
                             <Button
                                 variant="ghost"
                                 size="icon"
@@ -448,7 +508,9 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
             {isGridView ? (
                 <div className="h-full flex-1 min-h-0 grid grid-cols-1 md:grid-cols-2 gap-4 pb-2 auto-rows-fr overflow-hidden">
                     {(() => {
-                        const allTools: ToolTab[] = ['console', 'logcat', 'performance', 'commands', 'apps'];
+                        const allTools: ToolTab[] = isWebMode
+                            ? ['console', 'webview']
+                            : ['console', 'logcat', 'performance', 'commands', 'apps'];
                         const visibleTools = allTools.filter(t =>
                             visibleToolsInGrid.has(t) && (t !== 'console' || session.type === 'test')
                         );
@@ -462,7 +524,8 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                                 'logcat': t('toolbox.tabs.logcat'),
                                 'commands': t('toolbox.tabs.commands'),
                                 'performance': t('toolbox.tabs.performance'),
-                                'apps': t('toolbox.tabs.apps')
+                                'apps': t('toolbox.tabs.apps'),
+                                'webview': t('toolbox.tabs.webview', 'Webview')
                             };
 
                             return (
@@ -497,6 +560,34 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                                         />
                                     )}
                                     {tool === 'apps' && <AppsSubTab isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
+                                    {tool === 'webview' && (
+                                        <div className="h-full w-full flex flex-col p-2 overflow-hidden bg-surface-variant/10 min-h-0">
+                                            <DeviceViewport
+                                                screenshot={webViewport.screenshot}
+                                                loading={webViewport.loading}
+                                                imgRef={webViewport.imgRef}
+                                                imgLayout={webViewport.imgLayout}
+                                                onImgLoad={(e) => {
+                                                    const img = e.currentTarget;
+                                                    webViewport.setImgLayout({
+                                                        width: img.clientWidth,
+                                                        height: img.clientHeight,
+                                                        naturalWidth: img.naturalWidth,
+                                                        naturalHeight: img.naturalHeight
+                                                    });
+                                                }}
+                                                hoveredNode={webViewport.hoveredNode}
+                                                selectedNode={webViewport.selectedNode}
+                                                taps={webViewport.taps}
+                                                swipes={webViewport.swipes}
+                                                onRefresh={(forceClear, targetWebUrl) => webViewport.refreshAll(true, forceClear, targetWebUrl)}
+                                                handlers={webViewport.handlers}
+                                                isWeb={true}
+                                                maxHeight="100%"
+                                                className="w-full h-full flex flex-col"
+                                            />
+                                        </div>
+                                    )}
                                 </GridToolItem>
                             );
                         });
@@ -532,12 +623,38 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                     <div className={clsx("h-full flex-1 min-h-0 flex flex-col", activeTool === 'apps' ? "flex" : "hidden")}>
                         <AppsSubTab isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />
                     </div>
+
+                    <div className={clsx("h-full flex-1 min-h-0 flex flex-col overflow-hidden bg-surface-variant/10 p-4", activeTool === 'webview' ? "flex" : "hidden")}>
+                        <DeviceViewport
+                            screenshot={webViewport.screenshot}
+                            loading={webViewport.loading}
+                            imgRef={webViewport.imgRef}
+                            imgLayout={webViewport.imgLayout}
+                            onImgLoad={(e) => {
+                                const img = e.currentTarget;
+                                webViewport.setImgLayout({
+                                    width: img.clientWidth,
+                                    height: img.clientHeight,
+                                    naturalWidth: img.naturalWidth,
+                                    naturalHeight: img.naturalHeight
+                                });
+                            }}
+                            hoveredNode={webViewport.hoveredNode}
+                            selectedNode={webViewport.selectedNode}
+                            taps={webViewport.taps}
+                            swipes={webViewport.swipes}
+                            onRefresh={(forceClear, targetWebUrl) => webViewport.refreshAll(true, forceClear, targetWebUrl)}
+                            handlers={webViewport.handlers}
+                            isWeb={true}
+                            maxHeight="100%"
+                            className="w-full h-full flex flex-col"
+                        />
+                    </div>
                 </div>
             )}
         </div>
     );
 }
-
 
 
 function GridToolItem({ title, children, className, onHide, minimizeLabel, onMaximize, maximizeLabel }: { id: string, title: React.ReactNode, children: React.ReactNode, className?: string, onHide?: () => void, minimizeLabel?: string, onMaximize?: () => void, maximizeLabel?: string }) {

@@ -14,8 +14,10 @@ interface LayoutProps {
 
 export function Layout({ children, activePage, onNavigate }: LayoutProps) {
     const { settings } = useSettings();
-    const { getBool } = useRemoteConfig();
-    const isAskRaiEnabled = getBool('is_ask_rai_enabled');
+    const remoteConfig = useRemoteConfig() as {
+        isFeatureEnabled?: (feature: string) => boolean;
+    };
+    const isAskRaiEnabled = remoteConfig.isFeatureEnabled?.('is_ask_rai_enabled') ?? false;
 
     return (
         <div

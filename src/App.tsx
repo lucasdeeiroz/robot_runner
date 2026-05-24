@@ -21,18 +21,16 @@ import { argbFromHex, themeFromSourceColor, TonalPalette } from "@material/mater
 import { DeviceProvider } from "./lib/deviceStore";
 import { SelectionProvider } from "./lib/selectionStore";
 import { ExpressiveLoading } from "./components/atoms/ExpressiveLoading";
-import { AuthProvider, useAuth } from "./lib/authStore";
+import { useAuth } from "./lib/authStore";
 import { LoginPage } from "./pages/LoginPage";
 import { RemoteConfigProvider } from "./lib/RemoteConfigProvider";
 import { Button } from "./components/atoms/Button";
 
 function App() {
   return (
-    <AuthProvider>
-      <RemoteConfigProvider>
-        <AppContent />
-      </RemoteConfigProvider>
-    </AuthProvider>
+    <RemoteConfigProvider>
+      <AppContent />
+    </RemoteConfigProvider>
   );
 }
 

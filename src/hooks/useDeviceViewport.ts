@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { XMLParser } from 'fast-xml-parser';
 import { InspectorNode, transformXmlToTree, findNodesAtCoords } from '@/lib/inspectorUtils';
 import { feedback } from '@/lib/feedback';
+import { useSettings } from '@/lib/settings';
 
 interface DeviceViewportOptions {
     deviceId: string | null;
@@ -12,16 +13,27 @@ interface DeviceViewportOptions {
     onRefreshSuccess?: () => void;
     onNodeSelected?: (node: InspectorNode | null) => void;
     onNodeHovered?: (node: InspectorNode | null) => void;
+    isWeb?: boolean;
 }
 
 export function useDeviceViewport({
-    deviceId,
+    deviceId: initialDeviceId,
     isActive,
     isBusy = false,
     onRefreshSuccess,
     onNodeSelected,
-    onNodeHovered
+    onNodeHovered,
+    isWeb: isWebOverride
 }: DeviceViewportOptions) {
+    const { activeWebUrl, is_test_mode, setActiveWebUrl } = useSettings();
+    const isWeb = isWebOverride !== undefined ? isWebOverride : is_test_mode === 'web';
+    const getWebBrowser = (id: string | null): string => {
+        if (!id || !id.trim()) return 'chrome';
+        return id.trim();
+    };
+    const deviceId = isWeb
+        ? getWebBrowser(initialDeviceId)
+        : initialDeviceId;
     const [screenshot, setScreenshot] = useState<string | null>(null);
     const [rootNode, setRootNode] = useState<InspectorNode | null>(null);
     const [loading, setLoading] = useState(false);
@@ -41,18 +53,32 @@ export function useDeviceViewport({
 
     const [availableNodes, setAvailableNodes] = useState<InspectorNode[]>([]);
 
-    const refreshAll = useCallback(async (compressed: boolean = true) => {
+    const refreshAll = useCallback(async (compressed: boolean = true, forceClearScreenshot: boolean = false, targetWebUrl?: string) => {
         if (!deviceId) return;
         setLoading(true);
+
+        // Immediately clear selection and hover elements to avoid showing stale highlighter boundaries
+        setSelectedNode(null);
+        setHoveredNode(null);
+        setAvailableNodes([]);
+        if (onNodeSelected) onNodeSelected(null);
+        if (onNodeHovered) onNodeHovered(null);
+
+        if (forceClearScreenshot) {
+            setScreenshot(null);
+            setRootNode(null);
+        }
+
         try {
+            const webUrlParam = targetWebUrl || (isWeb ? activeWebUrl : undefined);
             const b64 = compressed 
-                ? await invoke<string>('get_compressed_screenshot', { deviceId, maxWidth: 1024, maxHeight: 1024 })
-                : await invoke<string>('get_screenshot', { deviceId });
+                ? await invoke<string>('get_compressed_screenshot', { deviceId, maxWidth: 1024, maxHeight: 1024, webUrl: webUrlParam })
+                : await invoke<string>('get_screenshot', { deviceId, webUrl: webUrlParam });
             
             const prefix = compressed ? 'data:image/jpeg;base64,' : 'data:image/png;base64,';
             setScreenshot(b64.startsWith('data:') ? b64 : `${prefix}${b64}`);
 
-            const xml = await invoke<string>('get_xml_dump', { deviceId });
+            const xml = await invoke<string>('get_xml_dump', { deviceId, webUrl: webUrlParam });
             const parser = new XMLParser({
                 ignoreAttributes: false,
                 attributeNamePrefix: "",
@@ -62,13 +88,20 @@ export function useDeviceViewport({
             const root = jsonObj.hierarchy ? transformXmlToTree(jsonObj.hierarchy) : transformXmlToTree(jsonObj);
             setRootNode(root);
 
+            if (isWeb && root && root.attributes && root.attributes.currentUrl) {
+                const browserUrl = root.attributes.currentUrl;
+                if (browserUrl && browserUrl !== activeWebUrl) {
+                    setActiveWebUrl(browserUrl);
+                }
+            }
+
             if (onRefreshSuccess) onRefreshSuccess();
         } catch (e) {
             feedback.toast.error("inspector.update_error", e);
         } finally {
             setLoading(false);
         }
-    }, [deviceId, onRefreshSuccess]);
+    }, [deviceId, onRefreshSuccess, is_test_mode, activeWebUrl, onNodeSelected, onNodeHovered]);
 
     // Handle auto-refresh on activation or busy state change
     useEffect(() => {
@@ -128,7 +161,7 @@ export function useDeviceViewport({
     }, [rootNode]);
 
     const sendAdbInput = useCallback(async (cmd: string) => {
-        if (!deviceId || isBusy) return;
+        if (!deviceId || isBusy || isWeb) return;
         const args = ['shell', 'input', ...cmd.split(' ')];
         try {
             await invoke('run_adb_command', { device: deviceId, args });
@@ -136,7 +169,7 @@ export function useDeviceViewport({
         } catch (e) {
             feedback.toast.error("inspector.input_error", e);
         }
-    }, [deviceId, isBusy, refreshAll]);
+    }, [deviceId, isBusy, is_test_mode, refreshAll]);
 
     const getCoords = useCallback((e: React.MouseEvent<HTMLImageElement>) => {
         if (!imgRef.current) return null;
@@ -236,9 +269,34 @@ export function useDeviceViewport({
         if (swipeStart) {
             const end = getCoords(e);
             if (end && isDragging) {
-                const duration = swipeStartTime ? Math.max(100, Math.min(3000, Date.now() - swipeStartTime)) : 500;
-                sendAdbInput(`swipe ${swipeStart.x} ${swipeStart.y} ${end.x} ${end.y} ${Math.floor(duration)}`);
-                addSwipeAnimation(swipeStart.x, swipeStart.y, end.x, end.y);
+                if (isWeb) {
+                    setLoading(true);
+                    // Immediately clear selection and hover elements to avoid showing stale highlighter boundaries
+                    setSelectedNode(null);
+                    setHoveredNode(null);
+                    setAvailableNodes([]);
+                    if (onNodeSelected) onNodeSelected(null);
+                    if (onNodeHovered) onNodeHovered(null);
+
+                    invoke('send_web_input', {
+                        actionType: 'scroll',
+                        x: swipeStart.x,
+                        y: swipeStart.y,
+                        endX: end.x,
+                        endY: end.y,
+                        webUrl: activeWebUrl || undefined
+                    }).then(() => {
+                        setTimeout(() => refreshAll(), 100);
+                    }).catch(e => {
+                        setLoading(false);
+                        feedback.toast.error("inspector.input_error", e);
+                    });
+                    addSwipeAnimation(swipeStart.x, swipeStart.y, end.x, end.y);
+                } else {
+                    const duration = swipeStartTime ? Math.max(100, Math.min(3000, Date.now() - swipeStartTime)) : 500;
+                    sendAdbInput(`swipe ${swipeStart.x} ${swipeStart.y} ${end.x} ${end.y} ${Math.floor(duration)}`);
+                    addSwipeAnimation(swipeStart.x, swipeStart.y, end.x, end.y);
+                }
             } else if (end && !isDragging) {
                 processInteractionAt(end, false);
             }
@@ -246,15 +304,38 @@ export function useDeviceViewport({
         setSwipeStart(null);
         setSwipeStartTime(null);
         setIsDragging(false);
-    }, [swipeStart, isDragging, swipeStartTime, getCoords, processInteractionAt, sendAdbInput, addSwipeAnimation]);
+    }, [swipeStart, isDragging, swipeStartTime, getCoords, processInteractionAt, sendAdbInput, addSwipeAnimation, is_test_mode, refreshAll, activeWebUrl, onNodeSelected, onNodeHovered]);
 
     const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLImageElement>) => {
         const coords = getCoords(e);
         if (coords) {
-            sendAdbInput(`tap ${coords.x} ${coords.y}`);
-            addTapAnimation(coords.x, coords.y);
+            if (isWeb) {
+                setLoading(true);
+                // Immediately clear selection and hover elements to avoid showing stale highlighter boundaries
+                setSelectedNode(null);
+                setHoveredNode(null);
+                setAvailableNodes([]);
+                if (onNodeSelected) onNodeSelected(null);
+                if (onNodeHovered) onNodeHovered(null);
+
+                invoke('send_web_input', {
+                    actionType: 'click',
+                    x: coords.x,
+                    y: coords.y,
+                    webUrl: activeWebUrl || undefined
+                }).then(() => {
+                    setTimeout(() => refreshAll(), 100);
+                }).catch(e => {
+                    setLoading(false);
+                    feedback.toast.error("inspector.input_error", e);
+                });
+                addTapAnimation(coords.x, coords.y);
+            } else {
+                sendAdbInput(`tap ${coords.x} ${coords.y}`);
+                addTapAnimation(coords.x, coords.y);
+            }
         }
-    }, [getCoords, sendAdbInput, addTapAnimation]);
+    }, [getCoords, is_test_mode, sendAdbInput, addTapAnimation, refreshAll, activeWebUrl, onNodeSelected, onNodeHovered]);
 
     return {
         screenshot,

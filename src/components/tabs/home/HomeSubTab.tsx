@@ -240,11 +240,13 @@ export function HomeSubTab({ onNavigate }: HomeSubTabProps) {
         }
     };
 
-    const { getBool, getString } = useRemoteConfig();
-    const isMaintenance = getBool('maintenance_mode');
-    const minVersion = getString('min_app_version');
-    const isUpdateRequired = !!(pkg.version && minVersion && semver.lt(pkg.version, minVersion));
-    const showHomeStats = getBool('show_home_stats');
+    const { isFeatureEnabled, getString } = useRemoteConfig();
+    const isMaintenance = isFeatureEnabled('maintenance_mode');
+    const showHomeStats = isFeatureEnabled('show_home_stats');
+
+    const minVersionValue = getString('min_app_version');
+    const isUpdateCheckEnabled = isFeatureEnabled('min_app_version') || semver.valid(minVersionValue) !== null;
+    const isUpdateRequired = !!(isUpdateCheckEnabled && pkg.version && minVersionValue && semver.valid(minVersionValue) && semver.lt(pkg.version, minVersionValue));
 
     return (
         <div className="flex flex-col gap-10 pb-12 pt-4">
@@ -262,7 +264,7 @@ export function HomeSubTab({ onNavigate }: HomeSubTabProps) {
                             icon={<AlertTriangle size={16} />}
                             className="rounded-[2rem] border-warning/20 bg-warning/5"
                         >
-                            {t('home.maintenance.description', { version: minVersion })}
+                            {t('home.maintenance.description', { version: minVersionValue })}
                         </Alert>
                     </motion.div>
                 )}
@@ -281,7 +283,7 @@ export function HomeSubTab({ onNavigate }: HomeSubTabProps) {
                             icon={<ArrowUpCircle size={16} />}
                             className="rounded-[2rem] border-primary/20 bg-primary/5"
                         >
-                            {t('home.update.description', { version: minVersion })}
+                            {t('home.update.description', { version: minVersionValue })}
                         </Alert>
                     </motion.div>
                 )}

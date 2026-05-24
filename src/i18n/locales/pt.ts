@@ -517,7 +517,11 @@ export const pt = {
                 ready: "Pronto",
                 loading: "Carregando...",
                 no_screenshot: "Sem captura de tela",
-                paused_test: "Inspector desabilitado durante o teste"
+                paused_test: "Inspector desabilitado durante o teste",
+                web_mode_title: "Inspetor Otimizado para Mobile",
+                web_mode_desc: "O Inspetor Visual é otimizado para Automação Mobile (Android e iOS). Para aplicações Web, por favor utilize as ferramentas de desenvolvedor nativas do navegador (ex: Chrome DevTools) ou o painel interativo do Cypress Test Runner para inspecionar elementos em tempo real.",
+                web_mode_action: "Abrir DevTools",
+                web_mode_info: "Abra o Chrome DevTools pressionando F12 ou Clique com o Botão Direito > Inspecionar em seu navegador web."
             },
             properties: "Propriedades do Nó",
             select_element: "Selecione um elemento na tela",
@@ -648,6 +652,10 @@ export const pt = {
         mapper: {
             title: "Mapeador",
             empty: "Selecione um dispositivo para iniciar o mapeamento",
+            web_mode_title: "Mapeador Otimizado para Mobile",
+            web_mode_desc: "O Mapeador de Elementos é otimizado para Automação Mobile (Android e iOS). Para aplicações Web, recomendamos estruturar seus elementos diretamente em seus modelos de objetos de página (POMs) ou bibliotecas de localizadores.",
+            web_mode_action: "Saiba Mais",
+            web_mode_info: "Elementos web são definidos diretamente em suas specs do Cypress ou page objects.",
             refresh: "Atualizar Fonte",
             screen_description: "Descrição da Tela",
             description: "Descrição",
@@ -1134,6 +1142,8 @@ export const pt = {
                 robot_args: "Argumentos Robot Framework",
                 maestro_args: "Argumentos Maestro",
                 appium_java_args: "Argumentos Appium Java",
+                cypress_args: "Argumentos Cypress",
+                selenium_args: "Argumentos Selenium",
                 app_packages: "Pacotes de Apps",
                 add_package: "Adicionar Pacote",
                 add_package_placeholder: "Adicionar pacote (Pressione Enter)",
@@ -1487,7 +1497,8 @@ export const pt = {
                 commands: "Comandos",
                 mirror: "Espelhamento",
                 performance: "Performance",
-                apps: "Apps"
+                apps: "Apps",
+                webview: "Webview"
             },
             actions: {
                 screenshot: "Capturar Tela",
@@ -1510,15 +1521,27 @@ export const pt = {
             description: "Vamos configurar seu perfil para otimizar sua experiência. Isso levará apenas um momento.",
             step1_title: "Selecione seu Idioma",
             step2_title: "Escolha seu Modo de Uso",
+            step2_platform_title: "Selecione a Plataforma de Exploração",
             error_no_mode: "Por favor, selecione um modo de uso para continuar.",
+            error_no_platform: "Por favor, selecione uma plataforma para continuar.",
+            platform: {
+                mobile: {
+                    title: "Plataforma Mobile",
+                    description: "Ferramentas cotidianas para depuração e testes manuais de apps mobile (ADB, Scrcpy, etc.)."
+                },
+                web: {
+                    title: "Plataforma Web",
+                    description: "Ferramentas cotidianas para depuração e testes manuais de páginas web."
+                }
+            },
             mode: {
                 explorer: {
                     title: "Explorador",
-                    description: "Ferramentas cotidianas para debug e testes manuais (ADB, Scrcpy, etc.). Nenhuma configuração necessária."
+                    description: "Ferramentas cotidianas para depuração e testes manuais. Nenhuma configuração necessária."
                 },
                 automator: {
                     title: "Automator",
-                    description: "Desenvolva e execute testes automatizados usando Robot Framework, Appium ou Maestro."
+                    description: "Desenvolva e execute testes automatizados usando Robot Framework, Appium, Maestro, Cypress ou Selenium."
                 }
             },
             step3_title: "Selecione seu Framework",
@@ -1535,6 +1558,14 @@ export const pt = {
                 maestro: {
                     title: "Maestro",
                     description: "Fluxos baseados em YAML. Ideal para testes de UI ultra-rápidos e simplicidade."
+                },
+                cypress: {
+                    title: "Cypress",
+                    description: "Ferramenta de testes front-end de próxima geração construída para a web moderna."
+                },
+                selenium: {
+                    title: "Selenium (Pytest)",
+                    description: "Automação de navegador padrão usando Python & pytest. Ideal para regressão web robusta."
                 }
             }
         },

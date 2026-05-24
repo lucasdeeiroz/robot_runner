@@ -28,7 +28,7 @@ interface TestsSubTabProps {
 type SelectionMode = 'file' | 'folder' | 'args';
 
 export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTabProps) {
-    const { settings, updateSetting } = useSettings();
+    const { settings, updateSetting, is_test_mode } = useSettings();
     const { t } = useTranslation();
     const [mode, setMode] = useState<SelectionMode>('file');
     const [launchStatus, setLaunchStatus] = useState("");
@@ -63,9 +63,13 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
         return false;
     }, [settings.aiProvider, settings.geminiApiKey, settings.claudeApiKey, settings.openaiApiKey]);
 
-    const { getBool } = useRemoteConfig();
-    const isAiEnabled = getBool('is_ai_analysis_enabled');
-    const isAiTestModeEnabled = getBool('is_ai_test_mode_enabled');
+    const remoteConfig = useRemoteConfig() as {
+        isFeatureEnabled?: (featureKey: string) => boolean;
+        features?: Record<string, boolean>;
+    };
+    const isFeatureEnabled = remoteConfig.isFeatureEnabled ?? ((featureKey: string) => !!remoteConfig.features?.[featureKey]);
+    const isAiEnabled = isFeatureEnabled('is_ai_analysis_enabled');
+    const isAiTestModeEnabled = isFeatureEnabled('is_ai_test_mode_enabled');
 
     const handleOpenTestSelector = async (path: string) => {
         const existingItem = items.find(i => i.path === path);
@@ -192,8 +196,8 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
         const fw = settings.automationFramework || 'robot';
 
         try {
-            // 1. Check/Start Appium (Skip for Maestro or AI Agents)
-            if (fw !== 'maestro' && !isAiAgent) {
+            // 1. Check/Start Appium (Skip for Maestro, Cypress, Selenium or AI Agents)
+            if (fw !== 'maestro' && fw !== 'cypress' && fw !== 'selenium' && !isAiAgent) {
                 const status = await invoke<{ running: boolean }>('get_appium_status', {
                     host: settings.appiumHost,
                     port: Number(settings.appiumPort),
@@ -245,14 +249,27 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
             for (const deviceUdid of targets) {
                 const runId = uuidv4();
                 const deviceObj = devices.find((d: Device) => d.udid === deviceUdid);
-                const devModel = deviceObj ? deviceObj.model.replace(/\s+/g, '') : "UnknownModel";
-                const devVer = deviceObj ? deviceObj.android_version || "0" : "0";
+                const isWebSession = is_test_mode === 'web';
 
-                let devName = deviceObj?.model || "Device";
-                if (deviceUdid && deviceUdid !== 'local') {
-                    devName = `${devName} (${deviceObj?.android_version ? `Android ${deviceObj.android_version}` : deviceUdid})`;
+                const devModel = isWebSession
+                    ? (deviceUdid || 'browser')
+                    : (deviceObj ? deviceObj.model.replace(/\s+/g, '') : "UnknownModel");
+                const devVer = isWebSession
+                    ? 'web'
+                    : (deviceObj ? deviceObj.android_version || "0" : "0");
+
+                let devName: string;
+                if (isWebSession) {
+                    devName = deviceUdid
+                        ? deviceUdid.charAt(0).toUpperCase() + deviceUdid.slice(1)
+                        : 'Browser';
                 } else {
-                    devName = "Local/Web";
+                    devName = deviceObj?.model || "Device";
+                    if (deviceUdid && deviceUdid !== 'local') {
+                        devName = `${devName} (${deviceObj?.android_version ? `Android ${deviceObj.android_version}` : deviceUdid})`;
+                    } else {
+                        devName = "Local/Web";
+                    }
                 }
 
                 // Determine suite name for UI and execution
@@ -420,7 +437,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     deviceUdid || "local",
                     devName,
                     finalTestPath || finalArgsFile || suiteName,
-                    fw as 'robot' | 'maestro' | 'appium',
+                    fw as 'robot' | 'maestro' | 'appium' | 'cypress' | 'selenium',
                     settings.saveLogs,
                     logDir,
                     finalArgsFile,
@@ -471,6 +488,28 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                         projectPath: finalTestPath,
                         outputDir: logDir,
                         appiumJavaArgs: settings.tools.appiumJavaArgs
+                    }).catch(e => {
+                        feedback.toast.error("tests.launch_failed", e);
+                    });
+                } else if (fw === 'cypress') {
+                    invoke("run_cypress_test", {
+                        runId,
+                        testPath: finalTestPath,
+                        outputDir: logDir,
+                        browser: deviceUdid || 'chrome',
+                        cypressArgs: settings.tools.cypressArgs,
+                        workingDir
+                    }).catch(e => {
+                        feedback.toast.error("tests.launch_failed", e);
+                    });
+                } else if (fw === 'selenium') {
+                    invoke("run_selenium_test", {
+                        runId,
+                        testPath: finalTestPath,
+                        outputDir: logDir,
+                        browser: deviceUdid || 'chrome',
+                        seleniumArgs: settings.tools.seleniumArgs,
+                        workingDir
                     }).catch(e => {
                         feedback.toast.error("tests.launch_failed", e);
                     });

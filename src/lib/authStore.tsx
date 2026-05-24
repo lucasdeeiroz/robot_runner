@@ -11,6 +11,7 @@ import { feedback } from './feedback';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { openUrl } from '@tauri-apps/plugin-opener';
+import { setUserTargeting } from './remoteConfig';
 
 interface AuthContextType {
   user: User | null;
@@ -43,6 +44,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       clearTimeout(safetyTimer);
       setUser(user);
+      setUserTargeting(user?.email || null);
       setLoading(false);
     });
 

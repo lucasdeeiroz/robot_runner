@@ -117,6 +117,12 @@ export function transformXmlToTree(rawNode: any, parent?: InspectorNode, keyName
 
     if (attributes['bounds']) {
         node.bounds = parseBounds(attributes['bounds']);
+    } else if (attributes['width'] && attributes['height']) {
+        const w = parseInt(attributes['width'], 10);
+        const h = parseInt(attributes['height'], 10);
+        if (!isNaN(w) && !isNaN(h)) {
+            node.bounds = { x: 0, y: 0, w, h };
+        }
     }
 
     // Link parent for children

@@ -1,4 +1,5 @@
 import { ScreenMap, NavigationData } from '@/lib/types';
+import { getRemoteString } from '../remoteConfig';
 
 /**
  * Appends a custom prompt instruction to the end of the original prompt if provided.
@@ -43,7 +44,7 @@ export function formatExistingMaps(maps: ScreenMap[]): string {
 }
 
 export function getExplorationPrompt(language: string, customPrompt?: string): string {
-  const basePrompt = `
+  const basePrompt = getRemoteString('prompt_exploration') || `
 # Role: Expert Autonomous Mobile QA Explorer
 Your goal is to map 100% of a mobile app's UI by discovering every screen, modal, and interactive element.
 
@@ -104,14 +105,14 @@ Your goal is to map 100% of a mobile app's UI by discovering every screen, modal
   },
   "rationale": "High-level reason for this step in the global exploration plan."
 }
-
-Respond in ${language}. Ensure JSON is valid and contains NO backticks or extra text.
 `.trim();
-  return appendCustomPrompt(basePrompt, customPrompt);
+
+  const languageDirective = `Respond in ${language}. Ensure JSON is valid and contains NO backticks or extra text.`;
+  return appendCustomPrompt(`${basePrompt}\n\n${languageDirective}`, customPrompt);
 }
 
 export function getRefinedTestCasesPrompt(language: string, customPrompt?: string): string {
-  const basePrompt = `
+  const basePrompt = getRemoteString('prompt_test_cases') || `
 Convert the user's raw requirements into well-structured Gherkin (BDD) test scenarios.
 1. Use the Gherkin format (Given/When/Then).
 2. For each scenario, include:
@@ -125,30 +126,30 @@ Convert the user's raw requirements into well-structured Gherkin (BDD) test scen
    ...
 3. If input is vague, infer Happy Path and at least one Sad Path.
 4. Separate multiple scenarios for the same story.
-5. Language: ${language}.
 `.trim();
-  return appendCustomPrompt(basePrompt, customPrompt);
+  const languageDirective = `Language: ${language}.`;
+  return appendCustomPrompt(`${basePrompt}\n${languageDirective}`, customPrompt);
 }
 
 export function getRefinedPBIPrompt(language: string, customPrompt?: string): string {
-  const basePrompt = `
+  const basePrompt = getRemoteString('prompt_pbi') || `
 Convert requirements into detailed Product Backlog Items (PBIs/User Stories).
 1. Format each PBI as:
    PBI: [ID] - [Title]
    As a [role], I want [action], so that [value/benefit].
-   
+
    Acceptance Criteria:
    - [point 1]
    - [point 2]
    ...
 2. Focus on the user perspective and business value.
-3. Language: ${language}.
 `.trim();
-  return appendCustomPrompt(basePrompt, customPrompt);
+  const languageDirective = `Language: ${language}.`;
+  return appendCustomPrompt(`${basePrompt}\n${languageDirective}`, customPrompt);
 }
 
 export function getRefinedImprovementPrompt(language: string, customPrompt?: string): string {
-  const basePrompt = `
+  const basePrompt = getRemoteString('prompt_improvement') || `
 Analyze requirements and suggest UI/UX or functional improvements.
 1. Format as a list of improvements:
    Improvement [number]: [Title]
@@ -156,35 +157,35 @@ Analyze requirements and suggest UI/UX or functional improvements.
    Rationale: [Why this is an improvement]
    Priority: [Low/Medium/High]
 2. Suggest enhancements that would make the feature more robust or user-friendly.
-3. Language: ${language}.
 `.trim();
-  return appendCustomPrompt(basePrompt, customPrompt);
+  const languageDirective = `Language: ${language}.`;
+  return appendCustomPrompt(`${basePrompt}\n${languageDirective}`, customPrompt);
 }
 
 export function getRefinedBugPrompt(language: string, customPrompt?: string): string {
-  const basePrompt = `
+  const basePrompt = getRemoteString('prompt_bug') || `
 transform a bug description into a professional, structured bug report.
 1. Format as:
    Bug Report: [Title]
    Severity: [S1/S2/S3]
-   
+
    Summary: [Brief description]
-   
+
    Steps to Reproduce:
    1. [Step 1]
    2. [Step 2]
    ...
    Actual Result: [What currently happens]
    Expected Result: [What should happen]
-   
+
    Notes: [Optional environment details or hints]
-2. Language: ${language}.
 `.trim();
-  return appendCustomPrompt(basePrompt, customPrompt);
+  const languageDirective = `Language: ${language}.`;
+  return appendCustomPrompt(`${basePrompt}\n${languageDirective}`, customPrompt);
 }
 
 export function getRefinedRobotScriptPrompt(language: string, customPrompt?: string): string {
-  const basePrompt = `
+  const basePrompt = getRemoteString('prompt_robot_script') || `
 Generate a complete, functional Robot Framework (.robot) script block.
 1. Use the standard structure: *** Settings ***, *** Variables ***, *** Keywords ***, *** Test Cases ***.
 2. In *** Settings ***, include Library AppiumLibrary.
@@ -193,16 +194,16 @@ Generate a complete, functional Robot Framework (.robot) script block.
 5. If an element name from mapping is found, use it as a basis for the keyword action (e.g., if mapped "Login Button", use its XPath/ID).
 6. Parameterize the keywords (use variables for dynamic data like usernames, passwords, or search queries found in the text).
 7. Ensure the script is valid and follows best practices for mobile automation.
-8. Language: ${language}.
 `.trim();
-  return appendCustomPrompt(basePrompt, customPrompt);
+  const languageDirective = `Language: ${language}.`;
+  return appendCustomPrompt(`${basePrompt}\n${languageDirective}`, customPrompt);
 }
 
 /**
  * Prompt specifically for reorganizing the flowchart layout.
  */
 export function getFlowchartLayoutPrompt(language: string, customPrompt?: string): string {
-  const basePrompt = `
+  const basePrompt = getRemoteString('prompt_flowchart_layout') || `
 Analyze the provided mobile application screens and their navigation connections to reorganize the Flowchart layout using a grid-based system (gridX, gridY).
 
 MANDATORY EXHAUSTIVITY RULE:
@@ -228,10 +229,9 @@ INPUT:
 OUTPUT:
 - Return ONLY a valid JSON object mapping each screen NAME to its new coordinates.
 - Format: { "nodes": { "Screen Name": { "gridX": number, "gridY": number }, ... }, "missed": ["Screen Name", ...] }
-
-Language for any required internal reasoning: ${language}.
 `.trim();
-  return appendCustomPrompt(basePrompt, customPrompt);
+  const languageDirective = `Language for any required internal reasoning: ${language}.`;
+  return appendCustomPrompt(`${basePrompt}\n${languageDirective}`, customPrompt);
 }
 
 /**
@@ -249,17 +249,17 @@ export function getElementNamingPrompt(
     .map(([k, v]) => `- ${k}: ${v}`)
     .join('\n');
 
-  const basePrompt = `
+  const basePromptTemplate = getRemoteString('prompt_element_naming') || `
 Context: Professional QA Engineering and Test Automation.
-Task: Suggest a descriptive name and a brief justification for this UI element found in the screen "${screenName}".
+Task: Suggest a descriptive name and a brief justification for this UI element found in the screen "\${screenName}".
 
 Element Attributes:
-${attributes}
-${mappingContext}
+\${attributes}
+\${mappingContext}
 
 Rules:
 1. Use "Space Separated" convention for the name (e.g., "Login Button", "Username Input").
-2. Respond in this language: ${language}.
+2. Respond in this language: \${language}.
 3. Return ONLY a valid JSON object.
 4. Do NOT include any markdown code blocks (triple backticks), introductory text, or concluding remarks.
 5. Keep the "justification" field extremely concise (maximum 15 words).
@@ -269,6 +269,14 @@ Rules:
      "justification": "Short reason..."
    }
 `.trim();
+
+  // Simple string replacement for dynamic parts in the remote prompt
+  const basePrompt = basePromptTemplate
+    .replace('${screenName}', screenName)
+    .replace('${attributes}', attributes)
+    .replace('${mappingContext}', mappingContext)
+    .replace('${language}', language);
+
   return appendCustomPrompt(basePrompt, customPrompt);
 }
 
@@ -276,7 +284,7 @@ Rules:
  * System instruction for suggesting semantic tags for a screen.
  */
 export function getScreenTaggingPrompt(language: string, customPrompt?: string): string {
-  const basePrompt = `
+  const basePrompt = getRemoteString('prompt_screen_tagging') || `
 You are a QA Architect.
 Analyze the screen components and optionally the provided screenshot to suggest 3 to 5 highly relevant semantic tags.
 
@@ -286,17 +294,16 @@ TAGGING CONSTRAINTS:
 - NO GENERIC TAGS: Do NOT use generic terms like "Screen", "Button", "Component", "Elements", "Mobile", "Page".
 - DESCRIPTIVE: Prefer one-word tags that provide clear context for organizing large test suites.
 - OUTPUT: Return ONLY a comma-separated list of tags.
-
-Language: ${language}.
 `.trim();
-  return appendCustomPrompt(basePrompt, customPrompt);
+  const languageDirective = `Language: ${language}.`;
+  return appendCustomPrompt(`${basePrompt}\n${languageDirective}`, customPrompt);
 }
 
 /**
  * Prompt for the Smart Selector Suggester in the Inspector.
  */
 export function getSmartSelectorPrompt(language: string, customPrompt?: string): string {
-  const basePrompt = `
+  const basePrompt = getRemoteString('prompt_smart_selector') || `
 You are an expert QA Automation Engineer. 
 Your task is to analyze the provided mobile element attributes and suggest the most resilient, stable, and unique selector (XPath or Accessibility ID).
 
@@ -305,9 +312,9 @@ Rules:
 2. Second preference is Resource ID if it's unique.
 3. If using XPath, avoid long absolute paths. Use relative paths with unique attributes.
 4. Provide the suggestion in a clear format: "Selector: [the selector]" followed by "Rationale: [explanation]".
-5. Provide the Rationale in the requested language: ${language}.
 `.trim();
-  return appendCustomPrompt(basePrompt, customPrompt);
+  const languageDirective = `Provide the Rationale in the requested language: ${language}.`;
+  return appendCustomPrompt(`${basePrompt}\n${languageDirective}`, customPrompt);
 }
 
 
@@ -317,7 +324,7 @@ Rules:
 export function getTestHistoryAnalysisPrompt(language: string, customPrompt?: string): string {
   const responseLanguage = language.toLowerCase().startsWith('pt') ? 'Portuguese' : language.toLowerCase().startsWith('es') ? 'Spanish' : 'English';
 
-  const basePrompt = `
+  const basePrompt = getRemoteString('prompt_test_history_analysis') || `
 You are a Senior QA Automation Engineer and Data Analyst. Do not mention who you are in your responses.
 Analyze the provided test execution history to identify:
 1. Flakiness: Tests that fail and pass intermittently under similar conditions. Use the "failedTests" list to track individual test stability across runs.
@@ -328,9 +335,9 @@ Analyze the provided test execution history to identify:
 
 Provide a comprehensive analysis in Markdown format.
 Use professional tone and actionable insights.
-Response language: ${responseLanguage}.
 `.trim();
-  return appendCustomPrompt(basePrompt, customPrompt);
+  const languageDirective = `Response language: ${responseLanguage}.`;
+  return appendCustomPrompt(`${basePrompt}\n${languageDirective}`, customPrompt);
 }
 
 /**
@@ -339,7 +346,7 @@ Response language: ${responseLanguage}.
 export function getExecutionSummaryPrompt(language: string, totalTests: number, customPrompt?: string): string {
   const responseLanguage = language.toLowerCase().startsWith('pt') ? 'Portuguese' : language.toLowerCase().startsWith('es') ? 'Spanish' : 'English';
 
-  const basePrompt = `
+  const basePromptTemplate = getRemoteString('prompt_execution_summary') || `
 You are a Senior Lead QA Engineer.
 Analyze the provided test execution tree and failure context to provide a high-level "Executive Summary".
 
@@ -347,24 +354,26 @@ Your primary objective is to identify if multiple failures share a common root c
 
 Focus on:
 1. Overall Success Rate: Use the "OVERALL STATISTICS" section to provide an accurate success percentage.
-2. Critical Failures Analysis: Use the "FAILURE CONTEXT" section below to explain WHY tests failed. Look for error messages, stack traces, or screenshots mentioned in technical details.
+2. Critical Failures Analysis: Use the \"FAILURE CONTEXT\" section below to explain WHY tests failed. Look for error messages, stack traces, or screenshots mentioned in technical details.
 3. Actionable Insights: Suggest what the developer or QA should check first based on the actual logs provided.
 
 Rules:
 - Use Markdown.
 - Be concise but professional.
-- ALWAYS use the provided numbers for success rate. If OVERALL STATISTICS shows ${totalTests} tests, then that is the truth.
+- ALWAYS use the provided numbers for success rate. If OVERALL STATISTICS shows \${totalTests} tests, then that is the truth.
 - IF technical details are provided in FAILURE CONTEXT, YOU MUST use them. Do not say they are missing.
-- Response language: ${responseLanguage}.
 `.trim();
-  return appendCustomPrompt(basePrompt, customPrompt);
+
+  const basePrompt = basePromptTemplate.replace('${totalTests}', totalTests.toString());
+  const languageDirective = `Response language: ${responseLanguage}.`;
+  return appendCustomPrompt(`${basePrompt}\n${languageDirective}`, customPrompt);
 }
 
 /**
  * Prompt for root cause analysis and self-healing in the Log Tree.
  */
 export function getFailureAnalysisPrompt(language: string, customPrompt?: string): string {
-  const basePrompt = `
+  const basePrompt = getRemoteString('prompt_failure_analysis') || `
 You are a Senior QA Automation Engineer.
 Analyze the test failure provided (error message + screenshot if available).
 
@@ -375,10 +384,9 @@ Analyze the test failure provided (error message + screenshot if available).
     - Suggest a highly resilient fallback locator (XPath, ID, or Accessibility ID) that could heal this test.
     - Clearly label this section as "💡 Healed Locator Suggestion:".
 3. Suggest a technical fix or next steps for the developer.
-
-Respond in ${language}. Keep it concise and technical.
 `.trim();
-  return appendCustomPrompt(basePrompt, customPrompt);
+  const languageDirective = `Respond in ${language}. Keep it concise and technical.`;
+  return appendCustomPrompt(`${basePrompt}\n${languageDirective}`, customPrompt);
 }
 
 /**
@@ -404,7 +412,7 @@ ${mappingContext}
  * Focuses on executing a specific scenario step-by-step using ADB.
  */
 export function getAutonomousAgentPrompt(language: string, customPrompt?: string): string {
-  const basePrompt = `
+  const basePrompt = getRemoteString('prompt_autonomous_agent') || `
 # Role: Autonomous Mobile QA Agent
 Your goal is to execute a test scenario step-by-step on a real device.
 
@@ -438,8 +446,7 @@ Your goal is to execute a test scenario step-by-step on a real device.
   "isStepCompleted": boolean,
   "nextExpectedState": "Describe what you expect to see on the screen next."
 }
-
-Respond in ${language}. Ensure the JSON is valid and contains NO markdown backticks or extra text.
 `.trim();
-  return appendCustomPrompt(basePrompt, customPrompt);
-}
+  const languageDirective = `Respond in ${language}. Ensure the JSON is valid and contains NO markdown backticks or extra text.`;
+  return appendCustomPrompt(`${basePrompt}\n${languageDirective}`, customPrompt);
+}

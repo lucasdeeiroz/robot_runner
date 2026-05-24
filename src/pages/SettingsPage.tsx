@@ -35,15 +35,18 @@ import { InfoCard } from "@/components/molecules/InfoCard";
 import { LogoInput } from "@/components/molecules/LogoInput";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 
+import { useRemoteConfig } from "@/lib/RemoteConfigProvider";
+
 interface SettingsPageProps {
     onNavigate?: (page: string) => void;
 }
 
 export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
-    const { settings, updateSetting, loading, profiles, activeProfileId, createProfile, switchProfile, renameProfile, deleteProfile, systemVersions, checkSystemVersions, systemCheckStatus, isNgrokEnabled } = useSettings();
+    const { settings, updateSetting, loading, profiles, activeProfileId, createProfile, switchProfile, renameProfile, deleteProfile, systemVersions, checkSystemVersions, systemCheckStatus, isNgrokEnabled, is_test_mode } = useSettings();
     const { t } = useTranslation();
     const { sessions } = useTestSessions();
     const isTestRunning = sessions.some(s => s.status === 'running');
+    const showAppiumSection = settings.usageMode === 'automator' && settings.automationFramework !== 'maestro' && is_test_mode !== 'web';
 
     // Profile Management Details
     const [showProfileModal, setShowProfileModal] = useState(false);
@@ -70,6 +73,10 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
 
     const geminiCodeVersion = systemVersions?.gemini_code;
     const isGeminiCodeInstalled = !!geminiCodeVersion && geminiCodeVersion !== 'Not Found';
+
+    const { isFeatureEnabled } = useRemoteConfig();
+    const isCypressEnabled = isFeatureEnabled('is_cypress_enabled');
+    const isSeleniumEnabled = isFeatureEnabled('is_selenium_enabled');
 
 
     const handleRestartADB = async () => {
@@ -525,7 +532,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                             <Select
                                 value={settings.automationFramework || 'robot'}
                                 onChange={async (e) => {
-                                    const framework = e.target.value as 'robot' | 'appium' | 'maestro';
+                                    const framework = e.target.value as 'robot' | 'appium' | 'maestro' | 'cypress' | 'selenium';
                                     updateSetting('automationFramework', framework);
                                     checkSystemVersions('automator', framework);
                                 }}
@@ -533,7 +540,9 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                 options={[
                                     { value: "robot", label: t('onboarding.framework.robot.title') },
                                     { value: "appium", label: t('onboarding.framework.appium.title') },
-                                    { value: "maestro", label: t('onboarding.framework.maestro.title') }
+                                    { value: "maestro", label: t('onboarding.framework.maestro.title') },
+                                    ...(isCypressEnabled ? [{ value: "cypress", label: t('onboarding.framework.cypress.title') }] : []),
+                                    ...(isSeleniumEnabled ? [{ value: "selenium", label: t('onboarding.framework.selenium.title') }] : [])
                                 ]}
                             />
                         </div>
@@ -580,7 +589,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
             <div className="grid gap-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Appium Server Config & Control */}
-                    {(settings.usageMode === 'automator' && settings.automationFramework !== 'maestro') && (
+                    {showAppiumSection && (
                         <Section
                             title={t('settings.appium.title')}
                             icon={Server}
@@ -714,30 +723,37 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                     <Section
                         title={t('settings.tools')}
                         icon={Wrench}
-                        className={clsx((settings.usageMode === 'explorer' || settings.automationFramework === 'maestro') && "col-span-full")}
+                        className={clsx(!showAppiumSection && "col-span-full")}
                         menus={
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleRestartADB}
-                                disabled={isRestartingADB}
-                                leftIcon={isRestartingADB ? <ExpressiveLoading size="xsm" variant="circular" /> : <RefreshCcw size={16} />}
-                                className="text-on-surface/80 hover:text-primary hover:bg-primary/10"
-                            >
-                                {t('settings.action.restart_adb')}
-                            </Button>
+                            is_test_mode !== 'web' ? (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={handleRestartADB}
+                                    disabled={isRestartingADB}
+                                    leftIcon={isRestartingADB ? <ExpressiveLoading size="xsm" variant="circular" /> : <RefreshCcw size={16} />}
+                                    className="text-on-surface/80 hover:text-primary hover:bg-primary/10"
+                                >
+                                    {t('settings.action.restart_adb')}
+                                </Button>
+                            ) : undefined
                         }
                     >
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {['robotArgs', 'maestroArgs', 'appiumJavaArgs', 'scrcpyArgs'].map((key) => {
+                            {['robotArgs', 'maestroArgs', 'appiumJavaArgs', 'cypressArgs', 'seleniumArgs', 'scrcpyArgs'].map((key) => {
                                 if (key === 'robotArgs' && (settings.usageMode === 'explorer' || (settings.automationFramework && settings.automationFramework !== 'robot'))) return null;
                                 if (key === 'maestroArgs' && (settings.usageMode === 'explorer' || settings.automationFramework !== 'maestro')) return null;
                                 if (key === 'appiumJavaArgs' && (settings.usageMode === 'explorer' || settings.automationFramework !== 'appium')) return null;
+                                if (key === 'cypressArgs' && (settings.usageMode === 'explorer' || settings.automationFramework !== 'cypress')) return null;
+                                if (key === 'seleniumArgs' && (settings.usageMode === 'explorer' || settings.automationFramework !== 'selenium')) return null;
+                                if (key === 'scrcpyArgs' && is_test_mode === 'web') return null;
 
                                 let isDisabled = false;
                                 if (key === 'robotArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
                                 if (key === 'maestroArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
                                 if (key === 'appiumJavaArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
+                                if (key === 'cypressArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
+                                if (key === 'seleniumArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
                                 if (key === 'scrcpyArgs' && systemCheckStatus?.missingMirroring?.length > 0) isDisabled = true;
 
                                 let labelKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
@@ -757,23 +773,25 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                 );
                             })}
                             {/* App Packages List */}
-                            <div className="col-span-1 md:col-span-2">
-                                <TagInput
-                                    label={t('settings.tool_config.app_packages')}
-                                    tags={settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean)}
-                                    onAdd={(tag) => {
-                                        const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
-                                        if (!current.includes(tag)) {
-                                            updateSetting('tools', { ...settings.tools, appPackage: [...current, tag].join(', ') });
-                                        }
-                                    }}
-                                    onRemove={(tag) => {
-                                        const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
-                                        updateSetting('tools', { ...settings.tools, appPackage: current.filter(t => t !== tag).join(', ') });
-                                    }}
-                                    placeholder={t('settings.tool_config.add_package_placeholder')}
-                                />
-                            </div>
+                            {is_test_mode !== 'web' && (
+                                <div className="col-span-1 md:col-span-2">
+                                    <TagInput
+                                        label={t('settings.tool_config.app_packages')}
+                                        tags={settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean)}
+                                        onAdd={(tag) => {
+                                            const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
+                                            if (!current.includes(tag)) {
+                                                updateSetting('tools', { ...settings.tools, appPackage: [...current, tag].join(', ') });
+                                            }
+                                        }}
+                                        onRemove={(tag) => {
+                                            const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
+                                            updateSetting('tools', { ...settings.tools, appPackage: current.filter(t => t !== tag).join(', ') });
+                                        }}
+                                        placeholder={t('settings.tool_config.add_package_placeholder')}
+                                    />
+                                </div>
+                            )}
                             {isNgrokEnabled && (
                                 <div className="col-span-1 md:col-span-2">
                                     <Input
@@ -798,6 +816,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                         {(['automationRoot', 'resources', 'tests', 'suites', 'logs', 'logcat', 'screenshots', 'recordings', 'mappings'] as Array<keyof typeof settings.paths>).map((key) => {
                             const isTestingPath = ['automationRoot', 'resources', 'tests', 'suites'].includes(key);
                             if (isTestingPath && settings.usageMode === 'explorer') return null;
+                            if (key === 'logcat' && is_test_mode === 'web') return null;
                             const isDisabled = isTestingPath && systemCheckStatus?.missingTesting?.length > 0;
                             return (
                                 <PathInput
@@ -1275,6 +1294,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                             (['adb', 'node', 'appium', 'uiautomator2', 'python', 'robot', 'appium_lib', 'java', 'maven', 'maestro', 'scrcpy', 'ngrok'] as Array<keyof typeof systemVersions>)
                                 .filter(key => {
                                     if (key === 'ngrok' && !isNgrokEnabled) return false;
+                                    if (is_test_mode === 'web' && ['adb', 'scrcpy'].includes(key)) return false;
                                     if (settings.usageMode === 'explorer' && ['node', 'appium', 'uiautomator2', 'python', 'robot', 'appium_lib', 'java', 'maven', 'maestro'].includes(key)) return false;
 
                                     // Framework-specific filtering

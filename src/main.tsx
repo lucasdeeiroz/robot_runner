@@ -3,6 +3,7 @@ import "./i18n/config";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import { SettingsProvider } from "@/lib/settings";
+import { AuthProvider } from "./lib/authStore";
 
 class GlobalErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: Error | null }> {
   constructor(props: { children: React.ReactNode }) {
@@ -29,7 +30,9 @@ class GlobalErrorBoundary extends React.Component<{ children: React.ReactNode },
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <GlobalErrorBoundary>
     <SettingsProvider>
-      <App />
+      <AuthProvider>
+        <App />
+      </AuthProvider>
     </SettingsProvider>
   </GlobalErrorBoundary>,
 );
