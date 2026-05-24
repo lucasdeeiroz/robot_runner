@@ -300,7 +300,6 @@ function applyRemoteTranslations() {
     let appliedAny = false;
 
     const currentFullLang = i18n.language;
-    console.log(`[RemoteConfig] i18n Refresh. Current full language: "${currentFullLang}"`);
 
     langs.forEach(lang => {
         const key = `i18n_${lang}`;
@@ -312,9 +311,6 @@ function applyRemoteTranslations() {
                 const translationData = resources.translation || resources;
                 
                 if (translationData && typeof translationData === 'object' && Object.keys(translationData).length > 0) {
-                    // Log keys found to help debugging
-                    console.log(`[RemoteConfig] Keys found in "${key}":`, Object.keys(translationData));
-                    
                     // Add to base and current variant
                     i18n.addResourceBundle(lang, 'translation', translationData, true, true);
                     if (currentFullLang.startsWith(lang) && currentFullLang !== lang) {
@@ -327,6 +323,11 @@ function applyRemoteTranslations() {
             }
         }
     });
+
+    if (appliedAny) {
+        // Force a re-render by notifying i18next
+        i18n.changeLanguage(currentFullLang);
+    }
 }
 
 /**
