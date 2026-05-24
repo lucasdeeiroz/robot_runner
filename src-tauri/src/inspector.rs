@@ -70,19 +70,7 @@ fn find_script(name: &str, app_handle: Option<&tauri::AppHandle>) -> Result<std:
     if parent.exists() {
         return Ok(parent);
     }
-    let current = std::env::current_dir()
-        .map_err(|_| format!("Failed to get current directory to locate {}", name))?;
-    let mut p = current.clone();
-    for _ in 0..4 {
-        let candidate = p.join(format!("scripts/{}", name));
-        if candidate.exists() {
-            return Ok(candidate);
-        }
-        if !p.pop() {
-            break;
-        }
-    }
-    Err(format!("Could not find scripts/{}. Current dir: {:?}", name, current))
+    Err(format!("Could not find scripts/{}", name))
 }
 
 async fn perform_web_capture(url: &str, browser: &str, app_handle: Option<&tauri::AppHandle>) -> Result<(String, String), String> {
