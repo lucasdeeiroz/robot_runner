@@ -296,11 +296,11 @@ function AppContent() {
             )}
           </AnimatePresence>
           <Layout activePage={activePage} onNavigate={setActivePage}>
-            <div className="max-w-7xl mx-auto h-full flex flex-col relative">
+            <div className="max-w-8xl mx-auto h-full flex flex-col relative">
               {/* RunPage - Kept mounted to preserve state */}
               {/* When active, it is relative to drive the container height. When not, it is absolute/hidden. */}
               <motion.div
-                className={clsx("flex flex-col w-full min-h-full", activePage === 'run' ? "relative" : "absolute inset-0 pointer-events-none opacity-0 overflow-hidden")}
+                className={clsx("flex flex-col w-full min-h-full px-4", activePage === 'run' ? "relative" : "absolute inset-0 pointer-events-none opacity-0 overflow-hidden")}
                 initial={false}
                 animate={{
                   opacity: activePage === 'run' ? 1 : 0,
