@@ -38,6 +38,7 @@ import { getAiContext } from '@/lib/dashboard/historyAnalysisUtils';
 import { ExplorationLogTree } from '@/components/molecules/ExplorationLogTree';
 import { useDeviceViewport } from '@/hooks/useDeviceViewport';
 import { DeviceViewport } from '@/components/organisms/DeviceViewport';
+import { useTestSessions } from '@/lib/testSessionStore';
 
 
 function groupElementsByType<T extends { type: string }>(
@@ -63,6 +64,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     const { settings, is_test_mode } = useSettings();
     const { t, i18n } = useTranslation();
     const { activeProfileId } = useSettings();
+    const { sessions } = useTestSessions();
 
     // --- Screen Mapper State ---
     const [screenName, setScreenName] = useState("");
@@ -156,6 +158,11 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     }, [activeProfileId]);
 
     const selectedDevice = selectedDeviceId;
+    const isTestRunningOnSelectedDevice = useMemo(() => {
+        if (!selectedDevice) return false;
+        return sessions.some(session => session.status === 'running' && session.deviceUdid === selectedDevice);
+    }, [selectedDevice, sessions]);
+    const isMapperBusy = isExploring || (isTestRunningOnSelectedDevice && !settings.allowActionsDuringTest);
 
     const {
         screenshot,
@@ -180,7 +187,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     } = useDeviceViewport({
         deviceId: selectedDevice,
         isActive,
-        isBusy: isExploring
+        isBusy: isMapperBusy
     });
 
     const toggleStayOn = async () => {
