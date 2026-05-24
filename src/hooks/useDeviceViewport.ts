@@ -27,13 +27,12 @@ export function useDeviceViewport({
 }: DeviceViewportOptions) {
     const { activeWebUrl, is_test_mode, setActiveWebUrl } = useSettings();
     const isWeb = isWebOverride !== undefined ? isWebOverride : is_test_mode === 'web';
-    const getHeadlessBrowser = (id: string | null): string => {
-        if (!id) return 'headless-chrome';
-        if (id.includes('firefox')) return 'headless-firefox';
-        return 'headless-chrome';
+    const getWebBrowser = (id: string | null): string => {
+        if (!id || !id.trim()) return 'chrome';
+        return id.trim();
     };
     const deviceId = isWeb
-        ? getHeadlessBrowser(initialDeviceId)
+        ? getWebBrowser(initialDeviceId)
         : initialDeviceId;
     const [screenshot, setScreenshot] = useState<string | null>(null);
     const [rootNode, setRootNode] = useState<InspectorNode | null>(null);

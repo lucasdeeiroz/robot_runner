@@ -481,7 +481,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                     if (framework === 'cypress') {
                         if (versions.node === 'Not Found') missingTesting.push('Node.js (Required for Cypress)');
                     } else if (framework === 'selenium') {
-                        if (versions.python === 'Not Found') missingTesting.push('Python');
+                        if (versions.python === 'Not Found' || versions.python === 'Not Checked') missingTesting.push('Python');
                     }
                 } else {
                     if (versions.node === 'Not Found') missingAppium.push('Node.js');

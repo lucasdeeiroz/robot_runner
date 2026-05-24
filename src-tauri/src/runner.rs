@@ -865,8 +865,7 @@ pub async fn run_selenium_test(
         }
         #[cfg(not(target_os = "windows"))]
         {
-            cmd = new_tokio_command("sh");
-            cmd.arg("-c").arg(&test_path);
+            cmd = new_tokio_command(&test_path);
         }
     }
 

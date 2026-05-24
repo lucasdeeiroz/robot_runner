@@ -1,6 +1,6 @@
 use crate::cmd_utils::new_tokio_command;
 use base64::{engine::general_purpose, Engine as _};
-use tauri::command;
+use tauri::{command, Manager};
 use std::sync::Mutex;
 use once_cell::sync::Lazy;
 
@@ -48,7 +48,32 @@ fn normalize_url(url: &str) -> String {
     u
 }
 
-async fn perform_web_capture(url: &str, browser: &str) -> Result<(String, String), String> {
+fn find_script(name: &str, app_handle: Option<&tauri::AppHandle>) -> Result<std::path::PathBuf, String> {
+    if let Some(handle) = app_handle {
+        if let Ok(resource_dir) = handle.path().resource_dir() {
+            let resource_candidate = resource_dir.join("scripts").join(name);
+            if resource_candidate.exists() {
+                return Ok(resource_candidate);
+            }
+            let fallback_resource_candidate = resource_dir.join(name);
+            if fallback_resource_candidate.exists() {
+                return Ok(fallback_resource_candidate);
+            }
+        }
+    }
+
+    let direct = std::path::PathBuf::from(format!("scripts/{}", name));
+    if direct.exists() {
+        return Ok(direct);
+    }
+    let parent = std::path::PathBuf::from(format!("../scripts/{}", name));
+    if parent.exists() {
+        return Ok(parent);
+    }
+    Err(format!("Could not find scripts/{}", name))
+}
+
+async fn perform_web_capture(url: &str, browser: &str, app_handle: Option<&tauri::AppHandle>) -> Result<(String, String), String> {
     // 1. Check cache first
     {
         let cache_lock = CAPTURE_CACHE.lock().unwrap();
@@ -61,39 +86,7 @@ async fn perform_web_capture(url: &str, browser: &str) -> Result<(String, String
     }
 
     // 2. Perform fresh capture using scripts/web_capture.cjs
-    let mut script_path = std::path::PathBuf::from("scripts/web_capture.cjs");
-    if !script_path.exists() {
-        // Try parent directory
-        let parent_path = std::path::PathBuf::from("../scripts/web_capture.cjs");
-        if parent_path.exists() {
-            script_path = parent_path;
-        } else {
-            // Let's walk up from the current directory to find it
-            if let Ok(current) = std::env::current_dir() {
-                let mut p = current.clone();
-                let mut found = false;
-                for _ in 0..4 {
-                    let test_path = p.join("scripts/web_capture.cjs");
-                    if test_path.exists() {
-                        script_path = test_path;
-                        found = true;
-                        break;
-                    }
-                    if !p.pop() {
-                        break;
-                    }
-                }
-                if !found {
-                    return Err(format!(
-                        "Could not find scripts/web_capture.cjs. Current dir: {:?}",
-                        current
-                     ));
-                }
-            } else {
-                return Err("Failed to get current directory to locate web_capture.cjs".to_string());
-            }
-        }
-    }
+    let script_path = find_script("web_capture.cjs", app_handle)?;
 
     let mut force_navigate = "false";
     {
@@ -161,10 +154,10 @@ async fn perform_web_capture(url: &str, browser: &str) -> Result<(String, String
 
 
 #[command]
-pub async fn get_screenshot(device_id: String, web_url: Option<String>) -> Result<String, String> {
+pub async fn get_screenshot(app_handle: tauri::AppHandle, device_id: String, web_url: Option<String>) -> Result<String, String> {
     if is_web_device(&device_id) {
         let url = web_url.unwrap_or_else(|| "https://google.com".to_string());
-        let (screenshot, _) = perform_web_capture(&url, &device_id).await?;
+        let (screenshot, _) = perform_web_capture(&url, &device_id, Some(&app_handle)).await?;
         return Ok(screenshot);
     }
 
@@ -191,12 +184,12 @@ pub async fn get_screenshot(device_id: String, web_url: Option<String>) -> Resul
 }
 
 #[command]
-pub async fn get_compressed_screenshot(device_id: String, max_width: Option<u32>, max_height: Option<u32>, web_url: Option<String>) -> Result<String, String> {
+pub async fn get_compressed_screenshot(app_handle: tauri::AppHandle, device_id: String, max_width: Option<u32>, max_height: Option<u32>, web_url: Option<String>) -> Result<String, String> {
     use crate::image_utils;
 
     if is_web_device(&device_id) {
         let url = web_url.unwrap_or_else(|| "https://google.com".to_string());
-        let (screenshot, _) = perform_web_capture(&url, &device_id).await?;
+        let (screenshot, _) = perform_web_capture(&url, &device_id, Some(&app_handle)).await?;
         
         // Decode base64 PNG screenshot to binary to resize and compress it
         let img_bytes = general_purpose::STANDARD.decode(&screenshot)
@@ -232,10 +225,10 @@ pub async fn get_compressed_screenshot(device_id: String, max_width: Option<u32>
 }
 
 #[command]
-pub async fn get_xml_dump(device_id: String, web_url: Option<String>) -> Result<String, String> {
+pub async fn get_xml_dump(app_handle: tauri::AppHandle, device_id: String, web_url: Option<String>) -> Result<String, String> {
     if is_web_device(&device_id) {
         let url = web_url.unwrap_or_else(|| "https://google.com".to_string());
-        let (_, xml) = perform_web_capture(&url, &device_id).await?;
+        let (_, xml) = perform_web_capture(&url, &device_id, Some(&app_handle)).await?;
         return Ok(xml);
     }
 
@@ -350,7 +343,7 @@ pub async fn get_xml_dump(device_id: String, web_url: Option<String>) -> Result<
 }
 
 #[command]
-pub async fn send_web_input(action_type: String, x: i32, y: i32, end_x: Option<i32>, end_y: Option<i32>, web_url: Option<String>) -> Result<(), String> {
+pub async fn send_web_input(app_handle: tauri::AppHandle, action_type: String, x: i32, y: i32, end_x: Option<i32>, end_y: Option<i32>, web_url: Option<String>) -> Result<(), String> {
     // Invalidate the cache's timestamp to force a fresh capture on the next refresh,
     // but preserve the requested_url to avoid triggering a forced navigate back.
     {
@@ -360,34 +353,7 @@ pub async fn send_web_input(action_type: String, x: i32, y: i32, end_x: Option<i
         }
     }
 
-    let mut script_path = std::path::PathBuf::from("scripts/web_interaction.cjs");
-    if !script_path.exists() {
-        let parent_path = std::path::PathBuf::from("../scripts/web_interaction.cjs");
-        if parent_path.exists() {
-            script_path = parent_path;
-        } else {
-            if let Ok(current) = std::env::current_dir() {
-                let mut p = current.clone();
-                let mut found = false;
-                for _ in 0..4 {
-                    let test_path = p.join("scripts/web_interaction.cjs");
-                    if test_path.exists() {
-                        script_path = test_path;
-                        found = true;
-                        break;
-                    }
-                    if !p.pop() {
-                        break;
-                    }
-                }
-                if !found {
-                    return Err("Could not find scripts/web_interaction.cjs".to_string());
-                }
-            } else {
-                return Err("Failed to get current directory to locate web_interaction.cjs".to_string());
-            }
-        }
-    }
+    let script_path = find_script("web_interaction.cjs", Some(&app_handle))?;
 
     let mut cmd = new_tokio_command("node");
     cmd.arg(script_path.to_string_lossy().to_string());
@@ -420,7 +386,7 @@ pub async fn send_web_input(action_type: String, x: i32, y: i32, end_x: Option<i
 }
 
 #[command]
-pub async fn save_web_screenshot(device_id: String, path: String) -> Result<(), String> {
+pub async fn save_web_screenshot(app_handle: tauri::AppHandle, device_id: String, path: String) -> Result<(), String> {
     let url = {
         let cache = CAPTURE_CACHE.lock().unwrap();
         cache.as_ref()
@@ -428,7 +394,7 @@ pub async fn save_web_screenshot(device_id: String, path: String) -> Result<(), 
             .unwrap_or_else(|| "https://google.com".to_string())
     };
 
-    let (screenshot, _) = perform_web_capture(&url, &device_id).await?;
+    let (screenshot, _) = perform_web_capture(&url, &device_id, Some(&app_handle)).await?;
 
     let img_bytes = general_purpose::STANDARD.decode(&screenshot)
         .map_err(|e| format!("Failed to decode screenshot: {}", e))?;
@@ -439,32 +405,8 @@ pub async fn save_web_screenshot(device_id: String, path: String) -> Result<(), 
     Ok(())
 }
 
-fn find_script(name: &str) -> Result<std::path::PathBuf, String> {
-    let direct = std::path::PathBuf::from(format!("scripts/{}", name));
-    if direct.exists() {
-        return Ok(direct);
-    }
-    let parent = std::path::PathBuf::from(format!("../scripts/{}", name));
-    if parent.exists() {
-        return Ok(parent);
-    }
-    let current = std::env::current_dir()
-        .map_err(|_| format!("Failed to get current directory to locate {}", name))?;
-    let mut p = current.clone();
-    for _ in 0..4 {
-        let candidate = p.join(format!("scripts/{}", name));
-        if candidate.exists() {
-            return Ok(candidate);
-        }
-        if !p.pop() {
-            break;
-        }
-    }
-    Err(format!("Could not find scripts/{}. Current dir: {:?}", name, current))
-}
-
 #[command]
-pub async fn start_web_recording() -> Result<(), String> {
+pub async fn start_web_recording(app_handle: tauri::AppHandle) -> Result<(), String> {
     {
         let guard = WEB_RECORDING_STATE.lock().unwrap();
         if guard.is_some() {
@@ -472,7 +414,7 @@ pub async fn start_web_recording() -> Result<(), String> {
         }
     }
 
-    let script_path = find_script("web_record.cjs")?;
+    let script_path = find_script("web_record.cjs", Some(&app_handle))?;
 
     let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -565,11 +507,12 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    #[ignore = "requires browser/CDP runtime and network access"]
     async fn test_perform_web_capture_resolves_path() {
         // Try perform_web_capture with a simple website (Google)
         // This will verify that scripts/web_capture.cjs is found, loaded, and runs without error.
         // We use "headless-chrome" for tests.
-        let result = perform_web_capture("https://google.com", "headless-chrome").await;
+        let result = perform_web_capture("https://google.com", "headless-chrome", None).await;
         
         // Assert that we don't get a "Could not find scripts/web_capture.cjs" or "Failed to run" error
         assert!(result.is_ok(), "Web capture failed: {:?}", result.err());
@@ -580,5 +523,3 @@ mod tests {
         assert!(xml.contains("hierarchy"), "XML dump should be a valid hierarchy");
     }
 }
-
-
