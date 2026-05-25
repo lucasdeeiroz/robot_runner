@@ -69,6 +69,7 @@ export function useDeviceViewport({
             setRootNode(null);
         }
 
+        let screenshotSucceeded = false;
         try {
             const webUrlParam = targetWebUrl || (isWeb ? activeWebUrl : undefined);
             
@@ -80,6 +81,7 @@ export function useDeviceViewport({
                 
                 const prefix = compressed ? 'data:image/jpeg;base64,' : 'data:image/png;base64,';
                 setScreenshot(b64.startsWith('data:') ? b64 : `${prefix}${b64}`);
+                screenshotSucceeded = true;
             } catch (screenshotErr) {
                 console.warn("[Inspector] Screenshot failed, but continuing with XML dump:", screenshotErr);
                 setScreenshot(null);
@@ -97,14 +99,30 @@ export function useDeviceViewport({
             setRootNode(root);
 
             // If screenshot failed, we need to set a fallback layout so interactions work
-            if (!screenshot && root?.bounds) {
+            if (!screenshotSucceeded && root?.bounds) {
+                let screenW = root.bounds.w;
+                let screenH = root.bounds.h;
+
+                try {
+                    const [wmW, wmH] = await invoke<[number, number]>('get_device_screen_size', { deviceId });
+                    if (wmW > 0 && wmH > 0) {
+                        screenW = wmW;
+                        screenH = wmH;
+                    }
+                } catch (err) {
+                    console.warn("[Inspector] Failed to get physical device screen size via wm size:", err);
+                }
+
+                // Adjust the rootNode's bounds to match the true physical screen size
+                root.bounds = { x: 0, y: 0, w: screenW, h: screenH };
+
                 const displayW = 300; // Match DeviceViewport fallback
-                const scale = displayW / root.bounds.w;
+                const scale = displayW / screenW;
                 setImgLayout({
                     width: displayW,
-                    height: root.bounds.h * scale,
-                    naturalWidth: root.bounds.w,
-                    naturalHeight: root.bounds.h
+                    height: screenH * scale,
+                    naturalWidth: screenW,
+                    naturalHeight: screenH
                 });
             }
 
@@ -122,6 +140,18 @@ export function useDeviceViewport({
             setLoading(false);
         }
     }, [deviceId, onRefreshSuccess, is_test_mode, activeWebUrl, onNodeSelected, onNodeHovered]);
+
+    // Reset viewport state when device changes to prevent stale layout/screenshot leak between devices
+    useEffect(() => {
+        setScreenshot(null);
+        setRootNode(null);
+        setSelectedNode(null);
+        setHoveredNode(null);
+        setAvailableNodes([]);
+        setImgLayout(null);
+        if (onNodeSelected) onNodeSelected(null);
+        if (onNodeHovered) onNodeHovered(null);
+    }, [deviceId]);
 
     // Handle auto-refresh on activation or busy state change
     useEffect(() => {

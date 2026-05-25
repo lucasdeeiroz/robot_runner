@@ -19,6 +19,7 @@ macro_rules! generate_robot_runner_handler {
             crate::inspector::get_screenshot,
             crate::inspector::get_compressed_screenshot,
             crate::inspector::get_xml_dump,
+            crate::inspector::get_device_screen_size,
             crate::inspector::send_web_input,
             crate::inspector::save_web_screenshot,
             crate::inspector::start_web_recording,

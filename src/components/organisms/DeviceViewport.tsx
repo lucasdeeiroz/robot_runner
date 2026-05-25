@@ -270,7 +270,7 @@ export const DeviceViewport: React.FC<DeviceViewportProps> = ({
                     <div className="relative inline-block overflow-hidden rounded-lg shadow border border-outline-variant/10 bg-surface">
                         <img
                             ref={imgRef as any}
-                            src={screenshot}
+                            src={screenshot || undefined}
                             alt="Web Execution Screenshot"
                             className="block w-full h-auto select-none"
                             style={{ maxHeight }}

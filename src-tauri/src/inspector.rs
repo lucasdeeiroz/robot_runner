@@ -432,3 +432,47 @@ pub async fn stop_web_recording(output_path: String) -> Result<(), String> {
 
     Ok(())
 }
+
+#[command]
+pub async fn get_device_screen_size(app_handle: AppHandle, device_id: String) -> Result<(u32, u32), String> {
+    if is_web_device(&device_id) {
+        return Ok((1280, 800)); // Default fallback for web
+    }
+
+    let adb_program = get_adb_program(&app_handle);
+    let mut cmd = new_tokio_command(&adb_program);
+    cmd.args(&["-s", &device_id, "shell", "wm size"]);
+
+    let output = cmd.output().await
+        .map_err(|e| format!("Failed to run wm size: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("wm size failed: {}", stderr));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut width = 0;
+    let mut height = 0;
+
+    for line in stdout.lines() {
+        let line = line.trim();
+        if line.starts_with("Override size:") || line.starts_with("Physical size:") {
+            if let Some(size_part) = line.split(':').nth(1) {
+                let parts: Vec<&str> = size_part.trim().split('x').collect();
+                if parts.len() == 2 {
+                    if let (Ok(w), Ok(h)) = (parts[0].trim().parse::<u32>(), parts[1].trim().parse::<u32>()) {
+                        width = w;
+                        height = h;
+                    }
+                }
+            }
+        }
+    }
+
+    if width > 0 && height > 0 {
+        Ok((width, height))
+    } else {
+        Err(format!("Could not parse wm size output: {}", stdout))
+    }
+}
