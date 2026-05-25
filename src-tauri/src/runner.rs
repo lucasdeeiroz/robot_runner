@@ -18,14 +18,11 @@ pub struct ProcessInfo {
 
 pub struct TestState(pub Arc<Mutex<HashMap<String, ProcessInfo>>>);
 
-use crate::cmd_utils::{new_std_command, new_tokio_command};
+use crate::cmd_utils::{new_std_command, new_tokio_command, get_adb_program};
 use crate::errors::{AppError, AppResult};
 
 /// Sends a graceful stop signal to a process.
-/// On Windows: Uses `taskkill /T` without `/F` to request termination of the process tree.
-/// On Unix: Sends SIGINT.
 fn graceful_stop(child: &mut Child, output_dir: &str) -> bool {
-    // 1. Trigger Listener-based stop via file flag
     let stop_file = std::path::Path::new(output_dir).join("stop.flag");
     if let Ok(_) = std::fs::File::create(&stop_file) {
         println!("[System] Created stop.flag in {}", output_dir);
@@ -34,8 +31,6 @@ fn graceful_stop(child: &mut Child, output_dir: &str) -> bool {
     if let Some(pid) = child.id() {
         #[cfg(target_os = "windows")]
         {
-            // Windows Fallback: taskkill /T (Tree) WITHOUT /F (Force)
-            // This sends a WM_CLOSE or similar close request to GUI apps and handles console apps politely.
             let _ = new_std_command("taskkill")
                 .arg("/T")
                 .arg("/PID")
@@ -146,11 +141,9 @@ pub async fn run_robot_test(
     timestamp_outputs: Option<bool>,
     rerun_failed_from: Option<String>,
 ) -> AppResult<String> {
-    // Resolve absolute path for output_dir to ensure clean logs
     let abs_output_dir = std::fs::canonicalize(&output_dir)
         .map(|p| {
             let s = p.to_string_lossy().to_string();
-            // Remove Windows UNC prefix if present
             if s.starts_with(r"\\?\") {
                 s[4..].to_string()
             } else {
@@ -159,15 +152,13 @@ pub async fn run_robot_test(
         })
         .unwrap_or_else(|_| output_dir.clone());
 
-    // Cleanup any stale stop flag before starting the test
     let stop_file_init = std::path::Path::new(&abs_output_dir).join("stop.flag");
     if stop_file_init.exists() {
         let _ = std::fs::remove_file(stop_file_init);
     }
 
-    let mut args = vec!["-d", &abs_output_dir, "--console", "verbose"];
+    let mut args: Vec<String> = vec!["-d".to_string(), abs_output_dir.clone(), "--console".to_string(), "verbose".to_string()];
 
-    // Inject LiveConsoleListener to force real-time stdout updates for test names
     let listener_path = std::path::Path::new(&abs_output_dir).join("LiveConsoleListener.py");
     let listener_code = r#"
 import sys
@@ -175,13 +166,11 @@ import os
 import threading
 import time
 import _thread
-from robot.libraries.BuiltIn import BuiltIn
 
 ROBOT_LISTENER_API_VERSION = 2
 
 def _sanitize(txt):
     if txt is None: return ""
-    # Replace newlines/tabs with spaces, pipe with 'I', and ' :: ' with ' : ' to avoid breaking delimiters
     return str(txt).replace('\n', ' ').replace('\r', '').replace('\t', ' ').replace('|', 'I').replace(' :: ', ' : ')
 
 def start_suite(name, attrs):
@@ -214,107 +203,68 @@ def start_keyword(name, attrs):
     pass
 
 def _monitor_stop():
-    # Check for stop signal in the same directory as the listener
     stop_file = os.path.join(os.path.dirname(__file__), "stop.flag")
     while True:
         if os.path.exists(stop_file):
-            # Inject a KeyboardInterrupt into the main thread
             _thread.interrupt_main()
             break
         time.sleep(0.5)
 
-# Start background monitor thread
 t = threading.Thread(target=_monitor_stop, daemon=True)
 t.start()
 "#;
-    // Ensure dir exists before writing and fail clearly if we cannot set up the listener
-    std::fs::create_dir_all(&abs_output_dir).map_err(|e| {
-        AppError::IoError(format!(
-            "Failed to create output directory '{}': {}",
-            abs_output_dir, e
-        ))
-    })?;
-    std::fs::write(&listener_path, listener_code).map_err(|e| {
-        AppError::IoError(format!(
-            "Failed to write listener file '{}': {}",
-            listener_path.display(),
-            e
-        ))
-    })?;
+    std::fs::create_dir_all(&abs_output_dir).map_err(|e| AppError::IoError(format!("Failed to create output directory: {}", e)))?;
+    std::fs::write(&listener_path, listener_code).map_err(|e| AppError::IoError(format!("Failed to write listener file: {}", e)))?;
 
-    args.push("--listener");
-    let listener_str = listener_path.to_str().ok_or_else(|| {
-        AppError::IoError(format!(
-            "Listener path '{}' is not valid UTF-8",
-            listener_path.display()
-        ))
-    })?;
-    args.push(listener_str);
+    args.push("--listener".to_string());
+    args.push(listener_path.to_string_lossy().to_string());
 
-    // Rerunning logic: Must appear before any Datasource (which might come from -A)
     if let Some(xml_path) = &rerun_failed_from {
         if !xml_path.is_empty() {
-            args.push("--rerunfailed");
-            args.push(xml_path);
-            args.push("--output");
-            args.push("output_rerun.xml");
+            args.push("--rerunfailed".to_string());
+            args.push(xml_path.clone());
+            args.push("--output".to_string());
+            args.push("output_rerun.xml".to_string());
         }
     }
 
     if let Some(true) = timestamp_outputs {
-        args.push("--timestampoutputs");
+        args.push("--timestampoutputs".to_string());
     }
 
-    let device_arg;
     if let Some(d) = &device {
-        device_arg = format!("udid:{}", d);
-        args.push("-v");
-        args.push(&device_arg);
+        args.push("-v".to_string());
+        args.push(format!("udid:{}", d));
     }
 
-    let model_arg;
     if let Some(m) = &device_model {
-        model_arg = format!("device_name:{}", m);
-        args.push("-v");
-        args.push(&model_arg);
+        args.push("-v".to_string());
+        args.push(format!("device_name:{}", m));
     }
 
-    let version_arg;
     if let Some(v) = &android_version {
-        version_arg = format!("os_version:{}", v);
-        args.push("-v");
-        args.push(&version_arg);
+        args.push("-v".to_string());
+        args.push(format!("os_version:{}", v));
     }
 
-    // Add selected tests if any
-    let test_specific_args: Vec<String>;
     if let Some(tests) = &selected_tests {
-        test_specific_args = tests
-            .iter()
-            .map(|t| {
-                // Robot uses glob patterns for --test, escape [ and ]
-                let escaped = t.replace("[", "[[]").replace("]", "[]]");
-                format!("--test={}", escaped)
-            })
-            .collect();
-        for arg in &test_specific_args {
-            args.push(arg);
+        for t in tests {
+            args.push("--test".to_string());
+            args.push(t.replace("[", "[[]").replace("]", "[]]"));
         }
     }
 
     if let Some(arg_file) = &arguments_file {
-        args.push("-A");
-        args.push(arg_file);
+        args.push("-A".to_string());
+        args.push(arg_file.clone());
     }
 
-    // Only add test_path if it is provided
     if let Some(tp) = &test_path {
         if !tp.is_empty() {
-            args.push(tp);
+            args.push(tp.clone());
         }
     }
 
-    // Write metadata.json for history
     #[derive(Serialize)]
     struct RunMetadata {
         run_id: String,
@@ -329,9 +279,7 @@ t.start()
     let metadata = RunMetadata {
         run_id: run_id.clone(),
         logs_path: logs_path.clone(),
-        device_udid: device
-            .clone()
-            .unwrap_or_else(|| "Local/Unknown".to_string()),
+        device_udid: device.clone().unwrap_or_else(|| "Local".to_string()),
         test_path: test_path.clone().unwrap_or_default(),
         timestamp: chrono::Local::now().to_rfc3339(),
         device_model: device_model.unwrap_or_default(),
@@ -343,7 +291,9 @@ t.start()
         let _ = std::fs::write(metadata_path, json);
     }
 
+    let adb_program = get_adb_program(&app);
     let mut cmd = new_tokio_command("python");
+    cmd.env("ADB", &adb_program);
     cmd.env("PYTHONIOENCODING", "utf-8");
     cmd.env("PYTHONUTF8", "1");
     cmd.arg("-m").arg("robot");
@@ -371,14 +321,12 @@ pub async fn run_maestro_test(
 
     let _ = std::fs::create_dir_all(&abs_output_dir);
 
-    // Determine report filename
     let mut report_filename = "output-maestro.xml".to_string();
     if let Some(true) = timestamp_outputs {
         let timestamp = chrono::Local::now().format("%Y%m%d-%H%M%S").to_string();
         report_filename = format!("output-maestro-{}.xml", timestamp);
     }
 
-    // Metadata
     #[derive(Serialize)]
     struct RunMetadata {
         run_id: String,
@@ -402,8 +350,6 @@ pub async fn run_maestro_test(
     }
 
     let mut cmd_args = vec![];
-
-    // maestro [args] test [path] --udid [udid] --output [report_path]
     if let Some(args) = maestro_args {
         if !args.is_empty() {
             for arg in args.split_whitespace() {
@@ -420,17 +366,16 @@ pub async fn run_maestro_test(
         cmd_args.push(d);
     }
 
-    // Add report output
     let report_path = std::path::Path::new(&abs_output_dir).join(report_filename);
     cmd_args.push("--format".to_string());
     cmd_args.push("junit".to_string());
     cmd_args.push("--output".to_string());
     cmd_args.push(report_path.to_string_lossy().to_string());
 
+    let adb_program = get_adb_program(&app);
     let mut cmd;
     #[cfg(target_os = "windows")]
     {
-        // Use shell on Windows to resolve maestro.cmd/ps1
         cmd = new_tokio_command("cmd");
         cmd.arg("/C").arg("maestro");
         for arg in cmd_args {
@@ -444,6 +389,7 @@ pub async fn run_maestro_test(
         cmd.args(cmd_args);
     }
 
+    cmd.env("ADB", &adb_program);
     cmd.env("JAVA_TOOL_OPTIONS", "-Dfile.encoding=UTF-8");
 
     spawn_and_monitor(app, state, run_id, cmd, working_dir, abs_output_dir).await
@@ -469,7 +415,6 @@ pub async fn run_appium_test(
 
     let _ = std::fs::create_dir_all(&abs_output_dir);
 
-    // Metadata
     #[derive(Serialize)]
     struct RunMetadata {
         run_id: String,
@@ -490,6 +435,7 @@ pub async fn run_appium_test(
         let _ = std::fs::write(metadata_path, json);
     }
 
+    let adb_program = get_adb_program(&app);
     let mut cmd;
     #[cfg(target_os = "windows")]
     {
@@ -513,17 +459,10 @@ pub async fn run_appium_test(
         cmd.arg("test");
     }
 
+    cmd.env("ADB", &adb_program);
     cmd.env("JAVA_TOOL_OPTIONS", "-Dfile.encoding=UTF-8");
 
-    spawn_and_monitor(
-        app,
-        state,
-        run_id,
-        cmd,
-        Some(abs_project_path),
-        abs_output_dir,
-    )
-    .await
+    spawn_and_monitor(app, state, run_id, cmd, Some(abs_project_path), abs_output_dir).await
 }
 
 async fn spawn_and_monitor(
@@ -543,40 +482,24 @@ async fn spawn_and_monitor(
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
-        // 0x00000200 = CREATE_NEW_PROCESS_GROUP
-        // We already set CREATE_NO_WINDOW in new_tokio_command, but we need to combine it here
         cmd.as_std_mut().creation_flags(0x00000200 | 0x08000000);
     }
 
-    let child = cmd
+    let mut child = cmd
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| AppError::ProcessError(format!("Failed to spawn process: {}", e)))?;
 
-    let mut child = child;
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| AppError::ProcessError("Failed to open stdout".to_string()))?;
-    let stderr = child
-        .stderr
-        .take()
-        .ok_or_else(|| AppError::ProcessError("Failed to open stderr".to_string()))?;
+    let stdout = child.stdout.take().unwrap();
+    let stderr = child.stderr.take().unwrap();
 
-    // Streaming tasks
     let app_handle = app.clone();
     let rid = run_id.clone();
     tokio::spawn(async move {
         let mut reader = tokio::io::BufReader::new(stdout).lines();
         while let Ok(Some(line)) = reader.next_line().await {
-            let _ = app_handle.emit(
-                "test-output",
-                TestOutput {
-                    run_id: rid.clone(),
-                    message: line,
-                },
-            );
+            let _ = app_handle.emit("test-output", TestOutput { run_id: rid.clone(), message: line });
         }
     });
 
@@ -585,65 +508,31 @@ async fn spawn_and_monitor(
     tokio::spawn(async move {
         let mut reader = tokio::io::BufReader::new(stderr).lines();
         while let Ok(Some(line)) = reader.next_line().await {
-            let _ = app_handle_err.emit(
-                "test-output",
-                TestOutput {
-                    run_id: rid_err.clone(),
-                    message: line,
-                },
-            );
+            let _ = app_handle_err.emit("test-output", TestOutput { run_id: rid_err.clone(), message: line });
         }
     });
 
-    // Store process info
     let (control_tx, mut control_rx) = tokio::sync::mpsc::channel::<ProcessCommand>(10);
     {
-        let mut procs = state
-            .0
-            .lock()
-            .map_err(|e| AppError::StringError(e.to_string()))?;
-        if procs.contains_key(&run_id) {
-            let _ = child.start_kill();
-            return Err(AppError::ProcessError(format!(
-                "Process with run_id '{}' already exists",
-                run_id
-            )));
-        }
-        procs.insert(
-            run_id.clone(),
-            ProcessInfo {
-                control_tx: control_tx.clone(),
-            },
-        );
+        let mut procs = state.0.lock().unwrap();
+        procs.insert(run_id.clone(), ProcessInfo { control_tx: control_tx.clone() });
     }
 
-    // Monitor for finish (Reactive Wait)
     let app_handle_mon = app.clone();
     let rid_mon = run_id.clone();
     let state_mon = state.0.clone();
     let output_dir_mon = output_dir.clone();
 
     tokio::spawn(async move {
-        let mut final_status: Option<std::process::ExitStatus> = None;
-
-        loop {
+        let final_status = loop {
             tokio::select! {
                 status = child.wait() => {
-                    match status {
-                        Ok(s) => final_status = Some(s),
-                        Err(e) => eprintln!("[Monitor] Error waiting for process: {}", e),
-                    }
-                    break;
+                    break status.ok();
                 }
                 Some(cmd) = control_rx.recv() => {
                     match cmd {
                         ProcessCommand::Stop => {
                             let _ = graceful_stop(&mut child, &output_dir_mon);
-                            let tx_kill = control_tx.clone();
-                            tokio::spawn(async move {
-                                tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
-                                let _ = tx_kill.send(ProcessCommand::Kill).await;
-                            });
                         }
                         ProcessCommand::Kill => {
                             let _ = child.start_kill();
@@ -651,36 +540,10 @@ async fn spawn_and_monitor(
                     }
                 }
             }
-        }
-
-        // Cleanup after exit
-        match state_mon.lock() {
-            Ok(mut procs) => {
-                procs.remove(&rid_mon);
-            }
-            Err(e) => {
-                eprintln!(
-                    "[Monitor] Failed to acquire process state lock during cleanup for {}: {}",
-                    rid_mon, e
-                );
-            }
-        }
-
-        // Cleanup stop signal if it exists
-        let stop_file = std::path::Path::new(&output_dir_mon).join("stop.flag");
-        if stop_file.exists() {
-            let _ = std::fs::remove_file(stop_file);
-        }
-
-        // Emit finished event
+        };
+        state_mon.lock().unwrap().remove(&rid_mon);
         let exit_code = final_status.and_then(|s| s.code()).unwrap_or(-1);
-        let _ = app_handle_mon.emit(
-            "test-finished",
-            TestFinished {
-                run_id: rid_mon,
-                exit_code,
-            },
-        );
+        let _ = app_handle_mon.emit("test-finished", TestFinished { run_id: rid_mon, exit_code });
     });
 
     Ok(format!("Test {} started successfully", run_id))
@@ -690,16 +553,13 @@ async fn spawn_and_monitor(
 pub async fn get_robot_test_cases(path: String) -> AppResult<Vec<String>> {
     use std::fs::File;
     use std::io::{BufRead, BufReader};
-
     let file = File::open(&path).map_err(|e| AppError::FileSystemError(e.to_string()))?;
     let reader = BufReader::new(file);
     let mut tests = Vec::new();
     let mut in_test_cases = false;
-
     for line in reader.lines() {
         let line = line.map_err(|e| AppError::FileSystemError(e.to_string()))?;
         let trimmed = line.trim();
-
         if trimmed.starts_with("*** Test Cases ***") || trimmed.starts_with("*** Tasks ***") {
             in_test_cases = true;
             continue;
@@ -707,17 +567,10 @@ pub async fn get_robot_test_cases(path: String) -> AppResult<Vec<String>> {
             in_test_cases = false;
             continue;
         }
-
-        if in_test_cases
-            && !line.is_empty()
-            && !line.starts_with(" ")
-            && !line.starts_with("\t")
-            && !trimmed.starts_with("#")
-        {
+        if in_test_cases && !line.is_empty() && !line.starts_with(" ") && !line.starts_with("\t") && !trimmed.starts_with("#") {
             tests.push(trimmed.to_string());
         }
     }
-
     Ok(tests)
 }
 
@@ -738,7 +591,6 @@ pub async fn run_cypress_test(
 
     let _ = std::fs::create_dir_all(&abs_output_dir);
 
-    // Metadata
     #[derive(Serialize)]
     struct RunMetadata {
         run_id: String,
@@ -759,6 +611,7 @@ pub async fn run_cypress_test(
         let _ = std::fs::write(metadata_path, json);
     }
 
+    let adb_program = get_adb_program(&app);
     let mut cmd;
     #[cfg(target_os = "windows")]
     {
@@ -770,26 +623,12 @@ pub async fn run_cypress_test(
         cmd = new_tokio_command("npx");
         cmd.arg("cypress").arg("run");
     }
-
-    // Spec path
-    if !test_path.is_empty() {
-        cmd.arg("--spec").arg(&test_path);
-    }
-
-    // Browser
-    if let Some(b) = browser {
-        cmd.arg("--browser").arg(b);
-    }
-
-    // Additional cypress args
+    if !test_path.is_empty() { cmd.arg("--spec").arg(&test_path); }
+    if let Some(b) = browser { cmd.arg("--browser").arg(b); }
     if let Some(args) = cypress_args {
-        if !args.is_empty() {
-            for arg in args.split_whitespace() {
-                cmd.arg(arg);
-            }
-        }
+        for arg in args.split_whitespace() { cmd.arg(arg); }
     }
-
+    cmd.env("ADB", &adb_program);
     spawn_and_monitor(app, state, run_id, cmd, working_dir, abs_output_dir).await
 }
 
@@ -810,7 +649,6 @@ pub async fn run_selenium_test(
 
     let _ = std::fs::create_dir_all(&abs_output_dir);
 
-    // Metadata
     #[derive(Serialize)]
     struct RunMetadata {
         run_id: String,
@@ -831,57 +669,32 @@ pub async fn run_selenium_test(
         let _ = std::fs::write(metadata_path, json);
     }
 
+    let adb_program = get_adb_program(&app);
     let mut cmd;
     let is_python = test_path.ends_with(".py");
     let is_js = test_path.ends_with(".js") || test_path.ends_with(".ts");
 
     if is_python {
         #[cfg(target_os = "windows")]
-        {
-            cmd = new_tokio_command("cmd");
-            cmd.arg("/C").arg("python").arg(&test_path);
-        }
+        { cmd = new_tokio_command("cmd"); cmd.arg("/C").arg("python").arg(&test_path); }
         #[cfg(not(target_os = "windows"))]
-        {
-            cmd = new_tokio_command("python");
-            cmd.arg(&test_path);
-        }
+        { cmd = new_tokio_command("python"); cmd.arg(&test_path); }
     } else if is_js {
         #[cfg(target_os = "windows")]
-        {
-            cmd = new_tokio_command("cmd");
-            cmd.arg("/C").arg("node").arg(&test_path);
-        }
+        { cmd = new_tokio_command("cmd"); cmd.arg("/C").arg("node").arg(&test_path); }
         #[cfg(not(target_os = "windows"))]
-        {
-            cmd = new_tokio_command("node");
-            cmd.arg(&test_path);
-        }
+        { cmd = new_tokio_command("node"); cmd.arg(&test_path); }
     } else {
         #[cfg(target_os = "windows")]
-        {
-            cmd = new_tokio_command("cmd");
-            cmd.arg("/C").arg(&test_path);
-        }
+        { cmd = new_tokio_command("cmd"); cmd.arg("/C").arg(&test_path); }
         #[cfg(not(target_os = "windows"))]
-        {
-            cmd = new_tokio_command(&test_path);
-        }
+        { cmd = new_tokio_command(&test_path); }
     }
 
-    // Browser
-    if let Some(b) = browser {
-        cmd.env("SELENIUM_BROWSER", b);
-    }
-
-    // Additional selenium args
+    if let Some(b) = browser { cmd.env("SELENIUM_BROWSER", b); }
     if let Some(args) = selenium_args {
-        if !args.is_empty() {
-            for arg in args.split_whitespace() {
-                cmd.arg(arg);
-            }
-        }
+        for arg in args.split_whitespace() { cmd.arg(arg); }
     }
-
+    cmd.env("ADB", &adb_program);
     spawn_and_monitor(app, state, run_id, cmd, working_dir, abs_output_dir).await
 }

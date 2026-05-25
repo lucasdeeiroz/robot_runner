@@ -11,8 +11,9 @@ import { useSettings } from '@/lib/settings';
 
 interface DeviceViewportProps {
     screenshot: string | null;
+    rootNode?: InspectorNode | null;
     loading: boolean;
-    imgRef: React.RefObject<HTMLImageElement | null>;
+    imgRef: React.RefObject<HTMLElement | null>;
     imgLayout: { width: number, height: number, naturalWidth: number, naturalHeight: number } | null;
     onImgLoad: (e: React.SyntheticEvent<HTMLImageElement>) => void;
 
@@ -28,10 +29,10 @@ interface DeviceViewportProps {
     // Handlers
     onRefresh: (forceClear?: boolean, targetWebUrl?: string) => void;
     handlers: {
-        onMouseMove: (e: React.MouseEvent<HTMLImageElement>) => void;
-        onMouseDown: (e: React.MouseEvent<HTMLImageElement>) => void;
-        onMouseUp: (e: React.MouseEvent<HTMLImageElement>) => void;
-        onDoubleClick: (e: React.MouseEvent<HTMLImageElement>) => void;
+        onMouseMove: (e: React.MouseEvent<HTMLElement>) => void;
+        onMouseDown: (e: React.MouseEvent<HTMLElement>) => void;
+        onMouseUp: (e: React.MouseEvent<HTMLElement>) => void;
+        onDoubleClick: (e: React.MouseEvent<HTMLElement>) => void;
     };
 
     // Customization
@@ -46,9 +47,10 @@ interface DeviceViewportProps {
 
 export const DeviceViewport: React.FC<DeviceViewportProps> = ({
     screenshot,
+    rootNode,
     loading,
     imgRef,
-    imgLayout,
+    imgLayout: initialImgLayout,
     onImgLoad,
     hoveredNode,
     selectedNode,
@@ -71,6 +73,23 @@ export const DeviceViewport: React.FC<DeviceViewportProps> = ({
 
     const [urlInput, setUrlInput] = React.useState(activeWebUrl);
 
+    // Derived layout for fallback (if image fails but hierarchy is OK)
+    const imgLayout = React.useMemo(() => {
+        if (initialImgLayout) return initialImgLayout;
+        if (!screenshot && rootNode?.bounds) {
+            // Assume a standard display width (e.g. 360px) and calculate height based on aspect ratio
+            const displayW = 300;
+            const scale = displayW / rootNode.bounds.w;
+            return {
+                width: displayW,
+                height: rootNode.bounds.h * scale,
+                naturalWidth: rootNode.bounds.w,
+                naturalHeight: rootNode.bounds.h
+            };
+        }
+        return null;
+    }, [initialImgLayout, screenshot, rootNode]);
+
     React.useEffect(() => {
         setUrlInput(activeWebUrl);
     }, [activeWebUrl]);
@@ -88,7 +107,7 @@ export const DeviceViewport: React.FC<DeviceViewportProps> = ({
         }
     };
 
-    if (!screenshot) {
+    if (!screenshot && !rootNode) {
         if (isWeb) {
             return (
                 <div className={clsx(
@@ -250,16 +269,16 @@ export const DeviceViewport: React.FC<DeviceViewportProps> = ({
                     )}
                     <div className="relative inline-block overflow-hidden rounded-lg shadow border border-outline-variant/10 bg-surface">
                         <img
-                            ref={imgRef}
+                            ref={imgRef as any}
                             src={screenshot}
                             alt="Web Execution Screenshot"
                             className="block w-full h-auto select-none"
                             style={{ maxHeight }}
                             onLoad={onImgLoad}
-                            onMouseMove={handlers.onMouseMove}
-                            onMouseDown={handlers.onMouseDown}
-                            onMouseUp={handlers.onMouseUp}
-                            onDoubleClick={handlers.onDoubleClick}
+                            onMouseMove={handlers.onMouseMove as any}
+                            onMouseDown={handlers.onMouseDown as any}
+                            onMouseUp={handlers.onMouseUp as any}
+                            onDoubleClick={handlers.onDoubleClick as any}
                             draggable={false}
                         />
 
@@ -432,99 +451,124 @@ export const DeviceViewport: React.FC<DeviceViewportProps> = ({
                 )}
             </AnimatePresence>
 
-            <img
-                ref={imgRef}
-                src={screenshot}
-                alt="Device Screenshot"
-                className="block w-auto h-auto max-w-full select-none rounded-lg"
-                style={{ maxHeight }}
-                onLoad={onImgLoad}
-                onMouseMove={handlers.onMouseMove}
-                onMouseDown={handlers.onMouseDown}
-                onMouseUp={handlers.onMouseUp}
-                onDoubleClick={handlers.onDoubleClick}
-                draggable={false}
-            />
-
-            {/* Animation Layers - Taps */}
-            {taps.map(tap => (
-                <motion.div
-                    key={tap.id}
-                    initial={{ scale: 0.5, opacity: 1 }}
-                    animate={{ scale: 2, opacity: 0 }}
-                    transition={{ duration: 0.5 }}
-                    className="absolute rounded-full bg-primary/30 border-2 border-primary pointer-events-none"
-                    style={{ left: tap.x - 20, top: tap.y - 20, width: 40, height: 40 }}
-                />
-            ))}
-
-            {/* Animation Layers - Swipes (Advanced SVG) */}
-            {swipes.map(swipe => (
-                <motion.svg
-                    key={swipe.id}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="absolute top-0 left-0 w-full h-full pointer-events-none z-30"
-                >
-                    <defs>
-                        <marker id={`arrow-${swipe.id}`} markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
-                            <path d="M0,0 L0,6 L9,3 z" fill="#f97316" />
-                        </marker>
-                    </defs>
-                    <motion.line
-                        initial={{ pathLength: 0 }}
-                        animate={{ pathLength: 1 }}
-                        transition={{ duration: 0.3 }}
-                        x1={swipe.startX} y1={swipe.startY}
-                        x2={swipe.endX} y2={swipe.endY}
-                        stroke="#f97316"
-                        strokeWidth="4"
-                        strokeDasharray="8 4"
-                        markerEnd={`url(#arrow-${swipe.id})`}
-                        className="animate-pulse"
+            <div 
+                className="relative inline-block overflow-hidden rounded-lg shadow border border-outline-variant/10 bg-surface"
+                style={{ width: imgLayout?.width, height: imgLayout?.height }}
+            >
+                {screenshot ? (
+                    <img
+                        ref={imgRef as any}
+                        src={screenshot}
+                        alt="Device Screenshot"
+                        className="block w-auto h-auto max-w-full select-none rounded-lg"
+                        style={{ maxHeight }}
+                        onLoad={onImgLoad}
+                        onMouseMove={handlers.onMouseMove as any}
+                        onMouseDown={handlers.onMouseDown as any}
+                        onMouseUp={handlers.onMouseUp as any}
+                        onDoubleClick={handlers.onDoubleClick as any}
+                        draggable={false}
                     />
-                </motion.svg>
-            ))}
+                ) : (
+                    <div
+                        ref={imgRef as any}
+                        className="relative flex flex-col items-center justify-center cursor-crosshair select-none bg-black/90 rounded-lg"
+                        style={{ 
+                            width: imgLayout?.width || 300, 
+                            height: imgLayout?.height || 600,
+                            maxHeight 
+                        }}
+                        onMouseMove={handlers.onMouseMove as any}
+                        onMouseDown={handlers.onMouseDown as any}
+                        onMouseUp={handlers.onMouseUp as any}
+                        onDoubleClick={handlers.onDoubleClick as any}
+                    >
+                        <Scan size={48} className="opacity-20 mb-4 text-white" />
+                        <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{t('inspector.status.no_screenshot')}</p>
+                        <p className="text-[9px] text-white/30 mt-1">{t('inspector.status.hierarchy_available')}</p>
+                    </div>
+                )}
 
-            {/* Highlighters */}
-            <AnimatePresence>
-                {searchResults.map(node => (
+                {/* Animation Layers - Taps */}
+                {taps.map(tap => (
                     <motion.div
-                        key={node.id}
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        className="absolute border-2 pointer-events-none z-30"
-                        style={getHighlighterStyle(node, searchColor, imgLayout)}
+                        key={tap.id}
+                        initial={{ scale: 0.5, opacity: 1 }}
+                        animate={{ scale: 2, opacity: 0 }}
+                        transition={{ duration: 0.5 }}
+                        className="absolute rounded-full bg-primary/30 border-2 border-primary pointer-events-none"
+                        style={{ left: tap.x - 20, top: tap.y - 20, width: 40, height: 40 }}
                     />
                 ))}
-            </AnimatePresence>
 
-            <motion.div
-                initial={false}
-                animate={hoveredNode?.bounds ? {
-                    ...getHighlighterStyle(hoveredNode, hoverColor, imgLayout),
-                    opacity: 1,
-                } as any : { opacity: 0 }}
-                className="absolute border-2 pointer-events-none z-10"
-                style={{ display: hoveredNode?.bounds ? 'block' : 'none' }}
-            />
+                {/* Animation Layers - Swipes (Advanced SVG) */}
+                {swipes.map(swipe => (
+                    <motion.svg
+                        key={swipe.id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute top-0 left-0 w-full h-full pointer-events-none z-30"
+                    >
+                        <defs>
+                            <marker id={`arrow-${swipe.id}`} markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+                                <path d="M0,0 L0,6 L9,3 z" fill="#f97316" />
+                            </marker>
+                        </defs>
+                        <motion.line
+                            initial={{ pathLength: 0 }}
+                            animate={{ pathLength: 1 }}
+                            transition={{ duration: 0.3 }}
+                            x1={swipe.startX} y1={swipe.startY}
+                            x2={swipe.endX} y2={swipe.endY}
+                            stroke="#f97316"
+                            strokeWidth="4"
+                            strokeDasharray="8 4"
+                            markerEnd={`url(#arrow-${swipe.id})`}
+                            className="animate-pulse"
+                        />
+                    </motion.svg>
+                ))}
 
-            <motion.div
-                initial={false}
-                animate={selectedNode?.bounds ? {
-                    ...getHighlighterStyle(selectedNode, selectionColor, imgLayout),
-                    opacity: 1,
-                    scale: [1, 1.02, 1],
-                } as any : { opacity: 0 }}
-                transition={{
-                    scale: { repeat: Infinity, duration: 2, ease: "easeInOut" },
-                    default: { duration: 0.15 }
-                }}
-                className="absolute border-2 pointer-events-none z-20"
-                style={{ display: selectedNode?.bounds ? 'block' : 'none' }}
-            />
+                {/* Highlighters */}
+                <AnimatePresence>
+                    {searchResults.map(node => (
+                        <motion.div
+                            key={node.id}
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="absolute border-2 pointer-events-none z-30"
+                            style={getHighlighterStyle(node, searchColor, imgLayout)}
+                        />
+                    ))}
+                </AnimatePresence>
+
+                <motion.div
+                    initial={false}
+                    animate={hoveredNode?.bounds ? {
+                        ...getHighlighterStyle(hoveredNode, hoverColor, imgLayout),
+                        opacity: 1,
+                    } as any : { opacity: 0 }}
+                    className="absolute border-2 pointer-events-none z-10"
+                    style={{ display: hoveredNode?.bounds ? 'block' : 'none' }}
+                />
+
+                <motion.div
+                    initial={false}
+                    animate={selectedNode?.bounds ? {
+                        ...getHighlighterStyle(selectedNode, selectionColor, imgLayout),
+                        opacity: 1,
+                        scale: [1, 1.02, 1],
+                    } as any : { opacity: 0 }}
+                    transition={{
+                        scale: { repeat: Infinity, duration: 2, ease: "easeInOut" },
+                        default: { duration: 0.15 }
+                    }}
+                    className="absolute border-2 pointer-events-none z-20"
+                    style={{ display: selectedNode?.bounds ? 'block' : 'none' }}
+                />
+            </div>
         </div>
     );
 };

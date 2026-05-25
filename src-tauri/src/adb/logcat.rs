@@ -1,4 +1,4 @@
-use crate::cmd_utils::new_std_command;
+use crate::cmd_utils::{new_std_command, get_adb_program};
 use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Write};
@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
-use tauri::State;
+use tauri::{State, AppHandle};
 
 // Structure to hold the process and the shared buffer
 pub struct LogcatProcess {
@@ -23,6 +23,7 @@ pub struct LogcatState(pub Mutex<HashMap<String, LogcatProcess>>);
 
 #[tauri::command]
 pub fn start_logcat(
+    app: AppHandle,
     state: State<'_, LogcatState>,
     device: String,
     filter: Option<String>,
@@ -34,6 +35,8 @@ pub fn start_logcat(
     if procs.contains_key(&device) {
         return Ok("Logcat already running".to_string());
     }
+
+    let adb_program = get_adb_program(&app);
 
     // Shared State for the supervisor thread
     let buffer = Arc::new(Mutex::new(Vec::new()));
@@ -65,11 +68,13 @@ pub fn start_logcat(
     let thread_output_file = output_file.clone();
     let thread_child_mutex = child_mutex.clone();
     let thread_should_stop = should_stop.clone();
+    let thread_adb_program = adb_program;
 
     thread::spawn(move || {
         let device_id = thread_device;
         let pkg = thread_filter;
         let lvl = thread_level.unwrap_or_else(|| "V".to_string()); // Default to Verbose but we format later
+        let adb_bin = thread_adb_program;
 
         // Loop until stopped
         while !thread_should_stop.load(Ordering::Relaxed) {
@@ -78,13 +83,12 @@ pub fn start_logcat(
             // 1. Resolve PID if package is provided
             if let Some(ref package) = pkg {
                 // Try to find PID
-                match get_pid(&device_id, package) {
+                match get_pid(&adb_bin, &device_id, package) {
                     Ok(Some(pid)) => {
                         current_pid = Some(pid);
                     }
                     Ok(None) => {
                         // App not running, wait and retry
-                        // println!("Logcat: App {} not running, waiting...", package);
                     }
                     Err(_) => {
                         // Error checking
@@ -114,13 +118,12 @@ pub fn start_logcat(
             args.push(&level_arg);
 
             // Spawn
-            let mut cmd = new_std_command("adb");
+            let mut cmd = new_std_command(&adb_bin);
             cmd.args(&args);
             cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 
             match cmd.spawn() {
                 Ok(mut child_proc) => {
-                    // println!("Logcat: Started process for PID {:?}", current_pid);
                     let stdout = child_proc.stdout.take();
 
                     // Store child
@@ -130,7 +133,6 @@ pub fn start_logcat(
                     }
 
                     // SPAWN READER THREAD
-                    // We need a separate thread because reader.lines() blocks
                     if let Some(out) = stdout {
                         let reader_buffer = thread_buffer.clone();
                         let reader_output_file = thread_output_file.clone();
@@ -170,7 +172,6 @@ pub fn start_logcat(
                     }
 
                     // MONITOR LOOP
-                    // Watch the child and the App PID
                     loop {
                         if thread_should_stop.load(Ordering::Relaxed) {
                             break;
@@ -193,34 +194,25 @@ pub fn start_logcat(
                         }
 
                         if child_dead {
-                            // println!("Logcat: Child exited naturally or error.");
                             break; // Go back to start of supervisor loop to restart
                         }
 
                         // 2. Check if App PID changed (Only if we are filtering by package)
                         if let Some(ref package) = pkg {
-                            // If we knew a PID, check if it's stillvalid
                             if let Some(ref old_pid) = current_pid {
-                                match get_pid(&device_id, package) {
+                                match get_pid(&adb_bin, &device_id, package) {
                                     Ok(Some(new_pid)) => {
                                         if new_pid != *old_pid {
                                             // PID Changed! App restarted.
-                                            // println!("Logcat: PID changed from {} to {}. Restarting...", old_pid, new_pid);
-
-                                            // Kill current child to force restart
                                             let mut lock = thread_child_mutex.lock().unwrap();
                                             if let Some(mut child) = lock.take() {
                                                 let _ = child.kill();
                                             }
-                                            break; // Monitor loop ends -> Supervisor loop restarts
+                                            break;
                                         }
                                     }
                                     Ok(None) => {
-                                        // App died (returns None).
-                                        // Keep waiting? Or kill logcat?
-                                        // If app died, logcat --pid might stay alive waiting.
-                                        // Better to kill and go back to searching.
-                                        // println!("Logcat: App died. Killing logcat waiting for restart.");
+                                        // App died
                                         let mut lock = thread_child_mutex.lock().unwrap();
                                         if let Some(mut child) = lock.take() {
                                             let _ = child.kill();
@@ -240,13 +232,10 @@ pub fn start_logcat(
                     }
                 }
                 Err(_e) => {
-                    // println!("Logcat: Failed to spawn adb: {}", e);
                     thread::sleep(Duration::from_secs(2));
                 }
             }
 
-            // If we are just running global logcat (no filter), and it exits, we probably shouldn't restart immediately loop hard,
-            // but `adb logcat` usually runs forever. If it crashes, restart is fine.
             if pkg.is_none() {
                 if thread_should_stop.load(Ordering::Relaxed) {
                     break;
@@ -254,7 +243,6 @@ pub fn start_logcat(
                 thread::sleep(Duration::from_secs(1));
             }
         }
-        // println!("Logcat: Supervisor thread exiting for {}", device_id);
     });
 
     procs.insert(
@@ -270,8 +258,8 @@ pub fn start_logcat(
     Ok("Logcat started".to_string())
 }
 
-fn get_pid(device: &str, pkg: &str) -> Result<Option<String>, String> {
-    let mut pidof_cmd = new_std_command("adb");
+fn get_pid(adb_bin: &str, device: &str, pkg: &str) -> Result<Option<String>, String> {
+    let mut pidof_cmd = new_std_command(adb_bin);
     pidof_cmd.args(&["-s", device, "shell", "pidof", "-s", pkg]);
 
     match pidof_cmd.output() {
@@ -282,7 +270,7 @@ fn get_pid(device: &str, pkg: &str) -> Result<Option<String>, String> {
             }
 
             // Check process state (zombie/cached check)
-            let mut oom_cmd = new_std_command("adb");
+            let mut oom_cmd = new_std_command(adb_bin);
             oom_cmd.args(&[
                 "-s",
                 device,

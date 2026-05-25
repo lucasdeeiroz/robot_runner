@@ -1208,6 +1208,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                         <div className="flex flex-col items-center justify-center overflow-hidden relative max-w-[30vw] rounded-2xl">
                             <DeviceViewport
                                 screenshot={screenshot}
+                                rootNode={rootNode}
                                 loading={loading}
                                 isExploring={isExploring}
                                 imgRef={imgRef}

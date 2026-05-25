@@ -1,5 +1,6 @@
-use crate::cmd_utils::new_tokio_command;
+use crate::cmd_utils::{new_tokio_command, get_adb_program};
 use serde::Serialize;
+use tauri::AppHandle;
 
 #[derive(Debug, Serialize, Default)]
 pub struct AppStats {
@@ -17,26 +18,30 @@ pub struct DeviceStats {
     pub temperature: f32, // Celsius
     pub app_stats: Option<AppStats>,
     pub foreground_activity: Option<String>,
+    pub screen_state: Option<String>,
 }
 
 #[tauri::command]
 pub async fn get_device_stats(
+    app: AppHandle,
     device: String,
     package: Option<String>,
 ) -> Result<DeviceStats, String> {
     // 1. Prepare async tasks for base device stats
-    let battery_task = run_adb_shell(&device, "dumpsys battery");
-    let meminfo_task = run_adb_shell(&device, "cat /proc/meminfo");
-    let top_task = run_adb_shell(&device, "top -n 1 -m 5");
-    let activity_task = run_adb_shell(&device, "dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity|ResumedActivity|mCurrentFocus'");
+    let battery_task = run_adb_shell(&app, &device, "dumpsys battery");
+    let meminfo_task = run_adb_shell(&app, &device, "cat /proc/meminfo");
+    let top_task = run_adb_shell(&app, &device, "top -n 1 -m 5");
+    let activity_task = run_adb_shell(&app, &device, "dumpsys activity top");
+    let power_task = run_adb_shell(&app, &device, "dumpsys power");
 
     // Start these in parallel
-    let (bat_output, mem_output, top_output, act_output) = tokio::join!(battery_task, meminfo_task, top_task, activity_task);
+    let (bat_output, mem_output, top_output, act_output, pwr_output) = tokio::join!(battery_task, meminfo_task, top_task, activity_task, power_task);
 
     let (battery_level, temperature) = parse_battery_info(&bat_output).unwrap_or((0, 0.0));
     let (ram_total, ram_used) = parse_mem_info(&mem_output).unwrap_or((0, 0));
     let cpu_usage = parse_cpu_usage(&top_output).unwrap_or(0.0);
     let foreground_activity = parse_foreground_activity(&act_output);
+    let screen_state = parse_screen_state(&pwr_output);
 
     // 2. Prepare app stats if package provided
     let mut app_stats = None;
@@ -45,8 +50,8 @@ pub async fn get_device_stats(
             let app_cpu = parse_app_cpu(&top_output, &pkg).unwrap_or(0.0);
 
             // These still call adb individually but we can parallelize them too
-            let ram_task = get_app_ram(&device, &pkg);
-            let fps_task = get_app_fps(&device, &pkg);
+            let ram_task = get_app_ram(&app, &device, &pkg);
+            let fps_task = get_app_fps(&app, &device, &pkg);
 
             let (app_ram_res, app_fps_res) = tokio::join!(ram_task, fps_task);
 
@@ -66,15 +71,14 @@ pub async fn get_device_stats(
         temperature,
         app_stats,
         foreground_activity,
+        screen_state,
     })
 }
 
-async fn run_adb_shell(device: &str, command_str: &str) -> String {
-    // Split command for arguments
-    let shell_args: Vec<&str> = command_str.split_whitespace().collect();
-
-    let mut cmd = new_tokio_command("adb");
-    cmd.arg("-s").arg(device).arg("shell").args(&shell_args);
+async fn run_adb_shell(app: &AppHandle, device: &str, command_str: &str) -> String {
+    let program = get_adb_program(app);
+    let mut cmd = new_tokio_command(&program);
+    cmd.arg("-s").arg(device).arg("shell").arg(command_str);
 
     let output = cmd.output().await;
 
@@ -117,17 +121,41 @@ pub fn parse_battery_info(output: &str) -> Option<(u8, f32)> {
 
 pub fn parse_foreground_activity(output: &str) -> Option<String> {
     for line in output.lines() {
-        if line.contains("topResumedActivity=ActivityRecord{") 
-            || line.contains("mResumedActivity: ActivityRecord{") 
-            || line.contains("ResumedActivity: ActivityRecord{") 
-            || line.contains("mCurrentFocus=Window{") 
-        {
+        // Look for topApp=ActivityRecord or TASK:
+        if line.contains("topApp=ActivityRecord") || line.contains("TASK:") {
             let parts: Vec<&str> = line.split_whitespace().collect();
-            for part in parts.iter().rev() {
+            for part in parts {
                 if part.contains("/") {
-                    let clean = part.replace("}", "");
-                    return Some(clean);
+                    // Potential package/activity string
+                    let clean = part.replace("}", "").replace("{", "");
+                    if let Some(slash_idx) = clean.find('/') {
+                        // Ensure it's not just a path
+                        if slash_idx > 0 && slash_idx < clean.len() - 1 {
+                             return Some(clean);
+                        }
+                    }
                 }
+            }
+        }
+    }
+    None
+}
+
+pub fn parse_screen_state(output: &str) -> Option<String> {
+    for line in output.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("mHoldingDisplaySuspendBlocker=") {
+            if trimmed.contains("true") {
+                return Some("ON".to_string());
+            } else {
+                return Some("OFF".to_string());
+            }
+        }
+        if trimmed.starts_with("Display Power: state=") {
+            if trimmed.contains("ON") {
+                return Some("ON".to_string());
+            } else if trimmed.contains("OFF") {
+                return Some("OFF".to_string());
             }
         }
     }
@@ -219,8 +247,8 @@ fn parse_app_cpu(top_output: &str, package: &str) -> Option<f32> {
     None
 }
 
-async fn get_app_ram(device: &str, package: &str) -> Option<u64> {
-    let output = run_adb_shell(device, &format!("dumpsys meminfo {}", package)).await;
+async fn get_app_ram(app: &AppHandle, device: &str, package: &str) -> Option<u64> {
+    let output = run_adb_shell(app, device, &format!("dumpsys meminfo {}", package)).await;
 
     for line in output.lines() {
         let trimmed = line.trim();
@@ -235,12 +263,12 @@ async fn get_app_ram(device: &str, package: &str) -> Option<u64> {
     None
 }
 
-async fn get_app_fps(device: &str, package: &str) -> Option<u32> {
+async fn get_app_fps(app: &AppHandle, device: &str, package: &str) -> Option<u32> {
     let cmd_str = format!(
         "dumpsys gfxinfo {} framestats; echo UPTIME_MARKER; cat /proc/uptime",
         package
     );
-    let output = run_adb_shell(device, &cmd_str).await;
+    let output = run_adb_shell(app, device, &cmd_str).await;
 
     let mut intended_vsyncs: Vec<u64> = Vec::new();
     let mut uptime_ns: u64 = 0;

@@ -43,6 +43,12 @@ interface SettingsPageProps {
 
 export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
     const { settings, updateSetting, loading, profiles, activeProfileId, createProfile, switchProfile, renameProfile, deleteProfile, systemVersions, checkSystemVersions, systemCheckStatus, isNgrokEnabled, is_test_mode } = useSettings();
+
+    useEffect(() => {
+        if (settings.customAdbPath) {
+            invoke('update_custom_adb_path', { path: settings.customAdbPath }).catch(console.error);
+        }
+    }, [settings.customAdbPath]);
     const { t } = useTranslation();
     const { sessions } = useTestSessions();
     const isTestRunning = sessions.some(s => s.status === 'running');
@@ -651,26 +657,26 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                         >
 
                             <div className="grid grid-cols-2 gap-4 mb-4">
-                                <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
-                                    <Input
-                                        label={t('settings.appium.host')}
-                                        type="text"
-                                        value={settings.appiumHost}
-                                        onChange={(e) => updateSetting('appiumHost', e.target.value)}
-                                        disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
-                                    />
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
+                                        <Input
+                                            label={t('settings.appium.host')}
+                                            type="text"
+                                            value={settings.appiumHost}
+                                            onChange={(e) => updateSetting('appiumHost', e.target.value)}
+                                            disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
+                                        />
+                                    </div>
+                                    <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
+                                        <Input
+                                            label={t('settings.appium.port')}
+                                            type="number"
+                                            value={settings.appiumPort}
+                                            onChange={(e) => updateSetting('appiumPort', Number(e.target.value))}
+                                            disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
+                                        />
+                                    </div>
                                 </div>
-                                <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
-                                    <Input
-                                        label={t('settings.appium.port')}
-                                        type="number"
-                                        value={settings.appiumPort}
-                                        onChange={(e) => updateSetting('appiumPort', Number(e.target.value))}
-                                        disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
-                                    />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 mb-4">
                                 <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
                                     <Input
                                         label={t('settings.tool_config.appium_base_path')}
@@ -681,6 +687,8 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                         placeholder="/wd/hub"
                                     />
                                 </div>
+                            </div>
+                            <div className="mb-4">
                                 <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
                                     <Input
                                         label={t('settings.tool_config.appium_args')}
@@ -792,6 +800,15 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                     />
                                 </div>
                             )}
+                            <div className="col-span-1 md:col-span-2">
+                                <PathInput
+                                    label={t('settings.tool_config.custom_adb_path' as any)}
+                                    value={settings.customAdbPath || ''}
+                                    onSelect={(path) => updateSetting('customAdbPath', path)}
+                                    placeholder={t('settings.not_set')}
+                                    directory={false}
+                                />
+                            </div>
                             {isNgrokEnabled && (
                                 <div className="col-span-1 md:col-span-2">
                                     <Input

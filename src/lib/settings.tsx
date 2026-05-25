@@ -39,6 +39,7 @@ export interface AppSettings {
     usageMode?: 'explorer' | 'automator';
     automationFramework?: 'robot' | 'appium' | 'maestro' | 'cypress' | 'selenium';
     explorerPlatform?: 'mobile' | 'web';
+    customAdbPath?: string;
 
     // Appium
     appiumHost: string;
@@ -138,7 +139,8 @@ const DEFAULT_SETTINGS: AppSettings = {
     aiChatEnabled: false,
     aiTestModeEnabled: false,
     aiSessionId: undefined,
-    updateChannel: 'stable'
+    updateChannel: 'stable',
+    customAdbPath: ''
 };
 
 export interface Profile {

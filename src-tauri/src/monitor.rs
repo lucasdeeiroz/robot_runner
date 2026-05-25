@@ -21,7 +21,7 @@ pub fn start_heartbeat_monitor(app_handle: AppHandle) {
                 .ok();
 
             // Check ADB status
-            let adb_devices = get_connected_devices().await.unwrap_or_default();
+            let adb_devices = get_connected_devices(app_handle.clone()).await.unwrap_or_default();
 
             let update = ServiceStatusUpdate {
                 appium: appium_status,
