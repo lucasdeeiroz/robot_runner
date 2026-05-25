@@ -87,8 +87,29 @@ export const DeviceViewport: React.FC<DeviceViewportProps> = ({
                 naturalHeight: rootNode.bounds.h
             };
         }
-        return null;
     }, [initialImgLayout, screenshot, rootNode]);
+
+    // Gather all highlightable nodes when screenshot is null
+    const highlightableNodes = React.useMemo(() => {
+        if (screenshot || !rootNode) return [];
+
+        const nodes: InspectorNode[] = [];
+        const traverse = (n: InspectorNode) => {
+            if (n.bounds) {
+                const attr = n.attributes || {};
+                
+                // Clicking priority matching InspectorSubTab
+                const hasPriority = attr['content-desc'] || attr['resource-id'] || attr['text'] || attr['clickable'] === 'true';
+                
+                if (hasPriority) {
+                    nodes.push(n);
+                }
+            }
+            n.children.forEach(traverse);
+        };
+        traverse(rootNode);
+        return nodes;
+    }, [screenshot, rootNode]);
 
     React.useEffect(() => {
         setUrlInput(activeWebUrl);
@@ -488,6 +509,31 @@ export const DeviceViewport: React.FC<DeviceViewportProps> = ({
                         <p className="text-[9px] text-white/30 mt-1">{t('inspector.status.hierarchy_available')}</p>
                     </div>
                 )}
+
+                {/* Fallback interactive overlays for when screenshot is missing */}
+                {!screenshot && highlightableNodes.map(node => {
+                    const style = getHighlighterStyle(node, 'rgba(255, 255, 255, 0.15)', imgLayout);
+                    if (style.display === 'none') return null;
+
+                    const text = node.attributes['text'];
+
+                    return (
+                        <div
+                            key={`fallback-overlay-${node.id}`}
+                            className="absolute border border-dashed border-white/20 rounded pointer-events-none flex items-center justify-center overflow-hidden"
+                            style={{
+                                ...style,
+                                backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                            }}
+                        >
+                            {text && (
+                                <span className="text-[9px] font-semibold text-white/70 truncate px-1 select-none bg-black/60 rounded border border-white/10 max-w-[90%]">
+                                    {text}
+                                </span>
+                            )}
+                        </div>
+                    );
+                })}
 
                 {/* Animation Layers - Taps */}
                 {taps.map(tap => (
