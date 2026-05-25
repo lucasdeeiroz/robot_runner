@@ -247,6 +247,11 @@ t.start()
         args.push(format!("os_version:{}", v));
     }
 
+    let adb_program = get_adb_program(&app);
+    let adb_path_var = adb_program.replace('\\', "/");
+    args.push("-v".to_string());
+    args.push(format!("ADB_PATH:{}", adb_path_var));
+
     if let Some(tests) = &selected_tests {
         for t in tests {
             args.push("--test".to_string());
@@ -286,12 +291,13 @@ t.start()
         android_version: android_version.unwrap_or_default(),
     };
 
+
+
     let metadata_path = std::path::Path::new(&abs_output_dir).join("metadata.json");
     if let Ok(json) = serde_json::to_string_pretty(&metadata) {
         let _ = std::fs::write(metadata_path, json);
     }
 
-    let adb_program = get_adb_program(&app);
     let mut cmd = new_tokio_command("python");
     cmd.env("ADB", &adb_program);
     cmd.env("PYTHONIOENCODING", "utf-8");

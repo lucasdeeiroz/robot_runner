@@ -44,11 +44,6 @@ interface SettingsPageProps {
 export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
     const { settings, updateSetting, loading, profiles, activeProfileId, createProfile, switchProfile, renameProfile, deleteProfile, systemVersions, checkSystemVersions, systemCheckStatus, isNgrokEnabled, is_test_mode } = useSettings();
 
-    useEffect(() => {
-        if (settings.customAdbPath) {
-            invoke('update_custom_adb_path', { path: settings.customAdbPath }).catch(console.error);
-        }
-    }, [settings.customAdbPath]);
     const { t } = useTranslation();
     const { sessions } = useTestSessions();
     const isTestRunning = sessions.some(s => s.status === 'running');
@@ -698,6 +693,20 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                         disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
                                         placeholder="--allow-insecure chromedriver"
                                     />
+                                    {settings.automationFramework === 'robot' && (
+                                        <div className="col-span-1 md:col-span-2 flex items-center gap-2 pt-2">
+                                            <input
+                                                type="checkbox"
+                                                id="noAppiumForRobot"
+                                                checked={settings.noAppiumForRobot || false}
+                                                onChange={(e) => updateSetting('noAppiumForRobot', e.target.checked)}
+                                                className="rounded border-outline-variant/30 text-primary dark:text-primary/80 focus:ring-primary/20 w-4 h-4 cursor-pointer"
+                                            />
+                                            <label htmlFor="noAppiumForRobot" className="text-xs font-semibold text-on-surface-variant/80 select-none cursor-pointer">
+                                                {t('settings.tool_config.no_appium_for_robot', 'Não usar Appium para Robot Framework')}
+                                            </label>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 

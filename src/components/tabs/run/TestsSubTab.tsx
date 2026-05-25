@@ -196,8 +196,9 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
         const fw = settings.automationFramework || 'robot';
 
         try {
-            // 1. Check/Start Appium (Skip for Maestro, Cypress, Selenium or AI Agents)
-            if (fw !== 'maestro' && fw !== 'cypress' && fw !== 'selenium' && !isAiAgent) {
+            // 1. Check/Start Appium (Skip for Maestro, Cypress, Selenium, AI Agents, or if Robot is selected and noAppiumForRobot is enabled)
+            const skipAppium = fw === 'maestro' || fw === 'cypress' || fw === 'selenium' || isAiAgent || (fw === 'robot' && settings.noAppiumForRobot);
+            if (!skipAppium) {
                 const status = await invoke<{ running: boolean }>('get_appium_status', {
                     host: settings.appiumHost,
                     port: Number(settings.appiumPort),

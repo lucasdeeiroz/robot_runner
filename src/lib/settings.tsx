@@ -40,6 +40,7 @@ export interface AppSettings {
     automationFramework?: 'robot' | 'appium' | 'maestro' | 'cypress' | 'selenium';
     explorerPlatform?: 'mobile' | 'web';
     customAdbPath?: string;
+    noAppiumForRobot?: boolean;
 
     // Appium
     appiumHost: string;
@@ -140,7 +141,8 @@ const DEFAULT_SETTINGS: AppSettings = {
     aiTestModeEnabled: false,
     aiSessionId: undefined,
     updateChannel: 'stable',
-    customAdbPath: ''
+    customAdbPath: '',
+    noAppiumForRobot: false
 };
 
 export interface Profile {
@@ -427,6 +429,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     };
 
     const activeProfile = storeData.profiles[storeData.activeProfileId] || storeData.profiles['default'];
+
+    useEffect(() => {
+        if (hasHydrated) {
+            invoke('update_custom_adb_path', { path: activeProfile.settings.customAdbPath || '' }).catch(console.error);
+        }
+    }, [activeProfile.settings.customAdbPath, hasHydrated]);
 
     const [systemVersions, setSystemVersions] = useState<SystemVersions | null>(null);
 
