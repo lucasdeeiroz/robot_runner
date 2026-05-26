@@ -388,9 +388,10 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
         addSession(newRunId, session.deviceUdid, session.deviceName, session.testPath, session.framework, session.timestampOutputs || false, outputDir, session.argumentsFile, session.deviceModel, session.androidVersion, session.selectedTests);
 
         try {
-            // Check Appium (Skip for Maestro)
+            // Check Appium (Skip for Maestro, Cypress, Selenium, or if Robot is selected and noAppiumForRobot is enabled)
             const fw = session.framework;
-            if (fw !== 'maestro' && fw !== 'cypress' && fw !== 'selenium') {
+            const skipAppium = fw === 'maestro' || fw === 'cypress' || fw === 'selenium' || (fw === 'robot' && settings.noAppiumForRobot);
+            if (!skipAppium) {
                 const status = await invoke<{ running: boolean }>('get_appium_status', {
                     host: settings.appiumHost,
                     port: Number(settings.appiumPort),

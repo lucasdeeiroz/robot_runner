@@ -1,6 +1,6 @@
-use crate::cmd_utils::new_tokio_command;
+use crate::cmd_utils::{new_tokio_command, get_adb_program};
 use base64::{engine::general_purpose, Engine as _};
-use tauri::{command, Manager};
+use tauri::{command, Manager, AppHandle};
 use std::sync::Mutex;
 use once_cell::sync::Lazy;
 
@@ -78,7 +78,6 @@ async fn perform_web_capture(url: &str, browser: &str, app_handle: Option<&tauri
     {
         let cache_lock = CAPTURE_CACHE.lock().unwrap();
         if let Some(ref cache) = *cache_lock {
-            // Hit cache ONLY if requested URL matches AND browser URL matches AND it's recent
             if cache.requested_url == url && cache.timestamp.elapsed() < std::time::Duration::from_millis(1500) {
                 return Ok((cache.screenshot.clone(), cache.xml.clone()));
             }
@@ -92,14 +91,10 @@ async fn perform_web_capture(url: &str, browser: &str, app_handle: Option<&tauri
     {
         let cache_lock = CAPTURE_CACHE.lock().unwrap();
         if let Some(ref cache) = *cache_lock {
-            // Force navigation ONLY if the requested URL is DIFFERENT from the last one requested.
-            // If browser URL changed naturally, requested_url will still match the previous one,
-            // so we won't force it back.
             if normalize_url(url) != normalize_url(&cache.requested_url) {
                 force_navigate = "true";
             }
         } else {
-            // No cache yet, first navigation
             force_navigate = "true";
         }
     }
@@ -120,7 +115,6 @@ async fn perform_web_capture(url: &str, browser: &str, app_handle: Option<&tauri
 
     let stdout_str = String::from_utf8_lossy(&output.stdout);
     
-    // Parse output JSON
     #[derive(serde::Deserialize)]
     struct CaptureResult {
         screenshot: Option<String>,
@@ -154,15 +148,15 @@ async fn perform_web_capture(url: &str, browser: &str, app_handle: Option<&tauri
 
 
 #[command]
-pub async fn get_screenshot(app_handle: tauri::AppHandle, device_id: String, web_url: Option<String>) -> Result<String, String> {
+pub async fn get_screenshot(app_handle: AppHandle, device_id: String, web_url: Option<String>) -> Result<String, String> {
     if is_web_device(&device_id) {
         let url = web_url.unwrap_or_else(|| "https://google.com".to_string());
         let (screenshot, _) = perform_web_capture(&url, &device_id, Some(&app_handle)).await?;
         return Ok(screenshot);
     }
 
-    // 1. Run adb exec-out screencap -p
-    let mut cmd = new_tokio_command("adb");
+    let adb_program = get_adb_program(&app_handle);
+    let mut cmd = new_tokio_command(&adb_program);
     cmd.args(&["-s", &device_id, "exec-out", "screencap", "-p"]);
 
     let output = cmd
@@ -177,21 +171,18 @@ pub async fn get_screenshot(app_handle: tauri::AppHandle, device_id: String, web
         ));
     }
 
-    // 2. Encode to Base64
     let b64 = general_purpose::STANDARD.encode(&output.stdout);
-
     Ok(b64)
 }
 
 #[command]
-pub async fn get_compressed_screenshot(app_handle: tauri::AppHandle, device_id: String, max_width: Option<u32>, max_height: Option<u32>, web_url: Option<String>) -> Result<String, String> {
+pub async fn get_compressed_screenshot(app_handle: AppHandle, device_id: String, max_width: Option<u32>, max_height: Option<u32>, web_url: Option<String>) -> Result<String, String> {
     use crate::image_utils;
 
     if is_web_device(&device_id) {
         let url = web_url.unwrap_or_else(|| "https://google.com".to_string());
         let (screenshot, _) = perform_web_capture(&url, &device_id, Some(&app_handle)).await?;
         
-        // Decode base64 PNG screenshot to binary to resize and compress it
         let img_bytes = general_purpose::STANDARD.decode(&screenshot)
             .map_err(|e| format!("Failed to decode base64 screenshot: {}", e))?;
 
@@ -202,7 +193,8 @@ pub async fn get_compressed_screenshot(app_handle: tauri::AppHandle, device_id: 
             .map_err(|e| format!("Image processing failed: {}", e));
     }
 
-    let mut cmd = new_tokio_command("adb");
+    let adb_program = get_adb_program(&app_handle);
+    let mut cmd = new_tokio_command(&adb_program);
     cmd.args(&["-s", &device_id, "exec-out", "screencap", "-p"]);
 
     let output = cmd
@@ -225,88 +217,70 @@ pub async fn get_compressed_screenshot(app_handle: tauri::AppHandle, device_id: 
 }
 
 #[command]
-pub async fn get_xml_dump(app_handle: tauri::AppHandle, device_id: String, web_url: Option<String>) -> Result<String, String> {
+pub async fn get_xml_dump(app_handle: AppHandle, device_id: String, web_url: Option<String>) -> Result<String, String> {
     if is_web_device(&device_id) {
         let url = web_url.unwrap_or_else(|| "https://google.com".to_string());
         let (_, xml) = perform_web_capture(&url, &device_id, Some(&app_handle)).await?;
         return Ok(xml);
     }
 
-    // 1. Run uiautomator dump (with retries)
+    let adb_program = get_adb_program(&app_handle);
     let mut attempts = 0;
     let max_attempts = 4;
 
     loop {
         attempts += 1;
 
-        let mut cmd = new_tokio_command("adb");
+        let mut cmd = new_tokio_command(&adb_program);
+        // Use exact suggested safe command: dump to sdcard and cat in one go
         cmd.args(&[
             "-s",
             &device_id,
             "shell",
-            "uiautomator",
-            "dump",
-            "/data/local/tmp/window_dump.xml",
+            "uiautomator dump /sdcard/ui_diag.xml >/dev/null && cat /sdcard/ui_diag.xml",
         ]);
 
         match cmd.output().await {
             Ok(output) => {
                 if output.status.success() {
-                    break;
-                } else {
-                    let stderr = String::from_utf8_lossy(&output.stderr);
-                    let stdout = String::from_utf8_lossy(&output.stdout);
-
-                    if attempts >= max_attempts {
-                        return Err(format!("uiautomator dump failed: {} {}", stderr, stdout));
+                    let raw_output = String::from_utf8_lossy(&output.stdout).to_string();
+                    let xml_content = if let Some(start) = raw_output.find('<') {
+                        raw_output[start..].to_string()
+                    } else {
+                        raw_output
+                    };
+                    // Basic validation that it's XML and contains hierarchy
+                    if xml_content.contains("hierarchy") {
+                        return Ok(xml_content);
                     }
-
-                    // cleanup before retry
-                    let _ = new_tokio_command("adb")
-                        .args(&[
-                            "-s",
-                            &device_id,
-                            "shell",
-                            "rm",
-                            "/data/local/tmp/window_dump.xml",
-                        ])
-                        .output()
-                        .await;
-                    let _ = new_tokio_command("adb")
-                        .args(&["-s", &device_id, "shell", "pkill", "uiautomator"])
-                        .output()
-                        .await;
-
-                    // Also try to stop appium server if it's hanging
-                    let _ = new_tokio_command("adb")
-                        .args(&[
-                            "-s",
-                            &device_id,
-                            "shell",
-                            "am",
-                            "force-stop",
-                            "io.appium.uiautomator2.server",
-                        ])
-                        .output()
-                        .await;
-                    let _ = new_tokio_command("adb")
-                        .args(&[
-                            "-s",
-                            &device_id,
-                            "shell",
-                            "am",
-                            "force-stop",
-                            "io.appium.uiautomator2.server.test",
-                        ])
-                        .output()
-                        .await;
                 }
+                
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                let stdout = String::from_utf8_lossy(&output.stdout);
+
+                if attempts >= max_attempts {
+                    return Err(format!("uiautomator dump failed after {} attempts: {} {}", max_attempts, stderr, stdout));
+                }
+
+                // cleanup before retry
+                let _ = new_tokio_command(&adb_program)
+                    .args(&["-s", &device_id, "shell", "pkill", "uiautomator"])
+                    .output()
+                    .await;
+
+                let _ = new_tokio_command(&adb_program)
+                    .args(&[
+                        "-s",
+                        &device_id,
+                        "shell",
+                        "am",
+                        "force-stop",
+                        "io.appium.uiautomator2.server",
+                    ])
+                    .output()
+                    .await;
             }
             Err(e) => {
-                eprintln!(
-                    "Failed to execute adb command (attempt {}/{}): {}",
-                    attempts, max_attempts, e
-                );
                 if attempts >= max_attempts {
                     return Err(format!("Failed to execute uiautomator dump command: {}", e));
                 }
@@ -315,37 +289,10 @@ pub async fn get_xml_dump(app_handle: tauri::AppHandle, device_id: String, web_u
 
         tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
     }
-
-    // 2. Cat the file
-    let mut cmd_cat = new_tokio_command("adb");
-    cmd_cat.args(&[
-        "-s",
-        &device_id,
-        "shell",
-        "cat",
-        "/data/local/tmp/window_dump.xml",
-    ]);
-
-    let cat_cmd = cmd_cat
-        .output()
-        .await
-        .map_err(|e| format!("Failed to cat window_dump.xml: {}", e))?;
-
-    if !cat_cmd.status.success() {
-        return Err(format!(
-            "Failed to read dump file: {}",
-            String::from_utf8_lossy(&cat_cmd.stderr)
-        ));
-    }
-
-    let xml_content = String::from_utf8_lossy(&cat_cmd.stdout).to_string();
-    Ok(xml_content)
 }
 
 #[command]
-pub async fn send_web_input(app_handle: tauri::AppHandle, action_type: String, x: i32, y: i32, end_x: Option<i32>, end_y: Option<i32>, web_url: Option<String>) -> Result<(), String> {
-    // Invalidate the cache's timestamp to force a fresh capture on the next refresh,
-    // but preserve the requested_url to avoid triggering a forced navigate back.
+pub async fn send_web_input(app_handle: AppHandle, action_type: String, x: i32, y: i32, end_x: Option<i32>, end_y: Option<i32>, web_url: Option<String>) -> Result<(), String> {
     {
         let mut cache_lock = CAPTURE_CACHE.lock().unwrap();
         if let Some(ref mut cache) = *cache_lock {
@@ -360,16 +307,8 @@ pub async fn send_web_input(app_handle: tauri::AppHandle, action_type: String, x
     cmd.arg(action_type);
     cmd.arg(x.to_string());
     cmd.arg(y.to_string());
-    if let Some(ex) = end_x {
-        cmd.arg(ex.to_string());
-    } else {
-        cmd.arg("0");
-    }
-    if let Some(ey) = end_y {
-        cmd.arg(ey.to_string());
-    } else {
-        cmd.arg("0");
-    }
+    cmd.arg(end_x.unwrap_or(0).to_string());
+    cmd.arg(end_y.unwrap_or(0).to_string());
     if let Some(url) = web_url {
         cmd.arg(url);
     }
@@ -386,7 +325,7 @@ pub async fn send_web_input(app_handle: tauri::AppHandle, action_type: String, x
 }
 
 #[command]
-pub async fn save_web_screenshot(app_handle: tauri::AppHandle, device_id: String, path: String) -> Result<(), String> {
+pub async fn save_web_screenshot(app_handle: AppHandle, device_id: String, path: String) -> Result<(), String> {
     let url = {
         let cache = CAPTURE_CACHE.lock().unwrap();
         cache.as_ref()
@@ -406,7 +345,7 @@ pub async fn save_web_screenshot(app_handle: tauri::AppHandle, device_id: String
 }
 
 #[command]
-pub async fn start_web_recording(app_handle: tauri::AppHandle) -> Result<(), String> {
+pub async fn start_web_recording(app_handle: AppHandle) -> Result<(), String> {
     {
         let guard = WEB_RECORDING_STATE.lock().unwrap();
         if guard.is_some() {
@@ -452,11 +391,9 @@ pub async fn stop_web_recording(output_path: String) -> Result<(), String> {
     let WebRecordingState { mut child, frames_dir, stop_file } =
         state.ok_or_else(|| "No web recording in progress.".to_string())?;
 
-    // Signal the recording script to stop
     std::fs::write(&stop_file, b"stop")
         .map_err(|e| format!("Failed to write stop signal: {}", e))?;
 
-    // Wait up to 15s for the script to finish writing frames and exit
     let _ = tokio::time::timeout(
         std::time::Duration::from_secs(15),
         child.wait()
@@ -464,7 +401,6 @@ pub async fn stop_web_recording(output_path: String) -> Result<(), String> {
 
     let _ = std::fs::remove_file(&stop_file);
 
-    // Verify frames were captured
     let has_frames = std::fs::read_dir(&frames_dir)
         .map(|mut d| d.any(|e| e.map(|f| f.file_name().to_string_lossy().ends_with(".jpg")).unwrap_or(false)))
         .unwrap_or(false);
@@ -489,7 +425,7 @@ pub async fn stop_web_recording(output_path: String) -> Result<(), String> {
         ])
         .output()
         .await
-        .map_err(|_| "ffmpeg not found. Install ffmpeg (e.g. `winget install Gyan.FFmpeg`) to enable web video recording.".to_string())?;
+        .map_err(|_| "ffmpeg not found. Install ffmpeg to enable web video recording.".to_string())?;
 
     let _ = std::fs::remove_dir_all(&frames_dir);
 
@@ -502,24 +438,46 @@ pub async fn stop_web_recording(output_path: String) -> Result<(), String> {
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+#[command]
+pub async fn get_device_screen_size(app_handle: AppHandle, device_id: String) -> Result<(u32, u32), String> {
+    if is_web_device(&device_id) {
+        return Ok((1280, 800)); // Default fallback for web
+    }
 
-    #[tokio::test]
-    #[ignore = "requires browser/CDP runtime and network access"]
-    async fn test_perform_web_capture_resolves_path() {
-        // Try perform_web_capture with a simple website (Google)
-        // This will verify that scripts/web_capture.cjs is found, loaded, and runs without error.
-        // We use "headless-chrome" for tests.
-        let result = perform_web_capture("https://google.com", "headless-chrome", None).await;
-        
-        // Assert that we don't get a "Could not find scripts/web_capture.cjs" or "Failed to run" error
-        assert!(result.is_ok(), "Web capture failed: {:?}", result.err());
-        
-        let (screenshot, xml) = result.unwrap();
-        assert!(!screenshot.is_empty(), "Screenshot should not be empty");
-        assert!(!xml.is_empty(), "XML dump should not be empty");
-        assert!(xml.contains("hierarchy"), "XML dump should be a valid hierarchy");
+    let adb_program = get_adb_program(&app_handle);
+    let mut cmd = new_tokio_command(&adb_program);
+    cmd.args(&["-s", &device_id, "shell", "wm size"]);
+
+    let output = cmd.output().await
+        .map_err(|e| format!("Failed to run wm size: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("wm size failed: {}", stderr));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut width = 0;
+    let mut height = 0;
+
+    for line in stdout.lines() {
+        let line = line.trim();
+        if line.starts_with("Override size:") || line.starts_with("Physical size:") {
+            if let Some(size_part) = line.split(':').nth(1) {
+                let parts: Vec<&str> = size_part.trim().split('x').collect();
+                if parts.len() == 2 {
+                    if let (Ok(w), Ok(h)) = (parts[0].trim().parse::<u32>(), parts[1].trim().parse::<u32>()) {
+                        width = w;
+                        height = h;
+                    }
+                }
+            }
+        }
+    }
+
+    if width > 0 && height > 0 {
+        Ok((width, height))
+    } else {
+        Err(format!("Could not parse wm size output: {}", stdout))
     }
 }

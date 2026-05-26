@@ -459,6 +459,7 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                 <div className="flex flex-col items-center justify-center overflow-hidden relative max-w-[30vw] rounded-2xl">
                     <DeviceViewport
                         screenshot={screenshot}
+                        rootNode={rootNode}
                         loading={loading}
                         imgRef={imgRef}
                         imgLayout={imgLayout}

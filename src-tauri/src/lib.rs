@@ -38,6 +38,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .manage(adb::shell::ShellState::default())
+        .manage(adb::AdbState::default())
         .manage(runner::TestState(Arc::new(Mutex::new(HashMap::new()))))
         .manage(appium::AppiumState(Arc::new(Mutex::new(None))))
         .manage(ngrok::NgrokState(Mutex::new(None)))

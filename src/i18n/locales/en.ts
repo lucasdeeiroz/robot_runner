@@ -517,6 +517,7 @@ export const en = {
                 ready: "Ready",
                 loading: "Loading...",
                 no_screenshot: "No screenshot",
+                hierarchy_available: "UI Hierarchy loaded (Interactions active)",
                 paused_test: "Inspector disabled during test",
                 web_mode_title: "Mobile-Optimized Inspector",
                 web_mode_desc: "Visual Inspector is optimized for Mobile Automation (Android & iOS). For Web applications, please use the browser's native developer tools (e.g., Chrome DevTools) or the Cypress Test Runner's interactive panel to inspect elements in real-time.",
@@ -1140,6 +1141,8 @@ export const en = {
             tool_config: {
                 appium_base_path: "Appium Base Path",
                 appium_args: "Appium Arguments",
+                no_appium_for_robot: "Do not use Appium for Robot Framework",
+                custom_adb_path: "Custom ADB Path",
                 scrcpy_args: "Scrcpy Arguments",
                 robot_args: "Robot Framework Arguments",
                 maestro_args: "Maestro Arguments",

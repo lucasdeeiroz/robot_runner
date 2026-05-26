@@ -1,22 +1,20 @@
-use crate::cmd_utils::new_tokio_command;
+use crate::cmd_utils::{new_tokio_command, get_adb_program};
+use tauri::AppHandle;
 
 #[tauri::command]
-pub async fn get_device_ip(serial: String) -> Result<String, String> {
-    // Strategy 1: ip route (reliable on most modern Androids)
-    let mut cmd_route = new_tokio_command("adb");
-    cmd_route.args(&["-s", &serial, "shell", "ip", "route"]);
-
-    let output = cmd_route.output().await.map_err(|e| e.to_string())?;
-
-    if output.status.success() {
+pub async fn get_device_ip(app: AppHandle, device: String) -> Result<String, String> {
+    let program = get_adb_program(&app);
+    // Method 1: ip addr show wlan0
+    let mut cmd1 = new_tokio_command(&program);
+    cmd1.args(&["-s", &device, "shell", "ip", "addr", "show", "wlan0"]);
+    
+    if let Ok(output) = cmd1.output().await {
         let stdout = String::from_utf8_lossy(&output.stdout);
-        // Look for line containing "wlan0" and extract the src IP
-        // Example output: "192.168.1.0/24 dev wlan0 proto kernel scope link src 192.168.1.5"
         for line in stdout.lines() {
-            if line.contains("wlan0") && line.contains("src") {
+            if line.contains("inet ") {
                 let parts: Vec<&str> = line.split_whitespace().collect();
-                if let Some(pos) = parts.iter().position(|&x| x == "src") {
-                    if let Some(ip) = parts.get(pos + 1) {
+                if parts.len() >= 2 {
+                    if let Some(ip) = parts[1].split('/').next() {
                         return Ok(ip.to_string());
                     }
                 }
@@ -24,22 +22,33 @@ pub async fn get_device_ip(serial: String) -> Result<String, String> {
         }
     }
 
-    // Strategy 2: ifconfig (older devices)
-    let mut cmd_ifconfig = new_tokio_command("adb");
-    cmd_ifconfig.args(&["-s", &serial, "shell", "ifconfig", "wlan0"]);
+    // Method 2: getprop dhcp.wlan0.ipaddress
+    let mut cmd2 = new_tokio_command(&program);
+    cmd2.args(&["-s", &device, "shell", "getprop", "dhcp.wlan0.ipaddress"]);
+    if let Ok(output) = cmd2.output().await {
+        let ip = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if !ip.is_empty() {
+            return Ok(ip);
+        }
+    }
 
-    let output_ifconfig = cmd_ifconfig.output().await.map_err(|e| e.to_string())?;
-
-    if output_ifconfig.status.success() {
-        let stdout = String::from_utf8_lossy(&output_ifconfig.stdout);
-        // Example: "inet addr:192.168.1.5 ..."
-        if let Some(start) = stdout.find("inet addr:") {
-            let rest = &stdout[start + 10..];
-            if let Some(end) = rest.find(' ') {
-                return Ok(rest[0..end].to_string());
+    // Method 3: ifconfig wlan0
+    let mut cmd3 = new_tokio_command(&program);
+    cmd3.args(&["-s", &device, "shell", "ifconfig", "wlan0"]);
+    if let Ok(output) = cmd3.output().await {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        for line in stdout.lines() {
+            if line.contains("inet addr:") {
+                let parts: Vec<&str> = line.split(':').collect();
+                if parts.len() >= 2 {
+                    let ip = parts[1].split_whitespace().next().unwrap_or("");
+                    if !ip.is_empty() {
+                        return Ok(ip.to_string());
+                    }
+                }
             }
         }
     }
 
-    Err("Could not detect device IP via ADB".to_string())
+    Err("Could not find device IP address".to_string())
 }

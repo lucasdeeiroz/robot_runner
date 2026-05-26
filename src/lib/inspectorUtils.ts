@@ -65,7 +65,7 @@ export function transformBounds(
  * Recursively converts the raw fast-xml-parser object into a cleaner InspectorNode tree.
  * Agnostic to tag names (handles node, hierarchy, or class-based tags).
  */
-export function transformXmlToTree(rawNode: any, parent?: InspectorNode, keyName: string = 'node'): InspectorNode {
+export function transformXmlToTree(rawNode: any, parent?: InspectorNode, keyName: string = 'node', isRoot: boolean = true): InspectorNode {
     const attributes: Record<string, string> = {};
     const children: InspectorNode[] = [];
 
@@ -90,11 +90,11 @@ export function transformXmlToTree(rawNode: any, parent?: InspectorNode, keyName
         } else if (Array.isArray(value)) {
             value.forEach((v: any) => {
                 if (typeof v === 'object' && v !== null) {
-                    children.push(transformXmlToTree(v, undefined, key));
+                    children.push(transformXmlToTree(v, undefined, key, false));
                 }
             });
         } else if (typeof value === 'object' && value !== null) {
-            children.push(transformXmlToTree(value, undefined, key));
+            children.push(transformXmlToTree(value, undefined, key, false));
         } else {
             attributes[key] = decodeHtmlEntities(String(value));
         }
@@ -146,7 +146,41 @@ export function transformXmlToTree(rawNode: any, parent?: InspectorNode, keyName
         }
     }
 
-    if (!parent) {
+    if (isRoot) {
+        // Calculate the bounding box of the entire tree to find the maximum extent of all elements.
+        // Android UI Automator coordinates are absolute physical screen coordinates.
+        // If the dump only contains a modal/dialog (common on payment terminals or secure screens),
+        // the root node bounds may be restricted to the modal, causing viewport scaling mismatch
+        // and clipping the modal elements outside the viewport container.
+        // Forcing the root bounds to start at (0, 0) and cover all elements' max extent solves this.
+        let maxX = 0;
+        let maxY = 0;
+
+        const traverseForMax = (n: InspectorNode) => {
+            if (n.bounds) {
+                maxX = Math.max(maxX, n.bounds.x + n.bounds.w);
+                maxY = Math.max(maxY, n.bounds.y + n.bounds.h);
+            }
+            n.children.forEach(traverseForMax);
+        };
+
+        traverseForMax(node);
+
+        const currentBounds = node.bounds;
+        if (!currentBounds || currentBounds.x !== 0 || currentBounds.y !== 0 || currentBounds.w < maxX || currentBounds.h < maxY) {
+            if (maxX > 0 && maxY > 0) {
+                const finalW = currentBounds && currentBounds.x === 0 ? Math.max(currentBounds.w, maxX) : maxX;
+                const finalH = currentBounds && currentBounds.y === 0 ? Math.max(currentBounds.h, maxY) : maxY;
+
+                node.bounds = {
+                    x: 0,
+                    y: 0,
+                    w: finalW,
+                    h: finalH
+                };
+            }
+        }
+
         assignInstances(node);
     }
 
@@ -535,7 +569,39 @@ export function findNodesByLocator(root: InspectorNode, locator: string): Inspec
             }
         };
 
-        const segments = path.split('/');
+        const splitXPath = (xpath: string): string[] => {
+            const segmentsList: string[] = [];
+            let current = "";
+            let inBracket = 0;
+            let inSingleQuote = false;
+            let inDoubleQuote = false;
+
+            for (let i = 0; i < xpath.length; i++) {
+                const char = xpath[i];
+                if (char === "'" && !inDoubleQuote) {
+                    inSingleQuote = !inSingleQuote;
+                    current += char;
+                } else if (char === '"' && !inSingleQuote) {
+                    inDoubleQuote = !inDoubleQuote;
+                    current += char;
+                } else if (char === '[' && !inSingleQuote && !inDoubleQuote) {
+                    inBracket++;
+                    current += char;
+                } else if (char === ']' && !inSingleQuote && !inDoubleQuote) {
+                    inBracket--;
+                    current += char;
+                } else if (char === '/' && !inSingleQuote && !inDoubleQuote && inBracket === 0) {
+                    segmentsList.push(current);
+                    current = "";
+                } else {
+                    current += char;
+                }
+            }
+            segmentsList.push(current);
+            return segmentsList;
+        };
+
+        const segments = splitXPath(path);
         // If it was absolute (/node), the first segment is ""
         // If it was relative (//node), the first two segments are ""
         if (segments[0] === "") {

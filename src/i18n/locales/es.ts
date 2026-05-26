@@ -517,7 +517,8 @@ export const es = {
                 ready: "Listo",
                 loading: "Cargando...",
                 no_screenshot: "Sin captura de pantalla",
-                paused_test: "Inspector deshabilitado durante la prueba",
+                hierarchy_available: "Jerarquía de IU cargada (Interacciones activas)",
+                paused_test: "Inspector desactivado durante la prueba",
                 web_mode_title: "Inspector Optimizado para Móviles",
                 web_mode_desc: "El Inspector Visual está optimizado para Automatización Móvil (Android e iOS). Para aplicaciones Web, utilice las herramientas de desarrollo nativas del navegador (por ejemplo, Chrome DevTools) o el panel interactivo de Cypress Test Runner para inspeccionar elementos en tiempo real.",
                 web_mode_action: "Abrir DevTools",
@@ -842,7 +843,9 @@ export const es = {
                 ready: "Listo",
                 loading: "Cargando...",
                 no_screenshot: "Sin captura de pantalla",
-                paused_test: "Mapeador desactivado durante la prueba"
+                hierarchy_available: "Jerarquía de IU cargada (Interacciones activas)",
+                paused_test: "Inspector desactivado durante la prueba",
+
             },
             nav: {
                 home: "Inicio",
@@ -1145,6 +1148,8 @@ export const es = {
             tool_config: {
                 appium_base_path: "Ruta Base de Appium",
                 appium_args: "Argumentos Appium",
+                no_appium_for_robot: "No usar Appium para Robot Framework",
+                custom_adb_path: "Ruta ADB Personalizada",
                 scrcpy_args: "Argumentos Scrcpy",
                 robot_args: "Argumentos Robot Framework",
                 maestro_args: "Argumentos Maestro",

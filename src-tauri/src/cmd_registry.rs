@@ -4,6 +4,7 @@ macro_rules! generate_robot_runner_handler {
         tauri::generate_handler![
             crate::greet,
             crate::adb::shell::get_adb_version,
+            crate::adb::shell::update_custom_adb_path,
             crate::adb::shell::run_adb_command,
             crate::adb::shell::start_adb_command,
             crate::adb::shell::stop_adb_command,
@@ -18,6 +19,7 @@ macro_rules! generate_robot_runner_handler {
             crate::inspector::get_screenshot,
             crate::inspector::get_compressed_screenshot,
             crate::inspector::get_xml_dump,
+            crate::inspector::get_device_screen_size,
             crate::inspector::send_web_input,
             crate::inspector::save_web_screenshot,
             crate::inspector::start_web_recording,
@@ -81,7 +83,15 @@ macro_rules! generate_robot_runner_handler {
             crate::auth::start_auth_server,
             crate::system::get_folder_size,
             crate::ai::call_claude_code_cli,
-            crate::ai::call_gemini_cli
+            crate::ai::call_gemini_cli,
+            crate::adb::shell::adb_input_tap,
+            crate::adb::shell::adb_input_swipe,
+            crate::adb::shell::adb_input_keyevent,
+            crate::adb::shell::adb_input_text,
+            crate::adb::shell::adb_settings_put,
+            crate::adb::shell::adb_settings_get,
+            crate::adb::shell::get_notifications,
+            crate::adb::shell::get_events
         ]
     };
 }
