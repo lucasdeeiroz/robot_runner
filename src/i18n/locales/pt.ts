@@ -1142,6 +1142,7 @@ export const pt = {
             tool_config: {
                 appium_base_path: "Caminho Base do Appium (Base Path)",
                 appium_args: "Argumentos Appium",
+                no_appium_for_robot: "Não usar Appium para Robot Framework",
                 custom_adb_path: "Caminho ADB Customizado",
                 scrcpy_args: "Argumentos Scrcpy",
                 robot_args: "Argumentos Robot Framework",

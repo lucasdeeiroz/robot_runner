@@ -1141,6 +1141,7 @@ export const en = {
             tool_config: {
                 appium_base_path: "Appium Base Path",
                 appium_args: "Appium Arguments",
+                no_appium_for_robot: "Do not use Appium for Robot Framework",
                 custom_adb_path: "Custom ADB Path",
                 scrcpy_args: "Scrcpy Arguments",
                 robot_args: "Robot Framework Arguments",

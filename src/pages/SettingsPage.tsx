@@ -703,7 +703,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                                 className="rounded border-outline-variant/30 text-primary dark:text-primary/80 focus:ring-primary/20 w-4 h-4 cursor-pointer"
                                             />
                                             <label htmlFor="noAppiumForRobot" className="text-xs font-semibold text-on-surface-variant/80 select-none cursor-pointer">
-                                                {t('settings.tool_config.no_appium_for_robot', 'Não usar Appium para Robot Framework')}
+                                                {t('settings.tool_config.no_appium_for_robot')}
                                             </label>
                                         </div>
                                     )}

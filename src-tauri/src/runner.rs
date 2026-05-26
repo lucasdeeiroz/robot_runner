@@ -520,7 +520,16 @@ async fn spawn_and_monitor(
 
     let (control_tx, mut control_rx) = tokio::sync::mpsc::channel::<ProcessCommand>(10);
     {
-        let mut procs = state.0.lock().unwrap();
+        let mut procs = state
+            .0
+            .lock()
+            .map_err(|e| AppError::ProcessError(format!("Failed to lock process state: {}", e)))?;
+        if procs.contains_key(&run_id) {
+            return Err(AppError::ProcessError(format!(
+                "A test with run ID '{}' is already running",
+                run_id
+            )));
+        }
         procs.insert(run_id.clone(), ProcessInfo { control_tx: control_tx.clone() });
     }
 
@@ -547,7 +556,9 @@ async fn spawn_and_monitor(
                 }
             }
         };
-        state_mon.lock().unwrap().remove(&rid_mon);
+        if let Ok(mut procs) = state_mon.lock() {
+            procs.remove(&rid_mon);
+        }
         let exit_code = final_status.and_then(|s| s.code()).unwrap_or(-1);
         let _ = app_handle_mon.emit("test-finished", TestFinished { run_id: rid_mon, exit_code });
     });

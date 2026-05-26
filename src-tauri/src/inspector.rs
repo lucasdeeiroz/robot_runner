@@ -237,13 +237,18 @@ pub async fn get_xml_dump(app_handle: AppHandle, device_id: String, web_url: Opt
             "-s",
             &device_id,
             "shell",
-            "uiautomator dump /sdcard/ui_diag.xml && cat /sdcard/ui_diag.xml",
+            "uiautomator dump /sdcard/ui_diag.xml >/dev/null && cat /sdcard/ui_diag.xml",
         ]);
 
         match cmd.output().await {
             Ok(output) => {
                 if output.status.success() {
-                    let xml_content = String::from_utf8_lossy(&output.stdout).to_string();
+                    let raw_output = String::from_utf8_lossy(&output.stdout).to_string();
+                    let xml_content = if let Some(start) = raw_output.find('<') {
+                        raw_output[start..].to_string()
+                    } else {
+                        raw_output
+                    };
                     // Basic validation that it's XML and contains hierarchy
                     if xml_content.contains("hierarchy") {
                         return Ok(xml_content);

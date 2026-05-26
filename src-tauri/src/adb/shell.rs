@@ -250,54 +250,105 @@ pub async fn start_adb_server(app: AppHandle) -> AppResult<String> {
 // SECURE ADB COMMANDS
 #[command]
 pub async fn adb_input_tap(app: AppHandle, device: String, x: i32, y: i32) -> AppResult<()> {
-    run_adb_shell_internal(&app, &device, &format!("input tap {} {}", x, y)).await?;
+    run_adb_shell_args_internal(
+        &app,
+        &device,
+        vec!["input".to_string(), "tap".to_string(), x.to_string(), y.to_string()],
+    )
+    .await?;
     Ok(())
 }
 
 #[command]
 pub async fn adb_input_swipe(app: AppHandle, device: String, x1: i32, y1: i32, x2: i32, y2: i32, ms: i32) -> AppResult<()> {
-    run_adb_shell_internal(&app, &device, &format!("input swipe {} {} {} {} {}", x1, y1, x2, y2, ms)).await?;
+    run_adb_shell_args_internal(
+        &app,
+        &device,
+        vec![
+            "input".to_string(),
+            "swipe".to_string(),
+            x1.to_string(),
+            y1.to_string(),
+            x2.to_string(),
+            y2.to_string(),
+            ms.to_string(),
+        ],
+    )
+    .await?;
     Ok(())
 }
 
 #[command]
 pub async fn adb_input_keyevent(app: AppHandle, device: String, keycode: String) -> AppResult<()> {
-    run_adb_shell_internal(&app, &device, &format!("input keyevent {}", keycode)).await?;
+    run_adb_shell_args_internal(
+        &app,
+        &device,
+        vec!["input".to_string(), "keyevent".to_string(), keycode],
+    )
+    .await?;
     Ok(())
 }
 
 #[command]
 pub async fn adb_input_text(app: AppHandle, device: String, text: String) -> AppResult<()> {
-    let escaped_text = text.replace("\"", "\\\"");
-    run_adb_shell_internal(&app, &device, &format!("input text \"{}\"", escaped_text)).await?;
+    run_adb_shell_args_internal(
+        &app,
+        &device,
+        vec!["input".to_string(), "text".to_string(), text],
+    )
+    .await?;
     Ok(())
 }
 
 #[command]
 pub async fn adb_settings_put(app: AppHandle, device: String, namespace: String, key: String, value: String) -> AppResult<()> {
-    run_adb_shell_internal(&app, &device, &format!("settings put {} {} {}", namespace, key, value)).await?;
+    run_adb_shell_args_internal(
+        &app,
+        &device,
+        vec!["settings".to_string(), "put".to_string(), namespace, key, value],
+    )
+    .await?;
     Ok(())
 }
 
 #[command]
 pub async fn adb_settings_get(app: AppHandle, device: String, namespace: String, key: String) -> AppResult<String> {
-    run_adb_shell_internal(&app, &device, &format!("settings get {} {}", namespace, key)).await
+    run_adb_shell_args_internal(
+        &app,
+        &device,
+        vec!["settings".to_string(), "get".to_string(), namespace, key],
+    )
+    .await
 }
 
 #[command]
 pub async fn get_notifications(app: AppHandle, device: String) -> AppResult<String> {
-    run_adb_shell_internal(&app, &device, "dumpsys notification --noredact").await
+    run_adb_shell_args_internal(
+        &app,
+        &device,
+        vec!["dumpsys".to_string(), "notification".to_string(), "--noredact".to_string()],
+    )
+    .await
 }
 
 #[command]
 pub async fn get_events(app: AppHandle, device: String) -> AppResult<String> {
-    run_adb_shell_internal(&app, &device, "getevent -l").await
+    run_adb_shell_args_internal(
+        &app,
+        &device,
+        vec!["getevent".to_string(), "-l".to_string()],
+    )
+    .await
 }
 
-async fn run_adb_shell_internal(app: &AppHandle, device: &str, command: &str) -> AppResult<String> {
+async fn run_adb_shell_args_internal(
+    app: &AppHandle,
+    device: &str,
+    command_args: Vec<String>,
+) -> AppResult<String> {
     let program = get_adb_program(app);
     let mut cmd = new_tokio_command(&program);
-    cmd.arg("-s").arg(device).arg("shell").arg(command);
+    cmd.arg("-s").arg(device).arg("shell").args(command_args);
 
     let output = cmd.output().await.map_err(|e| AppError::AdbError(e.to_string()))?;
     if output.status.success() {

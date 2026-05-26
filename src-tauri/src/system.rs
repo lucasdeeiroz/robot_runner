@@ -1,5 +1,5 @@
 use crate::cmd_utils::{new_std_command, get_adb_program};
-use crate::errors::AppResult;
+use crate::errors::{AppError, AppResult};
 use nosleep::{NoSleep, NoSleepType};
 use regex::Regex;
 use serde::Serialize;
@@ -9,13 +9,17 @@ use walkdir::WalkDir;
 
 #[command]
 pub async fn get_folder_size(path: String) -> AppResult<u64> {
-    let mut total_size = 0;
-    for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
-        if entry.file_type().is_file() {
-            total_size += entry.metadata().map(|m| m.len()).unwrap_or(0);
+    tokio::task::spawn_blocking(move || {
+        let mut total_size = 0;
+        for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
+            if entry.file_type().is_file() {
+                total_size += entry.metadata().map(|m| m.len()).unwrap_or(0);
+            }
         }
-    }
-    Ok(total_size)
+        total_size
+    })
+    .await
+    .map_err(|e| AppError::StringError(e.to_string()))
 }
 
 #[derive(Serialize, Default, Debug)]
@@ -49,6 +53,16 @@ pub async fn get_system_versions(
 
     let mut versions = SystemVersions {
         adb: adb.unwrap_or_else(|| "Not Found".to_string()),
+        node: "Not Checked".to_string(),
+        appium: "Not Checked".to_string(),
+        uiautomator2: "Not Checked".to_string(),
+        python: "Not Checked".to_string(),
+        robot: "Not Checked".to_string(),
+        appium_lib: "Not Checked".to_string(),
+        java: "Not Checked".to_string(),
+        maven: "Not Checked".to_string(),
+        maestro: "Not Checked".to_string(),
+        ngrok: "Not Checked".to_string(),
         ..Default::default()
     };
 
@@ -56,8 +70,8 @@ pub async fn get_system_versions(
     let scrcpy_raw = get_version("scrcpy", &["--version"]);
     versions.scrcpy = extract_version(&scrcpy_raw, r"scrcpy ([\d\.]+)").unwrap_or_else(|| "Not Found".to_string());
 
-    // Basic tools that should always be checked if in automator mode or just always to be safe
-    if check_automator || true {
+    // Basic tools that should always be checked in automator mode
+    if check_automator {
         // Node
         let node_raw = get_version("node", &["--version"]);
         versions.node = node_raw.trim().replace("v", "");
@@ -201,13 +215,15 @@ pub fn toggle_wakelock(state: State<'_, WakelockState>, enabled: bool) -> Result
 }
 
 #[command]
-pub async fn sync_workspace_permissions(_path: String) -> AppResult<()> {
+pub async fn sync_workspace_permissions(paths: Vec<String>) -> AppResult<()> {
     #[cfg(not(target_os = "windows"))]
     {
         use crate::cmd_utils::new_tokio_command;
-        let mut cmd = new_tokio_command("chmod");
-        cmd.args(&["-R", "755", &_path]);
-        let _ = cmd.output().await;
+        for path in paths {
+            let mut cmd = new_tokio_command("chmod");
+            cmd.args(["-R", "755", path.as_str()]);
+            let _ = cmd.output().await;
+        }
     }
     Ok(())
 }
