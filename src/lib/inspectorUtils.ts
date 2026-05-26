@@ -569,7 +569,39 @@ export function findNodesByLocator(root: InspectorNode, locator: string): Inspec
             }
         };
 
-        const segments = path.split('/');
+        const splitXPath = (xpath: string): string[] => {
+            const segmentsList: string[] = [];
+            let current = "";
+            let inBracket = 0;
+            let inSingleQuote = false;
+            let inDoubleQuote = false;
+
+            for (let i = 0; i < xpath.length; i++) {
+                const char = xpath[i];
+                if (char === "'" && !inDoubleQuote) {
+                    inSingleQuote = !inSingleQuote;
+                    current += char;
+                } else if (char === '"' && !inSingleQuote) {
+                    inDoubleQuote = !inDoubleQuote;
+                    current += char;
+                } else if (char === '[' && !inSingleQuote && !inDoubleQuote) {
+                    inBracket++;
+                    current += char;
+                } else if (char === ']' && !inSingleQuote && !inDoubleQuote) {
+                    inBracket--;
+                    current += char;
+                } else if (char === '/' && !inSingleQuote && !inDoubleQuote && inBracket === 0) {
+                    segmentsList.push(current);
+                    current = "";
+                } else {
+                    current += char;
+                }
+            }
+            segmentsList.push(current);
+            return segmentsList;
+        };
+
+        const segments = splitXPath(path);
         // If it was absolute (/node), the first segment is ""
         // If it was relative (//node), the first two segments are ""
         if (segments[0] === "") {

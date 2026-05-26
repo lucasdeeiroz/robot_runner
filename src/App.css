@@ -266,14 +266,14 @@ button:hover .rai-letter-r-ghost,
   z-index: 99999 !important;
 }
 
-/* Elevate stacking context and prevent clipping for all ancestors up the tree when hovering a tooltip, except for vertically scrollable containers */
-*:not(html):not(body):not([class*="overflow-y-auto"]):not([class*="overflow-auto"]):not([class*="overflow-y-scroll"]):not([class*="overflow-scroll"]):has([data-tooltip]:hover) {
+/* Elevate stacking context and prevent clipping for all ancestors up the tree when hovering a tooltip, except for scrollable or explicitly hidden overflow containers to prevent layout shift */
+*:not(html):not(body):not([class*="overflow-y-auto"]):not([class*="overflow-auto"]):not([class*="overflow-y-scroll"]):not([class*="overflow-scroll"]):not([class*="overflow-hidden"]):not([class*="overflow-x-hidden"]):not([class*="overflow-y-hidden"]):has([data-tooltip]:hover) {
   z-index: 99999 !important;
   overflow: visible !important;
 }
 
-/* For vertically scrollable containers, only elevate z-index to avoid scroll resetting and flickering */
-*:not(html):not(body):where([class*="overflow-y-auto"], [class*="overflow-auto"], [class*="overflow-y-scroll"], [class*="overflow-scroll"]):has([data-tooltip]:hover) {
+/* For scrollable or hidden overflow containers, only elevate z-index to avoid layout/scroll resetting and flickering */
+*:not(html):not(body):where([class*="overflow-y-auto"], [class*="overflow-auto"], [class*="overflow-y-scroll"], [class*="overflow-scroll"], [class*="overflow-hidden"], [class*="overflow-x-hidden"], [class*="overflow-y-hidden"]):has([data-tooltip]:hover) {
   z-index: 99999 !important;
 }
 

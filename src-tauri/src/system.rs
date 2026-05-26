@@ -215,11 +215,11 @@ pub fn toggle_wakelock(state: State<'_, WakelockState>, enabled: bool) -> Result
 }
 
 #[command]
-pub async fn sync_workspace_permissions(paths: Vec<String>) -> AppResult<()> {
+pub async fn sync_workspace_permissions(_paths: Vec<String>) -> AppResult<()> {
     #[cfg(not(target_os = "windows"))]
     {
         use crate::cmd_utils::new_tokio_command;
-        for path in paths {
+        for path in _paths {
             let mut cmd = new_tokio_command("chmod");
             cmd.args(["-R", "755", path.as_str()]);
             let _ = cmd.output().await;
