@@ -503,6 +503,10 @@ export const pt = {
             input_error: "Falha ao enviar input",
             empty: "Selecione um dispositivo para iniciar o Inspetor",
             refresh: "Atualizar Fonte",
+            export_xml: "Exportar XML",
+            export_xml_success: "XML exportado com sucesso!",
+            export_xml_error: "Falha ao exportar XML",
+            export_xml_no_data: "Nenhum dado XML carregado para exportar.",
             search: {
                 placeholder: "Buscar por ID, XPath, etc...",
                 clear: "Limpar busca"
