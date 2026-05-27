@@ -36,6 +36,7 @@ export function useDeviceViewport({
         : initialDeviceId;
     const [screenshot, setScreenshot] = useState<string | null>(null);
     const [rootNode, setRootNode] = useState<InspectorNode | null>(null);
+    const [xmlDump, setXmlDump] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [imgLayout, setImgLayout] = useState<{ width: number, height: number, naturalWidth: number, naturalHeight: number } | null>(null);
     const [selectedNode, setSelectedNode] = useState<InspectorNode | null>(null);
@@ -89,6 +90,7 @@ export function useDeviceViewport({
 
             // Try XML dump (critical for element interaction)
             const xml = await invoke<string>('get_xml_dump', { deviceId, webUrl: webUrlParam });
+            setXmlDump(xml);
             const parser = new XMLParser({
                 ignoreAttributes: false,
                 attributeNamePrefix: "",
@@ -145,6 +147,7 @@ export function useDeviceViewport({
     useEffect(() => {
         setScreenshot(null);
         setRootNode(null);
+        setXmlDump(null);
         setSelectedNode(null);
         setHoveredNode(null);
         setAvailableNodes([]);
@@ -158,6 +161,7 @@ export function useDeviceViewport({
         if (!deviceId) {
             setScreenshot(null);
             setRootNode(null);
+            setXmlDump(null);
             setSelectedNode(null);
             setAvailableNodes([]);
             prevBusy.current = isBusy;
@@ -392,6 +396,7 @@ export function useDeviceViewport({
         setScreenshot,
         rootNode,
         setRootNode,
+        xmlDump,
         loading,
         imgLayout,
         setImgLayout,

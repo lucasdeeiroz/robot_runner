@@ -503,6 +503,10 @@ export const es = {
             input_error: "Error al enviar entrada",
             empty: "Seleccione un dispositivo para iniciar el Inspector",
             refresh: "Actualizar Origen",
+            export_xml: "Exportar XML",
+            export_xml_success: "¡XML exportado con éxito!",
+            export_xml_error: "Error al exportar XML",
+            export_xml_no_data: "No hay datos XML cargados para exportar.",
             search: {
                 placeholder: "Buscar por ID, XPath, etc...",
                 clear: "Limpiar búsqueda"

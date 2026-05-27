@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { Check, Scan, Home, ArrowLeft, Rows, X, Search, Pencil, Copy, ChevronDown, ChevronUp, Videotape, Play, Trash2, Code, Move, MousePointer2, ArrowRight, ArrowUp, ArrowDown } from 'lucide-react';
+import { Check, Scan, Home, ArrowLeft, Rows, X, Search, Pencil, Copy, ChevronDown, ChevronUp, Videotape, Play, Trash2, Code, Move, MousePointer2, ArrowRight, ArrowUp, ArrowDown, Download } from 'lucide-react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { InspectorNode, generateXPath, findNodesByLocator, generateUiSelector } from '@/lib/inspectorUtils';
@@ -48,6 +48,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
     const {
         screenshot,
         rootNode,
+        xmlDump,
         loading,
         imgLayout,
         setImgLayout,
@@ -71,6 +72,33 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
     });
 
     const [copied, setCopied] = useState<string | null>(null);
+
+    const handleExportXml = async () => {
+        if (!xmlDump) {
+            feedback.toast.error(t('inspector.export_xml_no_data'));
+            return;
+        }
+
+        try {
+            const { save } = await import('@tauri-apps/plugin-dialog');
+            const filePath = await save({
+                filters: [{
+                    name: 'XML Document',
+                    extensions: ['xml']
+                }],
+                defaultPath: `ui_dump_${new Date().getTime()}.xml`
+            });
+
+            if (filePath) {
+                const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+                await writeTextFile(filePath, xmlDump);
+                feedback.toast.success(t('inspector.export_xml_success'));
+            }
+        } catch (e) {
+            console.error("XML export failed:", e);
+            feedback.toast.error(t('inspector.export_xml_error'));
+        }
+    };
 
     // AI Suggestion State
     const { settings, is_test_mode } = useSettings();
@@ -419,6 +447,20 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                                     >
                                         <Videotape size={16} className={clsx(isRecordingMode && "animate-pulse")} />
                                     </Button>
+                                    <div className="w-[1px] h-4 bg-outline-variant/30 self-center mx-1" />
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={handleExportXml}
+                                        disabled={!xmlDump}
+                                        className={clsx(
+                                            "p-1.5 rounded transition-all text-on-surface-variant/80 hover:bg-surface-variant/30",
+                                            !xmlDump && "opacity-50 cursor-not-allowed"
+                                        )}
+                                        title={t('inspector.export_xml')}
+                                    >
+                                        <Download size={16} />
+                                    </Button>
                                 </div>
                             </>
                         )}
@@ -663,7 +705,33 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                                     <div className="border border-outline-variant/30 rounded-2xl overflow-hidden text-sm">
                                         {Object.entries(selectedNode.attributes)
                                             .filter(([key, value]) => key !== undefined && value !== undefined && value !== null && value !== '')
-                                            .sort(([a], [b]) => a.localeCompare(b))
+                                            .sort(([a], [b]) => {
+                                                const order = [
+                                                    'resource-id',
+                                                    'text',
+                                                    'class',
+                                                    'package',
+                                                    'bounds',
+                                                    'index',
+                                                    'instance',
+                                                    'checkable',
+                                                    'checked',
+                                                    'clickable',
+                                                    'enabled',
+                                                    'focusable',
+                                                    'focused',
+                                                    'long-clickable',
+                                                    'password',
+                                                    'scrollable',
+                                                    'selected'
+                                                ];
+                                                const idxA = order.indexOf(a);
+                                                const idxB = order.indexOf(b);
+                                                if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                                                if (idxA !== -1) return -1;
+                                                if (idxB !== -1) return 1;
+                                                return a.localeCompare(b);
+                                            })
                                             .map(([key, value]) => (
                                                 <div key={key} className="flex flex-col border-b border-outline-variant/30 last:border-0">
                                                     <div className="bg-surface-variant/80 px-3 py-1.5 text-xs text-on-surface-variant/80 font-medium break-all">{key}</div>
