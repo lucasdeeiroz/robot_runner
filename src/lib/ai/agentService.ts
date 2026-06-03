@@ -1,4 +1,4 @@
-import { askGeminiCode } from '@/lib/dashboard/geminiCode';
+import { askAntigravityCli } from '@/lib/dashboard/antigravityCode';
 import { askClaudeCode } from '@/lib/dashboard/claudeCode';
 import { askGemini } from '@/lib/dashboard/gemini';
 import { askClaude } from '@/lib/dashboard/claude';
@@ -60,7 +60,7 @@ export async function askAgent(
     let fullPrompt = message;
     
     // If not using a CLI provider or no session id, inject history
-    if ((provider !== 'gemini-code' && provider !== 'claude-code') || !resumeSessionId) {
+    if ((provider !== 'antigravity-cli' && provider !== 'claude-code') || !resumeSessionId) {
         if (history.length > 0) {
             const historyText = history.map(h => `${h.role === 'user' ? 'USER' : 'AGENT'}: ${h.content}`).join('\n\n');
             fullPrompt = `PREVIOUS CONVERSATION HISTORY:\n${historyText}\n\nCURRENT USER MESSAGE:\n${message}`;
@@ -71,12 +71,12 @@ export async function askAgent(
         let result: any;
         let newSessionId = resumeSessionId;
 
-        if (provider === 'gemini-code') {
-            const response = await askGeminiCode(
+        if (provider === 'antigravity-cli') {
+            const response = await askAntigravityCli(
                 fullPrompt,
                 settings.paths.automationRoot,
                 systemInstruction,
-                settings.geminiCodeApiKey,
+                settings.antigravityApiKey,
                 {
                     jsonSchema: AGENT_JSON_SCHEMA,
                     resumeSessionId

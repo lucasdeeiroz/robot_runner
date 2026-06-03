@@ -72,8 +72,8 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
     const claudeCodeVersion = systemVersions?.claude_code;
     const isClaudeCodeInstalled = !!claudeCodeVersion && claudeCodeVersion !== 'Not Found';
 
-    const geminiCodeVersion = systemVersions?.gemini_code;
-    const isGeminiCodeInstalled = !!geminiCodeVersion && geminiCodeVersion !== 'Not Found';
+    const antigravityVersion = systemVersions?.antigravity;
+    const isAntigravityInstalled = !!antigravityVersion && antigravityVersion !== 'Not Found';
 
     const { isFeatureEnabled } = useRemoteConfig();
     const isCypressEnabled = isFeatureEnabled('is_cypress_enabled');
@@ -975,7 +975,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                         { value: 'claude', label: t('settings.ai.claude.title') },
                                         { value: 'openai', label: t('settings.ai.openai.title') },
                                         { value: 'claude-code', label: t('settings.ai.claude_code.title') },
-                                        { value: 'gemini-code', label: t('settings.ai.gemini_code.title') }
+                                        { value: 'antigravity-cli', label: t('settings.ai.antigravity.title') }
                                     ]}
                                 />
                             </div>
@@ -1219,8 +1219,8 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                             </div>
                         )}
 
-                        {/* Gemini CLI Config */}
-                        {settings.aiProvider === 'gemini-code' && (
+                        {/* Antigravity CLI Config */}
+                        {settings.aiProvider === 'antigravity-cli' && (
                             <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
                                 <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 space-y-3">
                                     <div className="flex items-start gap-3">
@@ -1229,21 +1229,21 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                         </div>
                                         <div className="space-y-1">
                                             <p className="text-sm font-medium text-on-surface">
-                                                {t('settings.ai.gemini_code.title')}
+                                                {t('settings.ai.antigravity.title')}
                                             </p>
                                             <p className="text-xs text-on-surface-variant leading-relaxed">
-                                                {t('settings.ai.gemini_code.help')}
+                                                {t('settings.ai.antigravity.help')}
                                             </p>
                                         </div>
                                     </div>
 
                                     <div className="pt-2 flex items-center justify-between gap-4">
                                         <div className="flex items-center gap-2">
-                                            <div className={`w-2 h-2 rounded-full ${isGeminiCodeInstalled ? 'bg-success' : 'bg-error animate-pulse'}`} />
+                                            <div className={`w-2 h-2 rounded-full ${isAntigravityInstalled ? 'bg-success' : 'bg-error animate-pulse'}`} />
                                             <span className="text-xs font-medium text-on-surface-variant">
-                                                {isGeminiCodeInstalled
-                                                    ? t('settings.ai.gemini_code.installed', { version: geminiCodeVersion }) 
-                                                    : t('settings.ai.gemini_code.not_installed')
+                                                {isAntigravityInstalled
+                                                    ? t('settings.ai.antigravity.installed', { version: antigravityVersion }) 
+                                                    : t('settings.ai.antigravity.not_installed')
                                                 }
                                             </span>
                                         </div>
@@ -1253,20 +1253,20 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                             onClick={() => checkSystemVersions()}
                                             className="h-8 px-3 text-[11px]"
                                         >
-                                            {t('settings.ai.gemini_code.check_install')}
+                                            {t('settings.ai.antigravity.check_install')}
                                         </Button>
                                     </div>
 
                                     <div className="pt-2">
                                         <Input
-                                            label={t('settings.ai.gemini_code.token_label')}
+                                            label={t('settings.ai.antigravity.token_label')}
                                             type="password"
-                                            value={settings.geminiCodeApiKey || ''}
-                                            onChange={(e) => updateSetting('geminiCodeApiKey', e.target.value)}
-                                            placeholder={t('settings.ai.gemini_code.token_placeholder')}
+                                            value={settings.antigravityApiKey || ''}
+                                            onChange={(e) => updateSetting('antigravityApiKey', e.target.value)}
+                                            placeholder={t('settings.ai.antigravity.token_placeholder')}
                                         />
                                         <p className="text-[10px] text-on-surface-variant/80 mt-1">
-                                            {t('settings.ai.gemini_code.token_help')}
+                                            {t('settings.ai.antigravity.token_help')}
                                         </p>
                                     </div>
                                 </div>

@@ -1,7 +1,8 @@
 
-import { useState, useEffect } from 'react';
-import { Check, Scan, Home, ArrowLeft, Rows, X, Search, Pencil, Copy, ChevronDown, ChevronUp, Videotape, Play, Trash2, Code, Move, MousePointer2, ArrowRight, ArrowUp, ArrowDown, Download } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Check, Scan, Home, ArrowLeft, Rows, X, Search, Pencil, Copy, ChevronDown, ChevronUp, Videotape, Play, Trash2, Code, Move, MousePointer2, ArrowRight, ArrowUp, ArrowDown, Download, RefreshCw } from 'lucide-react';
 import clsx from 'clsx';
+import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
 import { InspectorNode, generateXPath, findNodesByLocator, generateUiSelector } from '@/lib/inspectorUtils';
 import { feedback } from "@/lib/feedback";
@@ -136,6 +137,56 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
         selectedAddons: [] as string[]
     });
     const [customLocator, setCustomLocator] = useState("");
+
+    // Live UI Sync State
+    const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
+    const lastFocusRef = useRef("");
+
+    // Reset lastFocus when device changes
+    useEffect(() => {
+        lastFocusRef.current = "";
+    }, [selectedDevice]);
+
+    // Parallel Logcat & Focused Activity UI Sync Loop
+    useEffect(() => {
+        if (!autoRefreshEnabled || !selectedDevice || isTestRunning || !isActive || is_test_mode === 'web') {
+            return;
+        }
+
+        let isMounted = true;
+        let timeoutId: any;
+
+        const checkChanges = async () => {
+            try {
+                const result = await invoke<[boolean, string]>('check_ui_change', {
+                    device: selectedDevice,
+                    lastFocus: lastFocusRef.current
+                });
+
+                if (!isMounted) return;
+
+                const [hasChanged, currentFocus] = result;
+                lastFocusRef.current = currentFocus;
+
+                if (hasChanged) {
+                    await refreshAll(true, false);
+                }
+            } catch (err) {
+                console.warn("[Inspector Sync] Error checking UI changes:", err);
+            }
+
+            if (isMounted && autoRefreshEnabled) {
+                timeoutId = setTimeout(checkChanges, 2000);
+            }
+        };
+
+        timeoutId = setTimeout(checkChanges, 2000);
+
+        return () => {
+            isMounted = false;
+            clearTimeout(timeoutId);
+        };
+    }, [autoRefreshEnabled, selectedDevice, isTestRunning, isActive, is_test_mode, refreshAll]);
 
     // Auto-load AI suggestion from cache when node changes
     useEffect(() => {
@@ -309,7 +360,7 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                 }
 
                 result = typeof response === 'string' ? response : response.result;
-            } else if (provider === 'gemini-code') {
+            } else if (provider === 'antigravity-cli') {
                 const schema = {
                     type: "object",
                     properties: {
@@ -319,8 +370,8 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                     required: ["selector", "rationale"]
                 };
 
-                const { askGeminiCode } = await import('@/lib/dashboard/geminiCode');
-                const response = await askGeminiCode(prompt, settings.paths.automationRoot || '', systemInstruction, settings.geminiCodeApiKey, {
+                const { askAntigravityCli } = await import('@/lib/dashboard/antigravityCode');
+                const response = await askAntigravityCli(prompt, settings.paths.automationRoot || '', systemInstruction, settings.antigravityApiKey, {
                     jsonSchema: schema,
                     imageBase64: screenshot || undefined
                 });
@@ -461,6 +512,23 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                                     >
                                         <Download size={16} />
                                     </Button>
+                                    {is_test_mode !== 'web' && (
+                                        <>
+                                            <div className="w-[1px] h-4 bg-outline-variant/30 self-center mx-1" />
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
+                                                className={clsx(
+                                                    "p-1.5 rounded transition-all",
+                                                    autoRefreshEnabled ? "bg-primary/10 text-primary dark:text-primary/80 hover:bg-primary/20" : "hover:bg-surface-variant/30 text-on-surface-variant/80"
+                                                )}
+                                                title={t('inspector.live_sync')}
+                                            >
+                                                <RefreshCw size={16} className={clsx(autoRefreshEnabled && "animate-spin")} />
+                                            </Button>
+                                        </>
+                                    )}
                                 </div>
                             </>
                         )}

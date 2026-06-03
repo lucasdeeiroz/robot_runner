@@ -4,7 +4,7 @@ import clsx from "clsx";
 import { useTranslation } from "react-i18next";
 import { Star, Eye, EyeOff, Terminal, X, FolderOpen, Bot, Play, Pause, RefreshCw } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
-import { parseXmlBackground } from "@/lib/xmlParseCache";
+import { parseXmlBackground, invalidateCache } from "@/lib/xmlParseCache";
 import { parseHeuristicLogs } from "@/lib/heuristicParser";
 import { LogNode, LinearNode } from "@/lib/robotParser";
 import { LogTree } from "@/components/molecules/LogTree";
@@ -17,7 +17,7 @@ import * as gemini from "@/lib/dashboard/gemini";
 import * as openai from "@/lib/dashboard/openai";
 import * as claude from "@/lib/dashboard/claude";
 import * as claudeCli from "@/lib/dashboard/claudeCode";
-import * as geminiCode from "@/lib/dashboard/geminiCode";
+import * as antigravityCode from "@/lib/dashboard/antigravityCode";
 import { useCallback } from "react";
 
 interface RunConsoleProps {
@@ -204,6 +204,15 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
     // Track if post-test re-parse is in progress
     const [reparseLoading, setReparseLoading] = useState(false);
 
+    // Invalidate XML parsing cache for this session's output path when the test run starts
+    useEffect(() => {
+        if (isRunning && session?.outputDir) {
+            const outputPath = session.outputDir;
+            const outputXmlPath = session.outputXmlPath || `${outputPath.replace(/[\\/]+$/, "")}/output.xml`;
+            invalidateCache(outputXmlPath);
+        }
+    }, [isRunning, session?.outputDir, session?.outputXmlPath]);
+
     useEffect(() => {
         // Skip if running, or no output path, or tree is already officially repopulated
         if (isRunning || !session?.outputDir || !!session?.repopulatedTree) return;
@@ -216,6 +225,10 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                 // Try to find the detected output XML from logs first, then fallback to output.xml
                 const outputPath = session.outputDir!;
                 const outputXmlPath = session.outputXmlPath || `${outputPath.replace(/[\\/]+$/, "")}/output.xml`;
+                
+                // Invalidate XML parsing cache for this path to ensure we read the new test results
+                invalidateCache(outputXmlPath);
+                
                 const result = await parseXmlBackground(outputXmlPath);
                 if (!cancelled && result) {
                     setTree([result.rootSuite]);
@@ -264,9 +277,9 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                 result = await claude.summarizeExecution(tree, settings.claudeApiKey as string, settings.claudeModel || '', language, failureContext, undefined, customPrompt);
             } else if (provider === 'claude-code') {
                 result = await claudeCli.summarizeExecution(tree, settings.paths.automationRoot || '', language, failureContext?.map(f => f.message) || [], failureContext, customPrompt, settings.claudeCodeToken);
-            } else if (provider === 'gemini-code') {
-                const { summarizeExecution } = await import('@/lib/dashboard/geminiCode');
-                result = await summarizeExecution(tree, settings.paths.automationRoot || '', language, failureContext?.map(f => f.message) || [], failureContext, customPrompt, settings.geminiCodeApiKey);
+            } else if (provider === 'antigravity-cli') {
+                const { summarizeExecution } = await import('@/lib/dashboard/antigravityCode');
+                result = await summarizeExecution(tree, settings.paths.automationRoot || '', language, failureContext?.map(f => f.message) || [], failureContext, customPrompt, settings.antigravityApiKey);
             }
 
             setSummary(result);
@@ -305,8 +318,8 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                 response = await openai.generateAutonomousAction(xml, target, aiHistory, settings.openaiApiKey as string, settings.openaiModel || 'gpt-4o', lang);
             } else if (provider === 'claude') {
                 response = await claude.generateAutonomousAction(xml, target, aiHistory, settings.claudeApiKey as string, settings.claudeModel || 'claude-3-5-sonnet-latest', lang);
-            } else if (provider === 'gemini-code') {
-                response = await geminiCode.generateAutonomousAction(xml, target, aiHistory, settings.paths.automationRoot || '', lang, undefined, settings.geminiCodeApiKey);
+            } else if (provider === 'antigravity-cli') {
+                response = await antigravityCode.generateAutonomousAction(xml, target, aiHistory, settings.paths.automationRoot || '', lang, undefined, settings.antigravityApiKey);
             } else if (provider === 'claude-code') {
                 response = await claudeCli.generateAutonomousAction(xml, target, aiHistory, settings.paths.automationRoot || '', lang, undefined, settings.claudeCodeToken);
             } else {

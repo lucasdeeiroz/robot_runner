@@ -446,9 +446,9 @@ Error Message: ${(node as TestNode).failureDetail?.message}
                                                          } else if (provider === 'claude-code') {
                                                             const response = await askClaudeCode(prompt, settings.paths.automationRoot || '', systemInstruction, settings.claudeCodeToken, { imageBase64: screenshot });
                                                             result = typeof response === 'string' ? response : response.result;
-                                                        } else if (provider === 'gemini-code') {
-                                                            const { askGeminiCode } = await import('@/lib/dashboard/geminiCode');
-                                                            const response = await askGeminiCode(prompt, settings.paths.automationRoot || '', systemInstruction, settings.geminiCodeApiKey, { imageBase64: screenshot });
+                                                        } else if (provider === 'antigravity-cli') {
+                                                            const { askAntigravityCli } = await import('@/lib/dashboard/antigravityCode');
+                                                            const response = await askAntigravityCli(prompt, settings.paths.automationRoot || '', systemInstruction, settings.antigravityApiKey, { imageBase64: screenshot });
                                                             result = typeof response === 'string' ? response : response.result;
                                                         } else {
                                                             throw new Error("No AI provider configured");

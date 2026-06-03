@@ -197,15 +197,15 @@ export function HistoryDetailModal({ isOpen, onClose, log, onUpdateLog }: Histor
             } else if (provider === 'claude') {
                 apiKey = settings.claudeApiKey;
                 model = settings.claudeModel;
-            } else if (provider === 'gemini-code') {
-                apiKey = settings.geminiCodeApiKey;
-                model = 'gemini-code';
+            } else if (provider === 'antigravity-cli') {
+                apiKey = settings.antigravityApiKey;
+                model = 'antigravity-cli';
             } else {
                 apiKey = settings.geminiApiKey;
                 model = settings.geminiModel;
             }
 
-            if (!apiKey && provider !== 'claude-code' && provider !== 'gemini-code') {
+            if (!apiKey && provider !== 'claude-code' && provider !== 'antigravity-cli') {
                 throw new Error("Missing API Key");
             }
 
@@ -240,9 +240,9 @@ export function HistoryDetailModal({ isOpen, onClose, log, onUpdateLog }: Histor
                 result = await claude.summarizeExecution(tree, apiKey!, model!, language, failureContext, undefined, customPrompt, base64Screenshot);
             } else if (provider === 'claude-code') {
                 result = await claudeCli.summarizeExecution(tree, settings.paths.automationRoot || '', language, failureContext?.map(f => f.message) || [], failureContext, customPrompt, settings.claudeCodeToken, base64Screenshot);
-            } else if (provider === 'gemini-code') {
-                const { summarizeExecution } = await import('@/lib/dashboard/geminiCode');
-                result = await summarizeExecution(tree, settings.paths.automationRoot || '', language, failureContext?.map(f => f.message) || [], failureContext, customPrompt, settings.geminiCodeApiKey, base64Screenshot);
+            } else if (provider === 'antigravity-cli') {
+                const { summarizeExecution } = await import('@/lib/dashboard/antigravityCode');
+                result = await summarizeExecution(tree, settings.paths.automationRoot || '', language, failureContext?.map(f => f.message) || [], failureContext, customPrompt, settings.antigravityApiKey, base64Screenshot);
             } else {
                 result = await gemini.summarizeExecution(tree, apiKey!, model!, language, failureContext, undefined, customPrompt, base64Screenshot);
             }

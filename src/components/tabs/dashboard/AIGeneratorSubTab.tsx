@@ -38,8 +38,8 @@ export function AIGeneratorSubTab({ onNavigate }: AIGeneratorSubTabProps) {
 
     const provider = settings.aiProvider || 'gemini';
     const apiKey = provider === 'gemini' ? settings.geminiApiKey : provider === 'claude' ? settings.claudeApiKey : provider === 'openai' ? settings.openaiApiKey : 'CLI_MODE';
-    const model = provider === 'gemini' ? settings.geminiModel : provider === 'claude' ? settings.claudeModel : provider === 'openai' ? settings.openaiModel : provider === 'claude-code' ? 'claude-code' : 'gemini-code';
-    const hasApiKey = (provider === 'claude-code' || provider === 'gemini-code') ? true : !!apiKey;
+    const model = provider === 'gemini' ? settings.geminiModel : provider === 'claude' ? settings.claudeModel : provider === 'openai' ? settings.openaiModel : provider === 'claude-code' ? 'claude-code' : 'antigravity-cli';
+    const hasApiKey = (provider === 'claude-code' || provider === 'antigravity-cli') ? true : !!apiKey;
 
     const handleGenerate = async (customPrompt?: string) => {
         if (!requirements.trim() || !hasApiKey) return;
@@ -49,7 +49,8 @@ export function AIGeneratorSubTab({ onNavigate }: AIGeneratorSubTabProps) {
             let mapsContext: string | undefined = undefined;
             if (useMapping) {
                 const contextResponse = await getAiContext('artifact_generation', {
-                    profile_id: activeProfileId || undefined
+                    profile_id: activeProfileId || undefined,
+                    custom_mappings_dir: settings.paths?.mappings
                 });
                 mapsContext = contextResponse.context;
             }
@@ -65,9 +66,9 @@ export function AIGeneratorSubTab({ onNavigate }: AIGeneratorSubTabProps) {
                 aiResponse = await generateWithOpenAI(requirements, apiKey as string, model, currentLang, mapsContext as any, genType, undefined, customPrompt);
             } else if (provider === 'claude-code') {
                 aiResponse = await generateWithClaudeCode(requirements, settings.paths.automationRoot || '', currentLang, mapsContext as any, genType, customPrompt, settings.claudeCodeToken);
-            } else if (provider === 'gemini-code') {
-                const { generateRefinedTestCases } = await import('@/lib/dashboard/geminiCode');
-                aiResponse = await generateRefinedTestCases(requirements, settings.paths.automationRoot || '', currentLang, mapsContext as any, genType, customPrompt, settings.geminiCodeApiKey);
+            } else if (provider === 'antigravity-cli') {
+                const { generateRefinedTestCases } = await import('@/lib/dashboard/antigravityCode');
+                aiResponse = await generateRefinedTestCases(requirements, settings.paths.automationRoot || '', currentLang, mapsContext as any, genType, customPrompt, settings.antigravityApiKey);
             }
 
             setGeneratedContent(aiResponse);

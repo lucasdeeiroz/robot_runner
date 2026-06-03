@@ -104,9 +104,9 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         if (provider === 'gemini') return !!settings.geminiApiKey;
         if (provider === 'claude') return !!settings.claudeApiKey;
         if (provider === 'openai') return !!settings.openaiApiKey;
-        if (provider === 'claude-code' || provider === 'gemini-code') return true; // Always allow, as CLI may be pre-authenticated
+        if (provider === 'claude-code' || provider === 'antigravity-cli') return true; // Always allow, as CLI may be pre-authenticated
         return false;
-    }, [settings.aiProvider, settings.geminiApiKey, settings.claudeApiKey, settings.openaiApiKey, settings.claudeCodeToken]);
+    }, [settings.aiProvider, settings.geminiApiKey, settings.claudeApiKey, settings.openaiApiKey, settings.claudeCodeToken, settings.antigravityApiKey]);
     const [isStayOn, setIsStayOn] = useState(false);
 
     // Migration logic
@@ -456,7 +456,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         const apiKey = aiProvider === 'gemini' ? geminiApiKey : aiProvider === 'claude' ? claudeApiKey : openaiApiKey;
         const model = aiProvider === 'gemini' ? geminiModel : aiProvider === 'claude' ? claudeModel : openaiModel;
 
-        if (!apiKey && aiProvider !== 'claude-code' && aiProvider !== 'gemini-code') {
+        if (!apiKey && aiProvider !== 'claude-code' && aiProvider !== 'antigravity-cli') {
             feedback.toast.error(t('dashboard.generator.key_required', { provider: aiProvider.toUpperCase() }));
             return;
         }
@@ -504,9 +504,9 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 result = await claude.suggestElementName(criticalAttrs as any, screenName, apiKey!, model, lang, optimizedMaps as any, undefined, customPrompt);
             } else if (aiProvider === 'claude-code') {
                 result = await claudeCli.suggestElementName(criticalAttrs as any, screenName, settings.paths.automationRoot || '', lang, optimizedMaps as any, customPrompt, settings.claudeCodeToken, screenshot || undefined);
-            } else if (aiProvider === 'gemini-code') {
-                const { suggestElementName } = await import('@/lib/dashboard/geminiCode');
-                result = await suggestElementName(criticalAttrs as any, screenName, settings.paths.automationRoot || '', lang, optimizedMaps as any, customPrompt, settings.geminiCodeApiKey, screenshot || undefined);
+            } else if (aiProvider === 'antigravity-cli') {
+                const { suggestElementName } = await import('@/lib/dashboard/antigravityCode');
+                result = await suggestElementName(criticalAttrs as any, screenName, settings.paths.automationRoot || '', lang, optimizedMaps as any, customPrompt, settings.antigravityApiKey, screenshot || undefined);
             }
 
             if (result && result.name) {
@@ -533,7 +533,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         const apiKey = aiProvider === 'gemini' ? geminiApiKey : aiProvider === 'claude' ? claudeApiKey : openaiApiKey;
         const model = aiProvider === 'gemini' ? geminiModel : aiProvider === 'claude' ? claudeModel : openaiModel;
 
-        if (!apiKey && aiProvider !== 'claude-code' && aiProvider !== 'gemini-code') {
+        if (!apiKey && aiProvider !== 'claude-code' && aiProvider !== 'antigravity-cli') {
             feedback.toast.error(t('dashboard.generator.key_required', { provider: aiProvider.toUpperCase() }));
             return;
         }
@@ -554,9 +554,9 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 tags = await claude.suggestScreenTags(screenName || "Current Screen", elementsContext, apiKey!, model, lang, screenshot || undefined, undefined, customPrompt);
             } else if (aiProvider === 'claude-code') {
                 tags = await claudeCli.suggestScreenTags(screenName || "Current Screen", elementsContext, settings.paths.automationRoot || '', lang, customPrompt, settings.claudeCodeToken, screenshot || undefined);
-            } else if (aiProvider === 'gemini-code') {
-                const { suggestScreenTags } = await import('@/lib/dashboard/geminiCode');
-                tags = await suggestScreenTags(screenName || "Current Screen", elementsContext, settings.paths.automationRoot || '', lang, customPrompt, settings.geminiCodeApiKey, screenshot || undefined);
+            } else if (aiProvider === 'antigravity-cli') {
+                const { suggestScreenTags } = await import('@/lib/dashboard/antigravityCode');
+                tags = await suggestScreenTags(screenName || "Current Screen", elementsContext, settings.paths.automationRoot || '', lang, customPrompt, settings.antigravityApiKey, screenshot || undefined);
             }
 
             if (tags && Array.isArray(tags) && tags.length > 0) {
@@ -610,17 +610,26 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             explorer.addLog(t('mapper.exploration.step_marker', { step: explorer.getState().currentStep }), 'step', explorer.getState().currentStep);
 
             // App Recovery Logic
-            const currentPkg = await invoke<string>('get_focused_package', { device: selectedDevice });
+            let currentPkg = "";
+            try {
+                currentPkg = await invoke<string>('get_focused_package', { device: selectedDevice });
+            } catch (pkgError) {
+                console.warn("Failed to detect focused package:", pkgError);
+                if (explorer.getState().currentStep === 1) {
+                    explorer.addLog("Warning: Could not detect focused package on this device. App recovery logic will be bypassed.", "warning");
+                }
+            }
+
             if (!isExploringRef.current) return;
 
             let targetPkg = explorer.getTargetPackage();
 
-            if (explorer.getState().currentStep === 1 && !targetPkg) {
+            if (explorer.getState().currentStep === 1 && !targetPkg && currentPkg) {
                 targetPkg = currentPkg;
                 explorer.setTargetPackage(targetPkg);
             }
 
-            if (targetPkg && currentPkg !== targetPkg) {
+            if (targetPkg && currentPkg && currentPkg !== targetPkg) {
                 explorer.addLog(t('mapper.exploration.recovering_exit', { current: currentPkg, target: targetPkg }), 'transition');
                 await invoke('launch_package', { device: selectedDevice, package: targetPkg });
                 if (!isExploringRef.current) return;
@@ -637,11 +646,22 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             // Re-fetch using refreshAll logic isn't ideal here due to async nature,
             // but we can reuse the logic in the explorer
             const xml = await invoke<string>('get_xml_dump', { deviceId: selectedDevice });
-            const freshScreenshotBase64 = await invoke<string>('get_compressed_screenshot', { deviceId: selectedDevice, maxWidth: 1024, maxHeight: 1024 });
-            const prefix = 'data:image/jpeg;base64,';
-            const fullScreenshot = freshScreenshotBase64.startsWith('data:') ? freshScreenshotBase64 : `${prefix}${freshScreenshotBase64}`;
-            setScreenshot(fullScreenshot);
-            const screenshot = fullScreenshot;
+            
+            let screenshot: string | undefined = undefined;
+            try {
+                const freshScreenshotBase64 = await invoke<string>('get_compressed_screenshot', { deviceId: selectedDevice, maxWidth: 1024, maxHeight: 1024 });
+                if (freshScreenshotBase64) {
+                    const prefix = 'data:image/jpeg;base64,';
+                    const fullScreenshot = freshScreenshotBase64.startsWith('data:') ? freshScreenshotBase64 : `${prefix}${freshScreenshotBase64}`;
+                    setScreenshot(fullScreenshot);
+                    screenshot = fullScreenshot;
+                }
+            } catch (screenshotError) {
+                console.warn("Screenshot capture failed, proceeding with XML only:", screenshotError);
+                if (explorer.getState().currentStep === 1) {
+                    explorer.addLog("Warning: Screenshot capture failed (secured screen or OS restrictions). Proceeding with XML layout only.", "warning");
+                }
+            }
             if (!isExploringRef.current) return;
 
             // 2. Prepare Context (Backend-powered)
@@ -670,7 +690,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             const model = aiProvider === 'gemini' ? geminiModel : aiProvider === 'claude' ? claudeModel : aiProvider === 'openai' ? openaiModel : 'claude-code';
             const lang = language || i18n.language || 'en';
 
-            if (!apiKey && aiProvider !== 'claude-code' && aiProvider !== 'gemini-code') throw new Error("API Key missing");
+            if (!apiKey && aiProvider !== 'claude-code' && aiProvider !== 'antigravity-cli') throw new Error("API Key missing");
 
             explorer.addLog(t('mapper.exploration.analyzing_screen', { provider: aiProvider }), 'ai');
             setExplorationLogs([...explorer.getLogs()]);
@@ -695,9 +715,9 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                         if (result.session_id) {
                             explorer.setSessionId(result.session_id);
                         }
-                    } else if (aiProvider === 'gemini-code') {
-                        const { exploreScreen } = await import('@/lib/dashboard/geminiCode');
-                        result = await exploreScreen(simplifiedXml, settings.paths.automationRoot || '', lang, maps, explorer.getFormattedLogs(), customPrompt, settings.geminiCodeApiKey, explorer.getSessionId(), screenshot || undefined);
+                    } else if (aiProvider === 'antigravity-cli') {
+                        const { exploreScreen } = await import('@/lib/dashboard/antigravityCode');
+                        result = await exploreScreen(simplifiedXml, settings.paths.automationRoot || '', lang, maps, explorer.getFormattedLogs(), customPrompt, settings.antigravityApiKey, explorer.getSessionId(), screenshot || undefined);
                         if (result.session_id) {
                             explorer.setSessionId(result.session_id);
                         }
@@ -951,7 +971,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                     let startX = 540;
                     let startY = 1200;
                     let endX = 540;
-                    let endY = swipeDirection === 'down' ? 600 : 1800;
+                    let endY = swipeDirection === 'up' ? 600 : 1800;
 
                     let scrollableNode: InspectorNode | null = null;
 
@@ -979,10 +999,10 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                         endX = startX;
 
                         const padding = Math.round(h * 0.15); // 15% padding
-                        if (swipeDirection === 'down') { // Scroll down = drag finger up
+                        if (swipeDirection === 'up') { // Swipe up (gesture bottom-to-top) = Scroll down
                             startY = Math.round(y + h - padding);
                             endY = Math.round(y + padding);
-                        } else if (swipeDirection === 'up') {
+                        } else if (swipeDirection === 'down') { // Swipe down (gesture top-to-bottom) = Scroll up
                             startY = Math.round(y + padding);
                             endY = Math.round(y + h - padding);
                         } else if (swipeDirection === 'left') {
@@ -1014,7 +1034,12 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
         } catch (error: any) {
             console.error("Exploration error:", error);
-            stopExploration(`Error: ${error.message}`);
+            const reason = error instanceof Error 
+                ? error.message 
+                : (typeof error === 'object' && error !== null && 'message' in error)
+                    ? String(error.message)
+                    : String(error);
+            stopExploration(`Error: ${reason}`);
         }
     };
 

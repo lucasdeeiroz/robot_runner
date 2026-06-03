@@ -117,7 +117,7 @@ pub async fn call_claude_code_cli(
 }
 
 #[command]
-pub async fn call_gemini_cli(
+pub async fn call_antigravity_cli(
     prompt: String,
     project_root: String,
     api_key: Option<String>,
@@ -129,14 +129,14 @@ pub async fn call_gemini_cli(
     #[cfg(target_os = "windows")]
     let mut command = {
         let mut cmd = crate::cmd_utils::new_tokio_command("cmd");
-        cmd.args(&["/C", "gemini"]);
+        cmd.args(&["/C", "agy"]);
         cmd
     };
     #[cfg(not(target_os = "windows"))]
-    let mut command = crate::cmd_utils::new_tokio_command("gemini");
+    let mut command = crate::cmd_utils::new_tokio_command("agy");
 
     // Headless/Programmatic mode
-    // Note: Gemini CLI requires an argument for -p. We pass an empty string 
+    // Note: Antigravity CLI requires an argument for -p. We pass an empty string 
     // to enable headless mode while reading the full prompt from stdin.
     command.args(&["-p", ""]);
     command.args(&["--output-format", "json"]);
@@ -155,11 +155,12 @@ pub async fn call_gemini_cli(
         let trimmed = key.trim();
         if !trimmed.is_empty() {
             command.env("GEMINI_API_KEY", trimmed);
+            command.env("ANTIGRAVITY_API_KEY", trimmed);
         }
     }
 
-    // System Instructions are now prepended to the prompt to avoid file path errors in Gemini CLI
-    // (The CLI treats GEMINI_SYSTEM_MD as a file path if it's too long or complex)
+    // System Instructions are now prepended to the prompt to avoid file path errors in Antigravity CLI
+    // (The CLI treats ANTIGRAVITY_SYSTEM_MD as a file path if it's too long or complex)
 
     if !project_root.is_empty() {
         command.current_dir(project_root);
@@ -169,7 +170,7 @@ pub async fn call_gemini_cli(
     command.stdout(Stdio::piped());
     command.stderr(Stdio::piped());
 
-    let mut child = command.spawn().map_err(|e| AppError::ProcessError(format!("Failed to start Gemini CLI: {}. Make sure 'gemini' is installed and in your PATH.", e)))?;
+    let mut child = command.spawn().map_err(|e| AppError::ProcessError(format!("Failed to start Antigravity CLI: {}. Make sure 'agy' is installed and in your PATH.", e)))?;
 
     if let Some(mut stdin) = child.stdin.take() {
         use tokio::io::AsyncWriteExt;
@@ -197,11 +198,11 @@ pub async fn call_gemini_cli(
             }
         }
 
-        stdin.write_all(full_prompt.as_bytes()).await.map_err(|e| AppError::ProcessError(format!("Failed to write to Gemini CLI stdin: {}", e)))?;
+        stdin.write_all(full_prompt.as_bytes()).await.map_err(|e| AppError::ProcessError(format!("Failed to write to Antigravity CLI stdin: {}", e)))?;
         drop(stdin);
     }
 
-    let output = child.wait_with_output().await.map_err(|e| AppError::ProcessError(format!("Failed to wait for Gemini CLI: {}", e)))?;
+    let output = child.wait_with_output().await.map_err(|e| AppError::ProcessError(format!("Failed to wait for Antigravity CLI: {}", e)))?;
     
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -209,7 +210,7 @@ pub async fn call_gemini_cli(
     if output.status.success() {
         Ok(stdout)
     } else {
-        let error_msg = if !stderr.is_empty() { stderr } else if !stdout.is_empty() { stdout } else { "Gemini CLI exited with error but no message was provided.".to_string().into() };
-        Err(AppError::ProcessError(format!("Gemini CLI error: {}", error_msg)))
+        let error_msg = if !stderr.is_empty() { stderr } else if !stdout.is_empty() { stdout } else { "Antigravity CLI exited with error but no message was provided.".to_string().into() };
+        Err(AppError::ProcessError(format!("Antigravity CLI error: {}", error_msg)))
     }
 }

@@ -268,9 +268,9 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
             } else if (provider === 'claude-code') {
                 const response = await claudeCli.askClaudeCode(prompt, settings.paths.automationRoot || '', systemInstruction, settings.claudeCodeToken);
                 result = typeof response === 'string' ? response : response.result;
-            } else if (provider === 'gemini-code') {
-                const { askGeminiCode } = await import('@/lib/dashboard/geminiCode');
-                const response = await askGeminiCode(prompt, settings.paths.automationRoot || '', systemInstruction, settings.geminiCodeApiKey);
+            } else if (provider === 'antigravity-cli') {
+                const { askAntigravityCli } = await import('@/lib/dashboard/antigravityCode');
+                const response = await askAntigravityCli(prompt, settings.paths.automationRoot || '', systemInstruction, settings.antigravityApiKey);
                 result = typeof response === 'string' ? response : response.result;
             } else {
                 throw new Error("No AI provider configured");

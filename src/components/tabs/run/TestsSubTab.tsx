@@ -59,7 +59,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
         if (provider === 'gemini') return !!settings.geminiApiKey;
         if (provider === 'claude') return !!settings.claudeApiKey;
         if (provider === 'openai') return !!settings.openaiApiKey;
-        if (provider === 'claude-code' || provider === 'gemini-code') return true;
+        if (provider === 'claude-code' || provider === 'antigravity-cli') return true;
         return false;
     }, [settings.aiProvider, settings.geminiApiKey, settings.claudeApiKey, settings.openaiApiKey]);
 

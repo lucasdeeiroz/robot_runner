@@ -7,6 +7,9 @@ use std::sync::Mutex;
 use tauri::{command, State, AppHandle};
 use walkdir::WalkDir;
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
 #[command]
 pub async fn get_folder_size(path: String) -> AppResult<u64> {
     tokio::task::spawn_blocking(move || {
@@ -37,7 +40,7 @@ pub struct SystemVersions {
     pub scrcpy: String,
     pub ngrok: String,
     pub claude_code: String,
-    pub gemini_code: String,
+    pub antigravity: String,
 }
 
 #[command]
@@ -127,8 +130,8 @@ pub async fn get_system_versions(
     let claude_raw = get_version("claude", &["--version"]);
     versions.claude_code = if !claude_raw.is_empty() { claude_raw.trim().to_string() } else { "Not Found".to_string() };
 
-    let gemini_raw = get_version("gemini", &["--version"]);
-    versions.gemini_code = if !gemini_raw.is_empty() { gemini_raw.trim().to_string() } else { "Not Found".to_string() };
+    let antigravity_raw = get_version("agy", &["--version"]);
+    versions.antigravity = if !antigravity_raw.is_empty() { antigravity_raw.trim().to_string() } else { "Not Found".to_string() };
 
     versions
 }
@@ -136,12 +139,32 @@ pub async fn get_system_versions(
 fn get_version(cmd_name: &str, args: &[&str]) -> String {
     let mut cmd = new_std_command(cmd_name);
     cmd.args(args);
-    let output = cmd.output();
-    match output {
+    match cmd.output() {
         Ok(o) => {
             let stdout = String::from_utf8_lossy(&o.stdout).to_string();
             let stderr = String::from_utf8_lossy(&o.stderr).to_string();
             if stdout.is_empty() { stderr } else { stdout }
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            #[cfg(target_os = "windows")]
+            {
+                let mut cmd_fallback = std::process::Command::new("cmd");
+                cmd_fallback.arg("/C");
+                cmd_fallback.arg(cmd_name);
+                cmd_fallback.args(args);
+                cmd_fallback.creation_flags(0x08000000); // CREATE_NO_WINDOW
+                if let Ok(o) = cmd_fallback.output() {
+                    let stdout = String::from_utf8_lossy(&o.stdout).to_string();
+                    let stderr = String::from_utf8_lossy(&o.stderr).to_string();
+                    if stdout.is_empty() { stderr } else { stdout }
+                } else {
+                    String::new()
+                }
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                String::new()
+            }
         }
         Err(_) => String::new(),
     }
@@ -173,20 +196,42 @@ fn get_appium_driver_version(driver: &str) -> String {
         return "Not Found".to_string();
     }
 
+    // Regex to strip ANSI escape codes and their malformed remnants (e.g., [39m or 33m)
+    let ansi_re = Regex::new(r"[\u{001b}\x1b]\[[0-9;]*[a-zA-Z]").unwrap();
+    let remnant_re = Regex::new(r"\[?[0-9;]+[a-zA-Z]").unwrap();
+
     for line in raw.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with(driver) || (trimmed.contains(driver) && trimmed.contains("[")) {
-            // Look for version in brackets or after @
-            // Example: uiautomator2 [2.29.4]
-            let re = Regex::new(r"\[([^\]]+)\]").ok();
+        let cleaned_ansi = ansi_re.replace_all(line, "");
+        let cleaned = remnant_re.replace_all(&cleaned_ansi, "");
+        let trimmed = cleaned.trim();
+        if trimmed.starts_with(driver) || trimmed.contains(driver) {
+            // Check if there is an `@` symbol followed by the version (e.g. uiautomator2@7.5.2)
+            if let Some(idx) = trimmed.find(&format!("{}@", driver)) {
+                let after_at = &trimmed[idx + driver.len() + 1..];
+                // Split by space or brackets to isolate the version string
+                let version = after_at.split(|c: char| c.is_ascii_whitespace() || c == '[' || c == ']')
+                                      .next()
+                                      .unwrap_or("")
+                                      .trim();
+                if !version.is_empty() {
+                    return version.to_string();
+                }
+            }
+
+            // Fallback: Look for version in brackets containing digits (e.g. uiautomator2 [2.29.4])
+            // Do NOT match [installed (npm)]
+            let re = Regex::new(r"\[([\d\.]+)\]").ok();
             if let Some(r) = re {
                 if let Some(cap) = r.captures(trimmed) {
                     return cap[1].trim().to_string();
                 }
             }
+
+            // Fallback for general @ version
             if trimmed.contains("@") {
                 return trimmed.split("@").last().unwrap_or("Installed").trim().to_string();
             }
+
             return "Installed".to_string();
         }
     }
