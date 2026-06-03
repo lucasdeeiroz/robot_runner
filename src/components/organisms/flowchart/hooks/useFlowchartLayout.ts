@@ -28,6 +28,15 @@ export function useFlowchartLayout({ maps = [], activeProfileId, onRefresh, sett
     const [missedScreens, setMissedScreens] = useState<string[]>([]);
     
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const abortControllerRef = useRef<AbortController | null>(null);
+
+    const cancelReorganizeLayout = useCallback(() => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
+        setIsReorganizing(false);
+    }, []);
     const mappingsPath = settings.paths?.mappings;
 
     const mapsRef = useRef(maps);
@@ -162,6 +171,9 @@ export function useFlowchartLayout({ maps = [], activeProfileId, onRefresh, sett
         setIsReorganizing(true);
         setMissedScreens([]);
 
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+
         try {
             console.log("[Flowchart] Fetching AI context for layout...");
             const { context } = await getAiContext('flowchart_layout', { 
@@ -169,6 +181,8 @@ export function useFlowchartLayout({ maps = [], activeProfileId, onRefresh, sett
                 custom_mappings_dir: mappingsPath
             });
             
+            if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
+
             if (!context || context.trim() === "") {
                 console.warn("[Flowchart] AI context is empty. Reorganization might fail or do nothing.");
             } else {
@@ -184,11 +198,11 @@ export function useFlowchartLayout({ maps = [], activeProfileId, onRefresh, sett
             if (provider === 'openai') {
                 const apiKey = settings.openaiApiKey;
                 const model = settings.openaiModel || 'gpt-4o';
-                result = await reorganizeWithOpenAI(context, apiKey, model, language, undefined, customPrompt);
+                result = await reorganizeWithOpenAI(context, apiKey, model, language, controller.signal, customPrompt);
             } else if (provider === 'claude') {
                 const apiKey = settings.claudeApiKey;
                 const model = settings.claudeModel || 'claude-3-5-sonnet-20240620';
-                result = await reorganizeWithClaude(context, apiKey, model, language, undefined, customPrompt);
+                result = await reorganizeWithClaude(context, apiKey, model, language, controller.signal, customPrompt);
             } else if (provider === 'claude-code') {
                 result = await reorganizeWithClaudeCode(context, settings.paths.automationRoot || '', language, undefined, customPrompt, settings.claudeCodeToken);
             } else if (provider === 'antigravity-cli') {
@@ -196,8 +210,10 @@ export function useFlowchartLayout({ maps = [], activeProfileId, onRefresh, sett
             } else {
                 const apiKey = settings.geminiApiKey;
                 const model = settings.geminiModel || 'gemini-1.5-pro';
-                result = await reorganizeWithGemini(context, apiKey, model, language, undefined, customPrompt);
+                result = await reorganizeWithGemini(context, apiKey, model, language, controller.signal, customPrompt);
             }
+
+            if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
 
             console.log("[Flowchart] AI Reorganization result:", result);
 
@@ -253,11 +269,17 @@ export function useFlowchartLayout({ maps = [], activeProfileId, onRefresh, sett
                 throw new Error("AI returned no nodes or invalid format");
             }
         } catch (error: any) {
+            if (error?.name === 'AbortError' || String(error).includes('abort')) {
+                console.log('AI Reorganization was cancelled by the user.');
+                feedback.toast.info(t('mapper.flowchart.reorganize_cancelled'));
+                return;
+            }
             console.error('AI Reorganization failed:', error);
             const errorMessage = error?.message || String(error);
             feedback.toast.error(`${t('mapper.flowchart.reorganize_error')}: ${errorMessage}`);
         } finally {
             setIsReorganizing(false);
+            abortControllerRef.current = null;
         }
     }, [
         activeProfileId,
@@ -319,6 +341,7 @@ export function useFlowchartLayout({ maps = [], activeProfileId, onRefresh, sett
         gridBounds,
         saveLayout,
         autoReorganizeLayout,
+        cancelReorganizeLayout,
         handleClearAllCurvatures
     };
 }

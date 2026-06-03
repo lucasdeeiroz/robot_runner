@@ -1,5 +1,5 @@
 
-import { Smartphone, Battery, Cpu, Wrench, Monitor, MoreVertical, Camera, RotateCw, Layout, MousePointer2, RefreshCcw, Move } from 'lucide-react';
+import { Smartphone, Battery, Cpu, HardDrive, Wrench, Monitor, MoreVertical, Camera, RotateCw, Layout, MousePointer2, RefreshCcw, Move } from 'lucide-react';
 import { Device } from '@/lib/types';
 import { Button } from '@/components/atoms/Button';
 import { useTranslation } from 'react-i18next';
@@ -82,7 +82,7 @@ export function DeviceCard({ device, onMirror, onToolbox, onAction }: DeviceCard
                 </div>
 
                 {/* Quick Stats Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="bg-surface-variant/10 rounded-2xl p-3 border border-outline-variant/10 flex items-center gap-3 hover:bg-surface-variant/20 transition-colors">
                         <div className={clsx("p-2 rounded-xl bg-surface/80 shadow-sm", getBatteryColor(batteryLevel))}>
                             <Battery size={18} />
@@ -101,6 +101,21 @@ export function DeviceCard({ device, onMirror, onToolbox, onAction }: DeviceCard
                             <span className="text-sm font-bold text-on-surface/80 truncate">
                                 {device.ram_used && device.ram_total ? (
                                     `${formatMem(device.ram_used)} / ${formatMem(device.ram_total)}`
+                                ) : (
+                                    device.state || t('common.offline')
+                                )}
+                            </span>
+                        </div>
+                    </div>
+                    <div className="bg-surface-variant/10 rounded-2xl p-3 border border-outline-variant/10 flex items-center gap-3 hover:bg-surface-variant/20 transition-colors">
+                        <div className="p-2 rounded-xl bg-surface/80 text-primary shadow-sm">
+                            <HardDrive size={18} />
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                            <span className="text-[10px] text-on-surface-variant/50 uppercase font-bold tracking-wider leading-none mb-1">{t('home.device_card.storage')}</span>
+                            <span className="text-sm font-bold text-on-surface/80 truncate">
+                                {device.storage_used && device.storage_total ? (
+                                    `${formatMem(device.storage_used)} / ${formatMem(device.storage_total)}`
                                 ) : (
                                     device.state || t('common.offline')
                                 )}

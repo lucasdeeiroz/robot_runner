@@ -1,4 +1,4 @@
-import { collection, query, orderBy, limit, getDocs, Timestamp, where } from 'firebase/firestore';
+import { collection, query, orderBy, limit, getDocs, Timestamp, where, addDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { TestLog } from './historyCache';
 
@@ -49,5 +49,37 @@ export async function fetchGlobalHistory(uid: string, profileId: string, maxItem
     } catch (error) {
         console.error("[Firestore] Failed to fetch global history:", error);
         return [];
+    }
+}
+
+/**
+ * Uploads a local test log to Firestore.
+ */
+export async function uploadTestToFirebase(uid: string, profileId: string, log: TestLog): Promise<string | null> {
+    if (!db) return null;
+    try {
+        const historyRef = collection(db, `users/${uid}/history`);
+        const docRef = await addDoc(historyRef, {
+            runId: log.run_id || null,
+            logsPath: profileId,
+            testPath: log.path || '',
+            suiteName: log.suite_name || '',
+            status: log.status === 'PASS' ? 'passed' : 'failed',
+            exitCode: log.status === 'PASS' ? 0 : 1,
+            timestamp: log.timestamp ? new Date(log.timestamp) : new Date(),
+            deviceName: log.device_model || 'Unknown Device',
+            deviceModel: log.device_model || null,
+            deviceUdid: log.device_udid || null,
+            androidVersion: log.android_version || null,
+            framework: null,
+            passCount: log.pass_count || 0,
+            failCount: log.fail_count || 0,
+            duration: log.duration || '0s'
+        });
+        console.log("[Sync] Successfully uploaded test log to Firebase. Doc ID:", docRef.id);
+        return docRef.id;
+    } catch (error) {
+        console.error("[Sync] Failed to upload test log to Firebase:", error);
+        return null;
     }
 }

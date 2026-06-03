@@ -13,6 +13,7 @@ import { useSettings } from '@/lib/settings';
 import { useFlowchartView } from './flowchart/hooks/useFlowchartView';
 import { useFlowchartLayout } from './flowchart/hooks/useFlowchartLayout';
 import { useFlowchartInteraction } from './flowchart/hooks/useFlowchartInteraction';
+import { Button } from '@/components/atoms/Button';
 
 // Components
 import { FlowchartHeader } from './flowchart/components/FlowchartHeader';
@@ -71,7 +72,7 @@ export function FlowchartModal({ isOpen, onClose, maps = [], onEditScreen, onRef
     const {
         layout, setLayout, isDirty, setIsDirty,
         isReorganizing, missedScreens, allTags, gridBounds,
-        saveLayout, autoReorganizeLayout, handleClearAllCurvatures
+        saveLayout, autoReorganizeLayout, cancelReorganizeLayout, handleClearAllCurvatures
     } = layoutHook;
 
     const prevReorganizingRef = useRef(isReorganizing);
@@ -352,6 +353,16 @@ export function FlowchartModal({ isOpen, onClose, maps = [], onEditScreen, onRef
                                         </span>
                                         <span className="text-[10px] text-on-surface-variant animate-pulse">{t('common.please_wait', 'Please wait...')}</span>
                                     </div>
+                                    {isReorganizing && (
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={cancelReorganizeLayout}
+                                            className="mt-2 rounded-xl text-xs px-4"
+                                        >
+                                            {t('common.cancel')}
+                                        </Button>
+                                    )}
                                 </div>
                             </div>
                         )}

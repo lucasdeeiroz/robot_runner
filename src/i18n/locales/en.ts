@@ -174,7 +174,8 @@ export const en = {
                 clear: "Clear Data",
                 sort_by_name: "Sort by Name",
                 sort_by_package: "Sort by Package",
-                refresh: "Refresh List"
+                refresh: "Refresh List",
+                allow_downgrade: "Allow Downgrade (-d)"
             },
             search_placeholder: "Search packages...",
             toggle_system: "Toggle System Apps",
@@ -720,6 +721,7 @@ export const en = {
                 load_error: "Failed to load flowchart layout",
                 reorganize_success: "Layout reorganized successfully!",
                 reorganize_error: "AI reorganization failed",
+                reorganize_cancelled: "AI reorganization cancelled",
                 reorganizing: "Reorganizing layout with AI...",
                 exporting_image: "Generating high-resolution image...",
                 export_image_success: "Image exported successfully",
@@ -1344,7 +1346,8 @@ export const en = {
             loading_stats: "Analyzing test history...",
             device_card: {
                 battery: "Battery",
-                ram: "RAM"
+                ram: "RAM",
+                storage: "Storage"
             }
         },
         startup: {

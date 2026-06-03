@@ -38,6 +38,7 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
     const [search, setSearch] = useState("");
     const [showSystem, setShowSystem] = useState(false);
     const [sortBy, setSortBy] = useState<'name' | 'package'>('name');
+    const [downgrade, setDowngrade] = useState(false);
 
     // ... (rest of state)
 
@@ -177,7 +178,7 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
             });
             if (selected) {
                 toastId = toast.loading(t('apps.status.installing', "Installing APK..."));
-                await invoke("install_package", { device: activeDevice, path: selected });
+                await invoke("install_package", { device: activeDevice, path: selected, downgrade });
                 toast.success(t('apps.success.installed', "APK installed successfully"));
                 fetchPackages();
             }
@@ -254,7 +255,16 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
                     </div>
                 ) : null}
                 actions={
-                    <>
+                    <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-1.5 cursor-pointer text-xs text-on-surface-variant/80 hover:text-on-surface transition-colors select-none">
+                            <input
+                                type="checkbox"
+                                checked={downgrade}
+                                onChange={(e) => setDowngrade(e.target.checked)}
+                                className="rounded border-outline-variant/30 text-primary focus:ring-primary/30 h-3.5 w-3.5 bg-surface cursor-pointer"
+                            />
+                            <span>{t('apps.actions.allow_downgrade', 'Downgrade (-d)')}</span>
+                        </label>
                         <Button
                             onClick={handleInstall}
                             variant="ghost"
@@ -266,7 +276,7 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
                         >
                             <span className="text-xs font-semibold hidden lg:inline">{t('apps.actions.install')}</span>
                         </Button>
-                    </>
+                    </div>
                 }
             />
 

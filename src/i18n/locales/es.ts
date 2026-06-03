@@ -174,7 +174,8 @@ export const es = {
                 clear: "Borrar Datos",
                 sort_by_name: "Ordenar por Nombre",
                 sort_by_package: "Ordenar por Paquete",
-                refresh: "Actualizar Lista"
+                refresh: "Actualizar Lista",
+                allow_downgrade: "Permitir Downgrade (-d)"
             },
             search_placeholder: "Buscar paquetes...",
             toggle_system: "Mostrar Apps del Sistema",
@@ -727,6 +728,7 @@ export const es = {
                 load_error: "Error al cargar el diseño del diagrama de flujo",
                 reorganize_success: "¡Diseño reorganizado con éxito!",
                 reorganize_error: "Fallo en la reorganización por IA",
+                reorganize_cancelled: "Reorganización por IA cancelada",
                 reorganizing: "Reorganizando diseño con IA...",
                 exporting_image: "Generando imagen de alta resolución...",
                 export_image_success: "Imagen exportada con éxito",
@@ -1351,7 +1353,8 @@ export const es = {
             loading_stats: "Analizando historial de pruebas...",
             device_card: {
                 battery: "Batería",
-                ram: "RAM"
+                ram: "RAM",
+                storage: "Almacenamiento"
             }
         },
         startup: {

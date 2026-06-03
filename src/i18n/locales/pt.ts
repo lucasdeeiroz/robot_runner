@@ -174,7 +174,8 @@ export const pt = {
                 clear: "Limpar Dados",
                 sort_by_name: "Ordenar por Nome",
                 sort_by_package: "Ordenar por Pacote",
-                refresh: "Atualizar Lista"
+                refresh: "Atualizar Lista",
+                allow_downgrade: "Permitir Downgrade (-d)"
             },
             search_placeholder: "Buscar pacotes...",
             toggle_system: "Exibir Apps do Sistema",
@@ -721,6 +722,7 @@ export const pt = {
                 load_error: "Falha ao carregar layout do fluxograma",
                 reorganize_success: "Layout reorganizado com sucesso!",
                 reorganize_error: "Falha na reorganização por IA",
+                reorganize_cancelled: "Reorganização por IA cancelada",
                 reorganizing: "Reorganizando layout com IA...",
                 exporting_image: "Gerando imagem de alta resolução...",
                 export_image_success: "Imagem exportada com sucesso",
@@ -1345,7 +1347,8 @@ export const pt = {
             loading_stats: "Analisando histórico de testes...",
             device_card: {
                 battery: "Bateria",
-                ram: "RAM"
+                ram: "RAM",
+                storage: "Armazenamento"
             }
         },
         startup: {

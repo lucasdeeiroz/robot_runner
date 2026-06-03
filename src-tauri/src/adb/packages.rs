@@ -90,8 +90,13 @@ pub async fn clear_package(app: AppHandle, device: String, package: String) -> R
 }
 
 #[command]
-pub async fn install_package(app: AppHandle, device: String, path: String) -> Result<String, String> {
-    run_adb(&app, device, vec!["install", "-r", &path]).await
+pub async fn install_package(app: AppHandle, device: String, path: String, downgrade: Option<bool>) -> Result<String, String> {
+    let mut args = vec!["install", "-r"];
+    if downgrade.unwrap_or(false) {
+        args.push("-d");
+    }
+    args.push(&path);
+    run_adb(&app, device, args).await
 }
 
 #[command]

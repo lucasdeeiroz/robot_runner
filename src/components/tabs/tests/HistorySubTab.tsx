@@ -20,7 +20,7 @@ import { getCachedHistory, setCachedHistory, TestLog } from '@/lib/historyCache'
 import HistoryAIAnalysisModal from '@/components/organisms/HistoryAIAnalysisModal';
 import { AiButton } from "@/components/atoms/AiButton";
 import { auth } from '@/lib/firebase';
-import { fetchGlobalHistory } from '@/lib/testHistorySync';
+import { fetchGlobalHistory, uploadTestToFirebase } from '@/lib/testHistorySync';
 import { useAuth } from '@/lib/authStore';
 
 const formatDate = (dateStr: string) => {
@@ -174,8 +174,39 @@ export function HistorySubTab({ onNavigate }: HistorySubTabProps) {
 
                     // Sort by timestamp descending
                     combinedLogs = merged.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+                    // Sync any unsynced local logs to Firebase
+                    const unsyncedLogs = localLogs.filter((_, idx) => !matchedLocalIndices.has(idx));
+                    if (unsyncedLogs.length > 0) {
+                        console.log(`[Sync] Found ${unsyncedLogs.length} unsynced local logs. Syncing in background...`);
+                        Promise.all(
+                            unsyncedLogs.map(async (log) => {
+                                const docId = await uploadTestToFirebase(currentUser.uid, activeProfileId, log);
+                                if (docId) {
+                                    return { xml_path: log.xml_path, docId };
+                                }
+                                return null;
+                            })
+                        ).then((results) => {
+                            const successfulUploads = results.filter((r): r is { xml_path: string; docId: string } => r !== null);
+                            if (successfulUploads.length > 0) {
+                                console.log(`[Sync] Successfully synced ${successfulUploads.length} logs to Firebase.`);
+                                setHistory(prev => {
+                                    const updated = prev.map(log => {
+                                        const match = successfulUploads.find(u => u.xml_path === log.xml_path);
+                                        if (match) {
+                                            return { ...log, has_remote_sync: true, id: match.docId };
+                                        }
+                                        return log;
+                                    });
+                                    setCachedHistory(updated);
+                                    return updated;
+                                });
+                            }
+                        });
+                    }
                 } catch (err) {
-                    console.error("[Sync] Failed to fetch global history:", err);
+                    console.error("[Sync] Failed to fetch/sync global history:", err);
                 }
             }
 

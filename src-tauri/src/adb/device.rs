@@ -12,6 +12,8 @@ pub struct Device {
     pub battery_level: Option<u8>,
     pub ram_total: Option<u64>,
     pub ram_used: Option<u64>,
+    pub storage_total: Option<u64>,
+    pub storage_used: Option<u64>,
 }
 
 #[tauri::command]
@@ -48,6 +50,8 @@ pub async fn get_connected_devices(app: AppHandle) -> Result<Vec<Device>, String
                         battery_level: None,
                         ram_total: None,
                         ram_used: None,
+                        storage_total: None,
+                        storage_used: None,
                     }
                 }));
                 continue;
@@ -105,6 +109,31 @@ pub async fn get_connected_devices(app: AppHandle) -> Result<Vec<Device>, String
                     }
                 };
 
+                // Get Storage
+                let (storage_t, storage_u) = {
+                    let mut cmd = new_tokio_command(&program);
+                    cmd.args(&["-s", &udid, "shell", "df", "-k", "/data"]);
+                    let output = cmd.output().await;
+                    if let Ok(o) = output {
+                        let stdout = String::from_utf8_lossy(&o.stdout);
+                        let mut found = None;
+                        for line in stdout.lines() {
+                            if line.contains("/data") {
+                                let parts: Vec<&str> = line.split_whitespace().collect();
+                                if parts.len() >= 3 {
+                                    if let (Ok(total), Ok(used)) = (parts[1].parse::<u64>(), parts[2].parse::<u64>()) {
+                                        found = Some((total, used));
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        found.unwrap_or((0, 0))
+                    } else {
+                        (0, 0)
+                    }
+                };
+
                 Device {
                     udid,
                     model,
@@ -113,6 +142,8 @@ pub async fn get_connected_devices(app: AppHandle) -> Result<Vec<Device>, String
                     battery_level: battery,
                     ram_total: if ram_t > 0 { Some(ram_t) } else { None },
                     ram_used: if ram_u > 0 { Some(ram_u) } else { None },
+                    storage_total: if storage_t > 0 { Some(storage_t) } else { None },
+                    storage_used: if storage_u > 0 { Some(storage_u) } else { None },
                 }
             }));
         }
