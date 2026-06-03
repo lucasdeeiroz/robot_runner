@@ -16,16 +16,45 @@ pub async fn save_screenshot(app: AppHandle, device: String, path: String) -> Re
         .await
         .map_err(|e| format!("Failed to run {}: {}", program, e))?;
 
-    if !output.status.success() {
-        return Err(format!(
-            "ADB Screenshot failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        ));
-    }
+    let bytes = if !output.status.success() || output.stdout.is_empty() {
+        let remote_path = "/data/local/tmp/screencap_fallback.png";
+        
+        let mut cmd_cap = new_tokio_command(&program);
+        cmd_cap.args(&["-s", &device, "shell", "screencap", "-p", remote_path]);
+        let output_cap = cmd_cap.output().await
+            .map_err(|e| format!("Failed to execute fallback screencap on device: {}", e))?;
+        
+        if !output_cap.status.success() {
+            return Err(format!(
+                "Fallback screencap failed on device: {}",
+                String::from_utf8_lossy(&output_cap.stderr)
+            ));
+        }
+
+        let mut cmd_pull = new_tokio_command(&program);
+        cmd_pull.args(&["-s", &device, "pull", remote_path, &path]);
+        let output_pull = cmd_pull.output().await
+            .map_err(|e| format!("Failed to pull fallback screenshot: {}", e))?;
+
+        let mut cmd_rm = new_tokio_command(&program);
+        cmd_rm.args(&["-s", &device, "shell", "rm", remote_path]);
+        let _ = cmd_rm.output().await;
+
+        if !output_pull.status.success() {
+            return Err(format!(
+                "Failed to pull screenshot from device: {}",
+                String::from_utf8_lossy(&output_pull.stderr)
+            ));
+        }
+
+        return Ok(path);
+    } else {
+        output.stdout
+    };
 
     // Write buffer to file
     let mut file = File::create(&path).map_err(|e| format!("Failed to create file: {}", e))?;
-    file.write_all(&output.stdout)
+    file.write_all(&bytes)
         .map_err(|e| format!("Failed to write to file: {}", e))?;
 
     Ok(path)

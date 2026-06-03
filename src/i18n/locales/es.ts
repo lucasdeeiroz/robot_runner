@@ -499,6 +499,7 @@ export const es = {
                 }
             },
             title: "Inspector",
+            live_sync: "Sincronización Activa",
             update_error: "Error al actualizar inspector",
             input_error: "Error al enviar entrada",
             empty: "Seleccione un dispositivo para iniciar el Inspector",
@@ -726,6 +727,7 @@ export const es = {
                 load_error: "Error al cargar el diseño del diagrama de flujo",
                 reorganize_success: "¡Diseño reorganizado con éxito!",
                 reorganize_error: "Fallo en la reorganización por IA",
+                reorganizing: "Reorganizando diseño con IA...",
                 exporting_image: "Generando imagen de alta resolución...",
                 export_image_success: "Imagen exportada con éxito",
                 export_image_error: "Error al exportar imagen del diagrama de flujo",
@@ -1013,6 +1015,7 @@ export const es = {
                 progress_mapping_structure: "Mapeando estructura de la suite...",
                 progress_compressing_cache: "Comprimiendo caché...",
                 progress_loading_tree: "Cargando Log Tree...",
+                optimizing_view: "Optimizando la vista de ejecución...",
                 failure_detail: "Detalle de la Falla",
                 step_screenshot: "Captura de Pantalla del Paso",
                 view_fullscreen: "VER EN PANTALLA COMPLETA",
@@ -1204,15 +1207,15 @@ export const es = {
                     token_placeholder: "Pegue el token de 'claude setup-token'",
                     token_help: "Si su CLI informa \"Not logged in\", pegue el token generado al ejecutar 'claude setup-token' en su terminal."
                 },
-                gemini_code: {
-                    title: "Gemini CLI",
-                    help: "Este proveedor utiliza el comando local 'gemini'. Asegúrese de tener instalado y configurado el Gemini CLI.",
+                antigravity: {
+                    title: "Antigravity CLI",
+                    help: "Este proveedor utiliza el comando local 'antigravity'. Asegúrese de tener instalado y configurado el Antigravity CLI.",
                     check_install: "Verificar Instalación",
-                    installed: "¡Gemini CLI detectado! Versión: {{version}}",
-                    not_installed: "Gemini CLI no encontrado. Instale vía 'npm install -g @google/gemini-cli'.",
+                    installed: "¡Antigravity CLI detectado! Versión: {{version}}",
+                    not_installed: "Antigravity CLI no encontrado. Instale vía 'npm install -g @google/antigravity-cli'.",
                     token_label: "Clave API",
                     token_placeholder: "Ingrese su Clave API Gemini",
-                    token_help: "La Clave API se utilizará para autenticar sus solicitudes a través del Gemini CLI."
+                    token_help: "La Clave API se utilizará para autenticar sus solicitudes a través del Antigravity CLI."
                 },
                 max_exploration_steps: "Pasos Máximos de Exploración",
                 max_exploration_steps_help: "Número máximo de acciones autónomas que la IA realizará antes de detener la exploración."
@@ -1234,7 +1237,7 @@ export const es = {
                     scrcpy: "Scrcpy",
                     ngrok: "Ngrok (Tunnelling)",
                     claude_code: "Claude Code CLI",
-                    gemini_code: "Gemini CLI"
+                    antigravity: "Antigravity CLI"
                 }
             },
             folder_select: "Seleccionar Carpeta",

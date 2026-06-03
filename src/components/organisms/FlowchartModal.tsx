@@ -60,13 +60,27 @@ export function FlowchartModal({ isOpen, onClose, maps = [], onEditScreen, onRef
         };
     }, []);
 
+    useEffect(() => {
+        setShowUnsavedChangesModal(false);
+        setIsQuickConnectOpen(false);
+        setQuickConnectData(null);
+    }, [isOpen]);
+
     const view = useFlowchartView(containerRef);
-    const layoutHook = useFlowchartLayout({ maps, activeProfileId, onRefresh, settings });
+    const layoutHook = useFlowchartLayout({ maps, activeProfileId, onRefresh, settings, isOpen });
     const {
         layout, setLayout, isDirty, setIsDirty,
         isReorganizing, missedScreens, allTags, gridBounds,
         saveLayout, autoReorganizeLayout, handleClearAllCurvatures
     } = layoutHook;
+
+    const prevReorganizingRef = useRef(isReorganizing);
+    useEffect(() => {
+        if (prevReorganizingRef.current && !isReorganizing) {
+            view.centerView(layout.nodes);
+        }
+        prevReorganizingRef.current = isReorganizing;
+    }, [isReorganizing, layout.nodes, view]);
 
     const interaction = useFlowchartInteraction({
         layout, setLayout, viewTransform: view.viewTransform,
@@ -328,12 +342,14 @@ export function FlowchartModal({ isOpen, onClose, maps = [], onEditScreen, onRef
                             onClose={handleClose}
                         />
 
-                        {isExporting && (
+                        {(isReorganizing || isExporting) && (
                             <div className="absolute inset-0 z-[10000] bg-black/20 backdrop-blur-[2px] flex items-center justify-center animate-in fade-in duration-300">
                                 <div className="bg-surface p-6 rounded-2xl shadow-xl border border-outline-variant/30 flex flex-col items-center gap-4">
                                     <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-                                    <div className="flex flex-col items-center gap-1">
-                                        <span className="text-sm font-bold text-on-surface">{t('mapper.flowchart.exporting_image')}</span>
+                                    <div className="flex flex-col items-center gap-1 text-center">
+                                        <span className="text-sm font-bold text-on-surface">
+                                            {isReorganizing ? t('mapper.flowchart.reorganizing') : t('mapper.flowchart.exporting_image')}
+                                        </span>
                                         <span className="text-[10px] text-on-surface-variant animate-pulse">{t('common.please_wait', 'Please wait...')}</span>
                                     </div>
                                 </div>

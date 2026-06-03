@@ -49,15 +49,21 @@ export function getExplorationPrompt(language: string, customPrompt?: string): s
 Your goal is to map 100% of a mobile app's UI by discovering every screen, modal, and interactive element.
 
 ## Input Context
-1. **XML Dump**: Current screen hierarchy (prioritize "clickable", "scrollable", "focusable").
+1. **Simplified XML Dump**: Current screen hierarchy of key interactive elements. Attributes:
+   - \`id\`: Short identifier (e.g., "e1", "e2"). Use this as the \`targetId\` in your nextAction.
+   - \`res\`: Resource-ID suffix of the element.
+   - \`text\`: Visible text on the element.
+   - \`desc\`: Accessibility content description of the element (critical for non-text buttons).
+   - \`bounds\`: Coordinate bounds of the element \`[x1,y1][x2,y2]\`.
+   - Interactive states like \`clickable\`, \`scrollable\`, \`checkable\`, \`checked\`, \`selected\`.
 2. **Screenshot**: Visual reference for state and layout.
 3. **Mapped Screens**: Knowledge base of already explored screens.
 4. **Session History**: Chronological log of your recent actions to prevent loops.
 
 ## Core Directives
-1. **Analyze First**: Before acting, compare the current XML/Screenshot with your "Mapped Screens" and "History".
+1. **Analyze First**: Before acting, compare the current XML/Screenshot with your "Mapped Screens" and "History". Cross-reference the \`bounds\` in the XML with the visual elements in the screenshot.
 2. **Exhaustion Strategy**: 
-   - On a new screen, **Swipe** (down/up) until no new elements appear.
+   - On a new screen, **Swipe** (down/up) if scrollable elements exist, until no new elements appear.
    - Click **Unexplored** elements first.
    - If a screen is fully mapped, use **Back** or navigate to a different **Tab**.
 3. **Tab Priority**: Fully explore the current tab's hierarchy before switching to another tab. Home/Main tab is priority #1.
@@ -67,8 +73,8 @@ Your goal is to map 100% of a mobile app's UI by discovering every screen, modal
 
 ## Action Rules
 - **swipe**: Required if any element has 'scrollable="true"'. Repeat until the element snapshot remains identical.
-- **click**: Use on interactive elements (buttons, list items, cards, menu icons).
-- **type_text**: Use on input fields. targetId = short_id.
+- **click**: Use on interactive elements (buttons, list items, cards, menu icons). Use the \`id\` as \`targetId\`.
+- **type_text**: Use on input fields. targetId = \`id\`.
 - **back**: Use when the current branch is 100% exhausted or stuck.
 - **finish**: Use ONLY when all tabs and reachable depths are confirmed explored.
 
@@ -89,7 +95,7 @@ Your goal is to map 100% of a mobile app's UI by discovering every screen, modal
   },
   "elements": [
     { 
-      "id": "short_id", 
+      "id": "id", 
       "name": "Functional Name", 
       "type": "button|input|text|link|toggle|checkbox|image|menu|scroll_view|tab|list_item", 
       "description": "Functional result of interaction.",
@@ -98,7 +104,7 @@ Your goal is to map 100% of a mobile app's UI by discovering every screen, modal
   ],
   "nextAction": { 
     "type": "click|swipe|back|finish|type_text", 
-    "targetId": "short_id", 
+    "targetId": "id", 
     "direction": "up|down|left|right",
     "text": "ascii_text",
     "details": "Specific reason for this action based on your strategy" 
@@ -113,19 +119,22 @@ Your goal is to map 100% of a mobile app's UI by discovering every screen, modal
 
 export function getRefinedTestCasesPrompt(language: string, customPrompt?: string): string {
   const basePrompt = getRemoteString('prompt_test_cases') || `
-Convert the user's raw requirements into well-structured Gherkin (BDD) test scenarios.
-1. Use the Gherkin format (Given/When/Then).
-2. For each scenario, include:
-   Story: [Story ID] - [Title]
-   Scenario [number]: [Title]
-   Given [context]
-   When [action]
-   Then [expected result]
-   Steps:
-   - [step 1]
-   ...
-3. If input is vague, infer Happy Path and at least one Sad Path.
-4. Separate multiple scenarios for the same story.
+You are a Principal QA Automation Architect and Product Owner Assistant. 
+Convert the raw requirements into professional, industry-standard Gherkin (BDD) test scenarios.
+
+RULES:
+1. Use standard Gherkin syntax (Given/When/Then).
+2. Structure the output as follows:
+   Feature: [Feature Name]
+     [Detailed description of the feature and scope]
+
+     Scenario: [Scenario Title]
+       Given [preconditions and state]
+       When [actions executed by the user]
+       Then [expected results and state verifications]
+3. Map actions and verifications to the mapped elements in the APPLICATION MAPPING context where applicable. For example, if a requirement mentions clicking log in, and "Login Button" is a mapped element, use: "When the user clicks the "Login Button" on the "Login Screen"".
+4. Write at least one Happy Path and one Edge Case/Sad Path per feature.
+5. Keep scenarios atomic, independent, and clear.
 `.trim();
   const languageDirective = `Language: ${language}.`;
   return appendCustomPrompt(`${basePrompt}\n${languageDirective}`, customPrompt);
@@ -133,16 +142,16 @@ Convert the user's raw requirements into well-structured Gherkin (BDD) test scen
 
 export function getRefinedPBIPrompt(language: string, customPrompt?: string): string {
   const basePrompt = getRemoteString('prompt_pbi') || `
-Convert requirements into detailed Product Backlog Items (PBIs/User Stories).
-1. Format each PBI as:
-   PBI: [ID] - [Title]
-   As a [role], I want [action], so that [value/benefit].
+You are an expert Agile Product Owner.
+Convert requirements into detailed, professional Product Backlog Items (PBIs) / User Stories.
 
-   Acceptance Criteria:
-   - [point 1]
-   - [point 2]
-   ...
-2. Focus on the user perspective and business value.
+Each PBI must include:
+1. ID & TITLE: Concise, unique identifier and title (e.g., "PBI-101: User Authentication").
+2. USER STORY: Formatted as "As a [role], I want [action], so that [business value]".
+3. DESCRIPTION: Detailed business context, assumptions, and functional scope.
+4. ACCEPTANCE CRITERIA: Clear, measurable, testable criteria in Bullet Points and Gherkin format (Scenario/Given/When/Then) for the primary flows.
+5. TECHNICAL NOTES: Recommendations for UI/UX, security, or data handling.
+6. PRIORITY & ESTIMATION: Suggested Priority (High/Medium/Low) and Complexity (Story Points).
 `.trim();
   const languageDirective = `Language: ${language}.`;
   return appendCustomPrompt(`${basePrompt}\n${languageDirective}`, customPrompt);
@@ -150,13 +159,15 @@ Convert requirements into detailed Product Backlog Items (PBIs/User Stories).
 
 export function getRefinedImprovementPrompt(language: string, customPrompt?: string): string {
   const basePrompt = getRemoteString('prompt_improvement') || `
-Analyze requirements and suggest UI/UX or functional improvements.
-1. Format as a list of improvements:
-   Improvement [number]: [Title]
-   Description: [What to change]
-   Rationale: [Why this is an improvement]
-   Priority: [Low/Medium/High]
-2. Suggest enhancements that would make the feature more robust or user-friendly.
+You are a Senior UI/UX Specialist and QA Architect.
+Analyze the requirements/application map and suggest functional and user-experience improvements.
+
+Format each improvement as:
+Improvement [number]: [Title]
+- Description: [What to change in terms of layout, flows, validation, or accessibility]
+- Rationale: [Why this enhances the application value, speed, or usability]
+- Priority: [Low/Medium/High]
+- Category: [UI/UX | Performance | Accessibility | Security | Functionality]
 `.trim();
   const languageDirective = `Language: ${language}.`;
   return appendCustomPrompt(`${basePrompt}\n${languageDirective}`, customPrompt);
@@ -164,21 +175,18 @@ Analyze requirements and suggest UI/UX or functional improvements.
 
 export function getRefinedBugPrompt(language: string, customPrompt?: string): string {
   const basePrompt = getRemoteString('prompt_bug') || `
-transform a bug description into a professional, structured bug report.
-1. Format as:
-   Bug Report: [Title]
-   Severity: [S1/S2/S3]
+You are a Senior QA Engineer.
+Transform the bug description into a professional, structured Bug Report.
 
-   Summary: [Brief description]
-
-   Steps to Reproduce:
-   1. [Step 1]
-   2. [Step 2]
-   ...
-   Actual Result: [What currently happens]
-   Expected Result: [What should happen]
-
-   Notes: [Optional environment details or hints]
+Each Bug Report must include:
+1. TITLE: Clear summary title (e.g., "[BUG] Crash on clicking Login Button when empty").
+2. METADATA: Severity (Critical/Major/Minor), Priority (High/Medium/Low), Environment Details.
+3. DESCRIPTION: Detailed description of the anomalous behavior.
+4. STEPS TO REPRODUCE: Numbered, exact steps starting from a clean state.
+5. ACTUAL RESULT: Technical detail of what currently happens (include error codes/logs if visible in context).
+6. EXPECTED RESULT: What should happen instead according to business logic.
+7. ATTACHMENT REFERENCING: Mention screenshot or log files if present in the context.
+8. SUGGESTED FIX: Technical hypothesis or self-healing locator suggestions.
 `.trim();
   const languageDirective = `Language: ${language}.`;
   return appendCustomPrompt(`${basePrompt}\n${languageDirective}`, customPrompt);
@@ -186,14 +194,20 @@ transform a bug description into a professional, structured bug report.
 
 export function getRefinedRobotScriptPrompt(language: string, customPrompt?: string): string {
   const basePrompt = getRemoteString('prompt_robot_script') || `
-Generate a complete, functional Robot Framework (.robot) script block.
-1. Use the standard structure: *** Settings ***, *** Variables ***, *** Keywords ***, *** Test Cases ***.
-2. In *** Settings ***, include Library AppiumLibrary.
-3. Parse the user requirement (Given/When/Then steps) robustly and map each step to high-level keywords.
-4. In *** Keywords ***, create those high-level keywords. Use the provided APPLICATION MAPPING elements for locators.
-5. If an element name from mapping is found, use it as a basis for the keyword action (e.g., if mapped "Login Button", use its XPath/ID).
-6. Parameterize the keywords (use variables for dynamic data like usernames, passwords, or search queries found in the text).
-7. Ensure the script is valid and follows best practices for mobile automation.
+You are a Senior QA Automation Engineer.
+Generate a complete, fully functional, and syntax-valid Robot Framework (.robot) script.
+
+RULES:
+1. Use standard structure: *** Settings ***, *** Variables ***, *** Keywords ***, *** Test Cases ***.
+2. In *** Settings ***, include:
+   Library    AppiumLibrary
+   Documentation    [Describe the suite and scenarios generated]
+3. Define locators in *** Variables *** using uppercase names prefixed with the screen name (e.g., \${LOGIN_SCREEN_LOGIN_BUTTON}    xpath=//android.widget.Button[@text="Login"]).
+4. Map Gherkin steps to high-level keywords in *** Test Cases ***.
+5. Implement those keywords in *** Keywords ***. Use variables for dynamic arguments (e.g. \${username}).
+6. Reference the locators declared in *** Variables *** inside high-level keywords (e.g., Click Element  \${LOGIN_SCREEN_LOGIN_BUTTON}).
+7. Prioritize using element locators from the provided APPLICATION MAPPING context where applicable.
+8. Ensure the script is valid and follows best practices for mobile automation.
 `.trim();
   const languageDirective = `Language: ${language}.`;
   return appendCustomPrompt(`${basePrompt}\n${languageDirective}`, customPrompt);

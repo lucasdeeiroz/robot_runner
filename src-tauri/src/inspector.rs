@@ -147,6 +147,48 @@ async fn perform_web_capture(url: &str, browser: &str, app_handle: Option<&tauri
 }
 
 
+async fn fallback_screencap(app_handle: &AppHandle, device_id: &str) -> Result<Vec<u8>, String> {
+    let adb_program = get_adb_program(app_handle);
+    let remote_path = "/data/local/tmp/screencap_fallback.png";
+    
+    let mut cmd_cap = new_tokio_command(&adb_program);
+    cmd_cap.args(&["-s", device_id, "shell", "screencap", "-p", remote_path]);
+    let output_cap = cmd_cap.output().await
+        .map_err(|e| format!("Failed to execute fallback screencap on device: {}", e))?;
+    
+    if !output_cap.status.success() {
+        return Err(format!(
+            "Fallback screencap failed on device: {}",
+            String::from_utf8_lossy(&output_cap.stderr)
+        ));
+    }
+
+    let local_temp = std::env::temp_dir().join(format!("screencap_fallback_{}.png", rand::random::<u32>()));
+
+    let mut cmd_pull = new_tokio_command(&adb_program);
+    cmd_pull.args(&["-s", device_id, "pull", remote_path, local_temp.to_str().unwrap()]);
+    let output_pull = cmd_pull.output().await
+        .map_err(|e| format!("Failed to pull fallback screenshot: {}", e))?;
+
+    let mut cmd_rm = new_tokio_command(&adb_program);
+    cmd_rm.args(&["-s", device_id, "shell", "rm", remote_path]);
+    let _ = cmd_rm.output().await;
+
+    if !output_pull.status.success() {
+        return Err(format!(
+            "Failed to pull screenshot from device: {}",
+            String::from_utf8_lossy(&output_pull.stderr)
+        ));
+    }
+
+    let bytes = tokio::fs::read(&local_temp).await
+        .map_err(|e| format!("Failed to read local temp screenshot file: {}", e))?;
+
+    let _ = tokio::fs::remove_file(&local_temp).await;
+
+    Ok(bytes)
+}
+
 #[command]
 pub async fn get_screenshot(app_handle: AppHandle, device_id: String, web_url: Option<String>) -> Result<String, String> {
     if is_web_device(&device_id) {
@@ -164,14 +206,15 @@ pub async fn get_screenshot(app_handle: AppHandle, device_id: String, web_url: O
         .await
         .map_err(|e| format!("Failed to execute adb screencap: {}", e))?;
 
-    if !output.status.success() {
-        return Err(format!(
-            "ADB screencap failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        ));
-    }
+    let bytes = if !output.status.success() || output.stdout.is_empty() {
+        fallback_screencap(&app_handle, &device_id).await.map_err(|e| {
+            format!("ADB screencap failed and fallback also failed. Error: {}", e)
+        })?
+    } else {
+        output.stdout
+    };
 
-    let b64 = general_purpose::STANDARD.encode(&output.stdout);
+    let b64 = general_purpose::STANDARD.encode(&bytes);
     Ok(b64)
 }
 
@@ -202,17 +245,18 @@ pub async fn get_compressed_screenshot(app_handle: AppHandle, device_id: String,
         .await
         .map_err(|e| format!("Failed to execute adb screencap: {}", e))?;
 
-    if !output.status.success() {
-        return Err(format!(
-            "ADB screencap failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        ));
-    }
+    let bytes = if !output.status.success() || output.stdout.is_empty() {
+        fallback_screencap(&app_handle, &device_id).await.map_err(|e| {
+            format!("ADB screencap failed and fallback also failed. Error: {}", e)
+        })?
+    } else {
+        output.stdout
+    };
 
     let w = max_width.unwrap_or(800);
     let h = max_height.unwrap_or(800);
     
-    image_utils::compress_and_resize_image(output.stdout, w, h, 80)
+    image_utils::compress_and_resize_image(bytes, w, h, 80)
         .map_err(|e| format!("Image processing failed: {}", e))
 }
 

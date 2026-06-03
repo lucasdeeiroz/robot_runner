@@ -370,3 +370,67 @@ pub fn fetch_logcat_buffer(
         Ok((Vec::new(), 0))
     }
 }
+
+#[tauri::command]
+pub async fn check_ui_change(
+    app: AppHandle,
+    device: String,
+    last_focus: String,
+) -> Result<(bool, String), String> {
+    let adb_program = get_adb_program(&app);
+    
+    // 1. Get current focused window/activity
+    let mut focus_cmd = new_std_command(&adb_program);
+    focus_cmd.args(&["-s", &device, "shell", "dumpsys", "window", "visible-apps"]);
+    
+    let mut focus_raw = String::new();
+    if let Ok(output) = focus_cmd.output() {
+        focus_raw = String::from_utf8_lossy(&output.stdout).to_string();
+    }
+    
+    if focus_raw.is_empty() {
+        let mut fallback_cmd = new_std_command(&adb_program);
+        fallback_cmd.args(&["-s", &device, "shell", "dumpsys", "window"]);
+        if let Ok(output) = fallback_cmd.output() {
+            focus_raw = String::from_utf8_lossy(&output.stdout).to_string();
+        }
+    }
+
+    let mut current_focus = String::new();
+    for line in focus_raw.lines() {
+        if line.contains("mCurrentFocus") || line.contains("mFocusedApp") {
+            current_focus = line.trim().to_string();
+            break;
+        }
+    }
+
+    let focus_changed = !last_focus.is_empty() && last_focus != current_focus;
+    if focus_changed {
+        return Ok((true, current_focus));
+    }
+
+    // 2. Check recent logcat lines for transitions
+    let mut logcat_cmd = new_std_command(&adb_program);
+    logcat_cmd.args(&["-s", &device, "logcat", "-d", "-t", "50"]);
+    
+    let logcat_changed = if let Ok(output) = logcat_cmd.output() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let keywords = [
+            "ActivityTaskManager: START",
+            "ActivityTaskManager: Displayed",
+            "WINDOW_STATE_CHANGE",
+            "focusChanged",
+            "WindowManager: focusChanged",
+            "InputDispatcher: Focus entered",
+            "InputDispatcher: Focus left",
+            "AccessibilityManager: sendAccessibilityEvent",
+        ];
+        stdout.lines().any(|line| {
+            keywords.iter().any(|kw| line.contains(kw))
+        })
+    } else {
+        false
+    };
+
+    Ok((logcat_changed, current_focus))
+}

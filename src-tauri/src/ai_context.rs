@@ -27,6 +27,7 @@ pub struct AiContextParams {
     pub current_screenshot: Option<String>,
     pub failures_limit: Option<usize>,
     pub automation_root: Option<String>,
+    pub custom_mappings_dir: Option<String>,
 }
 
 #[derive(Serialize, Debug)]
@@ -208,7 +209,6 @@ fn get_exploration_context(params: AiContextParams) -> Result<AiContextResponse,
         context.push_str("### UI HIERARCHY (Simplified XML)\n\n");
         let doc = roxmltree::Document::parse(&xml).map_err(|e| e.to_string())?;
 
-        // Simple heuristic for interactive elements to keep XML tiny
         let mut simplified = String::new();
         simplified.push_str("<hierarchy>\n");
 
@@ -218,30 +218,59 @@ fn get_exploration_context(params: AiContextParams) -> Result<AiContextResponse,
         for node in doc.descendants() {
             if node.is_element() {
                 let tag = node.tag_name().name();
-                // Interactive elements or those with text content
                 let clickable = node.attribute("clickable") == Some("true")
                     || node.attribute("long-clickable") == Some("true");
-                let has_text =
-                    node.attribute("text").is_some() && node.attribute("text") != Some("");
+                let has_text = node.attribute("text").map_or(false, |t| !t.trim().is_empty());
+                let has_desc = node.attribute("content-desc").map_or(false, |d| !d.trim().is_empty());
+                let scrollable = node.attribute("scrollable") == Some("true");
+                let checkable = node.attribute("checkable") == Some("true");
 
-                if clickable || has_text || tag == "hierarchy" {
+                if clickable || has_text || has_desc || scrollable || checkable || tag == "hierarchy" {
                     count += 1;
                     let short_id = format!("e{}", count);
                     let xpath = generate_basic_xpath(&node);
                     short_id_map.insert(short_id.clone(), serde_json::json!(xpath));
 
                     let text = node.attribute("text").unwrap_or("");
+                    let desc = node.attribute("content-desc").unwrap_or("");
                     let resource_id = node
                         .attribute("resource-id")
                         .unwrap_or("")
                         .split('/')
                         .last()
                         .unwrap_or("");
+                    let bounds = node.attribute("bounds").unwrap_or("");
 
-                    simplified.push_str(&format!(
-                        "  <{tag} id='{}' text='{}' res='{}' clickable='{}' />\n",
-                        short_id, text, resource_id, clickable
-                    ));
+                    let mut attrs = format!("id=\"{}\"", short_id);
+                    if !resource_id.is_empty() {
+                        attrs.push_str(&format!(" res=\"{}\"", resource_id));
+                    }
+                    if !text.is_empty() {
+                        attrs.push_str(&format!(" text=\"{}\"", text.replace('"', "&quot;")));
+                    }
+                    if !desc.is_empty() {
+                        attrs.push_str(&format!(" desc=\"{}\"", desc.replace('"', "&quot;")));
+                    }
+                    if clickable {
+                        attrs.push_str(" clickable=\"true\"");
+                    }
+                    if scrollable {
+                        attrs.push_str(" scrollable=\"true\"");
+                    }
+                    if checkable {
+                        attrs.push_str(" checkable=\"true\"");
+                    }
+                    if node.attribute("checked") == Some("true") {
+                        attrs.push_str(" checked=\"true\"");
+                    }
+                    if node.attribute("selected") == Some("true") {
+                        attrs.push_str(" selected=\"true\"");
+                    }
+                    if !bounds.is_empty() {
+                        attrs.push_str(&format!(" bounds=\"{}\"", bounds));
+                    }
+
+                    simplified.push_str(&format!("  <{tag} {attrs} />\n"));
                 }
             }
         }
@@ -356,12 +385,24 @@ fn get_artifact_generation_context(
 ) -> Result<AiContextResponse, String> {
     let profile_id = params.profile_id.ok_or("Missing profile_id")?;
 
-    // Resolve base path for app local data
-    let base_path = app_handle
-        .path()
-        .app_local_data_dir()
-        .map_err(|e| e.to_string())?;
-    let maps_path = base_path.join("maps").join(&profile_id).join("screens");
+    // Resolve base path for screen maps
+    let maps_path = if let Some(ref custom_dir) = params.custom_mappings_dir {
+        if !custom_dir.trim().is_empty() {
+            Path::new(custom_dir).to_path_buf()
+        } else {
+            let base_path = app_handle
+                .path()
+                .app_local_data_dir()
+                .map_err(|e| e.to_string())?;
+            base_path.join("maps").join(&profile_id).join("screens")
+        }
+    } else {
+        let base_path = app_handle
+            .path()
+            .app_local_data_dir()
+            .map_err(|e| e.to_string())?;
+        base_path.join("maps").join(&profile_id).join("screens")
+    };
 
     // Check if directory exists
     if !maps_path.exists() {
@@ -465,12 +506,24 @@ fn get_flowchart_layout_context(
 ) -> Result<AiContextResponse, String> {
     let profile_id = params.profile_id.ok_or("Missing profile_id")?;
 
-    // Resolve base path for app local data
-    let base_path = app_handle
-        .path()
-        .app_local_data_dir()
-        .map_err(|e| e.to_string())?;
-    let maps_path = base_path.join("maps").join(&profile_id).join("screens");
+    // Resolve base path for screen maps
+    let maps_path = if let Some(ref custom_dir) = params.custom_mappings_dir {
+        if !custom_dir.trim().is_empty() {
+            Path::new(custom_dir).to_path_buf()
+        } else {
+            let base_path = app_handle
+                .path()
+                .app_local_data_dir()
+                .map_err(|e| e.to_string())?;
+            base_path.join("maps").join(&profile_id).join("screens")
+        }
+    } else {
+        let base_path = app_handle
+            .path()
+            .app_local_data_dir()
+            .map_err(|e| e.to_string())?;
+        base_path.join("maps").join(&profile_id).join("screens")
+    };
 
     // Check if directory exists
     if !maps_path.exists() {

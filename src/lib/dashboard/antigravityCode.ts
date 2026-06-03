@@ -42,14 +42,14 @@ function safeParseJson<T>(content: string): T {
     }
 }
 
-export interface GeminiCLIResponse {
+export interface AntigravityCLIResponse {
     result: string;
     structured_output?: any;
     session_id?: string;
     usage?: any;
 }
 
-export async function askGeminiCode(
+export async function askAntigravityCli(
     prompt: string,
     projectRoot: string,
     systemInstruction?: string,
@@ -59,7 +59,7 @@ export async function askGeminiCode(
         resumeSessionId?: string;
         imageBase64?: string;
     }
-): Promise<string | GeminiCLIResponse> {
+): Promise<string | AntigravityCLIResponse> {
     const formatReminder = options?.jsonSchema 
         ? `\n\nIMPORTANT: Respond ONLY with a valid JSON object matching this schema:\n${JSON.stringify(options.jsonSchema, null, 2)}\nDo NOT include greetings, markdown backticks, or any text outside the JSON object.` 
         : "\n\nIMPORTANT: Respond ONLY with the requested format. Do NOT include greetings, pleasantries, or introductory text.";
@@ -71,7 +71,7 @@ export async function askGeminiCode(
             ? options.imageBase64.split('base64,')[1] 
             : options?.imageBase64;
 
-        const rawResult = await invoke<string>('call_gemini_cli', {
+        const rawResult = await invoke<string>('call_antigravity_cli', {
             prompt: fullPrompt,
             projectRoot,
             apiKey,
@@ -85,12 +85,10 @@ export async function askGeminiCode(
 
         const parsed = safeParseJson<any>(rawResult);
         if (parsed && typeof parsed === 'object') {
-            // Gemini CLI uses "response", while other tools might use "result" or "completion"
             const mainContent = parsed.response !== undefined 
                 ? parsed.response 
                 : (parsed.result !== undefined ? parsed.result : (parsed.completion || parsed.text || parsed.content));
 
-            // If we used a schema, try to extract it from the main content
             if (options?.jsonSchema) {
                 const structured = typeof mainContent === 'string' ? safeParseJson<any>(mainContent) : mainContent;
                 if (structured && typeof structured === 'object') {
@@ -109,7 +107,7 @@ export async function askGeminiCode(
         }
         return String(rawResult);
     } catch (error: any) {
-        console.error("[Gemini CLI] Invocation failed:", error);
+        console.error("[Antigravity CLI] Invocation failed:", error);
         throw error;
     }
 }
@@ -148,7 +146,7 @@ export async function generateRefinedTestCases(
     const systemInstruction = getQAAssistantWrapper(promptString, !!appMapping, mappingContext, customPrompt);
     const prompt = `INPUT REQUIREMENTS:\n${requirements}`;
 
-    const response = await askGeminiCode(prompt, projectRoot, systemInstruction, apiKey);
+    const response = await askAntigravityCli(prompt, projectRoot, systemInstruction, apiKey);
     return typeof response === 'string' ? response : response.result;
 }
 
@@ -233,7 +231,7 @@ ${xmlDump.substring(0, 15000)}
         required: ["screen", "elements", "nextAction", "rationale"]
     };
 
-    const response = await askGeminiCode(prompt, projectRoot, systemInstruction, apiKey, {
+    const response = await askAntigravityCli(prompt, projectRoot, systemInstruction, apiKey, {
         jsonSchema: schema,
         resumeSessionId,
         imageBase64
@@ -294,7 +292,7 @@ DETAILED CONTEXT (Includes screenshot paths if available):
 ${failureContext ? JSON.stringify(failureContext, null, 2) : 'None'}
 `.trim();
 
-    const response = await askGeminiCode(prompt, projectRoot, systemInstruction, apiKey, {
+    const response = await askAntigravityCli(prompt, projectRoot, systemInstruction, apiKey, {
         imageBase64
     });
     return typeof response === 'string' ? response : response.result;
@@ -336,7 +334,7 @@ ${context}
         required: ["nodes", "missed"]
     };
 
-    const response = await askGeminiCode(prompt, projectRoot, systemInstruction, apiKey, {
+    const response = await askAntigravityCli(prompt, projectRoot, systemInstruction, apiKey, {
         jsonSchema: schema
     });
 
@@ -380,7 +378,7 @@ ${customPrompt ? `ADDITIONAL INSTRUCTIONS:\n${customPrompt}` : ""}
         required: ["name", "justification"]
     };
 
-    const response = await askGeminiCode(prompt, projectRoot, systemInstruction, apiKey, {
+    const response = await askAntigravityCli(prompt, projectRoot, systemInstruction, apiKey, {
         jsonSchema: schema,
         imageBase64
     });
@@ -414,7 +412,7 @@ ${customPrompt ? `ADDITIONAL INSTRUCTIONS:\n${customPrompt}` : ""}
         minItems: 1
     };
 
-    const response = await askGeminiCode(prompt, projectRoot, undefined, apiKey, {
+    const response = await askAntigravityCli(prompt, projectRoot, undefined, apiKey, {
         imageBase64,
         jsonSchema: schema
     });
@@ -450,14 +448,14 @@ ${customPrompt ? `USER SPECIFIC REQUEST:\n${customPrompt}` : "Provide a comprehe
 
     const systemInstruction = "You are an expert Test Lead and QA Architect.";
 
-    const response = await askGeminiCode(prompt, projectRoot, systemInstruction, apiKey, {
+    const response = await askAntigravityCli(prompt, projectRoot, systemInstruction, apiKey, {
         imageBase64
     });
     return typeof response === 'string' ? response : response.result;
 }
 
 /**
- * Autonomous Action Generation using Gemini CLI
+ * Autonomous Action Generation using Antigravity CLI
  */
 export async function generateAutonomousAction(
     xmlDump: string,
@@ -499,7 +497,7 @@ ${xmlDump.substring(0, 15000)}
         required: ["thought", "action", "isStepCompleted", "nextExpectedState"]
     };
 
-    const response = await askGeminiCode(prompt, projectRoot, systemInstruction, apiKey, {
+    const response = await askAntigravityCli(prompt, projectRoot, systemInstruction, apiKey, {
         jsonSchema: schema
     });
 
@@ -508,4 +506,3 @@ ${xmlDump.substring(0, 15000)}
     }
     return safeParseJson<AutonomousActionResponse>(typeof response === 'string' ? response : response.result);
 }
-

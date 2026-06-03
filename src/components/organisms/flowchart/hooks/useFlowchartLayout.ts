@@ -7,6 +7,7 @@ import { reorganizeFlowchartLayout as reorganizeWithGemini } from '@/lib/dashboa
 import { reorganizeFlowchartLayout as reorganizeWithOpenAI } from '@/lib/dashboard/openai';
 import { reorganizeFlowchartLayout as reorganizeWithClaude } from '@/lib/dashboard/claude';
 import { reorganizeFlowchartLayout as reorganizeWithClaudeCode } from '@/lib/dashboard/claudeCode';
+import { reorganizeFlowchartLayout as reorganizeWithAntigravity } from '@/lib/dashboard/antigravityCode';
 import { getAiContext } from '@/lib/dashboard/historyAnalysisUtils';
 
 
@@ -15,9 +16,10 @@ interface UseFlowchartLayoutProps {
     activeProfileId: string;
     onRefresh?: () => void;
     settings: any;
+    isOpen: boolean;
 }
 
-export function useFlowchartLayout({ maps = [], activeProfileId, onRefresh, settings }: UseFlowchartLayoutProps) {
+export function useFlowchartLayout({ maps = [], activeProfileId, onRefresh, settings, isOpen }: UseFlowchartLayoutProps) {
     const { t } = useTranslation();
     const [layout, setLayout] = useState<FlowchartLayout>({ version: 1, nodes: {}, edges: {} });
     const [loading, setLoading] = useState(true);
@@ -88,9 +90,18 @@ export function useFlowchartLayout({ maps = [], activeProfileId, onRefresh, sett
         }
     }, [activeProfileId, maps, t]);
 
+    const hasLoadedRef = useRef(false);
+
     useEffect(() => {
-        loadLayout();
-    }, [loadLayout]);
+        if (isOpen) {
+            if (!hasLoadedRef.current) {
+                loadLayout();
+                hasLoadedRef.current = true;
+            }
+        } else {
+            hasLoadedRef.current = false;
+        }
+    }, [isOpen, loadLayout]);
 
     const saveLayout = useCallback(async (manual = true) => {
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -151,7 +162,10 @@ export function useFlowchartLayout({ maps = [], activeProfileId, onRefresh, sett
 
         try {
             console.log("[Flowchart] Fetching AI context for layout...");
-            const { context } = await getAiContext('flowchart_layout', { profile_id: activeProfileId });
+            const { context } = await getAiContext('flowchart_layout', { 
+                profile_id: activeProfileId,
+                custom_mappings_dir: settings.paths?.mappings
+            });
             
             if (!context || context.trim() === "") {
                 console.warn("[Flowchart] AI context is empty. Reorganization might fail or do nothing.");
@@ -175,6 +189,8 @@ export function useFlowchartLayout({ maps = [], activeProfileId, onRefresh, sett
                 result = await reorganizeWithClaude(context, apiKey, model, language, undefined, customPrompt);
             } else if (provider === 'claude-code') {
                 result = await reorganizeWithClaudeCode(context, settings.paths.automationRoot || '', language, undefined, customPrompt, settings.claudeCodeToken);
+            } else if (provider === 'antigravity-cli') {
+                result = await reorganizeWithAntigravity(context, settings.paths.automationRoot || '', language, undefined, customPrompt, settings.antigravityApiKey);
             } else {
                 const apiKey = settings.geminiApiKey;
                 const model = settings.geminiModel || 'gemini-1.5-pro';
@@ -186,14 +202,37 @@ export function useFlowchartLayout({ maps = [], activeProfileId, onRefresh, sett
             if (result && result.nodes) {
                 setLayout(prev => {
                     const newNodes = { ...prev.nodes };
+                    let changedCount = 0;
+                    const changeDetails: Array<{ screen: string; from: { x: number; y: number } | null; to: { x: number; y: number } }> = [];
+
                     Object.entries(result.nodes).forEach(([name, coords]) => {
+                        const oldCoord = prev.nodes[name];
+                        const newX = (coords as any).gridX;
+                        const newY = (coords as any).gridY;
+                        
+                        if (!oldCoord || oldCoord.gridX !== newX || oldCoord.gridY !== newY) {
+                            changedCount++;
+                            changeDetails.push({
+                                screen: name,
+                                from: oldCoord ? { x: oldCoord.gridX, y: oldCoord.gridY } : null,
+                                to: { x: newX, y: newY }
+                            });
+                        }
+
                         newNodes[name] = {
-                            gridX: (coords as any).gridX,
-                            gridY: (coords as any).gridY
+                            gridX: newX,
+                            gridY: newY
                         };
                     });
 
-                    console.log("[Flowchart] Applying new layout nodes:", Object.keys(newNodes).length);
+                    console.log(`[Flowchart AI] Reorganized ${Object.keys(newNodes).length} nodes. Coordinates changed: ${changedCount}`);
+                    console.log("[Flowchart AI] Previous positions:", prev.nodes);
+                    console.log("[Flowchart AI] New positions proposed:", newNodes);
+                    if (changeDetails.length > 0) {
+                        console.log("[Flowchart AI] Changed elements details:", changeDetails);
+                    } else {
+                        console.log("[Flowchart AI] No coordinate values were modified by the AI suggestion. The AI layout proposal is identical to the current one.");
+                    }
 
                     return {
                         ...prev,
@@ -229,6 +268,8 @@ export function useFlowchartLayout({ maps = [], activeProfileId, onRefresh, sett
         settings.claudeModel,
         settings.geminiApiKey,
         settings.geminiModel,
+        settings.antigravityApiKey,
+        settings.paths?.automationRoot,
         t
     ]);
 

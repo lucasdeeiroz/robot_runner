@@ -19,7 +19,7 @@ export interface SystemVersions {
     scrcpy: string;
     ngrok: string;
     claude_code: string;
-    gemini_code: string;
+    antigravity: string;
     cypress: string;
     pytest: string;
 }
@@ -74,9 +74,9 @@ export interface AppSettings {
     };
 
     // AI
-    aiProvider: 'gemini' | 'claude' | 'openai' | 'claude-code' | 'gemini-code';
+    aiProvider: 'gemini' | 'claude' | 'openai' | 'claude-code' | 'antigravity-cli';
     geminiApiKey?: string;
-    geminiCodeApiKey?: string;
+    antigravityApiKey?: string;
     geminiModel: string;
     claudeApiKey?: string;
     claudeModel: string;
@@ -98,7 +98,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     primaryColor: 'blue',
     aiProvider: 'gemini',
     geminiApiKey: '',
-    geminiCodeApiKey: '',
+    antigravityApiKey: '',
     geminiModel: 'gemini-1.5-flash',
     claudeApiKey: '',
     claudeModel: 'claude-3-5-sonnet-20240620',

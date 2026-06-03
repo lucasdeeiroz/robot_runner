@@ -221,3 +221,42 @@ pub fn resolve_test_path(root: String, name: String) -> AppResult<Option<String>
         Ok(None)
     }
 }
+
+#[command]
+pub fn fs_exists(path: String) -> bool {
+    std::path::Path::new(&path).exists()
+}
+
+#[command]
+pub fn fs_mkdir(path: String) -> AppResult<()> {
+    std::fs::create_dir_all(&path).map_err(|e| AppError::FileSystemError(e.to_string()))
+}
+
+#[command]
+pub fn fs_write_text_file(path: String, content: String) -> AppResult<()> {
+    std::fs::write(&path, content).map_err(|e| AppError::FileSystemError(e.to_string()))
+}
+
+#[command]
+pub fn fs_read_text_file(path: String) -> AppResult<String> {
+    std::fs::read_to_string(&path).map_err(|e| AppError::FileSystemError(e.to_string()))
+}
+
+#[command]
+pub fn fs_remove_file(path: String) -> AppResult<()> {
+    std::fs::remove_file(&path).map_err(|e| AppError::FileSystemError(e.to_string()))
+}
+
+#[command]
+pub fn fs_read_dir_names(path: String) -> AppResult<Vec<String>> {
+    let read_dir = std::fs::read_dir(&path).map_err(|e| AppError::FileSystemError(e.to_string()))?;
+    let mut names = Vec::new();
+    for entry in read_dir {
+        if let Ok(entry) = entry {
+            if let Some(name) = entry.file_name().to_str() {
+                names.push(name.to_string());
+            }
+        }
+    }
+    Ok(names)
+}
