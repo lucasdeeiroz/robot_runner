@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Check, Scan, Home, ArrowLeft, Rows, X, Search, Pencil, Copy, ChevronDown, ChevronUp, Videotape, Play, Trash2, Code, Move, MousePointer2, ArrowRight, ArrowUp, ArrowDown, Download, RefreshCw } from 'lucide-react';
 import clsx from 'clsx';
 import { invoke } from '@tauri-apps/api/core';
@@ -140,11 +140,11 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
 
     // Live UI Sync State
     const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
-    const [lastFocus, setLastFocus] = useState("");
+    const lastFocusRef = useRef("");
 
     // Reset lastFocus when device changes
     useEffect(() => {
-        setLastFocus("");
+        lastFocusRef.current = "";
     }, [selectedDevice]);
 
     // Parallel Logcat & Focused Activity UI Sync Loop
@@ -160,13 +160,13 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
             try {
                 const result = await invoke<[boolean, string]>('check_ui_change', {
                     device: selectedDevice,
-                    lastFocus: lastFocus
+                    lastFocus: lastFocusRef.current
                 });
 
                 if (!isMounted) return;
 
                 const [hasChanged, currentFocus] = result;
-                setLastFocus(currentFocus);
+                lastFocusRef.current = currentFocus;
 
                 if (hasChanged) {
                     await refreshAll(true, false);
@@ -186,7 +186,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
             isMounted = false;
             clearTimeout(timeoutId);
         };
-    }, [autoRefreshEnabled, selectedDevice, isTestRunning, isActive, lastFocus, is_test_mode, refreshAll]);
+    }, [autoRefreshEnabled, selectedDevice, isTestRunning, isActive, is_test_mode, refreshAll]);
 
     // Auto-load AI suggestion from cache when node changes
     useEffect(() => {

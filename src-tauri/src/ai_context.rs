@@ -243,13 +243,13 @@ fn get_exploration_context(params: AiContextParams) -> Result<AiContextResponse,
 
                     let mut attrs = format!("id=\"{}\"", short_id);
                     if !resource_id.is_empty() {
-                        attrs.push_str(&format!(" res=\"{}\"", resource_id));
+                        attrs.push_str(&format!(" res=\"{}\"", escape_xml_attr(resource_id)));
                     }
                     if !text.is_empty() {
-                        attrs.push_str(&format!(" text=\"{}\"", text.replace('"', "&quot;")));
+                        attrs.push_str(&format!(" text=\"{}\"", escape_xml_attr(text)));
                     }
                     if !desc.is_empty() {
-                        attrs.push_str(&format!(" desc=\"{}\"", desc.replace('"', "&quot;")));
+                        attrs.push_str(&format!(" desc=\"{}\"", escape_xml_attr(desc)));
                     }
                     if clickable {
                         attrs.push_str(" clickable=\"true\"");
@@ -267,7 +267,7 @@ fn get_exploration_context(params: AiContextParams) -> Result<AiContextResponse,
                         attrs.push_str(" selected=\"true\"");
                     }
                     if !bounds.is_empty() {
-                        attrs.push_str(&format!(" bounds=\"{}\"", bounds));
+                        attrs.push_str(&format!(" bounds=\"{}\"", escape_xml_attr(bounds)));
                     }
 
                     simplified.push_str(&format!("  <{tag} {attrs} />\n"));
@@ -359,6 +359,7 @@ fn generate_basic_xpath(node: &roxmltree::Node) -> String {
         if parent.is_root() {
             break;
         }
+
         let tag = current.tag_name().name();
 
         // Find index among siblings with same tag
@@ -377,6 +378,15 @@ fn generate_basic_xpath(node: &roxmltree::Node) -> String {
 
     path.reverse();
     format!("/{}", path.join("/"))
+}
+
+fn escape_xml_attr(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
 }
 
 fn get_artifact_generation_context(

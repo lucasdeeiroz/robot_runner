@@ -28,6 +28,7 @@ export function useFlowchartLayout({ maps = [], activeProfileId, onRefresh, sett
     const [missedScreens, setMissedScreens] = useState<string[]>([]);
     
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const mappingsPath = settings.paths?.mappings;
 
     const mapsRef = useRef(maps);
     mapsRef.current = maps;
@@ -35,7 +36,7 @@ export function useFlowchartLayout({ maps = [], activeProfileId, onRefresh, sett
     const loadLayout = useCallback(async () => {
         setLoading(true);
         try {
-            const centralLayout = await loadFlowchartLayout(activeProfileId, settings.paths?.mappings);
+            const centralLayout = await loadFlowchartLayout(activeProfileId, mappingsPath);
             const newLayout: FlowchartLayout = { version: 1, nodes: {}, edges: {} };
             
             if (centralLayout) {
@@ -88,20 +89,21 @@ export function useFlowchartLayout({ maps = [], activeProfileId, onRefresh, sett
             setLoading(false);
             setIsDirty(false);
         }
-    }, [activeProfileId, maps, t]);
+    }, [activeProfileId, maps, mappingsPath, t]);
 
-    const hasLoadedRef = useRef(false);
+    const loadedLayoutKeyRef = useRef<string | null>(null);
+    const layoutLoadKey = `${activeProfileId}::${mappingsPath ?? ''}`;
 
     useEffect(() => {
         if (isOpen) {
-            if (!hasLoadedRef.current) {
+            if (loadedLayoutKeyRef.current !== layoutLoadKey) {
                 loadLayout();
-                hasLoadedRef.current = true;
+                loadedLayoutKeyRef.current = layoutLoadKey;
             }
         } else {
-            hasLoadedRef.current = false;
+            loadedLayoutKeyRef.current = null;
         }
-    }, [isOpen, loadLayout]);
+    }, [isOpen, layoutLoadKey, loadLayout]);
 
     const saveLayout = useCallback(async (manual = true) => {
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -129,11 +131,11 @@ export function useFlowchartLayout({ maps = [], activeProfileId, onRefresh, sett
                 await saveScreenMap(activeProfileId, {
                     ...map,
                     layout: { node: nodeLayout, edges: mapEdges }
-                }, settings.paths?.mappings);
+                }, mappingsPath);
             });
 
             await Promise.all(savePromises);
-            await deleteFlowchartLayout(activeProfileId, settings.paths?.mappings);
+            await deleteFlowchartLayout(activeProfileId, mappingsPath);
 
             setIsDirty(false);
             if (manual) feedback.toast.success(t('mapper.flowchart.save_success'));
@@ -142,7 +144,7 @@ export function useFlowchartLayout({ maps = [], activeProfileId, onRefresh, sett
             console.error('Failed to save layout:', error);
             if (manual) feedback.toast.error(t('mapper.flowchart.save_error'));
         }
-    }, [layout, maps, activeProfileId, t, onRefresh]);
+    }, [layout, maps, activeProfileId, mappingsPath, t, onRefresh]);
 
     // Auto-save debounce
     useEffect(() => {
@@ -164,7 +166,7 @@ export function useFlowchartLayout({ maps = [], activeProfileId, onRefresh, sett
             console.log("[Flowchart] Fetching AI context for layout...");
             const { context } = await getAiContext('flowchart_layout', { 
                 profile_id: activeProfileId,
-                custom_mappings_dir: settings.paths?.mappings
+                custom_mappings_dir: mappingsPath
             });
             
             if (!context || context.trim() === "") {
@@ -269,6 +271,7 @@ export function useFlowchartLayout({ maps = [], activeProfileId, onRefresh, sett
         settings.geminiApiKey,
         settings.geminiModel,
         settings.antigravityApiKey,
+        mappingsPath,
         settings.paths?.automationRoot,
         t
     ]);

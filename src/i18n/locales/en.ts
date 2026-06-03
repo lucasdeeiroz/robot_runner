@@ -1202,12 +1202,12 @@ export const en = {
                 },
                 antigravity: {
                     title: "Antigravity CLI",
-                    help: "This provider uses the local 'antigravity' command. Ensure you have the Antigravity CLI installed and configured.",
+                    help: "This provider uses the local 'agy' command. Ensure you have the Antigravity CLI installed and configured.",
                     check_install: "Check Installation",
                     installed: "Antigravity CLI detected! Version: {{version}}",
                     not_installed: "Antigravity CLI not found. Please install it using 'npm install -g @google/antigravity-cli'.",
                     token_label: "API Key",
-                    token_placeholder: "Enter Gemini API Key",
+                    token_placeholder: "Enter Antigravity API Key",
                     token_help: "The API Key will be used to authenticate your requests via the Antigravity CLI."
                 },
                 max_exploration_steps: "Max Exploration Steps",

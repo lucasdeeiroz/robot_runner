@@ -1317,9 +1317,9 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                 >
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {systemVersions ? (
-                            (['adb', 'node', 'appium', 'uiautomator2', 'python', 'robot', 'appium_lib', 'java', 'maven', 'maestro', 'scrcpy', 'ngrok', 'claude_code', 'antigravity'] as Array<keyof typeof systemVersions>)
+                            (['adb', 'node', 'appium', 'uiautomator2', 'python', 'robot', 'appium_lib', 'java', 'maven', 'maestro', 'scrcpy', 'ngrok'] as Array<keyof typeof systemVersions>)
                                 .filter(key => {
-                                    if (key === 'ngrok' && !isNgrokEnabled || key === 'claude_code' || key === 'antigravity') return false;
+                                    if (key === 'ngrok' && !isNgrokEnabled) return false;
                                     if (is_test_mode === 'web' && ['adb', 'scrcpy'].includes(key)) return false;
                                     if (settings.usageMode === 'explorer' && ['node', 'appium', 'uiautomator2', 'python', 'robot', 'appium_lib', 'java', 'maven', 'maestro'].includes(key)) return false;
 

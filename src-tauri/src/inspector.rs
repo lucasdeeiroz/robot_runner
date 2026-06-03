@@ -164,9 +164,10 @@ async fn fallback_screencap(app_handle: &AppHandle, device_id: &str) -> Result<V
     }
 
     let local_temp = std::env::temp_dir().join(format!("screencap_fallback_{}.png", rand::random::<u32>()));
+    let local_temp_string = local_temp.to_string_lossy().into_owned();
 
     let mut cmd_pull = new_tokio_command(&adb_program);
-    cmd_pull.args(&["-s", device_id, "pull", remote_path, local_temp.to_str().unwrap()]);
+    cmd_pull.args(&["-s", device_id, "pull", remote_path, local_temp_string.as_str()]);
     let output_pull = cmd_pull.output().await
         .map_err(|e| format!("Failed to pull fallback screenshot: {}", e))?;
 

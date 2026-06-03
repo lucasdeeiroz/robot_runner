@@ -1209,12 +1209,12 @@ export const es = {
                 },
                 antigravity: {
                     title: "Antigravity CLI",
-                    help: "Este proveedor utiliza el comando local 'antigravity'. Asegúrese de tener instalado y configurado el Antigravity CLI.",
+                    help: "Este proveedor utiliza el comando local 'agy'. Asegúrese de tener instalado y configurado el Antigravity CLI.",
                     check_install: "Verificar Instalación",
                     installed: "¡Antigravity CLI detectado! Versión: {{version}}",
                     not_installed: "Antigravity CLI no encontrado. Instale vía 'npm install -g @google/antigravity-cli'.",
                     token_label: "Clave API",
-                    token_placeholder: "Ingrese su Clave API Gemini",
+                    token_placeholder: "Ingrese su Clave API Antigravity",
                     token_help: "La Clave API se utilizará para autenticar sus solicitudes a través del Antigravity CLI."
                 },
                 max_exploration_steps: "Pasos Máximos de Exploración",
