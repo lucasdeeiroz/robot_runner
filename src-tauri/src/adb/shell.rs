@@ -1,4 +1,4 @@
-use crate::cmd_utils::{new_tokio_command, get_adb_program};
+use crate::cmd_utils::{new_tokio_command, get_adb_program, format_adb_error};
 use crate::errors::{AppError, AppResult};
 use std::collections::HashMap;
 use std::process::Stdio;
@@ -39,9 +39,7 @@ pub async fn get_adb_version(app: AppHandle) -> AppResult<String> {
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     } else {
-        Err(AppError::AdbError(
-            String::from_utf8_lossy(&output.stderr).to_string(),
-        ))
+        Err(AppError::AdbError(format_adb_error(&output)))
     }
 }
 
@@ -91,9 +89,7 @@ pub async fn run_adb_command(app: AppHandle, device: String, args: Vec<String>) 
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
     } else {
-        Err(AppError::AdbError(
-            String::from_utf8_lossy(&output.stderr).trim().to_string(),
-        ))
+        Err(AppError::AdbError(format_adb_error(&output)))
     }
 }
 
@@ -354,6 +350,6 @@ async fn run_adb_shell_args_internal(
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
     } else {
-        Err(AppError::AdbError(String::from_utf8_lossy(&output.stderr).trim().to_string()))
+        Err(AppError::AdbError(format_adb_error(&output)))
     }
 }

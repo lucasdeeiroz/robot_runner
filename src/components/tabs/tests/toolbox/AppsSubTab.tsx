@@ -14,6 +14,7 @@ import { Section } from "@/components/organisms/Section";
 import { Button } from "@/components/atoms/Button";
 import { Input } from "@/components/atoms/Input";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
+import { SplitButton } from "@/components/molecules/SplitButton";
 
 interface PackageInfo {
     name: String;
@@ -39,6 +40,9 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
     const [showSystem, setShowSystem] = useState(false);
     const [sortBy, setSortBy] = useState<'name' | 'package'>('name');
     const [downgrade, setDowngrade] = useState(false);
+    const [grantPermissions, setGrantPermissions] = useState(false);
+    const [allowTest, setAllowTest] = useState(false);
+    const [installSdcard, setInstallSdcard] = useState(false);
 
     // ... (rest of state)
 
@@ -178,7 +182,14 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
             });
             if (selected) {
                 toastId = toast.loading(t('apps.status.installing', "Installing APK..."));
-                await invoke("install_package", { device: activeDevice, path: selected, downgrade });
+                await invoke("install_package", {
+                    device: activeDevice,
+                    path: selected,
+                    downgrade,
+                    grant_permissions: grantPermissions,
+                    allow_test: allowTest,
+                    install_sdcard: installSdcard,
+                });
                 toast.success(t('apps.success.installed', "APK installed successfully"));
                 fetchPackages();
             }
@@ -256,26 +267,41 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
                 ) : null}
                 actions={
                     <div className="flex items-center gap-3">
-                        <label className="flex items-center gap-1.5 cursor-pointer text-xs text-on-surface-variant/80 hover:text-on-surface transition-colors select-none">
-                            <input
-                                type="checkbox"
-                                checked={downgrade}
-                                onChange={(e) => setDowngrade(e.target.checked)}
-                                className="rounded border-outline-variant/30 text-primary focus:ring-primary/30 h-3.5 w-3.5 bg-surface cursor-pointer"
-                            />
-                            <span>{t('apps.actions.allow_downgrade', 'Downgrade (-d)')}</span>
-                        </label>
-                        <Button
-                            onClick={handleInstall}
-                            variant="ghost"
-                            size="sm"
+                        <SplitButton
                             disabled={isTestRunning && !allowActionsDuringTest}
-                            className="bg-on-success-container/10/10 hover:bg-on-success-container/10/20 text-success border border-on-success-container/10/20"
-                            title={t('apps.actions.install')}
-                            leftIcon={<Upload size={14} />}
-                        >
-                            <span className="text-xs font-semibold hidden lg:inline">{t('apps.actions.install')}</span>
-                        </Button>
+                            variant="primary"
+                            primaryAction={{
+                                label: t('apps.actions.install', 'Install APK'),
+                                onClick: handleInstall,
+                                icon: <Upload size={14} />
+                            }}
+                            secondaryActions={[
+                                {
+                                    label: t('apps.actions.allow_downgrade', 'Downgrade (-d)'),
+                                    type: 'checkbox',
+                                    checked: downgrade,
+                                    onClick: () => setDowngrade(prev => !prev)
+                                },
+                                {
+                                    label: t('apps.actions.grant_permissions', 'Grant Permissions (-g)'),
+                                    type: 'checkbox',
+                                    checked: grantPermissions,
+                                    onClick: () => setGrantPermissions(prev => !prev)
+                                },
+                                {
+                                    label: t('apps.actions.allow_test', 'Allow Test APKs (-t)'),
+                                    type: 'checkbox',
+                                    checked: allowTest,
+                                    onClick: () => setAllowTest(prev => !prev)
+                                },
+                                {
+                                    label: t('apps.actions.install_sdcard', 'Install to SD Card (-s)'),
+                                    type: 'checkbox',
+                                    checked: installSdcard,
+                                    onClick: () => setInstallSdcard(prev => !prev)
+                                }
+                            ]}
+                        />
                     </div>
                 }
             />

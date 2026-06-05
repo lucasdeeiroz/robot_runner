@@ -30,3 +30,18 @@ pub fn new_tokio_command(program: &str) -> tokio::process::Command {
     }
     cmd
 }
+
+/// Formats an adb process failure output, falling back to stdout and then exit code if stderr is empty.
+pub fn format_adb_error(output: &std::process::Output) -> String {
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if !stderr.is_empty() {
+        stderr
+    } else {
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if !stdout.is_empty() {
+            stdout
+        } else {
+            format!("Process exited with status code: {}", output.status.code().unwrap_or(-1))
+        }
+    }
+}

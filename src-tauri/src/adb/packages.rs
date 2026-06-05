@@ -1,4 +1,4 @@
-use crate::cmd_utils::{new_tokio_command, get_adb_program};
+use crate::cmd_utils::{new_tokio_command, get_adb_program, format_adb_error};
 use tauri::AppHandle;
 use tauri::command;
 
@@ -90,10 +90,27 @@ pub async fn clear_package(app: AppHandle, device: String, package: String) -> R
 }
 
 #[command]
-pub async fn install_package(app: AppHandle, device: String, path: String, downgrade: Option<bool>) -> Result<String, String> {
+pub async fn install_package(
+    app: AppHandle,
+    device: String,
+    path: String,
+    downgrade: Option<bool>,
+    grant_permissions: Option<bool>,
+    allow_test: Option<bool>,
+    install_sdcard: Option<bool>,
+) -> Result<String, String> {
     let mut args = vec!["install", "-r"];
     if downgrade.unwrap_or(false) {
         args.push("-d");
+    }
+    if grant_permissions.unwrap_or(false) {
+        args.push("-g");
+    }
+    if allow_test.unwrap_or(false) {
+        args.push("-t");
+    }
+    if install_sdcard.unwrap_or(false) {
+        args.push("-s");
     }
     args.push(&path);
     run_adb(&app, device, args).await
@@ -166,6 +183,6 @@ async fn run_adb(app: &AppHandle, device: String, args: Vec<&str>) -> Result<Str
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     } else {
-        Err(String::from_utf8_lossy(&output.stderr).to_string())
+        Err(format_adb_error(&output))
     }
 }

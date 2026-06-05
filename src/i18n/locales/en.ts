@@ -175,7 +175,10 @@ export const en = {
                 sort_by_name: "Sort by Name",
                 sort_by_package: "Sort by Package",
                 refresh: "Refresh List",
-                allow_downgrade: "Allow Downgrade (-d)"
+                allow_downgrade: "Allow Downgrade (-d)",
+                grant_permissions: "Grant Permissions (-g)",
+                allow_test: "Allow Test APKs (-t)",
+                install_sdcard: "Install to SD Card (-s)"
             },
             search_placeholder: "Search packages...",
             toggle_system: "Toggle System Apps",
@@ -352,7 +355,8 @@ export const en = {
                 cancel_card: "Cancel",
                 enabling_tcpip: "Enabling TCP/IP 5555...",
                 tcpip_enabled: "TCP/IP 5555 Enabled",
-                tcpip_failed: "Failed to enable TCP/IP"
+                tcpip_failed: "Failed to enable TCP/IP",
+                command_not_allowed: "Command not allowed on this device"
             },
             security_warning: {
                 title: "Security Warning",

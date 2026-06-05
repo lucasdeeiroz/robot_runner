@@ -223,6 +223,8 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                 setStatusMsg({ text: t('connect.status.connection_failed') + `: ${ip}:${port}`, type: 'error' });
             } else if (errStr.includes("Pairing failed")) {
                 setStatusMsg({ text: t('connect.status.pairing_failed') + `: ${e}`, type: 'error' });
+            } else if (errStr.includes("Command not allowed")) {
+                setStatusMsg({ text: t('connect.status.command_not_allowed', "Command not allowed on this device"), type: 'error' });
             } else {
                 setStatusMsg({ text: errStr, type: 'error' });
             }
@@ -244,8 +246,14 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
             setStatusMsg({ text: t('connect.status.tcpip_enabled', "TCP/IP 5555 Enabled"), type: 'success' });
             feedback.toast.success("connect.status.tcpip_enabled");
         } catch (e) {
-            setStatusMsg({ text: `${t('connect.status.tcpip_failed', "Failed to enable TCP/IP")}: ${e}`, type: 'error' });
-            feedback.toast.error("connect.status.tcpip_failed", e);
+            const errStr = String(e);
+            if (errStr.includes("Command not allowed")) {
+                setStatusMsg({ text: t('connect.status.command_not_allowed', "Command not allowed on this device"), type: 'error' });
+                feedback.toast.error("connect.status.command_not_allowed");
+            } else {
+                setStatusMsg({ text: `${t('connect.status.tcpip_failed', "Failed to enable TCP/IP")}: ${e}`, type: 'error' });
+                feedback.toast.error("connect.status.tcpip_failed", e);
+            }
         } finally {
             setLoading(false);
         }

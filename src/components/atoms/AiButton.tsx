@@ -262,7 +262,7 @@ export const AiButton: React.FC<AiButtonProps> = ({
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: -4, scale: 0.98 }}
                             transition={{ duration: 0.15, ease: "easeOut" }}
-                            className="fixed z-[10000] bg-surface border border-outline-variant/30 rounded-2xl shadow-lg py-1.5 overflow-hidden"
+                            className="fixed z-[200000] bg-surface border border-outline-variant/30 rounded-2xl shadow-lg py-1.5 overflow-hidden"
                             style={dropdownStyle}
                         >
                             <button

@@ -1,4 +1,4 @@
-use crate::cmd_utils::{new_tokio_command, get_adb_program};
+use crate::cmd_utils::{new_tokio_command, get_adb_program, format_adb_error};
 use tauri::AppHandle;
 
 fn resolve_target(ip: Option<String>, port: Option<String>, target: Option<String>) -> Result<String, String> {
@@ -37,7 +37,7 @@ pub async fn adb_connect(
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     } else {
-        Err(String::from_utf8_lossy(&output.stderr).to_string())
+        Err(format_adb_error(&output))
     }
 }
 
@@ -62,7 +62,7 @@ pub async fn adb_pair(
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     } else {
-        Err(String::from_utf8_lossy(&output.stderr).to_string())
+        Err(format_adb_error(&output))
     }
 }
 
@@ -86,7 +86,7 @@ pub async fn adb_disconnect(
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     } else {
-        Err(String::from_utf8_lossy(&output.stderr).to_string())
+        Err(format_adb_error(&output))
     }
 }
 
@@ -104,6 +104,6 @@ pub async fn adb_disconnect_all(app: AppHandle) -> Result<String, String> {
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     } else {
-        Err(String::from_utf8_lossy(&output.stderr).to_string())
+        Err(format_adb_error(&output))
     }
 }
