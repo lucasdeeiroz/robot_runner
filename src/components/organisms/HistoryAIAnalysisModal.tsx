@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { invoke } from '@tauri-apps/api/core';
 import { Modal } from './Modal';
 import { AiResponse } from '../molecules/AiResponse';
 import { toast } from 'sonner';
@@ -9,6 +10,7 @@ import { getAiContext } from '@/lib/dashboard/historyAnalysisUtils';
 import { analyzeTestHistory as analyzeGemini } from '@/lib/dashboard/gemini';
 import { analyzeTestHistory as analyzeOpenAI } from '@/lib/dashboard/openai';
 import { analyzeTestHistory as analyzeClaude } from '@/lib/dashboard/claude';
+import { analyzeTestHistory as analyzeClaudeCode } from '@/lib/dashboard/claudeCode';
 import { load } from '@tauri-apps/plugin-store';
 import { BrainCircuit, Info, Sparkles, History as HistoryIcon } from 'lucide-react';
 
@@ -103,11 +105,13 @@ const HistoryAIAnalysisModal: React.FC<HistoryAIAnalysisModalProps> = ({
             const provider = settings.aiProvider;
             const apiKey = provider === 'gemini'
                 ? settings.geminiApiKey
-                : provider === 'claude'
-                    ? settings.claudeApiKey
-                    : settings.openaiApiKey;
+                : provider === 'openai'
+                    ? settings.openaiApiKey
+                    : provider === 'antigravity-cli'
+                        ? settings.antigravityApiKey
+                        : settings.claudeApiKey;
 
-            if (!apiKey) {
+            if (!apiKey && provider !== 'claude-code' && provider !== 'antigravity-cli') {
                 throw new Error(t('dashboard.generator.key_required', { provider: provider.charAt(0).toUpperCase() + provider.slice(1) }));
             }
 
@@ -138,12 +142,27 @@ const HistoryAIAnalysisModal: React.FC<HistoryAIAnalysisModalProps> = ({
             const deepContext = contextResponse.context;
             let result = "";
 
+            const screenshotPath = (contextResponse.metadata as any)?.first_screenshot;
+            let base64Screenshot: string | undefined = undefined;
+            if (screenshotPath) {
+                try {
+                    base64Screenshot = await invoke<string>('read_compressed_image_base64', { path: screenshotPath });
+                } catch (err) {
+                    console.warn("Failed to read compressed screenshot for history analysis:", err);
+                }
+            }
+
             if (provider === 'gemini') {
-                result = await analyzeGemini(historyData, apiKey, model, lang, deepContext, controller.signal, customPrompt);
+                result = await analyzeGemini(historyData, apiKey!, model, lang, deepContext, controller.signal, customPrompt, base64Screenshot);
             } else if (provider === 'openai') {
-                result = await analyzeOpenAI(historyData, apiKey, model, lang, deepContext, controller.signal, customPrompt);
+                result = await analyzeOpenAI(historyData, apiKey!, model, lang, deepContext, controller.signal, customPrompt, base64Screenshot);
             } else if (provider === 'claude') {
-                result = await analyzeClaude(historyData, apiKey, model, lang, deepContext, controller.signal, customPrompt);
+                result = await analyzeClaude(historyData, apiKey!, model, lang, deepContext, controller.signal, customPrompt, base64Screenshot);
+            } else if (provider === 'claude-code') {
+                result = await analyzeClaudeCode(historyData, settings.paths.automationRoot || '', lang, deepContext, controller.signal, customPrompt, settings.claudeCodeToken, base64Screenshot);
+            } else if (provider === 'antigravity-cli') {
+                const { analyzeTestHistory } = await import('@/lib/dashboard/antigravityCode');
+                result = await analyzeTestHistory(historyData, settings.paths.automationRoot || '', lang, deepContext, controller.signal, customPrompt, settings.antigravityApiKey, base64Screenshot);
             }
 
             if (!controller.signal.aborted) {

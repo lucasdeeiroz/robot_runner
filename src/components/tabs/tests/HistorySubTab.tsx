@@ -3,7 +3,7 @@ import { AnimatePresence } from 'framer-motion';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useSettings } from "@/lib/settings";
 import { HistoryCharts } from "@/components/organisms/HistoryCharts";
-import { XCircle, Calendar, ChevronDown, ChevronRight, CheckCircle, Clock, PieChart, Search, RefreshCw, Settings } from 'lucide-react';
+import { Cloud, XCircle, Calendar, ChevronDown, ChevronRight, CheckCircle, Clock, PieChart, Search, RefreshCw, Settings, HardDrive } from 'lucide-react';
 import clsx from 'clsx';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from "react-i18next";
@@ -19,6 +19,9 @@ import { HistoryDetailModal } from '@/components/organisms/HistoryDetailModal';
 import { getCachedHistory, setCachedHistory, TestLog } from '@/lib/historyCache';
 import HistoryAIAnalysisModal from '@/components/organisms/HistoryAIAnalysisModal';
 import { AiButton } from "@/components/atoms/AiButton";
+import { auth } from '@/lib/firebase';
+import { fetchGlobalHistory, uploadTestToFirebase } from '@/lib/testHistorySync';
+import { useAuth } from '@/lib/authStore';
 
 const formatDate = (dateStr: string) => {
     try {
@@ -42,8 +45,9 @@ interface HistorySubTabProps {
 }
 
 export function HistorySubTab({ onNavigate }: HistorySubTabProps) {
+    const { user } = useAuth();
     const { t } = useTranslation();
-    const { settings, updateSetting } = useSettings();
+    const { settings, updateSetting, activeProfileId } = useSettings();
     const [history, setHistory] = useState<TestLog[]>(getCachedHistory());
     const [filterText, setFilterText] = useState("");
     const [filterPeriod, setFilterPeriod] = useState("all_time");
@@ -84,22 +88,130 @@ export function HistorySubTab({ onNavigate }: HistorySubTabProps) {
     }, []);
 
     useEffect(() => {
+        // Clear current history visually when path or user changes to prevent ghosting/duplication
+        setHistory([]);
+        setCachedHistory([]);
+
         const timer = setTimeout(() => {
             loadHistory();
             isFirstRun.current = false;
         }, 150);
         return () => clearTimeout(timer);
-    }, [settings.paths.logs]);
+    }, [settings.paths.logs, user]);
 
     const loadHistory = async (refresh: boolean = false) => {
         setLoadingHistory(true);
         try {
-            const logs = await invoke<TestLog[]>('get_test_history', {
+            // 1. Load Local Logs from File System
+            const localLogs = await invoke<TestLog[]>('get_test_history', {
                 customPath: settings.paths.logs || null,
                 refresh: refresh
             });
-            setHistory(logs);
-            setCachedHistory(logs);
+
+            let combinedLogs = [...localLogs];
+
+            // 2. Fetch Global Logs from Firestore if logged in
+            const currentUser = auth?.currentUser;
+            if (currentUser && activeProfileId) {
+                try {
+                    const globalLogs = await fetchGlobalHistory(currentUser.uid, activeProfileId);
+                    
+                    // 3. Merge & Deduplicate
+                    // Rule 1: Use run_id for absolute matching if available.
+                    // Rule 2: Fallback to name+timestamp for older/missing records.
+                    const merged = [...localLogs];
+                    const matchedLocalIndices = new Set<number>();
+                    
+                    // Helper to normalize IDs for comparison (strips 'run_' prefix if present)
+                    const normalizeId = (id?: string | null) => id?.replace(/^run_/, '') || '';
+
+                    globalLogs.forEach(gLog => {
+                        const gRunId = normalizeId(gLog.run_id);
+                        const gDevice = gLog.device_udid || '';
+
+                        // Find the best local match that hasn't been used yet
+                        let matchedIdx = -1;
+                        
+                        // Pass 1: Try absolute run_id match
+                        matchedIdx = localLogs.findIndex((lLog, idx) => {
+                            if (matchedLocalIndices.has(idx)) return false;
+                            const lRunId = normalizeId(lLog.run_id);
+                            return lRunId && gRunId && lRunId === gRunId;
+                        });
+
+                        // Pass 2: Try heuristic (Name + Time + Device)
+                        if (matchedIdx === -1) {
+                            matchedIdx = localLogs.findIndex((lLog, idx) => {
+                                if (matchedLocalIndices.has(idx)) return false;
+                                
+                                const timeDiff = Math.abs(new Date(lLog.timestamp).getTime() - new Date(gLog.timestamp).getTime());
+                                const cleanLName = decodeHtml(lLog.suite_name).toLowerCase();
+                                const cleanGName = decodeHtml(gLog.suite_name).toLowerCase();
+                                const lDevice = lLog.device_udid || '';
+
+                                // Heuristic criteria: Name match AND close time AND same device
+                                const isNameMatch = cleanLName === cleanGName || cleanLName.includes(cleanGName) || cleanGName.includes(cleanLName);
+                                const isDeviceMatch = !lDevice || !gDevice || lDevice === gDevice; // Only match device if both present
+
+                                return isNameMatch && timeDiff < 60000 && isDeviceMatch;
+                            });
+                        }
+
+                        if (matchedIdx !== -1) {
+                            const localMatch = localLogs[matchedIdx];
+                            localMatch.has_remote_sync = true;
+                            if (!localMatch.id) localMatch.id = gLog.id;
+                            matchedLocalIndices.add(matchedIdx);
+                            console.log("[Sync] Matched cloud record to local:", { suite: gLog.suite_name, device: gDevice });
+                        } else {
+                            // No local match found, add as cloud-only
+                            const alreadyAdded = merged.find(m => m.id === gLog.id || (m.run_id && m.run_id === gLog.run_id));
+                            if (!alreadyAdded) {
+                                merged.push(gLog);
+                            }
+                        }
+                    });
+
+                    // Sort by timestamp descending
+                    combinedLogs = merged.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+                    // Sync any unsynced local logs to Firebase
+                    const unsyncedLogs = localLogs.filter((_, idx) => !matchedLocalIndices.has(idx));
+                    if (unsyncedLogs.length > 0) {
+                        console.log(`[Sync] Found ${unsyncedLogs.length} unsynced local logs. Syncing in background...`);
+                        Promise.all(
+                            unsyncedLogs.map(async (log) => {
+                                const docId = await uploadTestToFirebase(currentUser.uid, activeProfileId, log);
+                                if (docId) {
+                                    return { xml_path: log.xml_path, docId };
+                                }
+                                return null;
+                            })
+                        ).then((results) => {
+                            const successfulUploads = results.filter((r): r is { xml_path: string; docId: string } => r !== null);
+                            if (successfulUploads.length > 0) {
+                                console.log(`[Sync] Successfully synced ${successfulUploads.length} logs to Firebase.`);
+                                setHistory(prev => {
+                                    const updated = prev.map(log => {
+                                        const match = successfulUploads.find(u => u.xml_path === log.xml_path);
+                                        if (match) {
+                                            return { ...log, has_remote_sync: true, id: match.docId };
+                                        }
+                                        return log;
+                                    });
+                                    setCachedHistory(updated);
+                                    return updated;
+                                });
+                            }
+                        });
+                    }
+                } catch (err) {
+                    console.error("[Sync] Failed to fetch/sync global history:", err);
+                }
+            }
+
+            setHistory(combinedLogs);
+            setCachedHistory(combinedLogs);
         } catch (e) {
             feedback.toast.error("tests_page.load_error", e);
         } finally {
@@ -481,7 +593,10 @@ export function HistorySubTab({ onNavigate }: HistorySubTabProps) {
 
                             return (
                                 <div
-                                    key={item.id}
+                                    key={item.type === 'header' 
+                                        ? `header-${item.groupName}` 
+                                        : `${(item as any).run_id || (item as any).id || (item as any).path || virtualRow.index}`
+                                    }
                                     data-index={virtualRow.index}
                                     ref={rowVirtualizer.measureElement}
                                     className="absolute top-0 left-0 w-full"
@@ -538,6 +653,18 @@ export function HistorySubTab({ onNavigate }: HistorySubTabProps) {
                                                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-on-surface-variant/80">
                                                         <div className="flex items-center gap-1">
                                                             <Calendar size={12} /> {formatDate(item.log.timestamp)}
+                                                            <div className="flex items-center gap-1.5 ml-2">
+                                                                {item.log.xml_path && (
+                                                                    <div className="text-on-surface-variant/40" title={t('common.local_storage', "Armazenamento Local")}>
+                                                                        <HardDrive size={12} />
+                                                                    </div>
+                                                                )}
+                                                                {(item.log.is_remote || item.log.has_remote_sync) && (
+                                                                    <div className="text-primary/60" title={t('common.cloud_sync', "Sincronizado na Nuvem")}>
+                                                                        <Cloud size={12} />
+                                                                    </div>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                         <div className="flex items-center gap-1 bg-surface-variant/30 px-1.5 py-0.5 rounded text-[10px] font-medium border border-outline-variant/10">
                                                             <Clock size={10} className="shrink-0" />

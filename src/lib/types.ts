@@ -8,6 +8,8 @@ export interface Device {
     battery_level?: number | null;
     ram_total?: number | null;
     ram_used?: number | null;
+    storage_total?: number | null;
+    storage_used?: number | null;
 }
 
 // --- Screen Mapper Types ---

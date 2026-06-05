@@ -14,6 +14,7 @@ import { Section } from "@/components/organisms/Section";
 import { Button } from "@/components/atoms/Button";
 import { Input } from "@/components/atoms/Input";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
+import { SplitButton } from "@/components/molecules/SplitButton";
 
 interface PackageInfo {
     name: String;
@@ -38,6 +39,10 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
     const [search, setSearch] = useState("");
     const [showSystem, setShowSystem] = useState(false);
     const [sortBy, setSortBy] = useState<'name' | 'package'>('name');
+    const [downgrade, setDowngrade] = useState(false);
+    const [grantPermissions, setGrantPermissions] = useState(false);
+    const [allowTest, setAllowTest] = useState(false);
+    const [installSdcard, setInstallSdcard] = useState(false);
 
     // ... (rest of state)
 
@@ -177,7 +182,14 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
             });
             if (selected) {
                 toastId = toast.loading(t('apps.status.installing', "Installing APK..."));
-                await invoke("install_package", { device: activeDevice, path: selected });
+                await invoke("install_package", {
+                    device: activeDevice,
+                    path: selected,
+                    downgrade,
+                    grant_permissions: grantPermissions,
+                    allow_test: allowTest,
+                    install_sdcard: installSdcard,
+                });
                 toast.success(t('apps.success.installed', "APK installed successfully"));
                 fetchPackages();
             }
@@ -254,19 +266,43 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
                     </div>
                 ) : null}
                 actions={
-                    <>
-                        <Button
-                            onClick={handleInstall}
-                            variant="ghost"
-                            size="sm"
+                    <div className="flex items-center gap-3">
+                        <SplitButton
                             disabled={isTestRunning && !allowActionsDuringTest}
-                            className="bg-on-success-container/10/10 hover:bg-on-success-container/10/20 text-success border border-on-success-container/10/20"
-                            title={t('apps.actions.install')}
-                            leftIcon={<Upload size={14} />}
-                        >
-                            <span className="text-xs font-semibold hidden lg:inline">{t('apps.actions.install')}</span>
-                        </Button>
-                    </>
+                            variant="primary"
+                            primaryAction={{
+                                label: t('apps.actions.install', 'Install APK'),
+                                onClick: handleInstall,
+                                icon: <Upload size={14} />
+                            }}
+                            secondaryActions={[
+                                {
+                                    label: t('apps.actions.allow_downgrade', 'Downgrade (-d)'),
+                                    type: 'checkbox',
+                                    checked: downgrade,
+                                    onClick: () => setDowngrade(prev => !prev)
+                                },
+                                {
+                                    label: t('apps.actions.grant_permissions', 'Grant Permissions (-g)'),
+                                    type: 'checkbox',
+                                    checked: grantPermissions,
+                                    onClick: () => setGrantPermissions(prev => !prev)
+                                },
+                                {
+                                    label: t('apps.actions.allow_test', 'Allow Test APKs (-t)'),
+                                    type: 'checkbox',
+                                    checked: allowTest,
+                                    onClick: () => setAllowTest(prev => !prev)
+                                },
+                                {
+                                    label: t('apps.actions.install_sdcard', 'Install to SD Card (-s)'),
+                                    type: 'checkbox',
+                                    checked: installSdcard,
+                                    onClick: () => setInstallSdcard(prev => !prev)
+                                }
+                            ]}
+                        />
+                    </div>
                 }
             />
 

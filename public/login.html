@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Robot Runner - Autenticação</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <style>
+        body {
+            background: #0f172a;
+            color: #f8fafc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+        .card {
+            background: rgba(30, 41, 59, 0.7);
+            padding: 2.5rem;
+            border-radius: 1.5rem;
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            backdrop-filter: blur(12px);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+        h1 { margin: 0 0 0.5rem 0; font-size: 1.5rem; color: #38bdf8; }
+        p { color: #94a3b8; font-size: 0.875rem; line-height: 1.5; margin-bottom: 1.5rem; }
+        .spinner {
+            border: 3px solid rgba(56, 189, 248, 0.1);
+            border-top: 3px solid #38bdf8;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            animation: spin 1s linear infinite;
+            margin: 1.5rem auto;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .error { color: #ef4444; font-weight: bold; }
+        
+        .btn {
+            background: #38bdf8;
+            color: #0f172a;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1rem;
+            width: 100%;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        .btn:hover { background: #7dd3fc; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(56, 189, 248, 0.3); }
+        .btn:active { transform: translateY(0); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1 id="status">Robot Runner</h1>
+        <p id="sub">Clique abaixo para entrar com sua conta Google de forma segura.</p>
+        
+        <div id="loader" class="spinner" style="display: none;"></div>
+        
+        <button id="loginBtn" class="btn">
+            <svg style="width:18px;height:18px" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M21.35,11.1H12.18V13.83H18.69C18.36,17.64 15.19,19.27 12.19,19.27C9.03,19.27 6.59,17.38 6.59,13.33C6.59,9.28 9.03,7.39 12.19,7.39C14.85,7.39 16.59,8.96 16.59,8.96L18.46,6.97C18.46,6.97 15.82,4.62 12.19,4.62C6.73,4.62 3.74,8.74 3.74,13.33C3.74,17.92 6.73,22.04 12.19,22.04C18.36,22.04 21.35,17.31 21.35,12.43C21.35,11.83 21.35,11.1 21.35,11.1Z" />
+            </svg>
+            Entrar com Google
+        </button>
+    </div>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const port = params.get('port');
+        const apiKey = params.get('apiKey');
+        const projectID = window.location.hostname.split('.')[0];
+
+        const loginBtn = document.getElementById('loginBtn');
+        const loader = document.getElementById('loader');
+        const statusText = document.getElementById('status');
+        const subText = document.getElementById('sub');
+
+        if (!port || !apiKey) {
+            statusText.innerText = 'Parâmetros Inválidos';
+            subText.innerText = 'Esta página deve ser aberta pelo aplicativo Robot Runner.';
+            loginBtn.style.display = 'none';
+        } else {
+            const config = {
+                apiKey: apiKey,
+                authDomain: window.location.hostname,
+                projectId: projectID
+            };
+            
+            firebase.initializeApp(config);
+            const provider = new firebase.auth.GoogleAuthProvider();
+            
+            loginBtn.onclick = () => {
+                loginBtn.disabled = true;
+                loginBtn.style.display = 'none';
+                loader.style.display = 'block';
+                statusText.innerText = 'Autenticando...';
+                subText.innerText = 'Verifique a janela de login do Google.';
+
+                firebase.auth().signInWithPopup(provider).then(async (result) => {
+                    statusText.innerText = 'Sucesso!';
+                    subText.innerText = 'Retornando ao aplicativo...';
+                    
+                    // Get the Google ID Token from the credential, not the Firebase token
+                    const token = result.credential.idToken;
+                    window.location.href = `http://127.0.0.1:${port}/?code=${token}`;
+                }).catch(err => {
+                    console.error(err);
+                    statusText.innerText = 'Erro';
+                    statusText.className = 'error';
+                    subText.innerText = err.message;
+                    loader.style.display = 'none';
+                    loginBtn.style.display = 'flex';
+                    loginBtn.disabled = false;
+                });
+            };
+        }
+    </script>
+</body>
+</html>

@@ -1,7 +1,7 @@
 import { useMemo, memo } from "react";
 import { motion } from "framer-motion";
 
-const ExpressiveLoadingComponent = ({ size = "md", className, variant = "linear" }: { size?: "xsm" | "sm" | "md" | "lg", className?: string, variant?: "linear" | "circular" }) => {
+const ExpressiveLoadingComponent = ({ size = "md", className, variant = "linear" }: { size?: "xsm" | "sm" | "md" | "lg", className?: string, variant?: "linear" | "circular" | "skeleton" }) => {
 
     const strokeWidthMap = {
         xsm: "2",
@@ -9,6 +9,20 @@ const ExpressiveLoadingComponent = ({ size = "md", className, variant = "linear"
         md: "4",
         lg: "5"
     };
+
+    if (variant === 'skeleton') {
+        const skeletonClass = {
+            xsm: "h-3 rounded-md",
+            sm: "h-5 rounded-lg",
+            md: "h-8 rounded-xl",
+            lg: "h-12 rounded-2xl"
+        };
+        return (
+            <div className={`relative overflow-hidden bg-surface-variant/20 ${skeletonClass[size]} ${className || ''}`}>
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent translate-x-[-100%] animate-[shimmer_1.6s_infinite] dark:via-white/10" />
+            </div>
+        );
+    }
 
     // Memoize circular path calculation
     const circularPath = useMemo(() => {

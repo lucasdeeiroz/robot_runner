@@ -10,6 +10,8 @@ interface SplitButtonAction {
     onClick: () => void;
     icon?: React.ReactNode;
     disabled?: boolean;
+    type?: 'button' | 'checkbox';
+    checked?: boolean;
 }
 
 interface SplitButtonProps {
@@ -70,11 +72,13 @@ export function SplitButton({ primaryAction, secondaryActions, className, disabl
     if (!disabled) {
         const allActions = [primaryAction, ...secondaryActions];
         const enabledActions = allActions.filter(a => !a.disabled);
+        const firstEnabledButtonIdx = enabledActions.findIndex(a => a.type !== 'checkbox');
 
-        if (enabledActions.length > 0) {
-            // Promote first enabled action to primary
-            effectivePrimary = enabledActions[0];
-            effectiveSecondaries = enabledActions.slice(1);
+        if (firstEnabledButtonIdx !== -1) {
+            effectivePrimary = enabledActions[firstEnabledButtonIdx];
+            effectiveSecondaries = enabledActions.filter((_, idx) => idx !== firstEnabledButtonIdx);
+        } else {
+            effectiveSecondaries = enabledActions.filter(a => a !== primaryAction);
         }
     }
 
@@ -133,23 +137,60 @@ export function SplitButton({ primaryAction, secondaryActions, className, disabl
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: -4, scale: 0.98 }}
                             transition={{ duration: 0.15, ease: "easeOut" }}
-                            className="fixed z-50 bg-surface border border-outline-variant/30 rounded-2xl shadow-lg py-1.5 overflow-hidden"
+                            className="fixed z-[200000] bg-surface border border-outline-variant/30 rounded-2xl shadow-lg py-1.5 overflow-hidden"
                             style={dropdownStyle}
                         >
-                            {effectiveSecondaries.map((action, idx) => (
-                                <button
-                                    key={idx}
-                                    onClick={() => {
-                                        action.onClick();
-                                        setIsOpen(false);
-                                    }}
-                                    disabled={action.disabled}
-                                    className="w-full text-left px-4 py-2 text-sm text-on-surface/90 hover:bg-primary/5 active:bg-primary/10 flex items-center gap-2.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {action.icon && <span className="text-on-surface-variant">{action.icon}</span>}
-                                    {action.label}
-                                </button>
-                            ))}
+                            {effectiveSecondaries.map((action, idx) => {
+                                if (action.type === 'checkbox') {
+                                    return (
+                                        <label
+                                            key={idx}
+                                            className={clsx(
+                                                "w-full text-left px-4 py-2 text-sm text-on-surface/90 hover:bg-primary/5 active:bg-primary/10 flex items-center gap-2.5 transition-colors cursor-pointer select-none",
+                                                action.disabled && "opacity-50 cursor-not-allowed pointer-events-none"
+                                            )}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={action.checked}
+                                                onChange={() => {
+                                                    if (!action.disabled) {
+                                                        action.onClick();
+                                                    }
+                                                }}
+                                                disabled={action.disabled}
+                                                className="hidden"
+                                            />
+                                            <div className={clsx(
+                                                "w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0",
+                                                action.checked
+                                                    ? "bg-primary border-primary text-on-primary"
+                                                    : "border-outline-variant/30"
+                                            )}>
+                                                {action.checked && <div className="w-2 h-2 bg-on-primary rounded-2xl" />}
+                                            </div>
+                                            {action.icon && <span className="text-on-surface-variant">{action.icon}</span>}
+                                            <span>{action.label}</span>
+                                        </label>
+                                    );
+                                }
+
+                                return (
+                                    <button
+                                        key={idx}
+                                        type="button"
+                                        onClick={() => {
+                                            action.onClick();
+                                            setIsOpen(false);
+                                        }}
+                                        disabled={action.disabled}
+                                        className="w-full text-left px-4 py-2 text-sm text-on-surface/90 hover:bg-primary/5 active:bg-primary/10 flex items-center gap-2.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {action.icon && <span className="text-on-surface-variant">{action.icon}</span>}
+                                        {action.label}
+                                    </button>
+                                );
+                            })}
                         </motion.div>
                     )}
                 </AnimatePresence>

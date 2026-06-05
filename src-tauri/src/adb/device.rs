@@ -1,143 +1,149 @@
-use crate::cmd_utils::new_tokio_command;
+use crate::cmd_utils::{new_tokio_command, get_adb_program};
 use serde::{Deserialize, Serialize};
+use tauri::AppHandle;
+use crate::adb::stats::{parse_battery_info, parse_mem_info};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Device {
     pub udid: String,
     pub model: String,
     pub state: String, // "device", "offline", "unauthorized"
-    pub product: String,
-    pub transport_id: String,
     pub android_version: Option<String>,
     pub battery_level: Option<u8>,
     pub ram_total: Option<u64>,
     pub ram_used: Option<u64>,
+    pub storage_total: Option<u64>,
+    pub storage_used: Option<u64>,
 }
 
-use crate::errors::{AppError, AppResult};
-
 #[tauri::command]
-pub async fn get_connected_devices() -> AppResult<Vec<Device>> {
-    let mut cmd = new_tokio_command("adb");
-    cmd.args(&["devices", "-l"]);
+pub async fn get_connected_devices(app: AppHandle) -> Result<Vec<Device>, String> {
+    let program = get_adb_program(&app);
+    let mut cmd = new_tokio_command(&program);
+    cmd.arg("devices");
 
     let output = cmd
         .output()
         .await
-        .map_err(|e| AppError::AdbError(format!("Failed to execute adb: {}", e)))?;
-
-    if !output.status.success() {
-        return Err(AppError::AdbError(
-            String::from_utf8_lossy(&output.stderr).to_string(),
-        ));
-    }
+        .map_err(|e| format!("Failed to run {}: {}", program, e))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let mut device_tasks = Vec::new();
 
-    for line in stdout.lines().skip(1) {
-        if line.trim().is_empty() {
+    for line in stdout.lines() {
+        if line.is_empty() || line.starts_with("List of devices") {
             continue;
         }
 
         let parts: Vec<&str> = line.split_whitespace().collect();
-        if parts.len() < 2 {
-            continue;
-        }
+        if parts.len() >= 2 {
+            let udid = parts[0].to_string();
+            let state = parts[1].to_string();
 
-        let udid = parts[0].to_string();
-        let state = parts[1].to_string();
+            if state != "device" {
+                device_tasks.push(tokio::spawn(async move {
+                    Device {
+                        udid,
+                        model: "Unknown".to_string(),
+                        state,
+                        android_version: None,
+                        battery_level: None,
+                        ram_total: None,
+                        ram_used: None,
+                        storage_total: None,
+                        storage_used: None,
+                    }
+                }));
+                continue;
+            }
 
-        if state == "device" {
+            let app_clone = app.clone();
             device_tasks.push(tokio::spawn(async move {
-                let udid_clone = udid.clone();
+                let program = get_adb_program(&app_clone);
                 
-                // Fetch model
-                let model_task = tokio::spawn(async move {
-                    let mut cmd = new_tokio_command("adb");
-                    cmd.args(&["-s", &udid_clone, "shell", "getprop", "ro.product.model"]);
-                    cmd.output().await
-                });
+                // Get model
+                let model = {
+                    let mut cmd = new_tokio_command(&program);
+                    cmd.args(&["-s", &udid, "shell", "getprop", "ro.product.model"]);
+                    let output = cmd.output().await;
+                    if let Ok(o) = output {
+                        String::from_utf8_lossy(&o.stdout).trim().to_string()
+                    } else {
+                        "Unknown".to_string()
+                    }
+                };
 
-                let udid_clone2 = udid.clone();
-                // Fetch Android version
-                let ver_task = tokio::spawn(async move {
-                    let mut cmd = new_tokio_command("adb");
-                    cmd.args(&["-s", &udid_clone2, "shell", "getprop", "ro.build.version.release"]);
-                    cmd.output().await
-                });
+                // Get Android version
+                let version = {
+                    let mut cmd = new_tokio_command(&program);
+                    cmd.args(&["-s", &udid, "shell", "getprop", "ro.build.version.release"]);
+                    let output = cmd.output().await;
+                    if let Ok(o) = output {
+                        Some(String::from_utf8_lossy(&o.stdout).trim().to_string())
+                    } else {
+                        None
+                    }
+                };
 
-                let udid_clone3 = udid.clone();
-                // Fetch Battery level
-                let battery_task = tokio::spawn(async move {
-                    let mut cmd = new_tokio_command("adb");
-                    cmd.args(&["-s", &udid_clone3, "shell", "dumpsys", "battery"]);
-                    cmd.output().await
-                });
+                // Get Battery
+                let battery = {
+                    let mut cmd = new_tokio_command(&program);
+                    cmd.args(&["-s", &udid, "shell", "dumpsys", "battery"]);
+                    let output = cmd.output().await;
+                    if let Ok(o) = output {
+                        parse_battery_info(&String::from_utf8_lossy(&o.stdout)).map(|(lvl, _)| lvl)
+                    } else {
+                        None
+                    }
+                };
 
-                let udid_clone4 = udid.clone();
-                // Fetch Mem info
-                let mem_task = tokio::spawn(async move {
-                    let mut cmd = new_tokio_command("adb");
-                    cmd.args(&["-s", &udid_clone4, "shell", "cat", "/proc/meminfo"]);
-                    cmd.output().await
-                });
+                // Get RAM
+                let (ram_t, ram_u) = {
+                    let mut cmd = new_tokio_command(&program);
+                    cmd.args(&["-s", &udid, "shell", "cat", "/proc/meminfo"]);
+                    let output = cmd.output().await;
+                    if let Ok(o) = output {
+                        parse_mem_info(&String::from_utf8_lossy(&o.stdout)).unwrap_or((0, 0))
+                    } else {
+                        (0, 0)
+                    }
+                };
 
-                let model_res = model_task.await;
-                let ver_res = ver_task.await;
-                let bat_res = battery_task.await;
-                let mem_res = mem_task.await;
-
-                let model = model_res.ok()
-                    .and_then(|r| r.ok())
-                    .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
-                    .unwrap_or_else(|| "Unknown".to_string());
-
-                let android_version = ver_res.ok()
-                    .and_then(|r| r.ok())
-                    .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string());
-
-                let battery_level = bat_res.ok()
-                    .and_then(|r| r.ok())
-                    .and_then(|o| {
-                        let s = String::from_utf8_lossy(&o.stdout).to_string();
-                        crate::adb::stats::parse_battery_info(&s)
-                    })
-                    .map(|(level, _)| level);
-
-                let (ram_total, ram_used) = mem_res.ok()
-                    .and_then(|r| r.ok())
-                    .and_then(|o| {
-                        let s = String::from_utf8_lossy(&o.stdout).to_string();
-                        crate::adb::stats::parse_mem_info(&s)
-                    })
-                    .map(|(t, u)| (Some(t), Some(u)))
-                    .unwrap_or((None, None));
+                // Get Storage
+                let (storage_t, storage_u) = {
+                    let mut cmd = new_tokio_command(&program);
+                    cmd.args(&["-s", &udid, "shell", "df", "-k", "/data"]);
+                    let output = cmd.output().await;
+                    if let Ok(o) = output {
+                        let stdout = String::from_utf8_lossy(&o.stdout);
+                        let mut found = None;
+                        for line in stdout.lines() {
+                            if line.contains("/data") {
+                                let parts: Vec<&str> = line.split_whitespace().collect();
+                                if parts.len() >= 3 {
+                                    if let (Ok(total), Ok(used)) = (parts[1].parse::<u64>(), parts[2].parse::<u64>()) {
+                                        found = Some((total, used));
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        found.unwrap_or((0, 0))
+                    } else {
+                        (0, 0)
+                    }
+                };
 
                 Device {
                     udid,
                     model,
-                    state: "device".to_string(),
-                    product: "".to_string(),
-                    transport_id: "".to_string(),
-                    android_version,
-                    battery_level,
-                    ram_total,
-                    ram_used,
-                }
-            }));
-        } else {
-            device_tasks.push(tokio::spawn(async move {
-                Device {
-                    udid,
-                    model: "Unknown".to_string(),
                     state,
-                    product: "".to_string(),
-                    transport_id: "".to_string(),
-                    android_version: None,
-                    battery_level: None,
-                    ram_total: None,
-                    ram_used: None,
+                    android_version: version,
+                    battery_level: battery,
+                    ram_total: if ram_t > 0 { Some(ram_t) } else { None },
+                    ram_used: if ram_u > 0 { Some(ram_u) } else { None },
+                    storage_total: if storage_t > 0 { Some(storage_t) } else { None },
+                    storage_used: if storage_u > 0 { Some(storage_u) } else { None },
                 }
             }));
         }

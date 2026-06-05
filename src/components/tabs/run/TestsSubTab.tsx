@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { Play, FolderOpen, FileText, FileCode, History, ChartNoAxesGantt, X, Settings2, Info, Settings } from "lucide-react";
@@ -13,9 +13,11 @@ import { TabBar } from "@/components/organisms/TabBar";
 import { WarningModal } from "@/components/organisms/WarningModal";
 import { feedback } from "@/lib/feedback";
 import { Button } from "@/components/atoms/Button";
+import { AiButton } from "@/components/atoms/AiButton";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 import { useSelection, SelectionItem } from "@/lib/selectionStore";
 import { SelectionCounter } from "@/components/molecules/SelectionCounter";
+import { useRemoteConfig } from '@/lib/RemoteConfigProvider';
 
 interface TestsSubTabProps {
     selectedDevices: string[];
@@ -26,6 +28,7 @@ interface TestsSubTabProps {
 type SelectionMode = 'file' | 'folder' | 'args';
 
 export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTabProps) {
+    const { settings, updateSetting, is_test_mode } = useSettings();
     const { t } = useTranslation();
     const [mode, setMode] = useState<SelectionMode>('file');
     const [launchStatus, setLaunchStatus] = useState("");
@@ -50,6 +53,24 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
         type: 'test'
     });
 
+    // Remotaconfig
+    const hasApiKey = useMemo(() => {
+        const provider = settings.aiProvider || 'gemini';
+        if (provider === 'gemini') return !!settings.geminiApiKey;
+        if (provider === 'claude') return !!settings.claudeApiKey;
+        if (provider === 'openai') return !!settings.openaiApiKey;
+        if (provider === 'claude-code' || provider === 'antigravity-cli') return true;
+        return false;
+    }, [settings.aiProvider, settings.geminiApiKey, settings.claudeApiKey, settings.openaiApiKey]);
+
+    const remoteConfig = useRemoteConfig() as {
+        isFeatureEnabled?: (featureKey: string) => boolean;
+        features?: Record<string, boolean>;
+    };
+    const isFeatureEnabled = remoteConfig.isFeatureEnabled ?? ((featureKey: string) => !!remoteConfig.features?.[featureKey]);
+    const isAiEnabled = isFeatureEnabled('is_ai_analysis_enabled');
+    const isAiTestModeEnabled = isFeatureEnabled('is_ai_test_mode_enabled');
+
     const handleOpenTestSelector = async (path: string) => {
         const existingItem = items.find(i => i.path === path);
         setSelectorState({
@@ -73,6 +94,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
             setSelectorState(prev => ({ ...prev, isOpen: false, isLoading: false }));
         }
     };
+
 
     const handleOpenArgSelector = async (path: string) => {
         const existingItem = items.find(i => i.path === path);
@@ -117,11 +139,34 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
         return () => observer.disconnect();
     }, []);
 
-    const { settings, updateSetting } = useSettings();
-    const { addSession, sessions } = useTestSessions();
+    const { addSession, sessions, addSessionLog } = useTestSessions();
 
-    const handleRun = async () => {
-        if (items.length === 0) return;
+    const handleRunRef = useRef<(() => Promise<void>) | null>(null);
+
+    useEffect(() => {
+        const onAiRunTest = () => {
+            console.log("TESTS_SUB_TAB: Received ai_run_test event!");
+            if (handleRunRef.current) {
+                console.log("TESTS_SUB_TAB: Calling handleRunRef.current()...");
+                handleRunRef.current();
+            } else {
+                console.error("TESTS_SUB_TAB: handleRunRef.current is null!");
+            }
+        };
+        window.addEventListener('ai_run_test', onAiRunTest);
+        return () => window.removeEventListener('ai_run_test', onAiRunTest);
+    }, []);
+
+    const handleRun = async (isAiAgent: boolean = false, aiPrompt?: string) => {
+        if (items.length === 0 && !isAiAgent) {
+            feedback.toast.raw.error(t('tests.toasts.no_items_selected', { defaultValue: 'No items selected to run.' }));
+            return;
+        }
+
+        if (selectedDevices.length === 0) {
+            feedback.toast.raw.error(t('tests.toasts.no_device_selected', { defaultValue: 'No device selected.' }));
+            // We'll let it continue because targets defaults to [null] later
+        }
 
         // Check for busy devices
         const busyDeviceIds = sessions.filter(s => s.status === 'running' && s.type === 'test').map(s => s.deviceUdid);
@@ -151,8 +196,9 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
         const fw = settings.automationFramework || 'robot';
 
         try {
-            // 1. Check/Start Appium (Skip for Maestro)
-            if (fw !== 'maestro') {
+            // 1. Check/Start Appium (Skip for Maestro, Cypress, Selenium, AI Agents, or if Robot is selected and noAppiumForRobot is enabled)
+            const skipAppium = fw === 'maestro' || fw === 'cypress' || fw === 'selenium' || isAiAgent || (fw === 'robot' && settings.noAppiumForRobot);
+            if (!skipAppium) {
                 const status = await invoke<{ running: boolean }>('get_appium_status', {
                     host: settings.appiumHost,
                     port: Number(settings.appiumPort),
@@ -204,20 +250,34 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
             for (const deviceUdid of targets) {
                 const runId = uuidv4();
                 const deviceObj = devices.find((d: Device) => d.udid === deviceUdid);
-                const devModel = deviceObj ? deviceObj.model.replace(/\s+/g, '') : "UnknownModel";
-                const devVer = deviceObj ? deviceObj.android_version || "0" : "0";
+                const isWebSession = is_test_mode === 'web';
 
-                let devName = deviceObj?.model || "Device";
-                if (deviceUdid && deviceUdid !== 'local') {
-                    devName = `${devName} (${deviceObj?.android_version ? `Android ${deviceObj.android_version}` : deviceUdid})`;
+                const devModel = isWebSession
+                    ? (deviceUdid || 'browser')
+                    : (deviceObj ? deviceObj.model.replace(/\s+/g, '') : "UnknownModel");
+                const devVer = isWebSession
+                    ? 'web'
+                    : (deviceObj ? deviceObj.android_version || "0" : "0");
+
+                let devName: string;
+                if (isWebSession) {
+                    devName = deviceUdid
+                        ? deviceUdid.charAt(0).toUpperCase() + deviceUdid.slice(1)
+                        : 'Browser';
                 } else {
-                    devName = "Local/Web";
+                    devName = deviceObj?.model || "Device";
+                    if (deviceUdid && deviceUdid !== 'local') {
+                        devName = `${devName} (${deviceObj?.android_version ? `Android ${deviceObj.android_version}` : deviceUdid})`;
+                    } else {
+                        devName = "Local/Web";
+                    }
                 }
 
                 // Determine suite name for UI and execution
                 const suiteName = selections.length === 1
                     ? selections[0].name.split('.')[0]
                     : (() => {
+                        if (selections.length === 0) return "AI_Exploration";
                         const baseNames = selections.map(s => (s.name || "Test").split('.')[0]);
                         const joined = baseNames.join('_');
                         const truncated = joined.length > 50 ? joined.substring(0, 50) + "..." : joined;
@@ -229,7 +289,9 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                 let finalArgsFile: string | null = null;
                 let finalTests: string[] | null = null;
 
-                if (selections.length === 1 && (selections[0].tests?.length || 0) === 0 && (selections[0].args?.length || 0) === 0) {
+                if (selections.length === 0) {
+                    // No tests selected, AI mode only. Proceed without .args.
+                } else if (selections.length === 1 && (selections[0].tests?.length || 0) === 0 && (selections[0].args?.length || 0) === 0) {
                     // Simple case: single path
                     if (selections[0].type === 'args') finalArgsFile = selections[0].path;
                     else finalTestPath = selections[0].path;
@@ -376,14 +438,25 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     deviceUdid || "local",
                     devName,
                     finalTestPath || finalArgsFile || suiteName,
-                    fw as 'robot' | 'maestro' | 'appium',
+                    fw as 'robot' | 'maestro' | 'appium' | 'cypress' | 'selenium',
                     settings.saveLogs,
                     logDir,
                     finalArgsFile,
                     devModel,
                     devVer,
-                    finalTests || undefined
+                    finalTests || undefined,
+                    isAiAgent,
+                    aiPrompt
                 );
+
+                if (isAiAgent) {
+                    // In AI Agent mode, we don't necessarily start a standard framework process yet.
+                    // We just let the RunConsole handle the autonomous loop.
+                    // However, we might want to emit a "start" log.
+                    addSessionLog(runId, `[System] AI Agent Mode Activated.`);
+                    addSessionLog(runId, `[System] Prompt: ${aiPrompt || 'Default'}`);
+                    continue;
+                }
 
                 if (fw === 'robot') {
                     invoke("run_robot_test", {
@@ -419,6 +492,28 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     }).catch(e => {
                         feedback.toast.error("tests.launch_failed", e);
                     });
+                } else if (fw === 'cypress') {
+                    invoke("run_cypress_test", {
+                        runId,
+                        testPath: finalTestPath,
+                        outputDir: logDir,
+                        browser: deviceUdid || 'chrome',
+                        cypressArgs: settings.tools.cypressArgs,
+                        workingDir
+                    }).catch(e => {
+                        feedback.toast.error("tests.launch_failed", e);
+                    });
+                } else if (fw === 'selenium') {
+                    invoke("run_selenium_test", {
+                        runId,
+                        testPath: finalTestPath,
+                        outputDir: logDir,
+                        browser: deviceUdid || 'chrome',
+                        seleniumArgs: settings.tools.seleniumArgs,
+                        workingDir
+                    }).catch(e => {
+                        feedback.toast.error("tests.launch_failed", e);
+                    });
                 }
             }
 
@@ -436,19 +531,36 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
         }
     };
 
+    handleRunRef.current = handleRun;
+
     const getInitialPath = () => {
         if (mode === 'args') return settings.paths.suites;
         return settings.paths.tests || ".";
     };
 
     const tabs = [
-        { id: 'file', label: !isNarrow ? t('tests.mode.file') : '', icon: FileCode },
+        {
+            id: 'file',
+            label: !isNarrow ? t('tests.mode.file') : '',
+            icon: FileCode,
+            tooltip: isNarrow ? t('tests.mode.file') : undefined,
+            tooltipPosition: 'left' as const
+        },
         {
             id: 'folder',
             label: !isNarrow ? (settings.automationFramework === 'appium' ? t('tests.mode.project') : t('tests.mode.folder')) : '',
-            icon: FolderOpen
+            icon: FolderOpen,
+            tooltip: isNarrow ? (settings.automationFramework === 'appium' ? t('tests.mode.project') : t('tests.mode.folder')) : undefined,
+            tooltipPosition: 'left' as const
         },
-        { id: 'args', label: !isNarrow ? t('tests.mode.args') : '', icon: FileText, disabled: settings.automationFramework && settings.automationFramework !== 'robot' },
+        {
+            id: 'args',
+            label: !isNarrow ? t('tests.mode.args') : '',
+            icon: FileText,
+            disabled: settings.automationFramework && settings.automationFramework !== 'robot',
+            tooltip: isNarrow ? t('tests.mode.args') : undefined,
+            tooltipPosition: 'left' as const
+        },
     ].filter(tab => {
         if (tab.id === 'args' && settings.automationFramework && settings.automationFramework !== 'robot') return false;
         if (tab.id === 'file' && settings.automationFramework === 'appium') return false;
@@ -558,8 +670,28 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     variant="pills"
                     orientation="vertical"
                     className={clsx("shrink-0 gap-6 justify-between", isNarrow ? "w-fit" : "w-48")}
+                    menus={
+                        <>
+                        <SelectionCounter/>
+                        <div className="mt-6 border-t border-outline-variant/30"/>
+                        </>
+                    }
                     actions={
                         <>
+                            {hasApiKey && isAiEnabled && isAiTestModeEnabled && (
+                                <AiButton
+                                    id="run_ai"
+                                    label={isLaunching ? launchStatus : (items.length === 0 ? t('tests.run_ai_prompt') : t('tests.run_ai'))}
+                                    onClick={(_e, prompt) => handleRun(true, prompt)}
+                                    disabled={selectedDevices.length === 0 || isLaunching}
+                                    variant="secondary"
+                                    className="w-full mt-4"
+                                    alwaysOpenModal
+                                    showTextAlways
+                                    allowCustomPrompt={false}
+                                    requireCustomPrompt={items.length === 0}
+                                />
+                            )}
                             <Button
                                 variant="secondary"
                                 onClick={() => updateSetting('saveLogs', !settings.saveLogs)}
@@ -585,10 +717,6 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                         </>
                     }
                 />
-            </div>
-
-            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
-                <SelectionCounter />
             </div>
 
             {selectorState.isOpen && createPortal(

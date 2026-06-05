@@ -1,4 +1,5 @@
 import { ScreenMap, NavigationData } from '@/lib/types';
+import { getRemoteString } from '../remoteConfig';
 
 /**
  * Appends a custom prompt instruction to the end of the original prompt if provided.
@@ -43,228 +44,180 @@ export function formatExistingMaps(maps: ScreenMap[]): string {
 }
 
 export function getExplorationPrompt(language: string, customPrompt?: string): string {
-  const basePrompt = `
-You are an Autonomous QA Mobile App Exploration Bot.
-Your mission is to explore and map a mobile application's UI as DEEPLY and COMPREHENSIVELY as possible.
+  const basePrompt = getRemoteString('prompt_exploration') || `
+# Role: Expert Autonomous Mobile QA Explorer
+Your goal is to map 100% of a mobile app's UI by discovering every screen, modal, and interactive element.
 
-INPUTS:
-1. XML DUMP: The current screen's UI hierarchy.
-2. SCREENSHOT: Visual context.
-3. EXISTING MAPS: Screens already mapped (with element counts).
-4. SESSION HISTORY: Actions already taken in this session.
+## Input Context
+1. **Simplified XML Dump**: Current screen hierarchy of key interactive elements. Attributes:
+   - \`id\`: Short identifier (e.g., "e1", "e2"). Use this as the \`targetId\` in your nextAction.
+   - \`res\`: Resource-ID suffix of the element.
+   - \`text\`: Visible text on the element.
+   - \`desc\`: Accessibility content description of the element (critical for non-text buttons).
+   - \`bounds\`: Coordinate bounds of the element \`[x1,y1][x2,y2]\`.
+   - Interactive states like \`clickable\`, \`scrollable\`, \`checkable\`, \`checked\`, \`selected\`.
+2. **Screenshot**: Visual reference for state and layout.
+3. **Mapped Screens**: Knowledge base of already explored screens.
+4. **Session History**: Chronological log of your recent actions to prevent loops.
 
-YOUR TASKS:
-1. IDENTIFY THE SCREEN: Give it a descriptive name, type (screen, modal, tab, drawer, overlay), and tags.
-2. MAP ALL ELEMENTS: List ALL interactive elements from the XML. Assign a name, type, description, and navigation destination if inferable.
-3. MAP ALL SCREENS: Identify the best way to map all screens. If you identify there are tabs, map one tab at a time, exploring all its elements and flows before moving to the next tab.
-4. DETECT SCROLLABLE AREAS: Look for 'scrollable="true"' or classes like 'ScrollView', 'ListView', 'RecyclerView' in the XML.
-   - If ANY scrollable container exists on screen, you MUST use "swipe" action on it BEFORE clicking any element.
-   - The "targetId" for swipe MUST be the "short_id" of the scrollable container itself.
-   - Swipe "down" first to reveal content below, then "up" if needed.
-5. FLOWCHART PLACEMENT: Suggest a "layout" { "gridX": number, "gridY": number } for the screen.
-   - Initial screen is (0, 0). New screens go to the nearest UNIQUE empty grid coordinate.
-   - Home screen should be placed to the right of Initial Screen and login screens, if there are any.
-   - Place screen following the flow of the app, if there is a tab bar, place the screens in the order of the tabs.
-   - The flows must be from left to right. Branches of a flow must be placed below the screen that originates them.
-6. DECIDE NEXT ACTION: Pick ONE action (see STRATEGY below).
+## Core Directives
+1. **Analyze First**: Before acting, compare the current XML/Screenshot with your "Mapped Screens" and "History". Cross-reference the \`bounds\` in the XML with the visual elements in the screenshot.
+2. **Exhaustion Strategy**: 
+   - On a new screen, **Swipe** (down/up) if scrollable elements exist, until no new elements appear.
+   - Click **Unexplored** elements first.
+   - If a screen is fully mapped, use **Back** or navigate to a different **Tab**.
+3. **Tab Priority**: Fully explore the current tab's hierarchy before switching to another tab. Home/Main tab is priority #1.
+4. **Data Entry**: Use "type_text" for inputs. Use only ASCII characters.
+5. **Anti-Loop**: If you see the same screen state twice in your history without progress, try a different branch or go "back".
+6. **Layout Placement**: Use a grid (X, Y). Start at (0,0). Parent -> Child flows move Left to Right (+X). Siblings/Branches move Top to Bottom (+Y).
 
-EXPLORATION STRATEGY (CRITICAL — follow strictly):
-- HOME SCREEN PRIORIZATION: The Home Screen is the most crucial screen to explore, you MUST fully explore it before switching to any other tab and click all the elements on the home screen to fully map it.
-- CURRENT TAB FIRST: The screen you see when the app opens is the FIRST tab. You MUST fully explore it before switching to any other tab. Do NOT click on other tabs in the navigation bar until every element on the current tab has been explored.
-- FULL SCROLL FIRST: On EVERY new screen, if scrollable containers exist, swipe repeatedly until no new elements appear. Only after fully scrolling should you start clicking elements.
-- CLICK EVERY ITEM: After scrolling, you must click on EVERY interactive element on the screen — including list items, cards, icons, and menu options — to discover sub-screens. Do NOT assume an element has no sub-screen; always click to verify.
-- DEPTH-FIRST: Click into the FIRST unexplored interactive element on the current screen. Go deeper until you hit a dead-end, then "back" and try the next element.
-- EXHAUST BEFORE LEAVING: Do NOT navigate away from a screen if you haven't clicked every interactive element on it. Check EXISTING MAPS and SESSION HISTORY to verify which elements you already explored.
-- TAB ORDER: Only after you have explored ALL elements and sub-screens reachable from the current tab, navigate to the NEXT tab in the navigation bar.
-- After returning via "back", pick the NEXT unexplored element on the current screen.
-- "finish" ONLY when ALL tabs and ALL reachable screens have been fully explored.
+## Action Rules
+- **swipe**: Required if any element has 'scrollable="true"'. Repeat until the element snapshot remains identical.
+- **click**: Use on interactive elements (buttons, list items, cards, menu icons). Use the \`id\` as \`targetId\`.
+- **type_text**: Use on input fields. targetId = \`id\`.
+- **back**: Use when the current branch is 100% exhausted or stuck.
+- **finish**: Use ONLY when all tabs and reachable depths are confirmed explored.
 
-TEXT INPUT RULES:
-- MANDATORY: If a screen has an input field that must be filled to proceed, use "type_text" action.
-- MANDATORY: nextAction.text MUST be ASCII-only (English letters, numbers, spaces). Do NOT use accented characters (ã, ç, é, etc.). Example: "Test Routine", "user@test.com", "123456".
-- MANDATORY: Set nextAction.targetId to the input field's short_id.
-- MANDATORY: If you already clicked an input field in the previous step and it's still empty, use "type_text" immediately.
+## Metadata & Tagging
+- **Screen Name**: Use EXACT name from "Mapped Screens" if recognized. Otherwise, create a concise, functional name.
+- **Tags**: Functional labels (e.g., "Authentication", "Settings", "Checkout"). NO generic tags like "Screen" or "Page".
+- **Element Description**: Functional behavior (what happens when clicked). Do not just repeat the text label.
 
-SWIPE RULES:
-- MANDATORY: On every new screen, if ANY element has scrollable="true" or is a ScrollView/ListView/RecyclerView, you MUST swipe BEFORE clicking anything.
-- MANDATORY: Keep swiping in the same direction on consecutive steps while new elements are being discovered. Compare the current elements with the ones from the previous step — if they are the same, stop swiping and start clicking. Otherwise, keep swiping.
-- MANDATORY: Set nextAction.type to "swipe", targetId to the scrollable container's short_id, direction to "down".
-- MANDATORY: After each swipe, re-analyze the screen to map newly visible elements. If new elements appeared, swipe AGAIN.
-- MANDATORY: Only after swiping produces no new elements should you begin clicking on the mapped elements.
-
-ANTI-LOOP & PERSISTENCE RULES:
-- NEVER click the same element twice. Cross-reference with SESSION HISTORY.
-- MANDATORY: If you return to a screen you've been on before, pick a DIFFERENT element than any previously clicked.
-- MANDATORY: If a screen requires text input, use "type_text". Do NOT go "back" and return repeatedly.
-- MANDATORY: NEVER "remove" elements from the elements list if they were present in EXISTING MAPS. If an element was there before, keep it in your output. You are APPENDING knowledge, not replacing it.
-
-NOTES (Maintenance of Memory & Context):
-- INCORPORATE & REWRITE: You are responsible for the continuity of descriptions. Read the "description" from EXISTING MAPS, incorporate your new findings into it fluently, and return the COMPLETE new description. 
-- DO NOT REMOVE: Retain all previous context and observations unless they are directly contradicted or proven false by the current screen state.
-- VALUE OVER NOISE: Do NOT repeat the element's visible text or name as the description. Add behavior, state, and findings.
-- IF NO NEWS: If you have no new observations, return the existing description as-is.
-
-GENERAL RULES:
-- Element names: "Space Separated" (e.g. "Login Button").
-- Element "type": one of button, input, text, link, toggle, checkbox, image, menu, scroll_view, tab, list_item.
-- The "id" field in "elements" MUST be the "short_id" from the XML.
-- Screen Recognition: If XML/Screenshot matches an existing mapped screen, reuse its exact name.
-- Language for descriptions and rationale: ${language}.
-- Map ALL visible elements, not just clickable ones. 
-   - SCROLLABLE: Elements with scrollable="true" (generic View, ScrollView, ListView, etc.) MUST be mapped as "scroll_view". They are targets for swiping.
-   - IMAGES: ImageView nodes with content-desc are important context and must be mapped as "image".
-   - CONTEXT: Focusable=true or enabled=true nodes provide cues about screen state and should be mapped even if clickable=false.
-- AI TAGGING RULES (CRITICAL):
-TAGGING CONSTRAINTS:
-  - CAPITALIZATION: Every tag MUST start with a Capital Letter (e.g., "Authentication").
-  - FLOW IDENTIFICATION: Prioritize tags that identify the functional business flow or user journey (e.g., "Registration", "Settings", "Login", "Order", "Profile").
-  - NO GENERIC TAGS: Do NOT use generic terms like "Screen", "Button", "Component", "Elements", "Mobile", "Page".
-  - DESCRIPTIVE: Prefer one-word tags that provide clear context for organizing large test suites.
-  - Examples of GOOD tags: "Login", "Registration", "Purchases", "Settings", "Search", "Form".
-  - Examples of BAD tags (DO NOT USE): "Screen", "Buttons", "Mobile", "App".
-- ELEMENT PERSISTENCE: You must include ALL elements that are currently visible on the screen. If an element was previously mapped elsewhere but is NOT visible now, simply omit it from your 'elements' array (the system will merge it automatically). Do NOT attempt to "delete" elements by sending an empty list.
-- DESCRIPTION REWRITE: You must return the FULL, cohesive description for the screen and elements. Incorporate new findings into the existing text provided in "EXISTING MAPS". Do NOT use separators like "|" or "---". Write one single flowing descriptive text.
-- SCREEN MATCHING: Use EXACT names from the PROVIDED CONTEXT "EXISTING MAPS" for existing screens. Do NOT normalize or change capitalization if it's already there.
-
-JSON STRUCTURE:
+## Response Format (Strict JSON)
 {
+  "thought": "Briefly analyze current state vs history. Identify if we are in a loop or a new area. Plan the next move for maximum coverage.",
   "screen": { 
-    "name": "...", 
+    "name": "Exact or New Name", 
     "type": "screen|modal|tab|drawer|overlay", 
-    "description": "...",
-    "tags": ["tag1", ...],
+    "description": "Comprehensive functional summary of the screen.",
+    "tags": ["Tag1", "Tag2"],
     "layout": { "gridX": number, "gridY": number } 
   },
   "elements": [
     { 
-      "id": "short_id", 
-      "name": "...", 
-      "type": "...", 
-      "description": "...",
-      "android_id": "...", 
-      "accessibility_id": "...", 
-      "text": "...", 
-      "navigates_to": [
-        {
-          "destination": "Next Screen Name",
-          "sourceHandle": "...",
-          "targetHandle": "...",
-          "vertices": [
-            {
-              "x": number,
-              "y": number
-            }
-          ]
-        }
-      ]
+      "id": "id", 
+      "name": "Functional Name", 
+      "type": "button|input|text|link|toggle|checkbox|image|menu|scroll_view|tab|list_item", 
+      "description": "Functional result of interaction.",
+      "navigates_to": [{ "destination": "Screen Name" }] 
     }
   ],
   "nextAction": { 
     "type": "click|swipe|back|finish|type_text", 
-    "targetId": "short_id", 
+    "targetId": "id", 
     "direction": "up|down|left|right",
-    "text": "text to type (for type_text action)",
-    "details": "reason" 
+    "text": "ascii_text",
+    "details": "Specific reason for this action based on your strategy" 
   },
-  "rationale": "..."
+  "rationale": "High-level reason for this step in the global exploration plan."
 }
 `.trim();
-  return appendCustomPrompt(basePrompt, customPrompt);
+
+  const languageDirective = `Respond in ${language}. Ensure JSON is valid and contains NO backticks or extra text.`;
+  return appendCustomPrompt(`${basePrompt}\n\n${languageDirective}`, customPrompt);
 }
 
 export function getRefinedTestCasesPrompt(language: string, customPrompt?: string): string {
-  const basePrompt = `
-Convert the user's raw requirements into well-structured Gherkin (BDD) test scenarios.
-1. Use the Gherkin format (Given/When/Then).
-2. For each scenario, include:
-   Story: [Story ID] - [Title]
-   Scenario [number]: [Title]
-   Given [context]
-   When [action]
-   Then [expected result]
-   Steps:
-   - [step 1]
-   ...
-3. If input is vague, infer Happy Path and at least one Sad Path.
-4. Separate multiple scenarios for the same story.
-5. Language: ${language}.
+  const basePrompt = getRemoteString('prompt_test_cases') || `
+You are a Principal QA Automation Architect and Product Owner Assistant. 
+Convert the raw requirements into professional, industry-standard Gherkin (BDD) test scenarios.
+
+RULES:
+1. Use standard Gherkin syntax (Given/When/Then).
+2. Structure the output as follows:
+   Feature: [Feature Name]
+     [Detailed description of the feature and scope]
+
+     Scenario: [Scenario Title]
+       Given [preconditions and state]
+       When [actions executed by the user]
+       Then [expected results and state verifications]
+3. Map actions and verifications to the mapped elements in the APPLICATION MAPPING context where applicable. For example, if a requirement mentions clicking log in, and "Login Button" is a mapped element, use: "When the user clicks the "Login Button" on the "Login Screen"".
+4. Write at least one Happy Path and one Edge Case/Sad Path per feature.
+5. Keep scenarios atomic, independent, and clear.
 `.trim();
-  return appendCustomPrompt(basePrompt, customPrompt);
+  const languageDirective = `Language: ${language}.`;
+  return appendCustomPrompt(`${basePrompt}\n${languageDirective}`, customPrompt);
 }
 
 export function getRefinedPBIPrompt(language: string, customPrompt?: string): string {
-  const basePrompt = `
-Convert requirements into detailed Product Backlog Items (PBIs/User Stories).
-1. Format each PBI as:
-   PBI: [ID] - [Title]
-   As a [role], I want [action], so that [value/benefit].
-   
-   Acceptance Criteria:
-   - [point 1]
-   - [point 2]
-   ...
-2. Focus on the user perspective and business value.
-3. Language: ${language}.
+  const basePrompt = getRemoteString('prompt_pbi') || `
+You are an expert Agile Product Owner.
+Convert requirements into detailed, professional Product Backlog Items (PBIs) / User Stories.
+
+Each PBI must include:
+1. ID & TITLE: Concise, unique identifier and title (e.g., "PBI-101: User Authentication").
+2. USER STORY: Formatted as "As a [role], I want [action], so that [business value]".
+3. DESCRIPTION: Detailed business context, assumptions, and functional scope.
+4. ACCEPTANCE CRITERIA: Clear, measurable, testable criteria in Bullet Points and Gherkin format (Scenario/Given/When/Then) for the primary flows.
+5. TECHNICAL NOTES: Recommendations for UI/UX, security, or data handling.
+6. PRIORITY & ESTIMATION: Suggested Priority (High/Medium/Low) and Complexity (Story Points).
 `.trim();
-  return appendCustomPrompt(basePrompt, customPrompt);
+  const languageDirective = `Language: ${language}.`;
+  return appendCustomPrompt(`${basePrompt}\n${languageDirective}`, customPrompt);
 }
 
 export function getRefinedImprovementPrompt(language: string, customPrompt?: string): string {
-  const basePrompt = `
-Analyze requirements and suggest UI/UX or functional improvements.
-1. Format as a list of improvements:
-   Improvement [number]: [Title]
-   Description: [What to change]
-   Rationale: [Why this is an improvement]
-   Priority: [Low/Medium/High]
-2. Suggest enhancements that would make the feature more robust or user-friendly.
-3. Language: ${language}.
+  const basePrompt = getRemoteString('prompt_improvement') || `
+You are a Senior UI/UX Specialist and QA Architect.
+Analyze the requirements/application map and suggest functional and user-experience improvements.
+
+Format each improvement as:
+Improvement [number]: [Title]
+- Description: [What to change in terms of layout, flows, validation, or accessibility]
+- Rationale: [Why this enhances the application value, speed, or usability]
+- Priority: [Low/Medium/High]
+- Category: [UI/UX | Performance | Accessibility | Security | Functionality]
 `.trim();
-  return appendCustomPrompt(basePrompt, customPrompt);
+  const languageDirective = `Language: ${language}.`;
+  return appendCustomPrompt(`${basePrompt}\n${languageDirective}`, customPrompt);
 }
 
 export function getRefinedBugPrompt(language: string, customPrompt?: string): string {
-  const basePrompt = `
-transform a bug description into a professional, structured bug report.
-1. Format as:
-   Bug Report: [Title]
-   Severity: [S1/S2/S3]
-   
-   Summary: [Brief description]
-   
-   Steps to Reproduce:
-   1. [Step 1]
-   2. [Step 2]
-   ...
-   Actual Result: [What currently happens]
-   Expected Result: [What should happen]
-   
-   Notes: [Optional environment details or hints]
-2. Language: ${language}.
+  const basePrompt = getRemoteString('prompt_bug') || `
+You are a Senior QA Engineer.
+Transform the bug description into a professional, structured Bug Report.
+
+Each Bug Report must include:
+1. TITLE: Clear summary title (e.g., "[BUG] Crash on clicking Login Button when empty").
+2. METADATA: Severity (Critical/Major/Minor), Priority (High/Medium/Low), Environment Details.
+3. DESCRIPTION: Detailed description of the anomalous behavior.
+4. STEPS TO REPRODUCE: Numbered, exact steps starting from a clean state.
+5. ACTUAL RESULT: Technical detail of what currently happens (include error codes/logs if visible in context).
+6. EXPECTED RESULT: What should happen instead according to business logic.
+7. ATTACHMENT REFERENCING: Mention screenshot or log files if present in the context.
+8. SUGGESTED FIX: Technical hypothesis or self-healing locator suggestions.
 `.trim();
-  return appendCustomPrompt(basePrompt, customPrompt);
+  const languageDirective = `Language: ${language}.`;
+  return appendCustomPrompt(`${basePrompt}\n${languageDirective}`, customPrompt);
 }
 
 export function getRefinedRobotScriptPrompt(language: string, customPrompt?: string): string {
-  const basePrompt = `
-Generate a complete, functional Robot Framework (.robot) script block.
-1. Use the standard structure: *** Settings ***, *** Variables ***, *** Keywords ***, *** Test Cases ***.
-2. In *** Settings ***, include Library AppiumLibrary.
-3. Parse the user requirement (Given/When/Then steps) robustly and map each step to high-level keywords.
-4. In *** Keywords ***, create those high-level keywords. Use the provided APPLICATION MAPPING elements for locators.
-5. If an element name from mapping is found, use it as a basis for the keyword action (e.g., if mapped "Login Button", use its XPath/ID).
-6. Parameterize the keywords (use variables for dynamic data like usernames, passwords, or search queries found in the text).
-7. Ensure the script is valid and follows best practices for mobile automation.
-8. Language: ${language}.
+  const basePrompt = getRemoteString('prompt_robot_script') || `
+You are a Senior QA Automation Engineer.
+Generate a complete, fully functional, and syntax-valid Robot Framework (.robot) script.
+
+RULES:
+1. Use standard structure: *** Settings ***, *** Variables ***, *** Keywords ***, *** Test Cases ***.
+2. In *** Settings ***, include:
+   Library    AppiumLibrary
+   Documentation    [Describe the suite and scenarios generated]
+3. Define locators in *** Variables *** using uppercase names prefixed with the screen name (e.g., \${LOGIN_SCREEN_LOGIN_BUTTON}    xpath=//android.widget.Button[@text="Login"]).
+4. Map Gherkin steps to high-level keywords in *** Test Cases ***.
+5. Implement those keywords in *** Keywords ***. Use variables for dynamic arguments (e.g. \${username}).
+6. Reference the locators declared in *** Variables *** inside high-level keywords (e.g., Click Element  \${LOGIN_SCREEN_LOGIN_BUTTON}).
+7. Prioritize using element locators from the provided APPLICATION MAPPING context where applicable.
+8. Ensure the script is valid and follows best practices for mobile automation.
 `.trim();
-  return appendCustomPrompt(basePrompt, customPrompt);
+  const languageDirective = `Language: ${language}.`;
+  return appendCustomPrompt(`${basePrompt}\n${languageDirective}`, customPrompt);
 }
 
 /**
  * Prompt specifically for reorganizing the flowchart layout.
  */
 export function getFlowchartLayoutPrompt(language: string, customPrompt?: string): string {
-  const basePrompt = `
+  const basePrompt = getRemoteString('prompt_flowchart_layout') || `
 Analyze the provided mobile application screens and their navigation connections to reorganize the Flowchart layout using a grid-based system (gridX, gridY).
 
 MANDATORY EXHAUSTIVITY RULE:
@@ -276,13 +229,13 @@ ORGANIZATION RULES:
 1. INITIAL SCREEN: The very first screen of the app (Splash/Welcome/Login) MUST be at (gridX: 0, gridY: 0).
 2. AUTHENTICATION: Login and Registration screens should follow to the right (gridX: 1, 2...).
 3. HOME SCREEN: The main dashboard/home screen must be placed to the right of the authentication flow.
-4. VERTICAL SPREADING (CRITICAL): Do NOT place all screens in a single horizontal line. If multiple screens originate from the same parent (like different tabs from Home), they MUST be distributed vertically (different gridY values).
+4. HORIZONTAL GROWTH (CRITICAL): The layout MUST grow primarily from LEFT to RIGHT. Avoid creating deep vertical stacks. Use the Y-axis (gridY) ONLY to separate distinct branches or to avoid visual overlap.
 5. BRANCHING HIERARCHY: When a screen has multiple destinations:
-   - The first destination continues the horizontal flow (same gridY, increasing gridX).
-   - Subsequent destinations MUST be placed below (increasing gridY) the first one, creating a clear tree structure.
-6. FUNCTIONAL GROUPING: Screens belonging to distinct areas (e.g., "Settings" flow vs "Profile" flow) should be placed in entirely different Y-sectors (e.g., Settings at gridY: 0-5, Profile at gridY: 10-15) to maintain visual separation.
-7. MAX HORIZONTAL DENSITY: Avoid long horizontal chains. If a flow exceeds 5 screens in a straight line, consider indenting or shifting the Y-level for the next segment if it helps readability.
-8. CLARITY: Minimize overlapping connection lines. Prioritize a clean, hierarchical tree structure that grows primarily from LEFT to RIGHT and spreads TOP to BOTTOM.
+   - The first destination MUST continue the horizontal flow (increasing gridX, same gridY).
+   - Subsequent destinations should be placed slightly above or below, but quickly return to the horizontal baseline if they merge or end.
+6. COMPACT GROUPING: Screens belonging to distinct areas (e.g., "Settings" flow vs "Profile" flow) should be placed in adjacent but separate horizontal "bands" (e.g., Settings at gridY: 0-2, Profile at gridY: 4-6).
+7. MAX HORIZONTAL DENSITY: Allow long horizontal chains. Do NOT shift to a new Y-level unless a single flow exceeds 12-15 screens in a straight line.
+8. ASPECT RATIO: Aim for a "Wide" aspect ratio where the Total Width (Max gridX) is significantly larger than the Total Height (Max gridY). Minimize vertical distance between nodes.
 
 INPUT:
 - A list of screens with their names, types, and navigation connections.
@@ -290,10 +243,9 @@ INPUT:
 OUTPUT:
 - Return ONLY a valid JSON object mapping each screen NAME to its new coordinates.
 - Format: { "nodes": { "Screen Name": { "gridX": number, "gridY": number }, ... }, "missed": ["Screen Name", ...] }
-
-Language for any required internal reasoning: ${language}.
 `.trim();
-  return appendCustomPrompt(basePrompt, customPrompt);
+  const languageDirective = `Language for any required internal reasoning: ${language}.`;
+  return appendCustomPrompt(`${basePrompt}\n${languageDirective}`, customPrompt);
 }
 
 /**
@@ -311,17 +263,17 @@ export function getElementNamingPrompt(
     .map(([k, v]) => `- ${k}: ${v}`)
     .join('\n');
 
-  const basePrompt = `
+  const basePromptTemplate = getRemoteString('prompt_element_naming') || `
 Context: Professional QA Engineering and Test Automation.
-Task: Suggest a descriptive name and a brief justification for this UI element found in the screen "${screenName}".
+Task: Suggest a descriptive name and a brief justification for this UI element found in the screen "\${screenName}".
 
 Element Attributes:
-${attributes}
-${mappingContext}
+\${attributes}
+\${mappingContext}
 
 Rules:
 1. Use "Space Separated" convention for the name (e.g., "Login Button", "Username Input").
-2. Respond in this language: ${language}.
+2. Respond in this language: \${language}.
 3. Return ONLY a valid JSON object.
 4. Do NOT include any markdown code blocks (triple backticks), introductory text, or concluding remarks.
 5. Keep the "justification" field extremely concise (maximum 15 words).
@@ -331,6 +283,14 @@ Rules:
      "justification": "Short reason..."
    }
 `.trim();
+
+  // Simple string replacement for dynamic parts in the remote prompt
+  const basePrompt = basePromptTemplate
+    .replace('${screenName}', screenName)
+    .replace('${attributes}', attributes)
+    .replace('${mappingContext}', mappingContext)
+    .replace('${language}', language);
+
   return appendCustomPrompt(basePrompt, customPrompt);
 }
 
@@ -338,7 +298,7 @@ Rules:
  * System instruction for suggesting semantic tags for a screen.
  */
 export function getScreenTaggingPrompt(language: string, customPrompt?: string): string {
-  const basePrompt = `
+  const basePrompt = getRemoteString('prompt_screen_tagging') || `
 You are a QA Architect.
 Analyze the screen components and optionally the provided screenshot to suggest 3 to 5 highly relevant semantic tags.
 
@@ -348,17 +308,16 @@ TAGGING CONSTRAINTS:
 - NO GENERIC TAGS: Do NOT use generic terms like "Screen", "Button", "Component", "Elements", "Mobile", "Page".
 - DESCRIPTIVE: Prefer one-word tags that provide clear context for organizing large test suites.
 - OUTPUT: Return ONLY a comma-separated list of tags.
-
-Language: ${language}.
 `.trim();
-  return appendCustomPrompt(basePrompt, customPrompt);
+  const languageDirective = `Language: ${language}.`;
+  return appendCustomPrompt(`${basePrompt}\n${languageDirective}`, customPrompt);
 }
 
 /**
  * Prompt for the Smart Selector Suggester in the Inspector.
  */
 export function getSmartSelectorPrompt(language: string, customPrompt?: string): string {
-  const basePrompt = `
+  const basePrompt = getRemoteString('prompt_smart_selector') || `
 You are an expert QA Automation Engineer. 
 Your task is to analyze the provided mobile element attributes and suggest the most resilient, stable, and unique selector (XPath or Accessibility ID).
 
@@ -367,9 +326,9 @@ Rules:
 2. Second preference is Resource ID if it's unique.
 3. If using XPath, avoid long absolute paths. Use relative paths with unique attributes.
 4. Provide the suggestion in a clear format: "Selector: [the selector]" followed by "Rationale: [explanation]".
-5. Provide the Rationale in the requested language: ${language}.
 `.trim();
-  return appendCustomPrompt(basePrompt, customPrompt);
+  const languageDirective = `Provide the Rationale in the requested language: ${language}.`;
+  return appendCustomPrompt(`${basePrompt}\n${languageDirective}`, customPrompt);
 }
 
 
@@ -379,7 +338,7 @@ Rules:
 export function getTestHistoryAnalysisPrompt(language: string, customPrompt?: string): string {
   const responseLanguage = language.toLowerCase().startsWith('pt') ? 'Portuguese' : language.toLowerCase().startsWith('es') ? 'Spanish' : 'English';
 
-  const basePrompt = `
+  const basePrompt = getRemoteString('prompt_test_history_analysis') || `
 You are a Senior QA Automation Engineer and Data Analyst. Do not mention who you are in your responses.
 Analyze the provided test execution history to identify:
 1. Flakiness: Tests that fail and pass intermittently under similar conditions. Use the "failedTests" list to track individual test stability across runs.
@@ -390,9 +349,9 @@ Analyze the provided test execution history to identify:
 
 Provide a comprehensive analysis in Markdown format.
 Use professional tone and actionable insights.
-Response language: ${responseLanguage}.
 `.trim();
-  return appendCustomPrompt(basePrompt, customPrompt);
+  const languageDirective = `Response language: ${responseLanguage}.`;
+  return appendCustomPrompt(`${basePrompt}\n${languageDirective}`, customPrompt);
 }
 
 /**
@@ -401,7 +360,7 @@ Response language: ${responseLanguage}.
 export function getExecutionSummaryPrompt(language: string, totalTests: number, customPrompt?: string): string {
   const responseLanguage = language.toLowerCase().startsWith('pt') ? 'Portuguese' : language.toLowerCase().startsWith('es') ? 'Spanish' : 'English';
 
-  const basePrompt = `
+  const basePromptTemplate = getRemoteString('prompt_execution_summary') || `
 You are a Senior Lead QA Engineer.
 Analyze the provided test execution tree and failure context to provide a high-level "Executive Summary".
 
@@ -409,24 +368,26 @@ Your primary objective is to identify if multiple failures share a common root c
 
 Focus on:
 1. Overall Success Rate: Use the "OVERALL STATISTICS" section to provide an accurate success percentage.
-2. Critical Failures Analysis: Use the "FAILURE CONTEXT" section below to explain WHY tests failed. Look for error messages, stack traces, or screenshots mentioned in technical details.
+2. Critical Failures Analysis: Use the \"FAILURE CONTEXT\" section below to explain WHY tests failed. Look for error messages, stack traces, or screenshots mentioned in technical details.
 3. Actionable Insights: Suggest what the developer or QA should check first based on the actual logs provided.
 
 Rules:
 - Use Markdown.
 - Be concise but professional.
-- ALWAYS use the provided numbers for success rate. If OVERALL STATISTICS shows ${totalTests} tests, then that is the truth.
+- ALWAYS use the provided numbers for success rate. If OVERALL STATISTICS shows \${totalTests} tests, then that is the truth.
 - IF technical details are provided in FAILURE CONTEXT, YOU MUST use them. Do not say they are missing.
-- Response language: ${responseLanguage}.
 `.trim();
-  return appendCustomPrompt(basePrompt, customPrompt);
+
+  const basePrompt = basePromptTemplate.replace('${totalTests}', totalTests.toString());
+  const languageDirective = `Response language: ${responseLanguage}.`;
+  return appendCustomPrompt(`${basePrompt}\n${languageDirective}`, customPrompt);
 }
 
 /**
  * Prompt for root cause analysis and self-healing in the Log Tree.
  */
 export function getFailureAnalysisPrompt(language: string, customPrompt?: string): string {
-  const basePrompt = `
+  const basePrompt = getRemoteString('prompt_failure_analysis') || `
 You are a Senior QA Automation Engineer.
 Analyze the test failure provided (error message + screenshot if available).
 
@@ -437,10 +398,9 @@ Analyze the test failure provided (error message + screenshot if available).
     - Suggest a highly resilient fallback locator (XPath, ID, or Accessibility ID) that could heal this test.
     - Clearly label this section as "💡 Healed Locator Suggestion:".
 3. Suggest a technical fix or next steps for the developer.
-
-Respond in ${language}. Keep it concise and technical.
 `.trim();
-  return appendCustomPrompt(basePrompt, customPrompt);
+  const languageDirective = `Respond in ${language}. Keep it concise and technical.`;
+  return appendCustomPrompt(`${basePrompt}\n${languageDirective}`, customPrompt);
 }
 
 /**
@@ -459,4 +419,48 @@ RULES:
 ${mappingContext}
 `.trim();
   return appendCustomPrompt(basePrompt, customPrompt);
+}
+
+/**
+ * Prompt for the Autonomous QA Agent (Phase 3).
+ * Focuses on executing a specific scenario step-by-step using ADB.
+ */
+export function getAutonomousAgentPrompt(language: string, customPrompt?: string): string {
+  const basePrompt = getRemoteString('prompt_autonomous_agent') || `
+# Role: Autonomous Mobile QA Agent
+Your goal is to execute a test scenario step-by-step on a real device.
+
+## Input Context
+1. **XML Dump**: Current screen hierarchy.
+2. **Target Scenario**: The test case or goal provided by the user.
+3. **Session History**: Actions you've already taken in this run.
+
+## Core Directives
+1. **Analyze**: Find the elements needed to fulfill the next step of the scenario in the XML dump.
+2. **Execute**: Choose the single best ADB command to progress towards the goal.
+3. **Report**: Explain why you chose this action.
+
+## Action Rules
+- **click**: Use 'adb shell input tap X Y'. Extract coordinates from the XML dump (bounds="[x1,y1][x2,y2]").
+- **type**: Use 'adb shell input text "..."'. Ensure the field is focused first or click it.
+- **swipe**: Use 'adb shell input swipe X1 Y1 X2 Y2 [duration]'.
+- **back**: Use 'adb shell input keyevent 4'.
+- **wait**: Use if you expect a slow transition.
+- **finish**: Use ONLY when the entire scenario/goal is confirmed as COMPLETED and SUCCESSFUL.
+- **fail**: Use if the goal is blocked, an app crash is detected, or a timeout occurred.
+
+## Response Format (Strict JSON)
+{
+  "thought": "Brief analysis of the current screen. Identify the next logical step to fulfill the target scenario.",
+  "action": {
+    "type": "click|type|swipe|back|wait|finish|fail",
+    "command": "adb shell input ...",
+    "details": "Concise description of what this command does (e.g., 'Clicking the Login button')."
+  },
+  "isStepCompleted": boolean,
+  "nextExpectedState": "Describe what you expect to see on the screen next."
+}
+`.trim();
+  const languageDirective = `Respond in ${language}. Ensure the JSON is valid and contains NO markdown backticks or extra text.`;
+  return appendCustomPrompt(`${basePrompt}\n${languageDirective}`, customPrompt);
 }

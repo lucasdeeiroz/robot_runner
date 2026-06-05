@@ -11,12 +11,16 @@ import { twMerge } from 'tailwind-merge';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
+import { useRemoteConfig } from '@/lib/RemoteConfigProvider';
+
 interface AiButtonProps extends Omit<ButtonProps, 'leftIcon' | 'children' | 'onClick'> {
     id?: string;
     label?: string;
     expandable?: boolean;
     showTextAlways?: boolean;
     allowCustomPrompt?: boolean;
+    alwaysOpenModal?: boolean;
+    requireCustomPrompt?: boolean;
     onClick?: (e: React.MouseEvent<HTMLButtonElement>, customPrompt?: string) => void | Promise<void>;
 }
 
@@ -27,6 +31,8 @@ export const AiButton: React.FC<AiButtonProps> = ({
     expandable = true,
     showTextAlways = false,
     allowCustomPrompt = true,
+    alwaysOpenModal = false,
+    requireCustomPrompt = false,
     className,
     variant = 'primary',
     onClick,
@@ -77,6 +83,8 @@ export const AiButton: React.FC<AiButtonProps> = ({
         if (provider === 'gemini') return !!settings.geminiApiKey;
         if (provider === 'claude') return !!settings.claudeApiKey;
         if (provider === 'openai') return !!settings.openaiApiKey;
+        // CLI providers handle their own authentication, so we treat them as always "having" a key for visibility purposes
+        if (provider === 'claude-code' || provider === 'antigravity-cli') return true;
         return false;
     }, [settings.aiProvider, settings.geminiApiKey, settings.claudeApiKey, settings.openaiApiKey]);
 
@@ -108,14 +116,22 @@ export const AiButton: React.FC<AiButtonProps> = ({
         };
     }, [isDropdownOpen]);
 
-    if (!hasApiKey) return null;
+    const remoteConfig = useRemoteConfig();
+    const isAiEnabled = (remoteConfig as any)?.isFeatureEnabled?.('is_ai_analysis_enabled') ?? true;
+
+    // If AI is disabled via remote config, we hide.
+    if (!hasApiKey || !isAiEnabled) return null;
 
     const isTooltipNeeded = !showTextAlways && (!expandable || !isHovered);
     const isExpanded = showTextAlways || (expandable && isHovered) || isDropdownOpen;
     const showSplitLayout = isExpanded && allowCustomPrompt;
 
     const handlePrimaryClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-        if (onClick) onClick(e, customPrompt);
+        if (alwaysOpenModal && !isLoading) {
+            setIsModalOpen(true);
+        } else if (onClick) {
+            onClick(e, customPrompt);
+        }
     };
 
     const separatorStyles = {
@@ -246,7 +262,7 @@ export const AiButton: React.FC<AiButtonProps> = ({
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: -4, scale: 0.98 }}
                             transition={{ duration: 0.15, ease: "easeOut" }}
-                            className="fixed z-[10000] bg-surface border border-outline-variant/30 rounded-2xl shadow-lg py-1.5 overflow-hidden"
+                            className="fixed z-[200000] bg-surface border border-outline-variant/30 rounded-2xl shadow-lg py-1.5 overflow-hidden"
                             style={dropdownStyle}
                         >
                             <button
@@ -311,6 +327,7 @@ export const AiButton: React.FC<AiButtonProps> = ({
                             </Button>
                             <Button
                                 variant="primary"
+                                disabled={requireCustomPrompt && !customPrompt.trim()}
                                 onClick={(e) => {
                                     setIsModalOpen(false);
                                     saveCustomPrompt(customPrompt);

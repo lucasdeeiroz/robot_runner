@@ -217,6 +217,8 @@ export async function getAiContext(
         profile_id?: string;
         current_xml?: string;
         current_screenshot?: string;
+        automation_root?: string;
+        custom_mappings_dir?: string;
     }
 ): Promise<AiContextResponse> {
     return await invoke<AiContextResponse>('get_ai_context', { contextType: type, params });

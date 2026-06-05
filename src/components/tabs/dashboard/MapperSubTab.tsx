@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import {
-    Check, Scan, Home, ArrowLeft, Rows, X, Save, GitGraph, Trash2, Plus, FileClock, FileInput, SearchCode, ChevronDown, ChevronUp, ChevronRight,
-    FileCode, FileStack, Upload, Download, Eye, EyeClosed
+    Check, Scan, Home, ArrowLeft, Rows, X, GitGraph, Trash2, Plus, FileClock, SearchCode, ChevronDown, ChevronUp, ChevronRight,
+    FileCode, FileStack, Upload, Download, Eye, EyeClosed, Settings2
 } from 'lucide-react';
 import { XMLParser } from 'fast-xml-parser';
 import clsx from 'clsx';
@@ -17,9 +17,8 @@ import { Select } from "@/components/atoms/Select";
 import { TagInput } from "@/components/atoms/TagInput";
 import { Input } from "@/components/atoms/Input";
 import { Textarea } from "@/components/atoms/Textarea";
-import { useTestSessions } from '@/lib/testSessionStore';
 import { UIElementType, UIElementMap, ScreenMap, NavigationData } from '@/lib/types';
-import { saveScreenMap, listScreenMaps, deleteScreenMap, exportMapperData, importMapperData } from '@/lib/dashboard/mapperPersistence';
+import { saveScreenMap, loadScreenMap, listScreenMaps, deleteScreenMap, exportMapperData, importMapperData } from '@/lib/dashboard/mapperPersistence';
 import { useSettings } from '@/lib/settings';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { ConfirmationModal } from '@/components/organisms/ConfirmationModal';
@@ -33,11 +32,13 @@ import { AiResponse } from "@/components/molecules/AiResponse";
 import * as gemini from '@/lib/dashboard/gemini';
 import * as claude from '@/lib/dashboard/claude';
 import * as openai from '@/lib/dashboard/openai';
-import { AutonomousExplorer, ExplorationAction } from '@/lib/dashboard/explorationEngine';
+import * as claudeCli from '@/lib/dashboard/claudeCode';
+import { AutonomousExplorer, LogEntry, ExplorationAction } from '@/lib/dashboard/explorationEngine';
 import { getAiContext } from '@/lib/dashboard/historyAnalysisUtils';
 import { ExplorationLogTree } from '@/components/molecules/ExplorationLogTree';
 import { useDeviceViewport } from '@/hooks/useDeviceViewport';
 import { DeviceViewport } from '@/components/organisms/DeviceViewport';
+import { useTestSessions } from '@/lib/testSessionStore';
 
 
 function groupElementsByType<T extends { type: string }>(
@@ -60,9 +61,10 @@ interface MapperSubTabProps {
 }
 
 export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) {
-    const { settings } = useSettings();
+    const { settings, is_test_mode } = useSettings();
     const { t, i18n } = useTranslation();
     const { activeProfileId } = useSettings();
+    const { sessions } = useTestSessions();
 
     // --- Screen Mapper State ---
     const [screenName, setScreenName] = useState("");
@@ -102,12 +104,19 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         if (provider === 'gemini') return !!settings.geminiApiKey;
         if (provider === 'claude') return !!settings.claudeApiKey;
         if (provider === 'openai') return !!settings.openaiApiKey;
+        if (provider === 'claude-code' || provider === 'antigravity-cli') return true; // Always allow, as CLI may be pre-authenticated
         return false;
-    }, [settings.aiProvider, settings.geminiApiKey, settings.claudeApiKey, settings.openaiApiKey]);
+    }, [settings.aiProvider, settings.geminiApiKey, settings.claudeApiKey, settings.openaiApiKey, settings.claudeCodeToken, settings.antigravityApiKey]);
     const [isStayOn, setIsStayOn] = useState(false);
+
+    // Migration logic
+    const prevMappingsPathRef = useRef<string | null>(settings.paths?.mappings || null);
+    const [showMigrationModal, setShowMigrationModal] = useState(false);
+    const [migrationData, setMigrationData] = useState<{ oldPath: string; newPath: string } | null>(null);
+    const [isMigrating, setIsMigrating] = useState(false);
     const [isExploring, setIsExploring] = useState(false);
     const isExploringRef = useRef(false);
-    const [explorationLogs, setExplorationLogs] = useState<string[]>([]);
+    const [explorationLogs, setExplorationLogs] = useState<LogEntry[]>([]);
     const explorerRef = useRef<AutonomousExplorer | null>(null);
     const explorationPromptRef = useRef<string | undefined>(undefined);
     const explorationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -148,14 +157,16 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         loadSavedMaps();
     }, [activeProfileId]);
 
-    const { sessions } = useTestSessions();
-    const busyDeviceIds = sessions.filter(s => s.status === 'running' && s.type === 'test').map(s => s.deviceUdid);
     const selectedDevice = selectedDeviceId;
-    const isTestRunning = selectedDevice ? busyDeviceIds.includes(selectedDevice) : false;
+    const isTestRunningOnSelectedDevice = useMemo(() => {
+        if (!selectedDevice) return false;
+        return sessions.some(session => session.status === 'running' && session.deviceUdid === selectedDevice);
+    }, [selectedDevice, sessions]);
+    const isMapperBusy = isExploring || (isTestRunningOnSelectedDevice && !settings.allowActionsDuringTest);
 
     const {
         screenshot,
-        setScreenshot: setViewportScreenshot,
+        setScreenshot,
         rootNode,
         setRootNode,
         loading,
@@ -176,7 +187,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     } = useDeviceViewport({
         deviceId: selectedDevice,
         isActive,
-        isBusy: isTestRunning || isExploring
+        isBusy: isMapperBusy
     });
 
     const toggleStayOn = async () => {
@@ -193,10 +204,63 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     };
 
     const loadSavedMaps = async () => {
-        const maps = await listScreenMaps(activeProfileId);
+        const maps = await listScreenMaps(activeProfileId, settings.paths?.mappings);
         setSavedMaps(maps);
         return maps;
     };
+
+    const handleMappingsPathChange = async (oldPath: string, newPath: string) => {
+        try {
+            const oldEntries = await invoke<any[]>('list_directory', { path: oldPath });
+            const newEntries = await invoke<any[]>('list_directory', { path: newPath });
+
+            const hasMappings = oldEntries.some(e => e.name.endsWith('.json'));
+            const isEmpty = !newEntries.some(e => e.name.endsWith('.json'));
+
+            if (hasMappings && isEmpty) {
+                setMigrationData({ oldPath, newPath });
+                setShowMigrationModal(true);
+            }
+        } catch (e) {
+            console.error("Migration check failed", e);
+        }
+    };
+
+    const performMigration = async () => {
+        if (!migrationData) return;
+        setIsMigrating(true);
+        try {
+            const { oldPath, newPath } = migrationData;
+            const oldEntries = await invoke<any[]>('list_directory', { path: oldPath });
+            const mappingFiles = oldEntries.filter(e => !e.is_dir && e.name.endsWith('.json'));
+
+            for (const entry of mappingFiles) {
+                const content = await invoke<string>('read_file', { path: entry.path });
+                await invoke('save_file', { path: `${newPath}/${entry.name}`, content, append: false });
+            }
+
+            feedback.toast.success(t('mapper.migration.success'));
+            await loadSavedMaps();
+        } catch (e) {
+            console.error("Migration failed", e);
+            feedback.toast.error(t('mapper.migration.error'));
+        } finally {
+            setIsMigrating(false);
+            setShowMigrationModal(false);
+            setMigrationData(null);
+        }
+    };
+
+    useEffect(() => {
+        const currentMappingsPath = settings.paths?.mappings;
+        if (!currentMappingsPath) return;
+
+        if (prevMappingsPathRef.current && prevMappingsPathRef.current !== currentMappingsPath) {
+            handleMappingsPathChange(prevMappingsPathRef.current, currentMappingsPath);
+        }
+
+        prevMappingsPathRef.current = currentMappingsPath;
+    }, [settings.paths?.mappings]);
 
     // reset current element when selection changes
     useEffect(() => {
@@ -225,41 +289,25 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         setAiError(null);
     }, [selectedNode, mappedElements]);
 
-    // Helper to update current element state
+    // Helper to update current element state and auto-update mapping
     const updateElement = (key: keyof UIElementMap, value: any) => {
-        setCurrentElement(prev => ({ ...prev, [key]: value }));
-    };
+        setCurrentElement(prev => {
+            const next = { ...prev, [key]: value } as UIElementMap;
 
-    const saveElementMapping = () => {
-        if (!currentElement.name) {
-            feedback.toast.error(t('mapper.error.missing_name'));
-            return;
-        }
-
-        if (!selectedNode && !currentElement.id) {
-            feedback.toast.error(t('mapper.error.no_element_selected'));
-            return;
-        }
-
-        // Clone and sanitize
-        const elementToSave = { ...currentElement };
-        if (elementToSave.type === 'menu' && Array.isArray(elementToSave.menu_options)) {
-            elementToSave.menu_options = elementToSave.menu_options
-                .map(s => s.trim())
-                .filter(Boolean);
-        }
-
-        const newElement = elementToSave as UIElementMap;
-        setMappedElements(prev => {
-            const idx = prev.findIndex(e => e.id === newElement.id);
-            if (idx >= 0) {
-                const updated = [...prev];
-                updated[idx] = newElement;
-                return updated;
+            // Auto-update mappedElements list if this element has a name and ID
+            if (next.name && next.id) {
+                setMappedElements(list => {
+                    const idx = list.findIndex(e => e.id === next.id);
+                    if (idx >= 0) {
+                        const updated = [...list];
+                        updated[idx] = next;
+                        return updated;
+                    }
+                    return [...list, next];
+                });
             }
-            return [...prev, newElement];
+            return next;
         });
-        feedback.toast.success(t('mapper.feedback.mapped'));
     };
 
     const removeElementMapping = (id?: string) => {
@@ -277,35 +325,54 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         feedback.toast.success(t('mapper.feedback.removed'));
     };
 
-    // Screen Actions
-    const handleSaveScreen = async () => {
-        if (!screenName) {
-            feedback.toast.error(t('mapper.error.missing_screen_name'));
-            return;
-        }
-        if (mappedElements.length === 0) {
-            feedback.toast.info(t('mapper.feedback.empty_map'));
-            // allowing save even if empty, but warning is good
-        }
+    // Auto-save logic
+    const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
 
-        const map: ScreenMap = {
-            id: screenName.toLowerCase().replace(/\s+/g, '_'),
-            name: screenName,
-            type: screenType,
-            description: screenDescription || undefined,
-            tags: screenTags.length > 0 ? screenTags : undefined,
-            elements: mappedElements,
-            base64_preview: screenshot || undefined
+    useEffect(() => {
+        if (!screenName) return;
+
+        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+
+        debounceTimerRef.current = setTimeout(async () => {
+            setIsSaving(true);
+            const screenId = screenName.toLowerCase().replace(/\s+/g, '_');
+
+            // Fetch from latest source (disk) to avoid overwriting newer data (like layout)
+            // from other components/tabs
+            let existingMap: ScreenMap | null = null;
+            try {
+                existingMap = await loadScreenMap(activeProfileId, screenId, settings.paths?.mappings);
+            } catch (e) {
+                // Map doesn't exist yet, which is fine
+            }
+
+            const map: ScreenMap = {
+                id: screenId,
+                name: screenName,
+                type: screenType,
+                description: screenDescription || undefined,
+                tags: screenTags.length > 0 ? screenTags : undefined,
+                elements: mappedElements,
+                base64_preview: screenshot || undefined,
+                layout: existingMap?.layout
+            };
+            try {
+                await saveScreenMap(activeProfileId, map, settings.paths?.mappings);
+                // Refresh list
+                loadSavedMaps();
+            } catch (e) {
+                console.error("Auto-save failed", e);
+            } finally {
+                setIsSaving(false);
+            }
+        }, 1000);
+
+        return () => {
+            if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
         };
+    }, [screenName, screenType, screenDescription, screenTags, mappedElements, screenshot, activeProfileId]);
 
-        try {
-            await saveScreenMap(activeProfileId, map);
-            feedback.toast.success(t('mapper.feedback.saved'));
-            loadSavedMaps(); // Refresh list
-        } catch (e) {
-            feedback.toast.error(t('mapper.error.save_failed'), e);
-        }
-    };
 
     const handleLoadScreen = (map: ScreenMap) => {
         setScreenName(map.name);
@@ -313,7 +380,9 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         setScreenDescription(map.description || "");
         setScreenTags(map.tags || []);
         setMappedElements(map.elements);
-        // We don't necessarily update screenshot here because it should be live
+        if (map.base64_preview) {
+            setScreenshot(map.base64_preview);
+        }
         setShowLoadMenu(false);
         feedback.toast.success(t('mapper.feedback.loaded'));
     };
@@ -326,7 +395,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
     const confirmDeleteScreen = async () => {
         if (screenToDelete) {
-            await deleteScreenMap(activeProfileId, screenToDelete);
+            await deleteScreenMap(activeProfileId, screenToDelete, settings.paths?.mappings);
             loadSavedMaps();
             feedback.toast.success(t('mapper.feedback.deleted'));
             setScreenToDelete(null);
@@ -345,7 +414,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
     const handleExport = async () => {
         try {
-            const data = await exportMapperData(activeProfileId);
+            const data = await exportMapperData(activeProfileId, settings.paths?.mappings);
             const path = await save({
                 filters: [{ name: 'Robot Runner Flow', extensions: ['json'] }],
                 defaultPath: `flowchart_export_${new Date().toISOString().split('T')[0]}.json`
@@ -370,7 +439,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
             if (path && typeof path === 'string') {
                 const content = await invoke<string>('read_file', { path });
-                await importMapperData(activeProfileId, content);
+                await importMapperData(activeProfileId, content, settings.paths?.mappings);
                 feedback.toast.success(t('mapper.flowchart.import_success'));
                 loadSavedMaps(); // Refresh list
             }
@@ -387,7 +456,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         const apiKey = aiProvider === 'gemini' ? geminiApiKey : aiProvider === 'claude' ? claudeApiKey : openaiApiKey;
         const model = aiProvider === 'gemini' ? geminiModel : aiProvider === 'claude' ? claudeModel : openaiModel;
 
-        if (!apiKey) {
+        if (!apiKey && aiProvider !== 'claude-code' && aiProvider !== 'antigravity-cli') {
             feedback.toast.error(t('dashboard.generator.key_required', { provider: aiProvider.toUpperCase() }));
             return;
         }
@@ -428,11 +497,16 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             console.log(`[AI Debug] Prompt Context Size: ~${JSON.stringify(criticalAttrs).length + JSON.stringify(optimizedMaps).length} chars`);
 
             if (aiProvider === 'gemini') {
-                result = await gemini.suggestElementName(criticalAttrs as any, screenName, apiKey, model, lang, optimizedMaps as any, undefined, customPrompt);
+                result = await gemini.suggestElementName(criticalAttrs as any, screenName, apiKey!, model, lang, optimizedMaps as any, undefined, customPrompt);
             } else if (aiProvider === 'openai') {
-                result = await openai.suggestElementName(criticalAttrs as any, screenName, apiKey, model, lang, optimizedMaps as any, undefined, customPrompt);
+                result = await openai.suggestElementName(criticalAttrs as any, screenName, apiKey!, model, lang, optimizedMaps as any, undefined, customPrompt);
             } else if (aiProvider === 'claude') {
-                result = await claude.suggestElementName(criticalAttrs as any, screenName, apiKey, model, lang, optimizedMaps as any, undefined, customPrompt);
+                result = await claude.suggestElementName(criticalAttrs as any, screenName, apiKey!, model, lang, optimizedMaps as any, undefined, customPrompt);
+            } else if (aiProvider === 'claude-code') {
+                result = await claudeCli.suggestElementName(criticalAttrs as any, screenName, settings.paths.automationRoot || '', lang, optimizedMaps as any, customPrompt, settings.claudeCodeToken, screenshot || undefined);
+            } else if (aiProvider === 'antigravity-cli') {
+                const { suggestElementName } = await import('@/lib/dashboard/antigravityCode');
+                result = await suggestElementName(criticalAttrs as any, screenName, settings.paths.automationRoot || '', lang, optimizedMaps as any, customPrompt, settings.antigravityApiKey, screenshot || undefined);
             }
 
             if (result && result.name) {
@@ -440,7 +514,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 setAiJustification(result.justification);
                 feedback.toast.success(t('mapper.feedback.ai_success'));
             } else {
-                throw new Error("Empty suggestion");
+                throw new Error("Empty suggestion or invalid format returned by AI");
             }
         } catch (error: any) {
             console.error("AI Suggestion Error:", error);
@@ -459,7 +533,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         const apiKey = aiProvider === 'gemini' ? geminiApiKey : aiProvider === 'claude' ? claudeApiKey : openaiApiKey;
         const model = aiProvider === 'gemini' ? geminiModel : aiProvider === 'claude' ? claudeModel : openaiModel;
 
-        if (!apiKey) {
+        if (!apiKey && aiProvider !== 'claude-code' && aiProvider !== 'antigravity-cli') {
             feedback.toast.error(t('dashboard.generator.key_required', { provider: aiProvider.toUpperCase() }));
             return;
         }
@@ -473,17 +547,31 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             const elementsContext = mappedElements.map(el => ({ name: el.name, type: el.type }));
 
             if (aiProvider === 'gemini') {
-                tags = await gemini.suggestScreenTags(screenName || "Current Screen", elementsContext, apiKey, model, lang, screenshot || undefined, undefined, customPrompt);
+                tags = await gemini.suggestScreenTags(screenName || "Current Screen", elementsContext, apiKey!, model, lang, screenshot || undefined, undefined, customPrompt);
             } else if (aiProvider === 'openai') {
-                tags = await openai.suggestScreenTags(screenName || "Current Screen", elementsContext, apiKey, model, lang, screenshot || undefined, undefined, customPrompt);
+                tags = await openai.suggestScreenTags(screenName || "Current Screen", elementsContext, apiKey!, model, lang, screenshot || undefined, undefined, customPrompt);
             } else if (aiProvider === 'claude') {
-                tags = await claude.suggestScreenTags(screenName || "Current Screen", elementsContext, apiKey, model, lang, screenshot || undefined, undefined, customPrompt);
+                tags = await claude.suggestScreenTags(screenName || "Current Screen", elementsContext, apiKey!, model, lang, screenshot || undefined, undefined, customPrompt);
+            } else if (aiProvider === 'claude-code') {
+                tags = await claudeCli.suggestScreenTags(screenName || "Current Screen", elementsContext, settings.paths.automationRoot || '', lang, customPrompt, settings.claudeCodeToken, screenshot || undefined);
+            } else if (aiProvider === 'antigravity-cli') {
+                const { suggestScreenTags } = await import('@/lib/dashboard/antigravityCode');
+                tags = await suggestScreenTags(screenName || "Current Screen", elementsContext, settings.paths.automationRoot || '', lang, customPrompt, settings.antigravityApiKey, screenshot || undefined);
             }
 
-            if (tags && tags.length > 0) {
-                // Merge with existing tags, ensuring uniqueness
-                setScreenTags(prev => [...new Set([...prev, ...tags])]);
-                feedback.toast.success(t('mapper.feedback.ai_success'));
+            if (tags && Array.isArray(tags) && tags.length > 0) {
+                // Merge with existing tags, ensuring uniqueness and checking if anything changed
+                const existingTagsSet = new Set(screenTags);
+                const trulyNewTags = tags.filter(tag => tag && !existingTagsSet.has(tag));
+
+                if (trulyNewTags.length > 0) {
+                    setScreenTags(prev => [...new Set([...prev, ...trulyNewTags])]);
+                    feedback.toast.success(t('mapper.feedback.ai_success'));
+                } else {
+                    feedback.toast.raw.info(t('mapper.feedback.ai_no_new_tags', 'No new tags found'));
+                }
+            } else if (tags && Array.isArray(tags)) {
+                feedback.toast.raw.info(t('mapper.feedback.ai_no_tags', 'No tags suggested for this screen'));
             }
         } catch (error) {
             console.error("AI Tag Suggestion Error:", error);
@@ -504,7 +592,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         isExploringRef.current = false;
 
         if (reason) {
-            explorerRef.current?.addLog(`Exploration stopped: ${reason}`);
+            explorerRef.current?.addLog(t('mapper.exploration.stopped_reason', { reason }), 'stopped');
             setExplorationLogs(explorerRef.current?.getLogs() || []);
             feedback.toast.info(t('mapper.exploration.stopped', { reason }));
         }
@@ -519,21 +607,30 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         // Removed max steps check to allow indefinite exploration
 
         try {
-            explorer.addLog(`--- Step ${explorer.getState().currentStep} ---`);
+            explorer.addLog(t('mapper.exploration.step_marker', { step: explorer.getState().currentStep }), 'step', explorer.getState().currentStep);
 
             // App Recovery Logic
-            const currentPkg = await invoke<string>('get_focused_package', { device: selectedDevice });
+            let currentPkg = "";
+            try {
+                currentPkg = await invoke<string>('get_focused_package', { device: selectedDevice });
+            } catch (pkgError) {
+                console.warn("Failed to detect focused package:", pkgError);
+                if (explorer.getState().currentStep === 1) {
+                    explorer.addLog("Warning: Could not detect focused package on this device. App recovery logic will be bypassed.", "warning");
+                }
+            }
+
             if (!isExploringRef.current) return;
 
             let targetPkg = explorer.getTargetPackage();
 
-            if (explorer.getState().currentStep === 1 && !targetPkg) {
+            if (explorer.getState().currentStep === 1 && !targetPkg && currentPkg) {
                 targetPkg = currentPkg;
                 explorer.setTargetPackage(targetPkg);
             }
 
-            if (targetPkg && currentPkg !== targetPkg) {
-                explorer.addLog(`App exit detected (Current: ${currentPkg}, Target: ${targetPkg}). Recovering...`);
+            if (targetPkg && currentPkg && currentPkg !== targetPkg) {
+                explorer.addLog(t('mapper.exploration.recovering_exit', { current: currentPkg, target: targetPkg }), 'transition');
                 await invoke('launch_package', { device: selectedDevice, package: targetPkg });
                 if (!isExploringRef.current) return;
                 // Small delay to let app load
@@ -544,19 +641,36 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             setExplorationLogs([...explorer.getLogs()]);
 
             // 1. Capture Current State
-            explorer.addLog("Capturing screen...");
+            explorer.addLog(t('mapper.exploration.capturing_screen'), 'transition');
             setExplorationLogs([...explorer.getLogs()]);
-            // Re-fetch using refreshAll logic isn't ideal here due to async nature, 
+            // Re-fetch using refreshAll logic isn't ideal here due to async nature,
             // but we can reuse the logic in the explorer
             const xml = await invoke<string>('get_xml_dump', { deviceId: selectedDevice });
+            
+            let screenshot: string | undefined = undefined;
+            try {
+                const freshScreenshotBase64 = await invoke<string>('get_compressed_screenshot', { deviceId: selectedDevice, maxWidth: 1024, maxHeight: 1024 });
+                if (freshScreenshotBase64) {
+                    const prefix = 'data:image/jpeg;base64,';
+                    const fullScreenshot = freshScreenshotBase64.startsWith('data:') ? freshScreenshotBase64 : `${prefix}${freshScreenshotBase64}`;
+                    setScreenshot(fullScreenshot);
+                    screenshot = fullScreenshot;
+                }
+            } catch (screenshotError) {
+                console.warn("Screenshot capture failed, proceeding with XML only:", screenshotError);
+                if (explorer.getState().currentStep === 1) {
+                    explorer.addLog("Warning: Screenshot capture failed (secured screen or OS restrictions). Proceeding with XML layout only.", "warning");
+                }
+            }
             if (!isExploringRef.current) return;
 
             // 2. Prepare Context (Backend-powered)
-            explorer.addLog("Preparing optimized AI context...");
+            explorer.addLog(t('mapper.exploration.preparing_context'), 'transition');
             setExplorationLogs([...explorer.getLogs()]);
 
             const contextResponse = await getAiContext('exploration', {
-                current_xml: xml
+                current_xml: xml,
+                automation_root: settings.paths?.automationRoot
             });
 
             if (!isExploringRef.current) return;
@@ -572,13 +686,13 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
             // 2. AI Analysis
             const { aiProvider, geminiApiKey, claudeApiKey, openaiApiKey, geminiModel, claudeModel, openaiModel, language } = settings;
-            const apiKey = aiProvider === 'gemini' ? geminiApiKey : aiProvider === 'claude' ? claudeApiKey : openaiApiKey;
-            const model = aiProvider === 'gemini' ? geminiModel : aiProvider === 'claude' ? claudeModel : openaiModel;
+            const apiKey = aiProvider === 'gemini' ? geminiApiKey : aiProvider === 'claude' ? claudeApiKey : aiProvider === 'openai' ? openaiApiKey : 'CLI';
+            const model = aiProvider === 'gemini' ? geminiModel : aiProvider === 'claude' ? claudeModel : aiProvider === 'openai' ? openaiModel : 'claude-code';
             const lang = language || i18n.language || 'en';
 
-            if (!apiKey) throw new Error("API Key missing");
+            if (!apiKey && aiProvider !== 'claude-code' && aiProvider !== 'antigravity-cli') throw new Error("API Key missing");
 
-            explorer.addLog(`Analyzing screen with ${aiProvider}...`);
+            explorer.addLog(t('mapper.exploration.analyzing_screen', { provider: aiProvider }), 'ai');
             setExplorationLogs([...explorer.getLogs()]);
 
             let maps = await loadSavedMaps();
@@ -591,16 +705,27 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 try {
                     const customPrompt = explorationPromptRef.current;
                     if (aiProvider === 'gemini') {
-                        result = await gemini.exploreScreen(simplifiedXml, screenshot || "", apiKey, model, lang, maps, explorer.getLogs(), undefined, customPrompt);
+                        result = await gemini.exploreScreen(simplifiedXml, screenshot || "", apiKey as string, model, lang, maps, explorer.getFormattedLogs(), undefined, customPrompt);
                     } else if (aiProvider === 'openai') {
-                        result = await openai.exploreScreen(simplifiedXml, screenshot || "", apiKey, model, lang, maps, explorer.getLogs(), undefined, customPrompt);
+                        result = await openai.exploreScreen(simplifiedXml, screenshot || "", apiKey as string, model, lang, maps, explorer.getFormattedLogs(), undefined, customPrompt);
                     } else if (aiProvider === 'claude') {
-                        result = await claude.exploreScreen(simplifiedXml, screenshot || "", apiKey, model, lang, maps, explorer.getLogs(), undefined, customPrompt);
+                        result = await claude.exploreScreen(simplifiedXml, screenshot || "", apiKey as string, model, lang, maps, explorer.getFormattedLogs(), undefined, customPrompt);
+                    } else if (aiProvider === 'claude-code') {
+                        result = await claudeCli.exploreScreen(simplifiedXml, settings.paths.automationRoot || '', lang, maps, explorer.getFormattedLogs(), customPrompt, settings.claudeCodeToken, explorer.getSessionId(), screenshot || undefined);
+                        if (result.session_id) {
+                            explorer.setSessionId(result.session_id);
+                        }
+                    } else if (aiProvider === 'antigravity-cli') {
+                        const { exploreScreen } = await import('@/lib/dashboard/antigravityCode');
+                        result = await exploreScreen(simplifiedXml, settings.paths.automationRoot || '', lang, maps, explorer.getFormattedLogs(), customPrompt, settings.antigravityApiKey, explorer.getSessionId(), screenshot || undefined);
+                        if (result.session_id) {
+                            explorer.setSessionId(result.session_id);
+                        }
                     }
                     break; // Success
                 } catch (parseError: any) {
                     if (attempt === 0 && parseError.message?.includes('JSON')) {
-                        explorer.addLog(`AI returned malformed JSON. Retrying... (${parseError.message.substring(0, 80)})`);
+                        explorer.addLog(t('mapper.exploration.malformed_json_retry', { error: parseError.message.substring(0, 80) }), 'error');
                         setExplorationLogs([...explorer.getLogs()]);
                         await new Promise(resolve => setTimeout(resolve, 2000));
                         if (!isExploringRef.current) return;
@@ -627,8 +752,11 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
             aiScreen.elements = aiElements;
 
-            explorer.addLog(`AI mapped: ${aiScreen.name} (${aiScreen.type}) with ${aiElements.length} elements.`);
-            explorer.addLog(`Rationale: ${result.rationale}`);
+            explorer.addLog(t('mapper.exploration.ai_mapped_summary', { name: aiScreen.name, type: aiScreen.type, count: aiElements.length }), 'info');
+            if (result.thought) {
+                explorer.addThought(result.thought);
+            }
+            explorer.addLog(result.rationale, 'rationale');
 
             // Step 3: Back-update previous screen's element with navigates_to
             const prevNav = explorer.getPreviousNavigation();
@@ -657,8 +785,8 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
                     if (updated) {
                         const updatedPrevMap = { ...prevMap, elements: updatedElements };
-                        await saveScreenMap(activeProfileId, updatedPrevMap);
-                        explorer.addLog(`Back-updated "${prevNav.screenName}" → element navigates to "${aiScreen.name}"`);
+                        await saveScreenMap(activeProfileId, updatedPrevMap, settings.paths?.mappings);
+                        explorer.addLog(t('mapper.exploration.back_updated', { prev: prevNav.screenName, current: aiScreen.name }), 'info');
                         // Refresh maps so subsequent logic sees the update
                         maps = await loadSavedMaps();
                     }
@@ -679,7 +807,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
                 // Helper for smart description merging (prevents "A | A B" bloat)
                 if (existingMap) {
-                    explorer.addLog(`Merging AI insights into existing screen: "${existingMap.name}" (ID: ${existingMap.id}, ${existingMap.elements.length} elements)`);
+                    explorer.addLog(t('mapper.exploration.merging_insights', { name: existingMap.name, id: existingMap.id, count: existingMap.elements.length }), 'info');
 
                     // 1. Merge Screen Metadata - Replacement Strategy (AI is responsible for incorporating old info)
                     mergedDescription = aiScreen.description || existingMap.description || "";
@@ -714,7 +842,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
                     if (genuinelyNew.length > 0) {
                         mergedElements = [...mergedElements, ...genuinelyNew];
-                        explorer.addLog(`Added ${genuinelyNew.length} new elements discoverd by AI. Total: ${mergedElements.length}`);
+                        explorer.addLog(t('mapper.exploration.new_elements_discovered', { count: genuinelyNew.length, total: mergedElements.length }), 'info');
                     }
                 } else {
                     // New Screen: just use AI results
@@ -738,7 +866,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                             if (gx > 20) { gx = 0; gy++; }
                         }
                         resolvedLayout = { node: { gridX: gx, gridY: gy }, edges: {} };
-                        explorer.addLog(`Layout positioning: ${aiScreen.name} placed at (${gx}, ${gy})`);
+                        explorer.addLog(t('mapper.exploration.ai_suggested_layout', { name: aiScreen.name, x: gx, y: gy }), 'info');
                     }
                 }
 
@@ -754,7 +882,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                     layout: resolvedLayout
                 };
 
-                await saveScreenMap(activeProfileId, map);
+                await saveScreenMap(activeProfileId, map, settings.paths?.mappings);
                 explorer.markScreenVisited(aiScreen.name);
 
                 // Update UI State if it's the current screen we're looking at
@@ -766,7 +894,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
                 if (aiScreen.layout) {
                     const l = aiScreen.layout as any;
-                    explorer.addLog(`AI suggested layout for ${aiScreen.name}: (${l.gridX}, ${l.gridY})`);
+                    explorer.addLog(t('mapper.exploration.ai_suggested_layout', { name: aiScreen.name, x: l.gridX, y: l.gridY }), 'info');
                 }
             }
 
@@ -776,7 +904,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 const actionFingerprint = `${aiScreen.name}:${next.type}:${next.targetId || 'none'}`;
                 const visitCount = explorer.trackScreenVisit(aiScreen.name, actionFingerprint);
                 if (visitCount >= 4) {
-                    explorer.addLog(`Loop detected: screen "${aiScreen.name}" visited ${visitCount} times with repeated actions. Forcing back to escape.`);
+                    explorer.addLog(t('mapper.exploration.loop_detected', { name: aiScreen.name, count: visitCount }), 'warning');
                     await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'keyevent', '4'] });
 
                     if (!isExploringRef.current) return;
@@ -789,16 +917,16 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             // 5. Navigation
             const next = result.nextAction as ExplorationAction;
             if (next.type === 'finish') {
-                explorer.addLog("Exploration finished by AI.");
+                explorer.addLog(t('mapper.exploration.finished'), 'finished');
                 stopExploration("Finished");
                 return;
             } else if (next.type === 'back') {
-                explorer.addLog("Navigating back...");
+                explorer.addLog(t('mapper.exploration.navigating_back'), 'action');
                 explorer.resetSwipeCount();
                 explorer.clearPreviousNavigation();
                 await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'keyevent', '4'] });
             } else if (next.type === 'click' && next.targetId) {
-                explorer.addLog(`Clicking element: ${next.targetId} (${next.details || 'no details'})`);
+                explorer.addLog(t('mapper.exploration.clicking_element', { targetId: next.targetId, details: next.details || 'no details' }), 'action');
                 explorer.resetSwipeCount();
 
                 let targetNode: InspectorNode | null = null;
@@ -834,17 +962,69 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 const currentSwipes = explorer.getConsecutiveSwipes();
 
                 if (currentSwipes >= 10) {
-                    explorer.addLog(`Max swipe limits reached (10). Forcing navigation back.`);
+                    explorer.addLog(t('mapper.exploration.swipe_limit_reached'), 'error');
                     explorer.resetSwipeCount();
                     await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'keyevent', '4'] });
                 } else {
-                    // Logic to compute coords based on next.targetId/root
+                    explorer.addLog(t('mapper.exploration.swiping_action', { direction: swipeDirection }), 'action');
+
+                    let startX = 540;
+                    let startY = 1200;
+                    let endX = 540;
+                    let endY = swipeDirection === 'up' ? 600 : 1800;
+
+                    let scrollableNode: InspectorNode | null = null;
+
+                    if (next.targetId) {
+                        const xpath = shortIdMap[next.targetId] || next.targetId;
+                        const nodes = findNodesByLocator(root, xpath);
+                        scrollableNode = nodes.find(n => n.attributes['scrollable'] === 'true' || n.tagName.includes('ScrollView')) || nodes[0];
+                    }
+
+                    if (!scrollableNode) {
+                        const findScrollable = (n: InspectorNode): InspectorNode | null => {
+                            if (n.attributes['scrollable'] === 'true' || n.tagName.includes('ScrollView')) return n;
+                            for (const child of n.children) {
+                                const found = findScrollable(child);
+                                if (found) return found;
+                            }
+                            return null;
+                        };
+                        scrollableNode = findScrollable(root);
+                    }
+
+                    if (scrollableNode && scrollableNode.bounds) {
+                        const { x, y, w, h } = scrollableNode.bounds;
+                        startX = Math.round(x + w / 2);
+                        endX = startX;
+
+                        const padding = Math.round(h * 0.15); // 15% padding
+                        if (swipeDirection === 'up') { // Swipe up (gesture bottom-to-top) = Scroll down
+                            startY = Math.round(y + h - padding);
+                            endY = Math.round(y + padding);
+                        } else if (swipeDirection === 'down') { // Swipe down (gesture top-to-bottom) = Scroll up
+                            startY = Math.round(y + padding);
+                            endY = Math.round(y + h - padding);
+                        } else if (swipeDirection === 'left') {
+                            startY = Math.round(y + h / 2);
+                            endY = startY;
+                            startX = Math.round(x + w - padding);
+                            endX = Math.round(x + padding);
+                        } else if (swipeDirection === 'right') {
+                            startY = Math.round(y + h / 2);
+                            endY = startY;
+                            startX = Math.round(x + padding);
+                            endX = Math.round(x + w - padding);
+                        }
+                    }
+
                     await invoke('run_adb_command', {
                         device: selectedDevice,
-                        args: ['shell', 'input', 'swipe', '540', '1200', '540', swipeDirection === 'down' ? '600' : '1800', "500"]
+                        args: ['shell', 'input', 'swipe', String(startX), String(startY), String(endX), String(endY), "500"]
                     });
                 }
             } else if (next.type === 'type_text' && next.targetId && next.text) {
+                explorer.addLog(t('mapper.exploration.typing_action', { targetId: next.targetId, text: next.text }), 'action');
                 // ... Implementation of type_text
             }
 
@@ -854,13 +1034,24 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
         } catch (error: any) {
             console.error("Exploration error:", error);
-            stopExploration(`Error: ${error.message}`);
+            const reason = error instanceof Error 
+                ? error.message 
+                : (typeof error === 'object' && error !== null && 'message' in error)
+                    ? String(error.message)
+                    : String(error);
+            stopExploration(`Error: ${reason}`);
         }
     };
 
     const startExploration = async (customPrompt?: string) => {
         if (!selectedDevice) return;
-        explorerRef.current = new AutonomousExplorer(9999);
+
+        if (!customPrompt || customPrompt.trim() === '') {
+            feedback.toast.error(t('mapper.exploration.error_empty_guidelines'));
+            return;
+        }
+
+        explorerRef.current = new AutonomousExplorer(t, 9999);
         explorationPromptRef.current = customPrompt;
         setExplorationLogs([]);
         setIsExploring(true);
@@ -937,10 +1128,11 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         setCopied(label);
         setTimeout(() => setCopied(null), 2000);
     };
+    const hasElementFocus = !!selectedNode || !!currentElement.id;
 
     return (
         <div ref={setContainerRef} className="flex-1 min-h-[700px] flex flex-col space-y-4">
-            {!selectedDevice ? (
+            {!selectedDevice && is_test_mode !== 'web' ? (
                 <div className="h-full flex-1 flex flex-col items-center justify-center text-on-surface/80">
                     <Scan size={48} className="mb-4 opacity-20" />
                     <p>{t('mapper.empty')}</p>
@@ -955,32 +1147,14 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                         title={t('mapper.flowchart.open', 'Open Flowchart')}
                     >
                         <GitGraph size={16} />
-                        <span className={clsx(isNarrow && "hidden")}>{t('mapper.flowchart.open', 'Open Flowchart')}</span>
-                    </Button>
-                </div>
-            ) : isTestRunning ? (
-                <div className="h-full flex-1 flex flex-col items-center justify-center text-on-surface-variant/80 text-sm">
-                    <Scan size={32} className="opacity-20 mb-2" />
-                    <p>{t('mapper.status.paused_test', 'Mapper disabled during test')}</p>
-                    <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={() => {
-                            loadSavedMaps();
-                            setIsFlowchartOpen(true);
-                        }}
-                        className="flex items-center gap-2 mt-4 px-3 py-1.5 bg-transparent border border-primary text-primary hover:bg-primary/90 hover:text-surface rounded-2xl transition-colors shadow-sm text-sm font-medium"
-                        title={t('mapper.flowchart.open', 'Open Flowchart')}
-                    >
-                        <GitGraph size={16} />
-                        <span className={clsx(isNarrow && "hidden")}>{t('mapper.flowchart.open', 'Open Flowchart')}</span>
+                        <span className={clsx(isNarrow && "hidden")}>{t('mapper.flowchart.open')}</span>
                     </Button>
                 </div>
             ) : (
                 <>
                     {/* Toolbar */}
                     <Section
-                        title={t('mapper.title', 'Mapper')}
+                        title={t('mapper.title')}
                         icon={Scan}
                         variant="transparent"
                         className="p-0"
@@ -1000,7 +1174,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                     size="icon"
                                     onClick={handleExportProjectPOM}
                                     className="p-1.5 hover:bg-primary/10 hover:text-primary rounded text-on-surface-variant/80 transition-all"
-                                    title={t('mapper.action.export_project_pom', 'Export Project POM')}
+                                    title={t('mapper.action.export_project_pom')}
                                 >
                                     <FileStack size={18} />
                                 </Button>
@@ -1009,7 +1183,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                     size="icon"
                                     onClick={handleImport}
                                     className="p-1.5 hover:bg-primary/10 hover:text-primary rounded text-on-surface-variant/80 transition-all"
-                                    title={t('mapper.flowchart.import', 'Import Flow')}
+                                    title={t('mapper.flowchart.import')}
                                 >
                                     <Download size={18} />
                                 </Button>
@@ -1018,7 +1192,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                     size="icon"
                                     onClick={handleExport}
                                     className="p-1.5 hover:bg-primary/10 hover:text-primary rounded text-on-surface-variant/80 transition-all"
-                                    title={t('mapper.flowchart.export', 'Export Flow')}
+                                    title={t('mapper.flowchart.export')}
                                 >
                                     <Upload size={18} />
                                 </Button>
@@ -1034,6 +1208,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                         onClick={isExploring ? () => stopExploration(t('mapper.exploration.cancelled')) : (_e, prompt) => startExploration(prompt)}
                                         isLoading={isExploring}
                                         label={isExploring ? t('mapper.exploration.stop') : t('mapper.exploration.start')}
+                                        alwaysOpenModal={!isExploring}
                                     />
                                 )}
                                 <Button
@@ -1044,10 +1219,10 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                         setIsFlowchartOpen(true);
                                     }}
                                     className="flex items-center gap-2 px-3 py-1.5 bg-transparent border border-primary text-primary hover:bg-primary/90 hover:text-surface rounded-2xl transition-colors shadow-sm text-sm font-medium"
-                                    title={t('mapper.flowchart.open', 'Open Flowchart')}
+                                    title={t('mapper.flowchart.open')}
                                 >
                                     <GitGraph size={16} />
-                                    <span className={clsx(isNarrow && "hidden")}>{t('mapper.flowchart.open', 'Open Flowchart')}</span>
+                                    <span className={clsx(isNarrow && "hidden")}>{t('mapper.flowchart.open')}</span>
                                 </Button>
                             </>
                         }
@@ -1058,7 +1233,9 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                         <div className="flex flex-col items-center justify-center overflow-hidden relative max-w-[30vw] rounded-2xl">
                             <DeviceViewport
                                 screenshot={screenshot}
+                                rootNode={rootNode}
                                 loading={loading}
+                                isExploring={isExploring}
                                 imgRef={imgRef}
                                 imgLayout={imgLayout}
                                 onImgLoad={(e) => {
@@ -1074,535 +1251,555 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                 selectedNode={selectedNode}
                                 taps={taps}
                                 swipes={swipes}
-                                onRefresh={refreshAll}
+                                onRefresh={(forceClear, targetWebUrl) => refreshAll(true, forceClear, targetWebUrl)}
                                 handlers={handlers}
                             />
                         </div>
 
                         {/* Properties Panel */}
-                        <div className="bg-surface border border-outline-variant/30 rounded-2xl flex flex-col overflow-hidden shadow-sm flex-1">
-                            {/* Screen Settings */}
-                            <div className="p-4 border-t border-outline-variant/30 bg-surface/50 space-y-3">
-                                <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-start">
-                                    <Combobox
-                                        label={t('mapper.screen_name')}
-                                        value={screenName}
-                                        onChange={setScreenName}
-                                        options={savedMaps.map(m => m.name)}
-                                        placeholder={t('mapper.placeholder.screen_name')}
-                                    />
-                                    <div className="w-56 flex items-end gap-1">
-                                        <div className="flex-1">
-                                            <TagInput
-                                                label={t('mapper.screen_tags')}
-                                                tags={screenTags}
-                                                assistant={
-                                                    <AiButton
-                                                        id="mapper_suggest_tags"
-                                                        isLoading={isAISuggestingTags}
-                                                        onClick={handleAISuggestTags}
-                                                        label={t('mapper.action.ai_suggest_tags')}
-                                                        variant="ghost"
-                                                        className="mb-0 mr-0 ml-0 h-3 p-0 text-[8px] bg-transparent hover:bg-transparent"
-                                                    />
-                                                }
-                                                onChange={setScreenTags}
-                                                suggestions={[...new Set(savedMaps.flatMap(m => m.tags || []))]}
-                                                placeholder={t('mapper.placeholder.screen_tags')}
-                                            />
-                                        </div>
+                        <div className="bg-surface border border-outline-variant/30 rounded-2xl flex flex-col overflow-hidden shadow-sm flex-1 relative">
+                            <div className="flex items-center justify-between border-b border-outline-variant/30 shrink-0 bg-surface/50 px-4 py-3">
+                                <h3 className="text-sm font-semibold text-on-surface flex items-center gap-2">
+                                    <Settings2 size={16} className="text-primary" />
+                                    {hasElementFocus ? t('mapper.properties_element') : t('mapper.properties_screen')}
+                                </h3>
+                                {isSaving && (
+                                    <div className="flex items-center gap-1.5 text-[10px] text-on-surface-variant/50 font-medium px-2 py-1 bg-surface rounded-full shadow-sm border border-outline-variant/20">
+                                        <ExpressiveLoading size="xsm" variant="circular" />
+                                        {t('mapper.status.saving')}
                                     </div>
-                                    <div className="w-32">
-                                        <div className="text-xs font-medium text-on-surface-variant/80 ml-1 mb-1">
-                                            {t('mapper.screen_type')}
-                                        </div>
-                                        <Select
-                                            value={screenType}
-                                            onChange={(e) => setScreenType(e.target.value as any)}
-                                            options={['screen', 'modal', 'tab', 'drawer'].map(type => ({
-                                                label: t(`mapper.screen_types.${type}`),
-                                                value: type
-                                            }))}
-                                        />
-                                    </div>
-                                </div>
-                                <div className="px-4 pb-2">
-                                    <Textarea
-                                        label={t('mapper.input.screen_description')}
-                                        value={screenDescription}
-                                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setScreenDescription(e.target.value)}
-                                        placeholder={t('mapper.placeholder.screen_description')}
-                                        className="h-16"
-                                    />
-                                </div>
-                                <div className="flex gap-2">
-                                    <Button onClick={() => { handleSaveScreen(); refreshAll(); }} variant="primary" className="hover:bg-secondary-container">
-                                        <Save size={16} className="mr-2" /> {t('mapper.action.save_screen')}
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        onClick={() => {
-                                            setScreenName('');
-                                            setScreenType('screen');
-                                            setScreenTags([]);
-                                            setMappedElements([]);
-                                            setViewportScreenshot(null);
-                                            refreshAll();
-                                        }}
-                                        className="gap-2"
-                                    >
-                                        <Plus size={16} /> {t('mapper.action.new')}
-                                    </Button>
-                                    <div className="relative group" ref={loadMenuRef}>
-                                        <Button variant="ghost" size="icon" onClick={() => setShowLoadMenu(!showLoadMenu)}><FileClock size={16} /></Button>
-                                        {showLoadMenu && (
-                                            <div className="absolute top-full left-0 mt-2 w-80 bg-surface rounded-xl shadow-xl border border-outline-variant/30 overflow-hidden z-[100] flex flex-col max-h-80">
-                                                <div className="p-2 border-b border-outline-variant/30 bg-surface-variant/5 flex flex-col gap-2">
-                                                    <div className="px-1 text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest">
-                                                        {t('mapper.saved_screens')}
-                                                    </div>
-                                                    <SegmentedControl
-                                                        value={screenListMode}
-                                                        onChange={setScreenListMode}
-                                                        options={[
-                                                            { value: 'all', label: t('mapper.grouping.all_screens', 'All Screens') },
-                                                            { value: 'tags', label: t('mapper.grouping.by_tags', 'By Tags') }
-                                                        ]}
-                                                    />
-                                                </div>
-                                                <div className="overflow-y-auto custom-scrollbar flex-1">
-                                                    {savedMaps.length === 0 ? (
-                                                        <div className="p-4 text-center text-xs text-on-surface-variant/50 italic">{t('mapper.no_saved_maps')}</div>
-                                                    ) : screenListMode === 'all' ? (
-                                                        savedMaps.map(map => (
-                                                            <div
-                                                                key={map.id}
-                                                                onClick={() => handleLoadScreen(map)}
-                                                                className="flex items-center justify-between p-3 hover:bg-surface-variant/10 cursor-pointer border-b border-outline-variant/5 last:border-0 transition-colors group/item"
-                                                            >
-                                                                <div className="flex flex-col gap-0.5">
-                                                                    <span className="text-sm font-medium text-on-surface">{map.name}</span>
-                                                                    <span className="text-[10px] text-on-surface-variant/50 uppercase">{t(`mapper.screen_types.${map.type}`)}</span>
-                                                                </div>
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    onClick={(e) => handleDeleteScreen(map.id, e)}
-                                                                    className="p-1.5 opacity-0 group-hover/item:opacity-100 hover:text-error hover:bg-error/10 rounded transition-all"
-                                                                >
-                                                                    <Trash2 size={16} />
-                                                                </Button>
-                                                            </div>
-                                                        ))
-                                                    ) : (
-                                                        // Group by Tags
-                                                        (() => {
-                                                            const groupedEntries = groupScreensByTags(savedMaps, t('mapper.grouping.no_tags', 'No Tags'));
+                                )}
+                            </div>
 
-                                                            return groupedEntries.map(([tag, maps]) => {
-                                                                const isExpanded = expandedScreenTags.includes(tag);
-                                                                return (
-                                                                    <div key={tag} className="border-b border-outline-variant/5 last:border-0">
-                                                                        <div
-                                                                            className="flex items-center justify-between p-2 hover:bg-surface-variant/10 cursor-pointer text-xs font-semibold text-on-surface-variant/80 bg-surface-variant/5"
-                                                                            onClick={() => {
-                                                                                setExpandedScreenTags(prev =>
-                                                                                    prev.includes(tag) ? prev.filter(item => item !== tag) : [...prev, tag]
-                                                                                );
-                                                                            }}
-                                                                        >
-                                                                            <span className="flex items-center gap-1.5">
-                                                                                <span className="w-4 h-4 flex items-center justify-center">
-                                                                                    {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                                                                                </span>
-                                                                                {tag}
-                                                                            </span>
-                                                                            <span className="text-[10px] bg-surface-variant/30 px-1.5 rounded">{maps.length}</span>
-                                                                        </div>
-                                                                        {isExpanded && (
-                                                                            <div className="flex flex-col bg-surface-variant/5">
-                                                                                {maps.map(map => (
-                                                                                    <div
-                                                                                        key={`${tag}-${map.id}`}
-                                                                                        onClick={() => handleLoadScreen(map)}
-                                                                                        className="flex items-center justify-between p-2 pl-8 hover:bg-surface-variant/10 cursor-pointer border-t border-outline-variant/5 transition-colors group/item"
-                                                                                    >
-                                                                                        <div className="flex flex-col gap-0.5">
-                                                                                            <span className="text-sm font-medium text-on-surface">{map.name}</span>
-                                                                                            <span className="text-[10px] text-on-surface-variant/50 uppercase">{t(`mapper.screen_types.${map.type}`)}</span>
-                                                                                        </div>
-                                                                                        <Button
-                                                                                            variant="ghost"
-                                                                                            size="icon"
-                                                                                            onClick={(e) => handleDeleteScreen(map.id, e)}
-                                                                                            className="p-1 opacity-0 group-hover/item:opacity-100 hover:text-error hover:bg-error/10 rounded transition-all"
-                                                                                        >
-                                                                                            <Trash2 size={14} />
-                                                                                        </Button>
-                                                                                    </div>
-                                                                                ))}
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                );
-                                                            });
-                                                        })()
-                                                    )}
+                            {!hasElementFocus ? (
+                                <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar">
+                                    {/* Screen Settings */}
+                                    <div className="p-4 border-b border-outline-variant/30 bg-surface/50 space-y-4">
+                                        <div className="flex flex-col xl:flex-row gap-4 items-start">
+                                            <div className="flex-1 w-full xl:min-w-[200px]">
+                                                <Combobox
+                                                    label={t('mapper.screen_name')}
+                                                    value={screenName}
+                                                    onChange={setScreenName}
+                                                    options={savedMaps.map(m => m.name)}
+                                                    placeholder={t('mapper.placeholder.screen_name')}
+                                                />
+                                            </div>
+                                            <div className="w-full xl:w-40">
+                                                <div className="text-xs font-medium text-on-surface-variant/80 ml-1 mb-1">
+                                                    {t('mapper.screen_type')}
+                                                </div>
+                                                <Select
+                                                    value={screenType}
+                                                    onChange={(e) => setScreenType(e.target.value as any)}
+                                                    options={['screen', 'modal', 'tab', 'drawer'].map(type => ({
+                                                        label: t(`mapper.screen_types.${type}`),
+                                                        value: type
+                                                    }))}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col xl:flex-row gap-2 pb-2">
+                                            <Textarea
+                                                label={t('mapper.input.screen_description')}
+                                                value={screenDescription}
+                                                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setScreenDescription(e.target.value)}
+                                                placeholder={t('mapper.placeholder.screen_description')}
+                                                className="h-16"
+                                            />
+                                            <div className="w-full xl:w-72 flex gap-1 text-[8px]">
+                                                <div className="flex-1">
+                                                    <TagInput
+                                                        label={t('mapper.screen_tags')}
+                                                        tags={screenTags}
+                                                        assistant={
+                                                            <AiButton
+                                                                id="mapper_suggest_tags"
+                                                                isLoading={isAISuggestingTags}
+                                                                onClick={handleAISuggestTags}
+                                                                label={t('mapper.action.ai_suggest_tags')}
+                                                                variant="ghost"
+                                                                className="text-[6px] bg-transparent hover:bg-transparent mt-0"
+                                                            />
+                                                        }
+                                                        onChange={setScreenTags}
+                                                        suggestions={[...new Set(savedMaps.flatMap(m => m.tags || []))]}
+                                                        placeholder={t('mapper.placeholder.screen_tags')}
+                                                        className="mt-0 p-0 h-auto"
+                                                    />
                                                 </div>
                                             </div>
-                                        )}
-                                    </div>
-                                    <div className="flex-1 flex justify-end gap-2">
-                                        {screenName && mappedElements.length > 0 && (
+                                        </div>
+                                        <div className="flex gap-2">
                                             <Button
-                                                onClick={handleExportPOM}
-                                                variant="ghost"
-                                                size="icon"
-                                                title={t('mapper.action.export_pom')}
-                                                className="hover:text-primary hover:bg-primary/10 transition-all"
+                                                variant="outline"
+                                                onClick={() => {
+                                                    setScreenName('');
+                                                    setScreenType('screen');
+                                                    setScreenTags([]);
+                                                    setMappedElements([]);
+                                                    setScreenshot(null);
+                                                    refreshAll();
+                                                }}
+                                                className="gap-2"
                                             >
-                                                <FileCode size={18} />
+                                                <Plus size={16} /> {t('mapper.action.new')}
                                             </Button>
-                                        )}
+                                            <div className="relative group" ref={loadMenuRef}>
+                                                <Button variant="ghost" onClick={() => setShowLoadMenu(!showLoadMenu)} className="gap-2"><FileClock size={16} /> {t('mapper.saved_screens')}</Button>
+                                                {showLoadMenu && (
+                                                    <div className="absolute top-full left-0 mt-2 w-80 bg-surface rounded-xl shadow-xl border border-outline-variant/30 overflow-hidden z-[100] flex flex-col max-h-80">
+                                                        <div className="p-2 border-b border-outline-variant/30 bg-surface-variant/5 flex flex-col gap-2">
+                                                            <div className="px-1 text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest">
+                                                                {t('mapper.saved_screens')}
+                                                            </div>
+                                                            <SegmentedControl
+                                                                value={screenListMode}
+                                                                onChange={setScreenListMode}
+                                                                options={[
+                                                                    { value: 'all', label: t('mapper.grouping.all_screens') },
+                                                                    { value: 'tags', label: t('mapper.grouping.by_tags') }
+                                                                ]}
+                                                            />
+                                                        </div>
+                                                        <div className="overflow-y-auto custom-scrollbar flex-1">
+                                                            {savedMaps.length === 0 ? (
+                                                                <div className="p-4 text-center text-xs text-on-surface-variant/50 italic">{t('mapper.no_saved_maps')}</div>
+                                                            ) : screenListMode === 'all' ? (
+                                                                savedMaps.map(map => (
+                                                                    <div
+                                                                        key={map.id}
+                                                                        onClick={() => handleLoadScreen(map)}
+                                                                        className="flex items-center justify-between p-3 hover:bg-surface-variant/10 cursor-pointer border-b border-outline-variant/5 last:border-0 transition-colors group/item"
+                                                                    >
+                                                                        <div className="flex flex-col gap-0.5">
+                                                                            <span className="text-sm font-medium text-on-surface">{map.name}</span>
+                                                                            <span className="text-[10px] text-on-surface-variant/50 uppercase">{t(`mapper.screen_types.${map.type}`)}</span>
+                                                                        </div>
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            onClick={(e) => handleDeleteScreen(map.id, e)}
+                                                                            className="p-1.5 opacity-0 group-hover/item:opacity-100 hover:text-error hover:bg-error/10 rounded transition-all"
+                                                                        >
+                                                                            <Trash2 size={16} />
+                                                                        </Button>
+                                                                    </div>
+                                                                ))
+                                                            ) : (
+                                                                // Group by Tags
+                                                                (() => {
+                                                                    const groupedEntries = groupScreensByTags(savedMaps, t('mapper.grouping.no_tags'));
+
+                                                                    return groupedEntries.map(([tag, maps]) => {
+                                                                        const isExpanded = expandedScreenTags.includes(tag);
+                                                                        return (
+                                                                            <div key={tag} className="border-b border-outline-variant/5 last:border-0">
+                                                                                <div
+                                                                                    className="flex items-center justify-between p-2 hover:bg-surface-variant/10 cursor-pointer text-xs font-semibold text-on-surface-variant/80 bg-surface-variant/5"
+                                                                                    onClick={() => {
+                                                                                        setExpandedScreenTags(prev =>
+                                                                                            prev.includes(tag) ? prev.filter(item => item !== tag) : [...prev, tag]
+                                                                                        );
+                                                                                    }}
+                                                                                >
+                                                                                    <span className="flex items-center gap-1.5">
+                                                                                        <span className="w-4 h-4 flex items-center justify-center">
+                                                                                            {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                                                                        </span>
+                                                                                        {tag}
+                                                                                    </span>
+                                                                                    <span className="text-[10px] bg-surface-variant/30 px-1.5 rounded">{maps.length}</span>
+                                                                                </div>
+                                                                                {isExpanded && (
+                                                                                    <div className="flex flex-col bg-surface-variant/5">
+                                                                                        {maps.map(map => (
+                                                                                            <div
+                                                                                                key={`${tag}-${map.id}`}
+                                                                                                onClick={() => handleLoadScreen(map)}
+                                                                                                className="flex items-center justify-between p-2 pl-8 hover:bg-surface-variant/10 cursor-pointer border-t border-outline-variant/5 transition-colors group/item"
+                                                                                            >
+                                                                                                <div className="flex flex-col gap-0.5">
+                                                                                                    <span className="text-sm font-medium text-on-surface">{map.name}</span>
+                                                                                                    <span className="text-[10px] text-on-surface-variant/50 uppercase">{t(`mapper.screen_types.${map.type}`)}</span>
+                                                                                                </div>
+                                                                                                <Button
+                                                                                                    variant="ghost"
+                                                                                                    size="icon"
+                                                                                                    onClick={(e) => handleDeleteScreen(map.id, e)}
+                                                                                                    className="p-1 opacity-0 group-hover/item:opacity-100 hover:text-error hover:bg-error/10 rounded transition-all"
+                                                                                                >
+                                                                                                    <Trash2 size={14} />
+                                                                                                </Button>
+                                                                                            </div>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        );
+                                                                    });
+                                                                })()
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="flex-1 flex justify-end gap-2">
+                                                {screenName && mappedElements.length > 0 && (
+                                                    <Button
+                                                        onClick={handleExportPOM}
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        title={t('mapper.action.export_pom')}
+                                                        className="hover:text-primary hover:bg-primary/10 transition-all"
+                                                    >
+                                                        <FileCode size={18} />
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center justify-between border-t border-b border-outline-variant/30 p-4">
+                                        <h3 className="text-sm font-semibold text-primary dark:text-primary/80 uppercase tracking-wider flex items-center gap-2">
+                                            <SearchCode size={14} /> {t('mapper.screen_mapper')}
+                                        </h3>
+                                        <div className="flex gap-2">
+                                            <div className="relative group" ref={elementsMenuRef}>
+                                                <Button
+                                                    variant="ghost"
+                                                    onClick={() => setShowElementsMenu(!showElementsMenu)}
+                                                    className={clsx(showElementsMenu ? "text-primary dark:text-primary/80 bg-primary/10" : "text-on-surface-variant/80", "gap-2")}
+                                                >
+                                                    <FileClock size={16} /> {t('mapper.saved_elements')}
+                                                </Button>
+
+                                                {showElementsMenu && (
+                                                    <div className="absolute top-full right-0 mt-2 w-80 bg-surface rounded-xl shadow-xl border border-outline-variant/30 overflow-hidden z-[100] flex flex-col max-h-100">
+                                                        <div className="p-2 border-b border-outline-variant/30 bg-surface-variant/5 flex flex-col gap-2">
+                                                            <div className="px-1 text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest">
+                                                                {t('mapper.saved_elements', 'Saved Elements')}
+                                                            </div>
+                                                            <SegmentedControl
+                                                                value={elementListMode}
+                                                                onChange={setElementListMode}
+                                                                options={[
+                                                                    { value: 'all', label: t('mapper.grouping.all_elements', 'All Elements') },
+                                                                    { value: 'type', label: t('mapper.grouping.by_type', 'By Type') }
+                                                                ]}
+                                                            />
+                                                        </div>
+                                                        <div className="overflow-y-auto custom-scrollbar flex-1">
+                                                            {mappedElements.length === 0 ? (
+                                                                <div className="p-4 text-center text-xs text-on-surface-variant/50 italic">{t('mapper.no_saved_elements', 'No elements mapped')}</div>
+                                                            ) : elementListMode === 'all' ? (
+                                                                mappedElements.map(el => (
+                                                                    <div
+                                                                        key={el.id}
+                                                                        onClick={() => {
+                                                                            setCurrentElement(el);
+                                                                            // Try to find matching node in current tree if possible
+                                                                            if (rootNode) {
+                                                                                const findNodeById = (node: InspectorNode): InspectorNode | null => {
+                                                                                    if (generateXPath(node) === el.id) return node;
+                                                                                    for (const child of node.children) {
+                                                                                        const found = findNodeById(child);
+                                                                                        if (found) return found;
+                                                                                    }
+                                                                                    return null;
+                                                                                };
+                                                                                const matchingNode = findNodeById(rootNode);
+                                                                                if (matchingNode) setSelectedNode(matchingNode);
+                                                                            }
+                                                                            setShowElementsMenu(false);
+                                                                        }}
+                                                                        className={clsx(
+                                                                            "flex items-center justify-between p-3 hover:bg-surface-variant/10 cursor-pointer border-b border-outline-variant/5 last:border-0 transition-colors group/ele",
+                                                                            currentElement.id === el.id && "bg-primary/5"
+                                                                        )}
+                                                                    >
+                                                                        <div className="flex flex-col gap-0.5 truncate pr-2">
+                                                                            <span className="text-sm font-medium text-on-surface truncate">{el.name}</span>
+                                                                            <span className="text-[10px] text-on-surface-variant/50 uppercase">{t(`mapper.types.${el.type}`)}</span>
+                                                                        </div>
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                removeElementMapping(el.id);
+                                                                            }}
+                                                                            className="p-1.5 opacity-0 group-hover/ele:opacity-100 hover:text-error hover:bg-error/10 rounded transition-all"
+                                                                        >
+                                                                            <Trash2 size={16} />
+                                                                        </Button>
+                                                                    </div>
+                                                                ))
+                                                            ) : (
+                                                                // Group by Type
+                                                                (() => {
+                                                                    const grouped = groupElementsByType(mappedElements, (key) => t(key));
+
+                                                                    return Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([type, elements]) => {
+                                                                        const isExpanded = expandedElementTypes.includes(type);
+                                                                        return (
+                                                                            <div key={type} className="border-b border-outline-variant/5 last:border-0">
+                                                                                <div
+                                                                                    className="flex items-center justify-between p-2 hover:bg-surface-variant/10 cursor-pointer text-xs font-semibold text-on-surface-variant/80 bg-surface-variant/5"
+                                                                                    onClick={() => {
+                                                                                        setExpandedElementTypes(prev =>
+                                                                                            prev.includes(type) ? prev.filter(item => item !== type) : [...prev, type]
+                                                                                        );
+                                                                                    }}
+                                                                                >
+                                                                                    <span className="flex items-center gap-1.5">
+                                                                                        <span className="w-4 h-4 flex items-center justify-center">
+                                                                                            {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                                                                        </span>
+                                                                                        {type}
+                                                                                    </span>
+                                                                                    <span className="text-[10px] bg-surface-variant/30 px-1.5 rounded">{elements.length}</span>
+                                                                                </div>
+                                                                                {isExpanded && (
+                                                                                    <div className="flex flex-col bg-surface-variant/5">
+                                                                                        {elements.map(el => (
+                                                                                            <div
+                                                                                                key={el.id}
+                                                                                                onClick={() => {
+                                                                                                    setCurrentElement(el);
+                                                                                                    // Try to find matching node in current tree if possible
+                                                                                                    if (rootNode) {
+                                                                                                        const findNodeById = (node: InspectorNode): InspectorNode | null => {
+                                                                                                            if (generateXPath(node) === el.id) return node;
+                                                                                                            for (const child of node.children) {
+                                                                                                                const found = findNodeById(child);
+                                                                                                                if (found) return found;
+                                                                                                            }
+                                                                                                            return null;
+                                                                                                        };
+                                                                                                        const matchingNode = findNodeById(rootNode);
+                                                                                                        if (matchingNode) setSelectedNode(matchingNode);
+                                                                                                    }
+                                                                                                    setShowElementsMenu(false);
+                                                                                                }}
+                                                                                                className={clsx(
+                                                                                                    "flex items-center justify-between p-2 pl-8 hover:bg-surface-variant/10 cursor-pointer border-t border-outline-variant/5 transition-colors group/ele",
+                                                                                                    currentElement.id === el.id && "bg-primary/5"
+                                                                                                )}
+                                                                                            >
+                                                                                                <div className="flex flex-col gap-0.5 truncate pr-2">
+                                                                                                    <span className="text-sm font-medium text-on-surface truncate">{el.name}</span>
+                                                                                                    <span className="text-[10px] text-on-surface-variant/50 uppercase">{t(`mapper.types.${el.type}`)}</span>
+                                                                                                </div>
+                                                                                                <Button
+                                                                                                    variant="ghost"
+                                                                                                    size="icon"
+                                                                                                    onClick={(e) => {
+                                                                                                        e.stopPropagation();
+                                                                                                        removeElementMapping(el.id);
+                                                                                                    }}
+                                                                                                    className="p-1 opacity-0 group-hover/ele:opacity-100 hover:text-error hover:bg-error/10 rounded transition-all"
+                                                                                                >
+                                                                                                    <Trash2 size={14} />
+                                                                                                </Button>
+                                                                                            </div>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        );
+                                                                    });
+                                                                })()
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                            <div className="flex items-center justify-between border-t border-b border-outline-variant/30 p-4">
-                                <h3 className="text-sm font-semibold text-primary dark:text-primary/80 uppercase tracking-wider flex items-center gap-2">
-                                    <SearchCode size={14} /> {t('mapper.screen_mapper')}
-                                </h3>
-                                <div className="flex gap-2">
-                                    <div className="relative group" ref={elementsMenuRef}>
+                            ) : (
+                                <div className="flex-1 flex flex-col overflow-hidden">
+                                    <div className="flex items-center justify-between border-b border-outline-variant/30 shrink-0 bg-surface/50 px-2 py-1.5">
                                         <Button
                                             variant="ghost"
-                                            size="icon"
-                                            onClick={() => setShowElementsMenu(!showElementsMenu)}
-                                            className={clsx(showElementsMenu ? "text-primary dark:text-primary/80 bg-primary/10" : "text-on-surface-variant/80")}
-                                            title={t('mapper.saved_elements', 'Saved Elements')}
+                                            size="sm"
+                                            onClick={() => { setSelectedNode(null); setCurrentElement({}); }}
+                                            className="text-on-surface-variant/80 hover:text-on-surface/90 gap-1.5 px-2"
                                         >
-                                            <FileClock size={16} />
+                                            <ArrowLeft size={16} /> {t('mapper.action.back_to_screen', 'Back to Screen')}
                                         </Button>
-
-                                        {showElementsMenu && (
-                                            <div className="absolute top-full right-0 mt-2 w-80 bg-surface rounded-xl shadow-xl border border-outline-variant/30 overflow-hidden z-[100] flex flex-col max-h-100">
-                                                <div className="p-2 border-b border-outline-variant/30 bg-surface-variant/5 flex flex-col gap-2">
-                                                    <div className="px-1 text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest">
-                                                        {t('mapper.saved_elements', 'Saved Elements')}
-                                                    </div>
-                                                    <SegmentedControl
-                                                        value={elementListMode}
-                                                        onChange={setElementListMode}
-                                                        options={[
-                                                            { value: 'all', label: t('mapper.grouping.all_elements', 'All Elements') },
-                                                            { value: 'type', label: t('mapper.grouping.by_type', 'By Type') }
-                                                        ]}
-                                                    />
-                                                </div>
-                                                <div className="overflow-y-auto custom-scrollbar flex-1">
-                                                    {mappedElements.length === 0 ? (
-                                                        <div className="p-4 text-center text-xs text-on-surface-variant/50 italic">{t('mapper.no_saved_elements', 'No elements mapped')}</div>
-                                                    ) : elementListMode === 'all' ? (
-                                                        mappedElements.map(el => (
-                                                            <div
-                                                                key={el.id}
-                                                                onClick={() => {
-                                                                    setCurrentElement(el);
-                                                                    // Try to find matching node in current tree if possible
-                                                                    if (rootNode) {
-                                                                        const findNodeById = (node: InspectorNode): InspectorNode | null => {
-                                                                            if (generateXPath(node) === el.id) return node;
-                                                                            for (const child of node.children) {
-                                                                                const found = findNodeById(child);
-                                                                                if (found) return found;
-                                                                            }
-                                                                            return null;
-                                                                        };
-                                                                        const matchingNode = findNodeById(rootNode);
-                                                                        if (matchingNode) setSelectedNode(matchingNode);
-                                                                    }
-                                                                    setShowElementsMenu(false);
-                                                                }}
-                                                                className={clsx(
-                                                                    "flex items-center justify-between p-3 hover:bg-surface-variant/10 cursor-pointer border-b border-outline-variant/5 last:border-0 transition-colors group/ele",
-                                                                    currentElement.id === el.id && "bg-primary/5"
-                                                                )}
-                                                            >
-                                                                <div className="flex flex-col gap-0.5 truncate pr-2">
-                                                                    <span className="text-sm font-medium text-on-surface truncate">{el.name}</span>
-                                                                    <span className="text-[10px] text-on-surface-variant/50 uppercase">{t(`mapper.types.${el.type}`)}</span>
-                                                                </div>
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        removeElementMapping(el.id);
-                                                                    }}
-                                                                    className="p-1.5 opacity-0 group-hover/ele:opacity-100 hover:text-error hover:bg-error/10 rounded transition-all"
-                                                                >
-                                                                    <Trash2 size={16} />
-                                                                </Button>
-                                                            </div>
-                                                        ))
-                                                    ) : (
-                                                        // Group by Type
-                                                        (() => {
-                                                            const grouped = groupElementsByType(mappedElements, (key) => t(key));
-
-                                                            return Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([type, elements]) => {
-                                                                const isExpanded = expandedElementTypes.includes(type);
-                                                                return (
-                                                                    <div key={type} className="border-b border-outline-variant/5 last:border-0">
-                                                                        <div
-                                                                            className="flex items-center justify-between p-2 hover:bg-surface-variant/10 cursor-pointer text-xs font-semibold text-on-surface-variant/80 bg-surface-variant/5"
-                                                                            onClick={() => {
-                                                                                setExpandedElementTypes(prev =>
-                                                                                    prev.includes(type) ? prev.filter(item => item !== type) : [...prev, type]
-                                                                                );
-                                                                            }}
-                                                                        >
-                                                                            <span className="flex items-center gap-1.5">
-                                                                                <span className="w-4 h-4 flex items-center justify-center">
-                                                                                    {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                                                                                </span>
-                                                                                {type}
-                                                                            </span>
-                                                                            <span className="text-[10px] bg-surface-variant/30 px-1.5 rounded">{elements.length}</span>
-                                                                        </div>
-                                                                        {isExpanded && (
-                                                                            <div className="flex flex-col bg-surface-variant/5">
-                                                                                {elements.map(el => (
-                                                                                    <div
-                                                                                        key={el.id}
-                                                                                        onClick={() => {
-                                                                                            setCurrentElement(el);
-                                                                                            // Try to find matching node in current tree if possible
-                                                                                            if (rootNode) {
-                                                                                                const findNodeById = (node: InspectorNode): InspectorNode | null => {
-                                                                                                    if (generateXPath(node) === el.id) return node;
-                                                                                                    for (const child of node.children) {
-                                                                                                        const found = findNodeById(child);
-                                                                                                        if (found) return found;
-                                                                                                    }
-                                                                                                    return null;
-                                                                                                };
-                                                                                                const matchingNode = findNodeById(rootNode);
-                                                                                                if (matchingNode) setSelectedNode(matchingNode);
-                                                                                            }
-                                                                                            setShowElementsMenu(false);
-                                                                                        }}
-                                                                                        className={clsx(
-                                                                                            "flex items-center justify-between p-2 pl-8 hover:bg-surface-variant/10 cursor-pointer border-t border-outline-variant/5 transition-colors group/ele",
-                                                                                            currentElement.id === el.id && "bg-primary/5"
-                                                                                        )}
-                                                                                    >
-                                                                                        <div className="flex flex-col gap-0.5 truncate pr-2">
-                                                                                            <span className="text-sm font-medium text-on-surface truncate">{el.name}</span>
-                                                                                            <span className="text-[10px] text-on-surface-variant/50 uppercase">{t(`mapper.types.${el.type}`)}</span>
-                                                                                        </div>
-                                                                                        <Button
-                                                                                            variant="ghost"
-                                                                                            size="icon"
-                                                                                            onClick={(e) => {
-                                                                                                e.stopPropagation();
-                                                                                                removeElementMapping(el.id);
-                                                                                            }}
-                                                                                            className="p-1 opacity-0 group-hover/ele:opacity-100 hover:text-error hover:bg-error/10 rounded transition-all"
-                                                                                        >
-                                                                                            <Trash2 size={14} />
-                                                                                        </Button>
-                                                                                    </div>
-                                                                                ))}
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                );
-                                                            });
-                                                        })()
-                                                    )}
-                                                </div>
+                                        {availableNodes.length > 1 ? (
+                                            <div className="flex overflow-x-auto custom-scrollbar flex-1">
+                                                {availableNodes.map((node) => (
+                                                    <button
+                                                        key={node.id}
+                                                        onClick={() => setSelectedNode(node)}
+                                                        className={clsx(
+                                                            "px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
+                                                            selectedNode === node
+                                                                ? "border-primary text-primary dark:text-primary/80 bg-surface-variant/30"
+                                                                : "border-transparent text-on-surface-variant/80 hover:text-on-surface-variant/80 hover:bg-surface-variant/30"
+                                                        )}
+                                                    >
+                                                        {node.tagName}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="px-4 py-3 text-sm font-semibold text-on-surface-variant/80 flex-1">
+                                                {t('mapper.properties_element')}
                                             </div>
                                         )}
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <Button onClick={saveElementMapping} variant="primary" size="sm" className="hover:bg-secondary-container">
-                                            <FileInput size={16} className="mr-2" />
-                                            {mappedElements.find(e => e.id === currentElement.id) ? t('mapper.action.update') : t('mapper.action.add')}
-                                        </Button>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="flex items-center justify-between border-b border-outline-variant/30 shrink-0 bg-surface/50 pr-2">
-                                {availableNodes.length > 1 ? (
-                                    <div className="flex overflow-x-auto custom-scrollbar flex-1">
-                                        {availableNodes.map((node) => (
+                                        {selectedNode && (
                                             <button
-                                                key={node.id}
-                                                onClick={() => setSelectedNode(node)}
-                                                className={clsx(
-                                                    "px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
-                                                    selectedNode === node
-                                                        ? "border-primary text-primary dark:text-primary/80 bg-surface-variant/30"
-                                                        : "border-transparent text-on-surface-variant/80 hover:text-on-surface-variant/80 hover:bg-surface-variant/30"
-                                                )}
+                                                onClick={() => {
+                                                    setSelectedNode(null);
+                                                    setAvailableNodes([]);
+                                                }}
+                                                className="p-1.5 text-on-surface/80 hover:text-error hover:bg-error-container/10 rounded-2xl transition-colors ml-2"
                                             >
-                                                {node.tagName}
+                                                <X size={16} />
                                             </button>
-                                        ))}
+                                        )}
                                     </div>
-                                ) : (
-                                    <div className="px-4 py-3 text-sm font-semibold text-on-surface-variant/80 flex-1">
-                                        {t('mapper.properties')}
-                                    </div>
-                                )}
-                                {selectedNode && (
-                                    <button
-                                        onClick={() => {
-                                            setSelectedNode(null);
-                                            setAvailableNodes([]);
-                                        }}
-                                        className="p-1.5 text-on-surface/80 hover:text-error hover:bg-error-container/10 rounded-2xl transition-colors ml-2"
-                                    >
-                                        <X size={16} />
-                                    </button>
-                                )}
-                            </div>
 
-                            <div className="flex-1 overflow-y-auto custom-scrollbar p-0">
-                                <div className="p-4 space-y-4">
-                                    {selectedNode ? (
-                                        <>
-                                            <div className="space-y-4">
-                                                <NodeBreadcrumbs
-                                                    node={selectedNode}
-                                                    onSelect={setSelectedNode}
-                                                    onHover={setHoveredNode}
-                                                />
-                                            </div>
+                                    <div className="flex-1 overflow-y-auto custom-scrollbar p-0">
+                                        <div className="p-4 space-y-4">
+                                            {selectedNode ? (
+                                                <>
+                                                    <div className="space-y-4">
+                                                        <NodeBreadcrumbs
+                                                            node={selectedNode}
+                                                            onSelect={setSelectedNode}
+                                                            onHover={setHoveredNode}
+                                                        />
+                                                    </div>
 
-                                            <div className="mb-4 space-y-2">
-                                                <div className="flex items-center justify-between">
-                                                    <h3 className="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest">{t('inspector.attributes.identifiers')}</h3>
-                                                    <AiButton
-                                                        id="mapper_suggest_name"
-                                                        isLoading={isAISuggesting}
-                                                        onClick={handleAISuggestName}
-                                                        label={t('mapper.action.ai_suggest_name')}
-                                                        variant="primary"
-                                                        className="h-7"
-                                                    />
+                                                    <div className="mb-4 space-y-2">
+                                                        <div className="flex items-center justify-between">
+                                                            <h3 className="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest">{t('inspector.attributes.identifiers')}</h3>
+                                                            <AiButton
+                                                                id="mapper_suggest_name"
+                                                                isLoading={isAISuggesting}
+                                                                onClick={handleAISuggestName}
+                                                                label={t('mapper.action.ai_suggest_name')}
+                                                                variant="primary"
+                                                                className="h-7"
+                                                            />
+                                                        </div>
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                            <CopyButton
+                                                                label={t('inspector.attributes.access_id')}
+                                                                value={selectedNode.attributes['content-desc']}
+                                                                onCopy={(v: string) => copyToClipboard(v, 'aid')}
+                                                                active={copied === 'aid'}
+                                                            />
+                                                            <CopyButton
+                                                                label={t('inspector.attributes.resource_id')}
+                                                                value={selectedNode.attributes['resource-id']}
+                                                                onCopy={(v: string) => copyToClipboard(v, 'rid')}
+                                                                active={copied === 'rid'}
+                                                            />
+                                                        </div>
+                                                    </div>
+
+                                                    {showAISuggestion && (
+                                                        <AiResponse
+                                                            title={t('inspector.attributes.ai_suggest')}
+                                                            isLoading={isAISuggesting}
+                                                            responseTitle={t('inspector.attributes.suggested_selector')}
+                                                            response={aiSuggestedName ? `\`${aiSuggestedName}\`` : null}
+                                                            rationale={aiJustification}
+                                                            rationaleHeader={t('inspector.attributes.rationale')}
+                                                            error={aiError}
+                                                            onCopy={() => {
+                                                                updateElement('name', aiSuggestedName || '');
+                                                                feedback.toast.success(t('feedback.saved'));
+                                                            }}
+                                                        />
+                                                    )}
+
+                                                    <div className="grid grid-cols-1 gap-4">
+                                                        <Input
+                                                            label={t('mapper.input.element_name')}
+                                                            value={currentElement.name || ''}
+                                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateElement('name', e.target.value)}
+                                                            placeholder={t('mapper.placeholder.element_name')}
+                                                        />
+                                                        <Textarea
+                                                            label={t('mapper.input.element_description')}
+                                                            value={currentElement.description || ''}
+                                                            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => updateElement('description', e.target.value)}
+                                                            placeholder={t('mapper.placeholder.element_description', 'Element description (AI only)')}
+                                                            className="h-20"
+                                                        />
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                            <Select
+                                                                label={t('mapper.input.element_type')}
+                                                                value={currentElement.type || 'button'}
+                                                                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => updateElement('type', e.target.value)}
+                                                                options={(['button', 'input', 'text', 'link', 'toggle', 'checkbox', 'image', 'menu', 'scroll_view', 'tab'] as UIElementType[]).map(type => ({
+                                                                    label: t(`mapper.types.${type}`),
+                                                                    value: type
+                                                                }))}
+                                                            />
+                                                            <GroupedScreenSelect
+                                                                label={t('mapper.input.navigates_to')}
+                                                                value={
+                                                                    (typeof currentElement.navigates_to === 'string'
+                                                                        ? currentElement.navigates_to
+                                                                        : Array.isArray(currentElement.navigates_to)
+                                                                            ? currentElement.navigates_to[0]?.destination
+                                                                            : (currentElement.navigates_to as NavigationData)?.destination) || ''
+                                                                }
+                                                                onChange={(val) => {
+                                                                    if (Array.isArray(currentElement.navigates_to)) {
+                                                                        const newNavs = [...currentElement.navigates_to];
+                                                                        if (newNavs.length > 0) newNavs[0] = { ...newNavs[0], destination: val };
+                                                                        else newNavs.push({ destination: val });
+                                                                        updateElement('navigates_to', newNavs);
+                                                                    } else if (typeof currentElement.navigates_to === 'object' && currentElement.navigates_to !== null) {
+                                                                        updateElement('navigates_to', { ...(currentElement.navigates_to as NavigationData), destination: val });
+                                                                    } else {
+                                                                        updateElement('navigates_to', val);
+                                                                    }
+                                                                }}
+                                                                maps={savedMaps}
+                                                                placeholder={t('mapper.placeholder.navigates_to')}
+                                                            />
+                                                        </div>
+
+                                                        {/* Complex Fields */}
+                                                        {currentElement.type === 'menu' && (
+                                                            <Textarea
+                                                                label={t('mapper.input.menu_options')}
+                                                                value={currentElement.menu_options?.join(',') || ''}
+                                                                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => updateElement('menu_options', e.target.value.split(','))}
+                                                                placeholder={t('mapper.placeholder.menu_options')}
+                                                                className="h-20"
+                                                            />
+                                                        )}
+                                                        {currentElement.type === 'tab' && (
+                                                            <GroupedScreenSelect
+                                                                label={t('mapper.input.parent_screen')}
+                                                                value={currentElement.parent_screen || ''}
+                                                                onChange={(val) => updateElement('parent_screen', val)}
+                                                                maps={savedMaps}
+                                                                placeholder={t('mapper.placeholder.parent_screen')}
+                                                            />
+                                                        )}
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <div className="flex flex-col items-center justify-center h-full text-on-surface/80 p-8 text-center">
+                                                    <Scan size={48} className="mb-4 opacity-20" />
+                                                    <p className="text-sm">{t('mapper.select_element')}</p>
                                                 </div>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                                    <CopyButton
-                                                        label={t('inspector.attributes.access_id')}
-                                                        value={selectedNode.attributes['content-desc']}
-                                                        onCopy={(v: string) => copyToClipboard(v, 'aid')}
-                                                        active={copied === 'aid'}
-                                                    />
-                                                    <CopyButton
-                                                        label={t('inspector.attributes.resource_id')}
-                                                        value={selectedNode.attributes['resource-id']}
-                                                        onCopy={(v: string) => copyToClipboard(v, 'rid')}
-                                                        active={copied === 'rid'}
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            {showAISuggestion && (
-                                                <AiResponse
-                                                    title={t('inspector.attributes.ai_suggest')}
-                                                    isLoading={isAISuggesting}
-                                                    responseTitle={t('inspector.attributes.suggested_selector')}
-                                                    response={aiSuggestedName ? `\`${aiSuggestedName}\`` : null}
-                                                    rationale={aiJustification}
-                                                    rationaleHeader={t('inspector.attributes.rationale')}
-                                                    error={aiError}
-                                                    onCopy={() => {
-                                                        updateElement('name', aiSuggestedName || '');
-                                                        feedback.toast.success(t('feedback.saved'));
-                                                    }}
-                                                />
                                             )}
-
-                                            <div className="grid grid-cols-1 gap-4">
-                                                <Input
-                                                    label={t('mapper.input.element_name')}
-                                                    value={currentElement.name || ''}
-                                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateElement('name', e.target.value)}
-                                                    placeholder={t('mapper.placeholder.element_name')}
-                                                />
-                                                <Textarea
-                                                    label={t('mapper.input.element_description')}
-                                                    value={currentElement.description || ''}
-                                                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => updateElement('description', e.target.value)}
-                                                    placeholder={t('mapper.placeholder.element_description', 'Element description (AI only)')}
-                                                    className="h-20"
-                                                />
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <Select
-                                                        label={t('mapper.input.element_type')}
-                                                        value={currentElement.type || 'button'}
-                                                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => updateElement('type', e.target.value)}
-                                                        options={(['button', 'input', 'text', 'link', 'toggle', 'checkbox', 'image', 'menu', 'scroll_view', 'tab'] as UIElementType[]).map(type => ({
-                                                            label: t(`mapper.types.${type}`),
-                                                            value: type
-                                                        }))}
-                                                    />
-                                                    <GroupedScreenSelect
-                                                        label={t('mapper.input.navigates_to')}
-                                                        value={
-                                                            (typeof currentElement.navigates_to === 'string'
-                                                                ? currentElement.navigates_to
-                                                                : Array.isArray(currentElement.navigates_to)
-                                                                    ? currentElement.navigates_to[0]?.destination
-                                                                    : (currentElement.navigates_to as NavigationData)?.destination) || ''
-                                                        }
-                                                        onChange={(val) => {
-                                                            if (Array.isArray(currentElement.navigates_to)) {
-                                                                const newNavs = [...currentElement.navigates_to];
-                                                                if (newNavs.length > 0) newNavs[0] = { ...newNavs[0], destination: val };
-                                                                else newNavs.push({ destination: val });
-                                                                updateElement('navigates_to', newNavs);
-                                                            } else if (typeof currentElement.navigates_to === 'object' && currentElement.navigates_to !== null) {
-                                                                updateElement('navigates_to', { ...(currentElement.navigates_to as NavigationData), destination: val });
-                                                            } else {
-                                                                updateElement('navigates_to', val);
-                                                            }
-                                                        }}
-                                                        maps={savedMaps}
-                                                        placeholder={t('mapper.placeholder.navigates_to')}
-                                                    />
-                                                </div>
-
-                                                {/* Complex Fields */}
-                                                {currentElement.type === 'menu' && (
-                                                    <Textarea
-                                                        label={t('mapper.input.menu_options')}
-                                                        value={currentElement.menu_options?.join(',') || ''}
-                                                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => updateElement('menu_options', e.target.value.split(','))}
-                                                        placeholder={t('mapper.placeholder.menu_options')}
-                                                        className="h-20"
-                                                    />
-                                                )}
-                                                {currentElement.type === 'tab' && (
-                                                    <GroupedScreenSelect
-                                                        label={t('mapper.input.parent_screen')}
-                                                        value={currentElement.parent_screen || ''}
-                                                        onChange={(val) => updateElement('parent_screen', val)}
-                                                        maps={savedMaps}
-                                                        placeholder={t('mapper.placeholder.parent_screen')}
-                                                    />
-                                                )}
-                                            </div>
-                                        </>
-                                    ) : (
-                                        <div className="flex flex-col items-center justify-center h-full text-on-surface/80 p-8 text-center">
-                                            <Scan size={48} className="mb-4 opacity-20" />
-                                            <p className="text-sm">{t('mapper.select_element')}</p>
                                         </div>
-                                    )}
+                                    </div>
                                 </div>
-                            </div>
+                            )}
                         </div>
                     </div>
                 </>
@@ -1630,10 +1827,22 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                     confirmDeleteScreen();
                     refreshAll();
                 }}
-                title={t('mapper.confirm.delete_title', 'Delete Screen Map?')}
-                description={t('mapper.confirm.delete_desc', 'Are you sure you want to delete this screen map? This action cannot be undone.')}
+                title={t('mapper.confirm.delete_title')}
+                description={t('mapper.confirm.delete_desc')}
                 variant="danger"
                 confirmText={t('mapper.action.delete')}
+            />
+
+            <ConfirmationModal
+                isOpen={showMigrationModal}
+                onClose={() => setShowMigrationModal(false)}
+                onConfirm={performMigration}
+                title={t('mapper.migration.title')}
+                description={t('mapper.migration.message')}
+                confirmText={t('mapper.migration.copy')}
+                cancelText={t('mapper.migration.ignore')}
+                isLoading={isMigrating}
+                variant="warning"
             />
 
             {/* AI Exploration Log Panel */}
@@ -1646,7 +1855,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                         <div className="flex items-center gap-2">
                             <div className={clsx("w-2 h-2 rounded-full", isExploring ? "bg-success animate-pulse" : "bg-on-surface-variant/30")} />
                             <h4 className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">
-                                {isExploring ? t('mapper.exploration.active', 'AI Exploring...') : t('mapper.exploration.summary', 'Exploration Ended')}
+                                {isExploring ? t('mapper.exploration.active') : t('mapper.exploration.summary')}
                             </h4>
                         </div>
                         <div className="flex gap-1">
@@ -1662,7 +1871,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                 size="sm"
                                 onClick={toggleStayOn}
                                 className={clsx("flex items-center gap-2 px-3 py-1.5 rounded-2xl transition-all", isStayOn ? "bg-warning/20 text-warning" : "text-on-surface-variant/60 hover:bg-surface-variant/30")}
-                                title={t('mapper.action.toggle_stay_awake', 'Toggle Keep Screen Awake')}
+                                title={t('mapper.action.toggle_stay_awake')}
                             >
                                 {isStayOn ? <Eye size={16} stroke="currentColor" /> : <EyeClosed size={16} stroke="currentColor" />}
                             </Button>
@@ -1677,7 +1886,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                         {isExploring && (
                             <div className="flex items-center gap-2 text-[10px] text-primary animate-pulse mt-4 px-3 border-l-2 border-primary/30 py-1 font-mono">
                                 <ExpressiveLoading size="xsm" variant="circular" />
-                                {t('mapper.exploration.thinking', 'AI exploring and reasoning...')}
+                                {t('mapper.exploration.thinking')}
                             </div>
                         )}
                     </div>

@@ -18,6 +18,10 @@ export interface SystemVersions {
     maestro: string;
     scrcpy: string;
     ngrok: string;
+    claude_code: string;
+    antigravity: string;
+    cypress: string;
+    pytest: string;
 }
 
 // Initialize the store
@@ -33,7 +37,10 @@ export interface AppSettings {
     allowActionsDuringTest: boolean; // Control whether actions are allowed during test
     saveLogs: boolean; // Persist log saving preference
     usageMode?: 'explorer' | 'automator';
-    automationFramework?: 'robot' | 'appium' | 'maestro';
+    automationFramework?: 'robot' | 'appium' | 'maestro' | 'cypress' | 'selenium';
+    explorerPlatform?: 'mobile' | 'web';
+    customAdbPath?: string;
+    noAppiumForRobot?: boolean;
 
     // Appium
     appiumHost: string;
@@ -50,6 +57,7 @@ export interface AppSettings {
         screenshots: string;
         recordings: string;
         automationRoot: string;
+        mappings?: string;
     };
 
     // Tools
@@ -61,11 +69,14 @@ export interface AppSettings {
         appiumJavaArgs: string;
         appPackage: string; // for monitoring/logcat filtering
         ngrokToken: string;
+        cypressArgs: string;
+        seleniumArgs: string;
     };
 
     // AI
-    aiProvider: 'gemini' | 'claude' | 'openai';
+    aiProvider: 'gemini' | 'claude' | 'openai' | 'claude-code' | 'antigravity-cli';
     geminiApiKey?: string;
+    antigravityApiKey?: string;
     geminiModel: string;
     claudeApiKey?: string;
     claudeModel: string;
@@ -74,6 +85,11 @@ export interface AppSettings {
     maxExplorationSteps?: number;
     presentationEnabled: boolean;
     zoomFactor: number;
+    claudeCodeToken?: string;
+    aiChatEnabled: boolean;
+    aiTestModeEnabled: boolean;
+    aiSessionId?: string;
+    updateChannel?: 'stable' | 'beta' | 'alpha';
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -82,6 +98,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     primaryColor: 'blue',
     aiProvider: 'gemini',
     geminiApiKey: '',
+    antigravityApiKey: '',
     geminiModel: 'gemini-1.5-flash',
     claudeApiKey: '',
     claudeModel: 'claude-3-5-sonnet-20240620',
@@ -90,6 +107,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     recycleDeviceViews: false, // Default to false
     allowActionsDuringTest: false, // Default to false (blocking)
     saveLogs: false, // Default to false
+    explorerPlatform: 'mobile',
     appiumHost: '127.0.0.1',
     appiumPort: 4723,
     appiumBasePath: '/',
@@ -102,6 +120,7 @@ const DEFAULT_SETTINGS: AppSettings = {
         logcat: '',
         screenshots: '',
         recordings: '',
+        mappings: '',
     },
     tools: {
         appiumArgs: '--relaxed-security',
@@ -110,11 +129,20 @@ const DEFAULT_SETTINGS: AppSettings = {
         maestroArgs: '',
         appiumJavaArgs: 'test',
         appPackage: 'com.android.chrome, com.chrome.beta',
-        ngrokToken: ''
+        ngrokToken: '',
+        cypressArgs: '',
+        seleniumArgs: ''
     },
     maxExplorationSteps: 30,
     presentationEnabled: false,
-    zoomFactor: 1.0
+    zoomFactor: 1.0,
+    claudeCodeToken: '',
+    aiChatEnabled: false,
+    aiTestModeEnabled: false,
+    aiSessionId: undefined,
+    updateChannel: 'stable',
+    customAdbPath: '',
+    noAppiumForRobot: false
 };
 
 export interface Profile {
@@ -149,13 +177,17 @@ interface SettingsContextType {
     renameProfile: (id: string, name: string) => void;
     deleteProfile: (id: string) => void;
     loading: boolean;
+    hasHydrated: boolean;
     systemVersions: SystemVersions | null;
-    checkSystemVersions: (forceUsageMode?: 'explorer' | 'automator', forceFramework?: 'robot' | 'appium' | 'maestro') => Promise<void>;
+    checkSystemVersions: (forceUsageMode?: 'explorer' | 'automator', forceFramework?: 'robot' | 'appium' | 'maestro' | 'cypress' | 'selenium') => Promise<void>;
     systemCheckStatus: SystemCheckStatus;
     updateInfo: UpdateInfo | null;
     checkForAppUpdate: (manual?: boolean) => Promise<void>;
     isNgrokEnabled: boolean;
     enableNgrok: () => void;
+    is_test_mode: 'mobile' | 'web';
+    activeWebUrl: string;
+    setActiveWebUrl: (url: string) => void;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -167,7 +199,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             'default': { id: 'default', name: 'Default', settings: DEFAULT_SETTINGS }
         }
     });
+    const [activeWebUrl, setActiveWebUrl] = useState<string>('https://google.com');
     const [loading, setLoading] = useState(true);
+    const [hasHydrated, setHasHydrated] = useState(false);
     const [isNgrokEnabled, setIsNgrokEnabled] = useState(false);
 
     const enableNgrok = () => {
@@ -209,8 +243,21 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const loadSettings = async () => {
+        // Safety timeout for store operations (8s)
+        const safetyTimer = setTimeout(() => {
+            setLoading(currentLoading => {
+                if (currentLoading) {
+                    console.warn("[Settings] Store load taking too long, bypassing loading state...");
+                    return false;
+                }
+                return currentLoading;
+            });
+        }, 8000);
+
         try {
             const saved: any = await store.get('app_config');
+            clearTimeout(safetyTimer);
+
             if (saved) {
                 // Migration Logic
                 if (saved.profiles) {
@@ -219,6 +266,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                     const migrated = { ...saved };
                     Object.keys(migrated.profiles).forEach(pid => {
                         migrated.profiles[pid].settings = deepMerge(DEFAULT_SETTINGS, migrated.profiles[pid].settings);
+                        migrated.profiles[pid].settings.aiChatEnabled = false;
+                        migrated.profiles[pid].settings.aiTestModeEnabled = false;
                     });
 
                     // Validate activeProfileId
@@ -239,6 +288,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                     // It's the old flat format. Migrate to Default Profile.
                     console.info("Migrating legacy settings to Default Profile...");
                     const migratedSettings = deepMerge(DEFAULT_SETTINGS, saved);
+                    migratedSettings.aiChatEnabled = false;
+                    migratedSettings.aiTestModeEnabled = false;
                     const newStoreData: SettingsStoreData = {
                         activeProfileId: 'default',
                         profiles: {
@@ -265,6 +316,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         } catch (e) {
             feedback.toast.error("settings.load_error", e);
         } finally {
+            clearTimeout(safetyTimer);
+            setHasHydrated(true);
             setLoading(false);
         }
     };
@@ -377,6 +430,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
     const activeProfile = storeData.profiles[storeData.activeProfileId] || storeData.profiles['default'];
 
+    useEffect(() => {
+        if (hasHydrated) {
+            invoke('update_custom_adb_path', { path: activeProfile.settings.customAdbPath || '' }).catch(console.error);
+        }
+    }, [activeProfile.settings.customAdbPath, hasHydrated]);
+
     const [systemVersions, setSystemVersions] = useState<SystemVersions | null>(null);
 
     const [systemCheckStatus, setSystemCheckStatus] = useState<SystemCheckStatus>({
@@ -389,7 +448,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         missingTunnelling: []
     });
 
-    const checkSystemVersions = async (forceUsageMode?: 'explorer' | 'automator', forceFramework?: 'robot' | 'appium' | 'maestro') => {
+    const checkSystemVersions = async (forceUsageMode?: 'explorer' | 'automator', forceFramework?: 'robot' | 'appium' | 'maestro' | 'cypress' | 'selenium') => {
         setSystemCheckStatus(prev => ({ ...prev, loading: true }));
         try {
             // Use provided overrides or fall back to current settings
@@ -411,38 +470,53 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             const missingMirroring: string[] = [];
             const missingTunnelling: string[] = [];
 
-            // Critical Tools
-            if (versions.adb === 'Not Found') {
-                missingCritical.push('ADB');
-            }
+            const isWebMode = mode === 'explorer'
+                ? (activeProfile.settings.explorerPlatform === 'web')
+                : ['cypress', 'selenium'].includes(framework);
 
-            // Appium Tools (Only check if not explorer)
-            if (activeProfile.settings.usageMode !== 'explorer') {
-                if (versions.node === 'Not Found') missingAppium.push('Node.js');
-
-                // Framework Specific Tools
-                if (activeProfile.settings.automationFramework === 'robot') {
-                    if (versions.appium === 'Not Found') missingAppium.push('Appium (Node.js)');
-                    if (versions.uiautomator2 === 'Not Found') missingAppium.push('UiAutomator2 (Appium)');
-                    if (versions.python === 'Not Found') missingTesting.push('Python');
-                    if (versions.robot === 'Not Found') missingTesting.push('Robot Framework (Python)');
-                    if (versions.appium_lib === 'Not Found') missingTesting.push('AppiumLibrary (Robot Framework)');
+            // Critical Tools (Skip mobile checks in web mode)
+            if (!isWebMode) {
+                if (versions.adb === 'Not Found') {
+                    missingCritical.push('ADB');
                 }
-
-                if (activeProfile.settings.automationFramework === 'appium') {
-                    if (versions.appium === 'Not Found') missingAppium.push('Appium (Node.js)');
-                    if (versions.uiautomator2 === 'Not Found') missingAppium.push('UiAutomator2 (Appium)');
-                    if (versions.java === 'Not Found') missingTesting.push('Java (JDK)');
-                    if (versions.maven === 'Not Found') missingTesting.push('Maven');
-                }
-
-                if (activeProfile.settings.automationFramework === 'maestro') {
-                    if (versions.maestro === 'Not Found') missingTesting.push('Maestro');
+                // Mirroring Tools (Skip in web mode)
+                if (versions.scrcpy === 'Not Found') {
+                    missingMirroring.push('Scrcpy');
                 }
             }
 
-            // Mirroring Tools
-            if (versions.scrcpy === 'Not Found') missingMirroring.push('Scrcpy');
+            // Appium/Web Tools (Only check if not explorer)
+            if (mode !== 'explorer') {
+                if (isWebMode) {
+                    if (framework === 'cypress') {
+                        if (versions.node === 'Not Found') missingTesting.push('Node.js (Required for Cypress)');
+                    } else if (framework === 'selenium') {
+                        if (versions.python === 'Not Found' || versions.python === 'Not Checked') missingTesting.push('Python');
+                    }
+                } else {
+                    if (versions.node === 'Not Found') missingAppium.push('Node.js');
+
+                    // Framework Specific Tools
+                    if (framework === 'robot') {
+                        if (versions.appium === 'Not Found') missingAppium.push('Appium (Node.js)');
+                        if (versions.uiautomator2 === 'Not Found') missingAppium.push('UiAutomator2 (Appium)');
+                        if (versions.python === 'Not Found') missingTesting.push('Python');
+                        if (versions.robot === 'Not Found') missingTesting.push('Robot Framework (Python)');
+                        if (versions.appium_lib === 'Not Found') missingTesting.push('AppiumLibrary (Robot Framework)');
+                    }
+
+                    if (framework === 'appium') {
+                        if (versions.appium === 'Not Found') missingAppium.push('Appium (Node.js)');
+                        if (versions.uiautomator2 === 'Not Found') missingAppium.push('UiAutomator2 (Appium)');
+                        if (versions.java === 'Not Found') missingTesting.push('Java (JDK)');
+                        if (versions.maven === 'Not Found') missingTesting.push('Maven');
+                    }
+
+                    if (framework === 'maestro') {
+                        if (versions.maestro === 'Not Found') missingTesting.push('Maestro');
+                    }
+                }
+            }
 
             // Tunnelling Tools
             if (isNgrokEnabled && versions.ngrok === 'Not Found') missingTunnelling.push('Ngrok');
@@ -471,7 +545,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         if (updateInfo && !manual) return;
 
         try {
-            const info = await checkForUpdates();
+            const channel = activeProfile.settings.updateChannel || 'stable';
+            const info = await checkForUpdates(channel);
             setUpdateInfo(info);
 
             if (manual) {
@@ -486,6 +561,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         }
     };
 
+    const is_test_mode: 'mobile' | 'web' = activeProfile.settings.usageMode === 'explorer'
+        ? (activeProfile.settings.explorerPlatform || 'mobile')
+        : (['cypress', 'selenium'].includes(activeProfile.settings.automationFramework || 'robot') ? 'web' : 'mobile');
+
     return (
         <SettingsContext.Provider value={{
             settings: activeProfile.settings,
@@ -497,13 +576,17 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             renameProfile,
             deleteProfile,
             loading,
+            hasHydrated,
             systemVersions,
             checkSystemVersions,
             systemCheckStatus,
             updateInfo,
             checkForAppUpdate,
             isNgrokEnabled,
-            enableNgrok
+            enableNgrok,
+            is_test_mode,
+            activeWebUrl,
+            setActiveWebUrl
         }}>
             {children}
         </SettingsContext.Provider>

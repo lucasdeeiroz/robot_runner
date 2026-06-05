@@ -2,13 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { Virtuoso, VirtuosoHandle } from "react-virtuoso";
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
-import { Star, Eye, EyeOff, Terminal, X, FolderOpen } from "lucide-react";
+import { Star, Eye, EyeOff, Terminal, X, FolderOpen, Bot, Play, Pause, RefreshCw } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
-import { parseXmlBackground } from "@/lib/xmlParseCache";
-import {
-    LogNode,
-    LinearNode, SuiteNode, TestNode, TextNode
-} from "@/lib/robotParser";
+import { parseXmlBackground, invalidateCache } from "@/lib/xmlParseCache";
+import { parseHeuristicLogs } from "@/lib/heuristicParser";
+import { LogNode, LinearNode } from "@/lib/robotParser";
 import { LogTree } from "@/components/molecules/LogTree";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 import { useTestSessions } from "@/lib/testSessionStore";
@@ -18,6 +16,8 @@ import { useSettings } from "@/lib/settings";
 import * as gemini from "@/lib/dashboard/gemini";
 import * as openai from "@/lib/dashboard/openai";
 import * as claude from "@/lib/dashboard/claude";
+import * as claudeCli from "@/lib/dashboard/claudeCode";
+import * as antigravityCode from "@/lib/dashboard/antigravityCode";
 import { useCallback } from "react";
 
 interface RunConsoleProps {
@@ -27,9 +27,59 @@ interface RunConsoleProps {
     testPath?: string;
 }
 
+function parseCommandArgs(command: string): string[] {
+    const args: string[] = [];
+    let current = '';
+    let quote: '"' | "'" | null = null;
+    let escaped = false;
+
+    for (const char of command) {
+        if (escaped) {
+            current += char;
+            escaped = false;
+            continue;
+        }
+
+        if (char === '\\') {
+            escaped = true;
+            continue;
+        }
+
+        if (quote) {
+            if (char === quote) {
+                quote = null;
+            } else {
+                current += char;
+            }
+            continue;
+        }
+
+        if (char === '"' || char === "'") {
+            quote = char;
+            continue;
+        }
+
+        if (/\s/.test(char)) {
+            if (current.length > 0) {
+                args.push(current);
+                current = '';
+            }
+            continue;
+        }
+
+        current += char;
+    }
+
+    if (escaped) {
+        throw new Error('Invalid command: trailing escape character');
+    }
+    if (current.length > 0) args.push(current);
+    return args;
+}
+
 export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath }: RunConsoleProps) {
     const { t, i18n } = useTranslation();
-    const { sessions, setSessionTree } = useTestSessions();
+    const { sessions, setSessionTree, addSessionLog, markSessionFinished } = useTestSessions();
     const session = sessions.find(s => s.runId === runId);
 
     const [isRawMode, setIsRawMode] = useState(false);
@@ -42,20 +92,16 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
     const [summary, setSummary] = useState<string | null>(null);
     const [summaryError, setSummaryError] = useState<string | null>(null);
 
-    const virtuosoRef = useRef<VirtuosoHandle>(null);
-    const debugVirtuosoRef = useRef<VirtuosoHandle>(null);
-    const containerRef = useRef<HTMLDivElement>(null);
-    const [tree, setTree] = useState<LogNode[]>(() => session?.repopulatedTree ? [session.repopulatedTree] : []);
-    const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+    // AI Agent State
+    const [isAiLoopActive, setIsAiLoopActive] = useState(session?.isAiAgent || false);
+    const [aiStatus, setAiStatus] = useState<string>("");
+    const [aiHistory, setAiHistory] = useState<string[]>([]);
+    const [aiStepCount, setAiStepCount] = useState(0);
 
-    const handleToggleExpand = useCallback((id: string, expanded: boolean) => {
-        setExpandedIds(prev => {
-            const next = new Set(prev);
-            if (expanded) next.add(id);
-            else next.delete(id);
-            return next;
-        });
-    }, []);
+    const rawContainerRef = useRef<VirtuosoHandle>(null);
+    const fancyContainerRef = useRef<HTMLDivElement>(null);
+    const debugVirtuosoRef = useRef<VirtuosoHandle>(null);
+    const [tree, setTree] = useState<LogNode[]>(() => session?.repopulatedTree ? [session.repopulatedTree] : []);
 
     const handleChildrenLoaded = useCallback((id: string, children: LogNode[]) => {
         // Find node in tree and attach children so flattenLogNodes can see them
@@ -89,18 +135,21 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
         }
     }, [session?.repopulatedTree]);
 
-    // Auto-scroll logic for tree (Non-virtualized part)
+    // Handle auto-scroll logic
     useEffect(() => {
-        if (!isRawMode && stickToBottom && !showDebugConsole) {
-            const el = containerRef.current;
-            if (el) {
-                const timer = setTimeout(() => {
-                    el.scrollTop = el.scrollHeight;
-                }, 100);
-                return () => clearTimeout(timer);
+        if (!stickToBottom || showDebugConsole) return;
+
+        if (isRawMode) {
+            rawContainerRef.current?.scrollToIndex({
+                index: logs.length - 1,
+                behavior: 'auto',
+            });
+        } else {
+            if (fancyContainerRef.current) {
+                fancyContainerRef.current.scrollTop = fancyContainerRef.current.scrollHeight;
             }
         }
-    }, [tree, isRawMode, stickToBottom, showDebugConsole]);
+    }, [logs.length, tree.length, isRawMode, stickToBottom, showDebugConsole]);
 
     // Keep Screen Awake Lifecycle
     useEffect(() => {
@@ -151,11 +200,18 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
     // Persistent Parsing Context
     const parsedNodesRef = useRef<LinearNode[]>([]);
     const processedCountRef = useRef<number>(0);
-    const bufferRef = useRef<string[]>([]);
-    const pendingSuiteStartRef = useRef<boolean>(false);
 
     // Track if post-test re-parse is in progress
     const [reparseLoading, setReparseLoading] = useState(false);
+
+    // Invalidate XML parsing cache for this session's output path when the test run starts
+    useEffect(() => {
+        if (isRunning && session?.outputDir) {
+            const outputPath = session.outputDir;
+            const outputXmlPath = session.outputXmlPath || `${outputPath.replace(/[\\/]+$/, "")}/output.xml`;
+            invalidateCache(outputXmlPath);
+        }
+    }, [isRunning, session?.outputDir, session?.outputXmlPath]);
 
     useEffect(() => {
         // Skip if running, or no output path, or tree is already officially repopulated
@@ -169,6 +225,10 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                 // Try to find the detected output XML from logs first, then fallback to output.xml
                 const outputPath = session.outputDir!;
                 const outputXmlPath = session.outputXmlPath || `${outputPath.replace(/[\\/]+$/, "")}/output.xml`;
+                
+                // Invalidate XML parsing cache for this path to ensure we read the new test results
+                invalidateCache(outputXmlPath);
+                
                 const result = await parseXmlBackground(outputXmlPath);
                 if (!cancelled && result) {
                     setTree([result.rootSuite]);
@@ -208,13 +268,18 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
 
             if (provider === 'gemini') {
                 if (!settings.geminiApiKey) throw new Error("Missing Gemini API Key");
-                result = await gemini.summarizeExecution(tree, settings.geminiApiKey, settings.geminiModel || '', language, failureContext, undefined, customPrompt);
+                result = await gemini.summarizeExecution(tree, settings.geminiApiKey as string, settings.geminiModel || '', language, failureContext, undefined, customPrompt);
             } else if (provider === 'openai') {
                 if (!settings.openaiApiKey) throw new Error("Missing OpenAI API Key");
-                result = await openai.summarizeExecution(tree, settings.openaiApiKey, settings.openaiModel || '', language, failureContext, undefined, customPrompt);
+                result = await openai.summarizeExecution(tree, settings.openaiApiKey as string, settings.openaiModel || '', language, failureContext, undefined, customPrompt);
             } else if (provider === 'claude') {
                 if (!settings.claudeApiKey) throw new Error("Missing Claude API Key");
-                result = await claude.summarizeExecution(tree, settings.claudeApiKey, settings.claudeModel || '', language, failureContext, undefined, customPrompt);
+                result = await claude.summarizeExecution(tree, settings.claudeApiKey as string, settings.claudeModel || '', language, failureContext, undefined, customPrompt);
+            } else if (provider === 'claude-code') {
+                result = await claudeCli.summarizeExecution(tree, settings.paths.automationRoot || '', language, failureContext?.map(f => f.message) || [], failureContext, customPrompt, settings.claudeCodeToken);
+            } else if (provider === 'antigravity-cli') {
+                const { summarizeExecution } = await import('@/lib/dashboard/antigravityCode');
+                result = await summarizeExecution(tree, settings.paths.automationRoot || '', language, failureContext?.map(f => f.message) || [], failureContext, customPrompt, settings.antigravityApiKey);
             }
 
             setSummary(result);
@@ -226,7 +291,102 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
         }
     };
 
-    // Parse incremental logs
+    // AI Agent Autonomous Loop Logic
+    const runAiStep = useCallback(async () => {
+        const provider = settings.aiProvider || 'gemini';
+        
+        if (!session?.deviceUdid || !isAiLoopActive) return;
+        
+        // Key validation based on provider
+        if (provider === 'gemini' && !settings.geminiApiKey) return;
+        if (provider === 'openai' && !settings.openaiApiKey) return;
+        if (provider === 'claude' && !settings.claudeApiKey) return;
+
+        setAiStatus(t('run_tab.console.ai_steps.dumping', { defaultValue: 'Dumping screen hierarchy...' }));
+        try {
+            const xml = await invoke<string>("get_xml_dump", { deviceId: session.deviceUdid });
+            
+            setAiStatus(t('run_tab.console.ai_steps.thinking', { defaultValue: 'AI is thinking...' }));
+            
+            let response: gemini.AutonomousActionResponse;
+            const target = session.aiPrompt || session.testPath;
+            const lang = i18n.language;
+
+            if (provider === 'gemini') {
+                response = await gemini.generateAutonomousAction(xml, target, aiHistory, settings.geminiApiKey as string, settings.geminiModel || 'gemini-1.5-pro', lang);
+            } else if (provider === 'openai') {
+                response = await openai.generateAutonomousAction(xml, target, aiHistory, settings.openaiApiKey as string, settings.openaiModel || 'gpt-4o', lang);
+            } else if (provider === 'claude') {
+                response = await claude.generateAutonomousAction(xml, target, aiHistory, settings.claudeApiKey as string, settings.claudeModel || 'claude-3-5-sonnet-latest', lang);
+            } else if (provider === 'antigravity-cli') {
+                response = await antigravityCode.generateAutonomousAction(xml, target, aiHistory, settings.paths.automationRoot || '', lang, undefined, settings.antigravityApiKey);
+            } else if (provider === 'claude-code') {
+                response = await claudeCli.generateAutonomousAction(xml, target, aiHistory, settings.paths.automationRoot || '', lang, undefined, settings.claudeCodeToken);
+            } else {
+                throw new Error(`Unsupported AI provider for Autonomous Agent: ${provider}`);
+            }
+
+            const actionDesc = `[Step ${aiStepCount + 1}] ${response.action.type.toUpperCase()}: ${response.action.details}`;
+            setAiHistory(prev => [...prev, actionDesc]);
+            setAiStepCount(prev => prev + 1);
+
+            addSessionLog(runId, `[AI Agent] Thought: ${response.thought}`);
+            addSessionLog(runId, `[AI Agent] Action: ${response.action.details}`);
+
+            if (response.action.type === 'finish') {
+                setIsAiLoopActive(false);
+                setAiStatus(t('run_tab.console.ai_steps.finished', { defaultValue: 'Goal completed successfully!' }));
+                addSessionLog(runId, `[System] AI Agent mission completed.`);
+                markSessionFinished(runId, '0');
+                return;
+            }
+
+            if (response.action.type === 'fail') {
+                setIsAiLoopActive(false);
+                setAiStatus(t('run_tab.console.ai_steps.failed', { defaultValue: 'AI Agent failed to complete the goal.' }));
+                addSessionLog(runId, `[Error] AI Agent aborted: ${response.action.details}`);
+                markSessionFinished(runId, '1');
+                return;
+            }
+
+            if (response.action.command) {
+                setAiStatus(t('run_tab.console.ai_steps.executing', { action: response.action.details, defaultValue: `Executing: ${response.action.details}` }));
+
+                const rawCommand = response.action.command.trim();
+                const parsedArgs = parseCommandArgs(rawCommand);
+                let args = [...parsedArgs];
+                if (args[0] === 'adb') args = args.slice(1);
+                if (args[0] === '-s' && args.length >= 2) args = args.slice(2);
+                if (args.length === 0) {
+                    throw new Error('AI returned an empty ADB command');
+                }
+                await invoke("run_adb_command", { device: session.deviceUdid, args });
+                addSessionLog(runId, `[ADB] Executed: adb -s ${session.deviceUdid} ${args.join(' ')}`);
+            } else if (response.action.type === 'wait') {
+                setAiStatus(t('run_tab.console.ai_steps.waiting', { defaultValue: 'Waiting for transition...' }));
+                await new Promise(r => setTimeout(r, 2000));
+            }
+
+        } catch (e: any) {
+            console.error("AI Step failed:", e);
+            const errorMsg = e.message || String(e);
+            setAiStatus(`Error: ${errorMsg}`);
+            addSessionLog(runId, `[Error] AI Step failed: ${errorMsg}`);
+            setIsAiLoopActive(false);
+            markSessionFinished(runId, '1');
+        }
+    }, [runId, session?.deviceUdid, session?.aiPrompt, session?.testPath, settings, isAiLoopActive, aiHistory, aiStepCount, i18n.language, t, addSessionLog, markSessionFinished]);
+
+    useEffect(() => {
+        let timeoutId: any;
+        if (isAiLoopActive) {
+            timeoutId = setTimeout(runAiStep, 1500); // Small delay between steps
+        }
+        return () => clearTimeout(timeoutId);
+    }, [isAiLoopActive, aiStepCount, runAiStep]);
+
+
+    // Heuristic Parsing Loop
     useEffect(() => {
         // Skip log parsing if we already have a repopped tree and the test is finished
         if (!isRunning && tree.length > 0 && (session?.repopulatedTree || session?.outputDir)) {
@@ -237,12 +397,10 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
         const currentCount = logs.length;
         const processedCount = processedCountRef.current;
 
-        // Only clear if it's a fresh run or a reset, not just because component mounted with empty logs while not running
+        // Only clear if it's a fresh run or a reset
         if (currentCount < processedCount || (isRunning && currentCount === 0)) {
             parsedNodesRef.current = [];
             processedCountRef.current = 0;
-            bufferRef.current = [];
-            pendingSuiteStartRef.current = false;
             setTree([]);
             return;
         }
@@ -250,525 +408,30 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
         // If nothing new, exit early
         if (currentCount === processedCount) return;
 
-        // Constants
-        const IS_DOUBLE = (l: string) => /^={10,}$/.test(l.trim());
-        const IS_SINGLE = (l: string) => /^-{10,}$/.test(l.trim());
-        const cleanAnsi = (l: string) => l.replace(/\x1b\[[0-9;]*m/g, '').replace(/[\x00-\x1f\x7f-\x9f]/g, '');
-        const IS_STATUS = (line: string) => {
-            const clean = cleanAnsi(line).trim();
-            // Match | PASS | or | FAIL | or | SKIP | with any amount of padding/content
-            return /\|\s+(PASS|FAIL|SKIP)\s+\|/.test(clean);
-        };
-        const IS_SUMMARY = (l: string) => /^\d+ tests?, \d+ passed, \d+ failed/.test(l.trim());
-        const IS_MAESTRO_VERBOSE = (l: string) => /disableAnsi=false/.test(l) || /\(\[\s*(INFO|DEBUG|ERROR|WARN|TRACE)\s*\]\)/.test(l);
-        const IS_SYSTEM = (l: string) => l.trim().startsWith('[System]') || l.trim().startsWith('[Error]') || /^\s*(Output|Log|Report|STDERR|STDOUT):/.test(l) || IS_MAESTRO_VERBOSE(l);
-        const IS_MAESTRO_SUITE_START = (l: string) => l.includes("Debug output path:") || l.includes("Waiting for flows to complete...");
-        const IS_MAESTRO_SUITE_END = (l: string) => /Flow (Passed|Failed) in/.test(l) || /\d+\/\d+ Flow (Passed|Failed) in/.test(l);
-        const IS_MAESTRO_TEST_START = (l: string) => l.includes("Running flow ");
-        const IS_MAESTRO_TEST_END = (l: string) => /^\[(Passed|Failed)\]\s+.*\(\d+s\)/.test(l.trim());
-        const IS_MAVEN_TEST_START = (l: string) => l.startsWith("[INFO] Running ");
-        const IS_MAVEN_TEST_END = (l: string) => l.includes("Tests run: ") && l.includes("Failures: ");
-        const IS_ROBOT_RUNNER_TEST_START = (l: string) => l.startsWith("[RobotRunner-Test-Start]") || l.startsWith("[RR-TEST-START]");
-        const IS_RR_SUITE_START = (l: string) => l.startsWith("[RR-SUITE-START]");
-        const IS_RR_SUITE_END = (l: string) => l.startsWith("[RR-SUITE-END]");
-        const IS_RR_TEST_END = (l: string) => l.startsWith("[RR-TEST-END]");
-        const IS_REDUNDANT_SYSTEM = (l: string) => l.trim().startsWith('[System]') || /^\s*(Output|Log|Report):/.test(l) || IS_STATUS(l) || l.startsWith("[RR-");
+        // Use the modular heuristic parser
+        const result = parseHeuristicLogs(logs, parsedNodesRef.current, processedCount);
 
-        const extractOutputXmlPath = (l: string): string | undefined => {
-            const clean = cleanAnsi(l).trim();
-            const match = clean.match(/^\s*Output:\s*["']?(.+?\.xml)\b["']?(?:\s+.*)?$/i);
-            return match?.[1]?.trim();
-        };
+        parsedNodesRef.current = result.parsedNodes;
+        processedCountRef.current = result.processedCount;
 
-        const getDirectoryFromFilePath = (filePath: string): string | undefined => {
-            const normalized = filePath.trim().replace(/[\\/]+$/, "");
-            const lastSeparator = Math.max(normalized.lastIndexOf("/"), normalized.lastIndexOf("\\"));
-            if (lastSeparator <= 0) {
-                return lastSeparator === 0 ? normalized.slice(0, 1) : undefined;
-            }
-            return normalized.slice(0, lastSeparator);
-        };
-
-        const splitNameAndDoc = (raw: string) => {
-            // Handle both "Name :: Doc" and "Name::Doc" or "Name ::"
-            const match = raw.match(/^(.+?)\s?::\s*(.*)$/);
-            if (match) {
-                return {
-                    name: match[1].trim(),
-                    doc: match[2].trim() || undefined
-                };
-            }
-            return { name: raw.trim(), doc: undefined };
-        };
-
-        // Helper to detect output XML from logs
-        const detectOutputXml = (l: string) => {
-            const outputXmlPath = extractOutputXmlPath(l);
-            if (!outputXmlPath) {
-                return;
-            }
-
-            let outputDir = getDirectoryFromFilePath(outputXmlPath);
-            
-            // If outputDir is empty or same as file (edge cases), use parent
-            if (outputDir && outputDir.toLowerCase().endsWith('.xml')) {
-                outputDir = getDirectoryFromFilePath(outputDir);
-            }
-
-            // Save both separately: the XML file for parsing, and its directory for the 'Open Folder' button
-            setSessionTree(runId, undefined, undefined, outputDir, outputXmlPath);
-        };
-
-        if (currentCount > processedCount) {
-            const newLogs = logs.slice(processedCount);
-            const linearNodes = parsedNodesRef.current;
-
-            for (let i = 0; i < newLogs.length; i++) {
-                let line = newLogs[i];
-                const cleanLine = line.replace(/\x1b\[[0-9;]*m/g, '').replace(/[\x00-\x1f\x7f-\x9f]/g, '').trim();
-                const isSystem = IS_SYSTEM(line);
-
-                if (isSystem) detectOutputXml(line);
-
-
-                if (IS_MAESTRO_VERBOSE(line)) {
-                    line = line.replace(/.*disableAnsi=false.*?\]\)\s*/, '').trim();
-                }
-
-                if (!line) continue;
-
-                if (IS_DOUBLE(line)) {
-                    const last = linearNodes[linearNodes.length - 1];
-                    const prev = linearNodes[linearNodes.length - 2];
-                    const isPrevDouble = prev?.type === 'text' && IS_DOUBLE(prev.content);
-                    const isPrevSuite = prev?.type === 'suite-start' || prev?.type === 'suite-end';
-
-                    if (last?.type === 'text' && !IS_SYSTEM(last.content) && (isPrevDouble || isPrevSuite)) {
-                        const suiteLine = last.content.trim();
-                        const { name, doc } = splitNameAndDoc(suiteLine);
-                        linearNodes.pop();
-                        if (isPrevDouble) linearNodes.pop();
-                        linearNodes.push({ type: 'suite-start', name, doc, originalLine: suiteLine, id: `suite-start-${processedCount + i}` });
-                        continue;
-                    }
-
-                    // Heuristic: If we see a DOUBLE line and the last node was a TEXT that looks like a sub-suite (often preceded by SINGLE line)
-                    if (last?.type === 'text' && !IS_SYSTEM(last.content)) {
-                        const prevNode = linearNodes[linearNodes.length - 2];
-                        const isPrevSingle = prevNode?.type === 'text' && IS_SINGLE(prevNode.content);
-                        if (isPrevSingle) {
-                            const suiteLine = last.content.trim();
-                            const { name, doc } = splitNameAndDoc(suiteLine);
-                            
-                            linearNodes.pop();
-                            linearNodes.pop();
-                            linearNodes.push({ 
-                                type: 'suite-start', 
-                                name: name, 
-                                doc,
-                                originalLine: suiteLine, 
-                                id: `sub-suite-start-${processedCount + i}` 
-                            });
-                            continue;
-                        }
-                    }
-
-                    if (last?.type === 'text' && IS_SUMMARY(last.content)) {
-                        const summaryLine = last.content;
-                        let statusNodeIndex = -1;
-                        for (let k = 1; k <= 5; k++) {
-                            const node = linearNodes[linearNodes.length - 1 - k];
-                            if (!node || node.type !== 'text') break;
-                            if (IS_STATUS(node.content)) {
-                                const match = node.content.match(/^(.*?)\s*\|\s+(PASS|FAIL)\s+\|\s*$/);
-                                if (match) statusNodeIndex = linearNodes.length - 1 - k;
-                                break;
-                            }
-                        }
-                        if (statusNodeIndex !== -1) {
-                            const statusNode = linearNodes[statusNodeIndex] as TextNode;
-                            const match = statusNode.content.match(/^(.*?)\s*\|\s+(PASS|FAIL)\s+\|\s*$/);
-                            if (match) {
-                                const name = match[1].trim();
-                                const status = match[2] as 'PASS' | 'FAIL';
-                                linearNodes.splice(statusNodeIndex);
-                                const { name: finalName, doc } = splitNameAndDoc(name);
-                                linearNodes.push({ type: 'suite-end', name: finalName, status, doc, summary: summaryLine, id: `suite-end-${processedCount + i}` });
-                                continue;
-                            }
-                        }
-                    }
-                    linearNodes.push({ type: 'text', content: line, isSystem, id: `div-${processedCount + i}` });
-                } else if (IS_ROBOT_RUNNER_TEST_START(cleanLine)) {
-                    const raw = cleanLine.replace(/^\[(RobotRunner-Test-Start|RR-TEST-START)\]/, "").trim();
-                    const { name, doc } = splitNameAndDoc(raw);
-
-                    // Deduplicate against heuristic test detection (the test name line with spaces)
-                    let lastTest: any = null;
-                    for (let j = linearNodes.length - 1; j >= 0; j--) {
-                        if (linearNodes[j].type === 'test-start') {
-                            lastTest = linearNodes[j];
-                            break;
-                        }
-                    }
-
-                    if (lastTest && lastTest.name.trim() === name) {
-                        if (doc) lastTest.doc = doc;
-                        continue;
-                    }
-
-                    linearNodes.push({ type: 'test-start', name, doc, originalLine: raw, id: `rr-t-start-${processedCount + i}` });
-                } else if (IS_RR_SUITE_START(cleanLine)) {
-                    const raw = cleanLine.replace("[RR-SUITE-START]", "").trim();
-                    const { name, doc } = splitNameAndDoc(raw);
-                    // Deduplicate: check if this suite was already added by the standard output parser
-                    // Look back through recent nodes to find a matching suite-start
-                    let alreadyExists = false;
-                    for (let j = linearNodes.length - 1; j >= Math.max(0, linearNodes.length - 10); j--) {
-                        const node = linearNodes[j];
-                        if (node.type === 'suite-start') {
-                            const nodeLeaf = node.name.split('.').pop()?.trim();
-                            if (nodeLeaf === name) {
-                                if (doc && !node.doc) node.doc = doc;
-                                alreadyExists = true;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (alreadyExists) continue;
-                    linearNodes.push({ type: 'suite-start', name, doc, originalLine: raw, id: `rr-s-start-${processedCount + i}` });
-                } else if (IS_RR_SUITE_END(cleanLine)) {
-                    const raw = cleanLine.replace("[RR-SUITE-END]", "").trim();
-                    const parts = raw.split(" | ");
-                    const { name, doc } = splitNameAndDoc(parts[0]);
-                    const status = (parts[1] || 'PASS').trim() as 'PASS' | 'FAIL' | 'SKIP';
-                    linearNodes.push({ type: 'suite-end', name, doc, status: status, summary: '', id: `rr-s-end-${processedCount + i}` });
-                } else if (IS_RR_TEST_END(cleanLine)) {
-                    const parts = cleanLine.replace("[RR-TEST-END]", "").split(" | ");
-                    const { name, doc } = splitNameAndDoc(parts[0]);
-                    const status = (parts[1] || 'PASS').trim() as 'PASS' | 'FAIL' | 'SKIP';
-                    const ret = parts[2]?.trim();
-                    linearNodes.push({ type: 'test-end', name, doc, status, ret, id: `rr-t-end-${processedCount + i}` });
-                } else if (IS_MAESTRO_SUITE_START(line)) {
-                    linearNodes.push({ type: 'suite-start', name: 'Maestro Suite', originalLine: line, id: `m-suite-start-${processedCount + i}` });
-                } else if (IS_MAESTRO_SUITE_END(line)) {
-                    const status = line.includes("Passed") ? "PASS" : "FAIL";
-                    linearNodes.push({ type: 'suite-end', name: 'Maestro Suite', status, summary: line, id: `m-suite-end-${processedCount + i}` });
-                } else {
-                    linearNodes.push({ type: 'text', content: line, isSystem, id: `txt-${processedCount + i}` });
-                }
-            }
-            processedCountRef.current = currentCount;
+        // Update tree only if we haven't officially repopulated yet
+        if (!session?.repopulatedTree) {
+            setTree(result.tree);
         }
 
-        const root: LogNode[] = [];
-        const suiteStack: SuiteNode[] = [];
-        let currentTest: TestNode | null = null;
+        // Auto-detect output XML from logs
+        if (result.outputXmlPath || result.outputDir) {
+            setSessionTree(runId, undefined, undefined, result.outputDir, result.outputXmlPath);
+        }
 
-        const addToCurrentContext = (node: LogNode) => {
-            if (currentTest && node.type === 'text') {
-                currentTest.logs.push(node.content);
-                return;
-            }
-            if (suiteStack.length > 0) suiteStack[suiteStack.length - 1].children.push(node);
-            else root.push(node);
-        };
+    }, [logs, isRunning, runId, session?.repopulatedTree]);
 
-        const activeSuite = () => suiteStack.length > 0 ? suiteStack[suiteStack.length - 1] : null;
-
-        const closeCurrentTest = () => {
-            if (currentTest) {
-                const testLogs = currentTest.logs;
-                for (let j = testLogs.length - 1; j >= 0; j--) {
-                    const cleanLog = cleanAnsi(testLogs[j]);
-                    const match = cleanLog.match(/\|\s+(PASS|FAIL|SKIP)\s+\|/);
-                    if (match) {
-                        const finalStatus = match[1] as 'PASS' | 'FAIL' | 'SKIP';
-                        currentTest.status = finalStatus;
-                        const suite = activeSuite();
-                        if (suite && suite.stats) {
-                            if (finalStatus === 'PASS') suite.stats.passed++;
-                            else if (finalStatus === 'SKIP') suite.stats.skipped++;
-                            else if (finalStatus === 'FAIL') {
-                                suite.stats.failed++;
-                                // Propagate FAIL to all parents in the stack
-                                suiteStack.forEach(s => s.status = 'FAIL');
-                            }
-                        }
-                        break;
-                    }
-                }
-                currentTest = null;
-            }
-        };
-
-        parsedNodesRef.current.forEach((node, idx) => {
-            const nodeId = node.id || `node-${idx}`;
-            if (node.type === 'suite-start') {
-                closeCurrentTest();
-                const newSuite: SuiteNode = {
-                    type: 'suite',
-                    id: nodeId,
-                    name: node.name,
-                    doc: node.doc,
-                    status: 'RUNNING',
-                    summary: '',
-                    children: [],
-                    stats: { passed: 0, failed: 0, skipped: 0 }
-                };
-                if (activeSuite()) activeSuite()!.children.push(newSuite);
-                else root.push(newSuite);
-                suiteStack.push(newSuite);
-            } else if (node.type === 'suite-end') {
-                closeCurrentTest();
-                const targetName = node.name;
-                let matchIndex = -1;
-                const normalize = (n: string) => n.replace(/\.{2,}$/, '').trim();
-                const cleanTarget = normalize(targetName);
-                for (let i = suiteStack.length - 1; i >= 0; i--) {
-                    const s = suiteStack[i];
-                    const cleanStack = normalize(s.name);
-                    // Match exactly or check if it's the leaf name of a dotted path
-                    if (cleanStack === cleanTarget || cleanStack.endsWith('.' + cleanTarget) || cleanStack === cleanTarget.split('.').pop()) {
-                        matchIndex = i;
-                        break;
-                    }
-                }
-                if (matchIndex !== -1) {
-                    const suite = suiteStack[matchIndex];
-                    suite.status = node.status;
-                    suite.summary = node.summary;
-                    if ((node as any).doc) suite.doc = (node as any).doc;
-                    suiteStack.splice(matchIndex);
-                }
-            } else if (node.type === 'test-end') {
-                if (currentTest) {
-                    currentTest.status = node.status;
-                    if (node.doc) currentTest.doc = node.doc;
-                    if (node.ret) currentTest.ret = node.ret;
-                    const suite = activeSuite();
-                    if (suite && suite.stats) {
-                        if (node.status === 'PASS') suite.stats.passed++;
-                        else if (node.status === 'SKIP') suite.stats.skipped++;
-                        else if (node.status === 'FAIL') {
-                            suite.stats.failed++;
-                            suiteStack.forEach(s => s.status = 'FAIL');
-                        }
-                    }
-                    currentTest = null;
-                }
-            } else if (node.type === 'text') {
-                const line = node.content;
-                if (IS_SINGLE(line) || IS_DOUBLE(line)) {
-                    // Do NOT close test on separators. They are often part of the test output.
-                    if (currentTest) {
-                        currentTest.logs.push(line);
-                    } else {
-                        addToCurrentContext({ type: 'text', content: line, id: nodeId });
-                    }
-                } else if (IS_MAESTRO_TEST_START(line)) {
-                    closeCurrentTest();
-                    const name = line.replace(/.*Running flow\s+/, '').trim();
-                    currentTest = {
-                        type: 'test',
-                        name,
-                        status: 'RUNNING',
-                        logs: [line],
-                        id: `m-test-${processedCountRef.current + idx}`
-                    };
-                    if (activeSuite()) activeSuite()!.children.push(currentTest);
-                    else root.push(currentTest);
-                } else if (IS_MAESTRO_TEST_END(line)) {
-                    const status = line.toLowerCase().includes("passed") ? "PASS" : "FAIL";
-                    if (currentTest) {
-                        currentTest.status = status;
-                        currentTest.logs.push(line);
-                        const suite = activeSuite();
-                        if (suite && suite.stats) {
-                            if (status === 'PASS') suite.stats.passed++;
-                            else if (status === 'FAIL') suite.stats.failed++;
-                        }
-                        currentTest = null;
-                    } else {
-                        const name = line.replace(/^\[(Passed|Failed)\]\s+/, '').replace(/\s+\(\d+s\)$/, '').trim();
-                        const instantTest: TestNode = {
-                            type: 'test',
-                            name,
-                            status,
-                            logs: [line],
-                            id: `m-instant-${processedCountRef.current + idx}`
-                        };
-                        const suite = activeSuite();
-                        if (suite && suite.stats) {
-                            if (status === 'PASS') suite.stats.passed++;
-                            else if (status === 'FAIL') suite.stats.failed++;
-                        }
-                        if (activeSuite()) activeSuite()!.children.push(instantTest);
-                        else root.push(instantTest);
-                    }
-                } else if (IS_MAVEN_TEST_START(line)) {
-                    closeCurrentTest();
-                    const name = line.replace("[INFO] Running ", "").trim();
-                    currentTest = {
-                        type: 'test',
-                        name,
-                        status: 'RUNNING',
-                        logs: [line],
-                        id: `mvn-test-${processedCountRef.current + idx}`
-                    };
-                    if (activeSuite()) activeSuite()!.children.push(currentTest);
-                    else root.push(currentTest);
-                } else if (IS_MAVEN_TEST_END(line)) {
-                    if (currentTest) {
-                        const isFailed = line.includes("Failures: 0") && line.includes("Errors: 0") ? false : true;
-                        currentTest.status = isFailed ? "FAIL" : "PASS";
-                        currentTest.logs.push(line);
-                        currentTest = null;
-                    } else {
-                        addToCurrentContext({ type: 'text', content: line, id: nodeId });
-                    }
-                } else {
-                    const isSys = node.isSystem;
-                    if (isSys) {
-                        if (currentTest) {
-                            if (!IS_REDUNDANT_SYSTEM(line)) currentTest.logs.push(line);
-                            if (line.includes('[System] Finished:') || line.includes('[System] Stopping...') || line.includes('[System] Toolbox session stopped')) {
-                                const isSuccess = line.toLowerCase().includes('exit code: 0');
-                                const finalStatus = isSuccess ? 'PASS' : 'FAIL';
-                                if (currentTest.status === 'RUNNING') {
-                                    currentTest.status = finalStatus;
-                                    const suite = suiteStack[suiteStack.length - 1];
-                                    if (suite && suite.stats) {
-                                        if (finalStatus === 'PASS') suite.stats.passed++;
-                                        else if (finalStatus === 'FAIL') suite.stats.failed++;
-                                    }
-                                }
-                                currentTest = null;
-                                suiteStack.forEach(s => { if (s.status === 'RUNNING') s.status = finalStatus; });
-                            }
-                        } else {
-                            if (!IS_REDUNDANT_SYSTEM(line)) addToCurrentContext({ type: 'text', content: line, id: nodeId });
-                            if (line.includes('[System] Finished:') || line.includes('[System] Stopping...') || line.includes('[System] Toolbox session stopped')) {
-                                const isSuccess = line.toLowerCase().includes('exit code: 0');
-                                const finalStatus = isSuccess ? 'PASS' : 'FAIL';
-                                suiteStack.forEach(s => { if (s.status === 'RUNNING') s.status = finalStatus; });
-                            }
-                        }
-                    } else {
-                        if (currentTest) {
-                            const isMarker = IS_ROBOT_RUNNER_TEST_START(line);
-                            const cleanLineText = cleanAnsi(line);
-                            const statusMatch = cleanLineText.match(/^(.*?)\s*\|\s+(PASS|FAIL|SKIP)\s+\|/);
-                            const isStatusLine = !!statusMatch;
-
-                            if (isStatusLine && statusMatch) {
-                                const status = statusMatch[2] as 'PASS' | 'FAIL' | 'SKIP';
-                                currentTest.status = status;
-                                // Propagate to suites
-                                if (status === 'FAIL') {
-                                    suiteStack.forEach(s => s.status = 'FAIL');
-                                    const suite = activeSuite();
-                                    if (suite && suite.stats) suite.stats.failed++;
-                                } else if (status === 'PASS') {
-                                    const suite = activeSuite();
-                                    if (suite && suite.stats) suite.stats.passed++;
-                                } else if (status === 'SKIP') {
-                                    const suite = activeSuite();
-                                    if (suite && suite.stats) suite.stats.skipped++;
-                                }
-                            }
-
-                            const { name: nameOnly } = splitNameAndDoc(cleanLineText);
-                            const isTestNameLine = nameOnly === currentTest.name || (statusMatch?.[1].trim() === currentTest.name);
-                            if (!isMarker && !isTestNameLine) currentTest.logs.push(line);
-                        } else {
-                            if (IS_ROBOT_RUNNER_TEST_START(line)) {
-                                const rawName = line.replace("[RR-TEST-START]", "").replace("[RobotRunner-Test-Start]", "").trim();
-                                const { name, doc } = splitNameAndDoc(rawName);
-
-                                // Check if a test was already started by heuristic-matching just before
-                                const suiteChildren = activeSuite()?.children;
-                                const lastAdded = suiteChildren?.[suiteChildren.length - 1];
-                                const testLeaf = lastAdded?.type === 'test' ? lastAdded.name.split('.').pop()?.trim() : null;
-                                if (testLeaf === name) {
-                                    currentTest = lastAdded as TestNode; // Link to the already-started test node
-                                    return;
-                                }
-
-                                const newTest: TestNode = {
-                                    type: 'test',
-                                    name: name,
-                                    doc: doc,
-                                    status: 'RUNNING',
-                                    logs: [],
-                                    id: `test-started-${nodeId}`
-                                };
-                                if (activeSuite()) activeSuite()!.children.push(newTest);
-                                else root.push(newTest);
-                                currentTest = newTest;
-                            } else {
-                                const isMaestroSuite = activeSuite()?.name.includes('Maestro');
-                                if (line.trim().length > 0 && !isMaestroSuite && !line.includes('[RobotRunner-Test-Start]') && !line.includes('[RR-TEST-START]') && !IS_STATUS(line)) {
-                                    const { name, doc } = splitNameAndDoc(line);
-                                    const statusMatch = cleanAnsi(name).match(/^(.*?)\s*\|\s+(PASS|FAIL|SKIP)\s+\|/);
-                                    if (statusMatch) {
-                                        // It's a status line. Try to apply it to the last test instead of starting a new one.
-                                        const actualName = statusMatch[1].trim();
-                                        const suite = activeSuite();
-                                        if (suite) {
-                                            const lastNode = suite.children[suite.children.length - 1];
-                                            if (lastNode?.type === 'test' && (lastNode.name === actualName || actualName.endsWith('.' + lastNode.name))) {
-                                                const status = statusMatch[2] as any;
-                                                lastNode.status = status;
-                                                lastNode.logs.push(line);
-                                                if (status === 'FAIL') suiteStack.forEach(s => s.status = 'FAIL');
-                                                return;
-                                            }
-                                        }
-                                        // Fallback: don't create a new test for a status line if it's orphaned
-                                        addToCurrentContext({ type: 'text', content: line, id: nodeId });
-                                        return;
-                                    }
-
-                                    // Conservative heuristic: only start a new test if the line doesn't look like a log/status line
-                                    // Also check for common error prefixes and length
-                                    const isLikelyLog = name.startsWith('|') || 
-                                                       name.startsWith('...') || 
-                                                       name.startsWith('Arguments:') ||
-                                                       name.startsWith('Traceback') ||
-                                                       name.startsWith('TypeError') ||
-                                                       name.length > 100 ||
-                                                       name.includes('did not appear in');
-                                    
-                                    if (isLikelyLog) {
-                                        addToCurrentContext({ type: 'text', content: line, id: nodeId });
-                                        return;
-                                    }
-
-                                    const newTest: TestNode = {
-                                        type: 'test',
-                                        name: name,
-                                        doc,
-                                        status: 'RUNNING',
-                                        logs: [line],
-                                        id: `test-${nodeId}`
-                                    };
-                                    if (activeSuite()) activeSuite()!.children.push(newTest);
-                                    else root.push(newTest);
-                                    currentTest = newTest;
-                                } else {
-                                    if (!IS_REDUNDANT_SYSTEM(line)) addToCurrentContext({ type: 'text', content: line, id: nodeId });
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        });
-
-        setTree(root);
-    }, [logs]);
+    // Definitively update tree when session.repopulatedTree arrives
+    useEffect(() => {
+        if (session?.repopulatedTree) {
+            setTree([session.repopulatedTree]);
+        }
+    }, [session?.repopulatedTree]);
 
     return (
         <div className="h-full flex-1 min-h-0 flex flex-col bg-surface rounded-2xl font-mono text-sm border border-outline-variant/30 shadow-inner pointer-events-auto relative z-0 isolate overflow-hidden">
@@ -838,112 +501,210 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                             />
                         </div>
                     )}
+                    {session?.isAiAgent && (
+                        <div className="flex items-center gap-2 px-2 py-1 bg-primary/10 rounded-lg border border-primary/20 animate-pulse-slow">
+                            <Bot size={14} className="text-primary" />
+                            <span className="text-[10px] font-bold text-primary uppercase tracking-wider">AI AGENT MODE</span>
+                            <div className="h-3 w-[1px] bg-primary/20 mx-1" />
+                            <span className="text-[10px] text-on-surface-variant/70 font-medium">{aiStatus || 'Initializing...'}</span>
+                            <button
+                                onClick={() => setIsAiLoopActive(!isAiLoopActive)}
+                                className={clsx(
+                                    "ml-2 p-1 rounded-md transition-all hover:scale-110",
+                                    isAiLoopActive ? "text-error hover:bg-error/10" : "text-success hover:bg-success/10"
+                                )}
+                                title={isAiLoopActive ? t('common.pause') : t('common.start')}
+                            >
+                                {isAiLoopActive ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setAiHistory([]);
+                                    setAiStepCount(0);
+                                    setIsAiLoopActive(true);
+                                }}
+                                className="p-1 text-on-surface-variant/60 hover:text-primary rounded-md hover:bg-primary/10 transition-all"
+                                title={t('common.reset')}
+                            >
+                                <RefreshCw size={12} />
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 
             <div className="flex-1 min-h-0 flex flex-col relative">
                 <div
-                    ref={containerRef}
-                    onScroll={!isRawMode ? onScroll : undefined}
                     className={clsx(
-                        "h-full flex-1 min-h-0 flex flex-col bg-surface overflow-y-auto font-mono text-xs custom-scrollbar relative",
-                        !isRawMode && "p-4"
+                        "flex-1 min-h-0 font-mono text-[13px] leading-relaxed relative",
+                        isRawMode ? "block" : "hidden"
                     )}
                 >
-                    {logs.length === 0 && (
-                        <div className="text-on-surface-variant/80 italic opacity-50 select-none pb-4 p-4">{t('run_tab.console.waiting')}</div>
-                    )}
-                    {isRawMode ? (
-                        <Virtuoso
-                            ref={virtuosoRef}
-                            data={logs}
-                            followOutput={stickToBottom}
-                            atBottomStateChange={setStickToBottom}
-                            className="flex-1 w-full"
-                            style={{ height: '100%', minWidth: '100%' }}
-                            itemContent={(index, line) => (
-                                <div key={index} className="min-h-[1.2em] px-4 whitespace-pre-wrap font-mono text-xs text-on-surface/50 leading-tight border-l-2 border-transparent hover:border-primary/20 hover:bg-primary/5 transition-colors">
-                                    {index} {line}
+                    <Virtuoso
+                        ref={rawContainerRef}
+                        data={logs}
+                        followOutput="auto"
+                        onScroll={onScroll}
+                        className="custom-scrollbar"
+                        itemContent={(i, line) => {
+                            if (line.startsWith('[AI Agent] Thought:')) {
+                                const content = line.replace('[AI Agent] Thought:', '').trim();
+                                return (
+                                    <div className="whitespace-pre-wrap break-words hover:bg-surface-variant/10 px-6 py-0.5 rounded transition-colors border-l-2 border-transparent hover:border-primary/30 flex">
+                                        <span className="text-on-surface-variant/40 mr-3 select-none w-8 inline-block text-right tabular-nums shrink-0">{i + 1}</span>
+                                        <span className="flex-1 min-w-0 break-words text-primary font-semibold">
+                                            [AI Agent] Thought: <span className="text-primary/80 font-normal">{content}</span>
+                                        </span>
+                                    </div>
+                                );
+                            }
+                            if (line.startsWith('[AI Agent] Action:')) {
+                                const content = line.replace('[AI Agent] Action:', '').trim();
+                                return (
+                                    <div className="whitespace-pre-wrap break-words hover:bg-surface-variant/10 px-6 py-0.5 rounded transition-colors border-l-2 border-transparent hover:border-secondary/30 flex">
+                                        <span className="text-on-surface-variant/40 mr-3 select-none w-8 inline-block text-right tabular-nums shrink-0">{i + 1}</span>
+                                        <span className="flex-1 min-w-0 break-words text-secondary font-semibold">
+                                            [AI Agent] Action: <span className="text-secondary/80 font-normal">{content}</span>
+                                        </span>
+                                    </div>
+                                );
+                            }
+                            if (line.startsWith('[ADB] Executed:')) {
+                                const content = line.replace('[ADB] Executed:', '').trim();
+                                return (
+                                    <div className="whitespace-pre-wrap break-words hover:bg-surface-variant/10 px-6 py-0.5 rounded transition-colors border-l-2 border-transparent hover:border-tertiary/30 flex">
+                                        <span className="text-on-surface-variant/40 mr-3 select-none w-8 inline-block text-right tabular-nums shrink-0">{i + 1}</span>
+                                        <span className="flex-1 min-w-0 break-words text-tertiary font-semibold">
+                                            [ADB] Executed: <span className="text-tertiary/80 font-normal">{content}</span>
+                                        </span>
+                                    </div>
+                                );
+                            }
+                            return (
+                                <div className="whitespace-pre-wrap break-words hover:bg-surface-variant/10 px-6 py-0.5 rounded transition-colors border-l-2 border-transparent hover:border-primary/30 flex">
+                                    <span className="text-on-surface-variant/40 mr-3 select-none w-8 inline-block text-right tabular-nums shrink-0">{i + 1}</span>
+                                    <span className={clsx(
+                                        "flex-1 min-w-0 break-words",
+                                        line.includes('| PASS |') && "text-success font-semibold",
+                                        line.includes('| FAIL |') && "text-error font-semibold",
+                                        line.includes('| SKIP |') && "text-warning font-semibold",
+                                        (line.includes('[System]') || line.includes('[RR-')) && "text-on-surface-variant/60 italic"
+                                    )}>
+                                        {line}
+                                    </span>
                                 </div>
-                            )}
-                        />
-                    ) : (
-                        <div className="relative z-10 w-full mb-8">
-                            {(summary || isSummarizing || summaryError) && (
-                                <div className="mt-4 mb-8 border-b border-outline-variant/20 pb-6">
-                                    <AiResponse
-                                        title={t('run_tab.console.summary_title')}
-                                        isLoading={isSummarizing}
-                                        rationaleHeader={t('run_tab.console.summary_rationale')}
-                                        rationale={summary}
-                                        error={summaryError}
-                                        onCopy={() => { }}
-                                    />
+                            );
+                        }}
+                        components={{
+                            Footer: () => isRunning ? (
+                                <div className="flex items-center gap-2 text-primary/60 my-4 px-6 animate-pulse">
+                                    <Terminal size={14} className="animate-bounce" />
+                                    <span className="text-xs font-bold tracking-wider uppercase italic">Streaming live output...</span>
                                 </div>
-                            )}
-                            {!isRawMode && tree.length > 0 && (
-                                <div className="flex-1 min-h-0 space-y-2">
-                                    {tree.map((node) => (
-                                        <LogTree
-                                            key={node.id}
-                                            node={node}
-                                            depth={0}
-                                            dbPath={session?.parsedDbPath}
-                                            onToggleExpand={handleToggleExpand}
-                                            isExpanded={expandedIds.has(node.id)}
-                                            onChildrenLoaded={handleChildrenLoaded}
-                                        />
-                                    ))}
-                                </div>
-                            )}
-                            {(isRunning || session?.status === 'stopping') && (
-                                <div className="text-primary dark:text-primary/80 mt-4 flex items-center gap-2 text-sm italic opacity-70 animate-pulse ml-2">
-                                    <ExpressiveLoading size="sm" variant="circular" />
-                                    {session?.status === 'stopping'
-                                        ? t('run_tab.console.stopping', "Generating reports...")
-                                        : t('run_tab.console.processing', "Processing...")}
-                                </div>
-                            )}
-                            {!isRunning && reparseLoading && (
-                                <div className="text-primary/60 mt-4 flex items-center gap-2 text-xs italic opacity-60 animate-pulse ml-2">
-                                    <ExpressiveLoading size="sm" variant="circular" />
-                                    {t('run_tab.console.loading_xml')}
-                                </div>
-                            )}
-                        </div>
-                    )}
+                            ) : <div className="h-10" />
+                        }}
+                    />
                 </div>
 
-                {showDebugConsole && !isRawMode && (
-                    <div className="h-40 border-t border-outline-variant/30 bg-surface-variant/5 flex flex-col shrink-0 overflow-hidden">
-                        <div className="px-3 py-1 bg-surface-variant/20 flex items-center justify-between">
-                            <span className="text-[10px] font-bold uppercase text-on-surface-variant/60 tracking-wider">DEBUG CONSOLE</span>
-                            <button onClick={() => setShowDebugConsole(false)} className="text-on-surface-variant/60 hover:text-on-surface transition-colors">
-                                <X size={12} />
-                            </button>
-                        </div>
-                        <div
-                            className="flex-1 overflow-hidden font-mono text-[10px] text-on-surface-variant/70 leading-tight select-text"
-                        >
-                            <Virtuoso
-                                ref={debugVirtuosoRef}
-                                data={logs}
-                                followOutput={stickToBottom}
-                                atBottomStateChange={setStickToBottom}
-                                style={{ height: '100%' }}
-                                className="custom-scrollbar"
-                                itemContent={(index, line) => (
-                                    <div key={index} className="px-3 whitespace-pre-wrap break-all opacity-80 hover:opacity-100 transition-opacity hover:bg-surface-variant/10">
-                                        {index} {line}
+                {!isRawMode && (
+                    <div className="flex-1 min-h-0 flex flex-col">
+                        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar" ref={fancyContainerRef} onScroll={onScroll}>
+                            <div className="p-4 min-h-full">
+                                {tree.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-on-surface-variant/40 gap-4">
+                                        {isRunning ? (
+                                            <>
+                                                <ExpressiveLoading size="lg" />
+                                                <div className="text-center">
+                                                    <p className="text-sm font-medium animate-pulse">{t('run_tab.console.waiting_logs')}</p>
+                                                    <p className="text-xs opacity-60 mt-1">{t('run_tab.console.parsing_live')}</p>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div className="text-center group">
+                                                <div className="w-16 h-16 rounded-full bg-surface-variant/10 flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform">
+                                                    <Terminal size={32} className="opacity-20" />
+                                                </div>
+                                                <p className="text-sm italic">{t('run_tab.console.no_logs')}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="max-w-[1200px] mx-auto pb-20">
+                                        {tree.map((node) => (
+                                            <LogTree
+                                                key={node.id}
+                                                node={node}
+                                                dbPath={session?.parsedDbPath}
+                                                onChildrenLoaded={handleChildrenLoaded}
+                                            />
+                                        ))}
+                                        {reparseLoading && (
+                                            <div className="mt-8 flex items-center justify-center gap-3 p-4 rounded-xl bg-primary/5 border border-primary/10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                                <ExpressiveLoading size="sm" variant="circular" />
+                                                <span className="text-xs text-primary/70 font-medium tracking-wide uppercase italic">{t('run_tab.console.optimizing_view')}</span>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
-                            />
+                            </div>
                         </div>
                     </div>
                 )}
+
+                {/* Floating Summary UI */}
+                {(summary || isSummarizing || summaryError) && (
+                    <div className="absolute bottom-0 left-0 right-3 z-50 animate-in slide-in-from-bottom-8 fade-in duration-500 bg-surface">
+                        <AiResponse
+                            response={summary}
+                            isLoading={isSummarizing}
+                            error={summaryError}
+                            onClose={() => {
+                                setSummary(null);
+                                setSummaryError(null);
+                            }}
+                            title={t('run_tab.console.ai_analysis')}
+                            onRetry={handleSummarize}
+                        />
+                    </div>
+                )}
             </div>
+
+            {showDebugConsole && (
+                <div className="h-1/3 border-t border-outline-variant/30 bg-surface/95 backdrop-blur-md flex flex-col animate-in slide-in-from-bottom duration-300 z-30">
+                    <div className="flex items-center justify-between p-2 bg-surface-variant/10 shrink-0">
+                        <div className="flex items-center gap-2 px-2">
+                            <Terminal size={14} className="text-primary" />
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/70">{t('run_tab.console.debug_output')}</span>
+                        </div>
+                        <button
+                            onClick={() => setShowDebugConsole(false)}
+                            className="p-1 hover:bg-surface-variant/30 rounded text-on-surface-variant/60"
+                        >
+                            <X size={14} />
+                        </button>
+                    </div>
+                    <div className="flex-1 min-h-0 p-3 font-mono text-[11px] leading-relaxed overflow-y-auto custom-scrollbar bg-black/5 shadow-inner">
+                        <Virtuoso
+                            ref={debugVirtuosoRef}
+                            data={logs}
+                            followOutput="auto"
+                            itemContent={(index, line) => (
+                                <div className="whitespace-pre-wrap break-all py-0.5 border-l border-outline-variant/10 pl-3 mb-0.5 hover:bg-primary/5 transition-colors">
+                                    <span className="text-on-surface-variant/30 mr-3 select-none inline-block w-8 text-right tabular-nums">{index + 1}</span>
+                                    <span className={clsx(
+                                        line.includes('[System]') && "text-primary/60",
+                                        line.includes('[Error]') && "text-error font-bold",
+                                        line.includes('[RR-') && "text-secondary/60 italic"
+                                    )}>
+                                        {line}
+                                    </span>
+                                </div>
+                            )}
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
-
-export default RunConsole;

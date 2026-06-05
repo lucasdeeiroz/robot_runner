@@ -5,6 +5,9 @@ on:
       - 'v*'
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   create-release:
     permissions:
@@ -16,7 +19,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Create Release
         id: create_release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           name: Robot Runner ${{ github.ref_name }}
           body: "See the assets to download this version and install."
@@ -61,7 +64,7 @@ jobs:
       - name: Sync node version and setup cache
         uses: actions/setup-node@v4
         with:
-          node-version: 'lts/*'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install frontend dependencies
@@ -71,6 +74,13 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}
         with:
           # tagName, releaseName, releaseBody, releaseId REMOVED to prevent auto-upload
           # We manually upload renamed artifacts in the next steps.
@@ -83,24 +93,33 @@ jobs:
         run: |
           $VERSION = "${{ github.ref_name }}".TrimStart('v')
           
-          # Rename MSI
-          $msiPath = "src-tauri/target/release/bundle/msi/Robot Runner_${VERSION}_x64_en-US.msi"
-          if (Test-Path $msiPath) {
-             Copy-Item $msiPath "Robot.Runner_${VERSION}_windows_x64_en-US.msi"
+          # Rename MSI using wildcard to locate the source (directory may not exist if MSI bundle is disabled)
+          $msiFile = Get-ChildItem "src-tauri/target/release/bundle/msi/Robot Runner_*_x64_en-US.msi" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($msiFile) {
+             Copy-Item $msiFile.FullName "Robot.Runner_${VERSION}_windows_x64_en-US.msi"
+             Write-Host "Copied MSI to Robot.Runner_${VERSION}_windows_x64_en-US.msi"
+          } else {
+             Write-Warning "Source MSI file not found, skipping MSI artifact."
           }
           
-          # Rename Setup EXE
-          $exePath = "src-tauri/target/release/bundle/nsis/Robot Runner_${VERSION}_x64-setup.exe"
-          if (Test-Path $exePath) {
-             Copy-Item $exePath "Robot.Runner_${VERSION}_windows_x64-setup.exe"
+          # Rename Setup EXE using wildcard to locate the source
+          $exeFile = Get-ChildItem "src-tauri/target/release/bundle/nsis/Robot Runner_*_x64-setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($exeFile) {
+             Copy-Item $exeFile.FullName "Robot.Runner_${VERSION}_windows_x64-setup.exe"
+             Write-Host "Copied Setup EXE to Robot.Runner_${VERSION}_windows_x64-setup.exe"
+          } else {
+             Write-Warning "Source Setup EXE file not found!"
           }
 
           # Create Portable EXE
-          # Simply taking the raw binary. Note: sidecars must be in PATH on target machine.
           $binPath = "src-tauri/target/release/robot_runner.exe"
           if (Test-Path $binPath) {
              Copy-Item $binPath "Robot.Runner_${VERSION}_windows_x64-portable.exe"
+             Write-Host "Copied Portable EXE to Robot.Runner_${VERSION}_windows_x64-portable.exe"
+          } else {
+             Write-Warning "Source Portable EXE file not found!"
           }
+
 
       - name: Rename and Upload Artifacts (Linux)
         if: matrix.platform == 'ubuntu-22.04'
@@ -138,7 +157,7 @@ jobs:
           fi
 
       - name: Upload Renamed Assets
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           files: |
@@ -173,30 +192,33 @@ jobs:
             if ($manifestDir) {
                  Write-Host "Patching manifests in $($manifestDir.FullName)"
                  
-                 # 1. Inject Metadata into locale manifest
-                 $date = Get-Date -Format "yyyy-MM-dd"
-                 $localeManifest = Get-ChildItem -Path $manifestDir.FullName -Filter "*locale.en-US.yaml"
-                 if ($localeManifest) {
-                    $content = Get-Content $localeManifest.FullName -Raw
-                    
-                    if (-not ($content -match "ReleaseNotesUrl:")) {
-                        $releaseNotesUrl = "https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
-                        $content = $content + "`nReleaseNotesUrl: $releaseNotesUrl"
-                        Write-Host "Added ReleaseNotesUrl to $($localeManifest.Name)"
-                    }
+                  # 1. Inject Metadata into locale manifest (ReleaseNotesUrl)
+                  $date = Get-Date -Format "yyyy-MM-dd"
+                  $localeManifest = Get-ChildItem -Path $manifestDir.FullName -Filter "*locale.en-US.yaml"
+                  if ($localeManifest) {
+                      $content = Get-Content $localeManifest.FullName -Raw
+                      
+                      if (-not ($content -match "ReleaseNotesUrl:")) {
+                          $releaseNotesUrl = "https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
+                          $content = $content.Trim() + "`r`nReleaseNotesUrl: $releaseNotesUrl"
+                          Write-Host "Added ReleaseNotesUrl to $($localeManifest.Name)"
+                      }
 
-                    if (-not ($content -match "ReleaseDate:")) {
-                        if ($content -match "ReleaseNotesUrl:") {
-                            $content = $content -replace "(ReleaseNotesUrl: .+)", "`$1`nReleaseDate: $date"
-                            Write-Host "Inserted ReleaseDate after ReleaseNotesUrl in $($localeManifest.Name)"
-                        } else {
-                            $content = $content + "`nReleaseDate: $date"
-                            Write-Host "Added ReleaseDate: $date to $($localeManifest.Name)"
-                        }
-                    }
+                      Set-Content -Path $localeManifest.FullName -Value $content -Encoding utf8
+                  }
 
-                    Set-Content -Path $localeManifest.FullName -Value $content
-                 }
+                  # 2. Inject Metadata into version manifest (ReleaseDate)
+                  $versionManifest = Get-ChildItem -Path $manifestDir.FullName -Filter "*.yaml" | Where-Object { $_.Name -notmatch "installer" -and $_.Name -notmatch "locale" } | Select-Object -First 1
+                  if ($versionManifest) {
+                      $content = Get-Content $versionManifest.FullName -Raw
+                      
+                      if (-not ($content -match "ReleaseDate:")) {
+                          $content = $content.Trim() + "`r`nReleaseDate: $date"
+                          Write-Host "Added ReleaseDate: $date to $($versionManifest.Name)"
+                      }
+
+                      Set-Content -Path $versionManifest.FullName -Value $content -Encoding utf8
+                  }
 
                  Write-Host "Submitting manifest from $($manifestDir.FullName)"
                  .\wingetcreate.exe submit $manifestDir.FullName --token $env:GITHUB_TOKEN

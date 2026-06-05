@@ -4,7 +4,6 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { Play, Square, Eraser, AlignLeft, Package as PackageIcon, FolderSearch, Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
-import clsx from "clsx";
 
 import { useSettings } from "@/lib/settings";
 import { feedback } from "@/lib/feedback";
@@ -13,11 +12,13 @@ import { Section } from "@/components/organisms/Section";
 import { Button } from "@/components/atoms/Button";
 import { Select } from "@/components/atoms/Select";
 import { Modal } from "@/components/organisms/Modal";
+import { AiButton } from '@/components/atoms/AiButton';
 import { AiResponse } from "@/components/molecules/AiResponse";
 import * as gemini from "@/lib/dashboard/gemini";
 import * as claude from "@/lib/dashboard/claude";
 import * as openai from "@/lib/dashboard/openai";
-import { Sparkles } from "lucide-react";
+import * as claudeCli from "@/lib/dashboard/claudeCode";
+
 interface LogcatSubTabProps {
     selectedDevice: string;
     isTestRunning?: boolean;
@@ -264,6 +265,13 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
                 result = await claude.askClaude(prompt, settings.claudeApiKey || '', settings.claudeModel, systemInstruction);
             } else if (provider === 'openai') {
                 result = await openai.askOpenAI(prompt, settings.openaiApiKey || '', settings.openaiModel, systemInstruction);
+            } else if (provider === 'claude-code') {
+                const response = await claudeCli.askClaudeCode(prompt, settings.paths.automationRoot || '', systemInstruction, settings.claudeCodeToken);
+                result = typeof response === 'string' ? response : response.result;
+            } else if (provider === 'antigravity-cli') {
+                const { askAntigravityCli } = await import('@/lib/dashboard/antigravityCode');
+                const response = await askAntigravityCli(prompt, settings.paths.automationRoot || '', systemInstruction, settings.antigravityApiKey);
+                result = typeof response === 'string' ? response : response.result;
             } else {
                 throw new Error("No AI provider configured");
             }
@@ -382,17 +390,17 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
                         >
                             {!isNarrow && t(isStreaming ? 'logcat.stop' : 'logcat.start')}
                         </Button>
-                        <Button
+                        <AiButton
+                            id="logcat_analysis"
+                            isLoading={isAiLoading}
                             onClick={handleAiAnalyze}
-                            variant="outline"
+                            label={t('logcat.ai_analyze_button', 'Analyze with AI')}
+                            variant="secondary"
                             size="sm"
                             disabled={logs.length === 0 || isAiLoading}
                             className="bg-primary/5 border-primary/20 text-primary hover:bg-primary/10"
-                            title={t('logcat.ai_analyze_button', 'Analyze with AI')}
-                        >
-                            <Sparkles size={14} className={clsx("mr-1", isAiLoading && "animate-pulse")} />
-                            {!isNarrow && t('logcat.ai_analyze_button', 'Analyze with AI')}
-                        </Button>
+                            allowCustomPrompt={true}
+                        />
                     </div>
                 }
             />

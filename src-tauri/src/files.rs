@@ -122,10 +122,141 @@ pub fn read_image_base64(path: String) -> AppResult<String> {
 }
 
 #[command]
+pub fn read_compressed_image_base64(path: String, max_width: Option<u32>, max_height: Option<u32>) -> AppResult<String> {
+    use crate::image_utils;
+    let w = max_width.unwrap_or(800);
+    let h = max_height.unwrap_or(800);
+    image_utils::compress_image_path(&path, w, h, 80)
+}
+
+#[command]
 pub fn save_image(path: String, content: Vec<u8>) -> AppResult<()> {
     use std::io::Write;
     let mut file = fs::File::create(&path).map_err(|e| AppError::FileSystemError(e.to_string()))?;
     file.write_all(&content)
         .map_err(|e| AppError::FileSystemError(e.to_string()))?;
     Ok(())
+}
+#[command]
+pub fn resolve_test_path(root: String, name: String) -> AppResult<Option<String>> {
+    fn find_file_bounded(
+        root: &std::path::Path,
+        target_name: &str,
+    ) -> Option<std::path::PathBuf> {
+        const MAX_DEPTH: usize = 32;
+        const MAX_ENTRIES: usize = 10_000;
+
+        let target_lower = target_name.to_lowercase();
+        let mut visited_entries = 0usize;
+        let mut stack = vec![(root.to_path_buf(), 0usize)];
+
+        while let Some((dir, depth)) = stack.pop() {
+            if depth > MAX_DEPTH {
+                continue;
+            }
+
+            let entries = match fs::read_dir(&dir) {
+                Ok(entries) => entries,
+                Err(_) => continue,
+            };
+
+            for entry in entries.flatten() {
+                visited_entries += 1;
+                if visited_entries > MAX_ENTRIES {
+                    return None;
+                }
+
+                let path = entry.path();
+                let metadata = match fs::symlink_metadata(&path) {
+                    Ok(metadata) => metadata,
+                    Err(_) => continue,
+                };
+                let file_type = metadata.file_type();
+
+                // Do not follow symlinks to avoid cycles and unexpected traversal.
+                if file_type.is_symlink() {
+                    continue;
+                }
+
+                if file_type.is_dir() {
+                    if depth < MAX_DEPTH {
+                        stack.push((path, depth + 1));
+                    }
+                } else if let Some(file_name) = path.file_name().and_then(|s| s.to_str()) {
+                    let file_name_lower = file_name.to_lowercase();
+                    if file_name_lower == target_lower
+                        || path
+                            .file_stem()
+                            .and_then(|s| s.to_str())
+                            .map(|s| s.to_lowercase())
+                            == Some(target_lower.clone())
+                    {
+                        return Some(path);
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
+    if root.trim().is_empty() {
+        return Err(AppError::StringError(
+            "resolve_test_path: root path must not be empty".to_string(),
+        ));
+    }
+
+    let root_path = std::path::Path::new(&root);
+
+    if !root_path.exists() || !root_path.is_dir() {
+        return Err(AppError::StringError(format!(
+            "resolve_test_path: root '{}' does not exist or is not a directory",
+            root
+        )));
+    }
+
+    if let Some(found) = find_file_bounded(root_path, &name) {
+        Ok(Some(found.to_string_lossy().to_string()))
+    } else {
+        Ok(None)
+    }
+}
+
+#[command]
+pub fn fs_exists(path: String) -> bool {
+    std::path::Path::new(&path).exists()
+}
+
+#[command]
+pub fn fs_mkdir(path: String) -> AppResult<()> {
+    std::fs::create_dir_all(&path).map_err(|e| AppError::FileSystemError(e.to_string()))
+}
+
+#[command]
+pub fn fs_write_text_file(path: String, content: String) -> AppResult<()> {
+    std::fs::write(&path, content).map_err(|e| AppError::FileSystemError(e.to_string()))
+}
+
+#[command]
+pub fn fs_read_text_file(path: String) -> AppResult<String> {
+    std::fs::read_to_string(&path).map_err(|e| AppError::FileSystemError(e.to_string()))
+}
+
+#[command]
+pub fn fs_remove_file(path: String) -> AppResult<()> {
+    std::fs::remove_file(&path).map_err(|e| AppError::FileSystemError(e.to_string()))
+}
+
+#[command]
+pub fn fs_read_dir_names(path: String) -> AppResult<Vec<String>> {
+    let read_dir = std::fs::read_dir(&path).map_err(|e| AppError::FileSystemError(e.to_string()))?;
+    let mut names = Vec::new();
+    for entry in read_dir {
+        if let Ok(entry) = entry {
+            if let Some(name) = entry.file_name().to_str() {
+                names.push(name.to_string());
+            }
+        }
+    }
+    Ok(names)
 }

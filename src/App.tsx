@@ -21,11 +21,26 @@ import { argbFromHex, themeFromSourceColor, TonalPalette } from "@material/mater
 import { DeviceProvider } from "./lib/deviceStore";
 import { SelectionProvider } from "./lib/selectionStore";
 import { ExpressiveLoading } from "./components/atoms/ExpressiveLoading";
+import { useAuth } from "./lib/authStore";
+import { LoginPage } from "./pages/LoginPage";
+import { RemoteConfigProvider } from "./lib/RemoteConfigProvider";
+import { Button } from "./components/atoms/Button";
 
 function App() {
+  return (
+    <RemoteConfigProvider>
+      <AppContent />
+    </RemoteConfigProvider>
+  );
+}
+
+function AppContent() {
   const [activePage, setActivePage] = useState("home");
   const { t, i18n } = useTranslation();
   const { settings, updateSetting, checkSystemVersions, systemCheckStatus, loading: settings_loading, checkForAppUpdate } = useSettings();
+  const { user, loading: auth_loading } = useAuth();
+
+  // Initialize Remote Config once authenticated (now handled by RemoteConfigProvider)
 
   // State to track if we should show the overlay or if it has been dismissed/handled
   const [initialCheckDismissed, setInitialCheckDismissed] = useState(false);
@@ -209,12 +224,53 @@ function App() {
   }, [settings_loading]);
 
   // Prevent rendering (and thus flash) until settings are loaded
-  if (settings_loading) {
+  // Diagnostics for loading
+  const [loadingTime, setLoadingTime] = useState(0);
+  useEffect(() => {
+    let timer: any;
+    if (settings_loading || auth_loading) {
+      timer = setInterval(() => {
+        setLoadingTime(prev => prev + 1);
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [settings_loading, auth_loading]);
+
+  const forceBypassLoading = () => {
+    console.warn("[App] Manual loading bypass triggered.");
+    setLoadingTime(-1); // Special state to bypass
+  };
+
+  if ((settings_loading || auth_loading) && loadingTime !== -1) {
     return (
-      <div className="w-screen h-screen flex flex-col items-center justify-center bg-surface text-primary dark:text-primary/80">
-        <ExpressiveLoading variant="circular" size="lg" />
+      <div className="w-screen h-screen flex flex-col items-center justify-center bg-surface text-primary dark:text-primary/80 gap-8 p-6">
+        <div className="relative">
+          <ExpressiveLoading variant="circular" size="lg" />
+          {/* Diagnostic info is now hidden but the logic remains active */}
+        </div>
+        
+        {loadingTime > 10 && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }} 
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col items-center gap-4 max-w-sm text-center"
+          >
+            <p className="text-sm text-on-surface-variant/60">
+              {t('common.loading_taking_too_long')}
+            </p>
+            <Button variant="outline" size="sm" onClick={forceBypassLoading}>
+              {t('common.continue_anyway')}
+            </Button>
+          </motion.div>
+        )}
       </div>
     );
+  }
+
+  if (!user) {
+    return <LoginPage />;
   }
 
   return (
@@ -240,18 +296,18 @@ function App() {
             )}
           </AnimatePresence>
           <Layout activePage={activePage} onNavigate={setActivePage}>
-            <div className="max-w-7xl mx-auto h-full flex flex-col relative">
+            <div className="max-w-8xl mx-auto h-full flex flex-col relative">
               {/* RunPage - Kept mounted to preserve state */}
               {/* When active, it is relative to drive the container height. When not, it is absolute/hidden. */}
               <motion.div
-                className={clsx("flex flex-col w-full min-h-full", activePage === 'run' ? "relative" : "absolute inset-0 pointer-events-none opacity-0 overflow-hidden")}
+                className={clsx("flex flex-col w-full min-h-full px-4", activePage === 'run' ? "relative" : "absolute inset-0 pointer-events-none opacity-0 overflow-hidden")}
                 initial={false}
                 animate={{
                   opacity: activePage === 'run' ? 1 : 0,
                   zIndex: activePage === 'run' ? 10 : 0,
                   scale: activePage === 'run' ? 1 : 0.98
                 }}
-                transition={{ duration: 0.3 }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
               >
                 <RunPage onNavigate={setActivePage} initialTab={initialSubTab} />
               </motion.div>
@@ -265,7 +321,7 @@ function App() {
                   zIndex: activePage === 'dashboard' ? 10 : 0,
                   scale: activePage === 'dashboard' ? 1 : 0.98
                 }}
-                transition={{ duration: 0.3 }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
               >
                 <DashboardPage onNavigate={setActivePage} />
               </motion.div>
@@ -279,21 +335,21 @@ function App() {
                   zIndex: activePage === 'tests' ? 10 : 0,
                   scale: activePage === 'tests' ? 1 : 0.98
                 }}
-                transition={{ duration: 0.3 }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
               >
                 <TestsPage onNavigate={setActivePage} />
               </motion.div>
 
               {/* Other Pages - Transitions using AnimatePresence */}
-              <AnimatePresence mode="wait">
+              <AnimatePresence mode="popLayout">
                 {activePage !== 'run' && activePage !== 'dashboard' && activePage !== 'tests' && (
                   <motion.div
                     key={activePage}
                     className="relative w-full flex flex-col z-20"
-                    initial={{ opacity: 0, scale: 0.98, x: 20 }}
-                    animate={{ opacity: 1, scale: 1, x: 0 }}
-                    exit={{ opacity: 0, scale: 0.98, x: -20, position: 'absolute' }}
-                    transition={{ duration: 0.3, ease: [0.2, 0, 0, 1] }}
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
                   >
                     {activePage === 'settings' && <SettingsPage />}
                     {activePage === 'about' && <AboutPage />}

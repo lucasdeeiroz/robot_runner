@@ -83,6 +83,16 @@
       }
     }
   </style>
+  <script>
+    // Silent error logging for production
+    window.onerror = function (msg, url, lineNo, columnNo, error) {
+      console.error('Fatal Startup Error:', msg, 'at', url, ':', lineNo);
+      return false;
+    };
+    window.onunhandledrejection = function(event) {
+      console.error('Unhandled Promise Rejection:', event.reason);
+    };
+  </script>
 </head>
 
 <body>

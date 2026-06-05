@@ -15,6 +15,7 @@ import { TOOL_LINKS } from "@/lib/tools";
 import { getAvailableModels as getGeminiModels } from "@/lib/dashboard/gemini";
 import { getAvailableModels as getClaudeModels } from "@/lib/dashboard/claude";
 import { getAvailableModels as getOpenAIModels } from "@/lib/dashboard/openai";
+import { migrateScreenMaps } from "@/lib/dashboard/mapperPersistence";
 import { Modal } from "@/components/organisms/Modal";
 import { ConfirmationModal } from "@/components/organisms/ConfirmationModal";
 
@@ -34,20 +35,26 @@ import { InfoCard } from "@/components/molecules/InfoCard";
 import { LogoInput } from "@/components/molecules/LogoInput";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 
+import { useRemoteConfig } from "@/lib/RemoteConfigProvider";
+
 interface SettingsPageProps {
     onNavigate?: (page: string) => void;
 }
 
 export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
-    const { settings, updateSetting, loading, profiles, activeProfileId, createProfile, switchProfile, renameProfile, deleteProfile, systemVersions, checkSystemVersions, systemCheckStatus, isNgrokEnabled } = useSettings();
+    const { settings, updateSetting, loading, profiles, activeProfileId, createProfile, switchProfile, renameProfile, deleteProfile, systemVersions, checkSystemVersions, systemCheckStatus, isNgrokEnabled, is_test_mode } = useSettings();
+
     const { t } = useTranslation();
     const { sessions } = useTestSessions();
     const isTestRunning = sessions.some(s => s.status === 'running');
+    const showAppiumSection = settings.usageMode === 'automator' && settings.automationFramework !== 'maestro' && is_test_mode !== 'web';
 
     // Profile Management Details
     const [showProfileModal, setShowProfileModal] = useState(false);
     const [newProfileName, setNewProfileName] = useState("");
     const [isRenaming, setIsRenaming] = useState(false);
+    const [migrationPending, setMigrationPending] = useState<{ oldPath: string, newPath: string } | null>(null);
+    const [isMigrating, setIsMigrating] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
 
     // Responsive State
@@ -61,6 +68,17 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
     const [showModelList, setShowModelList] = useState(false);
 
     const [isRestartingADB, setIsRestartingADB] = useState(false);
+
+    const claudeCodeVersion = systemVersions?.claude_code;
+    const isClaudeCodeInstalled = !!claudeCodeVersion && claudeCodeVersion !== 'Not Found';
+
+    const antigravityVersion = systemVersions?.antigravity;
+    const isAntigravityInstalled = !!antigravityVersion && antigravityVersion !== 'Not Found';
+
+    const { isFeatureEnabled } = useRemoteConfig();
+    const isCypressEnabled = isFeatureEnabled('is_cypress_enabled');
+    const isSeleniumEnabled = isFeatureEnabled('is_selenium_enabled');
+
 
     const handleRestartADB = async () => {
         try {
@@ -119,6 +137,13 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
         observer.observe(containerRef.current);
         return () => observer.disconnect();
     }, []);
+
+    // Clear available models when provider changes
+    useEffect(() => {
+        setAvailableModels([]);
+        setModelFetchError(null);
+        setShowModelList(false);
+    }, [settings.aiProvider]);
 
 
 
@@ -306,6 +331,37 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
 
     return (
         <div ref={containerRef} className="space-y-4 animate-in fade-in duration-500">
+            {/* Migration Confirmation Modal */}
+            <ConfirmationModal
+                isOpen={!!migrationPending}
+                onClose={() => {
+                    if (migrationPending) {
+                        updateSetting('paths', { ...settings.paths, mappings: migrationPending.newPath });
+                        setMigrationPending(null);
+                    }
+                }}
+                onConfirm={async () => {
+                    if (migrationPending) {
+                        setIsMigrating(true);
+                        try {
+                            await migrateScreenMaps(activeProfileId, migrationPending.oldPath, migrationPending.newPath);
+                            feedback.toast.success('settings.feedback.migration_success');
+                        } catch (err) {
+                            feedback.toast.error('settings.feedback.migration_error', err);
+                        } finally {
+                            setIsMigrating(false);
+                            updateSetting('paths', { ...settings.paths, mappings: migrationPending.newPath });
+                            setMigrationPending(null);
+                        }
+                    }
+                }}
+                title={t('settings.paths.migration_title')}
+                description={t('settings.paths.migration_desc')}
+                confirmText={t('settings.paths.migration_confirm')}
+                variant="warning"
+                isLoading={isMigrating}
+            />
+
             {/* Delete Confirmation Modal */}
             <ConfirmationModal
                 isOpen={!!showDeleteConfirm}
@@ -477,7 +533,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                             <Select
                                 value={settings.automationFramework || 'robot'}
                                 onChange={async (e) => {
-                                    const framework = e.target.value as 'robot' | 'appium' | 'maestro';
+                                    const framework = e.target.value as 'robot' | 'appium' | 'maestro' | 'cypress' | 'selenium';
                                     updateSetting('automationFramework', framework);
                                     checkSystemVersions('automator', framework);
                                 }}
@@ -485,7 +541,9 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                 options={[
                                     { value: "robot", label: t('onboarding.framework.robot.title') },
                                     { value: "appium", label: t('onboarding.framework.appium.title') },
-                                    { value: "maestro", label: t('onboarding.framework.maestro.title') }
+                                    { value: "maestro", label: t('onboarding.framework.maestro.title') },
+                                    ...(isCypressEnabled ? [{ value: "cypress", label: t('onboarding.framework.cypress.title') }] : []),
+                                    ...(isSeleniumEnabled ? [{ value: "selenium", label: t('onboarding.framework.selenium.title') }] : [])
                                 ]}
                             />
                         </div>
@@ -532,7 +590,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
             <div className="grid gap-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Appium Server Config & Control */}
-                    {(settings.usageMode === 'automator' && settings.automationFramework !== 'maestro') && (
+                    {showAppiumSection && (
                         <Section
                             title={t('settings.appium.title')}
                             icon={Server}
@@ -594,26 +652,26 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                         >
 
                             <div className="grid grid-cols-2 gap-4 mb-4">
-                                <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
-                                    <Input
-                                        label={t('settings.appium.host')}
-                                        type="text"
-                                        value={settings.appiumHost}
-                                        onChange={(e) => updateSetting('appiumHost', e.target.value)}
-                                        disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
-                                    />
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
+                                        <Input
+                                            label={t('settings.appium.host')}
+                                            type="text"
+                                            value={settings.appiumHost}
+                                            onChange={(e) => updateSetting('appiumHost', e.target.value)}
+                                            disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
+                                        />
+                                    </div>
+                                    <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
+                                        <Input
+                                            label={t('settings.appium.port')}
+                                            type="number"
+                                            value={settings.appiumPort}
+                                            onChange={(e) => updateSetting('appiumPort', Number(e.target.value))}
+                                            disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
+                                        />
+                                    </div>
                                 </div>
-                                <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
-                                    <Input
-                                        label={t('settings.appium.port')}
-                                        type="number"
-                                        value={settings.appiumPort}
-                                        onChange={(e) => updateSetting('appiumPort', Number(e.target.value))}
-                                        disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
-                                    />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 mb-4">
                                 <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
                                     <Input
                                         label={t('settings.tool_config.appium_base_path')}
@@ -624,6 +682,8 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                         placeholder="/wd/hub"
                                     />
                                 </div>
+                            </div>
+                            <div className="mb-4">
                                 <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
                                     <Input
                                         label={t('settings.tool_config.appium_args')}
@@ -633,6 +693,20 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                         disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
                                         placeholder="--allow-insecure chromedriver"
                                     />
+                                    {settings.automationFramework === 'robot' && (
+                                        <div className="col-span-1 md:col-span-2 flex items-center gap-2 pt-2">
+                                            <input
+                                                type="checkbox"
+                                                id="noAppiumForRobot"
+                                                checked={settings.noAppiumForRobot || false}
+                                                onChange={(e) => updateSetting('noAppiumForRobot', e.target.checked)}
+                                                className="rounded border-outline-variant/30 text-primary dark:text-primary/80 focus:ring-primary/20 w-4 h-4 cursor-pointer"
+                                            />
+                                            <label htmlFor="noAppiumForRobot" className="text-xs font-semibold text-on-surface-variant/80 select-none cursor-pointer">
+                                                {t('settings.tool_config.no_appium_for_robot')}
+                                            </label>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -666,30 +740,37 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                     <Section
                         title={t('settings.tools')}
                         icon={Wrench}
-                        className={clsx((settings.usageMode === 'explorer' || settings.automationFramework === 'maestro') && "col-span-full")}
+                        className={clsx(!showAppiumSection && "col-span-full")}
                         menus={
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleRestartADB}
-                                disabled={isRestartingADB}
-                                leftIcon={isRestartingADB ? <ExpressiveLoading size="xsm" variant="circular" /> : <RefreshCcw size={16} />}
-                                className="text-on-surface/80 hover:text-primary hover:bg-primary/10"
-                            >
-                                {t('settings.action.restart_adb')}
-                            </Button>
+                            is_test_mode !== 'web' ? (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={handleRestartADB}
+                                    disabled={isRestartingADB}
+                                    leftIcon={isRestartingADB ? <ExpressiveLoading size="xsm" variant="circular" /> : <RefreshCcw size={16} />}
+                                    className="text-on-surface/80 hover:text-primary hover:bg-primary/10"
+                                >
+                                    {t('settings.action.restart_adb')}
+                                </Button>
+                            ) : undefined
                         }
                     >
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {['robotArgs', 'maestroArgs', 'appiumJavaArgs', 'scrcpyArgs'].map((key) => {
+                            {['robotArgs', 'maestroArgs', 'appiumJavaArgs', 'cypressArgs', 'seleniumArgs', 'scrcpyArgs'].map((key) => {
                                 if (key === 'robotArgs' && (settings.usageMode === 'explorer' || (settings.automationFramework && settings.automationFramework !== 'robot'))) return null;
                                 if (key === 'maestroArgs' && (settings.usageMode === 'explorer' || settings.automationFramework !== 'maestro')) return null;
                                 if (key === 'appiumJavaArgs' && (settings.usageMode === 'explorer' || settings.automationFramework !== 'appium')) return null;
+                                if (key === 'cypressArgs' && (settings.usageMode === 'explorer' || settings.automationFramework !== 'cypress')) return null;
+                                if (key === 'seleniumArgs' && (settings.usageMode === 'explorer' || settings.automationFramework !== 'selenium')) return null;
+                                if (key === 'scrcpyArgs' && is_test_mode === 'web') return null;
 
                                 let isDisabled = false;
                                 if (key === 'robotArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
                                 if (key === 'maestroArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
                                 if (key === 'appiumJavaArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
+                                if (key === 'cypressArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
+                                if (key === 'seleniumArgs' && systemCheckStatus?.missingTesting?.length > 0) isDisabled = true;
                                 if (key === 'scrcpyArgs' && systemCheckStatus?.missingMirroring?.length > 0) isDisabled = true;
 
                                 let labelKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
@@ -709,21 +790,32 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                 );
                             })}
                             {/* App Packages List */}
+                            {is_test_mode !== 'web' && (
+                                <div className="col-span-1 md:col-span-2">
+                                    <TagInput
+                                        label={t('settings.tool_config.app_packages')}
+                                        tags={settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean)}
+                                        onAdd={(tag) => {
+                                            const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
+                                            if (!current.includes(tag)) {
+                                                updateSetting('tools', { ...settings.tools, appPackage: [...current, tag].join(', ') });
+                                            }
+                                        }}
+                                        onRemove={(tag) => {
+                                            const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
+                                            updateSetting('tools', { ...settings.tools, appPackage: current.filter(t => t !== tag).join(', ') });
+                                        }}
+                                        placeholder={t('settings.tool_config.add_package_placeholder')}
+                                    />
+                                </div>
+                            )}
                             <div className="col-span-1 md:col-span-2">
-                                <TagInput
-                                    label={t('settings.tool_config.app_packages')}
-                                    tags={settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean)}
-                                    onAdd={(tag) => {
-                                        const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
-                                        if (!current.includes(tag)) {
-                                            updateSetting('tools', { ...settings.tools, appPackage: [...current, tag].join(', ') });
-                                        }
-                                    }}
-                                    onRemove={(tag) => {
-                                        const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
-                                        updateSetting('tools', { ...settings.tools, appPackage: current.filter(t => t !== tag).join(', ') });
-                                    }}
-                                    placeholder={t('settings.tool_config.add_package_placeholder')}
+                                <PathInput
+                                    label={t('settings.tool_config.custom_adb_path' as any)}
+                                    value={settings.customAdbPath || ''}
+                                    onSelect={(path) => updateSetting('customAdbPath', path)}
+                                    placeholder={t('settings.not_set')}
+                                    directory={false}
                                 />
                             </div>
                             {isNgrokEnabled && (
@@ -747,16 +839,40 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                 {/* Path Configuration */}
                 <Section title={t('settings.paths.title')} icon={FolderOpen}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {(['automationRoot', 'resources', 'tests', 'suites', 'logs', 'logcat', 'screenshots', 'recordings'] as Array<keyof typeof settings.paths>).map((key) => {
+                        {(['automationRoot', 'resources', 'tests', 'suites', 'logs', 'logcat', 'screenshots', 'recordings', 'mappings'] as Array<keyof typeof settings.paths>).map((key) => {
                             const isTestingPath = ['automationRoot', 'resources', 'tests', 'suites'].includes(key);
                             if (isTestingPath && settings.usageMode === 'explorer') return null;
+                            if (key === 'logcat' && is_test_mode === 'web') return null;
                             const isDisabled = isTestingPath && systemCheckStatus?.missingTesting?.length > 0;
                             return (
                                 <PathInput
                                     key={key}
                                     label={t(`settings.path_labels.${key}` as any)}
                                     value={settings.paths[key] || ''}
-                                    onSelect={(path) => updateSetting('paths', { ...settings.paths, [key]: path })}
+                                    onSelect={async (path) => {
+                                        if (key === 'mappings') {
+                                            const oldPath = settings.paths.mappings;
+                                            if (oldPath && oldPath !== path) {
+                                                try {
+                                                    const oldEntries = await invoke<any[]>('list_directory', { path: oldPath });
+                                                    const newEntries = await invoke<any[]>('list_directory', { path });
+                                                    const hasMappingsInSource = oldEntries.some(entry => entry.name.endsWith('.json'));
+                                                    const hasMappingsInDestination = newEntries.some(entry => entry.name.endsWith('.json'));
+
+                                                    if (hasMappingsInSource && hasMappingsInDestination) {
+                                                        feedback.toast.error('settings.paths.migration_destination_not_empty');
+                                                        return;
+                                                    }
+                                                } catch (error) {
+                                                    console.warn('Failed to validate mappings migration paths', error);
+                                                }
+
+                                                setMigrationPending({ oldPath, newPath: path });
+                                                return; // Do not update setting yet, wait for modal
+                                            }
+                                        }
+                                        updateSetting('paths', { ...settings.paths, [key]: path });
+                                    }}
                                     disabled={isDisabled}
                                     placeholder={t('settings.not_set')}
                                     directory={true}
@@ -853,10 +969,13 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                 <Select
                                     value={settings.aiProvider || 'gemini'}
                                     onChange={(e) => updateSetting('aiProvider', e.target.value as any)}
+                                    containerClassName="w-48"
                                     options={[
                                         { value: 'gemini', label: t('settings.ai.gemini.title') },
                                         { value: 'claude', label: t('settings.ai.claude.title') },
-                                        { value: 'openai', label: t('settings.ai.openai.title') }
+                                        { value: 'openai', label: t('settings.ai.openai.title') },
+                                        { value: 'claude-code', label: t('settings.ai.claude_code.title') },
+                                        { value: 'antigravity-cli', label: t('settings.ai.antigravity.title') }
                                     ]}
                                 />
                             </div>
@@ -903,7 +1022,15 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                                 </div>
                                             ) : availableModels.length > 0 ? (
                                                 availableModels.map(model => (
-                                                    <button key={model} className="w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0" onClick={() => { updateSetting('geminiModel', model); setShowModelList(false); }}>{model}</button>
+                                                    <button 
+                                                        key={model} 
+                                                        type="button"
+                                                        className="w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0" 
+                                                        onMouseDown={() => { updateSetting('geminiModel', model); setShowModelList(false); }}
+                                                        onClick={() => { updateSetting('geminiModel', model); setShowModelList(false); }}
+                                                    >
+                                                        {model}
+                                                    </button>
                                                 ))
                                             ) : (
                                                 <div className="px-3 py-4 text-sm text-on-surface-variant/60 italic text-center">
@@ -956,7 +1083,15 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                                 </div>
                                             ) : availableModels.length > 0 ? (
                                                 availableModels.map(model => (
-                                                    <button key={model} className="w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0" onClick={() => { updateSetting('claudeModel', model); setShowModelList(false); }}>{model}</button>
+                                                    <button 
+                                                        key={model} 
+                                                        type="button"
+                                                        className="w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0" 
+                                                        onMouseDown={() => { updateSetting('claudeModel', model); setShowModelList(false); }}
+                                                        onClick={() => { updateSetting('claudeModel', model); setShowModelList(false); }}
+                                                    >
+                                                        {model}
+                                                    </button>
                                                 ))
                                             ) : (
                                                 <div className="px-3 py-4 text-sm text-on-surface-variant/60 italic text-center">
@@ -1009,7 +1144,15 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                                 </div>
                                             ) : availableModels.length > 0 ? (
                                                 availableModels.map(model => (
-                                                    <button key={model} className="w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0" onClick={() => { updateSetting('openaiModel', model); setShowModelList(false); }}>{model}</button>
+                                                    <button 
+                                                        key={model} 
+                                                        type="button"
+                                                        className="w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0" 
+                                                        onMouseDown={() => { updateSetting('openaiModel', model); setShowModelList(false); }}
+                                                        onClick={() => { updateSetting('openaiModel', model); setShowModelList(false); }}
+                                                    >
+                                                        {model}
+                                                    </button>
                                                 ))
                                             ) : (
                                                 <div className="px-3 py-4 text-sm text-on-surface-variant/60 italic text-center">
@@ -1018,6 +1161,114 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                             )}
                                         </div>
                                     )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Claude Code CLI Config */}
+                        {settings.aiProvider === 'claude-code' && (
+                            <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
+                                <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 space-y-3">
+                                    <div className="flex items-start gap-3">
+                                        <div className="mt-0.5 p-2 rounded-xl bg-primary/10 text-primary">
+                                            <Terminal size={18} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="text-sm font-medium text-on-surface">
+                                                {t('settings.ai.claude_code.title')}
+                                            </p>
+                                            <p className="text-xs text-on-surface-variant leading-relaxed">
+                                                {t('settings.ai.claude_code.help')}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="pt-2 flex items-center justify-between gap-4">
+                                        <div className="flex items-center gap-2">
+                                            <div className={`w-2 h-2 rounded-full ${isClaudeCodeInstalled ? 'bg-success' : 'bg-error animate-pulse'}`} />
+                                            <span className="text-xs font-medium text-on-surface-variant">
+                                                {isClaudeCodeInstalled
+                                                    ? t('settings.ai.claude_code.installed', { version: claudeCodeVersion }) 
+                                                    : t('settings.ai.claude_code.not_installed')
+                                                }
+                                            </span>
+                                        </div>
+                                        <Button 
+                                            variant="secondary" 
+                                            size="sm" 
+                                            onClick={() => checkSystemVersions()}
+                                            className="h-8 px-3 text-[11px]"
+                                        >
+                                            {t('settings.ai.claude_code.check_install')}
+                                        </Button>
+                                    </div>
+
+                                    <div className="pt-2">
+                                        <Input
+                                            label={t('settings.ai.claude_code.token_label')}
+                                            type="password"
+                                            value={settings.claudeCodeToken || ''}
+                                            onChange={(e) => updateSetting('claudeCodeToken', e.target.value)}
+                                            placeholder={t('settings.ai.claude_code.token_placeholder')}
+                                        />
+                                        <p className="text-[10px] text-on-surface-variant/80 mt-1">
+                                            {t('settings.ai.claude_code.token_help')}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Antigravity CLI Config */}
+                        {settings.aiProvider === 'antigravity-cli' && (
+                            <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
+                                <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 space-y-3">
+                                    <div className="flex items-start gap-3">
+                                        <div className="mt-0.5 p-2 rounded-xl bg-primary/10 text-primary">
+                                            <Terminal size={18} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="text-sm font-medium text-on-surface">
+                                                {t('settings.ai.antigravity.title')}
+                                            </p>
+                                            <p className="text-xs text-on-surface-variant leading-relaxed">
+                                                {t('settings.ai.antigravity.help')}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="pt-2 flex items-center justify-between gap-4">
+                                        <div className="flex items-center gap-2">
+                                            <div className={`w-2 h-2 rounded-full ${isAntigravityInstalled ? 'bg-success' : 'bg-error animate-pulse'}`} />
+                                            <span className="text-xs font-medium text-on-surface-variant">
+                                                {isAntigravityInstalled
+                                                    ? t('settings.ai.antigravity.installed', { version: antigravityVersion }) 
+                                                    : t('settings.ai.antigravity.not_installed')
+                                                }
+                                            </span>
+                                        </div>
+                                        <Button 
+                                            variant="secondary" 
+                                            size="sm" 
+                                            onClick={() => checkSystemVersions()}
+                                            className="h-8 px-3 text-[11px]"
+                                        >
+                                            {t('settings.ai.antigravity.check_install')}
+                                        </Button>
+                                    </div>
+
+                                    <div className="pt-2">
+                                        <Input
+                                            label={t('settings.ai.antigravity.token_label')}
+                                            type="password"
+                                            value={settings.antigravityApiKey || ''}
+                                            onChange={(e) => updateSetting('antigravityApiKey', e.target.value)}
+                                            placeholder={t('settings.ai.antigravity.token_placeholder')}
+                                        />
+                                        <p className="text-[10px] text-on-surface-variant/80 mt-1">
+                                            {t('settings.ai.antigravity.token_help')}
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -1069,6 +1320,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                             (['adb', 'node', 'appium', 'uiautomator2', 'python', 'robot', 'appium_lib', 'java', 'maven', 'maestro', 'scrcpy', 'ngrok'] as Array<keyof typeof systemVersions>)
                                 .filter(key => {
                                     if (key === 'ngrok' && !isNgrokEnabled) return false;
+                                    if (is_test_mode === 'web' && ['adb', 'scrcpy'].includes(key)) return false;
                                     if (settings.usageMode === 'explorer' && ['node', 'appium', 'uiautomator2', 'python', 'robot', 'appium_lib', 'java', 'maven', 'maestro'].includes(key)) return false;
 
                                     // Framework-specific filtering

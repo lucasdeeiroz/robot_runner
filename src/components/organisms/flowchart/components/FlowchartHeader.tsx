@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
-import { 
-    X, ZoomIn, ZoomOut, Maximize, Save, 
-    Upload, Download, Camera, AlertTriangle, Eraser 
+import {
+    X, ZoomIn, ZoomOut, Maximize, Save,
+    Upload, Download, Camera, AlertTriangle, Eraser
 } from 'lucide-react';
 import { Button } from '@/components/atoms/Button';
 import { Select } from '@/components/atoms/Select';
@@ -51,8 +51,8 @@ export function FlowchartHeader({
             </h2>
             <div className="flex items-center gap-2">
                 {missedScreensCount > 0 && (
-                    <div 
-                        className="flex items-center gap-1.5 px-3 py-1 bg-warning/10 text-warning border border-warning/20 rounded-lg text-xs font-medium animate-pulse cursor-help" 
+                    <div
+                        className="flex items-center gap-1.5 px-3 py-1 bg-warning/10 text-warning border border-warning/20 rounded-lg text-xs font-medium animate-pulse cursor-help"
                         title={t('mapper.flowchart.ai_missed_help', 'These screens were placed in the quarantine area on the right.')}
                     >
                         <AlertTriangle size={14} />
@@ -78,30 +78,32 @@ export function FlowchartHeader({
                     title={t('mapper.flowchart.export')}>
                     <Upload size={16} />
                 </Button>
+                <div className="h-4 w-px bg-outline-variant/30 mx-2" />
                 <Button
                     onClick={onSave}
-                    className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full"
+                    className="p-2 bg-primary/10 hover:bg-primary/90 text-primary hover:text-on-primary rounded-full shadow-md transition-all active:scale-95"
                     title={t('common.save')}>
-                    <Save size={16} />
+                    <Save size={16} className="stroke-[2.5]" />
                 </Button>
+                <div className="h-4 w-px bg-outline-variant/30 mx-2" />
                 <Button
                     onClick={onClearCurvatures}
                     className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full"
                     title={t('mapper.flowchart.clear_curvatures', 'Clear all edge curvatures')}>
                     <Eraser size={16} />
                 </Button>
-                <div className="h-4 w-px bg-outline-variant/30 mx-2" />
                 <Button
                     onClick={onExportImage}
                     className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full transition-colors"
                     title={t('mapper.flowchart.export_image')}>
                     <Camera size={16} />
                 </Button>
-                <div className="h-4 w-px bg-outline-variant/30 mx-1" />
-                <div className="flex items-center gap-2 px-2 py-1 bg-surface-variant/10 rounded-lg border border-outline-variant/20 ml-2">
+                <div className="h-4 w-px bg-outline-variant/30 mx-2" />
+                <div className="flex items-center gap-2 px-3 py-1 bg-surface-variant/10 rounded-lg border border-outline-variant/20">
                     <span className="text-[10px] uppercase font-bold text-on-surface-variant/70 whitespace-nowrap">{t('mapper.flowchart.filter_by_tag')}</span>
                     <Select
-                        className="bg-transparent border-none text-xs font-semibold text-primary dark:text-primary/80 outline-none cursor-pointer py-0 h-6 min-w-[100px]"
+                        className="bg-transparent border-none text-xs font-semibold text-primary dark:text-primary/80 outline-none cursor-pointer py-0 h-6 min-w-[120px]"
+                        containerClassName="space-y-0 w-auto"
                         value={filterTag || ""}
                         onChange={(e) => setFilterTag(e.target.value || null)}
                         options={[

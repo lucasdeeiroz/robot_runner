@@ -4,7 +4,7 @@ import { useSettings } from '@/lib/settings';
 import { Button } from '@/components/atoms/Button';
 import { Select } from '@/components/atoms/Select';
 import { Badge } from '@/components/atoms/Badge';
-import { Compass, Bot, CheckCircle2, Zap, Terminal } from 'lucide-react';
+import { Compass, Bot, CheckCircle2, Zap, Terminal, Globe, Smartphone } from 'lucide-react';
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
 import { feedback } from '@/lib/feedback';
@@ -20,7 +20,8 @@ export function Onboarding({ onComplete }: OnboardingProps) {
     const [step, setStep] = useState(1);
     const [selectedLanguage, setSelectedLanguage] = useState(settings.language || 'en_US');
     const [selectedMode, setSelectedMode] = useState<'explorer' | 'automator' | undefined>(settings.usageMode);
-    const [selectedFramework, setSelectedFramework] = useState<'robot' | 'appium' | 'maestro' | undefined>(settings.automationFramework || 'robot');
+    const [selectedFramework, setSelectedFramework] = useState<'robot' | 'appium' | 'maestro' | 'cypress' | 'selenium' | undefined>(settings.automationFramework || 'robot');
+    const [selectedExplorerPlatform, setSelectedExplorerPlatform] = useState<'mobile' | 'web' | undefined>(settings.explorerPlatform || 'mobile');
 
     useEffect(() => {
         // Apply language choice immediately for the UI
@@ -45,17 +46,21 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             feedback.toast.error(t('onboarding.error_no_framework'));
             return;
         }
+        if (selectedMode === 'explorer' && !selectedExplorerPlatform) {
+            feedback.toast.error(t('onboarding.error_no_platform'));
+            return;
+        }
 
         updateSetting('usageMode', selectedMode);
         updateSetting('language', selectedLanguage);
         if (selectedMode === 'automator') {
             updateSetting('automationFramework', selectedFramework);
+        } else if (selectedMode === 'explorer') {
+            updateSetting('explorerPlatform', selectedExplorerPlatform);
         }
 
-        // Re-check system versions so missing automation tools warn if they chose automator
-        if (selectedMode === 'automator') {
-            await checkSystemVersions();
-        }
+        // Re-check system versions so missing automation/tunnelling tools warn
+        await checkSystemVersions();
 
         onComplete();
     };
@@ -170,16 +175,10 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                             <Button
                                 variant="primary"
                                 className="hover:bg-secondary-container"
-                                onClick={() => {
-                                    if (selectedMode === 'automator') {
-                                        setStep(3);
-                                    } else {
-                                        handleComplete();
-                                    }
-                                }}
+                                onClick={() => setStep(3)}
                                 disabled={!selectedMode}
                             >
-                                {selectedMode === 'automator' ? t('common.next') : t('common.finish')}
+                                {t('common.next')}
                             </Button>
                         </div>
                     </motion.div>
@@ -193,92 +192,215 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                         exit={{ opacity: 0, x: 20 }}
                         className="space-y-6"
                     >
-                        <h2 className="text-xl font-semibold mb-4 text-center text-on-surface">{t('onboarding.step3_title')}</h2>
-                        <div className="grid grid-cols-1 gap-4">
-                            {/* Robot Framework */}
-                            <div
-                                onClick={() => setSelectedFramework('robot')}
-                                className={clsx(
-                                    "relative p-4 rounded-2xl border-2 cursor-pointer transition-all hover:shadow-md flex items-center gap-4",
-                                    selectedFramework === 'robot'
-                                        ? "bg-primary/5 border-primary"
-                                        : "bg-surface border-outline-variant/30 hover:bg-surface-variant/30"
-                                )}
-                            >
-                                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary dark:text-primary/80 flex-shrink-0">
-                                    <Bot size={24} />
-                                </div>
-                                <div className="flex-1">
-                                    <h3 className="text-lg font-bold text-on-surface">{t('onboarding.framework.robot.title')}</h3>
-                                    <p className="text-sm text-on-surface-variant/80">
-                                        {t('onboarding.framework.robot.description')}
-                                    </p>
-                                </div>
-                                {selectedFramework === 'robot' && (
-                                    <div className="text-primary">
-                                        <CheckCircle2 size={24} />
-                                    </div>
-                                )}
-                            </div>
+                        <h2 className="text-xl font-semibold mb-4 text-center text-on-surface">
+                            {selectedMode === 'explorer' ? t('onboarding.step2_platform_title') : t('onboarding.step3_title')}
+                        </h2>
 
-                            {/* Appium Java */}
-                            <div
-                                onClick={() => setSelectedFramework('appium')}
-                                className={clsx(
-                                    "relative p-4 rounded-2xl border-2 cursor-pointer transition-all hover:shadow-md flex items-center gap-4",
-                                    selectedFramework === 'appium'
-                                        ? "bg-primary/5 border-primary"
-                                        : "bg-surface border-outline-variant/30 hover:bg-surface-variant/30"
-                                )}
-                            >
-                                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary dark:text-primary/80 flex-shrink-0">
-                                    <Terminal size={24} />
-                                </div>
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-2">
-                                        <h3 className="text-lg font-bold text-on-surface">{t('onboarding.framework.appium.title')}</h3>
-                                        <Badge variant="info" size="sm" className="font-bold opacity-70">{t('common.beta')}</Badge>
+                        {selectedMode === 'explorer' && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Mobile Platform */}
+                                <div
+                                    onClick={() => setSelectedExplorerPlatform('mobile')}
+                                    className={clsx(
+                                        "relative p-5 rounded-2xl border-2 cursor-pointer transition-all hover:shadow-md flex flex-col items-center justify-center text-center gap-3",
+                                        selectedExplorerPlatform === 'mobile'
+                                            ? "bg-primary/5 border-primary"
+                                            : "bg-surface border-outline-variant/30 hover:bg-surface-variant/30"
+                                    )}
+                                >
+                                    <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center text-primary dark:text-primary/80 mb-2">
+                                        <Smartphone size={28} />
                                     </div>
+                                    <h3 className="text-lg font-bold text-on-surface">{t('onboarding.platform.mobile.title')}</h3>
                                     <p className="text-sm text-on-surface-variant/80">
-                                        {t('onboarding.framework.appium.description')}
+                                        {t('onboarding.platform.mobile.description')}
                                     </p>
+                                    {selectedExplorerPlatform === 'mobile' && (
+                                        <div className="absolute top-4 right-4 text-primary">
+                                            <CheckCircle2 size={24} />
+                                        </div>
+                                    )}
                                 </div>
-                                {selectedFramework === 'appium' && (
-                                    <div className="text-primary">
-                                        <CheckCircle2 size={24} />
-                                    </div>
-                                )}
-                            </div>
 
-                            {/* Maestro */}
-                            <div
-                                onClick={() => setSelectedFramework('maestro')}
-                                className={clsx(
-                                    "relative p-4 rounded-2xl border-2 cursor-pointer transition-all hover:shadow-md flex items-center gap-4",
-                                    selectedFramework === 'maestro'
-                                        ? "bg-primary/5 border-primary"
-                                        : "bg-surface border-outline-variant/30 hover:bg-surface-variant/30"
-                                )}
-                            >
-                                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary dark:text-primary/80 flex-shrink-0">
-                                    <Zap size={24} />
-                                </div>
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-2">
-                                        <h3 className="text-lg font-bold text-on-surface">{t('onboarding.framework.maestro.title')}</h3>
-                                        <Badge variant="info" size="sm" className="font-bold opacity-70">{t('common.beta')}</Badge>
+                                {/* Web Platform */}
+                                <div
+                                    onClick={() => setSelectedExplorerPlatform('web')}
+                                    className={clsx(
+                                        "relative p-5 rounded-2xl border-2 cursor-pointer transition-all hover:shadow-md flex flex-col items-center justify-center text-center gap-3",
+                                        selectedExplorerPlatform === 'web'
+                                            ? "bg-primary/5 border-primary"
+                                            : "bg-surface border-outline-variant/30 hover:bg-surface-variant/30"
+                                    )}
+                                >
+                                    <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center text-primary dark:text-primary/80 mb-2">
+                                        <Globe size={28} />
                                     </div>
+                                    <h3 className="text-lg font-bold text-on-surface">{t('onboarding.platform.web.title')}</h3>
                                     <p className="text-sm text-on-surface-variant/80">
-                                        {t('onboarding.framework.maestro.description')}
+                                        {t('onboarding.platform.web.description')}
                                     </p>
+                                    {selectedExplorerPlatform === 'web' && (
+                                        <div className="absolute top-4 right-4 text-primary">
+                                            <CheckCircle2 size={24} />
+                                        </div>
+                                    )}
                                 </div>
-                                {selectedFramework === 'maestro' && (
-                                    <div className="text-primary">
-                                        <CheckCircle2 size={24} />
-                                    </div>
-                                )}
                             </div>
-                        </div>
+                        )}
+
+                        {selectedMode === 'automator' && (
+                            <div className="space-y-6 max-h-[380px] overflow-y-auto pr-2 custom-scrollbar">
+                                <div className="space-y-3">
+                                    <h3 className="text-xs font-bold uppercase tracking-wider text-on-surface-variant/60">
+                                        Mobile Automation Frameworks
+                                    </h3>
+                                    <div className="grid grid-cols-1 gap-3">
+                                        {/* Robot Framework */}
+                                        <div
+                                            onClick={() => setSelectedFramework('robot')}
+                                            className={clsx(
+                                                "relative p-4 rounded-2xl border-2 cursor-pointer transition-all hover:shadow-md flex items-center gap-4",
+                                                selectedFramework === 'robot'
+                                                    ? "bg-primary/5 border-primary"
+                                                    : "bg-surface border-outline-variant/30 hover:bg-surface-variant/30"
+                                            )}
+                                        >
+                                            <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary dark:text-primary/80 flex-shrink-0">
+                                                <Bot size={24} />
+                                            </div>
+                                            <div className="flex-1">
+                                                <h3 className="text-base font-bold text-on-surface">{t('onboarding.framework.robot.title')}</h3>
+                                                <p className="text-xs text-on-surface-variant/80">
+                                                    {t('onboarding.framework.robot.description')}
+                                                </p>
+                                            </div>
+                                            {selectedFramework === 'robot' && (
+                                                <div className="text-primary">
+                                                    <CheckCircle2 size={24} />
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Appium Java */}
+                                        <div
+                                            onClick={() => setSelectedFramework('appium')}
+                                            className={clsx(
+                                                "relative p-4 rounded-2xl border-2 cursor-pointer transition-all hover:shadow-md flex items-center gap-4",
+                                                selectedFramework === 'appium'
+                                                    ? "bg-primary/5 border-primary"
+                                                    : "bg-surface border-outline-variant/30 hover:bg-surface-variant/30"
+                                            )}
+                                        >
+                                            <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary dark:text-primary/80 flex-shrink-0">
+                                                <Terminal size={24} />
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <h3 className="text-base font-bold text-on-surface">{t('onboarding.framework.appium.title')}</h3>
+                                                    <Badge variant="info" size="sm" className="font-bold opacity-70">{t('common.beta')}</Badge>
+                                                </div>
+                                                <p className="text-xs text-on-surface-variant/80">
+                                                    {t('onboarding.framework.appium.description')}
+                                                </p>
+                                            </div>
+                                            {selectedFramework === 'appium' && (
+                                                <div className="text-primary">
+                                                    <CheckCircle2 size={24} />
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Maestro */}
+                                        <div
+                                            onClick={() => setSelectedFramework('maestro')}
+                                            className={clsx(
+                                                "relative p-4 rounded-2xl border-2 cursor-pointer transition-all hover:shadow-md flex items-center gap-4",
+                                                selectedFramework === 'maestro'
+                                                    ? "bg-primary/5 border-primary"
+                                                    : "bg-surface border-outline-variant/30 hover:bg-surface-variant/30"
+                                            )}
+                                        >
+                                            <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary dark:text-primary/80 flex-shrink-0">
+                                                <Zap size={24} />
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <h3 className="text-base font-bold text-on-surface">{t('onboarding.framework.maestro.title')}</h3>
+                                                    <Badge variant="info" size="sm" className="font-bold opacity-70">{t('common.beta')}</Badge>
+                                                </div>
+                                                <p className="text-xs text-on-surface-variant/80">
+                                                    {t('onboarding.framework.maestro.description')}
+                                                </p>
+                                            </div>
+                                            {selectedFramework === 'maestro' && (
+                                                <div className="text-primary">
+                                                    <CheckCircle2 size={24} />
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3 pt-2">
+                                    <h3 className="text-xs font-bold uppercase tracking-wider text-on-surface-variant/60">
+                                        Web Automation Frameworks
+                                    </h3>
+                                    <div className="grid grid-cols-1 gap-3">
+                                        {/* Cypress */}
+                                        <div
+                                            onClick={() => setSelectedFramework('cypress')}
+                                            className={clsx(
+                                                "relative p-4 rounded-2xl border-2 cursor-pointer transition-all hover:shadow-md flex items-center gap-4",
+                                                selectedFramework === 'cypress'
+                                                    ? "bg-primary/5 border-primary"
+                                                    : "bg-surface border-outline-variant/30 hover:bg-surface-variant/30"
+                                            )}
+                                        >
+                                            <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary dark:text-primary/80 flex-shrink-0">
+                                                <Globe size={24} />
+                                            </div>
+                                            <div className="flex-1">
+                                                <h3 className="text-base font-bold text-on-surface">{t('onboarding.framework.cypress.title')}</h3>
+                                                <p className="text-xs text-on-surface-variant/80">
+                                                    {t('onboarding.framework.cypress.description')}
+                                                </p>
+                                            </div>
+                                            {selectedFramework === 'cypress' && (
+                                                <div className="text-primary">
+                                                    <CheckCircle2 size={24} />
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Selenium Pytest */}
+                                        <div
+                                            onClick={() => setSelectedFramework('selenium')}
+                                            className={clsx(
+                                                "relative p-4 rounded-2xl border-2 cursor-pointer transition-all hover:shadow-md flex items-center gap-4",
+                                                selectedFramework === 'selenium'
+                                                    ? "bg-primary/5 border-primary"
+                                                    : "bg-surface border-outline-variant/30 hover:bg-surface-variant/30"
+                                            )}
+                                        >
+                                            <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary dark:text-primary/80 flex-shrink-0">
+                                                <Terminal size={24} />
+                                            </div>
+                                            <div className="flex-1">
+                                                <h3 className="text-base font-bold text-on-surface">{t('onboarding.framework.selenium.title')}</h3>
+                                                <p className="text-xs text-on-surface-variant/80">
+                                                    {t('onboarding.framework.selenium.description')}
+                                                </p>
+                                            </div>
+                                            {selectedFramework === 'selenium' && (
+                                                <div className="text-primary">
+                                                    <CheckCircle2 size={24} />
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="flex justify-between mt-8">
                             <Button variant="ghost" onClick={() => setStep(2)}>
@@ -288,7 +410,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                                 variant="primary"
                                 className="hover:bg-secondary-container"
                                 onClick={handleComplete}
-                                disabled={!selectedFramework}
+                                disabled={selectedMode === 'explorer' ? !selectedExplorerPlatform : !selectedFramework}
                             >
                                 {t('common.finish')}
                             </Button>

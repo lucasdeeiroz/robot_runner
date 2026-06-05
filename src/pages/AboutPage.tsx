@@ -1,10 +1,11 @@
-import { Github, Bot, RefreshCcw, Cpu, Users, Info, User } from "lucide-react";
+import { Scale, GitBranch, Bot, RefreshCcw, Cpu, Users, Info, User } from "lucide-react";
 import { PageHeader } from "@/components/organisms/PageHeader";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import packageJson from '../../package.json';
 import { useSettings } from "@/lib/settings";
 import { Button } from "@/components/atoms/Button";
+import { Select } from "@/components/atoms/Select";
 import { Section } from "@/components/organisms/Section";
 import { InfoCard } from "@/components/molecules/InfoCard";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
@@ -29,10 +30,12 @@ interface AboutPageProps {
     onNavigate?: (page: string) => void;
 }
 
+type UpdateChannel = 'stable' | 'beta' | 'alpha';
+
 export function AboutPage({ onNavigate: _onNavigate }: AboutPageProps) {
     const { t } = useTranslation();
     const appVersion = packageJson.version;
-    const { checkForAppUpdate, updateInfo } = useSettings();
+    const { checkForAppUpdate, updateInfo, settings, updateSetting } = useSettings();
     const [isChecking, setIsChecking] = useState(false);
     const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
 
@@ -46,6 +49,16 @@ export function AboutPage({ onNavigate: _onNavigate }: AboutPageProps) {
             await checkForAppUpdate(true); // Manual check
         } finally {
             setIsChecking(false);
+        }
+    };
+
+    const [clickCount, setClickCount] = useState(0);
+    const handleTitleClick = () => {
+        const newCount = clickCount + 1;
+        setClickCount(newCount);
+        if (newCount >= 5) {
+            updateSetting('presentationEnabled', true);
+            setClickCount(0);
         }
     };
 
@@ -66,10 +79,38 @@ export function AboutPage({ onNavigate: _onNavigate }: AboutPageProps) {
                             <Bot size={40} className="text-primary" />
                         </div>
 
-                        <h2 className="text-2xl font-bold text-on-surface/80 mb-2">
+                        <h2 
+                            className="text-2xl font-bold text-on-surface/80 mb-2 select-none cursor-default"
+                            onClick={handleTitleClick}
+                        >
                             Robot Runner
                         </h2>
-                        <div className="inline-flex items-center gap-2 pl-3 pr-1.5 py-1 rounded-2xl bg-primary/10 border border-primary/20 text-primary dark:text-primary/80 text-sm font-medium">
+                        <p className="mt-6 text-on-surface-variant/80 max-w-lg mx-auto leading-relaxed">
+                            {t('about.long_description')}
+                        </p>
+                        <div className="mt-6 inline-flex items-center gap-2 pl-3 pr-1.5 py-1 rounded-2xl bg-primary/10 border border-primary/20 text-primary dark:text-primary/80 text-sm font-medium">
+
+                            <div className="flex items-center gap-2 bg-surface-variant/20 px-3 py-1.5 rounded-2xl border border-outline-variant/30 w-max mr-2">
+                                <span className="text-xs text-on-surface-variant font-medium whitespace-nowrap">{t('about.update_channel')}:</span>
+                                <div className="w-28">
+                                    <Select
+                                        value={settings.updateChannel || 'stable'}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            if (value === 'stable' || value === 'beta' || value === 'alpha') {
+                                                updateSetting('updateChannel', value as UpdateChannel);
+                                            }
+                                        }}
+                                        containerClassName="!space-y-0"
+                                        className="!py-1 !px-2 !min-h-0 bg-transparent border-none shadow-none focus:ring-0 text-xs font-medium"
+                                        options={[
+                                            { value: 'stable', label: t('about.channel_stable') },
+                                            { value: 'beta', label: t('about.channel_beta') },
+                                            { value: 'alpha', label: t('about.channel_alpha') }
+                                        ]}
+                                    />
+                                </div>
+                            </div>
                             <span>v{appVersion}</span>
                             <div className="w-px h-3 bg-primary/20 mx-0.5" />
                             <Button
@@ -98,9 +139,6 @@ export function AboutPage({ onNavigate: _onNavigate }: AboutPageProps) {
                                 </Button>
                             )}
                         </div>
-                        <p className="mt-6 text-on-surface-variant/80 max-w-lg mx-auto leading-relaxed">
-                            {t('about.long_description')}
-                        </p>
                     </div>
 
                     {/* Content Grid */}
@@ -129,7 +167,7 @@ export function AboutPage({ onNavigate: _onNavigate }: AboutPageProps) {
                         {/* Legal & License (Now Right/Top) */}
                         <Section
                             title={t('about.legal_title')}
-                            icon={Github}
+                            icon={Scale}
                         >
                             <div className="space-y-4">
                                 <div className="p-4 bg-surface/50 rounded-2xl border border-outline-variant/30">
@@ -162,7 +200,7 @@ export function AboutPage({ onNavigate: _onNavigate }: AboutPageProps) {
 
                             <div className="flex justify-center pt-6 text-on-surface-variant/80 text-sm gap-6 mt-auto">
                                 <a href="https://github.com/lucasdeeiroz/robot_runner" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors flex items-center gap-2">
-                                    <Github size={16} /> {t('about.github_repo')}
+                                    <GitBranch size={16} /> {t('about.github_repo')}
                                 </a>
                             </div>
                         </Section>
@@ -196,7 +234,31 @@ export function AboutPage({ onNavigate: _onNavigate }: AboutPageProps) {
                                         </div>
                                     }
                                 >
-                                    {t('about.collaborator')}
+                                    {t('about.dev_collaborator')}
+                                </InfoCard>
+                                <InfoCard
+                                    title="Sarah Shelly Da Silva Farias"
+                                    href="https://github.com/sarahssf"
+                                    headerRight={<span>↗</span>}
+                                    icon={
+                                        <div className="w-12 h-12 bg-surface-variant/30 rounded-2xl flex items-center justify-center text-on-surface-variant/80">
+                                            <User size={24} />
+                                        </div>
+                                    }
+                                >
+                                    {t('about.qa_collaborator')}
+                                </InfoCard>
+                                <InfoCard
+                                    title="Abel Freire de Andrade"
+                                    href="https://github.com/abelandrad"
+                                    headerRight={<span>↗</span>}
+                                    icon={
+                                        <div className="w-12 h-12 bg-surface-variant/30 rounded-2xl flex items-center justify-center text-on-surface-variant/80">
+                                            <User size={24} />
+                                        </div>
+                                    }
+                                >
+                                    {t('about.qa_collaborator')}
                                 </InfoCard>
                             </div>
                         </Section>

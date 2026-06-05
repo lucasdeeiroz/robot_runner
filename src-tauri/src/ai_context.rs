@@ -4,7 +4,9 @@ use roxmltree;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
+use std::time::SystemTime;
 use tauri::Manager;
+use walkdir::WalkDir;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
@@ -24,6 +26,8 @@ pub struct AiContextParams {
     pub current_xml: Option<String>,
     pub current_screenshot: Option<String>,
     pub failures_limit: Option<usize>,
+    pub automation_root: Option<String>,
+    pub custom_mappings_dir: Option<String>,
 }
 
 #[derive(Serialize, Debug)]
@@ -79,17 +83,33 @@ fn get_history_analysis_context(params: AiContextParams) -> Result<AiContextResp
                             }
                         }
                     }
-                    // CRITICAL: Strip base64 screenshot data which eats up megabytes in token limit
+                    // STRIP only if it looks like base64 data to save tokens, keep if it's a file path
                     if let Some(fail_detail) = obj.get_mut("failureDetail") {
                         if let Some(fd_obj) = fail_detail.as_object_mut() {
-                            fd_obj.remove("screenshotPath");
-                            fd_obj.remove("screenshot_path");
+                            if let Some(val) = fd_obj.get("screenshotPath").and_then(|v| v.as_str()) {
+                                if val.starts_with("data:") || val.len() > 1024 {
+                                    fd_obj.remove("screenshotPath");
+                                }
+                            }
+                            if let Some(val) = fd_obj.get("screenshot_path").and_then(|v| v.as_str()) {
+                                if val.starts_with("data:") || val.len() > 1024 {
+                                    fd_obj.remove("screenshot_path");
+                                }
+                            }
                         }
                     }
                     if let Some(fail_detail) = obj.get_mut("failure_detail") {
                         if let Some(fd_obj) = fail_detail.as_object_mut() {
-                            fd_obj.remove("screenshotPath");
-                            fd_obj.remove("screenshot_path");
+                            if let Some(val) = fd_obj.get("screenshotPath").and_then(|v| v.as_str()) {
+                                if val.starts_with("data:") || val.len() > 1024 {
+                                    fd_obj.remove("screenshotPath");
+                                }
+                            }
+                            if let Some(val) = fd_obj.get("screenshot_path").and_then(|v| v.as_str()) {
+                                if val.starts_with("data:") || val.len() > 1024 {
+                                    fd_obj.remove("screenshot_path");
+                                }
+                            }
                         }
                     }
                 }
@@ -152,9 +172,32 @@ fn get_history_analysis_context(params: AiContextParams) -> Result<AiContextResp
         }
     }
 
+    let first_screenshot = failures.iter().find_map(|f| {
+        let parsed: serde_json::Value = serde_json::from_str(f).ok()?;
+        // Check multiple possible keys for screenshot path
+        parsed.get("failureDetail")
+            .and_then(|fd| fd.get("screenshotPath"))
+            .and_then(|s| s.as_str())
+            .map(|s| s.to_string())
+            .or_else(|| {
+                parsed.get("failure_detail")
+                    .and_then(|fd| fd.get("screenshot_path"))
+                    .and_then(|s| s.as_str())
+                    .map(|s| s.to_string())
+            })
+            .or_else(|| {
+                parsed.get("screenshotPath")
+                    .and_then(|s| s.as_str())
+                    .map(|s| s.to_string())
+            })
+    });
+
     Ok(AiContextResponse {
         context,
-        metadata: serde_json::json!({ "failure_count": failures.len() }),
+        metadata: serde_json::json!({ 
+            "failure_count": failures.len(),
+            "first_screenshot": first_screenshot
+        }),
     })
 }
 
@@ -166,7 +209,6 @@ fn get_exploration_context(params: AiContextParams) -> Result<AiContextResponse,
         context.push_str("### UI HIERARCHY (Simplified XML)\n\n");
         let doc = roxmltree::Document::parse(&xml).map_err(|e| e.to_string())?;
 
-        // Simple heuristic for interactive elements to keep XML tiny
         let mut simplified = String::new();
         simplified.push_str("<hierarchy>\n");
 
@@ -176,30 +218,59 @@ fn get_exploration_context(params: AiContextParams) -> Result<AiContextResponse,
         for node in doc.descendants() {
             if node.is_element() {
                 let tag = node.tag_name().name();
-                // Interactive elements or those with text content
                 let clickable = node.attribute("clickable") == Some("true")
                     || node.attribute("long-clickable") == Some("true");
-                let has_text =
-                    node.attribute("text").is_some() && node.attribute("text") != Some("");
+                let has_text = node.attribute("text").map_or(false, |t| !t.trim().is_empty());
+                let has_desc = node.attribute("content-desc").map_or(false, |d| !d.trim().is_empty());
+                let scrollable = node.attribute("scrollable") == Some("true");
+                let checkable = node.attribute("checkable") == Some("true");
 
-                if clickable || has_text || tag == "hierarchy" {
+                if clickable || has_text || has_desc || scrollable || checkable || tag == "hierarchy" {
                     count += 1;
                     let short_id = format!("e{}", count);
                     let xpath = generate_basic_xpath(&node);
                     short_id_map.insert(short_id.clone(), serde_json::json!(xpath));
 
                     let text = node.attribute("text").unwrap_or("");
+                    let desc = node.attribute("content-desc").unwrap_or("");
                     let resource_id = node
                         .attribute("resource-id")
                         .unwrap_or("")
                         .split('/')
                         .last()
                         .unwrap_or("");
+                    let bounds = node.attribute("bounds").unwrap_or("");
 
-                    simplified.push_str(&format!(
-                        "  <{tag} id='{}' text='{}' res='{}' clickable='{}' />\n",
-                        short_id, text, resource_id, clickable
-                    ));
+                    let mut attrs = format!("id=\"{}\"", short_id);
+                    if !resource_id.is_empty() {
+                        attrs.push_str(&format!(" res=\"{}\"", escape_xml_attr(resource_id)));
+                    }
+                    if !text.is_empty() {
+                        attrs.push_str(&format!(" text=\"{}\"", escape_xml_attr(text)));
+                    }
+                    if !desc.is_empty() {
+                        attrs.push_str(&format!(" desc=\"{}\"", escape_xml_attr(desc)));
+                    }
+                    if clickable {
+                        attrs.push_str(" clickable=\"true\"");
+                    }
+                    if scrollable {
+                        attrs.push_str(" scrollable=\"true\"");
+                    }
+                    if checkable {
+                        attrs.push_str(" checkable=\"true\"");
+                    }
+                    if node.attribute("checked") == Some("true") {
+                        attrs.push_str(" checked=\"true\"");
+                    }
+                    if node.attribute("selected") == Some("true") {
+                        attrs.push_str(" selected=\"true\"");
+                    }
+                    if !bounds.is_empty() {
+                        attrs.push_str(&format!(" bounds=\"{}\"", escape_xml_attr(bounds)));
+                    }
+
+                    simplified.push_str(&format!("  <{tag} {attrs} />\n"));
                 }
             }
         }
@@ -213,6 +284,70 @@ fn get_exploration_context(params: AiContextParams) -> Result<AiContextResponse,
         });
     }
 
+    // Automation Context: Inject snippets of existing test files to help the IA understand the project style
+    if let Some(root) = params.automation_root {
+        if Path::new(&root).exists() {
+            context.push_str("\n\n### AUTOMATION CONTEXT (Existing Test Patterns)\n");
+            const MAX_SCAN_DEPTH: usize = 5;
+            const MAX_DISCOVERED_ROBOT_FILES: usize = 200;
+            const MAX_FILES_IN_CONTEXT: usize = 3;
+            const MAX_CHARS_PER_FILE: usize = 1000;
+            const MAX_TOTAL_CHARS: usize = 3000;
+
+            let mut robot_files: Vec<(std::path::PathBuf, SystemTime)> =
+                Vec::with_capacity(MAX_DISCOVERED_ROBOT_FILES);
+            for entry in WalkDir::new(&root)
+                .max_depth(MAX_SCAN_DEPTH)
+                .follow_links(false)
+                .into_iter()
+                .filter_map(Result::ok)
+            {
+                if !entry.file_type().is_file() {
+                    continue;
+                }
+                if entry.path().extension().and_then(|s| s.to_str()) != Some("robot") {
+                    continue;
+                }
+
+                let modified = entry
+                    .metadata()
+                    .ok()
+                    .and_then(|m| m.modified().ok())
+                    .unwrap_or(SystemTime::UNIX_EPOCH);
+                robot_files.push((entry.path().to_path_buf(), modified));
+
+                if robot_files.len() >= MAX_DISCOVERED_ROBOT_FILES {
+                    break;
+                }
+            }
+
+            robot_files.sort_by(|a, b| b.1.cmp(&a.1));
+
+            let mut count = 0;
+            let mut total_chars = 0;
+            for (path, _) in robot_files.iter().take(MAX_FILES_IN_CONTEXT) {
+                if total_chars >= MAX_TOTAL_CHARS {
+                    break;
+                }
+                if let Ok(content) = fs::read_to_string(path) {
+                    count += 1;
+                    context.push_str(&format!(
+                        "\n--- File Pattern {} ({}) ---\n",
+                        count,
+                        path.file_name().unwrap_or_default().to_string_lossy()
+                    ));
+
+                    let remaining_chars = MAX_TOTAL_CHARS.saturating_sub(total_chars);
+                    let file_char_limit = remaining_chars.min(MAX_CHARS_PER_FILE);
+                    let snippet = content.chars().take(file_char_limit).collect::<String>();
+                    total_chars += snippet.chars().count();
+                    context.push_str(&snippet);
+                    context.push_str("\n");
+                }
+            }
+        }
+    }
+
     Ok(AiContextResponse { context, metadata })
 }
 
@@ -224,6 +359,7 @@ fn generate_basic_xpath(node: &roxmltree::Node) -> String {
         if parent.is_root() {
             break;
         }
+
         let tag = current.tag_name().name();
 
         // Find index among siblings with same tag
@@ -244,18 +380,39 @@ fn generate_basic_xpath(node: &roxmltree::Node) -> String {
     format!("/{}", path.join("/"))
 }
 
+fn escape_xml_attr(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
 fn get_artifact_generation_context(
     app_handle: tauri::AppHandle,
     params: AiContextParams,
 ) -> Result<AiContextResponse, String> {
     let profile_id = params.profile_id.ok_or("Missing profile_id")?;
 
-    // Resolve base path for app local data
-    let base_path = app_handle
-        .path()
-        .app_local_data_dir()
-        .map_err(|e| e.to_string())?;
-    let maps_path = base_path.join("maps").join(&profile_id).join("screens");
+    // Resolve base path for screen maps
+    let maps_path = if let Some(ref custom_dir) = params.custom_mappings_dir {
+        if !custom_dir.trim().is_empty() {
+            Path::new(custom_dir).to_path_buf()
+        } else {
+            let base_path = app_handle
+                .path()
+                .app_local_data_dir()
+                .map_err(|e| e.to_string())?;
+            base_path.join("maps").join(&profile_id).join("screens")
+        }
+    } else {
+        let base_path = app_handle
+            .path()
+            .app_local_data_dir()
+            .map_err(|e| e.to_string())?;
+        base_path.join("maps").join(&profile_id).join("screens")
+    };
 
     // Check if directory exists
     if !maps_path.exists() {
@@ -359,12 +516,24 @@ fn get_flowchart_layout_context(
 ) -> Result<AiContextResponse, String> {
     let profile_id = params.profile_id.ok_or("Missing profile_id")?;
 
-    // Resolve base path for app local data
-    let base_path = app_handle
-        .path()
-        .app_local_data_dir()
-        .map_err(|e| e.to_string())?;
-    let maps_path = base_path.join("maps").join(&profile_id).join("screens");
+    // Resolve base path for screen maps
+    let maps_path = if let Some(ref custom_dir) = params.custom_mappings_dir {
+        if !custom_dir.trim().is_empty() {
+            Path::new(custom_dir).to_path_buf()
+        } else {
+            let base_path = app_handle
+                .path()
+                .app_local_data_dir()
+                .map_err(|e| e.to_string())?;
+            base_path.join("maps").join(&profile_id).join("screens")
+        }
+    } else {
+        let base_path = app_handle
+            .path()
+            .app_local_data_dir()
+            .map_err(|e| e.to_string())?;
+        base_path.join("maps").join(&profile_id).join("screens")
+    };
 
     // Check if directory exists
     if !maps_path.exists() {

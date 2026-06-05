@@ -1,7 +1,9 @@
 import { ReactNode } from 'react';
 import { Sidebar } from '../organisms/Sidebar';
 import { PresentationPanel } from '../organisms/presentation/PresentationPanel';
+import { AiAgentPanel } from '../organisms/AiAgentPanel';
 import { useSettings } from "@/lib/settings";
+import { useRemoteConfig } from '@/lib/RemoteConfigProvider';
 import { AnimatePresence, motion } from 'framer-motion';
 
 interface LayoutProps {
@@ -12,6 +14,10 @@ interface LayoutProps {
 
 export function Layout({ children, activePage, onNavigate }: LayoutProps) {
     const { settings } = useSettings();
+    const remoteConfig = useRemoteConfig() as {
+        isFeatureEnabled?: (feature: string) => boolean;
+    };
+    const isAskRaiEnabled = remoteConfig.isFeatureEnabled?.('is_ask_rai_enabled') ?? false;
 
     return (
         <div
@@ -28,6 +34,17 @@ export function Layout({ children, activePage, onNavigate }: LayoutProps) {
                         className="overflow-hidden h-full flex-shrink-0"
                     >
                         <PresentationPanel />
+                    </motion.div>
+                )}
+                {settings.aiChatEnabled && isAskRaiEnabled && (
+                    <motion.div
+                        initial={{ width: 0, opacity: 0 }}
+                        animate={{ width: "24rem", opacity: 1 }} // w-96 is 24rem
+                        exit={{ width: 0, opacity: 0 }}
+                        transition={{ duration: 0.5, ease: "easeInOut" }}
+                        className="overflow-hidden h-full flex-shrink-0"
+                    >
+                        <AiAgentPanel onNavigate={onNavigate} />
                     </motion.div>
                 )}
             </AnimatePresence>

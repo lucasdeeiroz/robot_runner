@@ -10,7 +10,9 @@ export const TOOL_LINKS = {
     maven: "https://maven.apache.org/download.cgi",
     maestro: "https://docs.maestro.dev/maestro-cli/how-to-install-maestro-cli",
     scrcpy: "https://github.com/Genymobile/scrcpy/blob/master/doc/windows.md",
-    ngrok: "https://dashboard.ngrok.com/get-started/setup/"
+    ngrok: "https://dashboard.ngrok.com/get-started/setup/",
+    claude_code: "https://docs.anthropic.com/en/docs/agents-and-tools/claude-code",
+    antigravity: "https://github.com/google/antigravity"
 };
 
 

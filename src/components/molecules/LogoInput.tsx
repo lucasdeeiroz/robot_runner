@@ -1,6 +1,7 @@
 import { Upload, Trash2, Check, Image as ImageIcon } from "lucide-react";
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
+import { Button } from "@/components/atoms/Button";
 
 interface LogoInputProps {
     label: string;
@@ -38,21 +39,23 @@ export function LogoInput({ label, value, onUpload, onDelete, placeholder }: Log
                 {/* Actions */}
                 <div className="flex items-center gap-1">
                     {value && (
-                        <button
+                        <Button
                             onClick={onDelete}
-                            className="p-1.5 text-on-surface/80 hover:text-error hover:bg-error-container/10 rounded-2xl transition-all"
+                            variant="ghost"
+                            className="p-1.5 text-on-surface/80 hover:text-error hover:bg-error-container/10 rounded-2xl transition-all h-8 w-8"
                             title={t('settings.appearance.remove_logo')}
                         >
                             <Trash2 size={14} />
-                        </button>
+                        </Button>
                     )}
-                    <button
+                    <Button
                         onClick={onUpload}
-                        className="p-1.5 text-on-surface-variant/80 hover:text-primary hover:bg-outline-variant rounded-2xl transition-all"
+                        variant="ghost"
+                        className="p-1.5 text-on-surface-variant/80 hover:text-primary hover:bg-outline-variant rounded-2xl transition-all h-8 w-8"
                         title={t('settings.appearance.upload_logo')}
                     >
                         <Upload size={14} />
-                    </button>
+                    </Button>
                 </div>
             </div>
         </div>

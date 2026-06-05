@@ -1,7 +1,8 @@
 
-import { useState, useEffect } from 'react';
-import { Check, Scan, Home, ArrowLeft, Rows, X, Search, Pencil, Copy, ChevronDown, ChevronUp, Videotape, Play, Trash2, Code, Move, MousePointer2, ArrowRight, ArrowUp, ArrowDown } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Check, Scan, Home, ArrowLeft, Rows, X, Search, Pencil, Copy, ChevronDown, ChevronUp, Videotape, Play, Trash2, Code, Move, MousePointer2, ArrowRight, ArrowUp, ArrowDown, Download, RefreshCw } from 'lucide-react';
 import clsx from 'clsx';
+import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
 import { InspectorNode, generateXPath, findNodesByLocator, generateUiSelector } from '@/lib/inspectorUtils';
 import { feedback } from "@/lib/feedback";
@@ -14,6 +15,7 @@ import { useSettings } from "@/lib/settings";
 import * as gemini from "@/lib/dashboard/gemini";
 import * as claude from "@/lib/dashboard/claude";
 import * as openai from "@/lib/dashboard/openai";
+import * as claudeCli from "@/lib/dashboard/claudeCode";
 import { AiButton } from "@/components/atoms/AiButton";
 import { AiResponse } from "@/components/molecules/AiResponse";
 import { getSmartSelectorPrompt } from "@/lib/dashboard/prompts";
@@ -47,6 +49,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
     const {
         screenshot,
         rootNode,
+        xmlDump,
         loading,
         imgLayout,
         setImgLayout,
@@ -71,8 +74,35 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
 
     const [copied, setCopied] = useState<string | null>(null);
 
+    const handleExportXml = async () => {
+        if (!xmlDump) {
+            feedback.toast.error(t('inspector.export_xml_no_data'));
+            return;
+        }
+
+        try {
+            const { save } = await import('@tauri-apps/plugin-dialog');
+            const filePath = await save({
+                filters: [{
+                    name: 'XML Document',
+                    extensions: ['xml']
+                }],
+                defaultPath: `ui_dump_${new Date().getTime()}.xml`
+            });
+
+            if (filePath) {
+                const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+                await writeTextFile(filePath, xmlDump);
+                feedback.toast.success(t('inspector.export_xml_success'));
+            }
+        } catch (e) {
+            console.error("XML export failed:", e);
+            feedback.toast.error(t('inspector.export_xml_error'));
+        }
+    };
+
     // AI Suggestion State
-    const { settings } = useSettings();
+    const { settings, is_test_mode } = useSettings();
     const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
     const [aiRationale, setAiRationale] = useState<string | null>(null);
     const [aiError, setAiError] = useState<string | null>(null);
@@ -101,11 +131,62 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
     const [editingAttr, setEditingAttr] = useState<'resource-id' | 'content-desc' | 'xpath' | 'uiselector' | null>(null);
     const [editOptions, setEditOptions] = useState({
         type: 'equals' as 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'matches',
+        kinship: 'none' as 'none' | 'childSelector' | 'fromParent',
         useUiSelectorWrapper: true,
         xpathAttr: 'resource-id' as string,
         selectedAddons: [] as string[]
     });
     const [customLocator, setCustomLocator] = useState("");
+
+    // Live UI Sync State
+    const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
+    const lastFocusRef = useRef("");
+
+    // Reset lastFocus when device changes
+    useEffect(() => {
+        lastFocusRef.current = "";
+    }, [selectedDevice]);
+
+    // Parallel Logcat & Focused Activity UI Sync Loop
+    useEffect(() => {
+        if (!autoRefreshEnabled || !selectedDevice || isTestRunning || !isActive || is_test_mode === 'web') {
+            return;
+        }
+
+        let isMounted = true;
+        let timeoutId: any;
+
+        const checkChanges = async () => {
+            try {
+                const result = await invoke<[boolean, string]>('check_ui_change', {
+                    device: selectedDevice,
+                    lastFocus: lastFocusRef.current
+                });
+
+                if (!isMounted) return;
+
+                const [hasChanged, currentFocus] = result;
+                lastFocusRef.current = currentFocus;
+
+                if (hasChanged) {
+                    await refreshAll(true, false);
+                }
+            } catch (err) {
+                console.warn("[Inspector Sync] Error checking UI changes:", err);
+            }
+
+            if (isMounted && autoRefreshEnabled) {
+                timeoutId = setTimeout(checkChanges, 2000);
+            }
+        };
+
+        timeoutId = setTimeout(checkChanges, 2000);
+
+        return () => {
+            isMounted = false;
+            clearTimeout(timeoutId);
+        };
+    }, [autoRefreshEnabled, selectedDevice, isTestRunning, isActive, is_test_mode, refreshAll]);
 
     // Auto-load AI suggestion from cache when node changes
     useEffect(() => {
@@ -163,19 +244,21 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
             setEditOptions(newOpts);
 
             if (attr === 'xpath') {
-                setCustomLocator(generateXPath(selectedNode, initialAttr, editOptions.type, []));
+                setCustomLocator(generateXPath(selectedNode, initialAttr, newOpts.type, newOpts.kinship, []));
             } else if (attr === 'uiselector') {
                 setCustomLocator(generateUiSelector(selectedNode, {
                     attr: initialAttr as any,
-                    type: editOptions.type,
-                    useUiSelectorWrapper: editOptions.useUiSelectorWrapper,
+                    type: newOpts.type,
+                    kinship: newOpts.kinship,
+                    useUiSelectorWrapper: newOpts.useUiSelectorWrapper,
                     addons: []
                 }));
             } else {
                 setCustomLocator(generateUiSelector(selectedNode, {
                     attr: attr as any,
-                    type: editOptions.type,
-                    useUiSelectorWrapper: editOptions.useUiSelectorWrapper,
+                    type: newOpts.type,
+                    kinship: newOpts.kinship,
+                    useUiSelectorWrapper: newOpts.useUiSelectorWrapper,
                     addons: []
                 }));
             }
@@ -185,11 +268,12 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
     const updateCustomLocator = (options: typeof editOptions) => {
         if (!selectedNode || !editingAttr) return;
         if (editingAttr === 'xpath') {
-            setCustomLocator(generateXPath(selectedNode, options.xpathAttr, options.type, options.selectedAddons));
+            setCustomLocator(generateXPath(selectedNode, options.xpathAttr, options.type, options.kinship, options.selectedAddons));
         } else if (editingAttr === 'uiselector') {
             setCustomLocator(generateUiSelector(selectedNode, {
                 attr: options.xpathAttr as any,
                 type: options.type,
+                kinship: options.kinship,
                 useUiSelectorWrapper: options.useUiSelectorWrapper,
                 addons: options.selectedAddons
             }));
@@ -197,6 +281,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
             setCustomLocator(generateUiSelector(selectedNode, {
                 attr: editingAttr as any,
                 type: options.type,
+                kinship: options.kinship,
                 useUiSelectorWrapper: options.useUiSelectorWrapper,
                 addons: options.selectedAddons
             }));
@@ -241,39 +326,119 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
             let result = "";
             const provider = settings.aiProvider;
 
-            if (provider === 'gemini') {
-                result = await gemini.askGemini(prompt, settings.geminiApiKey || '', settings.geminiModel, systemInstruction);
+            if (provider === 'claude-code') {
+                const schema = {
+                    type: "object",
+                    properties: {
+                        selector: { type: "string" },
+                        rationale: { type: "string" }
+                    },
+                    required: ["selector", "rationale"]
+                };
+
+                const response = await claudeCli.askClaudeCode(prompt, settings.paths.automationRoot || '', systemInstruction, settings.claudeCodeToken, {
+                    allowedTools: ["Read"],
+                    jsonSchema: schema,
+                    imageBase64: screenshot || undefined
+                });
+
+                if (typeof response !== 'string' && response.structured_output) {
+                    setAiSuggestion(response.structured_output.selector);
+                    setAiRationale(response.structured_output.rationale);
+
+                    if (selectedNode.id) {
+                        setAiCache(prev => ({
+                            ...prev,
+                            [selectedNode.id]: {
+                                suggestion: response.structured_output.selector,
+                                rationale: response.structured_output.rationale
+                            }
+                        }));
+                    }
+                    setIsAiLoading(false);
+                    return;
+                }
+
+                result = typeof response === 'string' ? response : response.result;
+            } else if (provider === 'antigravity-cli') {
+                const schema = {
+                    type: "object",
+                    properties: {
+                        selector: { type: "string" },
+                        rationale: { type: "string" }
+                    },
+                    required: ["selector", "rationale"]
+                };
+
+                const { askAntigravityCli } = await import('@/lib/dashboard/antigravityCode');
+                const response = await askAntigravityCli(prompt, settings.paths.automationRoot || '', systemInstruction, settings.antigravityApiKey, {
+                    jsonSchema: schema,
+                    imageBase64: screenshot || undefined
+                });
+
+                if (typeof response !== 'string' && response.structured_output) {
+                    setAiSuggestion(response.structured_output.selector);
+                    setAiRationale(response.structured_output.rationale);
+
+                    if (selectedNode.id) {
+                        setAiCache(prev => ({
+                            ...prev,
+                            [selectedNode.id]: {
+                                suggestion: response.structured_output.selector,
+                                rationale: response.structured_output.rationale
+                            }
+                        }));
+                    }
+                    setIsAiLoading(false);
+                    return;
+                }
+
+                result = typeof response === 'string' ? response : response.result;
+            } else if (provider === 'gemini') {
+                result = await gemini.askGemini(prompt, settings.geminiApiKey || '', settings.geminiModel, systemInstruction, screenshot || undefined);
             } else if (provider === 'claude') {
-                result = await claude.askClaude(prompt, settings.claudeApiKey || '', settings.claudeModel, systemInstruction);
+                result = await claude.askClaude(prompt, settings.claudeApiKey || '', settings.claudeModel, systemInstruction, screenshot || undefined);
             } else if (provider === 'openai') {
-                result = await openai.askOpenAI(prompt, settings.openaiApiKey || '', settings.openaiModel, systemInstruction);
+                result = await openai.askOpenAI(prompt, settings.openaiApiKey || '', settings.openaiModel, systemInstruction, screenshot || undefined);
             } else {
                 throw new Error("No AI provider configured");
             }
 
             // Simple parsing of "Selector: " and "Rationale: "
-            const selectorMatch = result.match(/Selector:\s*([^\n]*)/i);
-            const rationaleMatch = result.match(/Rationale:\s*([\s\S]*)/i);
+            // Improved parsing: handle cases where the AI might not include prefixes or includes metadata
+            const selectorMatch = result.match(/Selector:\s*([^\n\r"]*)/i);
+            const rationaleMatch = result.match(/Rationale:\s*([\s\S]*?)(?=\s*","|$)/i);
 
+            let cleanSelector = "";
             if (selectorMatch) {
-                setAiSuggestion(selectorMatch[1].trim().replace(/`|"/g, ''));
+                cleanSelector = selectorMatch[1].trim().replace(/`|"/g, '');
             } else {
-                // fallback if AI didn't follow format exactly
-                setAiSuggestion(result.split('\n')[0]);
+                // If no "Selector:" prefix, try to get the first line but stop if it looks like metadata
+                const firstLine = result.split('\n')[0].trim();
+                cleanSelector = firstLine.split('","')[0].replace(/`|"/g, '');
+            }
+            let cleanRationale = "";
+            if (rationaleMatch) {
+                cleanRationale = rationaleMatch[1].trim();
+            } else {
+                // If no "Rationale:" prefix, use the whole result but exclude the selector line
+                const lines = result.split('\n');
+                if (lines.length > 1) {
+                    cleanRationale = lines.slice(1).join('\n').trim().split('","')[0];
+                } else {
+                    cleanRationale = result.split('","')[0];
+                }
             }
 
-            if (rationaleMatch) {
-                setAiRationale(rationaleMatch[1].trim());
-            } else {
-                setAiRationale(result);
-            }
+            setAiSuggestion(cleanSelector);
+            setAiRationale(cleanRationale);
 
             // Save to cache
             setAiCache(prev => ({
                 ...prev,
                 [selectedNode.id]: {
-                    suggestion: selectorMatch ? selectorMatch[1].trim().replace(/`|"/g, '') : result.split('\n')[0],
-                    rationale: rationaleMatch ? rationaleMatch[1].trim() : result
+                    suggestion: cleanSelector,
+                    rationale: cleanRationale
                 }
             }));
 
@@ -287,7 +452,7 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
     };
 
 
-    if (!selectedDevice) {
+    if (!selectedDevice && is_test_mode !== 'web') {
         return (
             <div className="h-full flex flex-col items-center justify-center text-on-surface/80">
                 <Scan size={48} className="mb-4 opacity-20" />
@@ -300,7 +465,7 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
         return (
             <div className="h-full flex flex-col items-center justify-center text-on-surface-variant/80 text-sm">
                 <Scan size={32} className="opacity-20 mb-2" />
-                <p>{t('inspector.status.paused_test', 'Inspector disabled during test')}</p>
+                <p>{t('inspector.status.paused_test')}</p>
             </div>
         );
     }
@@ -308,7 +473,7 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
     return (
         <div className="flex-1 min-h-[44rem] flex flex-col space-y-4">
             <Section
-                title={t('inspector.title', 'Inspector')}
+                title={t('inspector.title')}
                 icon={Scan}
                 variant="transparent"
                 className="p-0"
@@ -333,6 +498,37 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                                     >
                                         <Videotape size={16} className={clsx(isRecordingMode && "animate-pulse")} />
                                     </Button>
+                                    <div className="w-[1px] h-4 bg-outline-variant/30 self-center mx-1" />
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={handleExportXml}
+                                        disabled={!xmlDump}
+                                        className={clsx(
+                                            "p-1.5 rounded transition-all text-on-surface-variant/80 hover:bg-surface-variant/30",
+                                            !xmlDump && "opacity-50 cursor-not-allowed"
+                                        )}
+                                        title={t('inspector.export_xml')}
+                                    >
+                                        <Download size={16} />
+                                    </Button>
+                                    {is_test_mode !== 'web' && (
+                                        <>
+                                            <div className="w-[1px] h-4 bg-outline-variant/30 self-center mx-1" />
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
+                                                className={clsx(
+                                                    "p-1.5 rounded transition-all",
+                                                    autoRefreshEnabled ? "bg-primary/10 text-primary dark:text-primary/80 hover:bg-primary/20" : "hover:bg-surface-variant/30 text-on-surface-variant/80"
+                                                )}
+                                                title={t('inspector.live_sync')}
+                                            >
+                                                <RefreshCw size={16} className={clsx(autoRefreshEnabled && "animate-spin")} />
+                                            </Button>
+                                        </>
+                                    )}
                                 </div>
                             </>
                         )}
@@ -344,7 +540,7 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                         isSearchFocused ? "w-[28rem]" : "w-72"
                     )}>
                         <Input
-                            placeholder={t('inspector.search.placeholder', 'Search by ID, XPath, etc...')}
+                            placeholder={t('inspector.search.placeholder')}
                             value={searchQuery}
                             onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleSearch(e.target.value)}
                             onFocus={() => setIsSearchFocused(true)}
@@ -358,7 +554,7 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                                         handleSearch("");
                                     }}
                                     className="p-1 hover:bg-surface-variant/30 rounded-full transition-colors flex items-center justify-center"
-                                    title={t('inspector.search.clear', 'Clear')}
+                                    title={t('inspector.search.clear')}
                                 >
                                     <X size={14} className="opacity-50" />
                                 </button>
@@ -373,6 +569,7 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                 <div className="flex flex-col items-center justify-center overflow-hidden relative max-w-[30vw] rounded-2xl">
                     <DeviceViewport
                         screenshot={screenshot}
+                        rootNode={rootNode}
                         loading={loading}
                         imgRef={imgRef}
                         imgLayout={imgLayout}
@@ -390,7 +587,7 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                         searchResults={searchResults}
                         taps={taps}
                         swipes={swipes}
-                        onRefresh={refreshAll}
+                        onRefresh={(forceClear, targetWebUrl) => refreshAll(true, forceClear, targetWebUrl)}
                         handlers={handlers}
                     />
                 </div>
@@ -576,7 +773,33 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                                     <div className="border border-outline-variant/30 rounded-2xl overflow-hidden text-sm">
                                         {Object.entries(selectedNode.attributes)
                                             .filter(([key, value]) => key !== undefined && value !== undefined && value !== null && value !== '')
-                                            .sort(([a], [b]) => a.localeCompare(b))
+                                            .sort(([a], [b]) => {
+                                                const order = [
+                                                    'resource-id',
+                                                    'text',
+                                                    'class',
+                                                    'package',
+                                                    'bounds',
+                                                    'index',
+                                                    'instance',
+                                                    'checkable',
+                                                    'checked',
+                                                    'clickable',
+                                                    'enabled',
+                                                    'focusable',
+                                                    'focused',
+                                                    'long-clickable',
+                                                    'password',
+                                                    'scrollable',
+                                                    'selected'
+                                                ];
+                                                const idxA = order.indexOf(a);
+                                                const idxB = order.indexOf(b);
+                                                if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                                                if (idxA !== -1) return -1;
+                                                if (idxB !== -1) return 1;
+                                                return a.localeCompare(b);
+                                            })
                                             .map(([key, value]) => (
                                                 <div key={key} className="flex flex-col border-b border-outline-variant/30 last:border-0">
                                                     <div className="bg-surface-variant/80 px-3 py-1.5 text-xs text-on-surface-variant/80 font-medium break-all">{key}</div>
@@ -604,7 +827,7 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
             >
                 <div className="space-y-4">
                     <div className="space-y-1">
-                        <label className="text-xs font-medium text-on-surface-variant/80">{t('inspector.modal.match_type')}</label>
+                        <label className="text-xs font-medium text-on-surface-variant/80">{t('inspector.modal.match_type', 'Match Type')}</label>
                         <Select
                             value={editOptions.type}
                             onChange={(e) => {
@@ -623,6 +846,24 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                         />
                     </div>
 
+                    <div className="space-y-1">
+                        <label className="text-xs font-medium text-on-surface-variant/80">{t('inspector.modal.kinship_method')}</label>
+                        <Select
+                            value={editOptions.kinship}
+                            onChange={(e) => {
+                                const val = e.target.value as any;
+                                const newOpts = { ...editOptions, kinship: val };
+                                setEditOptions(newOpts);
+                                updateCustomLocator(newOpts);
+                            }}
+                            options={[
+                                { label: t('inspector.modal.kinship_none'), value: 'none' },
+                                { label: t('inspector.modal.kinship_child_selector'), value: 'childSelector' },
+                                { label: t('inspector.modal.kinship_from_parent'), value: 'fromParent' },
+                            ]}
+                        />
+                    </div>
+
                     {editingAttr !== 'xpath' && editingAttr !== 'uiselector' ? (
                         <div className="flex items-center gap-2 pt-2">
                             <input
@@ -637,7 +878,7 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                                 className="rounded border-outline-variant/30 text-primary dark:text-primary/80 focus:ring-primary/20"
                             />
                             <label htmlFor="useWrapper" className="text-xs font-medium text-on-surface-variant/80">
-                                {t('inspector.modal.use_wrapper', 'Use new UiSelector() wrapper')}
+                                {t('inspector.modal.use_wrapper')}
                             </label>
                         </div>
                     ) : (
@@ -662,19 +903,24 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                     )}
 
                     <div className="space-y-2 pt-2">
-                        <label className="text-xs font-medium text-on-surface-variant/80">{t('inspector.modal.additional_attrs', 'Additional Attributes')}</label>
+                        <label className="text-xs font-medium text-on-surface-variant/80">{t('inspector.modal.additional_attrs')}</label>
                         <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto custom-scrollbar p-1 border border-outline-variant/30 rounded-lg">
                             {[
-                                { label: t('inspector.modal.attr_resource_id', 'Resource ID'), value: 'resource-id' },
-                                { label: t('inspector.modal.attr_text', 'Text'), value: 'text' },
-                                { label: t('inspector.modal.attr_content_desc', 'Content Desc'), value: 'content-desc' },
-                                { label: t('inspector.modal.attr_class', 'Class'), value: 'class' },
-                                { label: t('inspector.modal.attr_index', 'Index'), value: 'index' },
-                                { label: t('inspector.modal.attr_clickable', 'Clickable'), value: 'clickable' },
-                                { label: t('inspector.modal.attr_enabled', 'Enabled'), value: 'enabled' },
-                                { label: t('inspector.modal.attr_checked', 'Checked'), value: 'checked' },
-                                { label: t('inspector.modal.attr_selected', 'Selected'), value: 'selected' },
-                                { label: t('inspector.modal.attr_focusable', 'Focusable'), value: 'focusable' },
+                                { label: t('inspector.modal.attr_resource_id'), value: 'resource-id' },
+                                { label: t('inspector.modal.attr_text'), value: 'text' },
+                                { label: t('inspector.modal.attr_content_desc'), value: 'content-desc' },
+                                { label: t('inspector.modal.attr_class'), value: 'class' },
+                                { label: t('inspector.modal.attr_index'), value: 'index' },
+                                { label: t('inspector.modal.attr_instance'), value: 'instance' },
+                                { label: t('inspector.modal.attr_clickable'), value: 'clickable' },
+                                { label: t('inspector.modal.attr_long_clickable'), value: 'long-clickable' },
+                                { label: t('inspector.modal.attr_enabled'), value: 'enabled' },
+                                { label: t('inspector.modal.attr_checked'), value: 'checked' },
+                                { label: t('inspector.modal.attr_selected'), value: 'selected' },
+                                { label: t('inspector.modal.attr_focusable'), value: 'focusable' },
+                                { label: t('inspector.modal.attr_focused'), value: 'focused' },
+                                { label: t('inspector.modal.attr_scrollable'), value: 'scrollable' },
+                                { label: t('inspector.modal.attr_checkable'), value: 'checkable' },
                             ].filter(opt =>
                                 selectedNode?.attributes[opt.value] !== undefined &&
                                 selectedNode?.attributes[opt.value] !== null &&

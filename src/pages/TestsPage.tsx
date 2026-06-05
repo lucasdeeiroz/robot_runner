@@ -4,7 +4,7 @@ import { useSettings } from "@/lib/settings";
 import { ToolboxView } from "@/components/tabs/tests/toolbox/ToolboxView";
 import { HistorySubTab } from "@/components/tabs/tests/HistorySubTab";
 import { AndroidVersionPill } from "@/components/atoms/AndroidVersionPill";
-import { XCircle, LayoutGrid, Minimize2, Maximize2, FileText, Settings } from 'lucide-react';
+import { XCircle, LayoutGrid, Minimize2, Maximize2, FileText, Settings, Globe } from 'lucide-react';
 import { PageHeader } from "@/components/organisms/PageHeader";
 import clsx from 'clsx';
 import { useTranslation } from "react-i18next";
@@ -29,6 +29,18 @@ export function TestsPage({ onNavigate }: TestsPageProps) {
     const isExplorer = settings.usageMode === 'explorer';
     const initialTab = isExplorer ? (sessions.length > 0 ? sessions[0].runId : '') : 'history';
     const [subTab, setSubTab] = useState<'history' | string>(initialTab);
+
+    useEffect(() => {
+        const handleNavigateSubTab = (e: Event) => {
+            const detail = (e as CustomEvent).detail;
+            if (detail && detail === 'history') {
+                setSubTab('history');
+                setActiveSessionId('dashboard');
+            }
+        };
+        window.addEventListener('ai_navigate_tests_subtab', handleNavigateSubTab);
+        return () => window.removeEventListener('ai_navigate_tests_subtab', handleNavigateSubTab);
+    }, [setActiveSessionId]);
 
     // Settings Dropdown State
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -206,8 +218,17 @@ export function TestsPage({ onNavigate }: TestsPageProps) {
                                     {s.type === 'test' && isFailed && <span className="w-2.5 h-2.5 rounded-full bg-error" />}
                                     {s.type === 'test' && s.status === 'error' && <span className="w-2.5 h-2.5 rounded-full bg-error" />}
 
-                                    <span>{s.deviceModel || s.deviceName}</span>
-                                    <AndroidVersionPill version={s.androidVersion} />
+                                    {s.androidVersion === 'web' ? (
+                                        <>
+                                            <span className="capitalize">{s.deviceModel || s.deviceName}</span>
+                                            <Globe size={13} className="text-primary shrink-0" />
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span>{s.deviceModel || s.deviceName}</span>
+                                            <AndroidVersionPill version={s.androidVersion} />
+                                        </>
+                                    )}
                                 </div>
                             ),
                             onClose: () => clearSession(s.runId),
@@ -346,8 +367,17 @@ export function TestsPage({ onNavigate }: TestsPageProps) {
                                             {s.type === 'toolbox' && <span className="w-2 h-2 rounded-2xl bg-on-surface/10" />}
                                             {s.type === 'test' && s.status === 'running' && <span className="w-2 h-2 rounded-2xl bg-orange-500 animate-pulse" />}
                                             {s.type === 'test' && s.status === 'finished' && <span className={clsx("w-2 h-2 rounded-2xl", (s.exitCode === "0") ? "bg-success" : "bg-error")} />}
-                                            <span>{s.deviceModel || s.deviceName}</span>
-                                            <AndroidVersionPill version={s.androidVersion} className="bg-surface-variant/30" />
+                                            {s.androidVersion === 'web' ? (
+                                                <>
+                                                    <span className="capitalize">{s.deviceModel || s.deviceName}</span>
+                                                    <Globe size={13} className="text-primary shrink-0" />
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span>{s.deviceModel || s.deviceName}</span>
+                                                    <AndroidVersionPill version={s.androidVersion} className="bg-surface-variant/30" />
+                                                </>
+                                            )}
                                         </div>
                                     }
                                     onClose={() => clearSession(s.runId)}

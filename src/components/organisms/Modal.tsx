@@ -34,7 +34,12 @@ export function Modal({ isOpen, onClose, title, children, className }: ModalProp
     return createPortal(
         <AnimatePresence>
             {isOpen && (
-                <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-[150000] flex items-center justify-center p-4"
+                >
                     {/* Backdrop */}
                     <motion.div
                         initial={{ opacity: 0 }}
@@ -44,13 +49,12 @@ export function Modal({ isOpen, onClose, title, children, className }: ModalProp
                         className="fixed inset-0 bg-black/50 backdrop-blur-sm"
                     />
 
-                    {/* Modal Content */}
                     <motion.div
                         ref={overlayRef}
                         initial={{ opacity: 0, scale: 0.95, y: 10 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                        transition={{ type: "spring", duration: 0.5, bounce: 0.3 }}
+                        transition={{ type: "spring", stiffness: 350, damping: 25, mass: 1 }}
                         className={clsx(
                             "relative bg-surface rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col border border-outline-variant/30",
                             className
@@ -70,7 +74,7 @@ export function Modal({ isOpen, onClose, title, children, className }: ModalProp
                             {children}
                         </div>
                     </motion.div>
-                </div>
+                </motion.div>
             )}
         </AnimatePresence>,
         document.body

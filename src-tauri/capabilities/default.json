@@ -15,6 +15,12 @@
           "path": "$APPLOCALDATA/**"
         },
         {
+          "path": "$APPDATA/**"
+        },
+        {
+          "path": "$APPCONFIG/**"
+        },
+        {
           "path": "$TEMP/**"
         }
       ]
@@ -113,6 +119,9 @@
         },
         {
           "url": "https://api.anthropic.com/**"
+        },
+        {
+          "url": "https://generativelanguage.googleapis.com/**"
         }
       ]
     },

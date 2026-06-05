@@ -1,4 +1,6 @@
 mod adb;
+mod ai;
+mod auth;
 mod ai_context;
 mod appium;
 pub mod cmd_utils;
@@ -11,6 +13,7 @@ mod ngrok;
 mod runner;
 mod system;
 mod xml_parser;
+mod image_utils;
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -35,6 +38,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .manage(adb::shell::ShellState::default())
+        .manage(adb::AdbState::default())
         .manage(runner::TestState(Arc::new(Mutex::new(HashMap::new()))))
         .manage(appium::AppiumState(Arc::new(Mutex::new(None))))
         .manage(ngrok::NgrokState(Mutex::new(None)))

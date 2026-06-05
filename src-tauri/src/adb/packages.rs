@@ -1,4 +1,5 @@
-use crate::cmd_utils::new_tokio_command;
+use crate::cmd_utils::{new_tokio_command, get_adb_program, format_adb_error};
+use tauri::AppHandle;
 use tauri::command;
 
 #[derive(serde::Serialize)]
@@ -10,9 +11,10 @@ pub struct PackageInfo {
 }
 
 #[command]
-pub async fn get_installed_packages(device: String) -> Result<Vec<PackageInfo>, String> {
+pub async fn get_installed_packages(app: AppHandle, device: String) -> Result<Vec<PackageInfo>, String> {
     // 1. Get All Packages with Path (-f)
     let output_all = run_adb(
+        &app,
         device.clone(),
         vec!["shell", "pm", "list", "packages", "-f"],
     )
@@ -20,6 +22,7 @@ pub async fn get_installed_packages(device: String) -> Result<Vec<PackageInfo>, 
 
     // 2. Get Disabled Packages (-d)
     let output_disabled = run_adb(
+        &app,
         device.clone(),
         vec!["shell", "pm", "list", "packages", "-d"],
     )
@@ -62,20 +65,19 @@ pub async fn get_installed_packages(device: String) -> Result<Vec<PackageInfo>, 
 }
 
 #[command]
-pub async fn uninstall_package(device: String, package: String) -> Result<String, String> {
-    run_adb(device, vec!["uninstall", &package]).await
+pub async fn uninstall_package(app: AppHandle, device: String, package: String) -> Result<String, String> {
+    run_adb(&app, device, vec!["uninstall", &package]).await
 }
 
 #[command]
-pub async fn enable_package(device: String, package: String) -> Result<String, String> {
-    // pm enable <pkg>
-    run_adb(device, vec!["shell", "pm", "enable", &package]).await
+pub async fn enable_package(app: AppHandle, device: String, package: String) -> Result<String, String> {
+    run_adb(&app, device, vec!["shell", "pm", "enable", &package]).await
 }
 
 #[command]
-pub async fn disable_package(device: String, package: String) -> Result<String, String> {
-    // pm disable-user --user 0 <pkg>
+pub async fn disable_package(app: AppHandle, device: String, package: String) -> Result<String, String> {
     run_adb(
+        &app,
         device,
         vec!["shell", "pm", "disable-user", "--user", "0", &package],
     )
@@ -83,39 +85,51 @@ pub async fn disable_package(device: String, package: String) -> Result<String, 
 }
 
 #[command]
-pub async fn clear_package(device: String, package: String) -> Result<String, String> {
-    run_adb(device, vec!["shell", "pm", "clear", &package]).await
+pub async fn clear_package(app: AppHandle, device: String, package: String) -> Result<String, String> {
+    run_adb(&app, device, vec!["shell", "pm", "clear", &package]).await
 }
 
 #[command]
-pub async fn install_package(device: String, path: String) -> Result<String, String> {
-    // adb install -r <path>
-    run_adb(device, vec!["install", "-r", &path]).await
-}
-
-#[command]
-pub async fn get_focused_package(device: String) -> Result<String, String> {
-    // Extract package from dumpsys window
-    // Format usually: mCurrentFocus=Window{... com.package.name/com.package.name.Activity}
-    let output = run_adb(device, vec!["shell", "dumpsys", "window"]).await?;
-
-    if let Some(pos) = output.find("u0 ") {
-        let rest = &output[pos + 3..];
-        if let Some(slash_pos) = rest.find('/') {
-            return Ok(rest[..slash_pos].trim().to_string());
-        }
+pub async fn install_package(
+    app: AppHandle,
+    device: String,
+    path: String,
+    downgrade: Option<bool>,
+    grant_permissions: Option<bool>,
+    allow_test: Option<bool>,
+    install_sdcard: Option<bool>,
+) -> Result<String, String> {
+    let mut args = vec!["install", "-r"];
+    if downgrade.unwrap_or(false) {
+        args.push("-d");
     }
+    if grant_permissions.unwrap_or(false) {
+        args.push("-g");
+    }
+    if allow_test.unwrap_or(false) {
+        args.push("-t");
+    }
+    if install_sdcard.unwrap_or(false) {
+        args.push("-s");
+    }
+    args.push(&path);
+    run_adb(&app, device, args).await
+}
 
-    // Fallback search if u0 is not present or format differs
+#[command]
+pub async fn get_focused_package(app: AppHandle, device: String) -> Result<String, String> {
+    // Secure command: shell dumpsys activity top
+    let output = run_adb(&app, device, vec!["shell", "dumpsys", "activity", "top"]).await?;
+
     for line in output.lines() {
-        if line.contains("mCurrentFocus") || line.contains("mFocusedApp") {
-            if let Some(start) = line.find('{') {
-                if let Some(end) = line.find('}') {
-                    let content = &line[start + 1..end];
-                    let parts: Vec<&str> = content.split_whitespace().collect();
-                    if let Some(pkg_activity) = parts.last() {
-                        if let Some((pkg, _)) = pkg_activity.split_once('/') {
-                            return Ok(pkg.to_string());
+        if line.contains("TASK:") || line.contains("topApp=ActivityRecord") {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            for part in parts {
+                if part.contains("/") {
+                    let clean = part.replace("}", "").replace("{", "");
+                    if let Some(slash_idx) = clean.find('/') {
+                        if slash_idx > 0 && slash_idx < clean.len() - 1 {
+                             return Ok(clean[..slash_idx].to_string());
                         }
                     }
                 }
@@ -127,8 +141,9 @@ pub async fn get_focused_package(device: String) -> Result<String, String> {
 }
 
 #[command]
-pub async fn launch_package(device: String, package: String) -> Result<String, String> {
+pub async fn launch_package(app: AppHandle, device: String, package: String) -> Result<String, String> {
     run_adb(
+        &app,
         device,
         vec![
             "shell",
@@ -144,16 +159,16 @@ pub async fn launch_package(device: String, package: String) -> Result<String, S
 }
 
 #[command]
-pub async fn set_stay_on(device: String, enabled: bool) -> Result<String, String> {
-    let mode = if enabled { "true" } else { "false" };
-    run_adb(device, vec!["shell", "svc", "power", "stayon", mode]).await
+pub async fn set_stay_on(app: AppHandle, device: String, enabled: bool) -> Result<String, String> {
+    let mode = if enabled { "3" } else { "0" }; // 3 is AC+USB, 0 is Off
+    run_adb(&app, device, vec!["shell", "settings", "put", "system", "stay_on_while_plugged_in", mode]).await
 }
 
 // Internal Helper
-async fn run_adb(device: String, args: Vec<&str>) -> Result<String, String> {
-    let mut command = new_tokio_command("adb");
+async fn run_adb(app: &AppHandle, device: String, args: Vec<&str>) -> Result<String, String> {
+    let program = get_adb_program(app);
+    let mut command = new_tokio_command(&program);
 
-    // Select device
     if !device.is_empty() {
         command.arg("-s").arg(&device);
     }
@@ -163,11 +178,11 @@ async fn run_adb(device: String, args: Vec<&str>) -> Result<String, String> {
     let output = command
         .output()
         .await
-        .map_err(|e| format!("Failed to execute adb: {}", e))?;
+        .map_err(|e| format!("Failed to execute {}: {}", program, e))?;
 
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     } else {
-        Err(String::from_utf8_lossy(&output.stderr).to_string())
+        Err(format_adb_error(&output))
     }
 }

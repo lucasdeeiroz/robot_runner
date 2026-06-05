@@ -39,37 +39,22 @@ export function transformBounds(
     actualImgWidth: number,
     actualImgHeight: number
 ): { x: number; y: number; w: number; h: number } {
-    // Detect if we need to swap/rotate
-    const xmlIsPortrait = xmlRootHeight > xmlRootWidth;
-    const imgIsPortrait = actualImgHeight > actualImgWidth;
+    if (xmlRootWidth === 0 || xmlRootHeight === 0) return bounds;
 
-    if (xmlIsPortrait !== imgIsPortrait) {
-        // Simple swap for orientation mismatch (Landscape screenshot vs Portrait XML)
-        // This assumes the coordinates are relative to the top-left in the current orientation
-        // but the bounds themselves might need swapping if it's a 90deg rotation.
+    // Calculate normalized positions (0-1) relative to the original XML resolution
+    const nx = bounds.x / xmlRootWidth;
+    const ny = bounds.y / xmlRootHeight;
+    const nw = bounds.w / xmlRootWidth;
+    const nh = bounds.h / xmlRootHeight;
 
-        // Usually, Android dumps in portrait (e.g. 1080x2400) even if rotated,
-        // but some systems might dump in the current orientation (2400x1080).
-        // If we have a mismatch, we likely need to "project" the portrait coordinates onto a landscape canvas.
-
-        // Calculate normalized positions (0-1)
-        const nx = bounds.x / xmlRootWidth;
-        const ny = bounds.y / xmlRootHeight;
-        const nw = bounds.w / xmlRootWidth;
-        const nh = bounds.h / xmlRootHeight;
-
-        // Project onto landscape
-        // Note: Simple scaling might be enough if the "stretched" look is just a scaling bug,
-        // but sometimes the axes are swapped.
-        return {
-            x: nx * actualImgWidth,
-            y: ny * actualImgHeight,
-            w: nw * actualImgWidth,
-            h: nh * actualImgHeight
-        };
-    }
-
-    return bounds;
+    // Project onto actual image dimensions (which might be resized/compressed)
+    // This handles scaling and orientation alignment by mapping normalized coordinates.
+    return {
+        x: nx * actualImgWidth,
+        y: ny * actualImgHeight,
+        w: nw * actualImgWidth,
+        h: nh * actualImgHeight
+    };
 }
 
 /**
@@ -80,7 +65,7 @@ export function transformBounds(
  * Recursively converts the raw fast-xml-parser object into a cleaner InspectorNode tree.
  * Agnostic to tag names (handles node, hierarchy, or class-based tags).
  */
-export function transformXmlToTree(rawNode: any, parent?: InspectorNode, keyName: string = 'node'): InspectorNode {
+export function transformXmlToTree(rawNode: any, parent?: InspectorNode, keyName: string = 'node', isRoot: boolean = true): InspectorNode {
     const attributes: Record<string, string> = {};
     const children: InspectorNode[] = [];
 
@@ -105,11 +90,11 @@ export function transformXmlToTree(rawNode: any, parent?: InspectorNode, keyName
         } else if (Array.isArray(value)) {
             value.forEach((v: any) => {
                 if (typeof v === 'object' && v !== null) {
-                    children.push(transformXmlToTree(v, undefined, key));
+                    children.push(transformXmlToTree(v, undefined, key, false));
                 }
             });
         } else if (typeof value === 'object' && value !== null) {
-            children.push(transformXmlToTree(value, undefined, key));
+            children.push(transformXmlToTree(value, undefined, key, false));
         } else {
             attributes[key] = decodeHtmlEntities(String(value));
         }
@@ -132,6 +117,12 @@ export function transformXmlToTree(rawNode: any, parent?: InspectorNode, keyName
 
     if (attributes['bounds']) {
         node.bounds = parseBounds(attributes['bounds']);
+    } else if (attributes['width'] && attributes['height']) {
+        const w = parseInt(attributes['width'], 10);
+        const h = parseInt(attributes['height'], 10);
+        if (!isNaN(w) && !isNaN(h)) {
+            node.bounds = { x: 0, y: 0, w, h };
+        }
     }
 
     // Link parent for children
@@ -155,7 +146,64 @@ export function transformXmlToTree(rawNode: any, parent?: InspectorNode, keyName
         }
     }
 
+    if (isRoot) {
+        // Calculate the bounding box of the entire tree to find the maximum extent of all elements.
+        // Android UI Automator coordinates are absolute physical screen coordinates.
+        // If the dump only contains a modal/dialog (common on payment terminals or secure screens),
+        // the root node bounds may be restricted to the modal, causing viewport scaling mismatch
+        // and clipping the modal elements outside the viewport container.
+        // Forcing the root bounds to start at (0, 0) and cover all elements' max extent solves this.
+        let maxX = 0;
+        let maxY = 0;
+
+        const traverseForMax = (n: InspectorNode) => {
+            if (n.bounds) {
+                maxX = Math.max(maxX, n.bounds.x + n.bounds.w);
+                maxY = Math.max(maxY, n.bounds.y + n.bounds.h);
+            }
+            n.children.forEach(traverseForMax);
+        };
+
+        traverseForMax(node);
+
+        const currentBounds = node.bounds;
+        if (!currentBounds || currentBounds.x !== 0 || currentBounds.y !== 0 || currentBounds.w < maxX || currentBounds.h < maxY) {
+            if (maxX > 0 && maxY > 0) {
+                const finalW = currentBounds && currentBounds.x === 0 ? Math.max(currentBounds.w, maxX) : maxX;
+                const finalH = currentBounds && currentBounds.y === 0 ? Math.max(currentBounds.h, maxY) : maxY;
+
+                node.bounds = {
+                    x: 0,
+                    y: 0,
+                    w: finalW,
+                    h: finalH
+                };
+            }
+        }
+
+        assignInstances(node);
+    }
+
     return node;
+}
+
+/**
+ * Calculates element occurrence index for its class and sets it on each node as the 'instance' attribute.
+ */
+export function assignInstances(root: InspectorNode): void {
+    const classCounts: Record<string, number> = {};
+    function traverse(node: InspectorNode) {
+        const className = node.attributes['class'] || node.tagName;
+        if (className) {
+            if (classCounts[className] === undefined) {
+                classCounts[className] = 0;
+            }
+            node.attributes['instance'] = String(classCounts[className]);
+            classCounts[className]++;
+        }
+        node.children.forEach(traverse);
+    }
+    traverse(root);
 }
 
 /**
@@ -263,16 +311,60 @@ export function findNodesByLocator(root: InspectorNode, locator: string): Inspec
         return currentResults;
     }
 
+    // 2.1 Support childSelector: parent.childSelector(child)
+    if (trimmed.includes('.childSelector')) {
+        const parts = trimmed.split('.childSelector');
+        if (parts.length === 2) {
+            const parentLocator = parts[0].trim();
+            const childLocator = parts[1].replace(/^\s*\(\s*new\s+/, '').replace(/\s*\)\s*$/, '').trim();
+            const parentNodes = findNodesByLocator(root, parentLocator);
+            const finalResults: InspectorNode[] = [];
+            parentNodes.forEach(pn => {
+                const childNodes = findNodesByLocator(pn, childLocator);
+                childNodes.forEach(cn => {
+                    if (cn.parent?.id === pn.id && !finalResults.some(r => r.id === cn.id)) {
+                        finalResults.push(cn);
+                    }
+                });
+            });
+            return finalResults;
+        }
+    }
+
+    // 2.2 Support fromParent: reference.fromParent(sibling)
+    if (trimmed.includes('.fromParent')) {
+        const parts = trimmed.split('.fromParent');
+        if (parts.length === 2) {
+            const refLocator = parts[0].trim();
+            const siblingLocator = parts[1].replace(/^\s*\(\s*new\s+/, '').replace(/\s*\)\s*$/, '').trim();
+            const refNodes = findNodesByLocator(root, refLocator);
+            const finalResults: InspectorNode[] = [];
+            refNodes.forEach(rn => {
+                if (rn.parent) {
+                    const siblingNodes = findNodesByLocator(rn.parent, siblingLocator);
+                    siblingNodes.forEach(sn => {
+                        if (sn.parent?.id === rn.parent?.id && sn.id !== rn.id && !finalResults.some(r => r.id === sn.id)) {
+                            finalResults.push(sn);
+                        }
+                    });
+                }
+            });
+            return finalResults;
+        }
+    }
+
     // 3. UiAutomator Support: new UiSelector().text("...")
     if (trimmed.includes('UiSelector()')) {
-        const methodMatch = trimmed.match(/\.\w+\s*\((\s*["'][\s\S]*?["']\s*)\)/g);
+        const methodMatch = trimmed.match(/\.\w+\s*\([^)]*\)/g);
         if (methodMatch) {
             const search = (node: InspectorNode) => {
                 let matchesAll = true;
                 methodMatch.forEach(m => {
-                    const parts = m.match(/\.(\w+)\s*\(\s*["']([\s\S]*?)["']\s*\)/);
+                    if (m.startsWith('.instance') || m.startsWith('.childSelector') || m.startsWith('.fromParent')) return;
+
+                    const parts = m.match(/\.(\w+)\s*\(\s*([\s\S]*?)\s*\)/);
                     if (parts) {
-                        const [, method, val] = parts;
+                        const [, method, rawVal] = parts;
                         let baseMethod = method;
                         let op: 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'matches' = 'equals';
 
@@ -290,26 +382,55 @@ export function findNodesByLocator(root: InspectorNode, locator: string): Inspec
                             op = 'matches';
                         }
 
+                        // Clean rawVal (could be "string", 'string', true, false, 3)
+                        let val: string | boolean | number = rawVal.trim();
+                        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+                            val = val.slice(1, -1);
+                        } else if (val === 'true') {
+                            val = true;
+                        } else if (val === 'false') {
+                            val = false;
+                        } else if (/^\d+$/.test(val)) {
+                            val = parseInt(val, 10);
+                        }
+
                         const attrMap: Record<string, string> = {
                             'resourceId': 'resource-id',
                             'description': 'content-desc',
                             'text': 'text',
-                            'className': 'class'
+                            'className': 'class',
+                            'longClickable': 'long-clickable'
                         };
-                        const attr = attrMap[baseMethod] || baseMethod;
-                        const nodeVal = node.attributes[attr] || "";
+                        const attr = attrMap[baseMethod] || baseMethod.replace(/([A-Z])/g, '-$1').toLowerCase();
+                        const nodeVal = node.attributes[attr];
 
-                        switch (op) {
-                            case 'contains': if (!nodeVal.includes(val)) matchesAll = false; break;
-                            case 'startsWith': if (!nodeVal.startsWith(val)) matchesAll = false; break;
-                            case 'endsWith': if (!nodeVal.endsWith(val)) matchesAll = false; break;
-                            case 'matches':
-                                try {
-                                    const re = new RegExp(val);
-                                    if (!re.test(nodeVal)) matchesAll = false;
-                                } catch { matchesAll = false; }
-                                break;
-                            default: if (nodeVal !== val) matchesAll = false;
+                        // If it's a boolean check
+                        if (typeof val === 'boolean') {
+                            const nodeBool = nodeVal === 'true';
+                            if (nodeBool !== val) matchesAll = false;
+                        }
+                        // If it's an integer check
+                        else if (typeof val === 'number') {
+                            if (baseMethod === 'index') {
+                                const nodeInt = parseInt(nodeVal || "0", 10);
+                                if (nodeInt !== val) matchesAll = false;
+                            }
+                        }
+                        // String checks
+                        else {
+                            const nodeString = nodeVal || "";
+                            switch (op) {
+                                case 'contains': if (!nodeString.includes(val)) matchesAll = false; break;
+                                case 'startsWith': if (!nodeString.startsWith(val)) matchesAll = false; break;
+                                case 'endsWith': if (!nodeString.endsWith(val)) matchesAll = false; break;
+                                case 'matches':
+                                    try {
+                                        const re = new RegExp(val);
+                                        if (!re.test(nodeString)) matchesAll = false;
+                                    } catch { matchesAll = false; }
+                                    break;
+                                default: if (nodeString !== val) matchesAll = false;
+                            }
                         }
                     }
                 });
@@ -317,6 +438,14 @@ export function findNodesByLocator(root: InspectorNode, locator: string): Inspec
                 node.children.forEach(search);
             };
             search(root);
+
+            // Handle instance filter
+            const instanceMatch = trimmed.match(/\.instance\s*\(\s*(\d+)\s*\)/);
+            if (instanceMatch && results.length > 0) {
+                const instanceIndex = parseInt(instanceMatch[1], 10);
+                return results[instanceIndex] ? [results[instanceIndex]] : [];
+            }
+
             if (results.length > 0) return results;
         }
     }
@@ -440,7 +569,39 @@ export function findNodesByLocator(root: InspectorNode, locator: string): Inspec
             }
         };
 
-        const segments = path.split('/');
+        const splitXPath = (xpath: string): string[] => {
+            const segmentsList: string[] = [];
+            let current = "";
+            let inBracket = 0;
+            let inSingleQuote = false;
+            let inDoubleQuote = false;
+
+            for (let i = 0; i < xpath.length; i++) {
+                const char = xpath[i];
+                if (char === "'" && !inDoubleQuote) {
+                    inSingleQuote = !inSingleQuote;
+                    current += char;
+                } else if (char === '"' && !inSingleQuote) {
+                    inDoubleQuote = !inDoubleQuote;
+                    current += char;
+                } else if (char === '[' && !inSingleQuote && !inDoubleQuote) {
+                    inBracket++;
+                    current += char;
+                } else if (char === ']' && !inSingleQuote && !inDoubleQuote) {
+                    inBracket--;
+                    current += char;
+                } else if (char === '/' && !inSingleQuote && !inDoubleQuote && inBracket === 0) {
+                    segmentsList.push(current);
+                    current = "";
+                } else {
+                    current += char;
+                }
+            }
+            segmentsList.push(current);
+            return segmentsList;
+        };
+
+        const segments = splitXPath(path);
         // If it was absolute (/node), the first segment is ""
         // If it was relative (//node), the first two segments are ""
         if (segments[0] === "") {
@@ -507,8 +668,43 @@ export function escapeXPath(val: string): string {
     return `concat(${result})`;
 }
 
-export function generateXPath(node: InspectorNode, attr?: string, type: 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'matches' = 'equals', addons: string[] = []): string {
+export function generateXPath(
+    node: InspectorNode,
+    attr?: string,
+    type: 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'matches' = 'equals',
+    kinship: 'none' | 'childSelector' | 'fromParent' = 'none',
+    addons: string[] = []
+): string {
     if (!node.parent) return '/*';
+
+    if (kinship === 'childSelector' && node.parent) {
+        const parentClass = node.parent.attributes['class'] || '*';
+        const parentPrefAttr = node.parent.attributes['resource-id'] ? 'resource-id' : node.parent.attributes['text'] ? 'text' : node.parent.attributes['content-desc'] ? 'content-desc' : undefined;
+        let parentSelector = `//${parentClass}`;
+        if (parentPrefAttr && node.parent.attributes[parentPrefAttr]) {
+            parentSelector += `[@${parentPrefAttr}=${escapeXPath(node.parent.attributes[parentPrefAttr])}]`;
+        }
+
+        const childXPath = generateXPath(node, attr, type, 'none', addons);
+        const relativeChild = childXPath.startsWith('//') ? childXPath.substring(2) : childXPath;
+        return `${parentSelector}/${relativeChild}`;
+    }
+
+    if (kinship === 'fromParent' && node.parent) {
+        const sibling = node.parent.children.find(c => c.id !== node.id && (c.attributes['text'] || c.attributes['resource-id'] || c.attributes['content-desc'])) || node.parent.children.find(c => c.id !== node.id);
+        if (sibling) {
+            const siblingClass = sibling.attributes['class'] || '*';
+            const siblingPrefAttr = sibling.attributes['resource-id'] ? 'resource-id' : sibling.attributes['text'] ? 'text' : sibling.attributes['content-desc'] ? 'content-desc' : undefined;
+            let siblingSelector = `//${siblingClass}`;
+            if (siblingPrefAttr && sibling.attributes[siblingPrefAttr]) {
+                siblingSelector += `[@${siblingPrefAttr}=${escapeXPath(sibling.attributes[siblingPrefAttr])}]`;
+            }
+
+            const targetXPath = generateXPath(node, attr, type, 'none', addons);
+            const relativeTarget = targetXPath.startsWith('//') ? targetXPath.substring(2) : targetXPath;
+            return `${siblingSelector}/../${relativeTarget}`;
+        }
+    }
 
     const attributes = node.attributes;
     const className = attributes['class'] || '*';
@@ -580,10 +776,16 @@ export function findNodeByShortId(node: InspectorNode, shortId: string): Inspect
  * Generates a simplified XML string for AI consumption, including the short_id.
  */
 export function generateSimplifiedXml(node: InspectorNode): string {
-    const attrStr = Object.entries(node.attributes)
+    // Heuristic: Ensure ScrollView is always marked as scrollable for the AI
+    const effectiveAttributes = { ...node.attributes };
+    if (node.tagName.includes('ScrollView')) {
+        effectiveAttributes['scrollable'] = 'true';
+    }
+
+    const attrStr = Object.entries(effectiveAttributes)
         .filter(([k]) => ['short_id', 'text', 'resource-id', 'content-desc', 'class', 'clickable', 'enabled', 'scrollable', 'focusable', 'long-clickable', 'checkable', 'selected'].includes(k))
         .filter(([k, v]) => v || (['clickable', 'scrollable', 'focusable'].includes(k) && v === "false")) // Include false for crucial QA flags
-        .map(([k, v]) => `${k}="${v.replace(/"/g, '&quot;')}"`)
+        .map(([k, v]) => `${k}="${(v || '').toString().replace(/"/g, '&quot;')}"`)
         .join(' ');
 
     const tagName = node.tagName.split('.').pop() || 'node'; // Use short class name
@@ -605,9 +807,45 @@ export function generateSimplifiedXml(node: InspectorNode): string {
 export function generateUiSelector(node: InspectorNode, options: {
     attr?: 'resource-id' | 'content-desc' | 'text' | 'class' | 'auto',
     type: 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'matches',
+    kinship?: 'none' | 'childSelector' | 'fromParent',
     useUiSelectorWrapper: boolean,
     addons?: string[]
 }): string {
+    if (options.kinship === 'childSelector' && node.parent) {
+        const parentSel = generateUiSelector(node.parent, {
+            attr: 'auto',
+            type: 'equals',
+            kinship: 'none',
+            useUiSelectorWrapper: false
+        });
+        const childSel = generateUiSelector(node, {
+            ...options,
+            kinship: 'none',
+            useUiSelectorWrapper: false
+        });
+        const full = `${parentSel}.childSelector(new UiSelector().${childSel})`;
+        return options.useUiSelectorWrapper ? `new UiSelector().${full}` : full;
+    }
+
+    if (options.kinship === 'fromParent' && node.parent) {
+        const sibling = node.parent.children.find(c => c.id !== node.id && (c.attributes['text'] || c.attributes['resource-id'] || c.attributes['content-desc'])) || node.parent.children.find(c => c.id !== node.id);
+        if (sibling) {
+            const siblingSel = generateUiSelector(sibling, {
+                attr: 'auto',
+                type: 'equals',
+                kinship: 'none',
+                useUiSelectorWrapper: false
+            });
+            const targetSel = generateUiSelector(node, {
+                ...options,
+                kinship: 'none',
+                useUiSelectorWrapper: false
+            });
+            const full = `${siblingSel}.fromParent(new UiSelector().${targetSel})`;
+            return options.useUiSelectorWrapper ? `new UiSelector().${full}` : full;
+        }
+    }
+
     const attributes = node.attributes;
     const preferredAttr = (options.attr === 'auto' || !options.attr)
         ? (attributes['resource-id'] ? 'resource-id' : attributes['content-desc'] ? 'content-desc' : attributes['text'] ? 'text' : 'class')
@@ -648,7 +886,13 @@ export function generateUiSelector(node: InspectorNode, options: {
             if (attrValue === undefined || attrValue === null || attrValue === "") {
                 return;
             }
-            selectorArr.push(`${m}("${attrValue}")`);
+            if (['checkable', 'checked', 'clickable', 'long-clickable', 'longClickable', 'enabled', 'focusable', 'focused', 'scrollable', 'selected'].includes(a)) {
+                selectorArr.push(`${m}(${attrValue === 'true'})`);
+            } else if (a === 'index' || a === 'instance') {
+                selectorArr.push(`${m}(${parseInt(attrValue, 10) || 0})`);
+            } else {
+                selectorArr.push(`${m}("${attrValue}")`);
+            }
         });
     }
 

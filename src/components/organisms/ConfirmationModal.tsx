@@ -45,7 +45,7 @@ export function ConfirmationModal({
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.95 }}
-                        transition={{ duration: 0.2 }}
+                        transition={{ type: "spring", stiffness: 350, damping: 25, mass: 1 }}
                         className="bg-surface border border-outline-variant/30 rounded-2xl shadow-xl w-full max-w-md p-6 relative z-10"
                     >
                         <button

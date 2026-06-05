@@ -13,6 +13,7 @@ export interface ButtonProps extends HTMLMotionProps<"button"> {
     leftIcon?: React.ReactNode;
     rightIcon?: React.ReactNode;
     children?: React.ReactNode;
+    tooltipPosition?: 'top' | 'bottom' | 'left' | 'right';
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
@@ -24,6 +25,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
     rightIcon,
     children,
     disabled,
+    title,
+    tooltipPosition = 'top',
     ...props
 }, ref) => {
     const variants = {
@@ -56,6 +59,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
                 className
             )}
             disabled={disabled || isLoading}
+            data-tooltip={title}
+            data-position={tooltipPosition}
             {...props}
         >
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

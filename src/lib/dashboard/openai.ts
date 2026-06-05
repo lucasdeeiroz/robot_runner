@@ -11,9 +11,9 @@ interface OpenAIResponse {
 }
 
 import { ScreenMap, UIElementMap } from '@/lib/types';
-import { AIGenerationType } from './gemini';
+import { AIGenerationType, AutonomousActionResponse } from './gemini';
 import { DeepAnalysisContext } from "./historyAnalysisUtils";
-import { getExplorationPrompt, formatExistingMaps, getRefinedTestCasesPrompt, getRefinedPBIPrompt, getRefinedImprovementPrompt, getRefinedBugPrompt, getRefinedRobotScriptPrompt, getFlowchartLayoutPrompt, getElementNamingPrompt, getScreenTaggingPrompt, getTestHistoryAnalysisPrompt, getExecutionSummaryPrompt, getQAAssistantWrapper } from "./prompts";
+import { getExplorationPrompt, formatExistingMaps, getRefinedTestCasesPrompt, getRefinedPBIPrompt, getRefinedImprovementPrompt, getRefinedBugPrompt, getRefinedRobotScriptPrompt, getFlowchartLayoutPrompt, getElementNamingPrompt, getScreenTaggingPrompt, getTestHistoryAnalysisPrompt, getExecutionSummaryPrompt, getQAAssistantWrapper, getAutonomousAgentPrompt } from "./prompts";
 import { fetch } from '@tauri-apps/plugin-http';
 
 function extractBase64Data(imageBase64: string): { mimeType: string, data: string } {
@@ -394,7 +394,8 @@ export async function analyzeTestHistory(
     language: string,
     deepContext?: Record<string, DeepAnalysisContext> | string,
     signal?: AbortSignal,
-    customPrompt?: string
+    customPrompt?: string,
+    imageBase64?: string
 ): Promise<string> {
     const systemInstruction = getTestHistoryAnalysisPrompt(language, customPrompt);
 
@@ -428,7 +429,7 @@ export async function analyzeTestHistory(
     const prompt = `History Data (JSON):\n${JSON.stringify(historySummary)}${deepContextStr}`;
 
     try {
-        return await askOpenAI(prompt, apiKey, model, systemInstruction, undefined, signal);
+        return await askOpenAI(prompt, apiKey, model, systemInstruction, imageBase64, signal);
     } catch (e) {
         console.error("OpenAI analyzeTestHistory failure:", e);
         throw e;
@@ -445,7 +446,8 @@ export async function summarizeExecution(
     language: string,
     failureContext?: any[],
     signal?: AbortSignal,
-    customPrompt?: string
+    customPrompt?: string,
+    imageBase64?: string
 ): Promise<string> {
     const cleanAnsi = (l: string) => l.replace(/\x1b\[[0-9;]*m/g, '').replace(/[\x00-\x1f\x7f-\x9f]/g, '');
 
@@ -532,7 +534,7 @@ export async function summarizeExecution(
     const prompt = `Execution Tree Structure:\n${JSON.stringify(simplify(tree))}${overallStats}${failureContextStr}`;
 
     try {
-        return await askOpenAI(prompt, apiKey, model, systemInstruction, undefined, signal);
+        return await askOpenAI(prompt, apiKey, model, systemInstruction, imageBase64, signal);
     } catch (e) {
         console.error("OpenAI summarizeExecution failure:", e);
         throw e;
@@ -563,16 +565,13 @@ export async function exploreScreen(
     const systemInstruction = getExplorationPrompt(language, customPrompt);
 
     const actionLogs = sessionHistory.filter(log =>
-        log.includes("--- Step") ||
-        log.includes("Clicking element:") ||
-        log.includes("Swiping") ||
-        log.includes("Navigating back") ||
-        log.includes("AI mapped:") ||
-        log.includes("Typing text on:") ||
-        log.includes("Loop detected") ||
-        log.includes("Exploration stopped") ||
-        log.includes("App exit detected") ||
-        log.includes("Exploration finished")
+        log.includes("---") ||
+        log.includes("ACTION:") ||
+        log.includes("AI:") ||
+        log.includes("RATIONALE:") ||
+        log.includes("ERROR:") ||
+        log.includes("WARNING:") ||
+        log.includes("FINISHED:")
     );
 
     const prompt = `
@@ -580,7 +579,7 @@ EXISTING MAPS (Mapped screens so far):
 ${formatExistingMaps(existingMaps)}
 
 SESSION HISTORY (Action logs):
-${actionLogs.slice(-50).join('\n')}
+${actionLogs.slice(-30).join('\n')}
 
 XML DUMP:
 ${xmlDump.substring(0, 15000)}
@@ -626,6 +625,68 @@ ${xmlDump.substring(0, 15000)}
         return safeParseJson(content);
     } catch (error: any) {
         console.error("OpenAI exploreScreen Error:", error);
+        throw error;
+    }
+}
+
+/**
+ * Autonomous Action Generation
+ */
+export async function generateAutonomousAction(
+    xmlDump: string,
+    targetScenario: string,
+    history: string[],
+    apiKey: string,
+    model: string,
+    language: string,
+    customPrompt?: string
+): Promise<AutonomousActionResponse> {
+    if (!apiKey) throw new Error("Missing OpenAI API Key");
+
+    const systemInstruction = getAutonomousAgentPrompt(language, customPrompt);
+    const prompt = `
+TARGET SCENARIO:
+${targetScenario}
+
+SESSION HISTORY:
+${history.join('\n')}
+
+CURRENT XML DUMP:
+${xmlDump.substring(0, 15000)}
+`.trim();
+
+    const url = "https://api.openai.com/v1/chat/completions";
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model,
+                messages: [
+                    { role: 'system', content: systemInstruction },
+                    { role: 'user', content: prompt }
+                ],
+                response_format: { type: "json_object" },
+                temperature: 0.2
+            })
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.error?.message || `API Error: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content;
+        if (!content) throw new Error("Empty response from OpenAI");
+
+        return safeParseJson<AutonomousActionResponse>(content);
+    } catch (error: any) {
+        console.error("OpenAI generateAutonomousAction Error:", error);
         throw error;
     }
 }

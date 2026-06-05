@@ -3,7 +3,8 @@ import { ScreenMap } from '@/lib/types';
 export interface ExplorationState {
     visitedScreens: string[]; // Screen names
     visitedElements: string[]; // Element IDs (XPath or Resource-ID)
-    logs: string[];
+    logs: LogEntry[];
+    thoughts: string[]; // AI thoughts per step
     maxSteps: number;
     currentStep: number;
     targetPackage?: string;
@@ -15,6 +16,7 @@ export interface ExplorationState {
     previousScreenName?: string;
     previousActionTargetId?: string; // short_id of the element clicked on the previous screen
     previousActionType?: string; // type of action (click, etc.)
+    sessionId?: string; // Session ID for Claude Code continuity
 }
 
 export interface ExplorationAction {
@@ -30,17 +32,27 @@ export interface ExplorationResult {
     nextAction: ExplorationAction;
 }
 
+export interface LogEntry {
+    text: string;
+    type: 'action' | 'info' | 'debug' | 'error' | 'ai' | 'rationale' | 'transition' | 'finished' | 'stopped' | 'step' | 'warning';
+    timestamp: string;
+    stepNumber?: number;
+}
+
 /**
  * Utility to manage the autonomous exploration session state.
  */
 export class AutonomousExplorer {
     private state: ExplorationState;
+    private t: (key: string, options?: any) => string;
 
-    constructor(initialMaxSteps: number = 9999) {
+    constructor(t: (key: string, options?: any) => string, initialMaxSteps: number = 9999) {
+        this.t = t;
         this.state = {
             visitedScreens: [],
             visitedElements: [],
             logs: [],
+            thoughts: [],
             maxSteps: initialMaxSteps,
             currentStep: 0,
             consecutiveSwipes: 0,
@@ -49,10 +61,20 @@ export class AutonomousExplorer {
         };
     }
 
-    public addLog(message: string) {
+    public addLog(message: string, type: LogEntry['type'] = 'info', stepNumber?: number) {
         const timestamp = new Date().toLocaleTimeString();
-        this.state.logs.push(`[${timestamp}] ${message}`);
-        console.log(`[Exploration] ${message}`);
+        this.state.logs.push({
+            text: message,
+            type,
+            timestamp,
+            stepNumber
+        });
+        console.log(`[Exploration:${type}] ${message}`);
+    }
+
+    public addThought(thought: string) {
+        this.state.thoughts.push(thought);
+        this.addLog(thought, 'ai');
     }
 
     public isAlreadyVisited(screenName: string): boolean {
@@ -62,7 +84,7 @@ export class AutonomousExplorer {
     public markScreenVisited(screenName: string) {
         if (!this.state.visitedScreens.includes(screenName)) {
             this.state.visitedScreens.push(screenName);
-            this.addLog(`Mapped new screen: ${screenName}`);
+            this.addLog(this.t('mapper.exploration.mapped_new_screen', { screenName }));
         }
     }
 
@@ -96,7 +118,7 @@ export class AutonomousExplorer {
 
     public setTargetPackage(pkg: string) {
         this.state.targetPackage = pkg;
-        this.addLog(`Target package identified: ${pkg}`);
+        this.addLog(this.t('mapper.exploration.target_package_identified', { pkg }));
     }
 
     public getTargetPackage(): string | undefined {
@@ -129,8 +151,15 @@ export class AutonomousExplorer {
         return this.state.currentStep >= this.state.maxSteps;
     }
 
-    public getLogs(): string[] {
+    public getLogs(): LogEntry[] {
         return this.state.logs;
+    }
+
+    public getFormattedLogs(): string[] {
+        return this.state.logs.map(log => {
+            const prefix = log.type !== 'info' && log.type !== 'step' ? `${log.type.toUpperCase()}: ` : "";
+            return `[${log.timestamp}] ${prefix}${log.text}`;
+        });
     }
 
     public getState(): ExplorationState {
@@ -165,5 +194,13 @@ export class AutonomousExplorer {
         this.state.previousScreenName = undefined;
         this.state.previousActionTargetId = undefined;
         this.state.previousActionType = undefined;
+    }
+
+    public setSessionId(sessionId: string) {
+        this.state.sessionId = sessionId;
+    }
+
+    public getSessionId(): string | undefined {
+        return this.state.sessionId;
     }
 }

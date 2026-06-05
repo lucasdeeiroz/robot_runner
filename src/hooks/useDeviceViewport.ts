@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { XMLParser } from 'fast-xml-parser';
 import { InspectorNode, transformXmlToTree, findNodesAtCoords } from '@/lib/inspectorUtils';
 import { feedback } from '@/lib/feedback';
+import { useSettings } from '@/lib/settings';
 
 interface DeviceViewportOptions {
     deviceId: string | null;
@@ -12,18 +13,30 @@ interface DeviceViewportOptions {
     onRefreshSuccess?: () => void;
     onNodeSelected?: (node: InspectorNode | null) => void;
     onNodeHovered?: (node: InspectorNode | null) => void;
+    isWeb?: boolean;
 }
 
 export function useDeviceViewport({
-    deviceId,
+    deviceId: initialDeviceId,
     isActive,
     isBusy = false,
     onRefreshSuccess,
     onNodeSelected,
-    onNodeHovered
+    onNodeHovered,
+    isWeb: isWebOverride
 }: DeviceViewportOptions) {
+    const { activeWebUrl, is_test_mode, setActiveWebUrl } = useSettings();
+    const isWeb = isWebOverride !== undefined ? isWebOverride : is_test_mode === 'web';
+    const getWebBrowser = (id: string | null): string => {
+        if (!id || !id.trim()) return 'chrome';
+        return id.trim();
+    };
+    const deviceId = isWeb
+        ? getWebBrowser(initialDeviceId)
+        : initialDeviceId;
     const [screenshot, setScreenshot] = useState<string | null>(null);
     const [rootNode, setRootNode] = useState<InspectorNode | null>(null);
+    const [xmlDump, setXmlDump] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [imgLayout, setImgLayout] = useState<{ width: number, height: number, naturalWidth: number, naturalHeight: number } | null>(null);
     const [selectedNode, setSelectedNode] = useState<InspectorNode | null>(null);
@@ -41,14 +54,43 @@ export function useDeviceViewport({
 
     const [availableNodes, setAvailableNodes] = useState<InspectorNode[]>([]);
 
-    const refreshAll = useCallback(async () => {
+    const refreshAll = useCallback(async (compressed: boolean = true, forceClearScreenshot: boolean = false, targetWebUrl?: string) => {
         if (!deviceId) return;
         setLoading(true);
-        try {
-            const b64 = await invoke<string>('get_screenshot', { deviceId });
-            setScreenshot(b64);
 
-            const xml = await invoke<string>('get_xml_dump', { deviceId });
+        // Immediately clear selection and hover elements to avoid showing stale highlighter boundaries
+        setSelectedNode(null);
+        setHoveredNode(null);
+        setAvailableNodes([]);
+        if (onNodeSelected) onNodeSelected(null);
+        if (onNodeHovered) onNodeHovered(null);
+
+        if (forceClearScreenshot) {
+            setScreenshot(null);
+            setRootNode(null);
+        }
+
+        let screenshotSucceeded = false;
+        try {
+            const webUrlParam = targetWebUrl || (isWeb ? activeWebUrl : undefined);
+            
+            // Try screenshot (non-critical)
+            try {
+                const b64 = compressed 
+                    ? await invoke<string>('get_compressed_screenshot', { deviceId, maxWidth: 1024, maxHeight: 1024, webUrl: webUrlParam })
+                    : await invoke<string>('get_screenshot', { deviceId, webUrl: webUrlParam });
+                
+                const prefix = compressed ? 'data:image/jpeg;base64,' : 'data:image/png;base64,';
+                setScreenshot(b64.startsWith('data:') ? b64 : `${prefix}${b64}`);
+                screenshotSucceeded = true;
+            } catch (screenshotErr) {
+                console.warn("[Inspector] Screenshot failed, but continuing with XML dump:", screenshotErr);
+                setScreenshot(null);
+            }
+
+            // Try XML dump (critical for element interaction)
+            const xml = await invoke<string>('get_xml_dump', { deviceId, webUrl: webUrlParam });
+            setXmlDump(xml);
             const parser = new XMLParser({
                 ignoreAttributes: false,
                 attributeNamePrefix: "",
@@ -58,19 +100,68 @@ export function useDeviceViewport({
             const root = jsonObj.hierarchy ? transformXmlToTree(jsonObj.hierarchy) : transformXmlToTree(jsonObj);
             setRootNode(root);
 
+            // If screenshot failed, we need to set a fallback layout so interactions work
+            if (!screenshotSucceeded && root?.bounds) {
+                let screenW = root.bounds.w;
+                let screenH = root.bounds.h;
+
+                try {
+                    const [wmW, wmH] = await invoke<[number, number]>('get_device_screen_size', { deviceId });
+                    if (wmW > 0 && wmH > 0) {
+                        screenW = wmW;
+                        screenH = wmH;
+                    }
+                } catch (err) {
+                    console.warn("[Inspector] Failed to get physical device screen size via wm size:", err);
+                }
+
+                // Adjust the rootNode's bounds to match the true physical screen size
+                root.bounds = { x: 0, y: 0, w: screenW, h: screenH };
+
+                const displayW = 300; // Match DeviceViewport fallback
+                const scale = displayW / screenW;
+                setImgLayout({
+                    width: displayW,
+                    height: screenH * scale,
+                    naturalWidth: screenW,
+                    naturalHeight: screenH
+                });
+            }
+
+            if (isWeb && root && root.attributes && root.attributes.currentUrl) {
+                const browserUrl = root.attributes.currentUrl;
+                if (browserUrl && browserUrl !== activeWebUrl) {
+                    setActiveWebUrl(browserUrl);
+                }
+            }
+
             if (onRefreshSuccess) onRefreshSuccess();
         } catch (e) {
             feedback.toast.error("inspector.update_error", e);
         } finally {
             setLoading(false);
         }
-    }, [deviceId, onRefreshSuccess]);
+    }, [deviceId, onRefreshSuccess, is_test_mode, activeWebUrl, onNodeSelected, onNodeHovered]);
+
+    // Reset viewport state when device changes to prevent stale layout/screenshot leak between devices
+    useEffect(() => {
+        setScreenshot(null);
+        setRootNode(null);
+        setXmlDump(null);
+        setSelectedNode(null);
+        setHoveredNode(null);
+        setAvailableNodes([]);
+        setImgLayout(null);
+        if (onNodeSelected) onNodeSelected(null);
+        if (onNodeHovered) onNodeHovered(null);
+    }, [deviceId]);
 
     // Handle auto-refresh on activation or busy state change
     useEffect(() => {
         if (!deviceId) {
             setScreenshot(null);
             setRootNode(null);
+            setXmlDump(null);
             setSelectedNode(null);
             setAvailableNodes([]);
             prevBusy.current = isBusy;
@@ -83,7 +174,7 @@ export function useDeviceViewport({
         if (isActive && !isBusy) {
             if (wasBusy) {
                 // Device just finished a busy task, wait a bit for system to settle
-                const timer = setTimeout(refreshAll, 1500);
+                const timer = setTimeout(() => refreshAll(), 1500);
                 return () => clearTimeout(timer);
             } else {
                 refreshAll();
@@ -93,21 +184,25 @@ export function useDeviceViewport({
 
     const addTapAnimation = useCallback((x: number, y: number) => {
         const id = Date.now();
-        if (!imgRef.current) return;
+        if (!imgRef.current || !rootNode?.bounds) return;
         const rect = imgRef.current.getBoundingClientRect();
-        const scaleX = rect.width / imgRef.current.naturalWidth;
-        const scaleY = rect.height / imgRef.current.naturalHeight;
+        
+        // Scale from XML space to screen space
+        const scaleX = rect.width / rootNode.bounds.w;
+        const scaleY = rect.height / rootNode.bounds.h;
 
         setTaps(prev => [...prev, { id, x: x * scaleX, y: y * scaleY }]);
         setTimeout(() => setTaps(prev => prev.filter(t => t.id !== id)), 500);
-    }, []);
+    }, [rootNode]);
 
     const addSwipeAnimation = useCallback((startX: number, startY: number, endX: number, endY: number) => {
         const id = Date.now();
-        if (!imgRef.current) return;
+        if (!imgRef.current || !rootNode?.bounds) return;
         const rect = imgRef.current.getBoundingClientRect();
-        const scaleX = rect.width / imgRef.current.naturalWidth;
-        const scaleY = rect.height / imgRef.current.naturalHeight;
+        
+        // Scale from XML space to screen space
+        const scaleX = rect.width / rootNode.bounds.w;
+        const scaleY = rect.height / rootNode.bounds.h;
 
         setSwipes(prev => [...prev, {
             id,
@@ -117,29 +212,49 @@ export function useDeviceViewport({
             endY: endY * scaleY
         }]);
         setTimeout(() => setSwipes(prev => prev.filter(s => s.id !== id)), 600);
-    }, []);
+    }, [rootNode]);
 
     const sendAdbInput = useCallback(async (cmd: string) => {
-        if (!deviceId || isBusy) return;
+        if (!deviceId || isBusy || isWeb) return;
         const args = ['shell', 'input', ...cmd.split(' ')];
         try {
             await invoke('run_adb_command', { device: deviceId, args });
-            setTimeout(refreshAll, 1500);
+            setTimeout(() => refreshAll(), 1500);
         } catch (e) {
             feedback.toast.error("inspector.input_error", e);
         }
-    }, [deviceId, isBusy, refreshAll]);
+    }, [deviceId, isBusy, is_test_mode, refreshAll]);
 
-    const getCoords = useCallback((e: React.MouseEvent<HTMLImageElement>) => {
-        if (!imgRef.current) return null;
+    const getCoords = useCallback((e: React.MouseEvent<HTMLElement>) => {
+        if (!imgRef.current || !imgLayout) return null;
         const rect = imgRef.current.getBoundingClientRect();
-        const scaleX = imgRef.current.naturalWidth / rect.width;
-        const scaleY = imgRef.current.naturalHeight / rect.height;
+        
+        // Coords in Natural space (the resized dimensions)
+        const scaleX = imgLayout.naturalWidth / rect.width;
+        const scaleY = imgLayout.naturalHeight / rect.height;
+        const naturalX = (e.clientX - rect.left) * scaleX;
+        const naturalY = (e.clientY - rect.top) * scaleY;
+
+        // If we have a rootNode, we should scale back to its coordinate system (original device size)
+        if (rootNode?.bounds) {
+            const xmlW = rootNode.bounds.w;
+            const xmlH = rootNode.bounds.h;
+            const imgW = imgLayout.naturalWidth;
+            const imgH = imgLayout.naturalHeight;
+
+            if (imgW > 0 && imgH > 0) {
+                return {
+                    x: Math.round((naturalX / imgW) * xmlW),
+                    y: Math.round((naturalY / imgH) * xmlH)
+                };
+            }
+        }
+
         return {
-            x: Math.round((e.clientX - rect.left) * scaleX),
-            y: Math.round((e.clientY - rect.top) * scaleY)
+            x: Math.round(naturalX),
+            y: Math.round(naturalY)
         };
-    }, []);
+    }, [rootNode, imgLayout]);
 
     const processInteractionAt = useCallback((coords: { x: number, y: number }, isHover: boolean) => {
         if (!rootNode) return;
@@ -183,7 +298,7 @@ export function useDeviceViewport({
         }
     }, [rootNode, onNodeHovered, onNodeSelected]);
 
-    const handleMouseMove = useCallback((e: React.MouseEvent<HTMLImageElement>) => {
+    const handleMouseMove = useCallback((e: React.MouseEvent<HTMLElement>) => {
         const coords = getCoords(e);
         if (!coords) return;
 
@@ -195,7 +310,7 @@ export function useDeviceViewport({
         }
     }, [swipeStart, getCoords, processInteractionAt]);
 
-    const handleMouseDown = useCallback((e: React.MouseEvent<HTMLImageElement>) => {
+    const handleMouseDown = useCallback((e: React.MouseEvent<HTMLElement>) => {
         const coords = getCoords(e);
         if (coords) {
             setSwipeStart(coords);
@@ -204,13 +319,38 @@ export function useDeviceViewport({
         }
     }, [getCoords]);
 
-    const handleMouseUp = useCallback((e: React.MouseEvent<HTMLImageElement>) => {
+    const handleMouseUp = useCallback((e: React.MouseEvent<HTMLElement>) => {
         if (swipeStart) {
             const end = getCoords(e);
             if (end && isDragging) {
-                const duration = swipeStartTime ? Math.max(100, Math.min(3000, Date.now() - swipeStartTime)) : 500;
-                sendAdbInput(`swipe ${swipeStart.x} ${swipeStart.y} ${end.x} ${end.y} ${Math.floor(duration)}`);
-                addSwipeAnimation(swipeStart.x, swipeStart.y, end.x, end.y);
+                if (isWeb) {
+                    setLoading(true);
+                    // Immediately clear selection and hover elements to avoid showing stale highlighter boundaries
+                    setSelectedNode(null);
+                    setHoveredNode(null);
+                    setAvailableNodes([]);
+                    if (onNodeSelected) onNodeSelected(null);
+                    if (onNodeHovered) onNodeHovered(null);
+
+                    invoke('send_web_input', {
+                        actionType: 'scroll',
+                        x: swipeStart.x,
+                        y: swipeStart.y,
+                        endX: end.x,
+                        endY: end.y,
+                        webUrl: activeWebUrl || undefined
+                    }).then(() => {
+                        setTimeout(() => refreshAll(), 100);
+                    }).catch(e => {
+                        setLoading(false);
+                        feedback.toast.error("inspector.input_error", e);
+                    });
+                    addSwipeAnimation(swipeStart.x, swipeStart.y, end.x, end.y);
+                } else {
+                    const duration = swipeStartTime ? Math.max(100, Math.min(3000, Date.now() - swipeStartTime)) : 500;
+                    sendAdbInput(`swipe ${swipeStart.x} ${swipeStart.y} ${end.x} ${end.y} ${Math.floor(duration)}`);
+                    addSwipeAnimation(swipeStart.x, swipeStart.y, end.x, end.y);
+                }
             } else if (end && !isDragging) {
                 processInteractionAt(end, false);
             }
@@ -218,21 +358,45 @@ export function useDeviceViewport({
         setSwipeStart(null);
         setSwipeStartTime(null);
         setIsDragging(false);
-    }, [swipeStart, isDragging, swipeStartTime, getCoords, processInteractionAt, sendAdbInput, addSwipeAnimation]);
+    }, [swipeStart, isDragging, swipeStartTime, getCoords, processInteractionAt, sendAdbInput, addSwipeAnimation, is_test_mode, refreshAll, activeWebUrl, onNodeSelected, onNodeHovered]);
 
-    const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLImageElement>) => {
+    const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLElement>) => {
         const coords = getCoords(e);
         if (coords) {
-            sendAdbInput(`tap ${coords.x} ${coords.y}`);
-            addTapAnimation(coords.x, coords.y);
+            if (isWeb) {
+                setLoading(true);
+                // Immediately clear selection and hover elements to avoid showing stale highlighter boundaries
+                setSelectedNode(null);
+                setHoveredNode(null);
+                setAvailableNodes([]);
+                if (onNodeSelected) onNodeSelected(null);
+                if (onNodeHovered) onNodeHovered(null);
+
+                invoke('send_web_input', {
+                    actionType: 'click',
+                    x: coords.x,
+                    y: coords.y,
+                    webUrl: activeWebUrl || undefined
+                }).then(() => {
+                    setTimeout(() => refreshAll(), 100);
+                }).catch(e => {
+                    setLoading(false);
+                    feedback.toast.error("inspector.input_error", e);
+                });
+                addTapAnimation(coords.x, coords.y);
+            } else {
+                sendAdbInput(`tap ${coords.x} ${coords.y}`);
+                addTapAnimation(coords.x, coords.y);
+            }
         }
-    }, [getCoords, sendAdbInput, addTapAnimation]);
+    }, [getCoords, is_test_mode, sendAdbInput, addTapAnimation, refreshAll, activeWebUrl, onNodeSelected, onNodeHovered]);
 
     return {
         screenshot,
         setScreenshot,
         rootNode,
         setRootNode,
+        xmlDump,
         loading,
         imgLayout,
         setImgLayout,

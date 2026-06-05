@@ -1,88 +1,109 @@
-use crate::cmd_utils::new_tokio_command;
-use tauri::command;
+use crate::cmd_utils::{new_tokio_command, get_adb_program, format_adb_error};
+use tauri::AppHandle;
 
-#[command]
-pub async fn adb_connect(ip: String, port: String) -> Result<String, String> {
-    let target = format!("{}:{}", ip, port);
-    // println!("ADB Connecting to {}", target);
+fn resolve_target(ip: Option<String>, port: Option<String>, target: Option<String>) -> Result<String, String> {
+    if let Some(explicit) = target {
+        let value = explicit.trim().to_string();
+        if !value.is_empty() {
+            return Ok(value);
+        }
+    }
 
-    let mut cmd = new_tokio_command("adb");
+    let ip = ip.unwrap_or_default().trim().to_string();
+    let port = port.unwrap_or_default().trim().to_string();
+    if ip.is_empty() || port.is_empty() {
+        return Err("IP and port are required".to_string());
+    }
+    Ok(format!("{}:{}", ip, port))
+}
+
+#[tauri::command]
+pub async fn adb_connect(
+    app: AppHandle,
+    ip: Option<String>,
+    port: Option<String>,
+    target: Option<String>,
+) -> Result<String, String> {
+    let target = resolve_target(ip, port, target)?;
+    let program = get_adb_program(&app);
+    let mut cmd = new_tokio_command(&program);
     cmd.args(&["connect", &target]);
 
     let output = cmd
         .output()
         .await
-        .map_err(|e| format!("Failed to execute adb: {}", e))?;
+        .map_err(|e| format!("Failed to run adb: {}", e))?;
 
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-
-    // ADB connect often returns 0 even on failure to connect, but prints "unable to connect"
-    if !output.status.success()
-        || stdout.contains("unable to connect")
-        || stdout.contains("failed to connect")
-        || stdout.contains("cannot connect to")
-    {
-        return Err(format!("Connection failed: {} {}", stdout, stderr));
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    } else {
+        Err(format_adb_error(&output))
     }
-
-    Ok(stdout)
 }
 
-#[command]
-pub async fn adb_pair(ip: String, port: String, code: String) -> Result<String, String> {
-    let target = format!("{}:{}", ip, port);
-    // println!("ADB Pairing with {} using code {}", target, code);
-
-    let mut cmd = new_tokio_command("adb");
+#[tauri::command]
+pub async fn adb_pair(
+    app: AppHandle,
+    ip: Option<String>,
+    port: Option<String>,
+    target: Option<String>,
+    code: String,
+) -> Result<String, String> {
+    let target = resolve_target(ip, port, target)?;
+    let program = get_adb_program(&app);
+    let mut cmd = new_tokio_command(&program);
     cmd.args(&["pair", &target, &code]);
 
     let output = cmd
         .output()
         .await
-        .map_err(|e| format!("Failed to execute adb: {}", e))?;
+        .map_err(|e| format!("Failed to run adb: {}", e))?;
 
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-
-    if !output.status.success() {
-        return Err(format!("Pairing failed: {} {}", stdout, stderr));
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    } else {
+        Err(format_adb_error(&output))
     }
-
-    Ok(stdout)
 }
 
-#[command]
-pub async fn adb_disconnect(ip: String, port: String) -> Result<String, String> {
-    let mut cmd = new_tokio_command("adb");
-    let target = format!("{}:{}", ip, port);
+#[tauri::command]
+pub async fn adb_disconnect(
+    app: AppHandle,
+    ip: Option<String>,
+    port: Option<String>,
+    target: Option<String>,
+) -> Result<String, String> {
+    let target = resolve_target(ip, port, target)?;
+    let program = get_adb_program(&app);
+    let mut cmd = new_tokio_command(&program);
     cmd.args(&["disconnect", &target]);
 
     let output = cmd
         .output()
         .await
-        .map_err(|e| format!("Failed to execute adb: {}", e))?;
+        .map_err(|e| format!("Failed to run adb: {}", e))?;
 
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    Ok(stdout)
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    } else {
+        Err(format_adb_error(&output))
+    }
 }
 
-#[command]
-pub async fn adb_disconnect_all() -> Result<String, String> {
-    let mut cmd = new_tokio_command("adb");
+#[tauri::command]
+pub async fn adb_disconnect_all(app: AppHandle) -> Result<String, String> {
+    let program = get_adb_program(&app);
+    let mut cmd = new_tokio_command(&program);
     cmd.arg("disconnect");
 
     let output = cmd
         .output()
         .await
-        .map_err(|e| format!("Failed to execute adb: {}", e))?;
+        .map_err(|e| format!("Failed to run adb: {}", e))?;
 
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-
-    if !output.status.success() {
-        return Err(format!("Disconnect All failed: {} {}", stdout, stderr));
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    } else {
+        Err(format_adb_error(&output))
     }
-
-    Ok(stdout)
 }

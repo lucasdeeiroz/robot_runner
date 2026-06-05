@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Sparkles, Copy, Check, ShieldAlert, ChevronRight, ChevronDown } from 'lucide-react';
+import { Sparkles, Copy, Check, ShieldAlert, ChevronRight, ChevronDown, X, RotateCcw } from 'lucide-react';
 import clsx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ExpressiveLoading } from '../atoms/ExpressiveLoading';
@@ -15,6 +15,8 @@ interface AiResponseProps {
     error?: string | null;
     isLoading?: boolean;
     onCopy?: (text: string) => void;
+    onClose?: () => void;
+    onRetry?: () => void;
     className?: string;
     variant?: 'primary' | 'error';
 }
@@ -28,6 +30,8 @@ export const AiResponse: React.FC<AiResponseProps> = React.memo(({
     error,
     isLoading,
     onCopy,
+    onClose,
+    onRetry,
     className,
     variant = 'primary'
 }) => {
@@ -97,9 +101,29 @@ export const AiResponse: React.FC<AiResponseProps> = React.memo(({
                                 </h4>
                             )}
                         </div>
-                        <button className="p-1 text-primary/40 group-hover/header:text-primary transition-colors hover:bg-primary/10 rounded">
-                            {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-                        </button>
+                        <div className="flex items-center gap-1">
+                            {onRetry && !isLoading && (
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); onRetry(); }}
+                                    className="p-1 text-primary/40 hover:text-primary transition-colors hover:bg-primary/10 rounded"
+                                    title={t('common.try_again')}
+                                >
+                                    <RotateCcw size={14} />
+                                </button>
+                            )}
+                            <button className="p-1 text-primary/40 group-hover/header:text-primary transition-colors hover:bg-primary/10 rounded">
+                                {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                            </button>
+                            {onClose && (
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); onClose(); }}
+                                    className="p-1 text-primary/40 hover:text-error transition-colors hover:bg-error/10 rounded"
+                                    title={t('common.close')}
+                                >
+                                    <X size={16} />
+                                </button>
+                            )}
+                        </div>
                     </div>
 
                     <AnimatePresence initial={false}>

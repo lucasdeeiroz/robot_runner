@@ -77,7 +77,8 @@ export const en = {
             long_description: "A modern, cross-platform GUI for Robot Framework and Appium, designed to simplify test automation workflows.",
             developed_by: "Developed by",
             lead: "Principal Developer",
-            collaborator: "Collaborating Developer",
+            dev_collaborator: "Collaborating Developer",
+            qa_collaborator: "Collaborating QA",
             powered_by: "Powered by",
             tools_title: "Tools Used",
             tools_desc: "Robot Runner is built on top of open-source giants:",
@@ -98,6 +99,10 @@ export const en = {
             license_desc: "This license allows free use, modification, and free redistribution of the Software, but prohibits selling, paid licensing, or other direct monetization of the Software.\n\n**Definitions:**\n\n- **'Software'** means the source code of this repository and any accompanying files, plus any compiled binaries/installers built from it, including modified versions.\n\n- **'Non-Commercial Use'** means use without charging fees for the Software itself. Non-Commercial Use includes personal use, educational use, and internal use by companies/organizations, even if such use provides indirect commercial benefit.\n\n- **'Commercialization'** means any direct monetization of the Software, including:\n  (a) selling the Software (source or binary), in whole or in part;\n  (b) licensing or sublicensing the Software for a fee;\n  (c) charging for access to the Software itself, including paywalled downloads;\n  (d) offering a 'paid version' of the Software that is substantially the same;\n  (e) bundling the Software into a paid product where the Software itself is a primary reason for payment.\n\nCharging for unrelated services is not prohibited (e.g., general consulting), as long as you are not charging for the Software itself.\n\n**Permissions (granted under this license):**\n\n1. You may use the Software for any purpose, including internal use by companies.\n2. You may copy and modify the Software.\n3. You may distribute the Software (source code and/or binaries/installers) for free.\n\n**Conditions:**\n\n**A. Attribution and Link Back** - Any redistribution of the Software (source or binary), modified or unmodified, must:\n- retain the above copyright notice and this license text; and\n- prominently include credit to the original author and a link to the original repository: https://github.com/lucasdeeiroz/robot_runner\n\n**B. Marking Changes** - If you distribute a modified version, you must clearly state that you modified it.\n\n**Restrictions:**\n\n1. You may not Commercialize the Software (as defined above) without written permission from the copyright holder.\n2. You may not remove or obscure the attribution/link-back requirements.",
             disclaimer: "The software is provided 'as is', without warranty of any kind, express or implied.",
             github_repo: "GitHub Repository",
+            update_channel: "Update Channel",
+            channel_stable: "Stable",
+            channel_beta: "Beta",
+            channel_alpha: "Alpha",
             update_check: "Check for Updates",
             update_available: "New version available: {{version}}",
             update_not_available: "You are up to date",
@@ -112,6 +117,35 @@ export const en = {
             view_releases: "View all releases on GitHub",
             update_downloaded: "Download complete! Opening installer...",
             update_download_error: "Failed to download update."
+        },
+        ai_agent: {
+            title: "AI Agent",
+            session_active: "Session Active",
+            clear_session: "Clear",
+            welcome_title: "Robot Runner AI",
+            welcome_desc: "Hello, I am Rai! I can help you analyze logs, run tests, or navigate the application.",
+            placeholder: "Ask me anything...",
+            thinking: "Thinking...",
+            action_proposed: "Action Proposed",
+            confirm_execute: "Confirm & Execute",
+            error: "Error communicating with AI: ",
+            session_cleared: "Session cleared",
+            action_unwired: "Action {{type}} is not yet fully wired to the backend.",
+            settings_updated: "Updated {{key}}",
+            executing_action: "Executing Action: {{type}}",
+            redirect_to_tests: "Redirecting to Tests panel to configure and run {{type}}.",
+            speak_title: "Read response aloud",
+            stop_speak_title: "Stop speaking",
+            mic_active: "Listening...",
+            mic_inactive: "Voice input",
+            mic_permission_error: "Microphone permission error or not supported",
+            invalid_automation_root: "Automation root is not configured. Please set a valid automation root before running a test.",
+            no_active_device: "No active device selected.",
+            suggested_prompts: {
+                settings: "\"Go to settings\"",
+                color: "\"Change my primary color to green\"",
+                help: "\"What can you do?\""
+            }
         },
         ai_page: {
             title: "AI Assistant",
@@ -140,7 +174,11 @@ export const en = {
                 clear: "Clear Data",
                 sort_by_name: "Sort by Name",
                 sort_by_package: "Sort by Package",
-                refresh: "Refresh List"
+                refresh: "Refresh List",
+                allow_downgrade: "Allow Downgrade (-d)",
+                grant_permissions: "Grant Permissions (-g)",
+                allow_test: "Allow Test APKs (-t)",
+                install_sdcard: "Install to SD Card (-s)"
             },
             search_placeholder: "Search packages...",
             toggle_system: "Toggle System Apps",
@@ -194,8 +232,11 @@ export const en = {
             }
         },
         common: {
+            loading_taking_too_long: "Loading is taking longer than expected...",
+            continue_anyway: "Continue anyway",
             refresh: "Refresh",
             online: "Online",
+            cloud_sync: "Synced to Cloud",
             offline: "Offline",
             try_again: "Try Again",
             beta: "Beta",
@@ -225,6 +266,7 @@ export const en = {
             done: "Done",
             search: "Search...",
             loading: "Loading...",
+            please_wait: "Please wait...",
             select: "Select...",
             minimize: "Minimize",
             maximize: "Maximize",
@@ -313,7 +355,8 @@ export const en = {
                 cancel_card: "Cancel",
                 enabling_tcpip: "Enabling TCP/IP 5555...",
                 tcpip_enabled: "TCP/IP 5555 Enabled",
-                tcpip_failed: "Failed to enable TCP/IP"
+                tcpip_failed: "Failed to enable TCP/IP",
+                command_not_allowed: "Command not allowed on this device"
             },
             security_warning: {
                 title: "Security Warning",
@@ -461,10 +504,15 @@ export const en = {
                 }
             },
             title: "Inspector",
+            live_sync: "Live Sync",
             update_error: "Failed to update inspector",
             input_error: "Failed to send input",
             empty: "Select a device to start Inspector",
             refresh: "Refresh Source",
+            export_xml: "Export XML",
+            export_xml_success: "XML successfully exported!",
+            export_xml_error: "Failed to export XML",
+            export_xml_no_data: "No XML data loaded to export.",
             search: {
                 placeholder: "Search by ID, XPath, etc...",
                 clear: "Clear Search"
@@ -479,7 +527,12 @@ export const en = {
                 ready: "Ready",
                 loading: "Loading...",
                 no_screenshot: "No screenshot",
-                paused_test: "Inspector disabled during test"
+                hierarchy_available: "UI Hierarchy loaded (Interactions active)",
+                paused_test: "Inspector disabled during test",
+                web_mode_title: "Mobile-Optimized Inspector",
+                web_mode_desc: "Visual Inspector is optimized for Mobile Automation (Android & iOS). For Web applications, please use the browser's native developer tools (e.g., Chrome DevTools) or the Cypress Test Runner's interactive panel to inspect elements in real-time.",
+                web_mode_action: "Launch DevTools",
+                web_mode_info: "Open Chrome DevTools by pressing F12 or Right Click > Inspect in your web browser."
             },
             properties: "Node Properties",
             select_element: "Select an element on the screenshot",
@@ -515,7 +568,16 @@ export const en = {
                 attr_enabled: "Enabled",
                 attr_checked: "Checked",
                 attr_selected: "Selected",
-                attr_focusable: "Focusable"
+                attr_focusable: "Focusable",
+                attr_instance: "Instance",
+                attr_long_clickable: "Long Clickable",
+                attr_focused: "Focused",
+                attr_scrollable: "Scrollable",
+                attr_checkable: "Checkable",
+                kinship_method: "Kinship Method",
+                kinship_none: "None",
+                kinship_child_selector: "Child Selector",
+                kinship_from_parent: "From Parent"
             },
             attributes: {
                 copied: "Copied!",
@@ -601,6 +663,10 @@ export const en = {
         mapper: {
             title: "Mapper",
             empty: "Select a device to start mapping",
+            web_mode_title: "Mobile-Optimized Mapper",
+            web_mode_desc: "Element Mapper is optimized for Mobile Automation (Android & iOS). For Web applications, we recommend structuring your elements directly within your page object models (POMs) or locator libraries.",
+            web_mode_action: "Learn More",
+            web_mode_info: "Web elements are defined directly in your Cypress specs or page objects.",
             refresh: "Refresh Source",
             screen_description: "Screen Description",
             grouping: {
@@ -626,7 +692,7 @@ export const en = {
                 import_success: "Flow imported successfully!",
                 export_error: "Failed to export flow",
                 import_error: "Failed to import flow",
-                reorganize: "Auto-Reorganize Layout",
+                reorganize: "AI Organize Layout",
                 reorganized: "Layout reorganized (BFS)",
                 ai_key_missing: "Missing AI API Key. Using standard reorganization...",
                 reorganized_ai: "Layout reorganized by AI",
@@ -642,7 +708,7 @@ export const en = {
                 title: "Navigation Flow",
                 center_view: "Center View",
                 filter_by_tag: "Filter by Tag",
-                all_tags: "All Tags",
+                all_tags: "All",
                 pan_mode: "Pan Mode (Hold Space)",
                 zoom_in: "Zoom In",
                 zoom_out: "Zoom Out",
@@ -657,8 +723,14 @@ export const en = {
                 curvatures_cleared: "All edge curvatures have been cleared",
                 save_success: "Layout saved successfully!",
                 load_error: "Failed to load flowchart layout",
+                reorganize_success: "Layout reorganized successfully!",
                 reorganize_error: "AI reorganization failed",
+                reorganize_cancelled: "AI reorganization cancelled",
+                reorganizing: "Reorganizing layout with AI...",
+                exporting_image: "Generating high-resolution image...",
+                export_image_success: "Image exported successfully",
                 export_image_error: "Failed to export flowchart image",
+                exploration_active: "AUTONOMOUS EXPLORATION ACTIVE",
                 unsaved_changes: {
                     title: "Unsaved Changes",
                     message: "You have unsaved changes. Do you want to save before exiting?",
@@ -667,7 +739,9 @@ export const en = {
                     cancel: "Cancel"
                 }
             },
-            properties: "Element Properties",
+            properties: "Properties",
+            properties_element: "Element Properties",
+            properties_screen: "Screen Properties",
             clear_selection: "Clear Selection",
             section_title: "Screen Mapper",
             screen_mapper: "Screen Mapper",
@@ -702,13 +776,23 @@ export const en = {
                 drawer: "Drawer",
                 dialog: "Dialog",
                 tab_content: "Tab Content",
-                overlay: "Overlay"
+                overlay: "Overlay",
+                undefined: "Screen"
+            },
+            migration: {
+                title: "Mapping Migration",
+                message: "We detected that you changed the mappings directory, but the new location is empty while the old one contains data. Do you want to copy the existing mappings to the new directory?",
+                copy: "Copy Files",
+                ignore: "Keep Empty",
+                success: "Mappings migrated successfully!",
+                error: "Failed to migrate mappings."
             },
             exploration: {
-                start: "Start Autonomous Exploration",
+                start: "AI Auto Mapping",
                 stop: "Stop",
                 active: "AI Exploring...",
                 thinking: "Thinking...",
+                error_empty_guidelines: "The exploration objective or guideline cannot be empty.",
                 step_title: "Step {{number}}",
                 initialization: "Initialization",
                 events_logged: "{{count}} events logged",
@@ -727,14 +811,39 @@ export const en = {
                 finished_title: "Exploration finished",
                 summary: "Exploration Ended",
                 stopped: "Exploration stopped: {{reason}}",
-                cancelled: "Exploration cancelled"
+                cancelled: "Exploration cancelled",
+                ai_thought: "AI Thought",
+                mapped_new_screen: "Mapped new screen: {{screenName}}",
+                target_package_identified: "Target package identified: {{pkg}}",
+                capturing_screen: "Capturing screen...",
+                analyzing_screen: "Analyzing screen with {{provider}}...",
+                preparing_context: "Preparing optimized AI context...",
+                ai_mapped_summary: "AI mapped: {{name}} ({{type}}) with {{count}} elements.",
+                rationale: "Rationale",
+                loop_detected: "Loop detected: screen \"{{name}}\" visited {{count}} times with repeated actions. Forcing back to escape.",
+                finished: "Exploration finished by AI.",
+                navigating_back: "Navigating back...",
+                clicking_element: "Clicking element: {{targetId}} ({{details}})",
+                swiping_action: "Swiping {{direction}}...",
+                typing_action: "Typing text on {{targetId}}: {{text}}",
+                recovering_exit: "App exit detected (Current: {{current}}, Target: {{target}}). Recovering...",
+                ai_suggested_layout: "AI suggested layout for {{name}} at ({{x}}, {{y}})",
+                swipe_limit_reached: "Max swipe limits reached (10). Forcing navigation back.",
+                stopped_reason: "Exploration stopped: {{reason}}",
+                step_marker: "--- Step {{step}} ---",
+                malformed_json_retry: "AI returned malformed JSON. Retrying... ({{error}})",
+                back_updated: "Back-updated \"{{prev}}\" → element navigates to \"{{current}}\"",
+                merging_insights: "Merging AI insights into existing screen: \"{{name}}\" (ID: {{id}}, {{count}} elements)",
+                new_elements_discovered: "Added {{count}} new elements discovered by AI. Total: {{total}}",
             },
             modes: {
                 inspect: "Inspect Mode",
                 tap: "Tap Mode",
                 swipe: "Swipe Mode"
             },
+
             status: {
+                saving: "Saving...",
                 fetching: "Fetching device state...",
                 ready: "Ready",
                 loading: "Loading...",
@@ -778,6 +887,8 @@ export const en = {
                 screen_description: "Description for AI context..."
             },
             action: {
+                back_to_screen: "Back to Screen",
+                back: "Back",
                 add: "Add Element",
                 update: "Update Element",
                 remove: "Remove Element",
@@ -844,6 +955,7 @@ export const en = {
             start_record: "Start Recording",
             stop_record: "Stop Recording",
             recording: "Recording...",
+            recording_started: "Recording performance stats...",
             select_device: "Select a device to view performance stats.",
             system_only: "Entire System",
             device_stats: "Device Performance",
@@ -902,6 +1014,7 @@ export const en = {
                 progress_mapping_structure: "Mapping suite structure...",
                 progress_compressing_cache: "Compressing cache...",
                 progress_loading_tree: "Loading Log Tree...",
+                optimizing_view: "Optimizing execution view...",
                 failure_detail: "Failure Detail",
                 step_screenshot: "Step Screenshot",
                 view_fullscreen: "VIEW FULLSCREEN",
@@ -930,6 +1043,7 @@ export const en = {
                 analyze_failure: "Analyze Failure",
                 analyzing: "Analyzing...",
                 ai_insight: "AI Insight",
+                ai_analysis: "AI Analysis",
                 ai_analysis_header: "Detailed Analysis",
                 summarize_run: "Summarize Execution",
                 summary_title: "Execution Summary",
@@ -951,6 +1065,14 @@ export const en = {
                     loading_context: "Extracting compressed context...",
                     success: "Trend analysis completed!",
                     persistence_note: "This analysis will be saved until you request a new one."
+                },
+                ai_steps: {
+                    dumping: "Dumping screen hierarchy...",
+                    thinking: "AI is thinking...",
+                    executing: "Executing: {{action}}",
+                    waiting: "Waiting for transition...",
+                    finished: "Goal completed successfully!",
+                    failed: "AI Agent failed to complete the goal."
                 }
             }
         },
@@ -971,6 +1093,10 @@ export const en = {
                 read_error: "Failed to read logo file. Please try again.",
                 select_error: "Failed to select logo"
             },
+            feedback: {
+                migration_success: "Screens migrated successfully",
+                migration_error: "Failed to migrate screens"
+            },
             appium: {
                 title: "Appium Server",
                 status_error: "Failed to get Appium status",
@@ -988,7 +1114,11 @@ export const en = {
             },
             paths: {
                 title: "Path Configuration",
-                select_error: "Failed to select folder"
+                select_error: "Failed to select folder",
+                migration_title: "Migrate Directory?",
+                migration_desc: "Do you want to move the /mapper subdirectory and its files to the new destination?",
+                migration_confirm: "Yes, Move",
+                migration_destination_not_empty: "The destination already has mapping files. Migration was skipped to avoid overwriting existing data."
             },
             load_error: "Failed to load settings",
             save_error: "Failed to save settings",
@@ -1024,10 +1154,14 @@ export const en = {
             tool_config: {
                 appium_base_path: "Appium Base Path",
                 appium_args: "Appium Arguments",
+                no_appium_for_robot: "Do not use Appium for Robot Framework",
+                custom_adb_path: "Custom ADB Path",
                 scrcpy_args: "Scrcpy Arguments",
                 robot_args: "Robot Framework Arguments",
                 maestro_args: "Maestro Arguments",
                 appium_java_args: "Appium Java Arguments",
+                cypress_args: "Cypress Arguments",
+                selenium_args: "Selenium Arguments",
                 app_packages: "App Packages",
                 add_package: "Add Package",
                 add_package_placeholder: "Add package (Press Enter)",
@@ -1062,6 +1196,26 @@ export const en = {
                     placeholder: "Enter OpenAI API Key",
                     help: "Get your API Key at"
                 },
+                claude_code: {
+                    title: "Claude Code (CLI)",
+                    help: "This provider uses the local 'claude' command. No API Key is required as it uses your system's Claude authentication (Team/Enterprise plans).",
+                    check_install: "Check Installation",
+                    installed: "Claude CLI detected! Version: {{version}}",
+                    not_installed: "Claude CLI not found. Please install it using 'npm install -g @anthropic-ai/claude-code'.",
+                    token_label: "OAuth Token (Optional)",
+                    token_placeholder: "Paste token from 'claude setup-token'",
+                    token_help: "If your CLI reports \"Not logged in\", paste the token generated by running 'claude setup-token' in your terminal."
+                },
+                antigravity: {
+                    title: "Antigravity CLI",
+                    help: "This provider uses the local 'agy' command. Ensure you have the Antigravity CLI installed and configured.",
+                    check_install: "Check Installation",
+                    installed: "Antigravity CLI detected! Version: {{version}}",
+                    not_installed: "Antigravity CLI not found. Please install it using 'npm install -g @google/antigravity-cli'.",
+                    token_label: "API Key",
+                    token_placeholder: "Enter Antigravity API Key",
+                    token_help: "The API Key will be used to authenticate your requests via the Antigravity CLI."
+                },
                 max_exploration_steps: "Max Exploration Steps",
                 max_exploration_steps_help: "Maximum number of autonomous actions the AI will perform before stopping exploration."
             },
@@ -1080,7 +1234,9 @@ export const en = {
                     maven: "Maven",
                     maestro: "Maestro",
                     scrcpy: "Scrcpy",
-                    ngrok: "Ngrok (Tunnelling)"
+                    ngrok: "Ngrok (Tunnelling)",
+                    claude_code: "Claude Code CLI",
+                    antigravity: "Antigravity CLI"
                 }
             },
             folder_select: "Select Folder",
@@ -1107,7 +1263,8 @@ export const en = {
                 logcat: "Logcat Directory",
                 screenshots: "Screenshots Directory",
                 recordings: "Recordings Directory",
-                automationRoot: "Automation Root (Working Dir)"
+                automationRoot: "Automation Root (Working Dir)",
+                mappings: "Mappings Directory"
             },
             tool_options: {
                 title: "Tool Options",
@@ -1140,6 +1297,14 @@ export const en = {
             description_about: "Information about Robot Runner and its creators."
         },
         home: {
+            maintenance: {
+                title: "System Maintenance",
+                description: "We are currently performing scheduled maintenance. Some features might be temporarily unavailable."
+            },
+            update: {
+                title: "Update Required",
+                description: "A newer version of Robot Runner is available ({{version}}). Please update to ensure compatibility."
+            },
             sections: {
                 devices: "Connected Devices",
                 devices_desc: "Real-time monitoring of active Android devices.",
@@ -1185,7 +1350,8 @@ export const en = {
             loading_stats: "Analyzing test history...",
             device_card: {
                 battery: "Battery",
-                ram: "RAM"
+                ram: "RAM",
+                storage: "Storage"
             }
         },
         startup: {
@@ -1271,7 +1437,10 @@ export const en = {
             },
             options: {
                 dont_overwrite: "Save Logs"
-            }
+            },
+            run_ai: "Run Test with AI",
+            run_ai_prompt: "Run Test by AI",
+            run_ai_desc: "The AI Agent will execute actions based on the generated BDD steps."
         },
         tests_page: {
             monitoring: "Test Monitoring",
@@ -1347,7 +1516,8 @@ export const en = {
                 commands: "Commands",
                 mirror: "Mirror",
                 performance: "Performance",
-                apps: "Apps"
+                apps: "Apps",
+                webview: "Webview"
             },
             actions: {
                 screenshot: "Take Screenshot",
@@ -1370,15 +1540,27 @@ export const en = {
             description: "Let's set up your profile to optimize your experience. This will only take a moment.",
             step1_title: "Select your Language",
             step2_title: "Choose your Usage Mode",
+            step2_platform_title: "Select Explorer Platform",
             error_no_mode: "Please select a usage mode to continue.",
+            error_no_platform: "Please select a platform to continue.",
+            platform: {
+                mobile: {
+                    title: "Mobile Platform",
+                    description: "Everyday tools for debugging and manual testing of mobile apps (ADB, Scrcpy, etc.)."
+                },
+                web: {
+                    title: "Web Platform",
+                    description: "Everyday tools for debugging and manual testing of web pages."
+                }
+            },
             mode: {
                 explorer: {
                     title: "Explorer",
-                    description: "Everyday tools for debugging and manual testing (ADB, Scrcpy, etc.). No setup required."
+                    description: "Everyday tools for debugging and manual testing. No setup required."
                 },
                 automator: {
                     title: "Automator",
-                    description: "Develop and run automated tests using Robot Framework, Appium, or Maestro."
+                    description: "Develop and run automated tests using Robot Framework, Appium, Maestro, Cypress, or Selenium."
                 }
             },
             step3_title: "Select your Framework",
@@ -1395,8 +1577,28 @@ export const en = {
                 maestro: {
                     title: "Maestro",
                     description: "YAML-based flows. Best for ultra-fast UI testing and simplicity."
+                },
+                cypress: {
+                    title: "Cypress",
+                    description: "Next-generation front-end testing tool built for the modern web."
+                },
+                selenium: {
+                    title: "Selenium (Pytest)",
+                    description: "Standard browser automation using Python & pytest. Best for robust web regression."
                 }
             }
+        },
+        auth: {
+            welcome_title: "Welcome to Robot Runner",
+            welcome_subtitle: "Please sign in to access all features and cloud synchronization.",
+            sign_in_with_google: "Sign in with Google",
+            logout: "Sign Out",
+            login_success: "Successfully signed in!",
+            login_error: "Authentication failed. Please try again.",
+            logout_success: "Successfully signed out.",
+            logout_error: "Failed to sign out.",
+            config_missing: "Cloud features are disabled or missing configuration (Check .env or GitHub Secrets).",
+            terms_and_privacy: "By signing in, you agree to our Terms of Service and Privacy Policy."
         }
     }
 };
