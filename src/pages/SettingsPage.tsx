@@ -694,17 +694,27 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                         placeholder="--allow-insecure chromedriver"
                                     />
                                     {settings.automationFramework === 'robot' && (
-                                        <div className="col-span-1 md:col-span-2 flex items-center gap-2 pt-2">
-                                            <input
-                                                type="checkbox"
+                                        <div className="col-span-1 md:col-span-2 flex items-center pt-2">
+                                            <button
+                                                type="button"
                                                 id="noAppiumForRobot"
-                                                checked={settings.noAppiumForRobot || false}
-                                                onChange={(e) => updateSetting('noAppiumForRobot', e.target.checked)}
-                                                className="rounded border-outline-variant/30 text-primary dark:text-primary/80 focus:ring-primary/20 w-4 h-4 cursor-pointer"
-                                            />
-                                            <label htmlFor="noAppiumForRobot" className="text-xs font-semibold text-on-surface-variant/80 select-none cursor-pointer">
-                                                {t('settings.tool_config.no_appium_for_robot')}
-                                            </label>
+                                                onClick={() => updateSetting('noAppiumForRobot', !settings.noAppiumForRobot)}
+                                                className="flex items-center gap-2.5 text-left focus:outline-none select-none cursor-pointer group"
+                                            >
+                                                <div className={clsx(
+                                                    "w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0 cursor-pointer",
+                                                    settings.noAppiumForRobot
+                                                        ? "bg-primary border-primary text-on-primary"
+                                                        : "border-outline-variant/30 bg-surface/50 group-hover:border-outline"
+                                                )}>
+                                                    {settings.noAppiumForRobot && (
+                                                        <div className="w-2 h-2 bg-on-primary rounded-2xl animate-in zoom-in-50 duration-200" />
+                                                    )}
+                                                </div>
+                                                <span className="text-xs font-semibold text-on-surface-variant/80 select-none cursor-pointer">
+                                                    {t('settings.tool_config.no_appium_for_robot')}
+                                                </span>
+                                            </button>
                                         </div>
                                     )}
                                 </div>

@@ -338,9 +338,13 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                     feedback.toast.error('ai_agent.no_active_device');
                     return;
                 }
-                await screenshotSaver.saveFile(async (path) => {
-                    await invoke('save_screenshot', { device: activeDeviceUdid, path });
-                }, 'feedback.screenshot_saved');
+                try {
+                    await screenshotSaver.saveFile(async (path) => {
+                        await invoke('save_screenshot', { device: activeDeviceUdid, path });
+                    }, 'feedback.screenshot_saved');
+                } catch (e) {
+                    console.error("Screenshot failed:", e);
+                }
                 break;
             case 'capture_logcat':
                 onNavigate('tests');

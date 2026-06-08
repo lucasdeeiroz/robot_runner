@@ -598,6 +598,7 @@ pub async fn run_cypress_test(
     run_id: String,
     test_path: String,
     output_dir: String,
+    logs_path: Option<String>,
     browser: Option<String>,
     cypress_args: Option<String>,
     working_dir: Option<String>,
@@ -611,6 +612,7 @@ pub async fn run_cypress_test(
     #[derive(Serialize)]
     struct RunMetadata {
         run_id: String,
+        logs_path: Option<String>,
         framework: String,
         test_path: String,
         timestamp: String,
@@ -618,6 +620,7 @@ pub async fn run_cypress_test(
 
     let metadata = RunMetadata {
         run_id: run_id.clone(),
+        logs_path: logs_path.clone(),
         framework: "cypress".to_string(),
         test_path: test_path.clone(),
         timestamp: chrono::Local::now().to_rfc3339(),
@@ -656,6 +659,7 @@ pub async fn run_selenium_test(
     run_id: String,
     test_path: String,
     output_dir: String,
+    logs_path: Option<String>,
     browser: Option<String>,
     selenium_args: Option<String>,
     working_dir: Option<String>,
@@ -669,6 +673,7 @@ pub async fn run_selenium_test(
     #[derive(Serialize)]
     struct RunMetadata {
         run_id: String,
+        logs_path: Option<String>,
         framework: String,
         test_path: String,
         timestamp: String,
@@ -676,6 +681,7 @@ pub async fn run_selenium_test(
 
     let metadata = RunMetadata {
         run_id: run_id.clone(),
+        logs_path: logs_path.clone(),
         framework: "selenium".to_string(),
         test_path: test_path.clone(),
         timestamp: chrono::Local::now().to_rfc3339(),

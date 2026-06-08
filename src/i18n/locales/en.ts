@@ -259,6 +259,8 @@ export const en = {
             clear: "Clear",
             coming_soon: "Module {{module}} coming soon...",
             error_occurred: "An error occurred: {{error}}",
+            failed_to_pull_video: "Failed to pull video",
+            failed_to_pull_screenshot: "Failed to pull screenshot from device",
             delete: "Delete",
             edit: "Edit",
             go_to_settings: "Go to Settings",

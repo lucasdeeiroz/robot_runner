@@ -28,7 +28,7 @@ interface TestsSubTabProps {
 type SelectionMode = 'file' | 'folder' | 'args';
 
 export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTabProps) {
-    const { settings, updateSetting, is_test_mode } = useSettings();
+    const { settings, updateSetting, is_test_mode, activeProfileId, profiles } = useSettings();
     const { t } = useTranslation();
     const [mode, setMode] = useState<SelectionMode>('file');
     const [launchStatus, setLaunchStatus] = useState("");
@@ -246,6 +246,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
 
             const targets = selectedDevices.length > 0 ? selectedDevices : [null];
             const workingDir = settings.paths.automationRoot || "";
+            const activeProfileName = profiles.find(p => p.id === activeProfileId)?.name || 'Default';
 
             for (const deviceUdid of targets) {
                 const runId = uuidv4();
@@ -446,7 +447,8 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     devVer,
                     finalTests || undefined,
                     isAiAgent,
-                    aiPrompt
+                    aiPrompt,
+                    activeProfileName
                 );
 
                 if (isAiAgent) {
@@ -463,6 +465,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                         runId,
                         testPath: finalTestPath,
                         outputDir: logDir,
+                        logs_path: activeProfileName,
                         device: deviceUdid === 'local' ? null : deviceUdid,
                         argumentsFile: finalArgsFile,
                         timestampOutputs: settings.saveLogs,
@@ -476,6 +479,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                         runId,
                         testPath: finalTestPath,
                         outputDir: logDir,
+                        logs_path: activeProfileName,
                         device: deviceUdid === 'local' ? null : deviceUdid,
                         maestroArgs: settings.tools.maestroArgs,
                         working_dir: settings.paths.automationRoot,
@@ -488,6 +492,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                         runId,
                         projectPath: finalTestPath,
                         outputDir: logDir,
+                        logs_path: activeProfileName,
                         appiumJavaArgs: settings.tools.appiumJavaArgs
                     }).catch(e => {
                         feedback.toast.error("tests.launch_failed", e);
@@ -497,6 +502,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                         runId,
                         testPath: finalTestPath,
                         outputDir: logDir,
+                        logs_path: activeProfileName,
                         browser: deviceUdid || 'chrome',
                         cypressArgs: settings.tools.cypressArgs,
                         workingDir
@@ -508,6 +514,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                         runId,
                         testPath: finalTestPath,
                         outputDir: logDir,
+                        logs_path: activeProfileName,
                         browser: deviceUdid || 'chrome',
                         seleniumArgs: settings.tools.seleniumArgs,
                         workingDir

@@ -72,9 +72,60 @@ pub async fn start_screen_recording(app: AppHandle, device: String) -> Result<St
         "--verbose",
         "/sdcard/robot_runner_rec.mp4",
     ]);
+    cmd.stdout(std::process::Stdio::piped());
+    cmd.stderr(std::process::Stdio::piped());
 
-    cmd.spawn()
+    let mut child = cmd.spawn()
         .map_err(|e| format!("Failed to start recording: {}", e))?;
+
+    // Wait a short duration to see if the process exits early (indicating failure)
+    sleep(Duration::from_millis(500)).await;
+
+    match child.try_wait() {
+        Ok(Some(status)) => {
+            // Process exited immediately, which means it failed (e.g., screenrecord not supported/allowed)
+            let output = child.wait_with_output().await
+                .map_err(|e| format!("Process exited immediately but couldn't get output: {}", e))?;
+            
+            let err_msg = String::from_utf8_lossy(&output.stderr);
+            let out_msg = String::from_utf8_lossy(&output.stdout);
+            let combined = format!("{}{}", out_msg, err_msg);
+            let cleaned = combined.trim();
+
+            if cleaned.is_empty() {
+                return Err(format!("Screen recording process exited immediately with status {}", status));
+            } else {
+                return Err(format!("Screen recording failed to start: {}", cleaned));
+            }
+        }
+        Ok(None) => {
+            // Process is still running, which means it likely started successfully.
+            // Consume stdout and stderr in background tasks to prevent blocking when buffers fill up.
+            let stdout = child.stdout.take();
+            let stderr = child.stderr.take();
+            if let Some(mut out) = stdout {
+                tokio::spawn(async move {
+                    use tokio::io::AsyncReadExt;
+                    let mut buf = [0; 1024];
+                    while let Ok(n) = out.read(&mut buf).await {
+                        if n == 0 { break; }
+                    }
+                });
+            }
+            if let Some(mut err) = stderr {
+                tokio::spawn(async move {
+                    use tokio::io::AsyncReadExt;
+                    let mut buf = [0; 1024];
+                    while let Ok(n) = err.read(&mut buf).await {
+                        if n == 0 { break; }
+                    }
+                });
+            }
+        }
+        Err(e) => {
+            return Err(format!("Failed to query child status: {}", e));
+        }
+    }
 
     Ok("Recording started".to_string())
 }

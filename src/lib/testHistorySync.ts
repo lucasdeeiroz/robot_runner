@@ -6,16 +6,16 @@ import { TestLog } from './historyCache';
  * Fetches the global test history for a specific user from Firestore, 
  * filtered by the current logs path (Project/Profile).
  */
-export async function fetchGlobalHistory(uid: string, profileId: string, maxItems: number = 50): Promise<TestLog[]> {
+export async function fetchGlobalHistory(uid: string, profileNameOrId: string, maxItems: number = 50): Promise<TestLog[]> {
     if (!db) return [];
     try {
         const historyRef = collection(db, `users/${uid}/history`);
         
-        console.log("[Firestore] Fetching history for Profile ID:", profileId);
+        console.log("[Firestore] Fetching history for Profile Name/ID:", profileNameOrId);
 
         const q = query(
             historyRef, 
-            where('logsPath', '==', profileId),
+            where('logsPath', '==', profileNameOrId),
             orderBy('timestamp', 'desc'), 
             limit(maxItems)
         );
@@ -28,6 +28,8 @@ export async function fetchGlobalHistory(uid: string, profileId: string, maxItem
             return {
                 id: doc.id,
                 run_id: data.runId || null,
+                logs_path: data.logsPath || null,
+                framework: data.framework || null,
                 path: data.testPath || '',
                 suite_name: data.suiteName || data.testPath?.split(/[\\/]/).pop() || 'Unknown',
                 status: data.status === 'passed' ? 'PASS' : 'FAIL',
@@ -55,13 +57,13 @@ export async function fetchGlobalHistory(uid: string, profileId: string, maxItem
 /**
  * Uploads a local test log to Firestore.
  */
-export async function uploadTestToFirebase(uid: string, profileId: string, log: TestLog): Promise<string | null> {
+export async function uploadTestToFirebase(uid: string, profileNameOrId: string, log: TestLog): Promise<string | null> {
     if (!db) return null;
     try {
         const historyRef = collection(db, `users/${uid}/history`);
         const docRef = await addDoc(historyRef, {
             runId: log.run_id || null,
-            logsPath: profileId,
+            logsPath: profileNameOrId,
             testPath: log.path || '',
             suiteName: log.suite_name || '',
             status: log.status === 'PASS' ? 'passed' : 'failed',
@@ -71,7 +73,7 @@ export async function uploadTestToFirebase(uid: string, profileId: string, log: 
             deviceModel: log.device_model || null,
             deviceUdid: log.device_udid || null,
             androidVersion: log.android_version || null,
-            framework: null,
+            framework: log.framework || null,
             passCount: log.pass_count || 0,
             failCount: log.fail_count || 0,
             duration: log.duration || '0s'

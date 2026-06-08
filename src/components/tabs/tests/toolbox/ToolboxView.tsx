@@ -129,8 +129,7 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
             }, 'feedback.screenshot_saved');
             recordingSaver.clearFeedback();
         } catch (e) {
-            const message = e instanceof Error ? e.message : String(e);
-            feedback.toast.error("toolbox.screenshot.error", message);
+            console.error("Screenshot failed:", e);
         }
     };
 
@@ -150,7 +149,7 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                     setIsRecording(false);
                 }
             } catch (e) {
-                feedback.toast.error("toolbox.recording.stop_error", e);
+                console.error("Stop recording failed:", e);
                 setIsRecording(false);
             }
         } else {
