@@ -98,7 +98,13 @@ macro_rules! generate_robot_runner_handler {
             crate::adb::shell::adb_settings_put,
             crate::adb::shell::adb_settings_get,
             crate::adb::shell::get_notifications,
-            crate::adb::shell::get_events
+            crate::adb::shell::get_events,
+            crate::security::encrypt_secret,
+            crate::security::decrypt_secret,
+            crate::git::get_git_status,
+            crate::git::git_stage_file,
+            crate::git::git_commit,
+            crate::git::git_push
         ]
     };
 }

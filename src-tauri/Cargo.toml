@@ -46,6 +46,8 @@ futures = "0.3"
 thiserror = "2"
 tauri-plugin-os = "2.3.2"
 image = "0.25"
+aes-gcm = "0.10"
+sha2 = "0.10"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

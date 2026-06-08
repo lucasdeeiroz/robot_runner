@@ -85,9 +85,21 @@ export async function askAntigravityCli(
 
         const parsed = safeParseJson<any>(rawResult);
         if (parsed && typeof parsed === 'object') {
-            const mainContent = parsed.response !== undefined 
+            let mainContent = parsed.response !== undefined 
                 ? parsed.response 
                 : (parsed.result !== undefined ? parsed.result : (parsed.completion || parsed.text || parsed.content));
+
+            if (mainContent && typeof mainContent === 'object') {
+                mainContent = mainContent.reply !== undefined 
+                    ? mainContent.reply 
+                    : (mainContent.result !== undefined 
+                        ? mainContent.result 
+                        : (mainContent.text !== undefined 
+                            ? mainContent.text 
+                            : (mainContent.content !== undefined 
+                                ? mainContent.content 
+                                : mainContent)));
+            }
 
             if (options?.jsonSchema) {
                 const structured = typeof mainContent === 'string' ? safeParseJson<any>(mainContent) : mainContent;
@@ -102,7 +114,7 @@ export async function askAntigravityCli(
             }
 
             if (mainContent !== undefined) {
-                return String(mainContent);
+                return typeof mainContent === 'object' ? JSON.stringify(mainContent) : String(mainContent);
             }
         }
         return String(rawResult);

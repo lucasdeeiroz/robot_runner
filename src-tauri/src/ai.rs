@@ -141,11 +141,21 @@ pub async fn call_antigravity_cli(
 
     if let Some(b64) = image_base_64 {
         if !b64.is_empty() {
-            full_prompt = format!(
-                "{}\n\n[VISUAL CONTEXT]: <screenshot_base64>\n{}\n</screenshot_base64>",
-                full_prompt,
-                b64
-            );
+            use base64::Engine;
+            let temp_dir = std::env::temp_dir();
+            let timestamp = chrono::Local::now().timestamp_micros();
+            let file_name = format!("agy_screenshot_{}.png", timestamp);
+            let file_path = temp_dir.join(file_name);
+            
+            if let Ok(decoded) = base64::engine::general_purpose::STANDARD.decode(b64.trim()) {
+                if std::fs::write(&file_path, decoded).is_ok() {
+                    full_prompt = format!(
+                        "{}\n\n[VISUAL CONTEXT]: The screenshot of the current screen/state is saved at: {}\nIf you need to analyze it, you can view this file using your tools.",
+                        full_prompt,
+                        file_path.to_string_lossy()
+                    );
+                }
+            }
         }
     }
 
