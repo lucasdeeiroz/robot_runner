@@ -9,6 +9,9 @@ import { WarningModal } from "@/components/organisms/WarningModal";
 import { feedback } from "@/lib/feedback";
 import { useSelection } from "@/lib/selectionStore";
 import { useSettings } from "@/lib/settings";
+import { Button } from "@/components/atoms/Button";
+import { Input } from "@/components/atoms/Input";
+import { Modal } from "@/components/organisms/Modal";
 
 export interface FileEntry {
     name: string;
@@ -53,6 +56,104 @@ export function FileExplorer({
     const [error, setError] = useState<string | null>(null);
     const [selectedEntry, setSelectedEntry] = useState<FileEntry | null>(null);
     const [warningModal, setWarningModal] = useState<{ isOpen: boolean, message: string }>({ isOpen: false, message: '' });
+
+    const [gitStatusEntries, setGitStatusEntries] = useState<Record<string, 'untracked' | 'modified' | 'staged' | 'deleted'>>({});
+    const [gitCommitMessage, setGitCommitMessage] = useState("");
+    const [showCommitModal, setShowCommitModal] = useState(false);
+    const [committing, setCommitting] = useState(false);
+    const [pushing, setPushing] = useState(false);
+
+    const getRelativePath = (entryPath: string) => {
+        if (!rootPath) return entryPath;
+        let rel = entryPath;
+        if (entryPath.startsWith(rootPath)) {
+            rel = entryPath.slice(rootPath.length);
+        }
+        return rel.replace(/\\/g, '/').replace(/^[\\/]/, '');
+    };
+
+    const fetchGitStatus = async () => {
+        if (!settings.git?.enabled || !rootPath) {
+            setGitStatusEntries({});
+            return;
+        }
+        try {
+            const statusList = await invoke<any[]>('get_git_status', { repoPath: rootPath });
+            const mapping: Record<string, 'untracked' | 'modified' | 'staged' | 'deleted'> = {};
+            statusList.forEach(item => {
+                const normPath = item.file_path.replace(/\\/g, '/').replace(/^[\\/]/, '');
+                mapping[normPath] = item.status;
+            });
+            setGitStatusEntries(mapping);
+        } catch (e) {
+            console.error("Failed to fetch git status:", e);
+        }
+    };
+
+    const getGitStatusForEntry = (entry: FileEntry) => {
+        if (!settings.git?.enabled) return null;
+        
+        const relPath = getRelativePath(entry.path);
+        
+        if (!entry.is_dir) {
+            return gitStatusEntries[relPath] || null;
+        } else {
+            const prefix = relPath ? `${relPath}/` : '';
+            let hasModified = false;
+            let hasUntracked = false;
+            let hasStaged = false;
+            
+            for (const [filePath, status] of Object.entries(gitStatusEntries)) {
+                if (filePath.startsWith(prefix)) {
+                    if (status === 'modified' || status === 'deleted') hasModified = true;
+                    if (status === 'untracked') hasUntracked = true;
+                    if (status === 'staged') hasStaged = true;
+                }
+            }
+            
+            if (hasModified) return 'modified';
+            if (hasStaged) return 'staged';
+            if (hasUntracked) return 'untracked';
+            return null;
+        }
+    };
+
+    const handleGitCommit = async () => {
+        if (!rootPath || !gitCommitMessage.trim()) return;
+        setCommitting(true);
+        try {
+            await invoke('git_commit', { repoPath: rootPath, message: gitCommitMessage.trim() });
+            feedback.toast.success(t('file_explorer.git_commit_success', "Successfully committed changes!"));
+            setGitCommitMessage("");
+            setShowCommitModal(false);
+            fetchGitStatus();
+        } catch (err) {
+            feedback.toast.error(String(err));
+        } finally {
+            setCommitting(false);
+        }
+    };
+
+    const handleGitPush = async () => {
+        if (!rootPath) return;
+        setPushing(true);
+        try {
+            await invoke('git_push', { repoPath: rootPath });
+            feedback.toast.success(t('file_explorer.git_push_success', "Successfully pushed changes to remote repository!"));
+        } catch (err) {
+            feedback.toast.error(String(err));
+        } finally {
+            setPushing(false);
+        }
+    };
+
+    useEffect(() => {
+        if (settings.git?.enabled && rootPath) {
+            fetchGitStatus();
+        } else {
+            setGitStatusEntries({});
+        }
+    }, [settings.git?.enabled, rootPath, currentPath]);
 
     useEffect(() => {
         loadDirectory(currentPath);
@@ -205,6 +306,28 @@ export function FileExplorer({
                             ? (currentPath === rootPath ? './' : currentPath.replace(rootPath, '').replace(/^[\\/]/, ''))
                             : currentPath}
                     </div>
+                    {settings.git?.enabled && (
+                        <div className="flex items-center gap-1.5 pr-1 border-l border-outline-variant/20 pl-2">
+                            <button
+                                onClick={() => setShowCommitModal(true)}
+                                disabled={!Object.values(gitStatusEntries).some(s => s === 'staged')}
+                                className="flex items-center gap-1 px-2.5 py-1 bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold rounded-xl transition-all active:scale-95 cursor-pointer"
+                                data-tooltip={t('file_explorer.git_commit_btn_tooltip', "Commit staged changes")}
+                                data-position="bottom"
+                            >
+                                {t('file_explorer.commit', "Commit")}
+                            </button>
+                            <button
+                                onClick={handleGitPush}
+                                disabled={pushing}
+                                className="flex items-center gap-1 px-2.5 py-1 bg-secondary-container text-on-secondary-container hover:bg-secondary-container/80 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold rounded-xl transition-all active:scale-95 cursor-pointer"
+                                data-tooltip={t('file_explorer.git_push', "Push to remote")}
+                                data-position="bottom"
+                            >
+                                {pushing ? t('file_explorer.pushing', "Pushing...") : t('file_explorer.push', "Push")}
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -272,7 +395,7 @@ export function FileExplorer({
                                             onClick={() => handleEntryClick(entry)}
                                             onDoubleClick={() => entry.is_dir ? handleNavigate(entry.path) : (onSelect && onSelect(entry.path))}
                                             className={clsx(
-                                                "flex items-center gap-3 px-3 py-2 rounded-2xl cursor-pointer text-sm select-none transition-all",
+                                                "flex items-center gap-3 px-3 py-2 rounded-2xl cursor-pointer text-sm select-none transition-all group",
                                                 isSelected 
                                                     ? "bg-secondary-container/50 text-on-secondary-container ring-1 ring-primary/30"
                                                     : isActive
@@ -297,6 +420,64 @@ export function FileExplorer({
                                             <span className={clsx("truncate flex-1", isSelected && "text-primary font-medium")}>
                                                 {entry.name}
                                             </span>
+                                            {(() => {
+                                                const gitStatus = getGitStatusForEntry(entry);
+                                                if (!gitStatus) return null;
+                                                
+                                                let badgeColor = "";
+                                                let badgeLabel = "";
+                                                switch (gitStatus) {
+                                                    case 'modified':
+                                                        badgeColor = "bg-amber-500/10 text-amber-500 border-amber-500/20";
+                                                        badgeLabel = "M";
+                                                        break;
+                                                    case 'staged':
+                                                        badgeColor = "bg-blue-500/10 text-blue-500 border-blue-500/20";
+                                                        badgeLabel = "A";
+                                                        break;
+                                                    case 'untracked':
+                                                        badgeColor = "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
+                                                        badgeLabel = "U";
+                                                        break;
+                                                    case 'deleted':
+                                                        badgeColor = "bg-rose-500/10 text-rose-500 border-rose-500/20";
+                                                        badgeLabel = "D";
+                                                        break;
+                                                }
+
+                                                return (
+                                                    <div className="flex items-center gap-2 shrink-0">
+                                                        {settings.git?.showBadges && (
+                                                            <span 
+                                                                className={clsx("text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border cursor-help", badgeColor)}
+                                                                data-tooltip={t(`file_explorer.git_status_${gitStatus}`)}
+                                                                data-position="top"
+                                                            >
+                                                                {badgeLabel}
+                                                            </span>
+                                                        )}
+                                                        {!entry.is_dir && (gitStatus === 'untracked' || gitStatus === 'modified') && (
+                                                            <button
+                                                                onClick={async (e) => {
+                                                                    e.stopPropagation();
+                                                                    try {
+                                                                        await invoke('git_stage_file', { repoPath: rootPath, filePath: getRelativePath(entry.path) });
+                                                                        feedback.toast.success(t('file_explorer.staged_success', { file: entry.name }));
+                                                                        fetchGitStatus();
+                                                                    } catch (err) {
+                                                                        feedback.toast.error(String(err));
+                                                                    }
+                                                                }}
+                                                                className="opacity-0 group-hover:opacity-100 px-2 py-0.5 bg-primary/15 text-primary rounded-lg text-xs font-semibold hover:bg-primary/25 transition-all active:scale-95 cursor-pointer"
+                                                                data-tooltip={t('file_explorer.git_stage_tooltip', "Stage changes")}
+                                                                data-position="top"
+                                                            >
+                                                                {t('file_explorer.git_stage', "Stage")}
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
                                             {renderEntryExtra && renderEntryExtra(entry, isSelected)}
                                             {entry.is_dir && <ChevronRight size={14} className="text-on-surface/80 opacity-50" />}
                                         </div>
@@ -333,6 +514,48 @@ export function FileExplorer({
                         {selectionMode === 'directory' ? t('file_explorer.select_folder') : t('file_explorer.select_file')}
                     </button>
                 </div>
+            )}
+
+            {/* Git Commit Modal */}
+            {settings.git?.enabled && (
+                <Modal
+                    isOpen={showCommitModal}
+                    onClose={() => {
+                        setShowCommitModal(false);
+                        setGitCommitMessage("");
+                    }}
+                    title={t('file_explorer.git_commit_title', "Commit Changes")}
+                    className="max-w-md"
+                >
+                    <div className="space-y-4">
+                        <Input
+                            label={t('file_explorer.git_commit_message_label', "Commit Message")}
+                            type="text"
+                            value={gitCommitMessage}
+                            onChange={(e) => setGitCommitMessage(e.target.value)}
+                            placeholder={t('file_explorer.git_commit_placeholder', "e.g. update test scripts")}
+                            autoFocus
+                        />
+                        <div className="flex justify-end gap-3 pt-2">
+                            <Button
+                                variant="secondary"
+                                onClick={() => {
+                                    setShowCommitModal(false);
+                                    setGitCommitMessage("");
+                                }}
+                            >
+                                {t('common.cancel', "Cancel")}
+                            </Button>
+                            <Button
+                                variant="primary"
+                                onClick={handleGitCommit}
+                                disabled={!gitCommitMessage.trim() || committing}
+                            >
+                                {committing ? t('file_explorer.committing', "Committing...") : t('file_explorer.commit', "Commit")}
+                            </Button>
+                        </div>
+                    </div>
+                </Modal>
             )}
         </div>
     );

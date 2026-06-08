@@ -483,7 +483,25 @@ export const en = {
             not_configured: "Path not configured",
             configure_tests: "Please configure the Tests Directory in Settings or select it below.",
             configure_suites: "Please configure the Suites Directory in Settings or select it below.",
-            select_folder_btn: "Select Folder"
+            select_folder_btn: "Select Folder",
+            git_commit_title: "Commit Changes",
+            git_commit_btn_tooltip: "Commit staged changes",
+            git_push: "Push to remote",
+            pushing: "Pushing...",
+            push: "Push",
+            git_commit_message_label: "Commit Message",
+            git_commit_placeholder: "e.g. update test scripts",
+            committing: "Committing...",
+            commit: "Commit",
+            staged_success: "Staged {{file}} successfully",
+            git_commit_success: "Successfully committed changes!",
+            git_push_success: "Successfully pushed changes to remote repository!",
+            git_stage_tooltip: "Stage changes",
+            git_stage: "Stage",
+            git_status_modified: "Modified",
+            git_status_staged: "Staged (Ready to Commit)",
+            git_status_untracked: "Untracked",
+            git_status_deleted: "Deleted"
         },
         inspector: {
             overlay: {
@@ -1273,6 +1291,66 @@ export const en = {
                 allow_actions_during_test: "Allow actions during test",
                 allow_actions_during_test_desc: "Enable Logcat, Performance Monitoring, and other tools even while a test is running"
             },
+            integrations: {
+                title: "Third-Party Integrations",
+                jira: {
+                    title: "Jira Software",
+                    host: "Jira Cloud Host URL",
+                    email: "Atlassian Account Email",
+                    token: "API Token",
+                    project: "Project Key",
+                    connection_success: "Successfully connected to Jira!",
+                    connection_failed: "Failed to connect to Jira. Check details.",
+                    export_success: "Issue created successfully: {{key}}",
+                    export_failed: "Failed to create Jira issue"
+                },
+                azure: {
+                    title: "Azure DevOps",
+                    org: "Organization Name",
+                    project: "Project Name",
+                    pat: "Personal Access Token (PAT)",
+                    connection_success: "Successfully connected to Azure DevOps!",
+                    connection_failed: "Failed to connect to Azure DevOps. Check details.",
+                    export_success: "Work item created successfully: #{{id}}",
+                    export_failed: "Failed to create Azure Work Item"
+                },
+                testlink: {
+                    title: "TestLink",
+                    url: "XML-RPC Endpoint URL",
+                    devkey: "Developer Key (API Key)",
+                    projectid: "Project ID (Numerical)",
+                    connection_success: "Successfully connected to TestLink!",
+                    connection_failed: "Failed to connect to TestLink. Check details.",
+                    export_success: "Suite and test cases exported to TestLink!",
+                    export_failed: "Failed to export to TestLink"
+                },
+                git: {
+                    title: "Git Integration",
+                    enabled: "Enable Git Integration",
+                    badges: "Show status badges in File Explorer",
+                    status_clean: "Clean",
+                    status_modified: "Modified",
+                    status_untracked: "Untracked",
+                    status_staged: "Staged",
+                    stage_all: "Stage All Changes",
+                    stage_file: "Stage File",
+                    commit: "Commit",
+                    commit_msg: "Commit Message",
+                    commit_success: "Committed successfully!",
+                    push: "Push Changes",
+                    push_success: "Pushed successfully!",
+                    not_installed: "Git CLI is not installed or not in system PATH."
+                },
+                webhooks: {
+                    title: "Slack & MS Teams Webhooks",
+                    slack_url: "Slack Webhook URL",
+                    teams_url: "MS Teams Webhook URL",
+                    notify_pass: "Notify on Test Pass",
+                    notify_fail: "Notify on Test Fail"
+                },
+                test_connection: "Test Connection",
+                testing: "Testing..."
+            }
         },
         settings_page: {
             path_auto_updated: "Path automatically updated: {{path}}",

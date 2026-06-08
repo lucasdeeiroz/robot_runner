@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    Wand2, Eraser, FileDown, FileText, Copy, Trash2, AlertCircle, CheckCircle2, Settings
+    Wand2, Eraser, FileDown, FileText, Copy, Trash2, AlertCircle, CheckCircle2, Settings, Briefcase, Server
 } from 'lucide-react';
 import { Button } from '@/components/atoms/Button';
 import { Textarea } from '@/components/atoms/Textarea';
@@ -21,6 +21,9 @@ import { addToHistory } from './HistoryPanel';
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
 import clsx from 'clsx';
+import { createJiraIssue } from '@/lib/integrations/jira';
+import { createAzureWorkItem } from '@/lib/integrations/azureDevOps';
+import { createTestLinkSuiteAndCases } from '@/lib/integrations/testLink';
 
 interface AIGeneratorSubTabProps {
     onNavigate?: (page: string) => void;
@@ -35,6 +38,148 @@ export function AIGeneratorSubTab({ onNavigate }: AIGeneratorSubTabProps) {
     const [genType, setGenType] = useState<AIGenerationType>('test_case');
     const [useMapping, setUseMapping] = useState(true);
     const [isGenerating, setIsGenerating] = useState(false);
+
+    const [isExportingJira, setIsExportingJira] = useState(false);
+    const [isExportingAzure, setIsExportingAzure] = useState(false);
+    const [isExportingTestLink, setIsExportingTestLink] = useState(false);
+
+    const parseGeneratedContent = (content: string, defaultType: string): { title: string; description: string } => {
+        const lines = content.split('\n');
+        let title = "";
+        
+        for (let line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('#')) {
+                title = trimmed.replace(/^#+\s*/, '');
+                break;
+            } else if (trimmed.startsWith('Title:') || trimmed.startsWith('Summary:')) {
+                title = trimmed.replace(/^(Title|Summary):\s*/i, '');
+                break;
+            }
+        }
+        
+        if (!title) {
+            for (let line of lines) {
+                const trimmed = line.trim();
+                if (trimmed) {
+                    title = trimmed;
+                    break;
+                }
+            }
+        }
+        
+        if (title.length > 80) {
+            title = title.substring(0, 80) + "...";
+        }
+        if (!title) {
+            title = `AI Generated ${defaultType} - ${new Date().toLocaleDateString()}`;
+        }
+        
+        return {
+            title,
+            description: content
+        };
+    };
+
+    const parseTestCasesForTestLink = (content: string): Array<{ name: string; steps: string[] }> => {
+        const lines = content.split('\n');
+        const testCases: Array<{ name: string; steps: string[] }> = [];
+        let currentCaseName = "";
+        let currentSteps: string[] = [];
+
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('Scenario:') || trimmed.startsWith('Scenario Outline:') || trimmed.startsWith('Test Case:') || trimmed.startsWith('Caso de Teste:')) {
+                if (currentCaseName) {
+                    testCases.push({ name: currentCaseName, steps: currentSteps.length > 0 ? currentSteps : ["No steps provided"] });
+                }
+                currentCaseName = trimmed;
+                currentSteps = [];
+            } else if (trimmed.startsWith('Given') || trimmed.startsWith('When') || trimmed.startsWith('Then') || trimmed.startsWith('And') || trimmed.startsWith('Dado') || trimmed.startsWith('Quando') || trimmed.startsWith('Então') || trimmed.startsWith('E ') || trimmed.startsWith('- ') || /^\d+\./.test(trimmed)) {
+                if (currentCaseName) {
+                    currentSteps.push(trimmed);
+                }
+            }
+        }
+
+        if (currentCaseName) {
+            testCases.push({ name: currentCaseName, steps: currentSteps.length > 0 ? currentSteps : ["No steps provided"] });
+        }
+
+        if (testCases.length === 0) {
+            const nonComments = lines.map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('#'));
+            testCases.push({
+                name: "AI Generated Test Suite",
+                steps: nonComments.length > 0 ? nonComments : ["Execute automated suite."]
+            });
+        }
+
+        return testCases;
+    };
+
+    const handleExportJira = async () => {
+        if (!generatedContent.trim()) return;
+        if (!settings.jira?.enabled || !settings.jira?.host || !settings.jira?.email || !settings.jira?.apiToken || !settings.jira?.projectKey) {
+            feedback.toast.error(t('settings.integrations.jira.export_failed') + ": Integration is not configured or disabled.");
+            onNavigate?.('settings');
+            return;
+        }
+
+        setIsExportingJira(true);
+        try {
+            const type = genType === 'bug' ? 'Bug' : 'Story';
+            const { title, description } = parseGeneratedContent(generatedContent, type);
+            const res = await createJiraIssue(title, description, type, settings.jira);
+            feedback.toast.success(t('settings.integrations.jira.export_success', { key: res.key }));
+        } catch (e: any) {
+            feedback.toast.error(t('settings.integrations.jira.export_failed') + ": " + (e.message || String(e)));
+        } finally {
+            setIsExportingJira(false);
+        }
+    };
+
+    const handleExportAzure = async () => {
+        if (!generatedContent.trim()) return;
+        if (!settings.azureDevOps?.enabled || !settings.azureDevOps?.org || !settings.azureDevOps?.project || !settings.azureDevOps?.pat) {
+            feedback.toast.error(t('settings.integrations.azure.export_failed') + ": Integration is not configured or disabled.");
+            onNavigate?.('settings');
+            return;
+        }
+
+        setIsExportingAzure(true);
+        try {
+            const type = genType === 'bug' ? 'Bug' : 'PBI';
+            const { title, description } = parseGeneratedContent(generatedContent, type);
+            const htmlDescription = description.replace(/\n/g, '<br/>');
+            const res = await createAzureWorkItem(title, htmlDescription, type, settings.azureDevOps);
+            feedback.toast.success(t('settings.integrations.azure.export_success', { id: res.id }));
+        } catch (e: any) {
+            feedback.toast.error(t('settings.integrations.azure.export_failed') + ": " + (e.message || String(e)));
+        } finally {
+            setIsExportingAzure(false);
+        }
+    };
+
+    const handleExportTestLink = async () => {
+        if (!generatedContent.trim()) return;
+        if (!settings.testLink?.enabled || !settings.testLink?.url || !settings.testLink?.devKey || !settings.testLink?.projectId) {
+            feedback.toast.error(t('settings.integrations.testlink.export_failed') + ": Integration is not configured or disabled.");
+            onNavigate?.('settings');
+            return;
+        }
+
+        setIsExportingTestLink(true);
+        try {
+            const testCases = parseTestCasesForTestLink(generatedContent);
+            const suiteName = `AI Suite - ${new Date().toLocaleDateString()}`;
+            await createTestLinkSuiteAndCases(suiteName, testCases, settings.testLink);
+            feedback.toast.success(t('settings.integrations.testlink.export_success'));
+        } catch (e: any) {
+            feedback.toast.error(t('settings.integrations.testlink.export_failed') + ": " + (e.message || String(e)));
+        } finally {
+            setIsExportingTestLink(false);
+        }
+    };
 
     const provider = settings.aiProvider || 'gemini';
     const apiKey = provider === 'gemini' ? settings.geminiApiKey : provider === 'claude' ? settings.claudeApiKey : provider === 'openai' ? settings.openaiApiKey : 'CLI_MODE';
@@ -309,9 +454,42 @@ export function AIGeneratorSubTab({ onNavigate }: AIGeneratorSubTabProps) {
                             onClick={handleExportRobot}
                             disabled={!generatedContent}
                             leftIcon={<FileText size={16} />}
-                            className="justify-center h-10 lg:col-span-1 md:col-span-2"
+                            className="justify-center h-10 lg:col-span-2 md:col-span-2"
                         >
                             {t('dashboard.actions.export_robot', "Robot Script (.robot)")}
+                        </Button>
+                    )}
+                    {settings.jira?.enabled && (
+                        <Button
+                            variant="outline"
+                            onClick={handleExportJira}
+                            disabled={!generatedContent || isExportingJira}
+                            leftIcon={<Briefcase size={16} className="text-primary" />}
+                            className="justify-center h-10"
+                        >
+                            {isExportingJira ? t('settings.integrations.testing') : "Jira Software"}
+                        </Button>
+                    )}
+                    {settings.azureDevOps?.enabled && (
+                        <Button
+                            variant="outline"
+                            onClick={handleExportAzure}
+                            disabled={!generatedContent || isExportingAzure}
+                            leftIcon={<Briefcase size={16} className="text-blue-500" />}
+                            className="justify-center h-10"
+                        >
+                            {isExportingAzure ? t('settings.integrations.testing') : "Azure DevOps"}
+                        </Button>
+                    )}
+                    {settings.testLink?.enabled && (
+                        <Button
+                            variant="outline"
+                            onClick={handleExportTestLink}
+                            disabled={!generatedContent || isExportingTestLink || genType === 'robot_script'}
+                            leftIcon={<Server size={16} className="text-orange-500" />}
+                            className="justify-center h-10"
+                        >
+                            {isExportingTestLink ? t('settings.integrations.testing') : "TestLink"}
                         </Button>
                     )}
                 </div>
