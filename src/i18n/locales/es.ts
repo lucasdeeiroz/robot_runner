@@ -501,7 +501,14 @@ export const es = {
             git_status_modified: "Modificado",
             git_status_staged: "Listo para Commit (Staged)",
             git_status_untracked: "No Rastreado",
-            git_status_deleted: "Eliminado"
+            git_status_deleted: "Eliminado",
+            git_fetch_tooltip: "Sincronizar con remoto (Fetch)",
+            git_fetch_success: "Sincronización con el remoto completada.",
+            git_pull_tooltip: "Descargar cambios del remoto (Pull)",
+            git_pull_success: "Cambios descargados del remoto con éxito.",
+            git_push_tooltip: "Enviar al remoto (Push)",
+            git_unstage_tooltip: "Quitar del stage (Unstage)",
+            unstaged_success: "{{file}} quitado del stage con éxito"
         },
         inspector: {
             overlay: {
@@ -1501,6 +1508,7 @@ export const es = {
                 args_one: "{{count}} archivo de args",
                 args_other: "{{count}} archivos de args",
                 clear_all: "Limpiar Todo",
+                cleared: "Selección borrada",
                 remove: "Remover"
             },
             target: "Objetivo",

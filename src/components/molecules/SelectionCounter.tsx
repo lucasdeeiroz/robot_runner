@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Trash2, ListFilter } from "lucide-react";
 import { useState, useEffect } from "react";
 import { SelectionSummaryModal } from "@/components/organisms/SelectionSummaryModal";
+import { feedback } from "@/lib/feedback";
 
 export function SelectionCounter() {
     const { items, clearSelection } = useSelection();
@@ -44,9 +45,13 @@ export function SelectionCounter() {
 
 
             <button
-                onClick={clearSelection}
-                className="p-1.5 hover:bg-error/10 hover:text-error rounded-full transition-colors"
-                title={t('tests.selection.clear_all')}
+                onClick={() => {
+                    clearSelection();
+                    feedback.toast.success(t('tests.selection.cleared'));
+                }}
+                className="p-1.5 hover:bg-error/10 hover:text-error rounded-full transition-colors cursor-pointer"
+                data-tooltip={t('tests.selection.clear_all')}
+                data-position="left"
             >
                 <Trash2 size={16} />
             </button>

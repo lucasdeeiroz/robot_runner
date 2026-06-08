@@ -441,7 +441,8 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                     <button
                         onClick={() => setIsRawMode(!isRawMode)}
                         className="p-1 hover:bg-surface-variant/30 rounded transition-colors text-on-surface-variant/80 hover:text-warning"
-                        title={isRawMode ? t('run_tab.console.fancy_mode') : t('run_tab.console.raw_mode')}
+                        data-tooltip={isRawMode ? t('run_tab.console.fancy_mode') : t('run_tab.console.raw_mode')}
+                        data-position="left"
                     >
                         <Star size={14} fill={!isRawMode ? "currentColor" : "none"} className={clsx(!isRawMode && "text-warning-container/40")} />
                     </button>
@@ -451,7 +452,8 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                             "p-1 hover:bg-surface-variant/30 rounded transition-colors",
                             showDebugConsole ? "text-primary bg-primary/10" : "text-on-surface-variant/80 hover:text-primary"
                         )}
-                        title={showDebugConsole ? t('run_tab.console.debug_off') : t('run_tab.console.debug_on')}
+                        data-tooltip={showDebugConsole ? t('run_tab.console.debug_off') : t('run_tab.console.debug_on')}
+                        data-position="left"
                     >
                         <Terminal size={14} />
                     </button>
@@ -461,7 +463,8 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                             "p-1 hover:bg-surface-variant/30 rounded transition-colors",
                             isKeepAwake ? "text-primary" : "text-on-surface-variant/80 hover:text-primary"
                         )}
-                        title={t('run_tab.console.keep_awake')}
+                        data-tooltip={t('run_tab.console.keep_awake')}
+                        data-position="left"
                     >
                         {isKeepAwake ? <Eye size={14} /> : <EyeOff size={14} />}
                     </button>
@@ -486,7 +489,8 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                                         }
                                     }}
                                     className="p-1 hover:bg-surface-variant/30 rounded transition-colors text-on-surface-variant/80 hover:text-primary"
-                                    title={t('run_tab.console.open_output_dir')}
+                                    data-tooltip={t('run_tab.console.open_output_dir')}
+                                    data-position="left"
                                 >
                                     <FolderOpen size={14} />
                                 </button>
@@ -513,7 +517,8 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                                     "ml-2 p-1 rounded-md transition-all hover:scale-110",
                                     isAiLoopActive ? "text-error hover:bg-error/10" : "text-success hover:bg-success/10"
                                 )}
-                                title={isAiLoopActive ? t('common.pause') : t('common.start')}
+                                data-tooltip={isAiLoopActive ? t('common.pause') : t('common.start')}
+                                data-position="left"
                             >
                                 {isAiLoopActive ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
                             </button>
@@ -524,7 +529,8 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                                     setIsAiLoopActive(true);
                                 }}
                                 className="p-1 text-on-surface-variant/60 hover:text-primary rounded-md hover:bg-primary/10 transition-all"
-                                title={t('common.reset')}
+                                data-tooltip={t('common.reset')}
+                                data-position="left"
                             >
                                 <RefreshCw size={12} />
                             </button>

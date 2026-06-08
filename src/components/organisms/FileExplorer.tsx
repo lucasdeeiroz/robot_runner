@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { Folder, File as FileIcon, ChevronRight, CornerLeftUp, FileText, FileCode, FolderSearch, Settings } from "lucide-react";
+import { Folder, File as FileIcon, ChevronRight, CornerLeftUp, FileText, FileCode, FolderSearch, Settings, RefreshCw, ArrowDownToLine, CirclePlus, CircleMinus, GitCommitVertical, CloudUpload } from "lucide-react";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
@@ -62,6 +62,8 @@ export function FileExplorer({
     const [showCommitModal, setShowCommitModal] = useState(false);
     const [committing, setCommitting] = useState(false);
     const [pushing, setPushing] = useState(false);
+    const [fetching, setFetching] = useState(false);
+    const [pulling, setPulling] = useState(false);
 
     const getRelativePath = (entryPath: string) => {
         if (!rootPath) return entryPath;
@@ -95,9 +97,20 @@ export function FileExplorer({
         
         const relPath = getRelativePath(entry.path);
         
-        if (!entry.is_dir) {
-            return gitStatusEntries[relPath] || null;
-        } else {
+        // 1. Check direct match or explicit parent folder untracked status
+        for (const [filePath, status] of Object.entries(gitStatusEntries)) {
+            const cleanKey = filePath.replace(/\/$/, '');
+            if (relPath === cleanKey) {
+                return status;
+            }
+            // Inherit ONLY if the parent folder itself is explicitly untracked as a whole
+            if (status === 'untracked' && relPath.startsWith(`${cleanKey}/`)) {
+                return 'untracked';
+            }
+        }
+        
+        // 2. If it's a directory, check children changes to calculate its badge
+        if (entry.is_dir) {
             const prefix = relPath ? `${relPath}/` : '';
             let hasModified = false;
             let hasUntracked = false;
@@ -111,11 +124,40 @@ export function FileExplorer({
                 }
             }
             
+            // Show badge for directory based on children changes
             if (hasModified) return 'modified';
             if (hasStaged) return 'staged';
             if (hasUntracked) return 'untracked';
-            return null;
         }
+        
+        return null;
+    };
+
+    const getFolderActionStatus = (entry: FileEntry): 'untracked' | 'modified' | 'staged' | 'deleted' | null => {
+        if (!entry.is_dir) return getGitStatusForEntry(entry);
+        
+        const relPath = getRelativePath(entry.path);
+        const prefix = relPath ? `${relPath}/` : '';
+        
+        const childStatuses = new Set<string>();
+        
+        // Check if the folder itself has a status, or gather child statuses
+        for (const [filePath, status] of Object.entries(gitStatusEntries)) {
+            const cleanKey = filePath.replace(/\/$/, '');
+            if (cleanKey === relPath) {
+                childStatuses.add(status);
+            } else if (filePath.startsWith(prefix)) {
+                childStatuses.add(status);
+            }
+        }
+        
+        // Only allow action if all changed children inside share the same status
+        if (childStatuses.size === 1) {
+            const status = Array.from(childStatuses)[0];
+            return status as 'untracked' | 'modified' | 'staged' | 'deleted';
+        }
+        
+        return null;
     };
 
     const handleGitCommit = async () => {
@@ -144,6 +186,34 @@ export function FileExplorer({
             feedback.toast.error(String(err));
         } finally {
             setPushing(false);
+        }
+    };
+
+    const handleGitFetch = async () => {
+        if (!rootPath) return;
+        setFetching(true);
+        try {
+            await invoke('git_fetch', { repoPath: rootPath });
+            feedback.toast.success(t('file_explorer.git_fetch_success', "Fetched from remote."));
+            fetchGitStatus();
+        } catch (err) {
+            feedback.toast.error(String(err));
+        } finally {
+            setFetching(false);
+        }
+    };
+
+    const handleGitPull = async () => {
+        if (!rootPath) return;
+        setPulling(true);
+        try {
+            await invoke('git_pull', { repoPath: rootPath });
+            feedback.toast.success(t('file_explorer.git_pull_success', "Successfully pulled changes from remote."));
+            fetchGitStatus();
+        } catch (err) {
+            feedback.toast.error(String(err));
+        } finally {
+            setPulling(false);
         }
     };
 
@@ -292,7 +362,7 @@ export function FileExplorer({
             />
             {/* Header / Breadcrumb */}
             {!isPathUnconfigured && (
-                <div className="flex items-center gap-2 mb-2 p-2 bg-transparent backdrop-blur-md rounded-2xl border border-outline-variant/30 shrink-0">
+                <div className="flex items-center gap-2 mb-2 p-2 bg-transparent backdrop-blur-md rounded-2xl border border-outline-variant/30 shrink-0 overflow-visible">
                     <button
                         onClick={handleUp}
                         disabled={currentPath === rootPath}
@@ -307,24 +377,50 @@ export function FileExplorer({
                             : currentPath}
                     </div>
                     {settings.git?.enabled && (
-                        <div className="flex items-center gap-1.5 pr-1 border-l border-outline-variant/20 pl-2">
+                        <div className="flex items-center gap-0.5 border-l border-outline-variant/20 pl-2">
+                            {/* Fetch */}
+                            <button
+                                onClick={handleGitFetch}
+                                disabled={fetching}
+                                className="p-1.5 rounded-lg text-on-surface-variant/70 hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-90 cursor-pointer"
+                                data-tooltip={t('file_explorer.git_fetch_tooltip', "Fetch from remote")}
+                                data-position="left"
+                                aria-label={t('file_explorer.git_fetch_tooltip', "Fetch from remote")}
+                            >
+                                <RefreshCw size={15} className={fetching ? 'animate-spin' : ''} />
+                            </button>
+                            {/* Pull */}
+                            <button
+                                onClick={handleGitPull}
+                                disabled={pulling}
+                                className="p-1.5 rounded-lg text-on-surface-variant/70 hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-90 cursor-pointer"
+                                data-tooltip={t('file_explorer.git_pull_tooltip', "Pull from remote")}
+                                data-position="left"
+                                aria-label={t('file_explorer.git_pull_tooltip', "Pull from remote")}
+                            >
+                                <ArrowDownToLine size={15} />
+                            </button>
+                            {/* Commit */}
                             <button
                                 onClick={() => setShowCommitModal(true)}
                                 disabled={!Object.values(gitStatusEntries).some(s => s === 'staged')}
-                                className="flex items-center gap-1 px-2.5 py-1 bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold rounded-xl transition-all active:scale-95 cursor-pointer"
+                                className="p-1.5 rounded-lg text-on-surface-variant/70 hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-90 cursor-pointer"
                                 data-tooltip={t('file_explorer.git_commit_btn_tooltip', "Commit staged changes")}
-                                data-position="bottom"
+                                data-position="left"
+                                aria-label={t('file_explorer.git_commit_btn_tooltip', "Commit staged changes")}
                             >
-                                {t('file_explorer.commit', "Commit")}
+                                <GitCommitVertical size={15} />
                             </button>
+                            {/* Push */}
                             <button
                                 onClick={handleGitPush}
                                 disabled={pushing}
-                                className="flex items-center gap-1 px-2.5 py-1 bg-secondary-container text-on-secondary-container hover:bg-secondary-container/80 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold rounded-xl transition-all active:scale-95 cursor-pointer"
-                                data-tooltip={t('file_explorer.git_push', "Push to remote")}
-                                data-position="bottom"
+                                className="p-1.5 rounded-lg text-on-surface-variant/70 hover:text-secondary hover:bg-secondary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-90 cursor-pointer"
+                                data-tooltip={t('file_explorer.git_push_tooltip', "Push to remote")}
+                                data-position="left"
+                                aria-label={t('file_explorer.git_push_tooltip', "Push to remote")}
                             >
-                                {pushing ? t('file_explorer.pushing', "Pushing...") : t('file_explorer.push', "Push")}
+                                <CloudUpload size={15} />
                             </button>
                         </div>
                     )}
@@ -424,6 +520,7 @@ export function FileExplorer({
                                                 const gitStatus = getGitStatusForEntry(entry);
                                                 if (!gitStatus) return null;
                                                 
+                                                const actionStatus = entry.is_dir ? getFolderActionStatus(entry) : gitStatus;
                                                 let badgeColor = "";
                                                 let badgeLabel = "";
                                                 switch (gitStatus) {
@@ -447,16 +544,7 @@ export function FileExplorer({
 
                                                 return (
                                                     <div className="flex items-center gap-2 shrink-0">
-                                                        {settings.git?.showBadges && (
-                                                            <span 
-                                                                className={clsx("text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border cursor-help", badgeColor)}
-                                                                data-tooltip={t(`file_explorer.git_status_${gitStatus}`)}
-                                                                data-position="top"
-                                                            >
-                                                                {badgeLabel}
-                                                            </span>
-                                                        )}
-                                                        {!entry.is_dir && (gitStatus === 'untracked' || gitStatus === 'modified') && (
+                                                        {(actionStatus === 'untracked' || actionStatus === 'modified' || actionStatus === 'deleted') && (
                                                             <button
                                                                 onClick={async (e) => {
                                                                     e.stopPropagation();
@@ -468,12 +556,42 @@ export function FileExplorer({
                                                                         feedback.toast.error(String(err));
                                                                     }
                                                                 }}
-                                                                className="opacity-0 group-hover:opacity-100 px-2 py-0.5 bg-primary/15 text-primary rounded-lg text-xs font-semibold hover:bg-primary/25 transition-all active:scale-95 cursor-pointer"
+                                                                className="opacity-0 group-hover:opacity-100 p-1 text-primary hover:bg-primary/20 rounded-lg transition-all active:scale-90 cursor-pointer"
                                                                 data-tooltip={t('file_explorer.git_stage_tooltip', "Stage changes")}
-                                                                data-position="top"
+                                                                data-position="left"
+                                                                aria-label={t('file_explorer.git_stage_tooltip', "Stage changes")}
                                                             >
-                                                                {t('file_explorer.git_stage', "Stage")}
+                                                                <CirclePlus size={14} />
                                                             </button>
+                                                        )}
+                                                        {actionStatus === 'staged' && (
+                                                            <button
+                                                                onClick={async (e) => {
+                                                                    e.stopPropagation();
+                                                                    try {
+                                                                        await invoke('git_unstage_file', { repoPath: rootPath, filePath: getRelativePath(entry.path) });
+                                                                        feedback.toast.success(t('file_explorer.unstaged_success', { file: entry.name }));
+                                                                        fetchGitStatus();
+                                                                    } catch (err) {
+                                                                        feedback.toast.error(String(err));
+                                                                    }
+                                                                }}
+                                                                className="opacity-0 group-hover:opacity-100 p-1 text-amber-500 hover:bg-amber-500/20 rounded-lg transition-all active:scale-90 cursor-pointer"
+                                                                data-tooltip={t('file_explorer.git_unstage_tooltip', "Unstage changes")}
+                                                                data-position="left"
+                                                                aria-label={t('file_explorer.git_unstage_tooltip', "Unstage changes")}
+                                                            >
+                                                                <CircleMinus size={14} />
+                                                            </button>
+                                                        )}
+                                                        {settings.git?.showBadges && (
+                                                            <span 
+                                                                className={clsx("text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border cursor-help", badgeColor)}
+                                                                data-tooltip={t(`file_explorer.git_status_${gitStatus}`)}
+                                                                data-position="left"
+                                                             >
+                                                                {badgeLabel}
+                                                            </span>
                                                         )}
                                                     </div>
                                                 );

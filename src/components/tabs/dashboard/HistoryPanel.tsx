@@ -86,7 +86,8 @@ export function HistoryPanel() {
                                     size="sm"
                                     onClick={() => handleDownload(item)}
                                     className="h-6 w-6 p-0 text-primary dark:text-primary/80"
-                                    title={t('common.download')}
+                                    data-tooltip={t('common.download')}
+                                    data-position="left"
                                 >
                                     <Download size={14} />
                                 </Button>
@@ -95,7 +96,8 @@ export function HistoryPanel() {
                                     size="sm"
                                     onClick={() => handleDelete(item.id)}
                                     className="h-6 w-6 p-0 text-error"
-                                    title={t('common.delete')}
+                                    data-tooltip={t('common.delete')}
+                                    data-position="left"
                                 >
                                     <Trash2 size={14} />
                                 </Button>

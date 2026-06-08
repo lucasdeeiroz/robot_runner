@@ -328,7 +328,8 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                                     }).catch(() => setStatusMsg({ text: t('connect.status.clipboard_error'), type: 'error' }));
                                 }}
                                 className="text-[10px] text-primary dark:text-primary/80 hover:underline cursor-pointer"
-                                title="Paste host:port or ngrok url"
+                                data-tooltip={t('connect.actions.paste_tooltip', "Paste host:port or ngrok url")}
+                                data-position="top"
                             >
                                 {t('connect.actions.paste_url') || "Paste URL"}
                             </button>
@@ -348,7 +349,8 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                                     onClick={handleEnableTcpIp}
                                     className="text-[10px] text-primary dark:text-primary/80 hover:underline cursor-pointer"
                                     disabled={loading}
-                                    title={t('connect.actions.enable_tcpip_tooltip', "Run 'adb tcpip 5555'")}
+                                    data-tooltip={t('connect.actions.enable_tcpip_tooltip', "Run 'adb tcpip 5555'")}
+                                    data-position="top"
                                 >
                                     {t('connect.actions.enable_tcpip', "Enable 5555")}
                                 </button>
@@ -500,7 +502,8 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                                                     size="sm"
                                                     onClick={() => { navigator.clipboard.writeText(ngrokUrl); setNgrokStatusMsg({ text: t('connect.actions.copy'), type: 'success' }); }}
                                                     className="p-1 h-auto text-on-surface/80 hover:text-on-surface-variant/80"
-                                                    title="Copy URL"
+                                                    data-tooltip={t('connect.actions.copy_tooltip', "Copy URL")}
+                                                    data-position="left"
                                                 >
                                                     <Copy size={16} />
                                                 </Button>

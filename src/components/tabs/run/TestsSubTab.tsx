@@ -632,6 +632,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                                                 isSelected ? "text-primary" : "text-on-surface-variant/40 hover:text-primary"
                                             )}
                                             title={t('tests.select_tests')}
+                                            tooltipPosition="left"
                                         >
                                             <ChartNoAxesGantt size={14} />
                                         </Button>
@@ -658,6 +659,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                                                 isSelected ? "text-primary" : "text-on-surface-variant/40 hover:text-primary"
                                             )}
                                             title={t('tests.select_args')}
+                                            tooltipPosition="left"
                                         >
                                             <Settings2 size={14} />
                                         </Button>

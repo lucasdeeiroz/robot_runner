@@ -492,9 +492,9 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                         {!isSearchFocused && (
                             <>
                                 <div className="flex gap-1">
-                                    <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 4')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" title={t('inspector.nav.back')}><ArrowLeft size={16} /></Button>
-                                    <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 3')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" title={t('inspector.nav.home')}><Home size={16} /></Button>
-                                    <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 187')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" title={t('inspector.nav.recents')}><Rows size={16} /></Button>
+                                    <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 4')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" data-tooltip={t('inspector.nav.back')} data-position="bottom"><ArrowLeft size={16} /></Button>
+                                    <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 3')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" data-tooltip={t('inspector.nav.home')} data-position="bottom"><Home size={16} /></Button>
+                                    <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 187')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" data-tooltip={t('inspector.nav.recents')} data-position="bottom"><Rows size={16} /></Button>
                                     <div className="w-[1px] h-4 bg-outline-variant/30 self-center mx-1" />
                                     <Button
                                         variant="ghost"
@@ -504,7 +504,8 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                                             "p-1.5 rounded transition-all",
                                             isRecordingMode ? "bg-error/10 text-error hover:bg-error/20" : "hover:bg-surface-variant/30 text-on-surface-variant/80"
                                         )}
-                                        title={isRecordingMode ? t('inspector.recorder.stop') : t('inspector.recorder.start')}
+                                        data-tooltip={isRecordingMode ? t('inspector.recorder.stop') : t('inspector.recorder.start')}
+                                        data-position="bottom"
                                     >
                                         <Videotape size={16} className={clsx(isRecordingMode && "animate-pulse")} />
                                     </Button>
@@ -518,7 +519,8 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                                             "p-1.5 rounded transition-all text-on-surface-variant/80 hover:bg-surface-variant/30",
                                             !xmlDump && "opacity-50 cursor-not-allowed"
                                         )}
-                                        title={t('inspector.export_xml')}
+                                        data-tooltip={t('inspector.export_xml')}
+                                        data-position="bottom"
                                     >
                                         <Download size={16} />
                                     </Button>
@@ -533,7 +535,8 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                                                     "p-1.5 rounded transition-all",
                                                     autoRefreshEnabled ? "bg-primary/10 text-primary dark:text-primary/80 hover:bg-primary/20" : "hover:bg-surface-variant/30 text-on-surface-variant/80"
                                                 )}
-                                                title={t('inspector.live_sync')}
+                                                data-tooltip={t('inspector.live_sync')}
+                                                data-position="bottom"
                                             >
                                                 <RefreshCw size={16} className={clsx(autoRefreshEnabled && "animate-spin")} />
                                             </Button>
@@ -564,7 +567,8 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                                         handleSearch("");
                                     }}
                                     className="p-1 hover:bg-surface-variant/30 rounded-full transition-colors flex items-center justify-center"
-                                    title={t('inspector.search.clear')}
+                                    data-tooltip={t('inspector.search.clear')}
+                                    data-position="left"
                                 >
                                     <X size={14} className="opacity-50" />
                                 </button>
@@ -633,7 +637,7 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                             </div>
                         )}
                         {selectedNode && (
-                            <Button variant="ghost" size="sm" onClick={() => { setSelectedNode(null); setAvailableNodes([]); }} className="h-7 w-7 p-0 text-on-surface/80 hover:text-error hover:bg-error-container/10 ml-2" title={t('inspector.clear_selection')}>
+                            <Button variant="ghost" size="sm" onClick={() => { setSelectedNode(null); setAvailableNodes([]); }} className="h-7 w-7 p-0 text-on-surface/80 hover:text-error hover:bg-error-container/10 ml-2" data-tooltip={t('inspector.clear_selection')} data-position="left">
                                 <X size={16} />
                             </Button>
                         )}

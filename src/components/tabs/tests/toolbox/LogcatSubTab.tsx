@@ -338,7 +338,8 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
                                 variant="ghost"
                                 size="sm"
                                 className="px-3 py-1.5 ml-2 rounded-2xl text-xs font-medium items-center justify-center gap-2 bg-surface text-on-surface/80 border border-outline-variant/30 hover:bg-surface-variant/50 transition-colors h-auto"
-                                title={t('logcat.clear')}
+                                data-tooltip={t('logcat.clear')}
+                                data-position="left"
                             >
                                 <Eraser size={14} />
                             </Button>
@@ -434,7 +435,8 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
                                     <span
                                         className="text-primary dark:text-primary/80 underline cursor-pointer hover:opacity-80"
                                         onClick={() => invoke('open_path', { path: log.replace(t('feedback.saved_to_prefix') + ' ', '') })}
-                                        title={t('logcat.open_file', 'Click to open file')}
+                                        data-tooltip={t('logcat.open_file', 'Click to open file')}
+                                        data-position="top"
                                     >
                                         {log}
                                     </span>

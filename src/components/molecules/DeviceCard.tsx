@@ -179,7 +179,8 @@ export function DeviceCard({ device, onMirror, onToolbox, onAction }: DeviceCard
                         disabled={!isOnline}
                         variant="primary"
                         size="icon"
-                        title={t('home.actions.mirror')}
+                        data-tooltip={t('home.actions.mirror')}
+                        data-position="left"
                         className="h-10 w-10 rounded-xl shadow-lg shadow-primary/10 hover:shadow-primary/20 active:scale-90 transition-all"
                     >
                         <Monitor size={20} />
@@ -189,7 +190,8 @@ export function DeviceCard({ device, onMirror, onToolbox, onAction }: DeviceCard
                         disabled={!isOnline}
                         variant="secondary"
                         size="icon"
-                        title={t('home.actions.toolbox')}
+                        data-tooltip={t('home.actions.toolbox')}
+                        data-position="left"
                         className="h-10 w-10 rounded-xl border-outline-variant/30 hover:bg-surface-variant/80 active:scale-90 transition-all"
                     >
                         <Wrench size={20} />

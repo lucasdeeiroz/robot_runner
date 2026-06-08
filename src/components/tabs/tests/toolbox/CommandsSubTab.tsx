@@ -203,7 +203,8 @@ export function CommandsSubTab({ selectedDevice, isTestRunning = false, allowAct
                         variant="ghost"
                         size="icon"
                         className="p-1 hover:text-error text-on-surface-variant/80"
-                        title={t('commands.clear')}
+                        data-tooltip={t('commands.clear')}
+                        data-position="left"
                     >
                         <Trash2 size={16} />
                     </Button>
@@ -261,7 +262,8 @@ export function CommandsSubTab({ selectedDevice, isTestRunning = false, allowAct
                                     disabled={isTestRunning && !allowActionsDuringTest}
                                     variant="ghost"
                                     className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-on-warning-container hover:text-on-warning-container/50 h-auto"
-                                    title={saved.cmd}
+                                    data-tooltip={saved.cmd}
+                                    data-position="top"
                                     leftIcon={<Star size={12} className="fill-warning/40 text-warning-container/60" />}
                                 >
                                     {saved.label}
@@ -301,7 +303,8 @@ export function CommandsSubTab({ selectedDevice, isTestRunning = false, allowAct
                     disabled={!command.trim() || isExecuting}
                     variant="ghost"
                     className="px-3 bg-surface-variant/30 hover:bg-outline-variant text-on-surface-variant/80 border border-outline-variant/30"
-                    title={t('commands.actions.save')}
+                    data-tooltip={t('commands.actions.save')}
+                    data-position="top"
                 >
                     <Save size={18} />
                 </Button>
@@ -310,7 +313,8 @@ export function CommandsSubTab({ selectedDevice, isTestRunning = false, allowAct
                     <Button
                         onClick={handleCancel}
                         variant="danger"
-                        title="Cancel Command"
+                        data-tooltip={t('commands.actions.cancel', "Cancel command")}
+                        data-position="top"
                     >
                         <Square size={18} fill="currentColor" />
                     </Button>

@@ -147,7 +147,8 @@ export function PerformanceSubTab({
                                 variant="ghost"
                                 size="sm"
                                 className="p-1.5 hover:bg-surface-variant/30 rounded transition-all active:scale-95 h-auto"
-                                title={t('performance.refresh')}
+                                data-tooltip={t('performance.refresh')}
+                                data-position="left"
                             >
                                 {isLoading ? (
                                     <ExpressiveLoading size="xsm" variant="circular" className="text-on-surface-variant/80" />
@@ -216,7 +217,8 @@ export function PerformanceSubTab({
                             size="sm"
                             disabled={(isTestRunning && !allowActionsDuringTest && !forceEnable)}
                             leftIcon={isRecording ? <Square size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
-                            title={isRecording ? t('performance.stop_record') : t('performance.start_record')}
+                            data-tooltip={isRecording ? t('performance.stop_record') : t('performance.start_record')}
+                            data-position="left"
                         >
                             {!isNarrow && (isRecording ? t('performance.recording') : "REC")}
                         </Button>

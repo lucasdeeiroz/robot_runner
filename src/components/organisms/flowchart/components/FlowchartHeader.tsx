@@ -53,7 +53,8 @@ export function FlowchartHeader({
                 {missedScreensCount > 0 && (
                     <div
                         className="flex items-center gap-1.5 px-3 py-1 bg-warning/10 text-warning border border-warning/20 rounded-lg text-xs font-medium animate-pulse cursor-help"
-                        title={t('mapper.flowchart.ai_missed_help', 'These screens were placed in the quarantine area on the right.')}
+                        data-tooltip={t('mapper.flowchart.ai_missed_help', 'These screens were placed in the quarantine area on the right.')}
+                        data-position="bottom"
                     >
                         <AlertTriangle size={14} />
                         {t('mapper.flowchart.ai_missed_count', { count: missedScreensCount })}
@@ -69,33 +70,43 @@ export function FlowchartHeader({
                 <Button
                     onClick={onImport}
                     className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full"
-                    title={t('mapper.flowchart.import')}>
+                    data-tooltip={t('mapper.flowchart.import')}
+                    data-position="bottom"
+                >
                     <Download size={16} />
                 </Button>
                 <Button
                     onClick={onExport}
                     className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full"
-                    title={t('mapper.flowchart.export')}>
+                    data-tooltip={t('mapper.flowchart.export')}
+                    data-position="bottom"
+                >
                     <Upload size={16} />
                 </Button>
                 <div className="h-4 w-px bg-outline-variant/30 mx-2" />
                 <Button
                     onClick={onSave}
                     className="p-2 bg-primary/10 hover:bg-primary/90 text-primary hover:text-on-primary rounded-full shadow-md transition-all active:scale-95"
-                    title={t('common.save')}>
+                    data-tooltip={t('common.save')}
+                    data-position="bottom"
+                >
                     <Save size={16} className="stroke-[2.5]" />
                 </Button>
                 <div className="h-4 w-px bg-outline-variant/30 mx-2" />
                 <Button
                     onClick={onClearCurvatures}
                     className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full"
-                    title={t('mapper.flowchart.clear_curvatures', 'Clear all edge curvatures')}>
+                    data-tooltip={t('mapper.flowchart.clear_curvatures', 'Clear all edge curvatures')}
+                    data-position="bottom"
+                >
                     <Eraser size={16} />
                 </Button>
                 <Button
                     onClick={onExportImage}
                     className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full transition-colors"
-                    title={t('mapper.flowchart.export_image')}>
+                    data-tooltip={t('mapper.flowchart.export_image')}
+                    data-position="bottom"
+                >
                     <Camera size={16} />
                 </Button>
                 <div className="h-4 w-px bg-outline-variant/30 mx-2" />
@@ -115,7 +126,9 @@ export function FlowchartHeader({
                 <Button
                     onClick={onCenterView}
                     className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full"
-                    title={t('mapper.flowchart.center_view')}>
+                    data-tooltip={t('mapper.flowchart.center_view')}
+                    data-position="bottom"
+                >
                     <Maximize size={16} />
                 </Button>
                 <div className="h-6 w-px bg-outline-variant/30 mx-2" />

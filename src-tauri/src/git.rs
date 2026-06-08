@@ -95,3 +95,48 @@ pub async fn git_push(repo_path: String) -> Result<(), String> {
 
     Ok(())
 }
+
+#[tauri::command]
+pub async fn git_unstage_file(repo_path: String, file_path: String) -> Result<(), String> {
+    let mut cmd = new_std_command("git");
+    cmd.arg("restore").arg("--staged").arg(&file_path).current_dir(&repo_path);
+
+    let output = cmd.output().map_err(|e| format!("Failed to execute git restore: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(format!("Git unstage failed: {}", stderr));
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn git_fetch(repo_path: String) -> Result<(), String> {
+    let mut cmd = new_std_command("git");
+    cmd.arg("fetch").current_dir(&repo_path);
+
+    let output = cmd.output().map_err(|e| format!("Failed to execute git fetch: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(format!("Git fetch failed: {}", stderr));
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn git_pull(repo_path: String) -> Result<(), String> {
+    let mut cmd = new_std_command("git");
+    cmd.arg("pull").current_dir(&repo_path);
+
+    let output = cmd.output().map_err(|e| format!("Failed to execute git pull: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(format!("Git pull failed: {}", stderr));
+    }
+
+    Ok(())
+}

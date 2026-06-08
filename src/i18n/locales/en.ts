@@ -501,7 +501,14 @@ export const en = {
             git_status_modified: "Modified",
             git_status_staged: "Staged (Ready to Commit)",
             git_status_untracked: "Untracked",
-            git_status_deleted: "Deleted"
+            git_status_deleted: "Deleted",
+            git_fetch_tooltip: "Fetch from remote",
+            git_fetch_success: "Fetched from remote successfully.",
+            git_pull_tooltip: "Pull from remote",
+            git_pull_success: "Successfully pulled changes from remote.",
+            git_push_tooltip: "Push to remote",
+            git_unstage_tooltip: "Unstage changes",
+            unstaged_success: "Unstaged {{file}} successfully"
         },
         inspector: {
             overlay: {
@@ -1494,6 +1501,7 @@ export const en = {
                 args_one: "{{count}} arg file",
                 args_other: "{{count}} arg files",
                 clear_all: "Clear All",
+                cleared: "Selection cleared",
                 remove: "Remove"
             },
             target: "Target",

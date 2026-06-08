@@ -103,8 +103,11 @@ macro_rules! generate_robot_runner_handler {
             crate::security::decrypt_secret,
             crate::git::get_git_status,
             crate::git::git_stage_file,
+            crate::git::git_unstage_file,
             crate::git::git_commit,
-            crate::git::git_push
+            crate::git::git_push,
+            crate::git::git_fetch,
+            crate::git::git_pull
         ]
     };
 }
