@@ -151,8 +151,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
 
                         const extractedSuiteName = sessionToFinish.testPath.split(/[\\/]/).pop()?.split('.')[0] || 'Unknown';
                         
-                        const activeProfileName = profiles.find(p => p.id === activeProfileId)?.name || 'Default';
-                        const resolvedProfileName = sessionToFinish.profileName || activeProfileName;
+                        const resolvedProfileName = sessionToFinish.profileName || 'Default';
 
                         addDoc(historyRef, {
                             runId: sessionToFinish.runId,
@@ -197,7 +196,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
             unlistenOutputPromise.then(f => f());
             unlistenFinishedPromise.then(f => f());
         };
-    }, [activeProfileId, settings.paths.logs, profiles]);
+    }, []);
 
 
 

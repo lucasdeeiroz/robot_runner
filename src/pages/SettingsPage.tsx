@@ -698,6 +698,8 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                             <button
                                                 type="button"
                                                 id="noAppiumForRobot"
+                                                role="checkbox"
+                                                aria-checked={settings.noAppiumForRobot || false}
                                                 onClick={() => updateSetting('noAppiumForRobot', !settings.noAppiumForRobot)}
                                                 className="flex items-center gap-2.5 text-left focus:outline-none select-none cursor-pointer group"
                                             >
