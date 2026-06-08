@@ -16,28 +16,34 @@ export interface AgentServiceResponse {
  * markdown code fences or extra text before/after the JSON object.
  */
 function safeParseJson<T>(content: string): T {
+    if (!content || typeof content !== 'string') return content as any;
     const trimmed = content.trim();
     try {
         return JSON.parse(trimmed);
     } catch (e) {
-        const firstBrace = content.indexOf('{');
-        const firstBracket = content.indexOf('[');
-        const startIndex = (firstBrace !== -1 && firstBracket !== -1)
-            ? Math.min(firstBrace, firstBracket)
-            : (firstBrace !== -1 ? firstBrace : (firstBracket !== -1 ? firstBracket : -1));
+        try {
+            const firstBrace = content.indexOf('{');
+            const lastBrace = content.lastIndexOf('}');
+            const firstBracket = content.indexOf('[');
+            const lastBracket = content.lastIndexOf(']');
 
-        const lastBrace = content.lastIndexOf('}');
-        const lastBracket = content.lastIndexOf(']');
-        const endIndex = Math.max(lastBrace, lastBracket);
+            let startIndex = -1;
+            let endIndex = -1;
 
-        if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
-            const jsonString = content.substring(startIndex, endIndex + 1);
-            try {
-                return JSON.parse(jsonString);
-            } catch (e2: any) {
-                console.error("[AI Agent] Failed to parse extracted JSON content:", jsonString);
-                throw new Error(`Failed to parse extracted JSON: ${e2.message}`);
+            if (firstBrace !== -1 && (firstBracket === -1 || (firstBrace < firstBracket && firstBrace !== -1))) {
+                startIndex = firstBrace;
+                endIndex = lastBrace;
+            } else if (firstBracket !== -1) {
+                startIndex = firstBracket;
+                endIndex = lastBracket;
             }
+
+            if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+                const jsonString = content.substring(startIndex, endIndex + 1);
+                return JSON.parse(jsonString);
+            }
+        } catch (innerError) {
+            // ignore
         }
         console.error("[AI Agent] No valid JSON structure found in content:", content);
         throw e;
@@ -87,7 +93,8 @@ export async function askAgent(
                 result = response.structured_output;
                 newSessionId = response.session_id || resumeSessionId;
             } else {
-                 result = typeof response === 'string' ? JSON.parse(response) : JSON.parse(response.result);
+                 const rawText = typeof response === 'string' ? response : response.result;
+                 result = safeParseJson(rawText);
             }
         } 
         else if (provider === 'claude-code') {
@@ -107,7 +114,8 @@ export async function askAgent(
                 result = response.structured_output;
                 newSessionId = response.session_id || resumeSessionId;
             } else {
-                 result = typeof response === 'string' ? JSON.parse(response) : JSON.parse(response.result);
+                 const rawText = typeof response === 'string' ? response : response.result;
+                 result = safeParseJson(rawText);
             }
         }
         else if (provider === 'gemini') {
