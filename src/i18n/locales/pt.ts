@@ -259,6 +259,8 @@ export const pt = {
             clear: "Limpar",
             coming_soon: "Módulo {{module}} em breve...",
             error_occurred: "Ocorreu um erro: {{error}}",
+            failed_to_pull_video: "Falha ao extrair vídeo",
+            failed_to_pull_screenshot: "Falha ao extrair captura de tela do dispositivo",
             delete: "Excluir",
             edit: "Editar",
             go_to_settings: "Ir para Configurações",

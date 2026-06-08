@@ -84,7 +84,16 @@ export function useFileSave({ fileType, extensions, defaultNamePrefix, settingPa
             }
         } catch (e) {
             const errorMessage = e instanceof Error ? e.message : String(e);
-            feedback.toast.raw.error(`${t('common.error_occurred')}: ${errorMessage}`);
+            let translatedError = errorMessage;
+            if (errorMessage.includes("Failed to pull video")) {
+                const details = (errorMessage.split("Failed to pull video:")[1] || "").trim();
+                translatedError = t("common.failed_to_pull_video") + (details ? `: ${details}` : "");
+            } else if (errorMessage.includes("Failed to pull screenshot from device")) {
+                const details = (errorMessage.split("Failed to pull screenshot from device:")[1] || "").trim();
+                translatedError = t("common.failed_to_pull_screenshot") + (details ? `: ${details}` : "");
+            }
+            feedback.toast.raw.error(t('common.error_occurred', { error: translatedError }));
+            throw e;
         } finally {
             setIsSaving(false);
         }

@@ -47,7 +47,8 @@ interface HistorySubTabProps {
 export function HistorySubTab({ onNavigate }: HistorySubTabProps) {
     const { user } = useAuth();
     const { t } = useTranslation();
-    const { settings, updateSetting, activeProfileId } = useSettings();
+    const { settings, updateSetting, activeProfileId, profiles } = useSettings();
+    const activeProfileName = profiles.find(p => p.id === activeProfileId)?.name || 'Default';
     const [history, setHistory] = useState<TestLog[]>(getCachedHistory());
     const [filterText, setFilterText] = useState("");
     const [filterPeriod, setFilterPeriod] = useState("all_time");
@@ -97,7 +98,7 @@ export function HistorySubTab({ onNavigate }: HistorySubTabProps) {
             isFirstRun.current = false;
         }, 150);
         return () => clearTimeout(timer);
-    }, [settings.paths.logs, user]);
+    }, [settings.paths.logs, user, activeProfileName, settings.automationFramework]);
 
     const loadHistory = async (refresh: boolean = false) => {
         setLoadingHistory(true);
@@ -108,18 +109,30 @@ export function HistorySubTab({ onNavigate }: HistorySubTabProps) {
                 refresh: refresh
             });
 
-            let combinedLogs = [...localLogs];
+            const currentFramework = settings.automationFramework || 'robot';
+
+            // Filter local logs to only show the ones belonging to the active profile and matching active framework (or legacy logs)
+            const filteredLocalLogs = localLogs.filter(log => {
+                const matchesProfile = !log.logs_path || log.logs_path === activeProfileName;
+                const matchesFramework = !log.framework || log.framework === currentFramework;
+                return matchesProfile && matchesFramework;
+            });
+
+            let combinedLogs = [...filteredLocalLogs];
 
             // 2. Fetch Global Logs from Firestore if logged in
             const currentUser = auth?.currentUser;
-            if (currentUser && activeProfileId) {
+            if (currentUser && activeProfileName) {
                 try {
-                    const globalLogs = await fetchGlobalHistory(currentUser.uid, activeProfileId);
+                    const allGlobalLogs = await fetchGlobalHistory(currentUser.uid, activeProfileName);
+                    
+                    // Filter global logs by active framework (allowing legacy logs where framework is null/missing)
+                    const globalLogs = allGlobalLogs.filter(log => !log.framework || log.framework === currentFramework);
                     
                     // 3. Merge & Deduplicate
                     // Rule 1: Use run_id for absolute matching if available.
                     // Rule 2: Fallback to name+timestamp for older/missing records.
-                    const merged = [...localLogs];
+                    const merged = [...filteredLocalLogs];
                     const matchedLocalIndices = new Set<number>();
                     
                     // Helper to normalize IDs for comparison (strips 'run_' prefix if present)
@@ -133,7 +146,7 @@ export function HistorySubTab({ onNavigate }: HistorySubTabProps) {
                         let matchedIdx = -1;
                         
                         // Pass 1: Try absolute run_id match
-                        matchedIdx = localLogs.findIndex((lLog, idx) => {
+                        matchedIdx = filteredLocalLogs.findIndex((lLog, idx) => {
                             if (matchedLocalIndices.has(idx)) return false;
                             const lRunId = normalizeId(lLog.run_id);
                             return lRunId && gRunId && lRunId === gRunId;
@@ -141,7 +154,7 @@ export function HistorySubTab({ onNavigate }: HistorySubTabProps) {
 
                         // Pass 2: Try heuristic (Name + Time + Device)
                         if (matchedIdx === -1) {
-                            matchedIdx = localLogs.findIndex((lLog, idx) => {
+                            matchedIdx = filteredLocalLogs.findIndex((lLog, idx) => {
                                 if (matchedLocalIndices.has(idx)) return false;
                                 
                                 const timeDiff = Math.abs(new Date(lLog.timestamp).getTime() - new Date(gLog.timestamp).getTime());
@@ -158,7 +171,7 @@ export function HistorySubTab({ onNavigate }: HistorySubTabProps) {
                         }
 
                         if (matchedIdx !== -1) {
-                            const localMatch = localLogs[matchedIdx];
+                            const localMatch = filteredLocalLogs[matchedIdx];
                             localMatch.has_remote_sync = true;
                             if (!localMatch.id) localMatch.id = gLog.id;
                             matchedLocalIndices.add(matchedIdx);
@@ -176,12 +189,12 @@ export function HistorySubTab({ onNavigate }: HistorySubTabProps) {
                     combinedLogs = merged.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
                     // Sync any unsynced local logs to Firebase
-                    const unsyncedLogs = localLogs.filter((_, idx) => !matchedLocalIndices.has(idx));
+                    const unsyncedLogs = filteredLocalLogs.filter((_, idx) => !matchedLocalIndices.has(idx));
                     if (unsyncedLogs.length > 0) {
                         console.log(`[Sync] Found ${unsyncedLogs.length} unsynced local logs. Syncing in background...`);
                         Promise.all(
                             unsyncedLogs.map(async (log) => {
-                                const docId = await uploadTestToFirebase(currentUser.uid, activeProfileId, log);
+                                const docId = await uploadTestToFirebase(currentUser.uid, activeProfileName, log);
                                 if (docId) {
                                     return { xml_path: log.xml_path, docId };
                                 }

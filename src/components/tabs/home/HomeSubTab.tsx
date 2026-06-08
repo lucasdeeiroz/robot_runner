@@ -122,9 +122,13 @@ export function HomeSubTab({ onNavigate }: HomeSubTabProps) {
         logEvent('device_action', { action_type: action });
         switch (action) {
             case 'screenshot':
-                await screenshotSaver.saveFile(async (path) => {
-                    await invoke('save_screenshot', { device: device.udid, path });
-                }, 'feedback.screenshot_saved');
+                try {
+                    await screenshotSaver.saveFile(async (path) => {
+                        await invoke('save_screenshot', { device: device.udid, path });
+                    }, 'feedback.screenshot_saved');
+                } catch (e) {
+                    console.error("Screenshot failed:", e);
+                }
                 break;
             case 'reboot':
                 try {

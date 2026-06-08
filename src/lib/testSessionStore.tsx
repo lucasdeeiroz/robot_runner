@@ -34,6 +34,7 @@ export interface TestSession {
     startTime: number;
     isAiAgent?: boolean;
     aiPrompt?: string;
+    profileName?: string;
 }
 
 interface TestOutputPayload {
@@ -48,7 +49,7 @@ interface TestFinishedPayload {
 
 interface TestSessionContextType {
     sessions: TestSession[];
-    addSession: (runId: string, deviceUdid: string, deviceName: string, testPath: string, framework: 'robot' | 'maestro' | 'appium' | 'cypress' | 'selenium', timestampOutputs: boolean, outputDir?: string, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string, selectedTests?: string[], isAiAgent?: boolean, aiPrompt?: string) => void;
+    addSession: (runId: string, deviceUdid: string, deviceName: string, testPath: string, framework: 'robot' | 'maestro' | 'appium' | 'cypress' | 'selenium', timestampOutputs: boolean, outputDir?: string, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string, selectedTests?: string[], isAiAgent?: boolean, aiPrompt?: string, profileName?: string) => void;
     addToolboxSession: (deviceUdid: string, deviceName: string, deviceModel?: string, androidVersion?: string) => void; // New action
     rerunSession: (runId: string, rerunFailedFrom?: string) => Promise<void>;
     stopSession: (runId: string) => Promise<void>;
@@ -69,7 +70,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
     const [sessions, setSessions] = useState<TestSession[]>([]);
     const [activeSessionId, setActiveSessionId] = useState<string | 'dashboard'>('dashboard');
     const [appiumRunning, setAppiumRunning] = useState(false);
-    const { settings, activeProfileId } = useSettings();
+    const { settings, activeProfileId, profiles } = useSettings();
     const isTestRunning = useMemo(() => sessions.some(s => s.status === 'running'), [sessions]);
 
     // Periodic Appium Status Check
@@ -150,9 +151,11 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
 
                         const extractedSuiteName = sessionToFinish.testPath.split(/[\\/]/).pop()?.split('.')[0] || 'Unknown';
                         
+                        const resolvedProfileName = sessionToFinish.profileName || 'Default';
+
                         addDoc(historyRef, {
                             runId: sessionToFinish.runId,
-                            logsPath: activeProfileId,
+                            logsPath: resolvedProfileName,
                             testPath: sessionToFinish.testPath,
                             suiteName: extractedSuiteName,
                             status: exit_code === 0 ? 'passed' : 'failed',
@@ -193,11 +196,11 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
             unlistenOutputPromise.then(f => f());
             unlistenFinishedPromise.then(f => f());
         };
-    }, [activeProfileId, settings.paths.logs]);
+    }, []);
 
 
 
-    const addSession = useCallback((runId: string, deviceUdid: string, deviceName: string, testPath: string, framework: 'robot' | 'maestro' | 'appium' | 'cypress' | 'selenium', timestampOutputs: boolean, outputDir?: string, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string, selectedTests?: string[], isAiAgent?: boolean, aiPrompt?: string) => {
+    const addSession = useCallback((runId: string, deviceUdid: string, deviceName: string, testPath: string, framework: 'robot' | 'maestro' | 'appium' | 'cypress' | 'selenium', timestampOutputs: boolean, outputDir?: string, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string, selectedTests?: string[], isAiAgent?: boolean, aiPrompt?: string, profileName?: string) => {
         setSessions(prev => {
             // Check for recycling
             if (settings.recycleDeviceViews) {
@@ -231,7 +234,8 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                         sessionEpoch: (existing.sessionEpoch || 0) + 1, // Force RunConsole remount
                         startTime: Date.now(),
                         isAiAgent,
-                        aiPrompt
+                        aiPrompt,
+                        profileName
                     };
 
                     setTimeout(() => setActiveSessionId(existing.runId), 0); // Focus it
@@ -261,7 +265,8 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     sessionEpoch: 0,
                     startTime: Date.now(),
                     isAiAgent,
-                    aiPrompt
+                    aiPrompt,
+                    profileName
                 }
             ];
         });
@@ -384,8 +389,26 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
             outputDir = settings.paths.logs || "../test_results";
         }
 
+        const activeProfileName = profiles.find(p => p.id === activeProfileId)?.name || 'Default';
+        const sessionProfileName = session.profileName || activeProfileName;
+
         // Add new session immediately
-        addSession(newRunId, session.deviceUdid, session.deviceName, session.testPath, session.framework, session.timestampOutputs || false, outputDir, session.argumentsFile, session.deviceModel, session.androidVersion, session.selectedTests);
+        addSession(
+            newRunId,
+            session.deviceUdid,
+            session.deviceName,
+            session.testPath,
+            session.framework,
+            session.timestampOutputs || false,
+            outputDir,
+            session.argumentsFile,
+            session.deviceModel,
+            session.androidVersion,
+            session.selectedTests,
+            session.isAiAgent,
+            session.aiPrompt,
+            sessionProfileName
+        );
 
         try {
             // Check Appium (Skip for Maestro, Cypress, Selenium, or if Robot is selected and noAppiumForRobot is enabled)
@@ -414,7 +437,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     runId: newRunId,
                     testPath: session.testPath === session.argumentsFile ? null : session.testPath,
                     outputDir: outputDir,
-                    logs_path: settings.paths.logs,
+                    logs_path: sessionProfileName,
                     device: session.deviceUdid === 'local' ? null : session.deviceUdid,
                     argumentsFile: session.argumentsFile,
                     deviceModel: session.deviceModel,
@@ -428,7 +451,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     runId: newRunId,
                     testPath: session.testPath,
                     outputDir: outputDir,
-                    logs_path: settings.paths.logs,
+                    logs_path: sessionProfileName,
                     device: session.deviceUdid === 'local' ? null : session.deviceUdid,
                     maestroArgs: settings.tools.maestroArgs,
                     working_dir: settings.paths.automationRoot,
@@ -439,7 +462,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     runId: newRunId,
                     projectPath: session.testPath,
                     outputDir: outputDir,
-                    logs_path: settings.paths.logs,
+                    logs_path: sessionProfileName,
                     appiumJavaArgs: settings.tools.appiumJavaArgs
                 });
             } else if (fw === 'cypress') {
@@ -447,6 +470,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     runId: newRunId,
                     testPath: session.testPath,
                     outputDir: outputDir,
+                    logs_path: sessionProfileName,
                     browser: session.deviceUdid || 'chrome',
                     cypressArgs: settings.tools.cypressArgs,
                     workingDir: settings.paths.automationRoot
@@ -456,6 +480,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     runId: newRunId,
                     testPath: session.testPath,
                     outputDir: outputDir,
+                    logs_path: sessionProfileName,
                     browser: session.deviceUdid || 'chrome',
                     seleniumArgs: settings.tools.seleniumArgs,
                     workingDir: settings.paths.automationRoot
@@ -471,7 +496,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                 return s;
             }));
         }
-    }, [sessions, settings, addSession]);
+    }, [sessions, settings, addSession, activeProfileId, profiles]);
 
     const clearSession = useCallback((runId: string) => {
         setSessions(prev => {

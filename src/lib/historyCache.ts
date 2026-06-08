@@ -2,6 +2,7 @@ export interface TestLog {
     id?: string; // For Firestore document ID
     run_id?: string | null;
     logs_path?: string | null;
+    framework?: string | null;
     path: string;
     suite_name: string;
     status: 'PASS' | 'FAIL';
