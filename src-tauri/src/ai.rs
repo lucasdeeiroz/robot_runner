@@ -253,43 +253,67 @@ pub async fn call_antigravity_cli(
                             });
 
                             if let Ok((_idx, payload)) = step_query {
-                                // Extract the JSON/text content from the protobuf-like binary step_payload.
-                                // We scan the binary blob to find the JSON structure corresponding to the model response.
-                                // The model response JSON is a standalone '{ ... }' block. We find the first '{',
-                                // then find its matching closing '}' by tracking the brace nesting depth.
-                                if let Some(fb) = payload.iter().position(|&b| b == b'{') {
-                                    let mut depth = 0;
+                                // Robustly extract the model's JSON response from the binary protobuf payload.
+                                // The payload may contain binary blobs (e.g., screenshots) with bytes that coincidentally
+                                // look like '{' (0x7B). We therefore enumerate ALL '{' positions, attempt to extract
+                                // a valid UTF-8 JSON object from each candidate, and select the largest one successfully
+                                // parsed — which will be the rich model response, not a stray brace in binary data.
+                                let mut best_json: Option<serde_json::Value> = None;
+                                let mut best_len: usize = 0;
+
+                                let mut search_start = 0;
+                                while let Some(rel_pos) = payload[search_start..].iter().position(|&b| b == b'{') {
+                                    let fb = search_start + rel_pos;
+                                    let mut depth: i32 = 0;
                                     let mut matched_end = None;
+
                                     for (i, &b) in payload.iter().enumerate().skip(fb) {
-                                        if b == b'{' {
-                                            depth += 1;
-                                        } else if b == b'}' {
-                                            depth -= 1;
-                                            if depth == 0 {
-                                                matched_end = Some(i);
-                                                break;
+                                        match b {
+                                            b'{' => depth += 1,
+                                            b'}' => {
+                                                depth -= 1;
+                                                if depth == 0 {
+                                                    matched_end = Some(i);
+                                                    break;
+                                                }
                                             }
+                                            _ => {}
                                         }
                                     }
 
                                     if let Some(lb) = matched_end {
-                                        let json_slice = &payload[fb..=lb];
-                                        let json_str = String::from_utf8_lossy(json_slice).into_owned();
-                                        
-                                        // Try parsing it as JSON first to avoid double serialization
-                                        let response_val: serde_json::Value = serde_json::from_str(&json_str).unwrap_or(serde_json::Value::String(json_str));
-                                        
-                                        // Wrap it in the format the frontend expects: { "response": <extracted_json>, "session_id": "<uuid>" }
-                                        let db_file_name = db_path.file_stem()
-                                            .map(|s| s.to_string_lossy().to_string())
-                                            .unwrap_or_default();
-                                        
-                                        let wrapper = serde_json::json!({
-                                            "response": response_val,
-                                            "session_id": db_file_name
-                                        });
-                                        stdout = wrapper.to_string();
+                                        let candidate = &payload[fb..=lb];
+                                        // Only attempt JSON parsing on valid UTF-8 slices to avoid garbage
+                                        if let Ok(candidate_str) = std::str::from_utf8(candidate) {
+                                            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(candidate_str) {
+                                                let candidate_len = lb - fb + 1;
+                                                if candidate_len > best_len {
+                                                    best_len = candidate_len;
+                                                    best_json = Some(parsed);
+                                                }
+                                            }
+                                        }
+                                        search_start = lb + 1;
+                                    } else {
+                                        // No matching closing brace; skip this '{' and continue
+                                        search_start = fb + 1;
                                     }
+
+                                    if search_start >= payload.len() {
+                                        break;
+                                    }
+                                }
+
+                                if let Some(response_val) = best_json {
+                                    let db_file_name = db_path.file_stem()
+                                        .map(|s| s.to_string_lossy().to_string())
+                                        .unwrap_or_default();
+
+                                    let wrapper = serde_json::json!({
+                                        "response": response_val,
+                                        "session_id": db_file_name
+                                    });
+                                    stdout = wrapper.to_string();
                                 }
                             }
                         }

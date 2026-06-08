@@ -444,8 +444,18 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
 
         } catch (error: any) {
             console.error("AI Suggestion Error:", error);
-            setAiError(error.message || String(error));
-            feedback.toast.error(t('inspector.attributes.ai_error_generic'));
+            const msg: string = error.message || String(error);
+            if (msg.startsWith('QUOTA_EXHAUSTED:')) {
+                const detail = msg.replace('QUOTA_EXHAUSTED:', '').trim();
+                setAiError(t('inspector.attributes.ai_error_quota', { detail }));
+                feedback.toast.error(t('inspector.attributes.ai_error_quota', { detail }), { duration: 8000 });
+            } else if (msg.startsWith('AUTH_ERROR:')) {
+                setAiError(t('inspector.attributes.ai_error_auth'));
+                feedback.toast.error(t('inspector.attributes.ai_error_auth'));
+            } else {
+                setAiError(msg);
+                feedback.toast.error(t('inspector.attributes.ai_error_generic'));
+            }
         } finally {
             setIsAiLoading(false);
         }

@@ -615,7 +615,9 @@ export const es = {
                 suggested_selector: "Selector Sugerido",
                 ai_rationale: "Justificación de IA",
                 rationale: "Justificación",
-                ai_error_generic: "Fallo en la sugerencia de IA."
+                ai_error_generic: "Fallo en la sugerencia de IA.",
+                ai_error_quota: "Cuota de IA agotada. {{detail}}",
+                ai_error_auth: "Error de autenticación de IA. Verifica tu clave API."
             },
             recorder: {
                 title: "Grabador de Pasos",
@@ -1078,6 +1080,8 @@ export const es = {
                 ai_analysis_placeholder: "Haga clic para realizar un análisis inteligente da causa raíz usando IA.",
                 ai_analysis_error: "Fallo en el análisis de IA",
                 ai_error_generic: "Análisis de IA fallido.",
+                ai_error_quota: "Cuota de IA agotada. {{detail}}",
+                ai_error_auth: "Error de autenticación de IA. Verifica tu clave API.",
                 ai_error_details: "Detalles del Error:",
                 ai_error_copy: "Copiar error",
                 ai_history: {

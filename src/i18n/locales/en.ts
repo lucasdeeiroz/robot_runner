@@ -615,7 +615,9 @@ export const en = {
                 suggested_selector: "Suggested Selector",
                 ai_rationale: "AI Rationale",
                 rationale: "Rationale",
-                ai_error_generic: "AI suggestion failed."
+                ai_error_generic: "AI suggestion failed.",
+                ai_error_quota: "AI quota exhausted. {{detail}}",
+                ai_error_auth: "AI authentication failed. Check your API key."
             },
             recorder: {
                 title: "Steps Recorder",
@@ -1071,6 +1073,8 @@ export const en = {
                 ai_analysis_placeholder: "Click to perform a smart root cause analysis using AI.",
                 ai_analysis_error: "AI analysis failed",
                 ai_error_generic: "AI analysis failed.",
+                ai_error_quota: "AI quota exhausted. {{detail}}",
+                ai_error_auth: "AI authentication failed. Check your API key.",
                 ai_error_details: "Error Details:",
                 ai_error_copy: "Copy Error",
                 ai_history: {

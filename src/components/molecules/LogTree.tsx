@@ -464,8 +464,19 @@ Error Message: ${(node as TestNode).failureDetail?.message}
                                                         }
                                                     } catch (err: any) {
                                                         console.error("AI Analysis Error:", err);
-                                                        setAiError(err.message || String(err));
-                                                        feedback.toast.error(t('run_tab.console.ai_error_generic'));
+                                                        const msg: string = err.message || String(err);
+                                                        if (msg.startsWith('QUOTA_EXHAUSTED:')) {
+                                                            const detail = msg.replace('QUOTA_EXHAUSTED:', '').trim();
+                                                            setAiError(t('run_tab.console.ai_error_quota', { detail }));
+                                                            feedback.toast.error(t('run_tab.console.ai_error_quota', { detail }), { duration: 8000 });
+                                                        } else if (msg.startsWith('AUTH_ERROR:')) {
+                                                            setAiError(t('run_tab.console.ai_error_auth'));
+                                                            feedback.toast.error(t('run_tab.console.ai_error_auth'));
+                                                        } else {
+                                                            setAiError(msg);
+                                                            feedback.toast.error(t('run_tab.console.ai_error_generic'));
+                                                        }
+
                                                     } finally {
                                                         setIsAnalyzing(false);
                                                     }

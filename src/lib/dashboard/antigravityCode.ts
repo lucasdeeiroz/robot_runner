@@ -49,6 +49,42 @@ export interface AntigravityCLIResponse {
     usage?: any;
 }
 
+/**
+ * Inspects a parsed CLI response for Google API / Gemini error payloads and throws
+ * a descriptive Error if found. Handles quota exhaustion (429), auth failures (401),
+ * and other API-level errors so callers receive a clean, translatable message.
+ */
+function detectApiError(parsed: any): void {
+    const err = parsed?.error;
+    if (!err) return;
+
+    const code: number = err.code ?? 0;
+    const message: string = err.message ?? 'Unknown API error';
+    const status: string = err.status ?? '';
+
+    if (code === 429 || status === 'RESOURCE_EXHAUSTED') {
+        // Extract the human-readable reset delay from ErrorInfo details if present
+        let resetDelay = '';
+        const details: any[] = err.details ?? [];
+        for (const detail of details) {
+            if (detail?.metadata?.quotaResetDelay) {
+                resetDelay = detail.metadata.quotaResetDelay;
+                break;
+            }
+        }
+        const resetSuffix = resetDelay ? ` Resets in ${resetDelay}.` : '';
+        throw new Error(`QUOTA_EXHAUSTED:${resetSuffix || message}`);
+    }
+
+    if (code === 401 || status === 'UNAUTHENTICATED') {
+        throw new Error(`AUTH_ERROR:${message}`);
+    }
+
+    // Generic API error fallback
+    throw new Error(`API_ERROR:${message}`);
+}
+
+
 export async function askAntigravityCli(
     prompt: string,
     projectRoot: string,
@@ -85,6 +121,10 @@ export async function askAntigravityCli(
 
         const parsed = safeParseJson<any>(rawResult);
         if (parsed && typeof parsed === 'object') {
+            // Detect and surface API-level errors (quota, auth, etc.) before any extraction
+            detectApiError(parsed);
+            detectApiError(parsed.response);
+
             let mainContent = parsed.response !== undefined 
                 ? parsed.response 
                 : (parsed.result !== undefined ? parsed.result : (parsed.completion || parsed.text || parsed.content));

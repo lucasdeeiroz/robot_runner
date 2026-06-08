@@ -615,7 +615,9 @@ export const pt = {
                 suggested_selector: "Seletor Sugerido",
                 ai_rationale: "Justificativa da IA",
                 rationale: "Justificativa",
-                ai_error_generic: "Falha na sugestão de IA."
+                ai_error_generic: "Falha na sugestão de IA.",
+                ai_error_quota: "Cota da IA esgotada. {{detail}}",
+                ai_error_auth: "Falha de autenticação da IA. Verifique sua chave de API."
             },
             recorder: {
                 title: "Gravador de Passos",
@@ -1072,6 +1074,8 @@ export const pt = {
                 ai_analysis_placeholder: "Clique para realizar uma análise inteligente da causa raiz usando IA.",
                 ai_analysis_error: "Falha na análise de IA",
                 ai_error_generic: "Falha na análise de IA.",
+                ai_error_quota: "Cota da IA esgotada. {{detail}}",
+                ai_error_auth: "Falha de autenticação da IA. Verifique sua chave de API.",
                 ai_error_details: "Detalhes do Erro:",
                 ai_error_copy: "Copiar Erro",
                 ai_history: {
