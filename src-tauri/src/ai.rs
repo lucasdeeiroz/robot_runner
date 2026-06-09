@@ -116,6 +116,93 @@ pub async fn call_claude_code_cli(
     }
 }
 
+fn read_varint(buffer: &[u8], mut offset: usize) -> Option<(u64, usize)> {
+    let mut result = 0u64;
+    let mut shift = 0;
+    while offset < buffer.len() {
+        let b = buffer[offset];
+        offset += 1;
+        result |= ((b & 0x7F) as u64) << shift;
+        if (b & 0x80) == 0 {
+            return Some((result, offset));
+        }
+        shift += 7;
+        if shift >= 64 {
+            return None; // Varint too long
+        }
+    }
+    None
+}
+
+fn find_field_bytes(buffer: &[u8], target_field: u32) -> Option<Vec<u8>> {
+    let mut pos = 0;
+    while pos < buffer.len() {
+        let (tag, bytes_read) = read_varint(buffer, pos)?;
+        pos = bytes_read;
+
+        let wire_type = tag & 0x7;
+        let field_num = (tag >> 3) as u32;
+
+        if wire_type == 2 { // length-delimited
+            let (len, bytes_read_len) = read_varint(buffer, pos)?;
+            pos = bytes_read_len;
+            let len = len as usize;
+
+            if pos + len <= buffer.len() {
+                let slice = &buffer[pos..(pos + len)];
+                if field_num == target_field {
+                    return Some(slice.to_vec());
+                }
+                pos += len;
+            } else {
+                break;
+            }
+        } else if wire_type == 0 { // varint
+            let (_, bytes_read_var) = read_varint(buffer, pos)?;
+            pos = bytes_read_var;
+        } else if wire_type == 1 { // 64-bit
+            pos += 8;
+        } else if wire_type == 5 { // 32-bit
+            pos += 4;
+        } else {
+            break;
+        }
+    }
+    None
+}
+
+fn extract_protobuf_response(payload: &[u8], fallback_session_id: &str) -> Option<(String, String)> {
+    // Try field 30 -> 4 first (final response in type 23 steps)
+    if let Some(submessage_30) = find_field_bytes(payload, 30) {
+        if let Some(response_text) = find_field_bytes(&submessage_30, 4) {
+            if let Ok(text_str) = String::from_utf8(response_text) {
+                if !text_str.trim().is_empty() {
+                    return Some((text_str, fallback_session_id.to_string()));
+                }
+            }
+        }
+    }
+
+    // Try field 20 -> 1 or 8 (reasoning/response in type 15 steps)
+    if let Some(submessage_20) = find_field_bytes(payload, 20) {
+        if let Some(response_text) = find_field_bytes(&submessage_20, 1)
+            .or_else(|| find_field_bytes(&submessage_20, 8))
+        {
+            if let Ok(text_str) = String::from_utf8(response_text) {
+                let session_id_str = find_field_bytes(&submessage_20, 6)
+                    .and_then(|b| String::from_utf8(b).ok())
+                    .unwrap_or_else(|| fallback_session_id.to_string());
+                
+                if !text_str.trim().is_empty() {
+                    return Some((text_str, session_id_str));
+                }
+            }
+        }
+    }
+
+    None
+}
+
 #[command]
 pub async fn call_antigravity_cli(
     prompt: String,
@@ -242,78 +329,88 @@ pub async fn call_antigravity_cli(
                 }
 
                 if let Some(ref db_path) = target_db_path {
+                    let db_file_name = db_path.file_stem()
+                        .map(|s| s.to_string_lossy().to_string())
+                        .unwrap_or_default();
+
                     if let Ok(conn) = rusqlite::Connection::open(&db_path) {
-                        // Retrieve the latest step payload (BLOB)
-                        let stmt_res = conn.prepare("SELECT idx, step_payload FROM steps ORDER BY idx DESC LIMIT 1");
+                        let stmt_res = conn.prepare("SELECT idx, step_payload FROM steps ORDER BY idx DESC");
                         if let Ok(mut stmt) = stmt_res {
-                            let step_query = stmt.query_row([], |row| {
-                                let idx: i32 = row.get(0)?;
-                                let payload: Vec<u8> = row.get(1)?;
-                                Ok((idx, payload))
-                            });
+                            if let Ok(mut rows) = stmt.query([]) {
+                                while let Ok(Some(row)) = rows.next() {
+                                    let payload_res = row.get::<_, Vec<u8>>(1);
 
-                            if let Ok((_idx, payload)) = step_query {
-                                // Robustly extract the model's JSON response from the binary protobuf payload.
-                                // The payload may contain binary blobs (e.g., screenshots) with bytes that coincidentally
-                                // look like '{' (0x7B). We therefore enumerate ALL '{' positions, attempt to extract
-                                // a valid UTF-8 JSON object from each candidate, and select the largest one successfully
-                                // parsed — which will be the rich model response, not a stray brace in binary data.
-                                let mut best_json: Option<serde_json::Value> = None;
-                                let mut best_len: usize = 0;
+                                    if let Ok(payload) = payload_res {
+                                        // 1. Try Protobuf extraction
+                                        if let Some((text_str, session_id_str)) = extract_protobuf_response(&payload, &db_file_name) {
+                                            let response_json = serde_json::from_str::<serde_json::Value>(&text_str)
+                                                .unwrap_or_else(|_| serde_json::Value::String(text_str));
+                                            stdout = serde_json::json!({
+                                                "response": response_json,
+                                                "session_id": session_id_str
+                                            }).to_string();
+                                            break;
+                                        }
 
-                                let mut search_start = 0;
-                                while let Some(rel_pos) = payload[search_start..].iter().position(|&b| b == b'{') {
-                                    let fb = search_start + rel_pos;
-                                    let mut depth: i32 = 0;
-                                    let mut matched_end = None;
+                                        // 2. Try Balanced Braces scan fallback on this payload
+                                        let mut best_json: Option<serde_json::Value> = None;
+                                        let mut best_len: usize = 0;
+                                        let mut search_start = 0;
 
-                                    for (i, &b) in payload.iter().enumerate().skip(fb) {
-                                        match b {
-                                            b'{' => depth += 1,
-                                            b'}' => {
-                                                depth -= 1;
-                                                if depth == 0 {
-                                                    matched_end = Some(i);
-                                                    break;
+                                        while let Some(rel_pos) = payload[search_start..].iter().position(|&b| b == b'{') {
+                                            let fb = search_start + rel_pos;
+                                            let mut depth: i32 = 0;
+                                            let mut matched_end = None;
+
+                                            for (i, &b) in payload.iter().enumerate().skip(fb) {
+                                                match b {
+                                                    b'{' => depth += 1,
+                                                    b'}' => {
+                                                        depth -= 1;
+                                                        if depth == 0 {
+                                                            matched_end = Some(i);
+                                                            break;
+                                                        }
+                                                    }
+                                                    _ => {}
                                                 }
                                             }
-                                            _ => {}
-                                        }
-                                    }
 
-                                    if let Some(lb) = matched_end {
-                                        let candidate = &payload[fb..=lb];
-                                        // Only attempt JSON parsing on valid UTF-8 slices to avoid garbage
-                                        if let Ok(candidate_str) = std::str::from_utf8(candidate) {
-                                            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(candidate_str) {
-                                                let candidate_len = lb - fb + 1;
-                                                if candidate_len > best_len {
-                                                    best_len = candidate_len;
-                                                    best_json = Some(parsed);
+                                            if let Some(lb) = matched_end {
+                                                let candidate = &payload[fb..=lb];
+                                                let mut parsed_ok = false;
+                                                if let Ok(candidate_str) = std::str::from_utf8(candidate) {
+                                                    if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(candidate_str) {
+                                                        let candidate_len = lb - fb + 1;
+                                                        if candidate_len > best_len {
+                                                            best_len = candidate_len;
+                                                            best_json = Some(parsed);
+                                                        }
+                                                        parsed_ok = true;
+                                                    }
                                                 }
+                                                if parsed_ok {
+                                                    search_start = lb + 1;
+                                                } else {
+                                                    search_start = fb + 1;
+                                                }
+                                            } else {
+                                                search_start = fb + 1;
+                                            }
+
+                                            if search_start >= payload.len() {
+                                                break;
                                             }
                                         }
-                                        search_start = lb + 1;
-                                    } else {
-                                        // No matching closing brace; skip this '{' and continue
-                                        search_start = fb + 1;
+
+                                        if let Some(response_val) = best_json {
+                                            stdout = serde_json::json!({
+                                                "response": response_val,
+                                                "session_id": db_file_name
+                                            }).to_string();
+                                            break;
+                                        }
                                     }
-
-                                    if search_start >= payload.len() {
-                                        break;
-                                    }
-                                }
-
-                                if let Some(response_val) = best_json {
-                                    let db_file_name = db_path.file_stem()
-                                        .map(|s| s.to_string_lossy().to_string())
-                                        .unwrap_or_default();
-
-                                    let wrapper = serde_json::json!({
-                                        "response": response_val,
-                                        "session_id": db_file_name
-                                    });
-                                    stdout = wrapper.to_string();
                                 }
                             }
                         }
@@ -322,7 +419,7 @@ pub async fn call_antigravity_cli(
             }
         }
     }
-    
+
     if output.status.success() {
         Ok(stdout)
     } else {
@@ -333,7 +430,6 @@ pub async fn call_antigravity_cli(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[tokio::test]
     async fn test_antigravity_cli_exec() {

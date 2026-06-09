@@ -29,8 +29,36 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
+#[cfg(target_os = "windows")]
+mod win32 {
+    use std::ffi::c_void;
+
+    unsafe extern "system" {
+        pub fn AllocConsole() -> i32;
+        pub fn GetConsoleWindow() -> *mut c_void;
+        pub fn ShowWindow(hWnd: *mut c_void, nCmdShow: i32) -> i32;
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn init_hidden_console() {
+    unsafe {
+        let window = win32::GetConsoleWindow();
+        if window.is_null() {
+            win32::AllocConsole();
+            let window = win32::GetConsoleWindow();
+            if !window.is_null() {
+                win32::ShowWindow(window, 0); // 0 is SW_HIDE
+            }
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(target_os = "windows")]
+    init_hidden_console();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_notification::init())

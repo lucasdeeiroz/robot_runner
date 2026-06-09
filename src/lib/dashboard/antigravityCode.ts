@@ -125,9 +125,26 @@ export async function askAntigravityCli(
             detectApiError(parsed);
             detectApiError(parsed.response);
 
+            if (options?.jsonSchema) {
+                const targetObject = parsed.response !== undefined ? parsed.response : parsed;
+                const structured = typeof targetObject === 'string' ? safeParseJson<any>(targetObject) : targetObject;
+                if (structured && typeof structured === 'object') {
+                    return {
+                        result: typeof targetObject === 'string' ? targetObject : JSON.stringify(targetObject),
+                        structured_output: structured,
+                        session_id: parsed.session_id,
+                        usage: parsed.usage || parsed.stats
+                    };
+                }
+            }
+
             let mainContent = parsed.response !== undefined 
                 ? parsed.response 
                 : (parsed.result !== undefined ? parsed.result : (parsed.completion || parsed.text || parsed.content));
+
+            if (mainContent === undefined) {
+                mainContent = parsed;
+            }
 
             if (mainContent && typeof mainContent === 'object') {
                 mainContent = mainContent.reply !== undefined 
@@ -139,18 +156,6 @@ export async function askAntigravityCli(
                             : (mainContent.content !== undefined 
                                 ? mainContent.content 
                                 : mainContent)));
-            }
-
-            if (options?.jsonSchema) {
-                const structured = typeof mainContent === 'string' ? safeParseJson<any>(mainContent) : mainContent;
-                if (structured && typeof structured === 'object') {
-                    return {
-                        result: typeof mainContent === 'string' ? mainContent : JSON.stringify(mainContent),
-                        structured_output: structured,
-                        session_id: parsed.session_id,
-                        usage: parsed.usage || parsed.stats
-                    };
-                }
             }
 
             if (mainContent !== undefined) {
