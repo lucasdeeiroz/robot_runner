@@ -33,14 +33,14 @@ interface FileExplorerProps {
     onNavigate?: (page: string) => void;
 }
 
-export function FileExplorer({ 
-    initialPath = ".", 
-    onSelect, 
-    onCancel, 
-    selectionMode = 'file', 
-    title: _title, 
-    onSelectionChange, 
-    allowHideFooter = false, 
+export function FileExplorer({
+    initialPath = ".",
+    onSelect,
+    onCancel,
+    selectionMode = 'file',
+    title: _title,
+    onSelectionChange,
+    allowHideFooter = false,
     renderEntryExtra,
     isMultiSelect = true,
     fallbackType,
@@ -94,9 +94,9 @@ export function FileExplorer({
 
     const getGitStatusForEntry = (entry: FileEntry) => {
         if (!settings.git?.enabled) return null;
-        
+
         const relPath = getRelativePath(entry.path);
-        
+
         // 1. Check direct match or explicit parent folder untracked status
         for (const [filePath, status] of Object.entries(gitStatusEntries)) {
             const cleanKey = filePath.replace(/\/$/, '');
@@ -108,14 +108,14 @@ export function FileExplorer({
                 return 'untracked';
             }
         }
-        
+
         // 2. If it's a directory, check children changes to calculate its badge
         if (entry.is_dir) {
             const prefix = relPath ? `${relPath}/` : '';
             let hasModified = false;
             let hasUntracked = false;
             let hasStaged = false;
-            
+
             for (const [filePath, status] of Object.entries(gitStatusEntries)) {
                 if (filePath.startsWith(prefix)) {
                     if (status === 'modified' || status === 'deleted') hasModified = true;
@@ -123,24 +123,24 @@ export function FileExplorer({
                     if (status === 'staged') hasStaged = true;
                 }
             }
-            
+
             // Show badge for directory based on children changes
             if (hasModified) return 'modified';
             if (hasStaged) return 'staged';
             if (hasUntracked) return 'untracked';
         }
-        
+
         return null;
     };
 
     const getFolderActionStatus = (entry: FileEntry): 'untracked' | 'modified' | 'staged' | 'deleted' | null => {
         if (!entry.is_dir) return getGitStatusForEntry(entry);
-        
+
         const relPath = getRelativePath(entry.path);
         const prefix = relPath ? `${relPath}/` : '';
-        
+
         const childStatuses = new Set<string>();
-        
+
         // Check if the folder itself has a status, or gather child statuses
         for (const [filePath, status] of Object.entries(gitStatusEntries)) {
             const cleanKey = filePath.replace(/\/$/, '');
@@ -150,13 +150,13 @@ export function FileExplorer({
                 childStatuses.add(status);
             }
         }
-        
+
         // Only allow action if all changed children inside share the same status
         if (childStatuses.size === 1) {
             const status = Array.from(childStatuses)[0];
             return status as 'untracked' | 'modified' | 'staged' | 'deleted';
         }
-        
+
         return null;
     };
 
@@ -279,7 +279,7 @@ export function FileExplorer({
             } else {
                 setSelectedEntry(entry);
                 if (onSelectionChange) onSelectionChange(entry);
-                
+
                 if (isMultiSelect && selectionMode === 'directory' && !entry.is_dir === false) {
                     toggleItem({
                         path: entry.path,
@@ -372,56 +372,56 @@ export function FileExplorer({
                         <CornerLeftUp size={18} />
                     </button>
                     <div className="flex-1 font-mono text-sm truncate px-2 text-on-surface/80">
-                        {rootPath && currentPath.startsWith(rootPath) 
+                        {rootPath && currentPath.startsWith(rootPath)
                             ? (currentPath === rootPath ? './' : currentPath.replace(rootPath, '').replace(/^[\\/]/, ''))
                             : currentPath}
                     </div>
                     {settings.git?.enabled && (
                         <div className="flex items-center gap-0.5 border-l border-outline-variant/20 pl-2">
                             {/* Fetch */}
-                            <button
+                            <Button
                                 onClick={handleGitFetch}
                                 disabled={fetching}
-                                className="p-1.5 rounded-lg text-on-surface-variant/70 hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-90 cursor-pointer"
+                                className="px-1 py-0 rounded-lg text-on-surface-variant/70 bg-transparent hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-90 cursor-pointer"
                                 data-tooltip={t('file_explorer.git_fetch_tooltip', "Fetch from remote")}
                                 data-position="left"
                                 aria-label={t('file_explorer.git_fetch_tooltip', "Fetch from remote")}
                             >
                                 <RefreshCw size={15} className={fetching ? 'animate-spin' : ''} />
-                            </button>
+                            </Button>
                             {/* Pull */}
-                            <button
+                            <Button
                                 onClick={handleGitPull}
                                 disabled={pulling}
-                                className="p-1.5 rounded-lg text-on-surface-variant/70 hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-90 cursor-pointer"
+                                className="px-1 py-0 rounded-lg text-on-surface-variant/70 bg-transparent hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-90 cursor-pointer"
                                 data-tooltip={t('file_explorer.git_pull_tooltip', "Pull from remote")}
                                 data-position="left"
                                 aria-label={t('file_explorer.git_pull_tooltip', "Pull from remote")}
                             >
                                 <ArrowDownToLine size={15} />
-                            </button>
+                            </Button>
                             {/* Commit */}
-                            <button
+                            <Button
                                 onClick={() => setShowCommitModal(true)}
                                 disabled={!Object.values(gitStatusEntries).some(s => s === 'staged')}
-                                className="p-1.5 rounded-lg text-on-surface-variant/70 hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-90 cursor-pointer"
+                                className="px-1 py-0 rounded-lg text-on-surface-variant/70 bg-transparent hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-90 cursor-pointer"
                                 data-tooltip={t('file_explorer.git_commit_btn_tooltip', "Commit staged changes")}
                                 data-position="left"
                                 aria-label={t('file_explorer.git_commit_btn_tooltip', "Commit staged changes")}
                             >
                                 <GitCommitVertical size={15} />
-                            </button>
+                            </Button>
                             {/* Push */}
-                            <button
+                            <Button
                                 onClick={handleGitPush}
                                 disabled={pushing}
-                                className="p-1.5 rounded-lg text-on-surface-variant/70 hover:text-secondary hover:bg-secondary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-90 cursor-pointer"
+                                className="px-1 py-0 rounded-lg text-on-surface-variant/70 bg-transparent hover:text-secondary hover:bg-secondary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-90 cursor-pointer"
                                 data-tooltip={t('file_explorer.git_push_tooltip', "Push to remote")}
                                 data-position="left"
                                 aria-label={t('file_explorer.git_push_tooltip', "Push to remote")}
                             >
                                 <CloudUpload size={15} />
-                            </button>
+                            </Button>
                         </div>
                     )}
                 </div>
@@ -439,7 +439,7 @@ export function FileExplorer({
                                 {t('file_explorer.not_configured')}
                             </h3>
                             <p className="text-sm text-on-surface-variant max-w-xs mx-auto">
-                                {fallbackType === 'tests' 
+                                {fallbackType === 'tests'
                                     ? t('file_explorer.configure_tests')
                                     : t('file_explorer.configure_suites')}
                             </p>
@@ -492,7 +492,7 @@ export function FileExplorer({
                                             onDoubleClick={() => entry.is_dir ? handleNavigate(entry.path) : (onSelect && onSelect(entry.path))}
                                             className={clsx(
                                                 "flex items-center gap-3 px-3 py-2 rounded-2xl cursor-pointer text-sm select-none transition-all group",
-                                                isSelected 
+                                                isSelected
                                                     ? "bg-secondary-container/50 text-on-secondary-container ring-1 ring-primary/30"
                                                     : isActive
                                                         ? "bg-secondary-container/30 text-on-secondary-container"
@@ -519,7 +519,7 @@ export function FileExplorer({
                                             {(() => {
                                                 const gitStatus = getGitStatusForEntry(entry);
                                                 if (!gitStatus) return null;
-                                                
+
                                                 const actionStatus = entry.is_dir ? getFolderActionStatus(entry) : gitStatus;
                                                 let badgeColor = "";
                                                 let badgeLabel = "";
@@ -585,11 +585,11 @@ export function FileExplorer({
                                                             </button>
                                                         )}
                                                         {settings.git?.showBadges && (
-                                                            <span 
+                                                            <span
                                                                 className={clsx("text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border cursor-help", badgeColor)}
                                                                 data-tooltip={t(`file_explorer.git_status_${gitStatus}`)}
                                                                 data-position="left"
-                                                             >
+                                                            >
                                                                 {badgeLabel}
                                                             </span>
                                                         )}
