@@ -1,6 +1,7 @@
 import { useSettings } from "@/lib/settings";
-import { Moon, Sun, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2, Settings as SettingsIcon, Sparkles, FileJson, RefreshCcw, GitBranch, Link2, Briefcase } from "lucide-react";
+import { Moon, Sun, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2, Settings as SettingsIcon, Sparkles, FileJson, RefreshCcw, GitBranch, Link2, Briefcase, ChevronDown } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
 const Slack = ({ size = 18 }: { size?: number }) => (
     <svg viewBox="0 0 24 24" width={size} height={size} stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
@@ -36,6 +37,7 @@ import { Button } from "@/components/atoms/Button";
 import { Input } from "@/components/atoms/Input";
 import { Section } from "@/components/organisms/Section";
 import { PageHeader } from "@/components/organisms/PageHeader";
+import { Switch } from "@/components/atoms/Switch";
 
 // New Components
 import { Select } from "@/components/atoms/Select";
@@ -68,6 +70,23 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
     const [migrationPending, setMigrationPending] = useState<{ oldPath: string, newPath: string } | null>(null);
     const [isMigrating, setIsMigrating] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+
+    // Integrations Modal state
+    const [showIntegrationsModal, setShowIntegrationsModal] = useState(false);
+    const [expandedIntegrations, setExpandedIntegrations] = useState<Record<string, boolean>>({
+        jira: false,
+        azure: false,
+        testlink: false,
+        git: false,
+        webhooks: false,
+    });
+
+    const toggleIntegrationExpanded = (key: string) => {
+        setExpandedIntegrations(prev => ({
+            ...prev,
+            [key]: !prev[key]
+        }));
+    };
 
     // Responsive State
     const containerRef = useRef<HTMLDivElement>(null);
@@ -439,6 +458,529 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                 description={t('settings.profiles.confirm_delete')}
                 confirmText={t('common.delete')}
             />
+
+            {/* Third-Party Integrations Modal */}
+            <Modal
+                isOpen={showIntegrationsModal}
+                onClose={() => setShowIntegrationsModal(false)}
+                title={t('settings.integrations.title')}
+                className="max-w-2xl"
+            >
+                <div className="space-y-4">
+                    {/* Jira */}
+                    {isFeatureEnabled('is_integration_jira_enabled') && (
+                        <div className="border border-outline-variant/30 rounded-2xl bg-surface/30 overflow-hidden">
+                            <div
+                                className="flex items-center justify-between p-4 cursor-pointer hover:bg-surface-variant/10 transition-colors select-none"
+                                onClick={() => toggleIntegrationExpanded('jira')}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                                        <Briefcase size={18} />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-semibold text-on-surface">{t('settings.integrations.jira.title')}</h3>
+                                        <span className="text-xs text-on-surface-variant/80">
+                                            {settings.jira?.enabled ? t('settings.integrations.enabled') : t('settings.integrations.disabled')}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                                    <Switch
+                                        checked={settings.jira?.enabled || false}
+                                        onCheckedChange={(checked) => updateSetting('jira', {
+                                            host: settings.jira?.host || '',
+                                            email: settings.jira?.email || '',
+                                            apiToken: settings.jira?.apiToken || '',
+                                            projectKey: settings.jira?.projectKey || '',
+                                            enabled: checked
+                                        })}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleIntegrationExpanded('jira')}
+                                        className={clsx(
+                                            "p-1.5 text-on-surface-variant/80 hover:text-on-surface hover:bg-surface-variant/30 rounded-2xl transition-all duration-200",
+                                            expandedIntegrations.jira && "transform rotate-180"
+                                        )}
+                                    >
+                                        <ChevronDown size={20} />
+                                    </button>
+                                </div>
+                            </div>
+                            <AnimatePresence initial={false}>
+                                {expandedIntegrations.jira && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: "auto", opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        transition={{ duration: 0.2 }}
+                                        className="overflow-hidden"
+                                    >
+                                        <div className="p-4 pt-0 border-t border-outline-variant/10 space-y-3">
+                                            <div className="h-2" />
+                                            <Input
+                                                label={t('settings.integrations.jira.host')}
+                                                type="text"
+                                                value={settings.jira?.host || ''}
+                                                onChange={(e) => updateSetting('jira', {
+                                                    host: e.target.value,
+                                                    email: settings.jira?.email || '',
+                                                    apiToken: settings.jira?.apiToken || '',
+                                                    projectKey: settings.jira?.projectKey || '',
+                                                    enabled: settings.jira?.enabled || false
+                                                })}
+                                                placeholder="e.g. your-company.atlassian.net"
+                                            />
+                                            <Input
+                                                label={t('settings.integrations.jira.email')}
+                                                type="email"
+                                                value={settings.jira?.email || ''}
+                                                onChange={(e) => updateSetting('jira', {
+                                                    host: settings.jira?.host || '',
+                                                    email: e.target.value,
+                                                    apiToken: settings.jira?.apiToken || '',
+                                                    projectKey: settings.jira?.projectKey || '',
+                                                    enabled: settings.jira?.enabled || false
+                                                })}
+                                                placeholder="e.g. name@company.com"
+                                            />
+                                            <Input
+                                                label={t('settings.integrations.jira.token')}
+                                                type="password"
+                                                value={settings.jira?.apiToken || ''}
+                                                onChange={(e) => updateSetting('jira', {
+                                                    host: settings.jira?.host || '',
+                                                    email: settings.jira?.email || '',
+                                                    apiToken: e.target.value,
+                                                    projectKey: settings.jira?.projectKey || '',
+                                                    enabled: settings.jira?.enabled || false
+                                                })}
+                                                placeholder="Atlassian API Token"
+                                            />
+                                            <Input
+                                                label={t('settings.integrations.jira.project')}
+                                                type="text"
+                                                value={settings.jira?.projectKey || ''}
+                                                onChange={(e) => updateSetting('jira', {
+                                                    host: settings.jira?.host || '',
+                                                    email: settings.jira?.email || '',
+                                                    apiToken: settings.jira?.apiToken || '',
+                                                    projectKey: e.target.value,
+                                                    enabled: settings.jira?.enabled || false
+                                                })}
+                                                placeholder="e.g. PROJ"
+                                            />
+                                            <div className="flex justify-end pt-2">
+                                                <Button
+                                                    onClick={handleTestJira}
+                                                    disabled={testingJira || !settings.jira?.host || !settings.jira?.email || !settings.jira?.apiToken || !settings.jira?.projectKey}
+                                                    variant="secondary"
+                                                    size="sm"
+                                                >
+                                                    {testingJira ? t('settings.integrations.testing') : t('settings.integrations.test_connection')}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    )}
+
+                    {/* Azure DevOps */}
+                    {isFeatureEnabled('is_integration_azure_enabled') && (
+                        <div className="border border-outline-variant/30 rounded-2xl bg-surface/30 overflow-hidden">
+                            <div
+                                className="flex items-center justify-between p-4 cursor-pointer hover:bg-surface-variant/10 transition-colors select-none"
+                                onClick={() => toggleIntegrationExpanded('azure')}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                                        <Briefcase size={18} />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-semibold text-on-surface">{t('settings.integrations.azure.title')}</h3>
+                                        <span className="text-xs text-on-surface-variant/80">
+                                            {settings.azureDevOps?.enabled ? t('settings.integrations.enabled') : t('settings.integrations.disabled')}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                                    <Switch
+                                        checked={settings.azureDevOps?.enabled || false}
+                                        onCheckedChange={(checked) => updateSetting('azureDevOps', {
+                                            org: settings.azureDevOps?.org || '',
+                                            project: settings.azureDevOps?.project || '',
+                                            pat: settings.azureDevOps?.pat || '',
+                                            enabled: checked
+                                        })}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleIntegrationExpanded('azure')}
+                                        className={clsx(
+                                            "p-1.5 text-on-surface-variant/80 hover:text-on-surface hover:bg-surface-variant/30 rounded-2xl transition-all duration-200",
+                                            expandedIntegrations.azure && "transform rotate-180"
+                                        )}
+                                    >
+                                        <ChevronDown size={20} />
+                                    </button>
+                                </div>
+                            </div>
+                            <AnimatePresence initial={false}>
+                                {expandedIntegrations.azure && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: "auto", opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        transition={{ duration: 0.2 }}
+                                        className="overflow-hidden"
+                                    >
+                                        <div className="p-4 pt-0 border-t border-outline-variant/10 space-y-3">
+                                            <div className="h-2" />
+                                            <Input
+                                                label={t('settings.integrations.azure.org')}
+                                                type="text"
+                                                value={settings.azureDevOps?.org || ''}
+                                                onChange={(e) => updateSetting('azureDevOps', {
+                                                    org: e.target.value,
+                                                    project: settings.azureDevOps?.project || '',
+                                                    pat: settings.azureDevOps?.pat || '',
+                                                    enabled: settings.azureDevOps?.enabled || false
+                                                })}
+                                                placeholder="Organization Name"
+                                            />
+                                            <Input
+                                                label={t('settings.integrations.azure.project')}
+                                                type="text"
+                                                value={settings.azureDevOps?.project || ''}
+                                                onChange={(e) => updateSetting('azureDevOps', {
+                                                    org: settings.azureDevOps?.org || '',
+                                                    project: e.target.value,
+                                                    pat: settings.azureDevOps?.pat || '',
+                                                    enabled: settings.azureDevOps?.enabled || false
+                                                })}
+                                                placeholder="Project Name"
+                                            />
+                                            <Input
+                                                label={t('settings.integrations.azure.pat')}
+                                                type="password"
+                                                value={settings.azureDevOps?.pat || ''}
+                                                onChange={(e) => updateSetting('azureDevOps', {
+                                                    org: settings.azureDevOps?.org || '',
+                                                    project: settings.azureDevOps?.project || '',
+                                                    pat: e.target.value,
+                                                    enabled: settings.azureDevOps?.enabled || false
+                                                })}
+                                                placeholder="Personal Access Token"
+                                            />
+                                            <div className="flex justify-end pt-2">
+                                                <Button
+                                                    onClick={handleTestAzure}
+                                                    disabled={testingAzure || !settings.azureDevOps?.org || !settings.azureDevOps?.project || !settings.azureDevOps?.pat}
+                                                    variant="secondary"
+                                                    size="sm"
+                                                >
+                                                    {testingAzure ? t('settings.integrations.testing') : t('settings.integrations.test_connection')}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    )}
+
+                    {/* TestLink */}
+                    {isFeatureEnabled('is_integration_testlink_enabled') && (
+                        <div className="border border-outline-variant/30 rounded-2xl bg-surface/30 overflow-hidden">
+                            <div
+                                className="flex items-center justify-between p-4 cursor-pointer hover:bg-surface-variant/10 transition-colors select-none"
+                                onClick={() => toggleIntegrationExpanded('testlink')}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                                        <Server size={18} />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-semibold text-on-surface">{t('settings.integrations.testlink.title')}</h3>
+                                        <span className="text-xs text-on-surface-variant/80">
+                                            {settings.testLink?.enabled ? t('settings.integrations.enabled') : t('settings.integrations.disabled')}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                                    <Switch
+                                        checked={settings.testLink?.enabled || false}
+                                        onCheckedChange={(checked) => updateSetting('testLink', {
+                                            url: settings.testLink?.url || '',
+                                            devKey: settings.testLink?.devKey || '',
+                                            projectId: settings.testLink?.projectId || '',
+                                            enabled: checked
+                                        })}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleIntegrationExpanded('testlink')}
+                                        className={clsx(
+                                            "p-1.5 text-on-surface-variant/80 hover:text-on-surface hover:bg-surface-variant/30 rounded-2xl transition-all duration-200",
+                                            expandedIntegrations.testlink && "transform rotate-180"
+                                        )}
+                                    >
+                                        <ChevronDown size={20} />
+                                    </button>
+                                </div>
+                            </div>
+                            <AnimatePresence initial={false}>
+                                {expandedIntegrations.testlink && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: "auto", opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        transition={{ duration: 0.2 }}
+                                        className="overflow-hidden"
+                                    >
+                                        <div className="p-4 pt-0 border-t border-outline-variant/10 space-y-3">
+                                            <div className="h-2" />
+                                            <Input
+                                                label={t('settings.integrations.testlink.url')}
+                                                type="text"
+                                                value={settings.testLink?.url || ''}
+                                                onChange={(e) => updateSetting('testLink', {
+                                                    url: e.target.value,
+                                                    devKey: settings.testLink?.devKey || '',
+                                                    projectId: settings.testLink?.projectId || '',
+                                                    enabled: settings.testLink?.enabled || false
+                                                })}
+                                                placeholder="e.g. http://localhost/testlink/lib/api/xmlrpc/v1/xmlrpc.php"
+                                            />
+                                            <Input
+                                                label={t('settings.integrations.testlink.devkey')}
+                                                type="password"
+                                                value={settings.testLink?.devKey || ''}
+                                                onChange={(e) => updateSetting('testLink', {
+                                                    url: settings.testLink?.url || '',
+                                                    devKey: e.target.value,
+                                                    projectId: settings.testLink?.projectId || '',
+                                                    enabled: settings.testLink?.enabled || false
+                                                })}
+                                                placeholder="Developer Key"
+                                            />
+                                            <Input
+                                                label={t('settings.integrations.testlink.projectid')}
+                                                type="text"
+                                                value={settings.testLink?.projectId || ''}
+                                                onChange={(e) => updateSetting('testLink', {
+                                                    url: settings.testLink?.url || '',
+                                                    devKey: settings.testLink?.devKey || '',
+                                                    projectId: e.target.value,
+                                                    enabled: settings.testLink?.enabled || false
+                                                })}
+                                                placeholder="Numerical Project ID"
+                                            />
+                                            <div className="flex justify-end pt-2">
+                                                <Button
+                                                    onClick={handleTestTestLink}
+                                                    disabled={testingTestLink || !settings.testLink?.url || !settings.testLink?.devKey || !settings.testLink?.projectId}
+                                                    variant="secondary"
+                                                    size="sm"
+                                                >
+                                                    {testingTestLink ? t('settings.integrations.testing') : t('settings.integrations.test_connection')}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    )}
+
+                    {/* Git */}
+                    {isFeatureEnabled('is_integration_git_enabled') && (
+                        <div className="border border-outline-variant/30 rounded-2xl bg-surface/30 overflow-hidden">
+                            <div
+                                className="flex items-center justify-between p-4 cursor-pointer hover:bg-surface-variant/10 transition-colors select-none"
+                                onClick={() => toggleIntegrationExpanded('git')}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                                        <GitBranch size={18} />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-semibold text-on-surface">{t('settings.integrations.git.title')}</h3>
+                                        <span className="text-xs text-on-surface-variant/80">
+                                            {settings.git?.enabled ? t('settings.integrations.enabled') : t('settings.integrations.disabled')}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                                    <Switch
+                                        checked={settings.git?.enabled || false}
+                                        onCheckedChange={(checked) => updateSetting('git', {
+                                            enabled: checked,
+                                            showBadges: settings.git?.showBadges || false
+                                        })}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleIntegrationExpanded('git')}
+                                        className={clsx(
+                                            "p-1.5 text-on-surface-variant/80 hover:text-on-surface hover:bg-surface-variant/30 rounded-2xl transition-all duration-200",
+                                            expandedIntegrations.git && "transform rotate-180"
+                                        )}
+                                    >
+                                        <ChevronDown size={20} />
+                                    </button>
+                                </div>
+                            </div>
+                            <AnimatePresence initial={false}>
+                                {expandedIntegrations.git && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: "auto", opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        transition={{ duration: 0.2 }}
+                                        className="overflow-hidden"
+                                    >
+                                        <div className="p-4 pt-0 border-t border-outline-variant/10 space-y-3">
+                                            <div className="h-2" />
+                                            <div className="flex items-center justify-between py-1">
+                                                <span className="text-xs font-semibold text-on-surface-variant/80 select-none">
+                                                    {t('settings.integrations.git.badges')}
+                                                </span>
+                                                <Switch
+                                                    checked={settings.git?.showBadges || false}
+                                                    onCheckedChange={(checked) => updateSetting('git', {
+                                                        enabled: settings.git?.enabled || false,
+                                                        showBadges: checked
+                                                    })}
+                                                />
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    )}
+
+                    {/* Webhooks */}
+                    {isFeatureEnabled('is_integration_webhooks_enabled') && (
+                        <div className="border border-outline-variant/30 rounded-2xl bg-surface/30 overflow-hidden">
+                            <div
+                                className="flex items-center justify-between p-4 cursor-pointer hover:bg-surface-variant/10 transition-colors select-none"
+                                onClick={() => toggleIntegrationExpanded('webhooks')}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                                        <Slack size={18} />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-semibold text-on-surface">{t('settings.integrations.webhooks.title')}</h3>
+                                        <span className="text-xs text-on-surface-variant/80">
+                                            {(settings.webhooks?.notifyOnPass || settings.webhooks?.notifyOnFail) ? t('settings.integrations.enabled') : t('settings.integrations.disabled')}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                                    <Switch
+                                        checked={settings.webhooks?.notifyOnPass || settings.webhooks?.notifyOnFail || false}
+                                        onCheckedChange={(checked) => {
+                                            updateSetting('webhooks', {
+                                                slackUrl: settings.webhooks?.slackUrl || '',
+                                                teamsUrl: settings.webhooks?.teamsUrl || '',
+                                                notifyOnPass: checked,
+                                                notifyOnFail: checked
+                                            });
+                                        }}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleIntegrationExpanded('webhooks')}
+                                        className={clsx(
+                                            "p-1.5 text-on-surface-variant/80 hover:text-on-surface hover:bg-surface-variant/30 rounded-2xl transition-all duration-200",
+                                            expandedIntegrations.webhooks && "transform rotate-180"
+                                        )}
+                                    >
+                                        <ChevronDown size={20} />
+                                    </button>
+                                </div>
+                            </div>
+                            <AnimatePresence initial={false}>
+                                {expandedIntegrations.webhooks && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: "auto", opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        transition={{ duration: 0.2 }}
+                                        className="overflow-hidden"
+                                    >
+                                        <div className="p-4 pt-0 border-t border-outline-variant/10 space-y-3">
+                                            <div className="h-2" />
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <Input
+                                                    label={t('settings.integrations.webhooks.slack_url')}
+                                                    type="text"
+                                                    value={settings.webhooks?.slackUrl || ''}
+                                                    onChange={(e) => updateSetting('webhooks', {
+                                                        slackUrl: e.target.value,
+                                                        teamsUrl: settings.webhooks?.teamsUrl || '',
+                                                        notifyOnPass: settings.webhooks?.notifyOnPass || false,
+                                                        notifyOnFail: settings.webhooks?.notifyOnFail || false
+                                                    })}
+                                                    placeholder="https://hooks.slack.com/services/..."
+                                                />
+                                                <Input
+                                                    label={t('settings.integrations.webhooks.teams_url')}
+                                                    type="text"
+                                                    value={settings.webhooks?.teamsUrl || ''}
+                                                    onChange={(e) => updateSetting('webhooks', {
+                                                        slackUrl: settings.webhooks?.slackUrl || '',
+                                                        teamsUrl: e.target.value,
+                                                        notifyOnPass: settings.webhooks?.notifyOnPass || false,
+                                                        notifyOnFail: settings.webhooks?.notifyOnFail || false
+                                                    })}
+                                                    placeholder="https://your-company.webhook.office.com/..."
+                                                />
+                                            </div>
+                                            <div className="flex gap-6 pt-2">
+                                                <div className="flex items-center gap-2.5">
+                                                    <span className="text-xs font-semibold text-on-surface-variant/80 select-none">
+                                                        {t('settings.integrations.webhooks.notify_pass')}
+                                                    </span>
+                                                    <Switch
+                                                        checked={settings.webhooks?.notifyOnPass || false}
+                                                        onCheckedChange={(checked) => updateSetting('webhooks', {
+                                                            slackUrl: settings.webhooks?.slackUrl || '',
+                                                            teamsUrl: settings.webhooks?.teamsUrl || '',
+                                                            notifyOnPass: checked,
+                                                            notifyOnFail: settings.webhooks?.notifyOnFail || false
+                                                        })}
+                                                    />
+                                                </div>
+                                                <div className="flex items-center gap-2.5">
+                                                    <span className="text-xs font-semibold text-on-surface-variant/80 select-none">
+                                                        {t('settings.integrations.webhooks.notify_fail')}
+                                                    </span>
+                                                    <Switch
+                                                        checked={settings.webhooks?.notifyOnFail || false}
+                                                        onCheckedChange={(checked) => updateSetting('webhooks', {
+                                                            slackUrl: settings.webhooks?.slackUrl || '',
+                                                            teamsUrl: settings.webhooks?.teamsUrl || '',
+                                                            notifyOnPass: settings.webhooks?.notifyOnPass || false,
+                                                            notifyOnFail: checked
+                                                        })}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    )}
+                </div>
+            </Modal>
 
             {/* Page Header */}
             <PageHeader
@@ -917,7 +1459,23 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
 
 
                 {/* Path Configuration */}
-                <Section title={t('settings.paths.title')} icon={FolderOpen}>
+                <Section 
+                    title={t('settings.paths.title')} 
+                    icon={FolderOpen}
+                    menus={
+                        isFeatureEnabled('is_integrations_enabled') && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setShowIntegrationsModal(true)}
+                                leftIcon={<Link2 size={16} />}
+                                className="text-on-surface/80 hover:text-primary hover:bg-primary/10"
+                            >
+                                {t('settings.integrations.title')}
+                            </Button>
+                        )
+                    }
+                >
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {(['automationRoot', 'resources', 'tests', 'suites', 'logs', 'logcat', 'screenshots', 'recordings', 'mappings'] as Array<keyof typeof settings.paths>).map((key) => {
                             const isTestingPath = ['automationRoot', 'resources', 'tests', 'suites'].includes(key);
@@ -1369,438 +1927,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                     </Section>
                 </div>
 
-                {/* Third-Party Integrations */}
-                <Section title={t('settings.integrations.title')} icon={Link2}>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* Jira integration */}
-                        <div className="p-4 rounded-2xl border border-outline-variant/30 bg-surface/30 space-y-4">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2.5">
-                                    <div className="p-2 rounded-xl bg-primary/10 text-primary">
-                                        <Briefcase size={18} />
-                                    </div>
-                                    <h3 className="font-semibold text-on-surface">{t('settings.integrations.jira.title')}</h3>
-                                </div>
-                                <button
-                                    type="button"
-                                    role="checkbox"
-                                    aria-checked={settings.jira?.enabled || false}
-                                    onClick={() => updateSetting('jira', {
-                                        host: settings.jira?.host || '',
-                                        email: settings.jira?.email || '',
-                                        apiToken: settings.jira?.apiToken || '',
-                                        projectKey: settings.jira?.projectKey || '',
-                                        enabled: !settings.jira?.enabled
-                                    })}
-                                    className="flex items-center gap-2 text-left focus:outline-none select-none cursor-pointer group"
-                                >
-                                    <div className={clsx(
-                                        "w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0",
-                                        settings.jira?.enabled ? "bg-primary border-primary text-on-primary" : "border-outline-variant/30 bg-surface/50 group-hover:border-outline"
-                                    )}>
-                                        {settings.jira?.enabled && <div className="w-2 h-2 bg-on-primary rounded-2xl" />}
-                                    </div>
-                                </button>
-                            </div>
-                            
-                            {settings.jira?.enabled && (
-                                <div className="space-y-3 pt-2 border-t border-outline-variant/10 animate-in fade-in duration-300">
-                                    <Input
-                                        label={t('settings.integrations.jira.host')}
-                                        type="text"
-                                        value={settings.jira?.host || ''}
-                                        onChange={(e) => updateSetting('jira', {
-                                            host: e.target.value,
-                                            email: settings.jira?.email || '',
-                                            apiToken: settings.jira?.apiToken || '',
-                                            projectKey: settings.jira?.projectKey || '',
-                                            enabled: settings.jira?.enabled || false
-                                        })}
-                                        placeholder="e.g. your-company.atlassian.net"
-                                    />
-                                    <Input
-                                        label={t('settings.integrations.jira.email')}
-                                        type="email"
-                                        value={settings.jira?.email || ''}
-                                        onChange={(e) => updateSetting('jira', {
-                                            host: settings.jira?.host || '',
-                                            email: e.target.value,
-                                            apiToken: settings.jira?.apiToken || '',
-                                            projectKey: settings.jira?.projectKey || '',
-                                            enabled: settings.jira?.enabled || false
-                                        })}
-                                        placeholder="e.g. name@company.com"
-                                    />
-                                    <Input
-                                        label={t('settings.integrations.jira.token')}
-                                        type="password"
-                                        value={settings.jira?.apiToken || ''}
-                                        onChange={(e) => updateSetting('jira', {
-                                            host: settings.jira?.host || '',
-                                            email: settings.jira?.email || '',
-                                            apiToken: e.target.value,
-                                            projectKey: settings.jira?.projectKey || '',
-                                            enabled: settings.jira?.enabled || false
-                                        })}
-                                        placeholder="Atlassian API Token"
-                                    />
-                                    <Input
-                                        label={t('settings.integrations.jira.project')}
-                                        type="text"
-                                        value={settings.jira?.projectKey || ''}
-                                        onChange={(e) => updateSetting('jira', {
-                                            host: settings.jira?.host || '',
-                                            email: settings.jira?.email || '',
-                                            apiToken: settings.jira?.apiToken || '',
-                                            projectKey: e.target.value,
-                                            enabled: settings.jira?.enabled || false
-                                        })}
-                                        placeholder="e.g. PROJ"
-                                    />
-                                    <div className="flex justify-end pt-2">
-                                        <Button
-                                            onClick={handleTestJira}
-                                            disabled={testingJira || !settings.jira?.host || !settings.jira?.email || !settings.jira?.apiToken || !settings.jira?.projectKey}
-                                            variant="secondary"
-                                            size="sm"
-                                        >
-                                            {testingJira ? t('settings.integrations.testing') : t('settings.integrations.test_connection')}
-                                        </Button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
 
-                        {/* Azure DevOps integration */}
-                        <div className="p-4 rounded-2xl border border-outline-variant/30 bg-surface/30 space-y-4">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2.5">
-                                    <div className="p-2 rounded-xl bg-primary/10 text-primary">
-                                        <Briefcase size={18} />
-                                    </div>
-                                    <h3 className="font-semibold text-on-surface">{t('settings.integrations.azure.title')}</h3>
-                                </div>
-                                <button
-                                    type="button"
-                                    role="checkbox"
-                                    aria-checked={settings.azureDevOps?.enabled || false}
-                                    onClick={() => updateSetting('azureDevOps', {
-                                        org: settings.azureDevOps?.org || '',
-                                        project: settings.azureDevOps?.project || '',
-                                        pat: settings.azureDevOps?.pat || '',
-                                        enabled: !settings.azureDevOps?.enabled
-                                    })}
-                                    className="flex items-center gap-2 text-left focus:outline-none select-none cursor-pointer group"
-                                >
-                                    <div className={clsx(
-                                        "w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0",
-                                        settings.azureDevOps?.enabled ? "bg-primary border-primary text-on-primary" : "border-outline-variant/30 bg-surface/50 group-hover:border-outline"
-                                    )}>
-                                        {settings.azureDevOps?.enabled && <div className="w-2 h-2 bg-on-primary rounded-2xl" />}
-                                    </div>
-                                </button>
-                            </div>
-                            
-                            {settings.azureDevOps?.enabled && (
-                                <div className="space-y-3 pt-2 border-t border-outline-variant/10 animate-in fade-in duration-300">
-                                    <Input
-                                        label={t('settings.integrations.azure.org')}
-                                        type="text"
-                                        value={settings.azureDevOps?.org || ''}
-                                        onChange={(e) => updateSetting('azureDevOps', {
-                                            org: e.target.value,
-                                            project: settings.azureDevOps?.project || '',
-                                            pat: settings.azureDevOps?.pat || '',
-                                            enabled: settings.azureDevOps?.enabled || false
-                                        })}
-                                        placeholder="Organization Name"
-                                    />
-                                    <Input
-                                        label={t('settings.integrations.azure.project')}
-                                        type="text"
-                                        value={settings.azureDevOps?.project || ''}
-                                        onChange={(e) => updateSetting('azureDevOps', {
-                                            org: settings.azureDevOps?.org || '',
-                                            project: e.target.value,
-                                            pat: settings.azureDevOps?.pat || '',
-                                            enabled: settings.azureDevOps?.enabled || false
-                                        })}
-                                        placeholder="Project Name"
-                                    />
-                                    <Input
-                                        label={t('settings.integrations.azure.pat')}
-                                        type="password"
-                                        value={settings.azureDevOps?.pat || ''}
-                                        onChange={(e) => updateSetting('azureDevOps', {
-                                            org: settings.azureDevOps?.org || '',
-                                            project: settings.azureDevOps?.project || '',
-                                            pat: e.target.value,
-                                            enabled: settings.azureDevOps?.enabled || false
-                                        })}
-                                        placeholder="Personal Access Token"
-                                    />
-                                    <div className="flex justify-end pt-2">
-                                        <Button
-                                            onClick={handleTestAzure}
-                                            disabled={testingAzure || !settings.azureDevOps?.org || !settings.azureDevOps?.project || !settings.azureDevOps?.pat}
-                                            variant="secondary"
-                                            size="sm"
-                                        >
-                                            {testingAzure ? t('settings.integrations.testing') : t('settings.integrations.test_connection')}
-                                        </Button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* TestLink integration */}
-                        <div className="p-4 rounded-2xl border border-outline-variant/30 bg-surface/30 space-y-4">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2.5">
-                                    <div className="p-2 rounded-xl bg-primary/10 text-primary">
-                                        <Server size={18} />
-                                    </div>
-                                    <h3 className="font-semibold text-on-surface">{t('settings.integrations.testlink.title')}</h3>
-                                </div>
-                                <button
-                                    type="button"
-                                    role="checkbox"
-                                    aria-checked={settings.testLink?.enabled || false}
-                                    onClick={() => updateSetting('testLink', {
-                                        url: settings.testLink?.url || '',
-                                        devKey: settings.testLink?.devKey || '',
-                                        projectId: settings.testLink?.projectId || '',
-                                        enabled: !settings.testLink?.enabled
-                                    })}
-                                    className="flex items-center gap-2 text-left focus:outline-none select-none cursor-pointer group"
-                                >
-                                    <div className={clsx(
-                                        "w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0",
-                                        settings.testLink?.enabled ? "bg-primary border-primary text-on-primary" : "border-outline-variant/30 bg-surface/50 group-hover:border-outline"
-                                    )}>
-                                        {settings.testLink?.enabled && <div className="w-2 h-2 bg-on-primary rounded-2xl" />}
-                                    </div>
-                                </button>
-                            </div>
-                            
-                            {settings.testLink?.enabled && (
-                                <div className="space-y-3 pt-2 border-t border-outline-variant/10 animate-in fade-in duration-300">
-                                    <Input
-                                        label={t('settings.integrations.testlink.url')}
-                                        type="text"
-                                        value={settings.testLink?.url || ''}
-                                        onChange={(e) => updateSetting('testLink', {
-                                            url: e.target.value,
-                                            devKey: settings.testLink?.devKey || '',
-                                            projectId: settings.testLink?.projectId || '',
-                                            enabled: settings.testLink?.enabled || false
-                                        })}
-                                        placeholder="e.g. http://localhost/testlink/lib/api/xmlrpc/v1/xmlrpc.php"
-                                    />
-                                    <Input
-                                        label={t('settings.integrations.testlink.devkey')}
-                                        type="password"
-                                        value={settings.testLink?.devKey || ''}
-                                        onChange={(e) => updateSetting('testLink', {
-                                            url: settings.testLink?.url || '',
-                                            devKey: e.target.value,
-                                            projectId: settings.testLink?.projectId || '',
-                                            enabled: settings.testLink?.enabled || false
-                                        })}
-                                        placeholder="Developer Key"
-                                    />
-                                    <Input
-                                        label={t('settings.integrations.testlink.projectid')}
-                                        type="text"
-                                        value={settings.testLink?.projectId || ''}
-                                        onChange={(e) => updateSetting('testLink', {
-                                            url: settings.testLink?.url || '',
-                                            devKey: settings.testLink?.devKey || '',
-                                            projectId: e.target.value,
-                                            enabled: settings.testLink?.enabled || false
-                                        })}
-                                        placeholder="Numerical Project ID"
-                                    />
-                                    <div className="flex justify-end pt-2">
-                                        <Button
-                                            onClick={handleTestTestLink}
-                                            disabled={testingTestLink || !settings.testLink?.url || !settings.testLink?.devKey || !settings.testLink?.projectId}
-                                            variant="secondary"
-                                            size="sm"
-                                        >
-                                            {testingTestLink ? t('settings.integrations.testing') : t('settings.integrations.test_connection')}
-                                        </Button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Git integration */}
-                        <div className="p-4 rounded-2xl border border-outline-variant/30 bg-surface/30 space-y-4">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2.5">
-                                    <div className="p-2 rounded-xl bg-primary/10 text-primary">
-                                        <GitBranch size={18} />
-                                    </div>
-                                    <h3 className="font-semibold text-on-surface">{t('settings.integrations.git.title')}</h3>
-                                </div>
-                                <button
-                                    type="button"
-                                    role="checkbox"
-                                    aria-checked={settings.git?.enabled || false}
-                                    onClick={() => updateSetting('git', {
-                                        enabled: !settings.git?.enabled,
-                                        showBadges: settings.git?.showBadges || false
-                                    })}
-                                    className="flex items-center gap-2 text-left focus:outline-none select-none cursor-pointer group"
-                                >
-                                    <div className={clsx(
-                                        "w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0",
-                                        settings.git?.enabled ? "bg-primary border-primary text-on-primary" : "border-outline-variant/30 bg-surface/50 group-hover:border-outline"
-                                    )}>
-                                        {settings.git?.enabled && <div className="w-2 h-2 bg-on-primary rounded-2xl" />}
-                                    </div>
-                                </button>
-                            </div>
-                            
-                            {settings.git?.enabled && (
-                                <div className="space-y-4 pt-2 border-t border-outline-variant/10 animate-in fade-in duration-300">
-                                    <button
-                                        type="button"
-                                        role="checkbox"
-                                        aria-checked={settings.git?.showBadges || false}
-                                        onClick={() => updateSetting('git', {
-                                            enabled: settings.git?.enabled || false,
-                                            showBadges: !settings.git?.showBadges
-                                        })}
-                                        className="flex items-center gap-2.5 text-left focus:outline-none select-none cursor-pointer group"
-                                    >
-                                        <div className={clsx(
-                                            "w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0 cursor-pointer",
-                                            settings.git?.showBadges ? "bg-primary border-primary text-on-primary" : "border-outline-variant/30 bg-surface/50 group-hover:border-outline"
-                                        )}>
-                                            {settings.git?.showBadges && <div className="w-2 h-2 bg-on-primary rounded-2xl" />}
-                                        </div>
-                                        <span className="text-xs font-semibold text-on-surface-variant/80 select-none cursor-pointer">
-                                            {t('settings.integrations.git.badges')}
-                                        </span>
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Webhooks integration */}
-                        <div className="p-4 rounded-2xl border border-outline-variant/30 bg-surface/30 space-y-4 lg:col-span-2">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2.5">
-                                    <div className="p-2 rounded-xl bg-primary/10 text-primary">
-                                        <Slack size={18} />
-                                    </div>
-                                    <h3 className="font-semibold text-on-surface">{t('settings.integrations.webhooks.title')}</h3>
-                                </div>
-                                <button
-                                    type="button"
-                                    role="checkbox"
-                                    aria-checked={settings.webhooks?.notifyOnPass || settings.webhooks?.notifyOnFail || false}
-                                    onClick={() => {
-                                        const nextVal = !(settings.webhooks?.notifyOnPass || settings.webhooks?.notifyOnFail);
-                                        updateSetting('webhooks', {
-                                            slackUrl: settings.webhooks?.slackUrl || '',
-                                            teamsUrl: settings.webhooks?.teamsUrl || '',
-                                            notifyOnPass: nextVal,
-                                            notifyOnFail: nextVal
-                                        });
-                                    }}
-                                    className="flex items-center gap-2 text-left focus:outline-none select-none cursor-pointer group"
-                                >
-                                    <div className={clsx(
-                                        "w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0",
-                                        (settings.webhooks?.notifyOnPass || settings.webhooks?.notifyOnFail) ? "bg-primary border-primary text-on-primary" : "border-outline-variant/30 bg-surface/50 group-hover:border-outline"
-                                    )}>
-                                        {(settings.webhooks?.notifyOnPass || settings.webhooks?.notifyOnFail) && <div className="w-2 h-2 bg-on-primary rounded-2xl" />}
-                                    </div>
-                                </button>
-                            </div>
-                            
-                            {(settings.webhooks?.notifyOnPass || settings.webhooks?.notifyOnFail) && (
-                                <div className="space-y-4 pt-2 border-t border-outline-variant/10 animate-in fade-in duration-300">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <Input
-                                            label={t('settings.integrations.webhooks.slack_url')}
-                                            type="text"
-                                            value={settings.webhooks?.slackUrl || ''}
-                                            onChange={(e) => updateSetting('webhooks', {
-                                                slackUrl: e.target.value,
-                                                teamsUrl: settings.webhooks?.teamsUrl || '',
-                                                notifyOnPass: settings.webhooks?.notifyOnPass || false,
-                                                notifyOnFail: settings.webhooks?.notifyOnFail || false
-                                            })}
-                                            placeholder="https://hooks.slack.com/services/..."
-                                        />
-                                        <Input
-                                            label={t('settings.integrations.webhooks.teams_url')}
-                                            type="text"
-                                            value={settings.webhooks?.teamsUrl || ''}
-                                            onChange={(e) => updateSetting('webhooks', {
-                                                slackUrl: settings.webhooks?.slackUrl || '',
-                                                teamsUrl: e.target.value,
-                                                notifyOnPass: settings.webhooks?.notifyOnPass || false,
-                                                notifyOnFail: settings.webhooks?.notifyOnFail || false
-                                            })}
-                                            placeholder="https://your-company.webhook.office.com/..."
-                                        />
-                                    </div>
-                                    <div className="flex gap-6">
-                                        <button
-                                            type="button"
-                                            role="checkbox"
-                                            aria-checked={settings.webhooks?.notifyOnPass || false}
-                                            onClick={() => updateSetting('webhooks', {
-                                                slackUrl: settings.webhooks?.slackUrl || '',
-                                                teamsUrl: settings.webhooks?.teamsUrl || '',
-                                                notifyOnPass: !settings.webhooks?.notifyOnPass,
-                                                notifyOnFail: settings.webhooks?.notifyOnFail || false
-                                            })}
-                                            className="flex items-center gap-2.5 text-left focus:outline-none select-none cursor-pointer group"
-                                        >
-                                            <div className={clsx(
-                                                "w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0 cursor-pointer",
-                                                settings.webhooks?.notifyOnPass ? "bg-primary border-primary text-on-primary" : "border-outline-variant/30 bg-surface/50 group-hover:border-outline"
-                                            )}>
-                                                {settings.webhooks?.notifyOnPass && <div className="w-2 h-2 bg-on-primary rounded-2xl" />}
-                                            </div>
-                                            <span className="text-xs font-semibold text-on-surface-variant/80 select-none cursor-pointer">
-                                                {t('settings.integrations.webhooks.notify_pass')}
-                                            </span>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            role="checkbox"
-                                            aria-checked={settings.webhooks?.notifyOnFail || false}
-                                            onClick={() => updateSetting('webhooks', {
-                                                slackUrl: settings.webhooks?.slackUrl || '',
-                                                teamsUrl: settings.webhooks?.teamsUrl || '',
-                                                notifyOnPass: settings.webhooks?.notifyOnPass || false,
-                                                notifyOnFail: !settings.webhooks?.notifyOnFail
-                                            })}
-                                            className="flex items-center gap-2.5 text-left focus:outline-none select-none cursor-pointer group"
-                                        >
-                                            <div className={clsx(
-                                                "w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0 cursor-pointer",
-                                                settings.webhooks?.notifyOnFail ? "bg-primary border-primary text-on-primary" : "border-outline-variant/30 bg-surface/50 group-hover:border-outline"
-                                            )}>
-                                                {settings.webhooks?.notifyOnFail && <div className="w-2 h-2 bg-on-primary rounded-2xl" />}
-                                            </div>
-                                            <span className="text-xs font-semibold text-on-surface-variant/80 select-none cursor-pointer">
-                                                {t('settings.integrations.webhooks.notify_fail')}
-                                            </span>
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </Section>
 
                 {/* System Versions */}
                 <Section

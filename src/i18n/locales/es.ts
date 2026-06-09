@@ -1311,6 +1311,8 @@ export const es = {
             },
             integrations: {
                 title: "Integraciones de Terceros",
+                enabled: "Habilitado",
+                disabled: "Deshabilitado",
                 jira: {
                     title: "Jira Software",
                     host: "URL del Host de Jira Cloud",
