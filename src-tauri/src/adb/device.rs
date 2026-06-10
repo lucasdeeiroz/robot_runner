@@ -117,14 +117,20 @@ pub async fn get_connected_devices(app: AppHandle) -> Result<Vec<Device>, String
                     if let Ok(o) = output {
                         let stdout = String::from_utf8_lossy(&o.stdout);
                         let mut found = None;
+                        let mut is_first_line = true;
                         for line in stdout.lines() {
-                            if line.contains("/data") {
-                                let parts: Vec<&str> = line.split_whitespace().collect();
-                                if parts.len() >= 3 {
-                                    if let (Ok(total), Ok(used)) = (parts[1].parse::<u64>(), parts[2].parse::<u64>()) {
-                                        found = Some((total, used));
-                                        break;
-                                    }
+                            if line.trim().is_empty() {
+                                continue;
+                            }
+                            if is_first_line {
+                                is_first_line = false;
+                                continue;
+                            }
+                            let parts: Vec<&str> = line.split_whitespace().collect();
+                            if parts.len() >= 3 {
+                                if let (Ok(total), Ok(used)) = (parts[1].parse::<u64>(), parts[2].parse::<u64>()) {
+                                    found = Some((total, used));
+                                    break;
                                 }
                             }
                         }

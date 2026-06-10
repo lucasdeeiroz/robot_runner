@@ -47,7 +47,7 @@ export const Tabs = ({
 
     // Revised active/inactive styles to rely on motion div for background
     const activeText = 'text-primary';
-    const inactiveText = 'text-on-surface-variant/80 hover:text-on-surface/80';
+    const inactiveText = 'text-on-surface-variant/80 hover:text-on-surface/80 hover:bg-surface-variant/30';
 
     // Unique IDs for this instance
     const activeTabId = layoutId ? `${layoutId}-activeTab` : "activeTab";
@@ -66,6 +66,7 @@ export const Tabs = ({
                 return (
                     <Button
                         key={tab.id}
+                        variant="unstyled"
                         onClick={() => onChange(tab.id)}
                         className={twMerge(
                             itemBase,

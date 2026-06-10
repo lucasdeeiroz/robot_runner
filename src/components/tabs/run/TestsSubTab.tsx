@@ -716,7 +716,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                                 onClick={() => handleRun()}
                                 disabled={selectedDevices.length === 0 || items.length === 0 || isLaunching}
                                 title={t('tests.run_selected')}
-                                className="w-full py-6 font-bold hover:bg-secondary-container"
+                                className="w-full py-6 font-bold"
                                 leftIcon={!isLaunching ? <Play size={18} fill="currentColor" /> : <ExpressiveLoading size="sm" variant="circular" />}
                             >
                                 {!isNarrow && (

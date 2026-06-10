@@ -134,14 +134,16 @@ export const AiButton: React.FC<AiButtonProps> = ({
         }
     };
 
-    const separatorStyles = {
+    const separatorStyles: Record<string, string> = {
         primary: "bg-on-primary/20",
         danger: "bg-on-error/20",
         secondary: "bg-outline-variant",
         ghost: "bg-outline-variant/30",
         outline: "bg-outline-variant/30",
         warning: "bg-on-warning-container/20",
-        success: "bg-emerald-500/20"
+        success: "bg-emerald-500/20",
+        link: "bg-transparent",
+        unstyled: "bg-transparent"
     };
 
     const sizeHeights: Record<string, string> = {
@@ -159,11 +161,11 @@ export const AiButton: React.FC<AiButtonProps> = ({
                 className={twMerge(
                     "relative inline-flex items-stretch rounded-2xl group transition-all duration-300",
                     "focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-1 ",
-                    variant === 'primary' && "bg-primary/10 hover:bg-secondary-container shadow-none border-transparent",
+                    variant === 'primary' && "bg-primary hover:brightness-110 shadow-none border-transparent",
                     variant === 'secondary' && "bg-surface hover:bg-surface-variant/50 shadow-none border-transparent",
-                    variant === 'danger' && "bg-error hover:bg-error/90 shadow-none border-transparent",
-                    variant === 'warning' && "bg-warning-container/20 hover:bg-warning-container/40 shadow-none border-transparent",
-                    variant === 'success' && "bg-emerald-500/10 hover:bg-emerald-500/20 shadow-none border-transparent",
+                    variant === 'danger' && "bg-error hover:brightness-110 shadow-none border-transparent",
+                    variant === 'warning' && "bg-warning hover:brightness-110 shadow-none border-transparent",
+                    variant === 'success' && "bg-success hover:brightness-110 shadow-none border-transparent",
                     variant === 'outline' && "bg-transparent hover:bg-surface-variant/30 text-on-surface/80 border border-outline-variant/30 shadow-none",
                     variant === 'ghost' && "bg-transparent hover:bg-surface-variant/30 text-on-surface-variant/80 border-transparent shadow-none",
                     heightClass,

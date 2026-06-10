@@ -21,9 +21,9 @@ export function DeviceCard({ device, onMirror, onToolbox, onAction }: DeviceCard
     const batteryLevel = device.battery_level ?? 0;
 
     const formatMem = (kb: number) => {
-        if (!kb) return '0 GB';
+        if (!kb) return '0';
         const gb = kb / (1024 * 1024);
-        return `${gb.toFixed(1)} GB`;
+        return gb.toFixed(1);
     };
 
     const getBatteryColor = (level: number) => {
@@ -100,7 +100,7 @@ export function DeviceCard({ device, onMirror, onToolbox, onAction }: DeviceCard
                             <span className="text-[10px] text-on-surface-variant/50 uppercase font-bold tracking-wider leading-none mb-1">{t('home.device_card.ram')}</span>
                             <span className="text-sm font-bold text-on-surface/80 truncate">
                                 {device.ram_used && device.ram_total ? (
-                                    `${formatMem(device.ram_used)} / ${formatMem(device.ram_total)}`
+                                    `${formatMem(device.ram_used)} / ${formatMem(device.ram_total)} GB`
                                 ) : (
                                     device.state || t('common.offline')
                                 )}
@@ -115,7 +115,7 @@ export function DeviceCard({ device, onMirror, onToolbox, onAction }: DeviceCard
                             <span className="text-[10px] text-on-surface-variant/50 uppercase font-bold tracking-wider leading-none mb-1">{t('home.device_card.storage')}</span>
                             <span className="text-sm font-bold text-on-surface/80 truncate">
                                 {device.storage_used && device.storage_total ? (
-                                    `${formatMem(device.storage_used)} / ${formatMem(device.storage_total)}`
+                                    `${formatMem(device.storage_used)} / ${formatMem(device.storage_total)} GB`
                                 ) : (
                                     device.state || t('common.offline')
                                 )}
