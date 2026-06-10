@@ -291,8 +291,8 @@ export async function suggestElementName(
         const content = data.content?.[0]?.text;
         
         // DEBUG: Log status and content
-        console.log("[Claude Status] Stop Reason:", data.stop_reason || "UNKNOWN");
-        console.log("[Claude Raw Content]:", content);
+        // console.log("[Claude Status] Stop Reason:", data.stop_reason || "UNKNOWN");
+        // console.log("[Claude Raw Content]:", content);
 
         if (!content) {
             throw new Error("Empty AI response");
@@ -329,7 +329,7 @@ export async function suggestElementName(
                         name: nameMatch[1],
                         justification: justificationMatch ? justificationMatch[1] : ""
                     };
-                    console.log("[Claude] Fuzzy extraction successful:", parsed);
+                    // console.log("[Claude] Fuzzy extraction successful:", parsed);
                 }
             }
 

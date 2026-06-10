@@ -63,8 +63,9 @@ export function WarningModal({
                                     <Icon size={24} />
                                 </div>
                                 <Button
+                                    variant="ghost" size="icon"
                                     onClick={onClose}
-                                    className="p-2 -mr-2 text-on-surface/40 hover:text-on-surface/80 bg-transparent hover:bg-surface-variant/50 rounded-xl transition-all"
+                                    className="w-8 h-8 -mr-2 text-on-surface/40 hover:text-on-surface/80 rounded-xl"
                                 >
                                     <X size={20} />
                                 </Button>

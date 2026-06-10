@@ -327,9 +327,10 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                                         }
                                     }).catch(() => setStatusMsg({ text: t('connect.status.clipboard_error'), type: 'error' }));
                                 }}
-                                className="text-[10px] bg-transparent p-0 m-0 shadow-none rounded-none hover:bg-transparent text-primary dark:text-primary/80 hover:underline cursor-pointer"
-                                data-tooltip={t('connect.actions.paste_tooltip', "Paste host:port or ngrok url")}
-                                data-position="top"
+                                variant="link"
+                                className="text-[10px]"
+                                title={t('connect.actions.paste_tooltip', "Paste host:port or ngrok url")}
+                                tooltipPosition="top"
                             >
                                 {t('connect.actions.paste_url') || "Paste URL"}
                             </Button>
@@ -347,10 +348,11 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                             {selectedDevice && (
                                 <Button
                                     onClick={handleEnableTcpIp}
-                                    className="text-[10px] bg-transparent p-0 m-0 shadow-none rounded-none hover:bg-transparent text-primary dark:text-primary/80 hover:underline cursor-pointer"
+                                    variant="link"
+                                    className="text-[10px]"
                                     disabled={loading}
-                                    data-tooltip={t('connect.actions.enable_tcpip_tooltip', "Run 'adb tcpip 5555'")}
-                                    data-position="top"
+                                    title={t('connect.actions.enable_tcpip_tooltip', "Run 'adb tcpip 5555'")}
+                                    tooltipPosition="top"
                                 >
                                     {t('connect.actions.enable_tcpip', "Enable 5555")}
                                 </Button>
@@ -461,8 +463,8 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                                     <span className="font-mono text-sm text-on-surface/80">••••••••</span>
                                 </div>
                             </div>
-                            <Button className="w-full py-2 bg-purple-600 text-on-primary rounded-2xl font-medium flex items-center justify-center gap-2">
-                                <Link size={18} /> {t('connect.actions.start_tunnel')}
+                            <Button className="w-full py-2 bg-purple-600 hover:bg-purple-500 text-on-primary rounded-2xl justify-center" leftIcon={<Link size={18} />}>
+                                {t('connect.actions.start_tunnel')}
                             </Button>
                         </div>
                     ) : (

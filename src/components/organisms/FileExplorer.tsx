@@ -364,9 +364,10 @@ export function FileExplorer({
             {!isPathUnconfigured && (
                 <div className="flex items-center gap-2 mb-2 p-2 bg-transparent backdrop-blur-md rounded-2xl border border-outline-variant/30 shrink-0 overflow-visible">
                     <Button
+                        variant="ghost" size="icon"
                         onClick={handleUp}
                         disabled={currentPath === rootPath}
-                        className="p-1 bg-transparent hover:bg-surface-variant/50 shadow-none hover:shadow-lg rounded-full transition-colors text-on-surface-variant/80 disabled:opacity-30 disabled:cursor-not-allowed"
+                        className="w-8 h-8 rounded-full text-on-surface-variant/80 disabled:opacity-30 disabled:cursor-not-allowed"
                         data-tooltip={t('file_explorer.up')}
                         data-position="right"
                     >
@@ -381,9 +382,10 @@ export function FileExplorer({
                         <div className="flex items-center gap-0.5 border-l border-outline-variant/20 pl-2">
                             {/* Fetch */}
                             <Button
+                                variant="ghost" size="sm"
                                 onClick={handleGitFetch}
                                 disabled={fetching}
-                                className="px-1 py-0 rounded-lg text-on-surface-variant/70 bg-transparent shadow-none hover:shadow-lg hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-90 cursor-pointer"
+                                className="h-6 w-8 p-0 rounded-lg text-on-surface-variant/70 hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed"
                                 data-tooltip={t('file_explorer.git_fetch_tooltip', "Fetch from remote")}
                                 data-position="left"
                                 aria-label={t('file_explorer.git_fetch_tooltip', "Fetch from remote")}
@@ -392,9 +394,10 @@ export function FileExplorer({
                             </Button>
                             {/* Pull */}
                             <Button
+                                variant="ghost" size="sm"
                                 onClick={handleGitPull}
                                 disabled={pulling}
-                                className="px-1 py-0 rounded-lg text-on-surface-variant/70 bg-transparent shadow-none hover:shadow-lg hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-90 cursor-pointer"
+                                className="h-6 w-8 p-0 rounded-lg text-on-surface-variant/70 hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed"
                                 data-tooltip={t('file_explorer.git_pull_tooltip', "Pull from remote")}
                                 data-position="left"
                                 aria-label={t('file_explorer.git_pull_tooltip', "Pull from remote")}
@@ -403,9 +406,10 @@ export function FileExplorer({
                             </Button>
                             {/* Commit */}
                             <Button
+                                variant="ghost" size="sm"
                                 onClick={() => setShowCommitModal(true)}
                                 disabled={!Object.values(gitStatusEntries).some(s => s === 'staged')}
-                                className="px-1 py-0 rounded-lg text-on-surface-variant/70 bg-transparent shadow-none hover:shadow-lg hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-90 cursor-pointer"
+                                className="h-6 w-8 p-0 rounded-lg text-on-surface-variant/70 hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed"
                                 data-tooltip={t('file_explorer.git_commit_btn_tooltip', "Commit staged changes")}
                                 data-position="left"
                                 aria-label={t('file_explorer.git_commit_btn_tooltip', "Commit staged changes")}
@@ -414,9 +418,10 @@ export function FileExplorer({
                             </Button>
                             {/* Push */}
                             <Button
+                                variant="ghost" size="sm"
                                 onClick={handleGitPush}
                                 disabled={pushing}
-                                className="px-1 py-0 rounded-lg text-on-surface-variant/70 bg-transparent shadow-none hover:shadow-lg hover:text-secondary hover:bg-secondary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-90 cursor-pointer"
+                                className="h-6 w-8 p-0 rounded-lg text-on-surface-variant/70 hover:text-secondary hover:bg-secondary/10 disabled:opacity-40 disabled:cursor-not-allowed"
                                 data-tooltip={t('file_explorer.git_push_tooltip', "Push to remote")}
                                 data-position="left"
                                 aria-label={t('file_explorer.git_push_tooltip', "Push to remote")}
@@ -547,6 +552,7 @@ export function FileExplorer({
                                                     <div className="flex items-center gap-2 shrink-0">
                                                         {(actionStatus === 'untracked' || actionStatus === 'modified' || actionStatus === 'deleted') && (
                                                             <Button
+                                                                variant="ghost" size="icon"
                                                                 onClick={async (e) => {
                                                                     e.stopPropagation();
                                                                     try {
@@ -557,7 +563,7 @@ export function FileExplorer({
                                                                         feedback.toast.error(String(err));
                                                                     }
                                                                 }}
-                                                                className="opacity-0 group-hover:opacity-100 p-1 bg-transparent text-primary shadow-none hover:shadow-lg hover:text-primary hover:bg-primary/20 rounded-lg transition-all active:scale-90 cursor-pointer"
+                                                                className="opacity-0 group-hover:opacity-100 w-6 h-6 rounded-lg text-primary hover:bg-primary/20"
                                                                 data-tooltip={t('file_explorer.git_stage_tooltip', "Stage changes")}
                                                                 data-position="left"
                                                                 aria-label={t('file_explorer.git_stage_tooltip', "Stage changes")}
@@ -567,6 +573,7 @@ export function FileExplorer({
                                                         )}
                                                         {actionStatus === 'staged' && (
                                                             <Button
+                                                                variant="ghost" size="icon"
                                                                 onClick={async (e) => {
                                                                     e.stopPropagation();
                                                                     try {
@@ -577,7 +584,7 @@ export function FileExplorer({
                                                                         feedback.toast.error(String(err));
                                                                     }
                                                                 }}
-                                                                className="opacity-0 group-hover:opacity-100 p-1 bg-transparent text-warning shadow-none hover:shadow-lg hover:text-amber-500 hover:bg-amber-500/20 rounded-lg transition-all active:scale-90 cursor-pointer"
+                                                                className="opacity-0 group-hover:opacity-100 w-6 h-6 rounded-lg text-warning hover:text-amber-500 hover:bg-amber-500/20"
                                                                 data-tooltip={t('file_explorer.git_unstage_tooltip', "Unstage changes")}
                                                                 data-position="left"
                                                                 aria-label={t('file_explorer.git_unstage_tooltip', "Unstage changes")}

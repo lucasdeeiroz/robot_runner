@@ -112,15 +112,17 @@ export const AiResponse: React.FC<AiResponseProps> = React.memo(({
                                     <RotateCcw size={14} />
                                 </Button>
                             )}
-                            <Button className="p-1 bg-transparent text-primary/40 group-hover/header:text-primary transition-colors hover:bg-primary/10 rounded rounded-full">
+                            <Button variant="ghost" size="icon" className="rounded-full h-8 w-8 text-primary/40 group-hover/header:text-primary hover:bg-primary/10">
                                 {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
                             </Button>
                             {onClose && (
                                 <Button
+                                    variant="ghost"
+                                    size="icon"
                                     onClick={(e) => { e.stopPropagation(); onClose(); }}
-                                    className="p-1 bg-transparent text-primary/40 hover:text-error transition-colors hover:bg-error/10 rounded rounded-full"
-                                    data-tooltip={t('common.close')}
-                                    data-position="left"
+                                    className="rounded-full h-8 w-8 text-primary/40 hover:text-error hover:bg-error/10"
+                                    title={t('common.close')}
+                                    tooltipPosition="left"
                                 >
                                     <X size={16} />
                                 </Button>

@@ -337,11 +337,12 @@ export function HistoryDetailModal({ isOpen, onClose, log, onUpdateLog }: Histor
                                 </div>
                             )}
                             <Button
+                                variant="ghost" size="icon"
                                 onClick={() => openLog(log.path)}
                                 disabled={log.is_remote && !log.xml_path}
                                 className={clsx(
-                                    "p-1 rounded transition-colors bg-transparent text-on-surface-variant/80 shadow-none hover:shadow-lg",
-                                    log.is_remote && !log.xml_path ? "opacity-20 cursor-not-allowed" : "hover:bg-surface-variant/30 hover:text-primary"
+                                    "w-6 h-6 rounded",
+                                    log.is_remote && !log.xml_path ? "opacity-20 cursor-not-allowed" : "hover:text-primary"
                                 )}
                                 data-tooltip={log.is_remote && !log.xml_path ? t('tests_page.local_only_action', "Ação disponível apenas localmente") : t('run_tab.console.open_output_dir')}
                                 data-position='bottom'

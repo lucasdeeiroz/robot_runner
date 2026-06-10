@@ -440,18 +440,20 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                 <span className="text-xs text-on-surface-variant/80 font-mono truncate px-2" title={testPath}>{testPath}</span>
                 <div className="flex items-center gap-1">
                     <Button
+                        variant="ghost" size="icon"
                         onClick={() => setIsRawMode(!isRawMode)}
-                        className="p-1 bg-transparent hover:bg-surface-variant/30 shadow-none hover:shadow-lg rounded-full transition-colors text-on-surface-variant/80 hover:text-warning"
+                        className="w-8 h-8 rounded-full text-on-surface-variant/80 hover:text-warning"
                         data-tooltip={isRawMode ? t('run_tab.console.fancy_mode') : t('run_tab.console.raw_mode')}
                         data-position="left"
                     >
                         <Star size={14} fill={!isRawMode ? "currentColor" : "none"} className={clsx(!isRawMode && "text-warning-container/40")} />
                     </Button>
                     <Button
+                        variant="ghost" size="icon"
                         onClick={() => setShowDebugConsole(!showDebugConsole)}
                         className={clsx(
-                            "p-1 bg-transparent hover:bg-surface-variant/30 shadow-none hover:shadow-lg rounded-full transition-colors",
-                            showDebugConsole ? "text-primary bg-primary/10" : "text-on-surface-variant/80 hover:text-primary"
+                            "w-8 h-8 rounded-full",
+                            showDebugConsole ? "text-primary bg-primary/10 hover:bg-primary/20" : "text-on-surface-variant/80 hover:text-primary"
                         )}
                         data-tooltip={showDebugConsole ? t('run_tab.console.debug_off') : t('run_tab.console.debug_on')}
                         data-position="left"
@@ -459,10 +461,11 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                         <Terminal size={14} />
                     </Button>
                     <Button
+                        variant="ghost" size="icon"
                         onClick={() => setIsKeepAwake(!isKeepAwake)}
                         className={clsx(
-                            "p-1 bg-transparent hover:bg-surface-variant/30 shadow-none hover:shadow-lg rounded-full transition-colors",
-                            isKeepAwake ? "text-primary" : "text-on-surface-variant/80 hover:text-primary"
+                            "w-8 h-8 rounded-full",
+                            isKeepAwake ? "text-primary hover:text-primary/80" : "text-on-surface-variant/80 hover:text-primary"
                         )}
                         data-tooltip={t('run_tab.console.keep_awake')}
                         data-position="left"
@@ -472,8 +475,9 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                     {!isRunning && tree.length > 0 && (
                         <div className="flex items-center gap-1">
                             {session?.outputDir && (
-                                <Button
-                                    onClick={async () => {
+                                    <Button
+                                        variant="ghost" size="icon"
+                                        onClick={async () => {
                                         let path = session.outputDir!;
                                         // Safety check: ensure we open a directory, not a file
                                         if (path.toLowerCase().endsWith('.xml') || path.toLowerCase().endsWith('.html')) {
@@ -489,10 +493,10 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                                             console.error("Failed to open log folder:", e);
                                         }
                                     }}
-                                    className="p-1 bg-transparent hover:bg-surface-variant/30 shadow-none hover:shadow-lg rounded-full transition-colors text-on-surface-variant/80 hover:text-primary"
-                                    data-tooltip={t('run_tab.console.open_output_dir')}
-                                    data-position="left"
-                                >
+                                        className="w-8 h-8 rounded-full text-on-surface-variant/80 hover:text-primary"
+                                        data-tooltip={t('run_tab.console.open_output_dir')}
+                                        data-position="left"
+                                    >
                                     <FolderOpen size={14} />
                                 </Button>
                             )}
@@ -524,12 +528,13 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                                 {isAiLoopActive ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
                             </Button>
                             <Button
+                                variant="ghost" size="icon"
                                 onClick={() => {
                                     setAiHistory([]);
                                     setAiStepCount(0);
                                     setIsAiLoopActive(true);
                                 }}
-                                className="p-1 bg-transparent hover:bg-primary/10 text-on-surface-variant/60 hover:text-primary shadow-none hover:shadow-lg rounded-full transition-colors"
+                                className="w-6 h-6 rounded-full text-on-surface-variant/60 hover:text-primary hover:bg-primary/10"
                                 data-tooltip={t('common.reset')}
                                 data-position="left"
                             >
@@ -685,8 +690,9 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                             <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/70">{t('run_tab.console.debug_output')}</span>
                         </div>
                         <Button
+                            variant="ghost" size="icon"
                             onClick={() => setShowDebugConsole(false)}
-                            className="p-1 bg-transparent hover:bg-surface-variant/30 shadow-none hover:shadow-lg rounded-full transition-colors text-on-surface-variant/60"
+                            className="w-8 h-8 rounded-full text-on-surface-variant/60"
                         >
                             <X size={14} />
                         </Button>

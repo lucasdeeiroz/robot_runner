@@ -786,7 +786,7 @@ function TestSelectorModal({ isOpen, onClose, tests, selected, onToggle, onSelec
                         {type === 'test' ? <FileCode size={18} className="text-primary" /> : <Settings2 size={18} className="text-primary" />}
                         {type === 'test' ? t('tests.selector.title') : t('tests.selector.args_title', "Selecione Argumentos")}
                     </h3>
-                    <Button onClick={onClose} className="p-1 bg-transparent shadow-none hover:bg-surface-variant/50 hover:shadow-lg rounded-full transition-colors"><X size={18} /></Button>
+                    <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full"><X size={18} /></Button>
                 </div>
 
                 {type === 'test' && (
@@ -830,11 +830,11 @@ function TestSelectorModal({ isOpen, onClose, tests, selected, onToggle, onSelec
 
                 <div className="p-4 border-t border-outline-variant/10 flex items-center justify-between bg-surface-variant/10">
                     <div className="flex items-center gap-2">
-                        <Button onClick={onSelectAll} className="m-0 p-0 bg-transparent hover:bg-transparent shadow-none text-[11px] font-bold text-primary hover:underline">{t('tests.selector.all')}</Button>
+                        <Button variant="link" size="sm" onClick={onSelectAll} className="p-0 font-bold">{t('tests.selector.all')}</Button>
                         <div className="w-1 h-1 bg-outline-variant rounded-full" />
-                        <Button onClick={onClearAll} className="m-0 p-0 bg-transparent hover:bg-transparent shadow-none text-[11px] font-bold text-on-surface-variant/60 hover:text-error">{t('tests.selector.none')}</Button>
+                        <Button variant="link" size="sm" onClick={onClearAll} className="p-0 font-bold text-on-surface-variant/60 hover:text-error">{t('tests.selector.none')}</Button>
                     </div>
-                    <Button variant="primary" size="sm" onClick={onConfirm} disabled={isLoading} className="rounded-xl px-6 hover:bg-secondary-container">{t('tests.selector.close')}</Button>
+                    <Button variant="primary" size="sm" onClick={onConfirm} isLoading={isLoading} className="rounded-xl px-6">{t('tests.selector.close')}</Button>
                 </div>
             </div>
         </div>

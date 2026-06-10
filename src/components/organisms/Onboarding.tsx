@@ -102,7 +102,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                             />
                         </div>
                         <div className="flex justify-end mt-8">
-                            <Button variant="primary" className="hover:bg-secondary-container" onClick={() => setStep(2)}>
+                            <Button variant="primary" onClick={() => setStep(2)}>
                                 {t('common.next')}
                             </Button>
                         </div>

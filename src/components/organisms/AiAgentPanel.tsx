@@ -16,6 +16,7 @@ import { useSpeechToText } from '@/hooks/useSpeechToText';
 import { useTextToSpeech } from '@/hooks/useTextToSpeech';
 import packageJson from '../../../package.json';
 import { Button } from "@/components/atoms/Button";
+import clsx from "clsx";
 
 interface AiAgentPanelProps {
     onNavigate: (page: string) => void;
@@ -501,6 +502,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
 
                 <div className="flex items-center gap-2">
                     <Button
+                        variant="ghost" size="sm"
                         onClick={() => {
                             stopSpeaking();
                             setMessages([]);
@@ -508,7 +510,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                             updateSetting('aiSessionId', undefined);
                             feedback.toast.success('ai_agent.session_cleared');
                         }}
-                        className="bg-transparent text-xs text-on-surface hover:bg-transparent hover:text-error transition-colors shadow-none"
+                        className="text-xs text-on-surface hover:text-error h-8"
                     >
                         {t('ai_agent.clear_session', 'Clear')}
                     </Button>
@@ -570,6 +572,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                             {msg.role === 'agent' && (
                                 <div className="flex items-center gap-2 ml-8 mt-1">
                                     <Button
+                                        variant="ghost" size="icon"
                                         onClick={() => {
                                             if (currentlySpeakingMsgId === msg.id) {
                                                 stopSpeaking();
@@ -581,8 +584,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                                         }}
                                         data-tooltip={currentlySpeakingMsgId === msg.id ? t('ai_agent.stop_speak_title') : t('ai_agent.speak_title')}
                                         data-position="right"
-                                        className={`p-1 rounded-md bg-transparent hover:bg-primary/10 transition-colors shadow-none rounded-full ${currentlySpeakingMsgId === msg.id ? 'text-primary animate-pulse' : 'text-on-surface-variant/60 hover:text-primary'
-                                            }`}
+                                        className={clsx("w-6 h-6 rounded-full hover:bg-primary/10", currentlySpeakingMsgId === msg.id ? 'text-primary animate-pulse' : 'text-on-surface-variant/60 hover:text-primary')}
                                     >
                                         {currentlySpeakingMsgId === msg.id ? <VolumeX size={14} /> : <Volume2 size={14} />}
                                     </Button>
@@ -673,13 +675,13 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                     >
                         {isListening ? <MicOff size={16} /> : <Mic size={16} />}
                     </button>
-                    <Button
+                    <button
                         onClick={() => handleSend()}
                         disabled={!input.trim() || isLoading}
                         className="absolute right-2 bottom-2 p-2 rounded-lg bg-primary text-on-primary hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-primary/20"
                     >
                         {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                    </Button>
+                    </button>
                 </div>
             </div>
         </div>

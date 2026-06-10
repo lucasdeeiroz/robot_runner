@@ -43,7 +43,7 @@ import { Switch } from "@/components/atoms/Switch";
 import { Select } from "@/components/atoms/Select";
 import { SplitButton } from "@/components/molecules/SplitButton";
 import { PathInput } from "@/components/molecules/PathInput";
-import { TagInput } from "@/components/molecules/TagInput";
+import { TagInput } from "@/components/atoms/TagInput";
 import { SegmentedControl } from "@/components/molecules/SegmentedControl";
 import { InfoCard } from "@/components/molecules/InfoCard";
 import { LogoInput } from "@/components/molecules/LogoInput";
@@ -1417,15 +1417,8 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                     <TagInput
                                         label={t('settings.tool_config.app_packages')}
                                         tags={settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean)}
-                                        onAdd={(tag) => {
-                                            const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
-                                            if (!current.includes(tag)) {
-                                                updateSetting('tools', { ...settings.tools, appPackage: [...current, tag].join(', ') });
-                                            }
-                                        }}
-                                        onRemove={(tag) => {
-                                            const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
-                                            updateSetting('tools', { ...settings.tools, appPackage: current.filter(t => t !== tag).join(', ') });
+                                        onChange={(tags) => {
+                                            updateSetting('tools', { ...settings.tools, appPackage: tags.join(', ') });
                                         }}
                                         placeholder={t('settings.tool_config.add_package_placeholder')}
                                     />
@@ -1661,9 +1654,10 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                             ) : availableModels.length > 0 ? (
                                                 availableModels.map(model => (
                                                     <Button
+                                                        variant="unstyled"
                                                         key={model}
                                                         type="button"
-                                                        className="justify-start w-full text-left px-3 py-2 text-sm bg-transparent text-on-surface/80 shadow-none hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0"
+                                                        className="justify-start w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0"
                                                         onMouseDown={() => { updateSetting('geminiModel', model); setShowModelList(false); }}
                                                         onClick={() => { updateSetting('geminiModel', model); setShowModelList(false); }}
                                                     >
@@ -1722,9 +1716,10 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                             ) : availableModels.length > 0 ? (
                                                 availableModels.map(model => (
                                                     <Button
+                                                        variant="unstyled"
                                                         key={model}
                                                         type="button"
-                                                        className="justify-start w-full text-left px-3 py-2 text-sm bg-transparent text-on-surface/80 shadow-none hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0"
+                                                        className="justify-start w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0"
                                                         onMouseDown={() => { updateSetting('claudeModel', model); setShowModelList(false); }}
                                                         onClick={() => { updateSetting('claudeModel', model); setShowModelList(false); }}
                                                     >
@@ -1785,7 +1780,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                                     <Button
                                                         key={model}
                                                         type="button"
-                                                        className="justify-start w-full text-left px-3 py-2 text-sm bg-transparent text-on-surface/80 shadow-none hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0"
+                                                        className="justify-start w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0"
                                                         onMouseDown={() => { updateSetting('openaiModel', model); setShowModelList(false); }}
                                                         onClick={() => { updateSetting('openaiModel', model); setShowModelList(false); }}
                                                     >

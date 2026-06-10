@@ -135,8 +135,9 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                     )}
                 </AnimatePresence>
                 <Button
+                    variant="ghost" size="icon"
                     onClick={() => setCollapsed(!collapsed)}
-                    className="p-1 bg-transparent hover:bg-surface-variant/50 shadow-none hover:shadow-lg rounded-full text-on-surface-variant/80 hover:text-on-surface/80 transition-transform active:scale-95"
+                    className="w-8 h-8 rounded-full text-on-surface-variant/80 hover:text-on-surface/80 transition-transform active:scale-95"
                 >
                     <motion.div
                         animate={{ rotate: collapsed ? 0 : 180 }}
@@ -152,16 +153,17 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
             <nav className="flex-1 p-2 space-y-1">
                 {navItems.map((item) => (
                     <Button
+                        variant="unstyled"
                         key={item.id}
                         onClick={() => {
                             onNavigate(item.id);
                             logEvent('feature_opened', { feature_name: item.id });
                         }}
                         className={cn(
-                            "group w-full flex items-center justify-start p-2 rounded-2xl transition-all duration-200 active:scale-95 relative",
+                            "group w-full flex items-center justify-start p-2 rounded-2xl transition-all duration-200 active:scale-95 relative hover:shadow-lg",
                             activePage === item.id
                                 ? "bg-primary/10 text-primary dark:text-primary/80 shadow-primary/20"
-                                : "bg-transparent text-on-surface-variant/80 shadow-none hover:bg-surface-variant/50 hover:text-on-surface/80 hover:shadow-lg",
+                                : "bg-transparent text-on-surface-variant/80 hover:bg-surface-variant/50 hover:text-on-surface/80",
                             collapsed ? "justify-center" : "gap-3"
                         )}
                         data-tooltip={collapsed ? item.label : undefined}
@@ -289,8 +291,9 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                     </AnimatePresence>
                     {!collapsed && (
                         <Button
+                            variant="ghost" size="icon"
                             onClick={signOut}
-                            className="p-1.5 bg-transparent hover:bg-error/10 text-on-surface-variant hover:text-error shadow-none hover:shadow-lg rounded-xl transition-all active:scale-95"
+                            className="w-8 h-8 hover:bg-error/10 text-on-surface-variant hover:text-error rounded-xl transition-all active:scale-95"
                             data-tooltip={t('auth.logout')}
                             data-position="top"
                         >
@@ -318,6 +321,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                     </div>
                     {updateAvailable && (
                         <Button
+                            variant="unstyled"
                             onClick={() => onNavigate('about')}
                             className="text-error font-bold bg-error-container px-1.5 py-0.5 rounded-2xl hover:bg-error-container/80 transition-colors animate-pulse cursor-pointer shrink-0"
                         >

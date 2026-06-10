@@ -44,18 +44,19 @@ export function DropdownMenu({ trigger, items, align = 'right' }: DropdownMenuPr
                         <Menu.Item key={index} disabled={item.disabled}>
                             {({ active, disabled }) => (
                                 <Button
+                                    variant="unstyled"
                                     onClick={item.onClick}
                                     disabled={disabled}
                                     className={clsx(
                                         "group flex w-full justify-start items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors",
                                         active ? (
-                                            item.variant === 'danger' ? "bg-error/10 text-error hover:bg-error/10 hover:text-error" :
-                                                item.variant === 'warning' ? "bg-warning/10 text-warning hover:bg-warning/10 hover:text-warning" :
-                                                    "bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary"
+                                            item.variant === 'danger' ? "bg-error/10 text-error" :
+                                                item.variant === 'warning' ? "bg-warning/10 text-warning" :
+                                                    "bg-primary/10 text-primary"
                                         ) : (
-                                            item.variant === 'danger' ? "bg-transparent shadow-none text-error/80" :
-                                                item.variant === 'warning' ? "bg-transparent shadow-none text-warning/80" :
-                                                    "bg-transparent shadow-none text-on-surface/80"
+                                            item.variant === 'danger' ? "text-error/80" :
+                                                item.variant === 'warning' ? "text-warning/80" :
+                                                    "text-on-surface/80"
                                         ),
                                         disabled && "opacity-30 cursor-not-allowed"
                                     )}

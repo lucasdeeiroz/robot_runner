@@ -492,9 +492,9 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                         {!isSearchFocused && (
                             <>
                                 <div className="flex gap-1">
-                                    <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 4')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" data-tooltip={t('inspector.nav.back')} data-position="bottom"><ArrowLeft size={16} /></Button>
-                                    <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 3')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" data-tooltip={t('inspector.nav.home')} data-position="bottom"><Home size={16} /></Button>
-                                    <Button variant="ghost" size="sm" onClick={() => sendAdbInput('keyevent 187')} className="p-1.5 hover:bg-surface-variant/30 rounded text-on-surface-variant/80" data-tooltip={t('inspector.nav.recents')} data-position="bottom"><Rows size={16} /></Button>
+                                    <Button variant="ghost" size="icon" onClick={() => sendAdbInput('keyevent 4')} className="rounded" title={t('inspector.nav.back')} tooltipPosition="bottom"><ArrowLeft size={16} /></Button>
+                                    <Button variant="ghost" size="icon" onClick={() => sendAdbInput('keyevent 3')} className="rounded" title={t('inspector.nav.home')} tooltipPosition="bottom"><Home size={16} /></Button>
+                                    <Button variant="ghost" size="icon" onClick={() => sendAdbInput('keyevent 187')} className="rounded" title={t('inspector.nav.recents')} tooltipPosition="bottom"><Rows size={16} /></Button>
                                     <div className="w-[1px] h-4 bg-outline-variant/30 self-center mx-1" />
                                     <Button
                                         variant="ghost"
@@ -562,13 +562,15 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                             leftIcon={<Search size={14} />}
                             rightIcon={searchQuery ? (
                                 <Button
+                                    variant="ghost"
+                                    size="icon"
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         handleSearch("");
                                     }}
-                                    className="p-0 bg-transparent shadow-none hover:bg-surface-variant/30 rounded-full transition-colors flex items-center justify-center"
-                                    data-tooltip={t('inspector.search.clear')}
-                                    data-position="left"
+                                    className="rounded-full"
+                                    title={t('inspector.search.clear')}
+                                    tooltipPosition="left"
                                 >
                                     <X size={14} className="opacity-50" />
                                 </Button>
@@ -1016,33 +1018,36 @@ function RecordingPane({
             <div className="p-4 border-b border-outline-variant/20 bg-surface-variant/10">
                 <div className="flex gap-1 mb-4 bg-surface-variant/30 p-1 rounded-xl">
                     <Button
+                        variant={activeTab === 'tap' ? 'primary' : 'ghost'}
                         onClick={() => setActiveTab('tap')}
                         className={clsx(
-                            "flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-lg transition-all",
-                            activeTab === 'tap' ? "bg-primary text-on-primary shadow-sm hover:bg-primary/90" : "bg-transparent shadow-none hover:bg-surface-variant/50 text-on-surface-variant/70"
+                            "flex-1 flex items-center justify-center py-2 text-xs font-bold rounded-lg",
+                            activeTab !== 'tap' && "text-on-surface-variant/70"
                         )}
+                        leftIcon={<MousePointer2 size={14} />}
                     >
-                        <MousePointer2 size={14} />
                         {t('inspector.recorder.actions.tap')}
                     </Button>
                     <Button
+                        variant={activeTab === 'swipe' ? 'primary' : 'ghost'}
                         onClick={() => setActiveTab('swipe')}
                         className={clsx(
-                            "flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-lg transition-all",
-                            activeTab === 'swipe' ? "bg-primary text-on-primary shadow-sm hover:bg-primary/90" : "bg-transparent shadow-none hover:bg-surface-variant/50 text-on-surface-variant/70"
+                            "flex-1 flex items-center justify-center py-2 text-xs font-bold rounded-lg",
+                            activeTab !== 'swipe' && "text-on-surface-variant/70"
                         )}
+                        leftIcon={<Move size={14} />}
                     >
-                        <Move size={14} />
                         {t('inspector.recorder.actions.swipe')}
                     </Button>
                     <Button
+                        variant={activeTab === 'drag' ? 'primary' : 'ghost'}
                         onClick={() => setActiveTab('drag')}
                         className={clsx(
-                            "flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-lg transition-all",
-                            activeTab === 'drag' ? "bg-primary text-on-primary shadow-sm hover:bg-primary/90" : "bg-transparent shadow-none hover:bg-surface-variant/50 text-on-surface-variant/70"
+                            "flex-1 flex items-center justify-center py-2 text-xs font-bold rounded-lg",
+                            activeTab !== 'drag' && "text-on-surface-variant/70"
                         )}
+                        leftIcon={<Play size={14} className="rotate-90" />}
                     >
-                        <Play size={14} className="rotate-90" />
                         {t('inspector.recorder.actions.drag_drop')}
                     </Button>
                 </div>
@@ -1102,11 +1107,12 @@ function RecordingPane({
                                             <div key={n.id} className="flex items-center">
                                                 {i > 0 && <span className="mx-0.5 text-[10px] opacity-30">&gt;</span>}
                                                 <Button
+                                                    variant="unstyled"
                                                     onClick={() => onSelectNode(n)}
                                                     onMouseEnter={() => onHoverNode(n)}
                                                     onMouseLeave={() => onHoverNode(null)}
                                                     className={clsx(
-                                                        "m-0 p-0 bg-transparent shadow-none text-[10px] hover:bg-transparent hover:text-primary transition-colors truncate max-w-[80px]",
+                                                        "text-[10px] hover:text-primary truncate max-w-[80px]",
                                                         n === selectedNode ? "font-bold text-on-surface underline decoration-primary/40 underline-offset-2" : "text-on-surface-variant/60"
                                                     )}
                                                 >
@@ -1335,11 +1341,12 @@ function NodeBreadcrumbs({ node, onSelect, onHover }: { node: InspectorNode, onS
                     <div key={n.id} className="flex items-center">
                         {i > 0 && <span className="mx-1 text-on-surface/80">&gt;</span>}
                         <Button
+                            variant="unstyled"
                             onClick={() => onSelect(n)}
                             onMouseEnter={() => onHover(n)}
                             onMouseLeave={() => onHover(null)}
                             className={clsx(
-                                "hover:text-primary hover:underline transition-colors text-left",
+                                "hover:text-primary hover:underline transition-colors text-left text-xs",
                                 n === node ? "font-bold text-on-surface/80" : ""
                             )}
                             title={generateXPath(n)}

@@ -295,8 +295,8 @@ export async function suggestElementName(
         const content = choice?.message?.content;
         
         // DEBUG: Log status and content
-        console.log("[OpenAI Status] Finish Reason:", choice?.finish_reason || "UNKNOWN");
-        console.log("[OpenAI Raw Content]:", content);
+        // console.log("[OpenAI Status] Finish Reason:", choice?.finish_reason || "UNKNOWN");
+        // console.log("[OpenAI Raw Content]:", content);
 
         try {
             const firstBrace = content.indexOf('{');
@@ -329,7 +329,7 @@ export async function suggestElementName(
                         name: nameMatch[1],
                         justification: justificationMatch ? justificationMatch[1] : ""
                     };
-                    console.log("[OpenAI] Fuzzy extraction successful:", parsed);
+                    // console.log("[OpenAI] Fuzzy extraction successful:", parsed);
                 }
             }
 

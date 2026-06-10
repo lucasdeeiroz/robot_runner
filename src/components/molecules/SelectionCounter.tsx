@@ -35,8 +35,9 @@ export function SelectionCounter() {
             <div className="flex items-center gap-2 mr-2">
                 <ListFilter size={18} className="text-secondary" />
                 <Button
+                    variant="unstyled"
                     onClick={() => setIsModalOpen(true)}
-                    className="text-sm font-medium hover:underline px-2 py-1 rounded-lg bg-transparent hover:bg-on-secondary-container/10 transition-colors whitespace-nowrap shadow-none"
+                    className="text-sm font-medium hover:underline px-2 py-1 rounded-lg hover:bg-on-secondary-container/10 transition-colors whitespace-nowrap"
                 >
                     {parts.join(", ")}
                 </Button>
@@ -46,11 +47,12 @@ export function SelectionCounter() {
 
 
             <Button
+                variant="unstyled"
                 onClick={() => {
                     clearSelection();
                     feedback.toast.success(t('tests.selection.cleared'));
                 }}
-                className="p-1.5 bg-transparent hover:bg-error/10 hover:text-error rounded-full transition-colors cursor-pointer shadow-none"
+                className="p-1.5 hover:bg-error/10 hover:text-error rounded-full transition-colors cursor-pointer"
                 data-tooltip={t('tests.selection.clear_all')}
                 data-position="left"
             >

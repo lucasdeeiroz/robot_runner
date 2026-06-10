@@ -285,8 +285,8 @@ export async function suggestElementName(
     const content = candidate?.content?.parts?.[0]?.text;
 
     // DEBUG: Always log context about the completion
-    console.log("[Gemini Status] Finish Reason:", candidate?.finishReason || "UNKNOWN");
-    console.log("[Gemini Raw Content]:", content);
+    // console.log("[Gemini Status] Finish Reason:", candidate?.finishReason || "UNKNOWN");
+    // console.log("[Gemini Raw Content]:", content);
 
     if (!content) {
         if (candidate?.finishReason === "SAFETY") {
@@ -326,7 +326,7 @@ export async function suggestElementName(
                     name: nameMatch[1],
                     justification: justificationMatch ? justificationMatch[1] : ""
                 };
-                console.log("[Gemini] Fuzzy extraction successful:", parsed);
+                // console.log("[Gemini] Fuzzy extraction successful:", parsed);
             }
         }
 
@@ -633,7 +633,7 @@ export async function reorganizeFlowchartLayout(
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     try {
-        console.log("[Gemini] Reorganizing flowchart layout with model:", model);
+        // console.log("[Gemini] Reorganizing flowchart layout with model:", model);
         const requestBody = JSON.stringify({
             contents: [{
                 role: 'user',
@@ -663,7 +663,7 @@ export async function reorganizeFlowchartLayout(
         }
 
         const resData = await response.json();
-        console.log("[Gemini] Raw Response Data:", resData);
+        // console.log("[Gemini] Raw Response Data:", resData);
 
         const resText = resData.candidates?.[0]?.content?.parts?.[0]?.text;
         if (!resText) {
@@ -671,7 +671,7 @@ export async function reorganizeFlowchartLayout(
             throw new Error("Empty response from Gemini");
         }
 
-        console.log("[Gemini] Extracted response text:", resText);
+        // console.log("[Gemini] Extracted response text:", resText);
         return safeParseJson(resText);
     } catch (error: any) {
         console.error("Gemini reorganizeFlowchartLayout Error:", error);

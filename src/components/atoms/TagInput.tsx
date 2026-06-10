@@ -13,6 +13,7 @@ interface TagInputProps {
     suggestions?: string[];
     placeholder?: string;
     className?: string;
+    disabled?: boolean;
 }
 
 export function TagInput({
@@ -22,7 +23,8 @@ export function TagInput({
     onChange,
     suggestions = [],
     placeholder,
-    className
+    className,
+    disabled
 }: TagInputProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [inputValue, setInputValue] = useState('');
@@ -86,12 +88,14 @@ export function TagInput({
                         className="flex items-center gap-1 px-2 py-0 bg-primary/10 text-primary dark:text-primary/80 text-xs font-medium rounded-lg animate-in fade-in zoom-in duration-200"
                     >
                         {tag}
-                        <Button
-                            onClick={() => removeTag(tag)}
-                            className="hover:bg-transparent hover:text-error transition-colors p-1 bg-transparent border-none shadow-none"
-                        >
-                            <X size={12} />
-                        </Button>
+                        {!disabled && (
+                            <Button
+                                onClick={() => removeTag(tag)}
+                                className="hover:bg-transparent hover:text-error transition-colors p-1 bg-transparent border-none shadow-none"
+                            >
+                                <X size={12} />
+                            </Button>
+                        )}
                     </span>
                 ))}
 
@@ -106,6 +110,7 @@ export function TagInput({
                         onKeyDown={handleKeyDown}
                         onFocus={() => setIsOpen(true)}
                         placeholder={tags.length === 0 ? placeholder : ''}
+                        disabled={disabled}
                         className="w-full bg-transparent border-none outline-none text-sm p-1 text-on-surface"
                     />
 

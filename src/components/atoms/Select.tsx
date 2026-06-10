@@ -137,6 +137,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(({
                             const isSelected = String(option.value) === String(currentValue);
                             return (
                                 <Button
+                                    variant="unstyled"
                                     key={option.value}
                                     type="button"
                                     onClick={() => handleSelect(option.value)}
@@ -144,7 +145,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(({
                                         "w-full text-left px-3.5 py-2.5 text-sm rounded-xl transition-all duration-200 flex items-center justify-between",
                                         isSelected
                                             ? "bg-primary/10 text-primary font-semibold"
-                                            : "text-on-surface/80 bg-transparent shadow-none hover:bg-surface-variant/40 hover:text-on-surface"
+                                            : "text-on-surface/80 hover:bg-surface-variant/40 hover:text-on-surface"
                                     )}
                                 >
                                     <span className="truncate">{option.label}</span>

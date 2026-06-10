@@ -50,8 +50,10 @@ export function ConfirmationModal({
                         className="bg-surface border border-outline-variant/30 rounded-2xl shadow-xl w-full max-w-md p-6 relative z-10"
                     >
                         <Button
+                            variant="ghost" 
+                            size="icon"
                             onClick={onClose}
-                            className="absolute top-4 right-4 bg-transparent shadow-none text-on-surface/80 hover:bg-transparent hover:text-on-surface-variant/80 transition-colors"
+                            className="absolute top-4 right-4 w-8 h-8 text-on-surface/80 hover:text-on-surface-variant/80"
                             disabled={isLoading}
                         >
                             <X size={20} />
@@ -75,9 +77,10 @@ export function ConfirmationModal({
 
                             <div className="flex items-center gap-3 w-full">
                                 <Button
+                                    variant="ghost"
                                     onClick={onClose}
                                     disabled={isLoading}
-                                    className="flex-1 px-4 py-2 bg-transparent shadow-none hover:bg-surface-variant/80 text-on-surface-variant rounded-2xl transition-colors font-medium text-sm disabled:opacity-50"
+                                    className="flex-1 rounded-2xl"
                                 >
                                     {cancelText || t('common.cancel')}
                                 </Button>

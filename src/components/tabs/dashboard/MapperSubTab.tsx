@@ -494,7 +494,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 };
             }).slice(-10); // Limit to last 10 screens
 
-            console.log(`[AI Debug] Prompt Context Size: ~${JSON.stringify(criticalAttrs).length + JSON.stringify(optimizedMaps).length} chars`);
+            // console.log(`[AI Debug] Prompt Context Size: ~${JSON.stringify(criticalAttrs).length + JSON.stringify(optimizedMaps).length} chars`);
 
             if (aiProvider === 'gemini') {
                 result = await gemini.suggestElementName(criticalAttrs as any, screenName, apiKey!, model, lang, optimizedMaps as any, undefined, customPrompt);
@@ -1939,11 +1939,12 @@ function NodeBreadcrumbs({ node, onSelect, onHover }: { node: InspectorNode | nu
                     <div key={n.id} className="flex items-center">
                         {i > 0 && <span className="mx-1 text-on-surface/80">&gt;</span>}
                         <Button
+                            variant="unstyled"
                             onClick={() => onSelect(n)}
                             onMouseEnter={() => onHover(n)}
                             onMouseLeave={() => onHover(null)}
                             className={clsx(
-                                "p-0 m-0 bg-transparent shadow-none rounded-none hover:bg-transparent hover:text-primary hover:underline transition-colors text-left",
+                                "hover:text-primary hover:underline transition-colors text-left",
                                 n === node ? "font-bold text-on-surface/80" : ""
                             )}
                             title={generateXPath(n)}
