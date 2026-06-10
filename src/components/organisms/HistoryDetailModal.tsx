@@ -20,6 +20,7 @@ import * as openai from '@/lib/dashboard/openai';
 import * as claude from '@/lib/dashboard/claude';
 import * as claudeCli from '@/lib/dashboard/claudeCode';
 import clsx from 'clsx';
+import { Button } from "@/components/atoms/Button";
 
 
 interface ParseProgress {
@@ -225,7 +226,7 @@ export function HistoryDetailModal({ isOpen, onClose, log, onUpdateLog }: Histor
             let base64Screenshot: string | undefined = undefined;
             const firstScreenshotNode = failureContext?.find(f => f.failureDetail?.screenshotPath || f.failure_detail?.screenshot_path || f.screenshotPath);
             const screenshotPath = firstScreenshotNode?.failureDetail?.screenshotPath || firstScreenshotNode?.failure_detail?.screenshot_path || firstScreenshotNode?.screenshotPath;
-            
+
             if (screenshotPath) {
                 try {
                     base64Screenshot = await invoke<string>('read_compressed_image_base64', { path: screenshotPath });
@@ -335,17 +336,18 @@ export function HistoryDetailModal({ isOpen, onClose, log, onUpdateLog }: Histor
                                     {log.device_udid ? ` (${log.device_udid})` : ''}
                                 </div>
                             )}
-                            <button
+                            <Button
                                 onClick={() => openLog(log.path)}
                                 disabled={log.is_remote && !log.xml_path}
                                 className={clsx(
-                                    "p-1 rounded transition-colors text-on-surface-variant/80",
+                                    "p-1 rounded transition-colors bg-transparent text-on-surface-variant/80 shadow-none hover:shadow-lg",
                                     log.is_remote && !log.xml_path ? "opacity-20 cursor-not-allowed" : "hover:bg-surface-variant/30 hover:text-primary"
                                 )}
-                                title={log.is_remote && !log.xml_path ? t('tests_page.local_only_action', "Ação disponível apenas localmente") : t('run_tab.console.open_output_dir')}
+                                data-tooltip={log.is_remote && !log.xml_path ? t('tests_page.local_only_action', "Ação disponível apenas localmente") : t('run_tab.console.open_output_dir')}
+                                data-position='bottom'
                             >
                                 <FolderOpen size={14} />
-                            </button>
+                            </Button>
                         </div>
 
                         <div className="flex-1" />

@@ -15,6 +15,7 @@ import { useTestSessions } from '@/lib/testSessionStore';
 import { useSpeechToText } from '@/hooks/useSpeechToText';
 import { useTextToSpeech } from '@/hooks/useTextToSpeech';
 import packageJson from '../../../package.json';
+import { Button } from "@/components/atoms/Button";
 
 interface AiAgentPanelProps {
     onNavigate: (page: string) => void;
@@ -499,7 +500,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <button
+                    <Button
                         onClick={() => {
                             stopSpeaking();
                             setMessages([]);
@@ -507,17 +508,18 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                             updateSetting('aiSessionId', undefined);
                             feedback.toast.success('ai_agent.session_cleared');
                         }}
-                        className="text-xs text-on-surface-variant hover:text-error transition-colors"
+                        className="bg-transparent text-xs text-on-surface hover:bg-transparent hover:text-error transition-colors shadow-none"
                     >
                         {t('ai_agent.clear_session', 'Clear')}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         onClick={handleClose}
                         className="p-1.5 rounded-lg bg-surface-variant/20 hover:bg-error/20 text-on-surface-variant hover:text-error transition-all"
-                        title={t('common.close', 'Close')}
+                        data-tooltip={t('common.close', 'Close')}
+                        data-position="left"
                     >
                         <X size={18} />
-                    </button>
+                    </Button>
                 </div>
             </div>
 
@@ -533,15 +535,15 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                             {t('ai_agent.welcome_desc')}
                         </p>
                         <div className="flex flex-col gap-2 w-full max-w-[280px]">
-                            <button onClick={() => handleSend(t('ai_agent.suggested_prompts.settings'))} className="text-xs text-left p-2 rounded-lg bg-surface-variant/30 hover:bg-primary/10 text-on-surface-variant transition-colors border border-outline-variant/30">
+                            <Button onClick={() => handleSend(t('ai_agent.suggested_prompts.settings'))} className="text-xs text-left p-2 rounded-lg bg-surface-variant/30 hover:bg-primary/10 text-on-surface-variant transition-colors border border-outline-variant/30">
                                 {t('ai_agent.suggested_prompts.settings')}
-                            </button>
-                            <button onClick={() => handleSend(t('ai_agent.suggested_prompts.color'))} className="text-xs text-left p-2 rounded-lg bg-surface-variant/30 hover:bg-primary/10 text-on-surface-variant transition-colors border border-outline-variant/30">
+                            </Button>
+                            <Button onClick={() => handleSend(t('ai_agent.suggested_prompts.color'))} className="text-xs text-left p-2 rounded-lg bg-surface-variant/30 hover:bg-primary/10 text-on-surface-variant transition-colors border border-outline-variant/30">
                                 {t('ai_agent.suggested_prompts.color')}
-                            </button>
-                            <button onClick={() => handleSend(t('ai_agent.suggested_prompts.help'))} className="text-xs text-left p-2 rounded-lg bg-surface-variant/30 hover:bg-primary/10 text-on-surface-variant transition-colors border border-outline-variant/30">
+                            </Button>
+                            <Button onClick={() => handleSend(t('ai_agent.suggested_prompts.help'))} className="text-xs text-left p-2 rounded-lg bg-surface-variant/30 hover:bg-primary/10 text-on-surface-variant transition-colors border border-outline-variant/30">
                                 {t('ai_agent.suggested_prompts.help')}
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 ) : (
@@ -567,7 +569,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
 
                             {msg.role === 'agent' && (
                                 <div className="flex items-center gap-2 ml-8 mt-1">
-                                    <button
+                                    <Button
                                         onClick={() => {
                                             if (currentlySpeakingMsgId === msg.id) {
                                                 stopSpeaking();
@@ -577,12 +579,13 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                                                 setCurrentlySpeakingMsgId(msg.id);
                                             }
                                         }}
-                                        title={currentlySpeakingMsgId === msg.id ? t('ai_agent.stop_speak_title') : t('ai_agent.speak_title')}
-                                        className={`p-1 rounded-md hover:bg-primary/10 transition-colors ${currentlySpeakingMsgId === msg.id ? 'text-primary animate-pulse' : 'text-on-surface-variant/60 hover:text-primary'
+                                        data-tooltip={currentlySpeakingMsgId === msg.id ? t('ai_agent.stop_speak_title') : t('ai_agent.speak_title')}
+                                        data-position="right"
+                                        className={`p-1 rounded-md bg-transparent hover:bg-primary/10 transition-colors shadow-none rounded-full ${currentlySpeakingMsgId === msg.id ? 'text-primary animate-pulse' : 'text-on-surface-variant/60 hover:text-primary'
                                             }`}
                                     >
                                         {currentlySpeakingMsgId === msg.id ? <VolumeX size={14} /> : <Volume2 size={14} />}
-                                    </button>
+                                    </Button>
                                 </div>
                             )}
 
@@ -596,13 +599,13 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                                                 <span className="text-xs font-bold uppercase tracking-wider">{t('ai_agent.action_proposed', 'Action Proposed')}</span>
                                             </div>
                                             <p className="text-sm text-on-surface">{action.description}</p>
-                                            <button
+                                            <Button
                                                 onClick={() => handleExecuteAction(action)}
                                                 className="mt-1 flex items-center justify-center gap-2 w-full py-1.5 bg-primary/10 hover:bg-primary text-primary hover:text-on-primary rounded-lg transition-colors text-xs font-bold"
                                             >
                                                 <Play size={12} fill="currentColor" />
                                                 {t('ai_agent.confirm_execute')}
-                                            </button>
+                                            </Button>
                                         </div>
                                     ))}
                                 </div>
@@ -611,13 +614,13 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                             {msg.suggestedPrompts && msg.suggestedPrompts.length > 0 && (
                                 <div className="mt-2 ml-8 flex flex-wrap gap-2 w-full max-w-[85%]">
                                     {msg.suggestedPrompts.map((prompt, idx) => (
-                                        <button
+                                        <Button
                                             key={idx}
                                             onClick={() => handleSend(prompt)}
                                             className="text-xs px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary text-primary hover:text-on-primary transition-all font-semibold border border-primary/20 shadow-sm"
                                         >
                                             {prompt}
-                                        </button>
+                                        </Button>
                                     ))}
                                 </div>
                             )}
@@ -664,19 +667,19 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                         disabled={isLoading}
                         title={isListening ? t('ai_agent.mic_active') : t('ai_agent.mic_inactive')}
                         className={`absolute right-12 bottom-2 p-2 rounded-lg transition-all ${isListening
-                                ? 'bg-error text-on-error animate-pulse shadow-lg shadow-error/50 scale-110'
-                                : 'bg-surface-variant/50 text-on-surface-variant hover:bg-primary/20 hover:text-primary'
+                            ? 'bg-error text-on-error animate-pulse shadow-lg shadow-error/50 scale-110'
+                            : 'bg-transparent text-on-surface-variant hover:bg-transparent hover:text-primary'
                             }`}
                     >
                         {isListening ? <MicOff size={16} /> : <Mic size={16} />}
                     </button>
-                    <button
+                    <Button
                         onClick={() => handleSend()}
                         disabled={!input.trim() || isLoading}
                         className="absolute right-2 bottom-2 p-2 rounded-lg bg-primary text-on-primary hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-primary/20"
                     >
                         {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                    </button>
+                    </Button>
                 </div>
             </div>
         </div>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Plus } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
+import { Button } from "@/components/atoms/Button";
 
 interface TagInputProps {
     label?: string;
@@ -56,17 +57,17 @@ export function TagInput({
                 {tags.map((tag) => (
                     <div
                         key={tag}
-                        className="flex items-center gap-1 bg-surface-variant border border-outline-variant/30 px-2 py-1 rounded-2xl text-sm text-on-surface-variant/80 animate-in zoom-in-95 duration-200"
+                        className="flex items-center gap-1 bg-surface-variant border border-outline-variant/30 px-2 py-0 rounded-2xl text-sm text-on-surface-variant/80 animate-in zoom-in-95 duration-200"
                     >
                         <span>{tag}</span>
                         {!disabled && (
-                            <button
+                            <Button
                                 type="button"
                                 onClick={() => onRemove(tag)}
-                                className="hover:text-error p-0.5 rounded-2xl transition-colors"
+                                className="p-0 m-0 bg-transparent shadow-none hover:bg-transparent hover:text-error rounded-2xl transition-colors"
                             >
                                 <X size={12} />
-                            </button>
+                            </Button>
                         )}
                     </div>
                 ))}
@@ -81,13 +82,13 @@ export function TagInput({
                         className="flex-1 bg-transparent border-none outline-none text-sm text-on-surface/80 placeholder:text-on-surface-variant/80/50 px-1"
                     />
                     {inputValue && !disabled && (
-                        <button
+                        <Button
                             type="button"
                             onClick={handleAdd}
                             className="text-primary dark:text-primary/80 hover:text-primary transition-colors p-1"
                         >
                             <Plus size={16} />
-                        </button>
+                        </Button>
                     )}
                 </div>
             </div>

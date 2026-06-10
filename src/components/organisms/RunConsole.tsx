@@ -19,6 +19,7 @@ import * as claude from "@/lib/dashboard/claude";
 import * as claudeCli from "@/lib/dashboard/claudeCode";
 import * as antigravityCode from "@/lib/dashboard/antigravityCode";
 import { useCallback } from "react";
+import { Button } from "@/components/atoms/Button";
 
 interface RunConsoleProps {
     runId: string;
@@ -225,10 +226,10 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                 // Try to find the detected output XML from logs first, then fallback to output.xml
                 const outputPath = session.outputDir!;
                 const outputXmlPath = session.outputXmlPath || `${outputPath.replace(/[\\/]+$/, "")}/output.xml`;
-                
+
                 // Invalidate XML parsing cache for this path to ensure we read the new test results
                 invalidateCache(outputXmlPath);
-                
+
                 const result = await parseXmlBackground(outputXmlPath);
                 if (!cancelled && result) {
                     setTree([result.rootSuite]);
@@ -294,9 +295,9 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
     // AI Agent Autonomous Loop Logic
     const runAiStep = useCallback(async () => {
         const provider = settings.aiProvider || 'gemini';
-        
+
         if (!session?.deviceUdid || !isAiLoopActive) return;
-        
+
         // Key validation based on provider
         if (provider === 'gemini' && !settings.geminiApiKey) return;
         if (provider === 'openai' && !settings.openaiApiKey) return;
@@ -305,9 +306,9 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
         setAiStatus(t('run_tab.console.ai_steps.dumping', { defaultValue: 'Dumping screen hierarchy...' }));
         try {
             const xml = await invoke<string>("get_xml_dump", { deviceId: session.deviceUdid });
-            
+
             setAiStatus(t('run_tab.console.ai_steps.thinking', { defaultValue: 'AI is thinking...' }));
-            
+
             let response: gemini.AutonomousActionResponse;
             const target = session.aiPrompt || session.testPath;
             const lang = i18n.language;
@@ -438,40 +439,40 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
             <div className="flex items-center justify-between p-2 border-b border-outline-variant/30 bg-surface/80 backdrop-blur shrink-0 z-20">
                 <span className="text-xs text-on-surface-variant/80 font-mono truncate px-2" title={testPath}>{testPath}</span>
                 <div className="flex items-center gap-1">
-                    <button
+                    <Button
                         onClick={() => setIsRawMode(!isRawMode)}
-                        className="p-1 hover:bg-surface-variant/30 rounded transition-colors text-on-surface-variant/80 hover:text-warning"
+                        className="p-1 bg-transparent hover:bg-surface-variant/30 shadow-none hover:shadow-lg rounded-full transition-colors text-on-surface-variant/80 hover:text-warning"
                         data-tooltip={isRawMode ? t('run_tab.console.fancy_mode') : t('run_tab.console.raw_mode')}
                         data-position="left"
                     >
                         <Star size={14} fill={!isRawMode ? "currentColor" : "none"} className={clsx(!isRawMode && "text-warning-container/40")} />
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         onClick={() => setShowDebugConsole(!showDebugConsole)}
                         className={clsx(
-                            "p-1 hover:bg-surface-variant/30 rounded transition-colors",
+                            "p-1 bg-transparent hover:bg-surface-variant/30 shadow-none hover:shadow-lg rounded-full transition-colors",
                             showDebugConsole ? "text-primary bg-primary/10" : "text-on-surface-variant/80 hover:text-primary"
                         )}
                         data-tooltip={showDebugConsole ? t('run_tab.console.debug_off') : t('run_tab.console.debug_on')}
                         data-position="left"
                     >
                         <Terminal size={14} />
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         onClick={() => setIsKeepAwake(!isKeepAwake)}
                         className={clsx(
-                            "p-1 hover:bg-surface-variant/30 rounded transition-colors",
+                            "p-1 bg-transparent hover:bg-surface-variant/30 shadow-none hover:shadow-lg rounded-full transition-colors",
                             isKeepAwake ? "text-primary" : "text-on-surface-variant/80 hover:text-primary"
                         )}
                         data-tooltip={t('run_tab.console.keep_awake')}
                         data-position="left"
                     >
                         {isKeepAwake ? <Eye size={14} /> : <EyeOff size={14} />}
-                    </button>
+                    </Button>
                     {!isRunning && tree.length > 0 && (
                         <div className="flex items-center gap-1">
                             {session?.outputDir && (
-                                <button
+                                <Button
                                     onClick={async () => {
                                         let path = session.outputDir!;
                                         // Safety check: ensure we open a directory, not a file
@@ -488,12 +489,12 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                                             console.error("Failed to open log folder:", e);
                                         }
                                     }}
-                                    className="p-1 hover:bg-surface-variant/30 rounded transition-colors text-on-surface-variant/80 hover:text-primary"
+                                    className="p-1 bg-transparent hover:bg-surface-variant/30 shadow-none hover:shadow-lg rounded-full transition-colors text-on-surface-variant/80 hover:text-primary"
                                     data-tooltip={t('run_tab.console.open_output_dir')}
                                     data-position="left"
                                 >
                                     <FolderOpen size={14} />
-                                </button>
+                                </Button>
                             )}
                             <AiButton
                                 id="run_summary"
@@ -511,7 +512,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                             <span className="text-[10px] font-bold text-primary uppercase tracking-wider">AI AGENT MODE</span>
                             <div className="h-3 w-[1px] bg-primary/20 mx-1" />
                             <span className="text-[10px] text-on-surface-variant/70 font-medium">{aiStatus || 'Initializing...'}</span>
-                            <button
+                            <Button
                                 onClick={() => setIsAiLoopActive(!isAiLoopActive)}
                                 className={clsx(
                                     "ml-2 p-1 rounded-md transition-all hover:scale-110",
@@ -521,19 +522,19 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                                 data-position="left"
                             >
                                 {isAiLoopActive ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                                 onClick={() => {
                                     setAiHistory([]);
                                     setAiStepCount(0);
                                     setIsAiLoopActive(true);
                                 }}
-                                className="p-1 text-on-surface-variant/60 hover:text-primary rounded-md hover:bg-primary/10 transition-all"
+                                className="p-1 bg-transparent hover:bg-primary/10 text-on-surface-variant/60 hover:text-primary shadow-none hover:shadow-lg rounded-full transition-colors"
                                 data-tooltip={t('common.reset')}
                                 data-position="left"
                             >
                                 <RefreshCw size={12} />
-                            </button>
+                            </Button>
                         </div>
                     )}
                 </div>
@@ -683,12 +684,12 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                             <Terminal size={14} className="text-primary" />
                             <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/70">{t('run_tab.console.debug_output')}</span>
                         </div>
-                        <button
+                        <Button
                             onClick={() => setShowDebugConsole(false)}
-                            className="p-1 hover:bg-surface-variant/30 rounded text-on-surface-variant/60"
+                            className="p-1 bg-transparent hover:bg-surface-variant/30 shadow-none hover:shadow-lg rounded-full transition-colors text-on-surface-variant/60"
                         >
                             <X size={14} />
-                        </button>
+                        </Button>
                     </div>
                     <div className="flex-1 min-h-0 p-3 font-mono text-[11px] leading-relaxed overflow-y-auto custom-scrollbar bg-black/5 shadow-inner">
                         <Virtuoso

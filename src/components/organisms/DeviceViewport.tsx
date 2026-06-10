@@ -97,10 +97,10 @@ export const DeviceViewport: React.FC<DeviceViewportProps> = ({
         const traverse = (n: InspectorNode) => {
             if (n.bounds) {
                 const attr = n.attributes || {};
-                
+
                 // Clicking priority matching InspectorSubTab
                 const hasPriority = attr['content-desc'] || attr['resource-id'] || attr['text'] || attr['clickable'] === 'true';
-                
+
                 if (hasPriority) {
                     nodes.push(n);
                 }
@@ -146,14 +146,14 @@ export const DeviceViewport: React.FC<DeviceViewportProps> = ({
 
                         {/* Navigation Buttons */}
                         <div className="flex items-center gap-2 text-on-surface/60 shrink-0">
-                            <button 
+                            <Button
                                 onClick={() => onRefresh(true)}
                                 disabled={loading}
                                 className="p-1 hover:bg-surface-variant/50 rounded transition text-on-surface disabled:opacity-50"
                                 title={t('inspector.refresh', 'Refresh Viewport')}
                             >
                                 <RefreshCw size={14} className={clsx(loading && "animate-spin")} />
-                            </button>
+                            </Button>
                         </div>
 
                         {/* Address Bar */}
@@ -167,12 +167,12 @@ export const DeviceViewport: React.FC<DeviceViewportProps> = ({
                                     className="bg-transparent border-none outline-none w-full text-on-surface text-xs py-0"
                                     placeholder={t('run_tab.web.enter_url', 'Enter target website URL...')}
                                 />
-                                <button
+                                <Button
                                     type="submit"
                                     className="px-2 py-0.5 bg-primary/10 hover:bg-primary/20 text-primary font-medium rounded text-[10px] transition-all"
                                 >
                                     Go
-                                </button>
+                                </Button>
                             </div>
                         </form>
 
@@ -199,8 +199,8 @@ export const DeviceViewport: React.FC<DeviceViewportProps> = ({
                                 {loading ? t('run_tab.web.starting', 'Initializing Web Browser...') : t('run_tab.web.waiting', 'Web Execution Monitor')}
                             </h3>
                             <p className="text-sm text-on-surface-variant">
-                                {loading 
-                                    ? t('run_tab.web.starting_desc', 'Setting up environment and launching target browser.') 
+                                {loading
+                                    ? t('run_tab.web.starting_desc', 'Setting up environment and launching target browser.')
                                     : t('run_tab.web.waiting_desc', 'Enter a URL in the address bar above and press Go to initialize the visual inspector.')
                                 }
                             </p>
@@ -241,14 +241,14 @@ export const DeviceViewport: React.FC<DeviceViewportProps> = ({
 
                     {/* Navigation Buttons */}
                     <div className="flex items-center gap-2 text-on-surface/60 shrink-0">
-                        <button 
+                        <Button
                             onClick={() => onRefresh(true)}
                             disabled={loading}
                             className="p-1 hover:bg-surface-variant/50 rounded transition text-on-surface disabled:opacity-50"
                             title={t('inspector.refresh', 'Refresh Viewport')}
                         >
                             <RefreshCw size={14} className={clsx(loading && "animate-spin")} />
-                        </button>
+                        </Button>
                     </div>
 
                     {/* Address Bar */}
@@ -262,12 +262,12 @@ export const DeviceViewport: React.FC<DeviceViewportProps> = ({
                                 className="bg-transparent border-none outline-none w-full text-on-surface text-xs py-0"
                                 placeholder={t('run_tab.web.enter_url', 'Enter target website URL...')}
                             />
-                            <button
+                            <Button
                                 type="submit"
                                 className="px-2 py-0.5 bg-primary/10 hover:bg-primary/20 text-primary font-medium rounded text-[10px] transition-all"
                             >
                                 Go
-                            </button>
+                            </Button>
                         </div>
                     </form>
 
@@ -472,7 +472,7 @@ export const DeviceViewport: React.FC<DeviceViewportProps> = ({
                 )}
             </AnimatePresence>
 
-            <div 
+            <div
                 className="relative inline-block overflow-hidden rounded-lg shadow border border-outline-variant/10 bg-surface"
                 style={{ width: imgLayout?.width, height: imgLayout?.height }}
             >
@@ -494,10 +494,10 @@ export const DeviceViewport: React.FC<DeviceViewportProps> = ({
                     <div
                         ref={imgRef as any}
                         className="relative flex flex-col items-center justify-center cursor-crosshair select-none bg-black/90 rounded-lg"
-                        style={{ 
-                            width: imgLayout?.width || 300, 
+                        style={{
+                            width: imgLayout?.width || 300,
                             height: imgLayout?.height || 600,
-                            maxHeight 
+                            maxHeight
                         }}
                         onMouseMove={handlers.onMouseMove as any}
                         onMouseDown={handlers.onMouseDown as any}

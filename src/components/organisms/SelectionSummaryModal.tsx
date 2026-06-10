@@ -57,14 +57,14 @@ export function SelectionSummaryModal({ isOpen, onClose }: SelectionSummaryModal
                     )}
                 </div>
 
-                <button
+                <Button
                     onClick={() => removeItem(item.id)}
-                    className="p-2 opacity-0 group-hover:opacity-100 hover:bg-error/10 hover:text-error rounded-xl transition-all"
+                    className="p-2 opacity-0 group-hover:opacity-100 bg-transparent shadow-none hover:shadow-lg rounded-full transition-all hover:bg-error/10 hover:text-error rounded-xl transition-all"
                     data-tooltip={t('tests.selection.remove')}
                     data-position="top"
                 >
                     <Trash2 size={16} />
-                </button>
+                </Button>
             </div>
         );
     };
@@ -107,12 +107,12 @@ export function SelectionSummaryModal({ isOpen, onClose }: SelectionSummaryModal
                                 >
                                     {t('tests.selection.clear_all')}
                                 </Button>
-                                <button
+                                <Button
                                     onClick={onClose}
-                                    className="p-2 hover:bg-surface-variant/50 rounded-full transition-colors"
+                                    className="p-2 bg-transparent hover:bg-surface-variant/50 shadow-none hover:shadow-lg rounded-full transition-all"
                                 >
                                     <X size={24} />
-                                </button>
+                                </Button>
                             </div>
                         </div>
 

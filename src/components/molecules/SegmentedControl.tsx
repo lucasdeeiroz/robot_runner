@@ -1,3 +1,4 @@
+import { Button } from "@/components/atoms/Button";
 import React from 'react';
 import { twMerge } from 'tailwind-merge';
 
@@ -33,21 +34,21 @@ export function SegmentedControl<T extends string | number>({
                 {options.map((option) => {
                     const isSelected = option.value === value;
                     return (
-                        <button
+                        <Button
                             key={option.value}
                             type="button"
                             onClick={() => onChange(option.value)}
                             className={twMerge(
                                 "flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-2xl text-sm font-medium transition-all duration-200",
                                 isSelected
-                                    ? "bg-on-primary text-primary dark:text-primary/80 shadow-sm"
-                                    : "text-on-surface-variant/80 hover:text-on-surface/80 hover:bg-outline-variant/50"
+                                    ? "bg-on-primary text-primary shadow-sm hover:bg-on-primary"
+                                    : "bg-transparent shadow-none text-on-surface-variant/80 hover:text-on-surface/80 hover:bg-outline-variant/50"
                             )}
                             title={option.label}
                         >
                             {option.icon}
                             {option.label && <span>{option.label}</span>}
-                        </button>
+                        </Button>
                     );
                 })}
             </div>

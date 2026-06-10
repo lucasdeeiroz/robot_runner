@@ -496,16 +496,16 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                             enabled: checked
                                         })}
                                     />
-                                    <button
+                                    <Button
                                         type="button"
                                         onClick={() => toggleIntegrationExpanded('jira')}
                                         className={clsx(
-                                            "p-1.5 text-on-surface-variant/80 hover:text-on-surface hover:bg-surface-variant/30 rounded-2xl transition-all duration-200",
+                                            "p-1.5 text-on-surface-variant/80 hover:text-on-surface bg-transparent shadow-none hover:bg-surface-variant/30 rounded-2xl transition-all duration-200",
                                             expandedIntegrations.jira && "transform rotate-180"
                                         )}
                                     >
                                         <ChevronDown size={20} />
-                                    </button>
+                                    </Button>
                                 </div>
                             </div>
                             <AnimatePresence initial={false}>
@@ -616,16 +616,16 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                             enabled: checked
                                         })}
                                     />
-                                    <button
+                                    <Button
                                         type="button"
                                         onClick={() => toggleIntegrationExpanded('azure')}
                                         className={clsx(
-                                            "p-1.5 text-on-surface-variant/80 hover:text-on-surface hover:bg-surface-variant/30 rounded-2xl transition-all duration-200",
+                                            "p-1.5 text-on-surface-variant/80 hover:text-on-surface bg-transparent shadow-none hover:bg-surface-variant/30 rounded-2xl transition-all duration-200",
                                             expandedIntegrations.azure && "transform rotate-180"
                                         )}
                                     >
                                         <ChevronDown size={20} />
-                                    </button>
+                                    </Button>
                                 </div>
                             </div>
                             <AnimatePresence initial={false}>
@@ -720,16 +720,16 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                             enabled: checked
                                         })}
                                     />
-                                    <button
+                                    <Button
                                         type="button"
                                         onClick={() => toggleIntegrationExpanded('testlink')}
                                         className={clsx(
-                                            "p-1.5 text-on-surface-variant/80 hover:text-on-surface hover:bg-surface-variant/30 rounded-2xl transition-all duration-200",
+                                            "p-1.5 text-on-surface-variant/80 hover:text-on-surface bg-transparent shadow-none hover:bg-surface-variant/30 rounded-2xl transition-all duration-200",
                                             expandedIntegrations.testlink && "transform rotate-180"
                                         )}
                                     >
                                         <ChevronDown size={20} />
-                                    </button>
+                                    </Button>
                                 </div>
                             </div>
                             <AnimatePresence initial={false}>
@@ -822,16 +822,16 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                             showBadges: settings.git?.showBadges || false
                                         })}
                                     />
-                                    <button
+                                    <Button
                                         type="button"
                                         onClick={() => toggleIntegrationExpanded('git')}
                                         className={clsx(
-                                            "p-1.5 text-on-surface-variant/80 hover:text-on-surface hover:bg-surface-variant/30 rounded-2xl transition-all duration-200",
+                                            "p-1.5 text-on-surface-variant/80 hover:text-on-surface bg-transparent shadow-none hover:bg-surface-variant/30 rounded-2xl transition-all duration-200",
                                             expandedIntegrations.git && "transform rotate-180"
                                         )}
                                     >
                                         <ChevronDown size={20} />
-                                    </button>
+                                    </Button>
                                 </div>
                             </div>
                             <AnimatePresence initial={false}>
@@ -894,16 +894,16 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                             });
                                         }}
                                     />
-                                    <button
+                                    <Button
                                         type="button"
                                         onClick={() => toggleIntegrationExpanded('webhooks')}
                                         className={clsx(
-                                            "p-1.5 text-on-surface-variant/80 hover:text-on-surface hover:bg-surface-variant/30 rounded-2xl transition-all duration-200",
+                                            "p-1.5 text-on-surface-variant/80 hover:text-on-surface bg-transparent shadow-none hover:bg-surface-variant/30 rounded-2xl transition-all duration-200",
                                             expandedIntegrations.webhooks && "transform rotate-180"
                                         )}
                                     >
                                         <ChevronDown size={20} />
-                                    </button>
+                                    </Button>
                                 </div>
                             </div>
                             <AnimatePresence initial={false}>
@@ -1305,13 +1305,13 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                     />
                                     {settings.automationFramework === 'robot' && (
                                         <div className="col-span-1 md:col-span-2 flex items-center pt-2">
-                                            <button
+                                            <Button
                                                 type="button"
                                                 id="noAppiumForRobot"
                                                 role="checkbox"
                                                 aria-checked={settings.noAppiumForRobot || false}
                                                 onClick={() => updateSetting('noAppiumForRobot', !settings.noAppiumForRobot)}
-                                                className="flex items-center gap-2.5 text-left focus:outline-none select-none cursor-pointer group"
+                                                className="flex items-center gap-2.5 text-left focus:outline-none select-none cursor-pointer group bg-transparent shadow-none hover:bg-transparent"
                                             >
                                                 <div className={clsx(
                                                     "w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0 cursor-pointer",
@@ -1326,7 +1326,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                                 <span className="text-xs font-semibold text-on-surface-variant/80 select-none cursor-pointer">
                                                     {t('settings.tool_config.no_appium_for_robot')}
                                                 </span>
-                                            </button>
+                                            </Button>
                                         </div>
                                     )}
                                 </div>
@@ -1459,8 +1459,8 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
 
 
                 {/* Path Configuration */}
-                <Section 
-                    title={t('settings.paths.title')} 
+                <Section
+                    title={t('settings.paths.title')}
                     icon={FolderOpen}
                     menus={
                         isFeatureEnabled('is_integrations_enabled') && (
@@ -1660,15 +1660,15 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                                 </div>
                                             ) : availableModels.length > 0 ? (
                                                 availableModels.map(model => (
-                                                    <button 
-                                                        key={model} 
+                                                    <Button
+                                                        key={model}
                                                         type="button"
-                                                        className="w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0" 
+                                                        className="justify-start w-full text-left px-3 py-2 text-sm bg-transparent text-on-surface/80 shadow-none hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0"
                                                         onMouseDown={() => { updateSetting('geminiModel', model); setShowModelList(false); }}
                                                         onClick={() => { updateSetting('geminiModel', model); setShowModelList(false); }}
                                                     >
                                                         {model}
-                                                    </button>
+                                                    </Button>
                                                 ))
                                             ) : (
                                                 <div className="px-3 py-4 text-sm text-on-surface-variant/60 italic text-center">
@@ -1721,15 +1721,15 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                                 </div>
                                             ) : availableModels.length > 0 ? (
                                                 availableModels.map(model => (
-                                                    <button 
-                                                        key={model} 
+                                                    <Button
+                                                        key={model}
                                                         type="button"
-                                                        className="w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0" 
+                                                        className="justify-start w-full text-left px-3 py-2 text-sm bg-transparent text-on-surface/80 shadow-none hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0"
                                                         onMouseDown={() => { updateSetting('claudeModel', model); setShowModelList(false); }}
                                                         onClick={() => { updateSetting('claudeModel', model); setShowModelList(false); }}
                                                     >
                                                         {model}
-                                                    </button>
+                                                    </Button>
                                                 ))
                                             ) : (
                                                 <div className="px-3 py-4 text-sm text-on-surface-variant/60 italic text-center">
@@ -1782,15 +1782,15 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                                 </div>
                                             ) : availableModels.length > 0 ? (
                                                 availableModels.map(model => (
-                                                    <button 
-                                                        key={model} 
+                                                    <Button
+                                                        key={model}
                                                         type="button"
-                                                        className="w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0" 
+                                                        className="justify-start w-full text-left px-3 py-2 text-sm bg-transparent text-on-surface/80 shadow-none hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0"
                                                         onMouseDown={() => { updateSetting('openaiModel', model); setShowModelList(false); }}
                                                         onClick={() => { updateSetting('openaiModel', model); setShowModelList(false); }}
                                                     >
                                                         {model}
-                                                    </button>
+                                                    </Button>
                                                 ))
                                             ) : (
                                                 <div className="px-3 py-4 text-sm text-on-surface-variant/60 italic text-center">
@@ -1826,14 +1826,14 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                             <div className={`w-2 h-2 rounded-full ${isClaudeCodeInstalled ? 'bg-success' : 'bg-error animate-pulse'}`} />
                                             <span className="text-xs font-medium text-on-surface-variant">
                                                 {isClaudeCodeInstalled
-                                                    ? t('settings.ai.claude_code.installed', { version: claudeCodeVersion }) 
+                                                    ? t('settings.ai.claude_code.installed', { version: claudeCodeVersion })
                                                     : t('settings.ai.claude_code.not_installed')
                                                 }
                                             </span>
                                         </div>
-                                        <Button 
-                                            variant="secondary" 
-                                            size="sm" 
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
                                             onClick={() => checkSystemVersions()}
                                             className="h-8 px-3 text-[11px]"
                                         >
@@ -1880,14 +1880,14 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                             <div className={`w-2 h-2 rounded-full ${isAntigravityInstalled ? 'bg-success' : 'bg-error animate-pulse'}`} />
                                             <span className="text-xs font-medium text-on-surface-variant">
                                                 {isAntigravityInstalled
-                                                    ? t('settings.ai.antigravity.installed', { version: antigravityVersion }) 
+                                                    ? t('settings.ai.antigravity.installed', { version: antigravityVersion })
                                                     : t('settings.ai.antigravity.not_installed')
                                                 }
                                             </span>
                                         </div>
-                                        <Button 
-                                            variant="secondary" 
-                                            size="sm" 
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
                                             onClick={() => checkSystemVersions()}
                                             className="h-8 px-3 text-[11px]"
                                         >

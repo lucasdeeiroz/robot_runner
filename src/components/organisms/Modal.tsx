@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import clsx from "clsx";
 import { AnimatePresence, motion } from "framer-motion";
+import { Button } from "@/components/atoms/Button";
 
 interface ModalProps {
     isOpen: boolean;
@@ -63,12 +64,12 @@ export function Modal({ isOpen, onClose, title, children, className }: ModalProp
                     >
                         <div className="flex items-center justify-between p-4 border-b border-outline-variant/30 shrink-0">
                             <h2 className="text-lg font-semibold text-on-surface/80">{title}</h2>
-                            <button
+                            <Button
                                 onClick={onClose}
-                                className="p-1 text-on-surface/80 hover:text-on-surface-variant/80 hover:bg-surface-variant/30 rounded-2xl transition-colors"
+                                className="p-1 text-on-surface/80 hover:text-on-surface-variant/80 bg-transparent hover:bg-surface-variant/30 shadow-none hover:shadow-lg rounded-full transition-colors"
                             >
                                 <X size={20} />
-                            </button>
+                            </Button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 min-h-0">
                             {children}

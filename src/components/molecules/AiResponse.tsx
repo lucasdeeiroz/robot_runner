@@ -5,6 +5,7 @@ import clsx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ExpressiveLoading } from '../atoms/ExpressiveLoading';
 import { useTranslation } from 'react-i18next';
+import { Button } from "@/components/atoms/Button";
 
 interface AiResponseProps {
     title?: string;
@@ -103,25 +104,26 @@ export const AiResponse: React.FC<AiResponseProps> = React.memo(({
                         </div>
                         <div className="flex items-center gap-1">
                             {onRetry && !isLoading && (
-                                <button 
+                                <Button
                                     onClick={(e) => { e.stopPropagation(); onRetry(); }}
                                     className="p-1 text-primary/40 hover:text-primary transition-colors hover:bg-primary/10 rounded"
                                     title={t('common.try_again')}
                                 >
                                     <RotateCcw size={14} />
-                                </button>
+                                </Button>
                             )}
-                            <button className="p-1 text-primary/40 group-hover/header:text-primary transition-colors hover:bg-primary/10 rounded">
+                            <Button className="p-1 bg-transparent text-primary/40 group-hover/header:text-primary transition-colors hover:bg-primary/10 rounded rounded-full">
                                 {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-                            </button>
+                            </Button>
                             {onClose && (
-                                <button 
+                                <Button
                                     onClick={(e) => { e.stopPropagation(); onClose(); }}
-                                    className="p-1 text-primary/40 hover:text-error transition-colors hover:bg-error/10 rounded"
-                                    title={t('common.close')}
+                                    className="p-1 bg-transparent text-primary/40 hover:text-error transition-colors hover:bg-error/10 rounded rounded-full"
+                                    data-tooltip={t('common.close')}
+                                    data-position="left"
                                 >
                                     <X size={16} />
-                                </button>
+                                </Button>
                             )}
                         </div>
                     </div>
@@ -155,13 +157,14 @@ export const AiResponse: React.FC<AiResponseProps> = React.memo(({
                                                         <span className="text-[9px] font-black text-primary/60 uppercase tracking-widest block">
                                                             {responseTitle}
                                                         </span>
-                                                        <button
+                                                        <Button
                                                             onClick={(e) => { e.stopPropagation(); handleCopyResponse(); }}
-                                                            className="p-1.5 hover:bg-primary/10 rounded-lg text-primary transition-all opacity-40 hover:opacity-100"
-                                                            title={t("mapper.action.copy_result")}
+                                                            className="p-1.5 hover:bg-primary/10 rounded-full bg-transparent text-primary transition-all opacity-40 hover:opacity-100"
+                                                            data-tooltip={t("mapper.action.copy_result")}
+                                                            data-position="left"
                                                         >
                                                             {copiedResponse ? <Check size={14} className="text-success" /> : <Copy size={14} />}
-                                                        </button>
+                                                        </Button>
                                                     </div>
                                                     <div className="prose prose-sm dark:prose-invert max-w-none text-xs text-on-surface/90 max-h-64 overflow-y-auto custom-scrollbar pr-2 leading-relaxed">
                                                         <ReactMarkdown>{response}</ReactMarkdown>
@@ -175,13 +178,14 @@ export const AiResponse: React.FC<AiResponseProps> = React.memo(({
                                                         <span className="text-[9px] font-black text-primary/60 uppercase tracking-widest block">
                                                             {rationaleHeader}
                                                         </span>
-                                                        <button
+                                                        <Button
                                                             onClick={(e) => { e.stopPropagation(); handleCopyRationale(); }}
-                                                            className="p-1.5 hover:bg-primary/10 rounded-lg text-primary transition-all opacity-40 hover:opacity-100"
-                                                            title={t("mapper.action.copy_analysis")}
+                                                            className="p-1.5 hover:bg-primary/10 rounded-full bg-transparent text-primary transition-all opacity-40 hover:opacity-100"
+                                                            data-tooltip={t("mapper.action.copy_analysis")}
+                                                            data-position="left"
                                                         >
                                                             {copiedRationale ? <Check size={14} className="text-success" /> : <Copy size={14} />}
-                                                        </button>
+                                                        </Button>
                                                     </div>
                                                     <div className="prose prose-sm dark:prose-invert max-w-none text-xs text-on-surface/80 leading-relaxed max-h-96 overflow-y-auto custom-scrollbar pr-2">
                                                         <ReactMarkdown>{rationale}</ReactMarkdown>

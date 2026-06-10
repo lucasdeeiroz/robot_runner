@@ -5,6 +5,7 @@ import { Modal } from "@/components/organisms/Modal";
 import { TOOL_LINKS } from "@/lib/tools";
 import { motion } from "framer-motion";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
+import { Button } from "@/components/atoms/Button";
 
 interface SystemCheckOverlayProps {
     status: SystemCheckStatus;
@@ -87,12 +88,12 @@ export function SystemCheckOverlay({ status, onCriticalExit, onTestingRedirect, 
                         )}
                     </div>
 
-                    <button
+                    <Button
                         onClick={onCriticalExit}
                         className="w-full py-2.5 bg-error hover:bg-error/90 text-on-error rounded-2xl font-medium transition-colors"
                     >
                         {t('startup.critical.action')}
-                    </button>
+                    </Button>
                 </motion.div>
             </motion.div>
         );
@@ -125,12 +126,12 @@ export function SystemCheckOverlay({ status, onCriticalExit, onTestingRedirect, 
 
                     <p className="text-xs text-on-surface/80 text-center italic">{t('startup.testing.note')}</p>
 
-                    <button
+                    <Button
                         onClick={onTestingRedirect}
                         className="w-full py-2.5 bg-on-surface text-on-primary rounded-2xl font-medium transition-opacity hover:opacity-90"
                     >
                         {t('startup.testing.action')}
-                    </button>
+                    </Button>
                 </div>
             </Modal>
         );
@@ -163,12 +164,12 @@ export function SystemCheckOverlay({ status, onCriticalExit, onTestingRedirect, 
                     </div>
                     <p className="text-xs text-on-surface/80 text-center italic">{t('startup.mirroring.note')}</p>
 
-                    <button
+                    <Button
                         onClick={onMirroringContinue}
                         className="w-full py-2.5 bg-on-surface text-on-primary rounded-2xl font-medium transition-opacity hover:opacity-90"
                     >
                         {t('startup.mirroring.action')}
-                    </button>
+                    </Button>
                 </div>
             </Modal>
         );

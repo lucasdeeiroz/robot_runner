@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import clsx from 'clsx';
 import { ChevronsUpDown, Check } from 'lucide-react';
+import { Button } from "@/components/atoms/Button";
 
 interface ComboboxProps {
     label?: string;
@@ -102,7 +103,7 @@ export function Combobox({
             {isOpen && filteredOptions.length > 0 && (
                 <div className="absolute z-50 w-full mt-1 bg-surface border border-outline-variant/30 rounded-lg shadow-lg max-h-48 overflow-auto custom-scrollbar">
                     {filteredOptions.map((option) => (
-                        <button
+                        <Button
                             key={option}
                             type="button"
                             onClick={() => handleSelectOption(option)}
@@ -110,12 +111,12 @@ export function Combobox({
                                 "w-full text-left px-3 py-2 text-sm transition-colors flex items-center justify-between group",
                                 option === value
                                     ? "bg-primary/10 text-primary dark:text-primary/80"
-                                    : "text-on-surface/80 hover:bg-surface-variant/10"
+                                    : "bg-transparent shadow-none text-on-surface/80 hover:bg-surface-variant/10"
                             )}
                         >
                             <span>{option}</span>
                             {option === value && <Check size={14} className="opacity-100" />}
-                        </button>
+                        </Button>
                     ))}
                 </div>
             )}

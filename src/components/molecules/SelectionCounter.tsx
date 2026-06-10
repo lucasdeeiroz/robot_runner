@@ -4,6 +4,7 @@ import { Trash2, ListFilter } from "lucide-react";
 import { useState, useEffect } from "react";
 import { SelectionSummaryModal } from "@/components/organisms/SelectionSummaryModal";
 import { feedback } from "@/lib/feedback";
+import { Button } from "@/components/atoms/Button";
 
 export function SelectionCounter() {
     const { items, clearSelection } = useSelection();
@@ -33,28 +34,28 @@ export function SelectionCounter() {
         <div className="flex items-center gap-2 px-4 py-2 bg-secondary-container text-on-secondary-container rounded-2xl shadow-lg border border-secondary/20 animate-in fade-in slide-in-from-bottom-2">
             <div className="flex items-center gap-2 mr-2">
                 <ListFilter size={18} className="text-secondary" />
-                <button
+                <Button
                     onClick={() => setIsModalOpen(true)}
-                    className="text-sm font-medium hover:underline px-2 py-1 rounded-lg hover:bg-on-secondary-container/10 transition-colors whitespace-nowrap"
+                    className="text-sm font-medium hover:underline px-2 py-1 rounded-lg bg-transparent hover:bg-on-secondary-container/10 transition-colors whitespace-nowrap shadow-none"
                 >
                     {parts.join(", ")}
-                </button>
+                </Button>
             </div>
 
             <div className="h-4 w-px bg-on-secondary-container/20 mx-1" />
 
 
-            <button
+            <Button
                 onClick={() => {
                     clearSelection();
                     feedback.toast.success(t('tests.selection.cleared'));
                 }}
-                className="p-1.5 hover:bg-error/10 hover:text-error rounded-full transition-colors cursor-pointer"
+                className="p-1.5 bg-transparent hover:bg-error/10 hover:text-error rounded-full transition-colors cursor-pointer shadow-none"
                 data-tooltip={t('tests.selection.clear_all')}
                 data-position="left"
             >
                 <Trash2 size={16} />
-            </button>
+            </Button>
 
             <SelectionSummaryModal
                 isOpen={isModalOpen}

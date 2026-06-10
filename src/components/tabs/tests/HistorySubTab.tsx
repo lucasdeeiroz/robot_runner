@@ -497,18 +497,18 @@ export function HistorySubTab({ onNavigate }: HistorySubTabProps) {
 
                     {showCharts && (
                         <div className="flex items-center bg-surface/50 border border-outline-variant/30 rounded-lg p-1">
-                            <button
+                            <Button
                                 onClick={() => setCountMethod('suites')}
-                                className={clsx("px-3 py-1.5 text-xs font-medium rounded-md transition-colors", countMethod === 'suites' ? "bg-primary/20 text-primary" : "text-on-surface-variant hover:bg-on-surface/5")}
+                                className={clsx("m-0 p-0 px-3 text-xs font-medium rounded-md transition-colors", countMethod === 'suites' ? "bg-primary/20 text-primary" : "bg-transparent shadow-none text-on-surface-variant hover:bg-on-surface/5")}
                             >
                                 {t('tests_page.charts.count_by_suites')}
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                                 onClick={() => setCountMethod('tests')}
-                                className={clsx("px-3 py-1.5 text-xs font-medium rounded-md transition-colors", countMethod === 'tests' ? "bg-primary/20 text-primary" : "text-on-surface-variant hover:bg-on-surface/5")}
+                                className={clsx("m-0 p-0 px-3 text-xs font-medium rounded-md transition-colors", countMethod === 'tests' ? "bg-primary/20 text-primary" : "bg-transparent shadow-none text-on-surface-variant hover:bg-on-surface/5")}
                             >
                                 {t('tests_page.charts.count_by_tests')}
-                            </button>
+                            </Button>
                         </div>
                     )}
                 </div>

@@ -4,6 +4,7 @@ import clsx from "clsx";
 import { useTranslation } from "react-i18next";
 import { AnimatePresence, motion } from "framer-motion";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
+import { Button } from "@/components/atoms/Button";
 
 interface ConfirmationModalProps {
     isOpen: boolean;
@@ -48,13 +49,13 @@ export function ConfirmationModal({
                         transition={{ type: "spring", stiffness: 350, damping: 25, mass: 1 }}
                         className="bg-surface border border-outline-variant/30 rounded-2xl shadow-xl w-full max-w-md p-6 relative z-10"
                     >
-                        <button
+                        <Button
                             onClick={onClose}
-                            className="absolute top-4 right-4 text-on-surface/80 hover:text-on-surface-variant/80 transition-colors"
+                            className="absolute top-4 right-4 bg-transparent shadow-none text-on-surface/80 hover:bg-transparent hover:text-on-surface-variant/80 transition-colors"
                             disabled={isLoading}
                         >
                             <X size={20} />
-                        </button>
+                        </Button>
 
                         <div className="flex flex-col items-center text-center">
                             <div className={clsx(
@@ -73,26 +74,26 @@ export function ConfirmationModal({
                             </p>
 
                             <div className="flex items-center gap-3 w-full">
-                                <button
+                                <Button
                                     onClick={onClose}
                                     disabled={isLoading}
-                                    className="flex-1 px-4 py-2 bg-surface-variant hover:bg-surface-variant/80 text-on-surface-variant/80 rounded-2xl transition-colors font-medium text-sm disabled:opacity-50"
+                                    className="flex-1 px-4 py-2 bg-transparent shadow-none hover:bg-surface-variant/80 text-on-surface-variant rounded-2xl transition-colors font-medium text-sm disabled:opacity-50"
                                 >
                                     {cancelText || t('common.cancel')}
-                                </button>
-                                <button
+                                </Button>
+                                <Button
                                     onClick={onConfirm}
                                     disabled={isLoading}
                                     className={clsx(
                                         "flex-1 px-4 py-2 text-on-primary rounded-2xl transition-colors font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-2",
                                         variant === 'danger'
-                                            ? "bg-error-container hover:bg-error-container/80 text-on-surface/80"
+                                            ? "bg-error-container hover:bg-error/80 text-on-surface/80 hover:text-on-error"
                                             : "bg-warning-container hover:bg-warning-container/80 text-on-surface/80"
                                     )}
                                 >
                                     {isLoading && <ExpressiveLoading size="xsm" variant="circular" className="text-on-primary" />}
                                     {confirmText || t('common.confirm')}
-                                </button>
+                                </Button>
                             </div>
                         </div>
                     </motion.div>

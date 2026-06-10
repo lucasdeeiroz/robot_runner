@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { Sparkles, ChevronDown, PenLine } from 'lucide-react';
 import { useSettings } from '@/lib/settings';
-import { Button, ButtonProps } from './Button';
+import { Button, ButtonProps } from "@/components/atoms/Button";
 import { ExpressiveLoading } from './ExpressiveLoading';
 import { Modal } from '../organisms/Modal';
 import { Textarea } from './Textarea';
@@ -43,7 +43,7 @@ export const AiButton: React.FC<AiButtonProps> = ({
     const [isHovered, setIsHovered] = useState(false);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    
+
     const storageKey = useMemo(() => {
         return id ? `robot_runner_ai_prompt_${id}` : "robot_runner_ai_prompt";
     }, [id]);
@@ -57,7 +57,7 @@ export const AiButton: React.FC<AiButtonProps> = ({
             setCustomPrompt(localStorage.getItem(storageKey) || "");
         };
         const customEventName = id ? `robot_runner_ai_prompt_changed_${id}` : "robot_runner_ai_prompt_changed";
-        
+
         window.addEventListener("storage", handleStorage);
         window.addEventListener(customEventName, handleStorage);
         return () => {
@@ -265,23 +265,23 @@ export const AiButton: React.FC<AiButtonProps> = ({
                             className="fixed z-[200000] bg-surface border border-outline-variant/30 rounded-2xl shadow-lg py-1.5 overflow-hidden"
                             style={dropdownStyle}
                         >
-                            <button
+                            <Button
                                 onClick={() => {
                                     setIsDropdownOpen(false);
                                     setIsModalOpen(true);
                                 }}
-                                className="w-full text-left px-2 py-2 text-sm text-on-surface/90 hover:bg-primary/5 active:bg-primary/10 flex items-center gap-2.5 transition-colors"
+                                className="w-full justify-start text-left px-2 py-2 bg-transparent hover:bg-primary/5 active:bg-primary/10 shadow-none rounded-none flex items-center gap-2.5 transition-colors"
                             >
                                 <PenLine size={16} className="text-on-surface-variant flex-shrink-0" />
                                 <div className="flex flex-col">
-                                    <span className="font-medium">{t('components.ai_button.customize_prompt')}</span>
+                                    <span className="font-medium text-on-surface-variant">{t('components.ai_button.customize_prompt')}</span>
                                     {customPrompt && (
                                         <span className="text-[10px] text-primary truncate max-w-[150px]">
                                             {t('components.ai_button.custom_rule_active')}
                                         </span>
                                     )}
                                 </div>
-                            </button>
+                            </Button>
                         </motion.div>
                     )}
                 </AnimatePresence>

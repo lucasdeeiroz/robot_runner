@@ -23,6 +23,7 @@ import { feedback } from "@/lib/feedback";
 import { AiButton } from "../atoms/AiButton";
 import { AiResponse } from "./AiResponse";
 import { getFailureAnalysisPrompt } from "@/lib/dashboard/prompts";
+import { Button } from "@/components/atoms/Button";
 
 interface LogTreeProps {
     node: LogNode;
@@ -85,8 +86,8 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({
     const hasMetadata = !!((node as any).doc || (node as any).ret || (node as any).aiAnalysis);
     const hasFailure = node.type === 'test' && !!(node as TestNode).failureDetail;
     const hasLogs = node.type === 'test' && (node as TestNode).logs && (node as TestNode).logs.length > 0;
-    const hasScreenshot = (node.type === 'keyword' && !!(node as KeywordNode).screenshotPath) || 
-                          (node.type === 'test' && !!(node as TestNode).failureDetail?.screenshotPath);
+    const hasScreenshot = (node.type === 'keyword' && !!(node as KeywordNode).screenshotPath) ||
+        (node.type === 'test' && !!(node as TestNode).failureDetail?.screenshotPath);
 
     // A node can be expanded if it has any children, lazy-load flag, documentation, return values, logs, failure details or screenshots
     const canExpand = (node as any).hasChildren || hasChildrenArray || hasLazyChildren || hasMetadata || hasFailure || hasLogs || hasScreenshot;
@@ -191,7 +192,7 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({
         const isThought = node.type === 'ai-thought';
         const isAction = node.type === 'ai-action';
         const Icon = isThought ? Bot : isAction ? Play : Terminal;
-        
+
         const borderClass = isThought ? "border-primary/20" : isAction ? "border-secondary/20" : "border-tertiary/20";
         const bgClass = isThought ? "bg-primary/5" : isAction ? "bg-secondary/5" : "bg-tertiary/5";
         const leftBarClass = isThought ? "bg-primary/40" : isAction ? "bg-secondary/40" : "bg-tertiary/40";
@@ -443,7 +444,7 @@ Error Message: ${(node as TestNode).failureDetail?.message}
                                                             result = await askClaude(prompt, settings.claudeApiKey || '', settings.claudeModel, systemInstruction, screenshot);
                                                         } else if (provider === 'openai') {
                                                             result = await askOpenAI(prompt, settings.openaiApiKey || '', settings.openaiModel, systemInstruction, screenshot);
-                                                         } else if (provider === 'claude-code') {
+                                                        } else if (provider === 'claude-code') {
                                                             const response = await askClaudeCode(prompt, settings.paths.automationRoot || '', systemInstruction, settings.claudeCodeToken, { imageBase64: screenshot });
                                                             result = typeof response === 'string' ? response : response.result;
                                                         } else if (provider === 'antigravity-cli') {
@@ -626,13 +627,13 @@ Error Message: ${(node as TestNode).failureDetail?.message}
                                 className="max-w-full max-h-[85vh] rounded-xl shadow-2xl border border-white/10"
                             />
                             <div className="flex items-center gap-4">
-                                <button
+                                <Button
                                     className="px-6 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-all font-medium border border-white/10 flex items-center gap-2 group"
                                     onClick={() => setPreviewImage(null)}
                                 >
                                     <XCircle size={18} className="text-white/70 group-hover:text-white transition-colors" />
                                     {t('common.close')}
-                                </button>
+                                </Button>
                             </div>
                         </motion.div>
                     </div>

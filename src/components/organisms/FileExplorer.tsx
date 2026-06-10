@@ -363,14 +363,15 @@ export function FileExplorer({
             {/* Header / Breadcrumb */}
             {!isPathUnconfigured && (
                 <div className="flex items-center gap-2 mb-2 p-2 bg-transparent backdrop-blur-md rounded-2xl border border-outline-variant/30 shrink-0 overflow-visible">
-                    <button
+                    <Button
                         onClick={handleUp}
                         disabled={currentPath === rootPath}
-                        className="p-1 hover:bg-surface-variant/50 rounded transition-colors text-on-surface-variant/80 disabled:opacity-30 disabled:cursor-not-allowed"
-                        title={t('file_explorer.up')}
+                        className="p-1 bg-transparent hover:bg-surface-variant/50 shadow-none hover:shadow-lg rounded-full transition-colors text-on-surface-variant/80 disabled:opacity-30 disabled:cursor-not-allowed"
+                        data-tooltip={t('file_explorer.up')}
+                        data-position="right"
                     >
                         <CornerLeftUp size={18} />
-                    </button>
+                    </Button>
                     <div className="flex-1 font-mono text-sm truncate px-2 text-on-surface/80">
                         {rootPath && currentPath.startsWith(rootPath)
                             ? (currentPath === rootPath ? './' : currentPath.replace(rootPath, '').replace(/^[\\/]/, ''))
@@ -382,7 +383,7 @@ export function FileExplorer({
                             <Button
                                 onClick={handleGitFetch}
                                 disabled={fetching}
-                                className="px-1 py-0 rounded-lg text-on-surface-variant/70 bg-transparent hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-90 cursor-pointer"
+                                className="px-1 py-0 rounded-lg text-on-surface-variant/70 bg-transparent shadow-none hover:shadow-lg hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-90 cursor-pointer"
                                 data-tooltip={t('file_explorer.git_fetch_tooltip', "Fetch from remote")}
                                 data-position="left"
                                 aria-label={t('file_explorer.git_fetch_tooltip', "Fetch from remote")}
@@ -393,7 +394,7 @@ export function FileExplorer({
                             <Button
                                 onClick={handleGitPull}
                                 disabled={pulling}
-                                className="px-1 py-0 rounded-lg text-on-surface-variant/70 bg-transparent hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-90 cursor-pointer"
+                                className="px-1 py-0 rounded-lg text-on-surface-variant/70 bg-transparent shadow-none hover:shadow-lg hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-90 cursor-pointer"
                                 data-tooltip={t('file_explorer.git_pull_tooltip', "Pull from remote")}
                                 data-position="left"
                                 aria-label={t('file_explorer.git_pull_tooltip', "Pull from remote")}
@@ -404,7 +405,7 @@ export function FileExplorer({
                             <Button
                                 onClick={() => setShowCommitModal(true)}
                                 disabled={!Object.values(gitStatusEntries).some(s => s === 'staged')}
-                                className="px-1 py-0 rounded-lg text-on-surface-variant/70 bg-transparent hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-90 cursor-pointer"
+                                className="px-1 py-0 rounded-lg text-on-surface-variant/70 bg-transparent shadow-none hover:shadow-lg hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-90 cursor-pointer"
                                 data-tooltip={t('file_explorer.git_commit_btn_tooltip', "Commit staged changes")}
                                 data-position="left"
                                 aria-label={t('file_explorer.git_commit_btn_tooltip', "Commit staged changes")}
@@ -415,7 +416,7 @@ export function FileExplorer({
                             <Button
                                 onClick={handleGitPush}
                                 disabled={pushing}
-                                className="px-1 py-0 rounded-lg text-on-surface-variant/70 bg-transparent hover:text-secondary hover:bg-secondary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-90 cursor-pointer"
+                                className="px-1 py-0 rounded-lg text-on-surface-variant/70 bg-transparent shadow-none hover:shadow-lg hover:text-secondary hover:bg-secondary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-90 cursor-pointer"
                                 data-tooltip={t('file_explorer.git_push_tooltip', "Push to remote")}
                                 data-position="left"
                                 aria-label={t('file_explorer.git_push_tooltip', "Push to remote")}
@@ -444,22 +445,22 @@ export function FileExplorer({
                                     : t('file_explorer.configure_suites')}
                             </p>
                         </div>
-                        <button
+                        <Button
                             onClick={handleSelectFolder}
                             className="flex items-center gap-2 px-6 py-2.5 bg-primary text-on-primary rounded-2xl text-sm font-medium hover:bg-primary/90 transition-all shadow-md active:scale-95"
                         >
                             <Folder size={18} />
                             {t('file_explorer.select_folder_btn')}
-                        </button>
+                        </Button>
 
                         {onNavigate && (
-                            <button
+                            <Button
                                 onClick={() => onNavigate?.('settings')}
                                 className="flex items-center gap-2 px-6 py-2 text-on-surface-variant/60 hover:text-primary transition-all text-sm"
                             >
                                 <Settings size={14} />
                                 {t('common.go_to_settings', "Go to Settings")}
-                            </button>
+                            </Button>
                         )}
                     </div>
                 ) : (
@@ -474,9 +475,9 @@ export function FileExplorer({
                         {error && (
                             <div className="flex flex-col items-center justify-center h-full text-error">
                                 <span className="text-sm">{error}</span>
-                                <button onClick={() => loadDirectory(".")} className="mt-4 text-xs underline">
+                                <Button onClick={() => loadDirectory(".")} className="mt-4 text-xs underline">
                                     {t('file_explorer.reset')}
-                                </button>
+                                </Button>
                             </div>
                         )}
 
@@ -545,7 +546,7 @@ export function FileExplorer({
                                                 return (
                                                     <div className="flex items-center gap-2 shrink-0">
                                                         {(actionStatus === 'untracked' || actionStatus === 'modified' || actionStatus === 'deleted') && (
-                                                            <button
+                                                            <Button
                                                                 onClick={async (e) => {
                                                                     e.stopPropagation();
                                                                     try {
@@ -556,16 +557,16 @@ export function FileExplorer({
                                                                         feedback.toast.error(String(err));
                                                                     }
                                                                 }}
-                                                                className="opacity-0 group-hover:opacity-100 p-1 text-primary hover:bg-primary/20 rounded-lg transition-all active:scale-90 cursor-pointer"
+                                                                className="opacity-0 group-hover:opacity-100 p-1 bg-transparent text-primary shadow-none hover:shadow-lg hover:text-primary hover:bg-primary/20 rounded-lg transition-all active:scale-90 cursor-pointer"
                                                                 data-tooltip={t('file_explorer.git_stage_tooltip', "Stage changes")}
                                                                 data-position="left"
                                                                 aria-label={t('file_explorer.git_stage_tooltip', "Stage changes")}
                                                             >
                                                                 <CirclePlus size={14} />
-                                                            </button>
+                                                            </Button>
                                                         )}
                                                         {actionStatus === 'staged' && (
-                                                            <button
+                                                            <Button
                                                                 onClick={async (e) => {
                                                                     e.stopPropagation();
                                                                     try {
@@ -576,13 +577,13 @@ export function FileExplorer({
                                                                         feedback.toast.error(String(err));
                                                                     }
                                                                 }}
-                                                                className="opacity-0 group-hover:opacity-100 p-1 text-amber-500 hover:bg-amber-500/20 rounded-lg transition-all active:scale-90 cursor-pointer"
+                                                                className="opacity-0 group-hover:opacity-100 p-1 bg-transparent text-warning shadow-none hover:shadow-lg hover:text-amber-500 hover:bg-amber-500/20 rounded-lg transition-all active:scale-90 cursor-pointer"
                                                                 data-tooltip={t('file_explorer.git_unstage_tooltip', "Unstage changes")}
                                                                 data-position="left"
                                                                 aria-label={t('file_explorer.git_unstage_tooltip', "Unstage changes")}
                                                             >
                                                                 <CircleMinus size={14} />
-                                                            </button>
+                                                            </Button>
                                                         )}
                                                         {settings.git?.showBadges && (
                                                             <span
@@ -618,19 +619,19 @@ export function FileExplorer({
                     <div className="flex-1 text-xs text-on-surface/80 truncate">
                         {selectedEntry ? selectedEntry.name : selectionMode === 'directory' ? t('file_explorer.current') : t('file_explorer.no_selection')}
                     </div>
-                    <button
+                    <Button
                         onClick={() => onCancel?.()}
                         className="px-4 py-2 rounded-2xl text-sm font-medium text-on-surface-variant/80 hover:bg-surface-variant/30 transition-colors"
                     >
                         {t('file_explorer.cancel')}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         onClick={handleConfirm}
                         disabled={!selectedEntry && selectionMode === 'file'}
                         className="px-4 py-2 rounded-2xl text-sm font-medium bg-primary text-on-primary hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {selectionMode === 'directory' ? t('file_explorer.select_folder') : t('file_explorer.select_file')}
-                    </button>
+                    </Button>
                 </div>
             )}
 

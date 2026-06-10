@@ -173,20 +173,20 @@ export function PerformanceSubTab({
                             <div className="flex items-center gap-2 px-3 py-1 bg-warning/10 text-warning rounded-2xl text-[11px] font-medium border border-warning/20">
                                 <FolderSearch size={14} />
                                 <span>{t('logcat.not_saving')}</span>
-                                <button
+                                <Button
                                     onClick={handleConfigurePath}
                                     className="underline hover:text-warning/80 ml-1"
                                 >
                                     {t('logcat.configure_path')}
-                                </button>
+                                </Button>
                                 {onNavigate && (
-                                    <button
+                                    <Button
                                         onClick={() => onNavigate?.('settings')}
                                         className="flex items-center gap-1 hover:text-warning/80 ml-2 border-l border-warning/20 pl-2"
                                     >
                                         <Settings size={12} />
                                         {t('common.go_to_settings')}
-                                    </button>
+                                    </Button>
                                 )}
                             </div>
                         )}
@@ -245,8 +245,8 @@ export function PerformanceSubTab({
                         <Activity size={48} className="opacity-20 mb-4" />
                         <h4 className="font-bold text-on-surface mb-2">{t('performance.status.paused_test', "Monitoring Paused")}</h4>
                         <p className="max-w-xs mb-6 opacity-70 italic">{t('performance.paused_description', "Performance polling is disabled to avoid interference with the running test.")}</p>
-                        
-                        <Button 
+
+                        <Button
                             onClick={() => setShowHighImpactWarning(true)}
                             variant="secondary"
                             size="sm"

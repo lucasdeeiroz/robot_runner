@@ -646,7 +646,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             // Re-fetch using refreshAll logic isn't ideal here due to async nature,
             // but we can reuse the logic in the explorer
             const xml = await invoke<string>('get_xml_dump', { deviceId: selectedDevice });
-            
+
             let screenshot: string | undefined = undefined;
             try {
                 const freshScreenshotBase64 = await invoke<string>('get_compressed_screenshot', { deviceId: selectedDevice, maxWidth: 1024, maxHeight: 1024 });
@@ -1034,8 +1034,8 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
         } catch (error: any) {
             console.error("Exploration error:", error);
-            const reason = error instanceof Error 
-                ? error.message 
+            const reason = error instanceof Error
+                ? error.message
                 : (typeof error === 'object' && error !== null && 'message' in error)
                     ? String(error.message)
                     : String(error);
@@ -1631,18 +1631,18 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                         {availableNodes.length > 1 ? (
                                             <div className="flex overflow-x-auto custom-scrollbar flex-1">
                                                 {availableNodes.map((node) => (
-                                                    <button
+                                                    <Button
                                                         key={node.id}
                                                         onClick={() => setSelectedNode(node)}
                                                         className={clsx(
-                                                            "px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
+                                                            "px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap rounded-none shadow-none",
                                                             selectedNode === node
-                                                                ? "border-primary text-primary dark:text-primary/80 bg-surface-variant/30"
-                                                                : "border-transparent text-on-surface-variant/80 hover:text-on-surface-variant/80 hover:bg-surface-variant/30"
+                                                                ? "border-b-primary text-primary bg-surface-variant/30"
+                                                                : "bg-transparent text-on-surface-variant/80 hover:text-on-surface-variant/80 hover:bg-surface-variant/30"
                                                         )}
                                                     >
                                                         {node.tagName}
-                                                    </button>
+                                                    </Button>
                                                 ))}
                                             </div>
                                         ) : (
@@ -1651,15 +1651,15 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                             </div>
                                         )}
                                         {selectedNode && (
-                                            <button
+                                            <Button
                                                 onClick={() => {
                                                     setSelectedNode(null);
                                                     setAvailableNodes([]);
                                                 }}
-                                                className="p-1.5 text-on-surface/80 hover:text-error hover:bg-error-container/10 rounded-2xl transition-colors ml-2"
+                                                className="p-1.5 text-on-surface/80 hover:text-error bg-transparent hover:bg-error-container/10 shadow-none rounded-full transition-colors ml-2"
                                             >
                                                 <X size={16} />
-                                            </button>
+                                            </Button>
                                         )}
                                     </div>
 
@@ -1938,20 +1938,20 @@ function NodeBreadcrumbs({ node, onSelect, onHover }: { node: InspectorNode | nu
                 {displayPath.map((n, i) => (
                     <div key={n.id} className="flex items-center">
                         {i > 0 && <span className="mx-1 text-on-surface/80">&gt;</span>}
-                        <button
+                        <Button
                             onClick={() => onSelect(n)}
                             onMouseEnter={() => onHover(n)}
                             onMouseLeave={() => onHover(null)}
                             className={clsx(
-                                "hover:text-primary hover:underline transition-colors text-left",
+                                "p-0 m-0 bg-transparent shadow-none rounded-none hover:bg-transparent hover:text-primary hover:underline transition-colors text-left",
                                 n === node ? "font-bold text-on-surface/80" : ""
                             )}
                             title={generateXPath(n)}
                         >
                             {cleanTag(n.tagName)}
-                            {n.attributes['resource-id'] && <span className="ml-1 text-primary dark:text-primary/80">resource-id="{n.attributes['resource-id'].split('/').pop()}"</span>}
-                            {!n.attributes['resource-id'] && n.attributes['content-desc'] && <span className="ml-1 text-on-success-container/10">content-desc="{n.attributes['content-desc'].substring(0, 15)}..."</span>}
-                        </button>
+                            {n.attributes['resource-id'] && <span className="p-0 m-0 ml-1 rounded-none text-primary dark:text-primary/80">resource-id="{n.attributes['resource-id'].split('/').pop()}"</span>}
+                            {!n.attributes['resource-id'] && n.attributes['content-desc'] && <span className="p-0 m-0 ml-1 rounded-none text-on-success-container/10">content-desc="{n.attributes['content-desc'].substring(0, 15)}..."</span>}
+                        </Button>
                     </div>
                 ))}
                 {path.length > 2 && (

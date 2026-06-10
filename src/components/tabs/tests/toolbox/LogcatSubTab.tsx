@@ -314,20 +314,20 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
                             <div className="flex items-center gap-2 px-3 py-1 bg-warning/10 text-warning rounded-2xl text-[11px] font-medium border border-warning/20">
                                 <FolderSearch size={14} />
                                 <span>{t('logcat.not_saving')}</span>
-                                <button
+                                <Button
                                     onClick={handleConfigurePath}
                                     className="underline hover:text-warning/80 ml-1"
                                 >
                                     {t('logcat.configure_path')}
-                                </button>
+                                </Button>
                                 {onNavigate && (
-                                    <button
+                                    <Button
                                         onClick={() => onNavigate?.('settings')}
                                         className="flex items-center gap-1 hover:text-warning/80 ml-2 border-l border-warning/20 pl-2"
                                     >
                                         <Settings size={12} />
                                         {t('common.go_to_settings')}
-                                    </button>
+                                    </Button>
                                 )}
                             </div>
                         )}
