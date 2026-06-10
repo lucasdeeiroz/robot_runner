@@ -267,20 +267,34 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                 }
             }
 
-            if (provider === 'gemini') {
-                if (!settings.geminiApiKey) throw new Error("Missing Gemini API Key");
-                result = await gemini.summarizeExecution(tree, settings.geminiApiKey as string, settings.geminiModel || '', language, failureContext, undefined, customPrompt);
-            } else if (provider === 'openai') {
-                if (!settings.openaiApiKey) throw new Error("Missing OpenAI API Key");
-                result = await openai.summarizeExecution(tree, settings.openaiApiKey as string, settings.openaiModel || '', language, failureContext, undefined, customPrompt);
-            } else if (provider === 'claude') {
-                if (!settings.claudeApiKey) throw new Error("Missing Claude API Key");
-                result = await claude.summarizeExecution(tree, settings.claudeApiKey as string, settings.claudeModel || '', language, failureContext, undefined, customPrompt);
-            } else if (provider === 'claude-code') {
-                result = await claudeCli.summarizeExecution(tree, settings.paths.automationRoot || '', language, failureContext?.map(f => f.message) || [], failureContext, customPrompt, settings.claudeCodeToken);
-            } else if (provider === 'antigravity-cli') {
-                const { summarizeExecution } = await import('@/lib/dashboard/antigravityCode');
-                result = await summarizeExecution(tree, settings.paths.automationRoot || '', language, failureContext?.map(f => f.message) || [], failureContext, customPrompt, settings.antigravityApiKey);
+            // Attempt AI call with one retry
+            for (let attempt = 0; attempt < 2; attempt++) {
+                try {
+                    if (provider === 'gemini') {
+                        if (!settings.geminiApiKey) throw new Error("Missing Gemini API Key");
+                        result = await gemini.summarizeExecution(tree, settings.geminiApiKey as string, settings.geminiModel || '', language, failureContext, undefined, customPrompt);
+                    } else if (provider === 'openai') {
+                        if (!settings.openaiApiKey) throw new Error("Missing OpenAI API Key");
+                        result = await openai.summarizeExecution(tree, settings.openaiApiKey as string, settings.openaiModel || '', language, failureContext, undefined, customPrompt);
+                    } else if (provider === 'claude') {
+                        if (!settings.claudeApiKey) throw new Error("Missing Claude API Key");
+                        result = await claude.summarizeExecution(tree, settings.claudeApiKey as string, settings.claudeModel || '', language, failureContext, undefined, customPrompt);
+                    } else if (provider === 'claude-code') {
+                        result = await claudeCli.summarizeExecution(tree, settings.paths.automationRoot || '', language, failureContext?.map(f => f.message) || [], failureContext, customPrompt, settings.claudeCodeToken);
+                    } else if (provider === 'antigravity-cli') {
+                        const { summarizeExecution } = await import('@/lib/dashboard/antigravityCode');
+                        result = await summarizeExecution(tree, settings.paths.automationRoot || '', language, failureContext?.map(f => f.message) || [], failureContext, customPrompt, settings.antigravityApiKey);
+                    }
+                    
+                    if (result) {
+                        break; // Success, exit retry loop
+                    }
+                } catch (e: any) {
+                    if (attempt === 1) {
+                        throw e; // Rethrow on the last attempt
+                    }
+                    console.warn(`AI Summarization attempt ${attempt + 1} failed, retrying...`, e);
+                }
             }
 
             setSummary(result);
@@ -309,22 +323,38 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
 
             setAiStatus(t('run_tab.console.ai_steps.thinking', { defaultValue: 'AI is thinking...' }));
 
-            let response: gemini.AutonomousActionResponse;
+            let response: gemini.AutonomousActionResponse = null as any;
             const target = session.aiPrompt || session.testPath;
             const lang = i18n.language;
 
-            if (provider === 'gemini') {
-                response = await gemini.generateAutonomousAction(xml, target, aiHistory, settings.geminiApiKey as string, settings.geminiModel || 'gemini-1.5-pro', lang);
-            } else if (provider === 'openai') {
-                response = await openai.generateAutonomousAction(xml, target, aiHistory, settings.openaiApiKey as string, settings.openaiModel || 'gpt-4o', lang);
-            } else if (provider === 'claude') {
-                response = await claude.generateAutonomousAction(xml, target, aiHistory, settings.claudeApiKey as string, settings.claudeModel || 'claude-3-5-sonnet-latest', lang);
-            } else if (provider === 'antigravity-cli') {
-                response = await antigravityCode.generateAutonomousAction(xml, target, aiHistory, settings.paths.automationRoot || '', lang, undefined, settings.antigravityApiKey);
-            } else if (provider === 'claude-code') {
-                response = await claudeCli.generateAutonomousAction(xml, target, aiHistory, settings.paths.automationRoot || '', lang, undefined, settings.claudeCodeToken);
-            } else {
-                throw new Error(`Unsupported AI provider for Autonomous Agent: ${provider}`);
+            // Attempt AI call with one retry
+            for (let attempt = 0; attempt < 2; attempt++) {
+                try {
+                    if (provider === 'gemini') {
+                        response = await gemini.generateAutonomousAction(xml, target, aiHistory, settings.geminiApiKey as string, settings.geminiModel || 'gemini-1.5-pro', lang);
+                    } else if (provider === 'openai') {
+                        response = await openai.generateAutonomousAction(xml, target, aiHistory, settings.openaiApiKey as string, settings.openaiModel || 'gpt-4o', lang);
+                    } else if (provider === 'claude') {
+                        response = await claude.generateAutonomousAction(xml, target, aiHistory, settings.claudeApiKey as string, settings.claudeModel || 'claude-3-5-sonnet-latest', lang);
+                    } else if (provider === 'antigravity-cli') {
+                        response = await antigravityCode.generateAutonomousAction(xml, target, aiHistory, settings.paths.automationRoot || '', lang, undefined, settings.antigravityApiKey);
+                    } else if (provider === 'claude-code') {
+                        response = await claudeCli.generateAutonomousAction(xml, target, aiHistory, settings.paths.automationRoot || '', lang, undefined, settings.claudeCodeToken);
+                    } else {
+                        throw new Error(`Unsupported AI provider for Autonomous Agent: ${provider}`);
+                    }
+                    
+                    if (response && response.action) {
+                        break; // Success, exit retry loop
+                    } else {
+                        throw new Error("Invalid format returned by AI for autonomous action");
+                    }
+                } catch (e: any) {
+                    if (attempt === 1) {
+                        throw e; // Rethrow on the last attempt
+                    }
+                    console.warn(`AI Autonomous Action attempt ${attempt + 1} failed, retrying...`, e);
+                }
             }
 
             const actionDesc = `[Step ${aiStepCount + 1}] ${response.action.type.toUpperCase()}: ${response.action.details}`;

@@ -496,25 +496,36 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
             // console.log(`[AI Debug] Prompt Context Size: ~${JSON.stringify(criticalAttrs).length + JSON.stringify(optimizedMaps).length} chars`);
 
-            if (aiProvider === 'gemini') {
-                result = await gemini.suggestElementName(criticalAttrs as any, screenName, apiKey!, model, lang, optimizedMaps as any, undefined, customPrompt);
-            } else if (aiProvider === 'openai') {
-                result = await openai.suggestElementName(criticalAttrs as any, screenName, apiKey!, model, lang, optimizedMaps as any, undefined, customPrompt);
-            } else if (aiProvider === 'claude') {
-                result = await claude.suggestElementName(criticalAttrs as any, screenName, apiKey!, model, lang, optimizedMaps as any, undefined, customPrompt);
-            } else if (aiProvider === 'claude-code') {
-                result = await claudeCli.suggestElementName(criticalAttrs as any, screenName, settings.paths.automationRoot || '', lang, optimizedMaps as any, customPrompt, settings.claudeCodeToken, screenshot || undefined);
-            } else if (aiProvider === 'antigravity-cli') {
-                const { suggestElementName } = await import('@/lib/dashboard/antigravityCode');
-                result = await suggestElementName(criticalAttrs as any, screenName, settings.paths.automationRoot || '', lang, optimizedMaps as any, customPrompt, settings.antigravityApiKey, screenshot || undefined);
-            }
+            // Attempt AI call with one retry on JSON parse or network failure
+            for (let attempt = 0; attempt < 2; attempt++) {
+                try {
+                    if (aiProvider === 'gemini') {
+                        result = await gemini.suggestElementName(criticalAttrs as any, screenName, apiKey!, model, lang, optimizedMaps as any, undefined, customPrompt);
+                    } else if (aiProvider === 'openai') {
+                        result = await openai.suggestElementName(criticalAttrs as any, screenName, apiKey!, model, lang, optimizedMaps as any, undefined, customPrompt);
+                    } else if (aiProvider === 'claude') {
+                        result = await claude.suggestElementName(criticalAttrs as any, screenName, apiKey!, model, lang, optimizedMaps as any, undefined, customPrompt);
+                    } else if (aiProvider === 'claude-code') {
+                        result = await claudeCli.suggestElementName(criticalAttrs as any, screenName, settings.paths.automationRoot || '', lang, optimizedMaps as any, customPrompt, settings.claudeCodeToken, screenshot || undefined);
+                    } else if (aiProvider === 'antigravity-cli') {
+                        const { suggestElementName } = await import('@/lib/dashboard/antigravityCode');
+                        result = await suggestElementName(criticalAttrs as any, screenName, settings.paths.automationRoot || '', lang, optimizedMaps as any, customPrompt, settings.antigravityApiKey, screenshot || undefined);
+                    }
 
-            if (result && result.name) {
-                setAiSuggestedName(result.name);
-                setAiJustification(result.justification);
-                feedback.toast.success(t('mapper.feedback.ai_success'));
-            } else {
-                throw new Error("Empty suggestion or invalid format returned by AI");
+                    if (result && result.name) {
+                        setAiSuggestedName(result.name);
+                        setAiJustification(result.justification);
+                        feedback.toast.success(t('mapper.feedback.ai_success'));
+                        break; // Success, exit retry loop
+                    } else {
+                        throw new Error("Empty suggestion or invalid format returned by AI");
+                    }
+                } catch (e: any) {
+                    if (attempt === 1) {
+                        throw e; // Rethrow on the last attempt
+                    }
+                    console.warn(`AI Suggestion attempt ${attempt + 1} failed, retrying...`, e);
+                }
             }
         } catch (error: any) {
             console.error("AI Suggestion Error:", error);
@@ -546,17 +557,33 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             // Use mapped elements for context
             const elementsContext = mappedElements.map(el => ({ name: el.name, type: el.type }));
 
-            if (aiProvider === 'gemini') {
-                tags = await gemini.suggestScreenTags(screenName || "Current Screen", elementsContext, apiKey!, model, lang, screenshot || undefined, undefined, customPrompt);
-            } else if (aiProvider === 'openai') {
-                tags = await openai.suggestScreenTags(screenName || "Current Screen", elementsContext, apiKey!, model, lang, screenshot || undefined, undefined, customPrompt);
-            } else if (aiProvider === 'claude') {
-                tags = await claude.suggestScreenTags(screenName || "Current Screen", elementsContext, apiKey!, model, lang, screenshot || undefined, undefined, customPrompt);
-            } else if (aiProvider === 'claude-code') {
-                tags = await claudeCli.suggestScreenTags(screenName || "Current Screen", elementsContext, settings.paths.automationRoot || '', lang, customPrompt, settings.claudeCodeToken, screenshot || undefined);
-            } else if (aiProvider === 'antigravity-cli') {
-                const { suggestScreenTags } = await import('@/lib/dashboard/antigravityCode');
-                tags = await suggestScreenTags(screenName || "Current Screen", elementsContext, settings.paths.automationRoot || '', lang, customPrompt, settings.antigravityApiKey, screenshot || undefined);
+            // Attempt AI call with one retry
+            for (let attempt = 0; attempt < 2; attempt++) {
+                try {
+                    if (aiProvider === 'gemini') {
+                        tags = await gemini.suggestScreenTags(screenName || "Current Screen", elementsContext, apiKey!, model, lang, screenshot || undefined, undefined, customPrompt);
+                    } else if (aiProvider === 'openai') {
+                        tags = await openai.suggestScreenTags(screenName || "Current Screen", elementsContext, apiKey!, model, lang, screenshot || undefined, undefined, customPrompt);
+                    } else if (aiProvider === 'claude') {
+                        tags = await claude.suggestScreenTags(screenName || "Current Screen", elementsContext, apiKey!, model, lang, screenshot || undefined, undefined, customPrompt);
+                    } else if (aiProvider === 'claude-code') {
+                        tags = await claudeCli.suggestScreenTags(screenName || "Current Screen", elementsContext, settings.paths.automationRoot || '', lang, customPrompt, settings.claudeCodeToken, screenshot || undefined);
+                    } else if (aiProvider === 'antigravity-cli') {
+                        const { suggestScreenTags } = await import('@/lib/dashboard/antigravityCode');
+                        tags = await suggestScreenTags(screenName || "Current Screen", elementsContext, settings.paths.automationRoot || '', lang, customPrompt, settings.antigravityApiKey, screenshot || undefined);
+                    }
+
+                    if (tags && Array.isArray(tags)) {
+                        break; // Success, exit retry loop
+                    } else {
+                        throw new Error("Invalid format returned by AI for screen tags");
+                    }
+                } catch (e: any) {
+                    if (attempt === 1) {
+                        throw e; // Rethrow on the last attempt
+                    }
+                    console.warn(`AI Tags Suggestion attempt ${attempt + 1} failed, retrying...`, e);
+                }
             }
 
             if (tags && Array.isArray(tags) && tags.length > 0) {

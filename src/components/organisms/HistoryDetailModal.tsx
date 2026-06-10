@@ -210,7 +210,7 @@ export function HistoryDetailModal({ isOpen, onClose, log, onUpdateLog }: Histor
                 throw new Error("Missing API Key");
             }
 
-            let result: string;
+            let result: string = "";
             const language = i18n.language || 'en';
 
             // Fetch failure context from DB if available
@@ -235,17 +235,31 @@ export function HistoryDetailModal({ isOpen, onClose, log, onUpdateLog }: Histor
                 }
             }
 
-            if (provider === 'openai') {
-                result = await openai.summarizeExecution(tree, apiKey!, model!, language, failureContext, undefined, customPrompt, base64Screenshot);
-            } else if (provider === 'claude') {
-                result = await claude.summarizeExecution(tree, apiKey!, model!, language, failureContext, undefined, customPrompt, base64Screenshot);
-            } else if (provider === 'claude-code') {
-                result = await claudeCli.summarizeExecution(tree, settings.paths.automationRoot || '', language, failureContext?.map(f => f.message) || [], failureContext, customPrompt, settings.claudeCodeToken, base64Screenshot);
-            } else if (provider === 'antigravity-cli') {
-                const { summarizeExecution } = await import('@/lib/dashboard/antigravityCode');
-                result = await summarizeExecution(tree, settings.paths.automationRoot || '', language, failureContext?.map(f => f.message) || [], failureContext, customPrompt, settings.antigravityApiKey, base64Screenshot);
-            } else {
-                result = await gemini.summarizeExecution(tree, apiKey!, model!, language, failureContext, undefined, customPrompt, base64Screenshot);
+            // Attempt AI call with one retry
+            for (let attempt = 0; attempt < 2; attempt++) {
+                try {
+                    if (provider === 'openai') {
+                        result = await openai.summarizeExecution(tree, apiKey!, model!, language, failureContext, undefined, customPrompt, base64Screenshot);
+                    } else if (provider === 'claude') {
+                        result = await claude.summarizeExecution(tree, apiKey!, model!, language, failureContext, undefined, customPrompt, base64Screenshot);
+                    } else if (provider === 'claude-code') {
+                        result = await claudeCli.summarizeExecution(tree, settings.paths.automationRoot || '', language, failureContext?.map(f => f.message) || [], failureContext, customPrompt, settings.claudeCodeToken, base64Screenshot);
+                    } else if (provider === 'antigravity-cli') {
+                        const { summarizeExecution } = await import('@/lib/dashboard/antigravityCode');
+                        result = await summarizeExecution(tree, settings.paths.automationRoot || '', language, failureContext?.map(f => f.message) || [], failureContext, customPrompt, settings.antigravityApiKey, base64Screenshot);
+                    } else {
+                        result = await gemini.summarizeExecution(tree, apiKey!, model!, language, failureContext, undefined, customPrompt, base64Screenshot);
+                    }
+                    
+                    if (result) {
+                        break; // Success, exit retry loop
+                    }
+                } catch (e: any) {
+                    if (attempt === 1) {
+                        throw e; // Rethrow on the last attempt
+                    }
+                    console.warn(`AI Summarization attempt ${attempt + 1} failed, retrying...`, e);
+                }
             }
 
             setSummary(result);
