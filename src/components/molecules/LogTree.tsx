@@ -607,36 +607,38 @@ Error Message: ${(node as TestNode).failureDetail?.message}
             )}
 
             {/* Fullscreen Preview Portal */}
-            {previewImage && createPortal(
+            {createPortal(
                 <AnimatePresence>
-                    <div
-                        className="fixed inset-0 z-[20000] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md cursor-zoom-out"
-                        onClick={() => setPreviewImage(null)}
-                    >
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                            className="relative max-w-full max-h-full flex flex-col items-center gap-4"
-                            onClick={(e) => e.stopPropagation()}
+                    {previewImage && (
+                        <div
+                            className="fixed inset-0 z-[200000] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md cursor-zoom-out"
+                            onClick={() => setPreviewImage(null)}
                         >
-                            <img
-                                src={previewImage}
-                                alt="Full size preview"
-                                className="max-w-full max-h-[85vh] rounded-xl shadow-2xl border border-white/10"
-                            />
-                            <div className="flex items-center gap-4">
-                                <Button
-                                    className="px-6 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-all font-medium border border-white/10 flex items-center gap-2 group"
-                                    onClick={() => setPreviewImage(null)}
-                                >
-                                    <XCircle size={18} className="text-white/70 group-hover:text-white transition-colors" />
-                                    {t('common.close')}
-                                </Button>
-                            </div>
-                        </motion.div>
-                    </div>
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                                transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                                className="relative max-w-full max-h-full flex flex-col items-center gap-4"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <img
+                                    src={previewImage}
+                                    alt="Full size preview"
+                                    className="max-w-full max-h-[85vh] rounded-xl shadow-2xl border border-white/10"
+                                />
+                                <div className="flex items-center gap-4">
+                                    <Button
+                                        className="px-6 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-all font-medium border border-white/10 flex items-center gap-2 group"
+                                        onClick={() => setPreviewImage(null)}
+                                    >
+                                        <XCircle size={18} className="text-white/70 group-hover:text-white transition-colors" />
+                                        {t('common.close')}
+                                    </Button>
+                                </div>
+                            </motion.div>
+                        </div>
+                    )}
                 </AnimatePresence>,
                 document.body
             )}
