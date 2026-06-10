@@ -34,3 +34,6 @@ When the user reports a bug (e.g., "The button icon disappeared"):
 2. Formulate a hypothesis (e.g., "Did `<Button>` override native `<button>` styles?").
 3. Use `run_command` to check `git log -p -1 <file>` if needed.
 4. Execute the fix directly using `replace_file_content`.
+
+## 5. Continuous Improvement
+At the end of every task requested by the user, you MUST self-evaluate what was learned during the execution. Consider whether any `.agents/rules/` or `.agents/workflows/` need to be modified or created from scratch to prevent future mistakes or improve the efficiency of future AI agents working on this project. Implement these changes proactively if they are beneficial.

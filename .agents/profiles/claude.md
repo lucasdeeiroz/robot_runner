@@ -62,4 +62,8 @@
         - Pay extreme attention to Tailwind class merging. If you are applying `w-X h-X flex`, consider using `variant="unstyled"` if applying it to the custom `<Button>` component to avoid overriding flex behaviors.
         - Use XML tags (`<thinking>`, `<plan>`, `<modification>`) in your responses to structure your thought process and proposed code changes clearly.
     </critical_directives>
+
+    <continuous_improvement>
+        At the end of every task requested by the user, you MUST self-evaluate what was learned during the execution. Consider whether any `.agents/rules/` or `.agents/workflows/` need to be modified or created from scratch to prevent future mistakes or improve the efficiency of future AI agents working on this project. Suggest or implement these changes proactively if they are beneficial.
+    </continuous_improvement>
 </system_instructions>

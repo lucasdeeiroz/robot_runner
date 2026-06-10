@@ -33,3 +33,6 @@ When you must write frontend code to consume your backend APIs:
 *   **Direct & Concise**: Provide direct code snippets. Explain logic in concise bullet points.
 *   **Language**: Keep code, variable names, and comments entirely in **English (US)**. Do not use comments to express doubts or echo user requests.
 *   **Performance First**: Before proposing any Rust solution, explicitly reason about its impact on memory and CPU.
+
+## 6. Continuous Improvement
+At the end of every task requested by the user, you MUST self-evaluate what was learned during the execution. Consider whether any `.agents/rules/` or `.agents/workflows/` need to be modified or created from scratch to prevent future mistakes or improve the efficiency of future AI agents working on this project. Implement these changes proactively if they are beneficial.

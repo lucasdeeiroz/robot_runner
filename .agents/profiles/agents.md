@@ -35,3 +35,6 @@ For IDEs that support dynamic rule injection based on file context (like Cursor 
 ## How to Use
 When prompting your AI, simply mention or attach the specific markdown file associated with its model to load the optimized context. For example:
 > *"@claude.md Please refactor the Inspector component to use virtualized lists."*
+
+## Continuous Improvement Task for All Agents
+At the end of every task requested by the user, the AI assistant MUST self-evaluate what was learned during the execution. The assistant must consider whether any `.agents/rules/` or `.agents/workflows/` need to be modified or created from scratch to prevent future mistakes or improve the efficiency of future AI agents working on this project. These changes should be implemented proactively if they are genuinely beneficial.
