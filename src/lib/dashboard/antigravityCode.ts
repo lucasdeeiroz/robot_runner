@@ -183,12 +183,7 @@ export async function generateRefinedTestCases(
         mappingContext = appMapping;
     } else if (Array.isArray(appMapping) && appMapping.length > 0) {
         mappingContext = "\n\nAPPLICATION MAPPING:\n";
-        appMapping.forEach(screen => {
-            mappingContext += `- Screen: "${screen.name}" (${screen.type})\n`;
-            screen.elements.forEach(el => {
-                mappingContext += `  * Element: "${el.name}" (Type: ${el.type})\n`;
-            });
-        });
+        mappingContext += formatExistingMaps(appMapping);
     }
 
     let promptString = "";

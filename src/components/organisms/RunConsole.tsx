@@ -98,6 +98,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
     const [aiStatus, setAiStatus] = useState<string>("");
     const [aiHistory, setAiHistory] = useState<string[]>([]);
     const [aiStepCount, setAiStepCount] = useState(0);
+    const pendingActionsRef = useRef<any[]>([]);
 
     const rawContainerRef = useRef<VirtuosoHandle>(null);
     const fancyContainerRef = useRef<HTMLDivElement>(null);
@@ -317,54 +318,82 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
         if (provider === 'openai' && !settings.openaiApiKey) return;
         if (provider === 'claude' && !settings.claudeApiKey) return;
 
-        setAiStatus(t('run_tab.console.ai_steps.dumping', { defaultValue: 'Dumping screen hierarchy...' }));
         try {
-            const xml = await invoke<string>("get_xml_dump", { deviceId: session.deviceUdid });
+            let currentAction: any = null;
+            let currentThought: string = "";
 
-            setAiStatus(t('run_tab.console.ai_steps.thinking', { defaultValue: 'AI is thinking...' }));
+            if (pendingActionsRef.current.length > 0) {
+                currentAction = pendingActionsRef.current.shift();
+                currentThought = "Executing next planned action.";
+                setAiStatus(t('run_tab.console.ai_steps.executing', { action: currentAction.details, defaultValue: `Executing: ${currentAction.details}` }));
+            } else {
+                setAiStatus(t('run_tab.console.ai_steps.dumping', { defaultValue: 'Dumping screen hierarchy...' }));
+                const xml = await invoke<string>("get_xml_dump", { deviceId: session.deviceUdid });
 
-            let response: gemini.AutonomousActionResponse = null as any;
-            const target = session.aiPrompt || session.testPath;
-            const lang = i18n.language;
+                setAiStatus(t('run_tab.console.ai_steps.thinking', { defaultValue: 'AI is thinking...' }));
 
-            // Attempt AI call with one retry
-            for (let attempt = 0; attempt < 2; attempt++) {
-                try {
-                    if (provider === 'gemini') {
-                        response = await gemini.generateAutonomousAction(xml, target, aiHistory, settings.geminiApiKey as string, settings.geminiModel || 'gemini-1.5-pro', lang);
-                    } else if (provider === 'openai') {
-                        response = await openai.generateAutonomousAction(xml, target, aiHistory, settings.openaiApiKey as string, settings.openaiModel || 'gpt-4o', lang);
-                    } else if (provider === 'claude') {
-                        response = await claude.generateAutonomousAction(xml, target, aiHistory, settings.claudeApiKey as string, settings.claudeModel || 'claude-3-5-sonnet-latest', lang);
-                    } else if (provider === 'antigravity-cli') {
-                        response = await antigravityCode.generateAutonomousAction(xml, target, aiHistory, settings.paths.automationRoot || '', lang, undefined, settings.antigravityApiKey);
-                    } else if (provider === 'claude-code') {
-                        response = await claudeCli.generateAutonomousAction(xml, target, aiHistory, settings.paths.automationRoot || '', lang, undefined, settings.claudeCodeToken);
-                    } else {
-                        throw new Error(`Unsupported AI provider for Autonomous Agent: ${provider}`);
+                let response: gemini.AutonomousActionResponse = null as any;
+                const target = session.aiPrompt || session.testPath;
+                const lang = i18n.language;
+
+                // Attempt AI call with one retry
+                for (let attempt = 0; attempt < 2; attempt++) {
+                    try {
+                        if (provider === 'gemini') {
+                            response = await gemini.generateAutonomousAction(xml, target, aiHistory, settings.geminiApiKey as string, settings.geminiModel || 'gemini-1.5-pro', lang);
+                        } else if (provider === 'openai') {
+                            response = await openai.generateAutonomousAction(xml, target, aiHistory, settings.openaiApiKey as string, settings.openaiModel || 'gpt-4o', lang);
+                        } else if (provider === 'claude') {
+                            response = await claude.generateAutonomousAction(xml, target, aiHistory, settings.claudeApiKey as string, settings.claudeModel || 'claude-3-5-sonnet-latest', lang);
+                        } else if (provider === 'antigravity-cli') {
+                            response = await antigravityCode.generateAutonomousAction(xml, target, aiHistory, settings.paths.automationRoot || '', lang, undefined, settings.antigravityApiKey);
+                        } else if (provider === 'claude-code') {
+                            response = await claudeCli.generateAutonomousAction(xml, target, aiHistory, settings.paths.automationRoot || '', lang, undefined, settings.claudeCodeToken);
+                        } else {
+                            throw new Error(`Unsupported AI provider for Autonomous Agent: ${provider}`);
+                        }
+
+                        // Planner-Executor compatibility: support 'actions' array or fallback to 'action' object
+                        let parsedActions = response.actions;
+                        if (!parsedActions || parsedActions.length === 0) {
+                            if (response.action) {
+                                parsedActions = [response.action];
+                            }
+                        }
+                        
+                        if (parsedActions && parsedActions.length > 0) {
+                            pendingActionsRef.current = parsedActions;
+                            currentThought = response.thought || "AI generated a new action plan.";
+                            break; // Success, exit retry loop
+                        } else {
+                            throw new Error("Invalid format returned by AI for autonomous action");
+                        }
+                    } catch (e: any) {
+                        if (attempt === 1) {
+                            throw e; // Rethrow on the last attempt
+                        }
+                        console.warn(`AI Autonomous Action attempt ${attempt + 1} failed, retrying...`, e);
                     }
-                    
-                    if (response && response.action) {
-                        break; // Success, exit retry loop
-                    } else {
-                        throw new Error("Invalid format returned by AI for autonomous action");
-                    }
-                } catch (e: any) {
-                    if (attempt === 1) {
-                        throw e; // Rethrow on the last attempt
-                    }
-                    console.warn(`AI Autonomous Action attempt ${attempt + 1} failed, retrying...`, e);
+                }
+
+                if (pendingActionsRef.current.length > 0) {
+                    currentAction = pendingActionsRef.current.shift();
                 }
             }
 
-            const actionDesc = `[Step ${aiStepCount + 1}] ${response.action.type.toUpperCase()}: ${response.action.details}`;
+            if (!currentAction) {
+                throw new Error("Failed to retrieve or parse autonomous action plan");
+            }
+
+            const actionDesc = `[Step ${aiStepCount + 1}] ${currentAction.type.toUpperCase()}: ${currentAction.details}`;
             setAiHistory(prev => [...prev, actionDesc]);
             setAiStepCount(prev => prev + 1);
 
-            addSessionLog(runId, `[AI Agent] Thought: ${response.thought}`);
-            addSessionLog(runId, `[AI Agent] Action: ${response.action.details}`);
+            addSessionLog(runId, `[AI Agent] Thought: ${currentThought}`);
+            addSessionLog(runId, `[AI Agent] Action: ${currentAction.details}`);
 
-            if (response.action.type === 'finish') {
+            if (currentAction.type === 'finish') {
+                pendingActionsRef.current = []; // Clear queue
                 setIsAiLoopActive(false);
                 setAiStatus(t('run_tab.console.ai_steps.finished', { defaultValue: 'Goal completed successfully!' }));
                 addSessionLog(runId, `[System] AI Agent mission completed.`);
@@ -372,18 +401,19 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                 return;
             }
 
-            if (response.action.type === 'fail') {
+            if (currentAction.type === 'fail') {
+                pendingActionsRef.current = []; // Clear queue
                 setIsAiLoopActive(false);
                 setAiStatus(t('run_tab.console.ai_steps.failed', { defaultValue: 'AI Agent failed to complete the goal.' }));
-                addSessionLog(runId, `[Error] AI Agent aborted: ${response.action.details}`);
+                addSessionLog(runId, `[Error] AI Agent aborted: ${currentAction.details}`);
                 markSessionFinished(runId, '1');
                 return;
             }
 
-            if (response.action.command) {
-                setAiStatus(t('run_tab.console.ai_steps.executing', { action: response.action.details, defaultValue: `Executing: ${response.action.details}` }));
+            if (currentAction.command) {
+                setAiStatus(t('run_tab.console.ai_steps.executing', { action: currentAction.details, defaultValue: `Executing: ${currentAction.details}` }));
 
-                const rawCommand = response.action.command.trim();
+                const rawCommand = currentAction.command.trim();
                 const parsedArgs = parseCommandArgs(rawCommand);
                 let args = [...parsedArgs];
                 if (args[0] === 'adb') args = args.slice(1);
@@ -393,7 +423,11 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                 }
                 await invoke("run_adb_command", { device: session.deviceUdid, args });
                 addSessionLog(runId, `[ADB] Executed: adb -s ${session.deviceUdid} ${args.join(' ')}`);
-            } else if (response.action.type === 'wait') {
+                
+                // If there are more actions in queue, use a very short delay, otherwise standard wait
+                const waitTime = pendingActionsRef.current.length > 0 ? 500 : 2000;
+                await new Promise(r => setTimeout(r, waitTime));
+            } else if (currentAction.type === 'wait') {
                 setAiStatus(t('run_tab.console.ai_steps.waiting', { defaultValue: 'Waiting for transition...' }));
                 await new Promise(r => setTimeout(r, 2000));
             }

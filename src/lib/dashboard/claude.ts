@@ -65,12 +65,7 @@ export async function generateRefinedTestCases(
         mappingContext = appMapping;
     } else if (Array.isArray(appMapping) && appMapping.length > 0) {
         mappingContext = "\n\nAPPLICATION MAPPING (Use these element names and types for precision):\n";
-        appMapping.forEach(screen => {
-            mappingContext += `- Screen: "${screen.name}" (${screen.type})\n`;
-            screen.elements.forEach(el => {
-                mappingContext += `  * Element: "${el.name}" (Type: ${el.type})\n`;
-            });
-        });
+        mappingContext += formatExistingMaps(appMapping);
     }
 
     let promptString = "";
@@ -247,12 +242,7 @@ export async function suggestElementName(
         mappingContext = appMapping;
     } else if (Array.isArray(appMapping) && appMapping.length > 0) {
         mappingContext = "\n\nAPPLICATION MAPPING (Context of other screens for naming consistency):\n";
-        appMapping.forEach(screen => {
-            mappingContext += `- Screen: "${screen.name}"\n`;
-            screen.elements.forEach(el => {
-                mappingContext += `  * Element: "${el.name}" (Type: ${el.type})\n`;
-            });
-        });
+        mappingContext += formatExistingMaps(appMapping);
     }
 
     const prompt = getElementNamingPrompt(screenName, elementAttr, language, mappingContext, customPrompt);

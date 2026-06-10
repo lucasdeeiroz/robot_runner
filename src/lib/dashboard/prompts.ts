@@ -24,6 +24,9 @@ export function formatExistingMaps(maps: ScreenMap[]): string {
     if (m.elements.length > 0) {
       const elementSummaries = m.elements.map(el => {
         let summary = `    · ${el.name} [${el.type}]`;
+        if (el.assertion_target) summary += ` (Assert Target)`;
+        if (el.expected_data) summary += ` (Mock: ${el.expected_data})`;
+        if (el.business_rule) summary += ` (Rule: ${el.business_rule})`;
         // Show navigation destinations
         if (el.navigates_to) {
           const dest = typeof el.navigates_to === 'string'
@@ -132,7 +135,10 @@ RULES:
        Given [preconditions and state]
        When [actions executed by the user]
        Then [expected results and state verifications]
-3. Map actions and verifications to the mapped elements in the APPLICATION MAPPING context where applicable. For example, if a requirement mentions clicking log in, and "Login Button" is a mapped element, use: "When the user clicks the "Login Button" on the "Login Screen"".
+3. Map actions and verifications to the mapped elements in the APPLICATION MAPPING context where applicable. 
+   - If an element is an "(Assert Target)", ensure there is a "Then" step verifying its presence or correctness.
+   - If an element specifies "(Mock: data)", use that exact data in your "When" inputs.
+   - If an element specifies "(Rule: id)", append that ID to the scenario or steps for traceability.
 4. Write at least one Happy Path and one Edge Case/Sad Path per feature.
 5. Keep scenarios atomic, independent, and clear.
 `.trim();
@@ -207,6 +213,9 @@ RULES:
 5. Implement those keywords in *** Keywords ***. Use variables for dynamic arguments (e.g. \${username}).
 6. Reference the locators declared in *** Variables *** inside high-level keywords (e.g., Click Element  \${LOGIN_SCREEN_LOGIN_BUTTON}).
 7. Prioritize using element locators from the provided APPLICATION MAPPING context where applicable.
+   - For elements marked as "(Assert Target)", ALWAYS generate a "Wait Until Page Contains Element" or similar validation keyword.
+   - For elements marked with "(Mock: data)", use that mock data as the default variable value in the script.
+   - For elements marked with "(Rule: id)", add a \`[Tags] rule_id\` to the test case.
 8. Ensure the script is valid and follows best practices for mobile automation.
 `.trim();
   const languageDirective = `Language: ${language}.`;
@@ -427,7 +436,7 @@ ${mappingContext}
  */
 export function getAutonomousAgentPrompt(language: string, customPrompt?: string): string {
   const basePrompt = getRemoteString('prompt_autonomous_agent') || `
-# Role: Autonomous Mobile QA Agent
+# Role: Autonomous Mobile QA Agent Planner
 Your goal is to execute a test scenario step-by-step on a real device.
 
 ## Input Context
@@ -437,8 +446,8 @@ Your goal is to execute a test scenario step-by-step on a real device.
 
 ## Core Directives
 1. **Analyze**: Find the elements needed to fulfill the next step of the scenario in the XML dump.
-2. **Execute**: Choose the single best ADB command to progress towards the goal.
-3. **Report**: Explain why you chose this action.
+2. **Plan & Execute**: Generate a list of deterministic ADB commands to progress towards the goal. You may group multiple sequential actions (like typing text then clicking submit) to save time, as long as they are predictable and don't require checking the screen state between them.
+3. **Report**: Explain why you chose this plan.
 
 ## Action Rules
 - **click**: Use 'adb shell input tap X Y'. Extract coordinates from the XML dump (bounds="[x1,y1][x2,y2]").
@@ -451,12 +460,14 @@ Your goal is to execute a test scenario step-by-step on a real device.
 
 ## Response Format (Strict JSON)
 {
-  "thought": "Brief analysis of the current screen. Identify the next logical step to fulfill the target scenario.",
-  "action": {
-    "type": "click|type|swipe|back|wait|finish|fail",
-    "command": "adb shell input ...",
-    "details": "Concise description of what this command does (e.g., 'Clicking the Login button')."
-  },
+  "thought": "Brief analysis of the current screen. Identify the next logical steps to fulfill the target scenario.",
+  "actions": [
+    {
+      "type": "click|type|swipe|back|wait|finish|fail",
+      "command": "adb shell input ...",
+      "details": "Concise description of what this command does (e.g., 'Clicking the Login button')."
+    }
+  ],
   "isStepCompleted": boolean,
   "nextExpectedState": "Describe what you expect to see on the screen next."
 }

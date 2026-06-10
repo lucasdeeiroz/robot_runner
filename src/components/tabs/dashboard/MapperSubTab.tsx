@@ -17,12 +17,14 @@ import { Select } from "@/components/atoms/Select";
 import { TagInput } from "@/components/atoms/TagInput";
 import { Input } from "@/components/atoms/Input";
 import { Textarea } from "@/components/atoms/Textarea";
+import { Switch } from "@/components/atoms/Switch";
 import { UIElementType, UIElementMap, ScreenMap, NavigationData } from '@/lib/types';
 import { saveScreenMap, loadScreenMap, listScreenMaps, deleteScreenMap, exportMapperData, importMapperData } from '@/lib/dashboard/mapperPersistence';
 import { useSettings } from '@/lib/settings';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { ConfirmationModal } from '@/components/organisms/ConfirmationModal';
 import { FlowchartModal } from '@/components/organisms/FlowchartModal';
+import { generateTestLinkXML, generateRobotBDD, generateFlows } from '@/lib/dashboard/flowGenerator';
 import { Button } from '@/components/atoms/Button';
 import { SegmentedControl } from '@/components/molecules/SegmentedControl';
 import { GroupedScreenSelect } from '@/components/molecules/GroupedScreenSelect';
@@ -618,11 +620,15 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         setIsExploring(false);
         isExploringRef.current = false;
 
-        if (reason) {
-            explorerRef.current?.addLog(t('mapper.exploration.stopped_reason', { reason }), 'stopped');
-            setExplorationLogs(explorerRef.current?.getLogs() || []);
-            feedback.toast.info(t('mapper.exploration.stopped', { reason }));
+        if (explorerRef.current) {
+            explorerRef.current.addLog(t('mapper.exploration.stopped', { reason }), "stopped");
+            setExplorationLogs([...explorerRef.current.getLogs()]);
+            explorerRef.current = null;
         }
+
+        // Trigger cleanup to merge Screen_[hash] into actual screens
+        // We use a timeout to let the state settle
+        setTimeout(() => cleanupAndMergeScreens(savedMaps), 0);
     };
 
     const runExplorationStep = async () => {
@@ -739,39 +745,123 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             }).slice(-15); // Limit to last 15 screens to provide enough context without blowing up prompt size
 
             let result: any = null;
+            let useAiFallback = false;
+            
+            const heuristicScreenTemp = explorer.generateHeuristicScreenMap(root);
+            
+            const previousNav = explorer.getPreviousNavigation();
+            // Swipe Screen Merging logic: if the previous action was a swipe, force the generated heuristic
+            // screen to use the exact same name as the previous screen, so elements get appended naturally.
+            if (previousNav && previousNav.actionType === 'swipe' && previousNav.screenName) {
+                heuristicScreenTemp.name = previousNav.screenName;
+                heuristicScreenTemp.id = previousNav.screenName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+            } else if (heuristicScreenTemp.elements.length > 0) {
+                // Similarity-based Screen Merging
+                let bestMatch: { name: string, id: string, score: number } | null = null;
+                const currentIds = new Set(heuristicScreenTemp.elements.map(e => e.id));
+                
+                for (const existingMap of maps) {
+                    if (existingMap.name.startsWith('Screen_')) continue; // Compare only with established screens
+                    
+                    const existingIds = new Set(existingMap.elements.map(e => e.id));
+                    let overlap = 0;
+                    currentIds.forEach(id => {
+                        if (existingIds.has(id)) overlap++;
+                    });
+                    
+                    // Similarity based on the larger map to ensure minor variations match
+                    const maxElements = Math.max(currentIds.size, existingIds.size);
+                    const similarity = maxElements > 0 ? overlap / maxElements : 0;
+                    
+                    // Threshold of 75% similarity to consider it the same screen
+                    if (similarity >= 0.75 && (!bestMatch || similarity > bestMatch.score)) {
+                        bestMatch = { name: existingMap.name, id: existingMap.id, score: similarity };
+                    }
+                }
 
-            // Attempt AI call with one retry on JSON parse failure
-            for (let attempt = 0; attempt < 2; attempt++) {
-                try {
-                    const customPrompt = explorationPromptRef.current;
-                    if (aiProvider === 'gemini') {
-                        result = await gemini.exploreScreen(simplifiedXml, screenshot || "", apiKey as string, model, lang, optimizedExplorationMaps as any, explorer.getFormattedLogs(), undefined, customPrompt);
-                    } else if (aiProvider === 'openai') {
-                        result = await openai.exploreScreen(simplifiedXml, screenshot || "", apiKey as string, model, lang, optimizedExplorationMaps as any, explorer.getFormattedLogs(), undefined, customPrompt);
-                    } else if (aiProvider === 'claude') {
-                        result = await claude.exploreScreen(simplifiedXml, screenshot || "", apiKey as string, model, lang, optimizedExplorationMaps as any, explorer.getFormattedLogs(), undefined, customPrompt);
-                    } else if (aiProvider === 'claude-code') {
-                        result = await claudeCli.exploreScreen(simplifiedXml, settings.paths.automationRoot || '', lang, optimizedExplorationMaps as any, explorer.getFormattedLogs(), customPrompt, settings.claudeCodeToken, explorer.getSessionId(), screenshot || undefined);
-                        if (result.session_id) {
-                            explorer.setSessionId(result.session_id);
-                        }
-                    } else if (aiProvider === 'antigravity-cli') {
-                        const { exploreScreen } = await import('@/lib/dashboard/antigravityCode');
-                        result = await exploreScreen(simplifiedXml, settings.paths.automationRoot || '', lang, optimizedExplorationMaps as any, explorer.getFormattedLogs(), customPrompt, settings.antigravityApiKey, explorer.getSessionId(), screenshot || undefined);
-                        if (result.session_id) {
-                            explorer.setSessionId(result.session_id);
+                if (bestMatch) {
+                    explorer.addLog(t('mapper.exploration.similarity_merge', { defaultValue: `Merged into "${bestMatch.name}" (Similarity: ${Math.round(bestMatch.score * 100)}%)` }), 'info');
+                    heuristicScreenTemp.name = bestMatch.name;
+                    heuristicScreenTemp.id = bestMatch.id;
+
+                    // Annotate the element that caused this minor variation
+                    if (previousNav && previousNav.actionType === 'click' && previousNav.targetId) {
+                        const existingMap = maps.find(m => m.id === bestMatch!.id);
+                        if (existingMap) {
+                            const triggerElement = existingMap.elements.find(e => e.id === previousNav.targetId);
+                            if (triggerElement) {
+                                const annotation = "Toggles UI state/visibility";
+                                if (!triggerElement.description?.includes(annotation)) {
+                                    triggerElement.description = triggerElement.description 
+                                        ? `${triggerElement.description} | ${annotation}`
+                                        : annotation;
+                                }
+                            }
                         }
                     }
-                    break; // Success
-                } catch (parseError: any) {
-                    if (attempt === 0 && parseError.message?.includes('JSON')) {
-                        explorer.addLog(t('mapper.exploration.malformed_json_retry', { error: parseError.message.substring(0, 80) }), 'error');
-                        setExplorationLogs([...explorer.getLogs()]);
-                        await new Promise(resolve => setTimeout(resolve, 2000));
-                        if (!isExploringRef.current) return;
-                        continue;
+                }
+            }
+            
+            // Check if we are looping/stuck
+            if (explorer.isScreenLooping(heuristicScreenTemp.name, 4)) {
+                useAiFallback = true;
+                explorer.addLog(t('mapper.exploration.heuristic_stuck', { defaultValue: 'Heuristic seems stuck. Falling back to AI for this step.' }), "warning");
+            }
+
+            if (!useAiFallback) {
+                const heuristicAction = explorer.determineHeuristicAction(root);
+                if (heuristicAction) {
+                    // Match AI format
+                    result = {
+                        screen: heuristicScreenTemp,
+                        elements: heuristicScreenTemp.elements.map(e => ({ id: e.id, name: e.name, type: e.type, shortId: e.id })),
+                        nextAction: heuristicAction,
+                        thought: 'Heuristic algorithm picked the next action.',
+                        rationale: 'Using code-first DFS algorithm to save tokens.',
+                        isHeuristic: true
+                    };
+                    explorer.addLog("DFS Algorithm generated the next step.", "info");
+                    // Minor artificial delay for UX
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                } else {
+                    useAiFallback = true;
+                }
+            }
+
+            if (useAiFallback) {
+                // Attempt AI call with one retry on JSON parse failure
+                for (let attempt = 0; attempt < 2; attempt++) {
+                    try {
+                        const customPrompt = explorationPromptRef.current;
+                        if (aiProvider === 'gemini') {
+                            result = await gemini.exploreScreen(simplifiedXml, screenshot || "", apiKey as string, model, lang, optimizedExplorationMaps as any, explorer.getFormattedLogs(), undefined, customPrompt);
+                        } else if (aiProvider === 'openai') {
+                            result = await openai.exploreScreen(simplifiedXml, screenshot || "", apiKey as string, model, lang, optimizedExplorationMaps as any, explorer.getFormattedLogs(), undefined, customPrompt);
+                        } else if (aiProvider === 'claude') {
+                            result = await claude.exploreScreen(simplifiedXml, screenshot || "", apiKey as string, model, lang, optimizedExplorationMaps as any, explorer.getFormattedLogs(), undefined, customPrompt);
+                        } else if (aiProvider === 'claude-code') {
+                            result = await claudeCli.exploreScreen(simplifiedXml, settings.paths.automationRoot || '', lang, optimizedExplorationMaps as any, explorer.getFormattedLogs(), customPrompt, settings.claudeCodeToken, explorer.getSessionId(), screenshot || undefined);
+                            if (result.session_id) {
+                                explorer.setSessionId(result.session_id);
+                            }
+                        } else if (aiProvider === 'antigravity-cli') {
+                            const { exploreScreen } = await import('@/lib/dashboard/antigravityCode');
+                            result = await exploreScreen(simplifiedXml, settings.paths.automationRoot || '', lang, optimizedExplorationMaps as any, explorer.getFormattedLogs(), customPrompt, settings.antigravityApiKey, explorer.getSessionId(), screenshot || undefined);
+                            if (result.session_id) {
+                                explorer.setSessionId(result.session_id);
+                            }
+                        }
+                        break; // Success
+                    } catch (parseError: any) {
+                        if (attempt === 0 && parseError.message?.includes('JSON')) {
+                            explorer.addLog(t('mapper.exploration.malformed_json_retry', { error: parseError.message.substring(0, 80) }), 'error');
+                            setExplorationLogs([...explorer.getLogs()]);
+                            await new Promise(resolve => setTimeout(resolve, 2000));
+                            if (!isExploringRef.current) return;
+                            continue;
+                        }
+                        throw parseError;
                     }
-                    throw parseError;
                 }
             }
 
@@ -779,7 +869,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             if (!result) throw new Error("AI returned no exploration result");
 
             // 3. Auto-Mapping
-            const aiScreen = result.screen;
+            const aiScreen = result.screen || { name: 'Unknown Screen', type: 'screen', elements: [] };
             // Use the shortIdMap from the backend to map context back to XPaths
             const aiElements = (result.elements || []).map((el: any) => {
                 const xpath = shortIdMap[el.id] || el.id;
@@ -797,6 +887,10 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 explorer.addThought(result.thought);
             }
             explorer.addLog(result.rationale, 'rationale');
+
+            if (explorer.getState().currentStep === 1 && aiScreen.name) {
+                explorer.setInitialScreenName(aiScreen.name);
+            }
 
             // Step 3: Back-update previous screen's element with navigates_to
             const prevNav = explorer.getPreviousNavigation();
@@ -940,11 +1034,18 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
             // 4. Loop Detection — force escape if a screen is visited too many times
             if (aiScreen.name) {
-                const next = result.nextAction as ExplorationAction;
+                const next = (result.nextAction || { type: 'back' }) as ExplorationAction;
                 const actionFingerprint = `${aiScreen.name}:${next.type}:${next.targetId || 'none'}`;
                 const visitCount = explorer.trackScreenVisit(aiScreen.name, actionFingerprint);
                 if (visitCount >= 4) {
                     explorer.addLog(t('mapper.exploration.loop_detected', { name: aiScreen.name, count: visitCount }), 'warning');
+                    
+                    if (aiScreen.name === explorer.getInitialScreenName()) {
+                        explorer.addLog(t('mapper.exploration.cannot_go_back_from_root', { defaultValue: 'Preventing back action on initial screen to avoid app exit.' }), 'info');
+                        stopExploration("Finished (Root screen fully explored)");
+                        return;
+                    }
+
                     await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'keyevent', '4'] });
 
                     if (!isExploringRef.current) return;
@@ -955,12 +1056,17 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             }
 
             // 5. Navigation
-            const next = result.nextAction as ExplorationAction;
+            const next = (result.nextAction || { type: 'back' }) as ExplorationAction;
             if (next.type === 'finish') {
                 explorer.addLog(t('mapper.exploration.finished'), 'finished');
                 stopExploration("Finished");
                 return;
             } else if (next.type === 'back') {
+                if (aiScreen.name === explorer.getInitialScreenName()) {
+                    explorer.addLog(t('mapper.exploration.cannot_go_back_from_root', { defaultValue: 'Preventing back action on initial screen to avoid app exit.' }), 'info');
+                    stopExploration("Finished (Root screen fully explored)");
+                    return;
+                }
                 explorer.addLog(t('mapper.exploration.navigating_back'), 'action');
                 explorer.resetSwipeCount();
                 explorer.clearPreviousNavigation();
@@ -971,6 +1077,9 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
                 let targetNode: InspectorNode | null = null;
                 const xpath = shortIdMap[next.targetId] || next.targetId;
+                
+                // CRITICAL: Mark element as visited so DFS doesn't click it again infinitely
+                explorer.markElementVisited(xpath);
 
                 // Priority 1: Label-based search
                 const aiElement = aiScreen.elements?.find((el: any) => (el.shortId || el.id) === next.targetId);
@@ -1000,6 +1109,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             } else if (next.type === 'swipe') {
                 const swipeDirection = next.direction || 'down';
                 const currentSwipes = explorer.getConsecutiveSwipes();
+                const previousNav = explorer.getPreviousNavigation();
 
                 if (currentSwipes >= 10) {
                     explorer.addLog(t('mapper.exploration.swipe_limit_reached'), 'error');
@@ -1039,10 +1149,10 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                         endX = startX;
 
                         const padding = Math.round(h * 0.15); // 15% padding
-                        if (swipeDirection === 'up') { // Swipe up (gesture bottom-to-top) = Scroll down
+                        if (swipeDirection === 'down') { // AI means "Scroll down" = Swipe up (gesture bottom-to-top)
                             startY = Math.round(y + h - padding);
                             endY = Math.round(y + padding);
-                        } else if (swipeDirection === 'down') { // Swipe down (gesture top-to-bottom) = Scroll up
+                        } else if (swipeDirection === 'up') { // AI means "Scroll up" = Swipe down (gesture top-to-bottom)
                             startY = Math.round(y + padding);
                             endY = Math.round(y + h - padding);
                         } else if (swipeDirection === 'left') {
@@ -1062,10 +1172,33 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                         device: selectedDevice,
                         args: ['shell', 'input', 'swipe', String(startX), String(startY), String(endX), String(endY), "500"]
                     });
+                    explorer.setPreviousNavigation(aiScreen.name, undefined, 'swipe');
                 }
             } else if (next.type === 'type_text' && next.targetId && next.text) {
                 explorer.addLog(t('mapper.exploration.typing_action', { targetId: next.targetId, text: next.text }), 'action');
-                // ... Implementation of type_text
+                
+                const xpath = shortIdMap[next.targetId] || next.targetId;
+                explorer.markElementVisited(xpath);
+                
+                const targetNode = findNodesByLocator(root, xpath)[0];
+                if (targetNode && targetNode.bounds) {
+                    // Tap to focus
+                    const centerX = Math.round(targetNode.bounds.x + targetNode.bounds.w / 2);
+                    const centerY = Math.round(targetNode.bounds.y + targetNode.bounds.h / 2);
+                    await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'tap', String(centerX), String(centerY)] });
+                    
+                    // Small delay to let keyboard appear
+                    await new Promise(r => setTimeout(r, 500));
+                    
+                    // Input text. Replace spaces with %s for adb
+                    const escapedText = next.text.replace(/ /g, '%s');
+                    await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'text', escapedText] });
+                    
+                    // Press Enter
+                    await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'keyevent', '66'] });
+                    
+                    explorer.setPreviousNavigation(aiScreen.name, xpath, 'type_text');
+                }
             }
 
             if (!isExploringRef.current) return;
@@ -1080,6 +1213,51 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                     ? String(error.message)
                     : String(error);
             stopExploration(`Error: ${reason}`);
+        }
+    };
+
+    const cleanupAndMergeScreens = async (currentMaps: ScreenMap[]) => {
+        // Iterate and try to merge temporary Screen_[hash] into AI named screens
+        const finalMaps = [...currentMaps];
+        let mergedAny = false;
+
+        for (let i = finalMaps.length - 1; i >= 0; i--) {
+            const screen = finalMaps[i];
+            if (screen.name.startsWith('Screen_')) {
+                // Find a potential AI screen that shares a high percentage of elements
+                const hashElementIds = new Set(screen.elements.map(e => e.id));
+                
+                for (const potentialAiScreen of finalMaps) {
+                    if (potentialAiScreen.name.startsWith('Screen_') || potentialAiScreen.id === screen.id) continue;
+                    
+                    const aiElementIds = new Set(potentialAiScreen.elements.map(e => e.id));
+                    let overlap = 0;
+                    hashElementIds.forEach(id => {
+                        if (aiElementIds.has(id)) overlap++;
+                    });
+                    
+                    // If >= 30% of the hash screen elements exist in the AI screen, assume they are the same
+                    if (overlap > 0 && overlap / hashElementIds.size >= 0.3) {
+                        // Merge elements
+                        const newElements = screen.elements.filter(e => !aiElementIds.has(e.id));
+                        potentialAiScreen.elements = [...potentialAiScreen.elements, ...newElements];
+                        
+                        await saveScreenMap(activeProfileId, potentialAiScreen, settings.paths?.mappings);
+                        await deleteScreenMap(activeProfileId, screen.id, settings.paths?.mappings);
+
+                        // Delete the hash screen from local copy
+                        finalMaps.splice(i, 1);
+                        mergedAny = true;
+                        
+                        explorerRef.current?.addLog(`Merged temporary screen "${screen.name}" into AI screen "${potentialAiScreen.name}"`, "info");
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (mergedAny) {
+            loadSavedMaps();
         }
     };
 
@@ -1513,6 +1691,58 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                     <FileClock size={16} /> {t('mapper.saved_elements')}
                                                 </Button>
 
+                                                <div className="flex bg-surface-variant p-1 rounded-2xl">
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        className="text-xs px-3 py-1.5 min-h-[32px] rounded-xl text-on-surface hover:bg-surface flex items-center gap-2"
+                                                        onClick={async () => {
+                                                            try {
+                                                                const maps = await listScreenMaps(activeProfileId, customDir || undefined);
+                                                                const flows = generateFlows(maps);
+                                                                if (flows.length === 0) {
+                                                                    explorer.addLog(t('mapper.export.no_flows_found', { defaultValue: 'No connected paths found. Connect screens via "navigates_to" first.' }), "warning");
+                                                                    return;
+                                                                }
+                                                                
+                                                                const xmlData = generateTestLinkXML(flows);
+                                                                const bddData = generateRobotBDD(flows);
+                                                                
+                                                                await exportMapperData(activeProfileId, customDir || undefined); // Keeping the standard export for maps too if needed
+                                                                
+                                                                const savePathXML = await save({
+                                                                    title: t('mapper.export.save_testlink_xml', { defaultValue: 'Save TestLink Flows (XML)' }),
+                                                                    filters: [{ name: 'XML', extensions: ['xml'] }],
+                                                                    defaultPath: 'flows.xml'
+                                                                });
+
+                                                                if (savePathXML) {
+                                                                    const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+                                                                    await writeTextFile(savePathXML, xmlData);
+                                                                    explorer.addLog(t('mapper.export.flows_success', { defaultValue: 'TestLink XML exported successfully.' }), "success");
+                                                                }
+                                                                
+                                                                const savePathBDD = await save({
+                                                                    title: t('mapper.export.save_robot_bdd', { defaultValue: 'Save Robot Framework BDD' }),
+                                                                    filters: [{ name: 'Robot', extensions: ['robot'] }],
+                                                                    defaultPath: 'flows.robot'
+                                                                });
+
+                                                                if (savePathBDD) {
+                                                                    const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+                                                                    await writeTextFile(savePathBDD, bddData);
+                                                                    explorer.addLog(t('mapper.export.flows_success', { defaultValue: 'Robot BDD exported successfully.' }), "success");
+                                                                }
+
+                                                            } catch (err: any) {
+                                                                explorer.addLog(t('mapper.export.error', { error: err.message }), "error");
+                                                            }
+                                                        }}
+                                                    >
+                                                        <Download size={14} />
+                                                        {t('mapper.export.flows', { defaultValue: 'Export Flows' })}
+                                                    </Button>
+                                                </div>
+
                                                 {showElementsMenu && (
                                                     <div className="absolute top-full right-0 mt-2 w-80 bg-surface rounded-xl shadow-xl border border-outline-variant/30 overflow-hidden z-[100] flex flex-col max-h-100">
                                                         <div className="p-2 border-b border-outline-variant/30 bg-surface-variant/5 flex flex-col gap-2">
@@ -1809,6 +2039,45 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                             />
                                                         </div>
 
+                                                        {/* AI & QA Fields */}
+                                                        <div className="mt-6 border-t border-surface-variant pt-4">
+                                                            <div className="flex items-center gap-2 mb-4 cursor-pointer" onClick={() => updateElement('assertion_target', !currentElement.assertion_target)}>
+                                                                <Switch 
+                                                                    checked={!!currentElement.assertion_target} 
+                                                                    onCheckedChange={(c) => updateElement('assertion_target', c)} 
+                                                                />
+                                                                <span className="text-sm font-medium text-on-surface">Assertion Target <span className="opacity-50 text-xs ml-1">(Verifies screen load)</span></span>
+                                                            </div>
+                                                            <div className="grid grid-cols-2 gap-4">
+                                                                <Input
+                                                                    label="Expected Data (Mocks)"
+                                                                    value={currentElement.expected_data || ''}
+                                                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateElement('expected_data', e.target.value)}
+                                                                    placeholder="e.g. Email, CEP"
+                                                                />
+                                                                <Select
+                                                                    label="Suggested Interaction"
+                                                                    value={currentElement.suggested_interaction || ''}
+                                                                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => updateElement('suggested_interaction', e.target.value)}
+                                                                    options={[
+                                                                        { label: 'Auto (Guessed)', value: '' },
+                                                                        { label: 'Tap', value: 'tap' },
+                                                                        { label: 'Swipe', value: 'swipe' },
+                                                                        { label: 'Long Press', value: 'long_press' },
+                                                                        { label: 'Type Text', value: 'type' },
+                                                                    ]}
+                                                                />
+                                                            </div>
+                                                            <div className="mt-4">
+                                                                <Input
+                                                                    label="Business Rule (TestLink ID)"
+                                                                    value={currentElement.business_rule || ''}
+                                                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateElement('business_rule', e.target.value)}
+                                                                    placeholder="e.g. REQ-102"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        
                                                         {/* Complex Fields */}
                                                         {currentElement.type === 'menu' && (
                                                             <Textarea
