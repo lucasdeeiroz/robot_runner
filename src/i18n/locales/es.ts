@@ -232,6 +232,9 @@ export const es = {
             }
         },
         common: {
+            start: "Iniciar",
+            pause: "Pausar",
+            reset: "Reiniciar",
             loading_taking_too_long: "La carga está tardando más de lo esperado...",
             continue_anyway: "Continuar de todos modos",
             refresh: "Actualizar",

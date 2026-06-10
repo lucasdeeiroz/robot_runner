@@ -232,6 +232,9 @@ export const en = {
             }
         },
         common: {
+            start: "Start",
+            pause: "Pause",
+            reset: "Reset",
             loading_taking_too_long: "Loading is taking longer than expected...",
             continue_anyway: "Continue anyway",
             refresh: "Refresh",

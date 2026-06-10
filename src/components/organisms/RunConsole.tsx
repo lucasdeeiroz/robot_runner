@@ -517,6 +517,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                             <div className="h-3 w-[1px] bg-primary/20 mx-1" />
                             <span className="text-[10px] text-on-surface-variant/70 font-medium">{aiStatus || 'Initializing...'}</span>
                             <Button
+                                variant="ghost"
                                 onClick={() => setIsAiLoopActive(!isAiLoopActive)}
                                 className={clsx(
                                     "ml-2 p-1 rounded-md transition-all hover:scale-110",

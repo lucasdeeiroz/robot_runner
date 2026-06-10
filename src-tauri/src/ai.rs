@@ -246,6 +246,28 @@ pub async fn call_antigravity_cli(
         }
     }
 
+    // Windows cmd.exe has a hard limit of 8191 characters for command line arguments.
+    // Since 'agy' is a .cmd script on Windows, any prompt exceeding this limit will cause 'os error 206'.
+    // We bypass this by writing large prompts to a temporary file and asking the CLI to read it.
+    let prompt_to_pass = if full_prompt.len() > 7500 {
+        let temp_dir = std::env::temp_dir();
+        let timestamp = chrono::Local::now().timestamp_micros();
+        let file_name = format!("agy_prompt_{}.txt", timestamp);
+        let file_path = temp_dir.join(file_name);
+        
+        match std::fs::write(&file_path, &full_prompt) {
+            Ok(_) => {
+                format!(
+                    "Read the text file at '{}' using your file reading tools. It contains the system instructions and the user query you must execute. Respond directly with the requested output format and nothing else.",
+                    file_path.to_string_lossy()
+                )
+            },
+            Err(_) => full_prompt // fallback
+        }
+    } else {
+        full_prompt
+    };
+
     #[cfg(target_os = "windows")]
     let mut command = crate::cmd_utils::new_tokio_command("agy");
     #[cfg(not(target_os = "windows"))]
@@ -253,7 +275,7 @@ pub async fn call_antigravity_cli(
 
     // Headless/Programmatic mode
     command.arg("--print");
-    command.arg(&full_prompt);
+    command.arg(&prompt_to_pass);
     command.arg("--dangerously-skip-permissions");
 
     // Session Continuity

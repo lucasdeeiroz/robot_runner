@@ -698,6 +698,19 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             let maps = await loadSavedMaps();
             if (!isExploringRef.current) return;
 
+            // OPTIMIZATION 2: DRASTIC context reduction for exploration maps as well
+            const optimizedExplorationMaps = maps.map(m => {
+                const isCurrentScreen = explorer.getPreviousNavigation()?.screenName === m.name;
+                return {
+                    name: m.name,
+                    type: m.type,
+                    description: m.description,
+                    elements: isCurrentScreen
+                        ? m.elements.map(e => ({ name: e.name, type: e.type, navigates_to: e.navigates_to }))
+                        : [] // Don't send elements of other screens to save hundreds of tokens
+                };
+            }).slice(-15); // Limit to last 15 screens to provide enough context without blowing up prompt size
+
             let result: any = null;
 
             // Attempt AI call with one retry on JSON parse failure
@@ -705,19 +718,19 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 try {
                     const customPrompt = explorationPromptRef.current;
                     if (aiProvider === 'gemini') {
-                        result = await gemini.exploreScreen(simplifiedXml, screenshot || "", apiKey as string, model, lang, maps, explorer.getFormattedLogs(), undefined, customPrompt);
+                        result = await gemini.exploreScreen(simplifiedXml, screenshot || "", apiKey as string, model, lang, optimizedExplorationMaps as any, explorer.getFormattedLogs(), undefined, customPrompt);
                     } else if (aiProvider === 'openai') {
-                        result = await openai.exploreScreen(simplifiedXml, screenshot || "", apiKey as string, model, lang, maps, explorer.getFormattedLogs(), undefined, customPrompt);
+                        result = await openai.exploreScreen(simplifiedXml, screenshot || "", apiKey as string, model, lang, optimizedExplorationMaps as any, explorer.getFormattedLogs(), undefined, customPrompt);
                     } else if (aiProvider === 'claude') {
-                        result = await claude.exploreScreen(simplifiedXml, screenshot || "", apiKey as string, model, lang, maps, explorer.getFormattedLogs(), undefined, customPrompt);
+                        result = await claude.exploreScreen(simplifiedXml, screenshot || "", apiKey as string, model, lang, optimizedExplorationMaps as any, explorer.getFormattedLogs(), undefined, customPrompt);
                     } else if (aiProvider === 'claude-code') {
-                        result = await claudeCli.exploreScreen(simplifiedXml, settings.paths.automationRoot || '', lang, maps, explorer.getFormattedLogs(), customPrompt, settings.claudeCodeToken, explorer.getSessionId(), screenshot || undefined);
+                        result = await claudeCli.exploreScreen(simplifiedXml, settings.paths.automationRoot || '', lang, optimizedExplorationMaps as any, explorer.getFormattedLogs(), customPrompt, settings.claudeCodeToken, explorer.getSessionId(), screenshot || undefined);
                         if (result.session_id) {
                             explorer.setSessionId(result.session_id);
                         }
                     } else if (aiProvider === 'antigravity-cli') {
                         const { exploreScreen } = await import('@/lib/dashboard/antigravityCode');
-                        result = await exploreScreen(simplifiedXml, settings.paths.automationRoot || '', lang, maps, explorer.getFormattedLogs(), customPrompt, settings.antigravityApiKey, explorer.getSessionId(), screenshot || undefined);
+                        result = await exploreScreen(simplifiedXml, settings.paths.automationRoot || '', lang, optimizedExplorationMaps as any, explorer.getFormattedLogs(), customPrompt, settings.antigravityApiKey, explorer.getSessionId(), screenshot || undefined);
                         if (result.session_id) {
                             explorer.setSessionId(result.session_id);
                         }
@@ -1872,6 +1885,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                 onClick={toggleStayOn}
                                 className={clsx("flex items-center gap-2 px-3 py-1.5 rounded-2xl transition-all", isStayOn ? "bg-warning/20 text-warning" : "text-on-surface-variant/60 hover:bg-surface-variant/30")}
                                 title={t('mapper.action.toggle_stay_awake')}
+                                data-position='left'
                             >
                                 {isStayOn ? <Eye size={16} stroke="currentColor" /> : <EyeClosed size={16} stroke="currentColor" />}
                             </Button>
