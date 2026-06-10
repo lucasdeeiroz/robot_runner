@@ -1697,17 +1697,17 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                         className="text-xs px-3 py-1.5 min-h-[32px] rounded-xl text-on-surface hover:bg-surface flex items-center gap-2"
                                                         onClick={async () => {
                                                             try {
-                                                                const maps = await listScreenMaps(activeProfileId, customDir || undefined);
+                                                                const maps = await listScreenMaps(activeProfileId, settings.paths?.mappings);
                                                                 const flows = generateFlows(maps);
                                                                 if (flows.length === 0) {
-                                                                    explorer.addLog(t('mapper.export.no_flows_found', { defaultValue: 'No connected paths found. Connect screens via "navigates_to" first.' }), "warning");
+                                                                    feedback.toast.info(t('mapper.export.no_flows_found', { defaultValue: 'No connected paths found. Connect screens via "navigates_to" first.' }));
                                                                     return;
                                                                 }
                                                                 
                                                                 const xmlData = generateTestLinkXML(flows);
                                                                 const bddData = generateRobotBDD(flows);
                                                                 
-                                                                await exportMapperData(activeProfileId, customDir || undefined); // Keeping the standard export for maps too if needed
+                                                                await exportMapperData(activeProfileId, settings.paths?.mappings); // Keeping the standard export for maps too if needed
                                                                 
                                                                 const savePathXML = await save({
                                                                     title: t('mapper.export.save_testlink_xml', { defaultValue: 'Save TestLink Flows (XML)' }),
@@ -1718,7 +1718,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                                 if (savePathXML) {
                                                                     const { writeTextFile } = await import('@tauri-apps/plugin-fs');
                                                                     await writeTextFile(savePathXML, xmlData);
-                                                                    explorer.addLog(t('mapper.export.flows_success', { defaultValue: 'TestLink XML exported successfully.' }), "success");
+                                                                    feedback.toast.success(t('mapper.export.flows_success', { defaultValue: 'TestLink XML exported successfully.' }));
                                                                 }
                                                                 
                                                                 const savePathBDD = await save({
@@ -1730,11 +1730,11 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                                 if (savePathBDD) {
                                                                     const { writeTextFile } = await import('@tauri-apps/plugin-fs');
                                                                     await writeTextFile(savePathBDD, bddData);
-                                                                    explorer.addLog(t('mapper.export.flows_success', { defaultValue: 'Robot BDD exported successfully.' }), "success");
+                                                                    feedback.toast.success(t('mapper.export.flows_success', { defaultValue: 'Robot BDD exported successfully.' }));
                                                                 }
 
                                                             } catch (err: any) {
-                                                                explorer.addLog(t('mapper.export.error', { error: err.message }), "error");
+                                                                feedback.toast.error(t('mapper.export.error', { error: err.message }));
                                                             }
                                                         }}
                                                     >

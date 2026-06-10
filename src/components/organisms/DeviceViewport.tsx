@@ -474,7 +474,6 @@ export const DeviceViewport: React.FC<DeviceViewportProps> = ({
 
             <div
                 className="relative inline-block overflow-hidden rounded-lg shadow border border-outline-variant/10 bg-surface"
-                style={{ width: imgLayout?.width, height: imgLayout?.height }}
             >
                 {screenshot ? (
                     <img
