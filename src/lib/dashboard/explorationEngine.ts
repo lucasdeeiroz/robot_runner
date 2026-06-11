@@ -1,5 +1,18 @@
 import { ScreenMap, UIElementMap } from '@/lib/types';
 import { InspectorNode, generateXPath } from '@/lib/inspectorUtils';
+
+export interface ExplorationConfig {
+    priorityKeywords: string[];
+    avoidKeywords: string[];
+    revisitKnownScreens: boolean;
+}
+
+export const DEFAULT_EXPLORATION_CONFIG: ExplorationConfig = {
+    priorityKeywords: [],
+    avoidKeywords: [],
+    revisitKnownScreens: false,
+};
+
 export interface ExplorationState {
     visitedScreens: string[]; // Screen names
     visitedElements: string[]; // Element IDs (XPath or Resource-ID)
@@ -18,6 +31,8 @@ export interface ExplorationState {
     previousActionTargetId?: string; // short_id of the element clicked on the previous screen
     previousActionType?: string; // type of action (click, etc.)
     sessionId?: string; // Session ID for Claude Code continuity
+    priorityKeywords: string[];
+    avoidKeywords: string[];
 }
 
 export interface ExplorationAction {
@@ -48,7 +63,12 @@ export class AutonomousExplorer {
     private state: ExplorationState;
     private t: (key: string, options?: any) => string;
 
-    constructor(t: (key: string, options?: any) => string, initialMaxSteps: number = 9999) {
+    constructor(
+        t: (key: string, options?: any) => string,
+        initialMaxSteps: number = 9999,
+        config?: ExplorationConfig,
+        knownScreens?: ScreenMap[]
+    ) {
         this.t = t;
         this.state = {
             visitedScreens: [],
@@ -60,7 +80,13 @@ export class AutonomousExplorer {
             consecutiveSwipes: 0,
             screenVisitCount: {},
             actionFingerprints: {},
+            priorityKeywords: config?.priorityKeywords ?? [],
+            avoidKeywords: config?.avoidKeywords ?? [],
         };
+
+        if (config && !config.revisitKnownScreens && knownScreens?.length) {
+            knownScreens.forEach(s => this.markScreenVisited(s.name));
+        }
     }
 
     public addLog(message: string, type: LogEntry['type'] = 'info', stepNumber?: number) {
@@ -222,50 +248,57 @@ export class AutonomousExplorer {
      * Finds the next unvisited interactive element on the screen using DFS.
      */
     public determineHeuristicAction(root: InspectorNode): ExplorationAction | null {
-        let unvisitedTarget: InspectorNode | null = null;
         const visited = this.state.visitedElements;
 
+        const staticBlockedTerms = ['back', 'navigate up', 'voltar', 'deletar', 'apagar', 'remover', 'excluir', 'delete', 'remove', 'eliminar', 'borrar'];
+        const allBlockedTerms = [...staticBlockedTerms, ...this.state.avoidKeywords.map(k => k.toLowerCase())];
+
+        const unvisitedTargets: InspectorNode[] = [];
+
         const traverse = (node: InspectorNode) => {
-            if (unvisitedTarget) return; // already found one
-            
-            const isInteractive = node.attributes['clickable'] === 'true' || 
-                                  node.attributes['checkable'] === 'true' || 
-                                  node.attributes['long-clickable'] === 'true' || 
+            const isInteractive = node.attributes['clickable'] === 'true' ||
+                                  node.attributes['checkable'] === 'true' ||
+                                  node.attributes['long-clickable'] === 'true' ||
                                   node.attributes['class']?.includes('EditText') ||
                                   (node.attributes['focusable'] === 'true' && (!!node.attributes['content-desc'] || !!node.attributes['text']));
-                                  
-            // Generate true XPath for the node since raw XML doesn't have short_id
+
             const xpath = generateXPath(node);
 
             if (isInteractive && xpath && !visited.includes(xpath)) {
-                // Heuristic: Avoid clicking 'Back', 'Navigate up', or elements with empty bounds that might crash
                 const text = (node.attributes['text'] || '').toLowerCase();
                 const desc = (node.attributes['content-desc'] || '').toLowerCase();
-                
-                const blockedTerms = ['back', 'navigate up', 'voltar', 'deletar', 'apagar', 'remover', 'excluir', 'delete', 'remove', 'eliminar', 'borrar'];
-                const hasBlockedTerm = blockedTerms.some(term => text.includes(term) || desc.includes(term));
-                
-                if (!hasBlockedTerm) {
-                    unvisitedTarget = node;
-                    return;
-                }
+                const hasBlockedTerm = allBlockedTerms.some(term => text.includes(term) || desc.includes(term));
+                if (!hasBlockedTerm) unvisitedTargets.push(node);
             }
 
-            // Continue DFS
             node.children.forEach(traverse);
         };
 
         traverse(root);
 
+        // Sort: priority elements first, DFS order preserved among ties
+        if (this.state.priorityKeywords.length > 0) {
+            const keywords = this.state.priorityKeywords.map(k => k.toLowerCase());
+            unvisitedTargets.sort((a, b) => {
+                const aText = ((a.attributes['text'] || '') + ' ' + (a.attributes['content-desc'] || '')).toLowerCase();
+                const bText = ((b.attributes['text'] || '') + ' ' + (b.attributes['content-desc'] || '')).toLowerCase();
+                const aPriority = keywords.some(k => aText.includes(k));
+                const bPriority = keywords.some(k => bText.includes(k));
+                return (aPriority === bPriority) ? 0 : aPriority ? -1 : 1;
+            });
+        }
+
+        const unvisitedTarget = unvisitedTargets[0] ?? null;
+
         if (unvisitedTarget) {
-            const xpath = generateXPath(unvisitedTarget as InspectorNode);
-            const isInput = (unvisitedTarget as InspectorNode).attributes['class']?.includes('EditText');
+            const xpath = generateXPath(unvisitedTarget);
+            const isInput = unvisitedTarget.attributes['class']?.includes('EditText');
 
             if (isInput) {
                 return {
                     type: 'type_text',
                     targetId: xpath,
-                    text: 'Test', // Default heuristic text
+                    text: 'Test',
                     details: 'Heuristic: type text into unvisited input'
                 };
             }
@@ -289,6 +322,14 @@ export class AutonomousExplorer {
         return {
             type: 'back',
             details: 'Heuristic: stuck, going back'
+        };
+    }
+
+    public getConfig(): ExplorationConfig {
+        return {
+            priorityKeywords: [...this.state.priorityKeywords],
+            avoidKeywords: [...this.state.avoidKeywords],
+            revisitKnownScreens: false,
         };
     }
 

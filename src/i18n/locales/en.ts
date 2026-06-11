@@ -867,6 +867,18 @@ export const en = {
                 back_updated: "Back-updated \"{{prev}}\" → element navigates to \"{{current}}\"",
                 merging_insights: "Merging AI insights into existing screen: \"{{name}}\" (ID: {{id}}, {{count}} elements)",
                 new_elements_discovered: "Added {{count}} new elements discovered by AI. Total: {{total}}",
+                analyzing_prompt: "Analyzing prompt...",
+            },
+            enhancer: {
+                title: "Audit & Enhance Maps",
+                description: "This tool will programmatically remove duplicates, standardize elements, and use AI to generate semantic names and descriptions for your saved screens.",
+                ready: "Ready to process {{count}} screens.",
+                btn_cancel: "Cancel",
+                btn_close: "Close",
+                btn_start: "Start Enhancement",
+                btn_enhancing: "Enhancing...",
+                btn_done: "Done",
+                btn_audit_enhance: "Audit & Enhance"
             },
             modes: {
                 inspect: "Inspect Mode",

@@ -2,7 +2,6 @@ import { ScreenMap, FlowMap, FlowStep, NavigationData } from '../types';
 
 export function generateFlows(maps: ScreenMap[]): FlowMap[] {
     const flows: FlowMap[] = [];
-    const visited = new Set<string>();
 
     // Start with screens that have no incoming links (Roots) or just pick the first ones
     // For simplicity, let's trace every possible path up to a max depth (e.g. 10 steps)

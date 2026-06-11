@@ -206,6 +206,54 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
             } else if (provider === 'openai') {
                 models = await getOpenAIModels(apiKey);
             }
+
+            // Reorganize models from cheapest/fastest to most expensive/powerful
+            const priorityLists: Record<string, string[]> = {
+                gemini: [
+                    '-flash-lite',
+                    '-flash',
+                    '-flash-preview',
+                    '-pro',
+                    '-flash-lite-latest',
+                    '-flash-latest',
+                    '-flash-preview-latest',
+                    '-pro-latest'
+                ],
+                claude: [
+                    "claude-haiku",
+                    "claude-sonnet",
+                    "claude-opus",
+                    "claude-fable"
+                ],
+                openai: [
+                    "-nano",
+                    "-mini",
+                    "-pro",
+                    "-turbo",
+                    "-codex",
+                    "-deep-research"
+                ]
+            };
+
+            const priorities = priorityLists[provider] || [];
+
+            models.sort((a, b) => {
+                let indexA = -1;
+                let indexB = -1;
+                if (provider === 'gemini' || provider === 'openai') {
+                    indexA = priorities.findIndex(p => a === p || a.endsWith(p));
+                    indexB = priorities.findIndex(p => b === p || b.endsWith(p));
+                } else {
+                    indexA = priorities.findIndex(p => a === p || a.startsWith(p));
+                    indexB = priorities.findIndex(p => b === p || b.startsWith(p));
+                }
+
+                if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+                if (indexA !== -1) return -1;
+                if (indexB !== -1) return 1;
+                return a.localeCompare(b);
+            });
+
             setAvailableModels(models);
         } catch (e: any) {
             setModelFetchError(e.message || "Failed to fetch models");
@@ -1778,6 +1826,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                             ) : availableModels.length > 0 ? (
                                                 availableModels.map(model => (
                                                     <Button
+                                                        variant="unstyled"
                                                         key={model}
                                                         type="button"
                                                         className="justify-start w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0"

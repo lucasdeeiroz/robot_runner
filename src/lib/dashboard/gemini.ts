@@ -180,7 +180,7 @@ export async function askGemini(
                 } : undefined,
                 generationConfig: {
                     temperature: 0.4,
-                    maxOutputTokens: 2048,
+                    maxOutputTokens: 8192,
                 }
             })
         });

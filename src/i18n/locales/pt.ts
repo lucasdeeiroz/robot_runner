@@ -868,6 +868,18 @@ export const pt = {
                 back_updated: "Atualização retroativa: \"{{prev}}\" → elemento agora navega para \"{{current}}\"",
                 merging_insights: "Mesclando insights da IA na tela existente: \"{{name}}\" (ID: {{id}}, {{count}} elementos)",
                 new_elements_discovered: "Adicionados {{count}} novos elementos descobertos pela IA. Total: {{total}}",
+                analyzing_prompt: "Analisando prompt...",
+            },
+            enhancer: {
+                title: "Auditoria e Melhoria de Mapeamentos",
+                description: "Esta ferramenta irá remover duplicatas programaticamente, padronizar elementos e usar IA para gerar nomes semânticos e descrições para suas telas salvas.",
+                ready: "Pronto para processar {{count}} telas.",
+                btn_cancel: "Cancelar",
+                btn_close: "Fechar",
+                btn_start: "Iniciar Melhoria",
+                btn_enhancing: "Melhorando...",
+                btn_done: "Concluído",
+                btn_audit_enhance: "Auditar e Melhorar"
             },
             modes: {
                 inspect: "Modo Inspeção",

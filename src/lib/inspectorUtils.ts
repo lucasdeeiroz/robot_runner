@@ -708,7 +708,21 @@ export function generateXPath(
 
     const attributes = node.attributes;
     const className = attributes['class'] || '*';
-    const preferredAttr = attr || (attributes['resource-id'] ? 'resource-id' : attributes['text'] ? 'text' : attributes['content-desc'] ? 'content-desc' : undefined);
+    
+    // For input fields, the 'text' attribute is highly volatile because it holds the user input.
+    // Using it in the XPath breaks element tracking as soon as text is typed.
+    const isInput = className.includes('EditText');
+    
+    let defaultPreferredAttr: string | undefined = undefined;
+    if (attributes['resource-id']) {
+        defaultPreferredAttr = 'resource-id';
+    } else if (attributes['content-desc']) {
+        defaultPreferredAttr = 'content-desc';
+    } else if (!isInput && attributes['text']) {
+        defaultPreferredAttr = 'text';
+    }
+
+    const preferredAttr = attr || defaultPreferredAttr;
 
     if (preferredAttr && attributes[preferredAttr]) {
         const val = attributes[preferredAttr];

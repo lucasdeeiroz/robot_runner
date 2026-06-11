@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import {
     Check, Scan, Home, ArrowLeft, Rows, X, GitGraph, Trash2, Plus, FileClock, SearchCode, ChevronDown, ChevronUp, ChevronRight,
-    FileCode, FileStack, Upload, Download, Eye, EyeClosed, Settings2
+    FileCode, FileStack, Upload, Download, Eye, EyeClosed, Settings2, Sparkles
 } from 'lucide-react';
 import { XMLParser } from 'fast-xml-parser';
 import clsx from 'clsx';
@@ -23,6 +23,7 @@ import { saveScreenMap, loadScreenMap, listScreenMaps, deleteScreenMap, exportMa
 import { useSettings } from '@/lib/settings';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { ConfirmationModal } from '@/components/organisms/ConfirmationModal';
+import EnhanceMapsModal from '@/components/organisms/EnhanceMapsModal';
 import { FlowchartModal } from '@/components/organisms/FlowchartModal';
 import { generateTestLinkXML, generateRobotBDD, generateFlows } from '@/lib/dashboard/flowGenerator';
 import { Button } from '@/components/atoms/Button';
@@ -110,6 +111,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         return false;
     }, [settings.aiProvider, settings.geminiApiKey, settings.claudeApiKey, settings.openaiApiKey, settings.claudeCodeToken, settings.antigravityApiKey]);
     const [isStayOn, setIsStayOn] = useState(false);
+    const [isEnhanceModalOpen, setIsEnhanceModalOpen] = useState(false);
 
     // Migration logic
     const prevMappingsPathRef = useRef<string | null>(settings.paths?.mappings || null);
@@ -719,8 +721,8 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
             // 2. AI Analysis
             const { aiProvider, geminiApiKey, claudeApiKey, openaiApiKey, geminiModel, claudeModel, openaiModel, language } = settings;
-            const apiKey = aiProvider === 'gemini' ? geminiApiKey : aiProvider === 'claude' ? claudeApiKey : aiProvider === 'openai' ? openaiApiKey : 'CLI';
-            const model = aiProvider === 'gemini' ? geminiModel : aiProvider === 'claude' ? claudeModel : aiProvider === 'openai' ? openaiModel : 'claude-code';
+            const apiKey = aiProvider === 'gemini' ? geminiApiKey : aiProvider === 'claude' ? claudeApiKey : openaiApiKey === 'openai' ? openaiApiKey : 'CLI';
+            const model = aiProvider === 'gemini' ? geminiModel : aiProvider === 'claude' ? claudeModel : openaiModel === 'openai' ? openaiModel : 'claude-code';
             const lang = language || i18n.language || 'en';
 
             if (!apiKey && aiProvider !== 'claude-code' && aiProvider !== 'antigravity-cli') throw new Error("API Key missing");
@@ -1109,7 +1111,6 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             } else if (next.type === 'swipe') {
                 const swipeDirection = next.direction || 'down';
                 const currentSwipes = explorer.getConsecutiveSwipes();
-                const previousNav = explorer.getPreviousNavigation();
 
                 if (currentSwipes >= 10) {
                     explorer.addLog(t('mapper.exploration.swipe_limit_reached'), 'error');
@@ -1568,8 +1569,19 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                 {showLoadMenu && (
                                                     <div className="absolute top-full left-0 mt-2 w-80 bg-surface rounded-xl shadow-xl border border-outline-variant/30 overflow-hidden z-[100] flex flex-col max-h-80">
                                                         <div className="p-2 border-b border-outline-variant/30 bg-surface-variant/5 flex flex-col gap-2">
-                                                            <div className="px-1 text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest">
-                                                                {t('mapper.saved_screens')}
+                                                            <div className="px-1 text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest flex justify-between items-center">
+                                                                <span>{t('mapper.saved_screens')}</span>
+                                                                <Button 
+                                                                    variant="ghost" 
+                                                                    size="sm" 
+                                                                    className="h-6 text-[10px] py-0 px-2 flex items-center gap-1 hover:text-primary"
+                                                                    onClick={() => {
+                                                                        setShowLoadMenu(false);
+                                                                        setIsEnhanceModalOpen(true);
+                                                                    }}
+                                                                >
+                                                                    <Sparkles size={12} /> {t('mapper.enhancer.btn_audit_enhance')}
+                                                                </Button>
                                                             </div>
                                                             <SegmentedControl
                                                                 value={screenListMode}
@@ -2200,9 +2212,27 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                             </div>
                         )}
                     </div>
-
                 </div>
             )}
+            
+            <EnhanceMapsModal
+                isOpen={isEnhanceModalOpen}
+                onClose={() => setIsEnhanceModalOpen(false)}
+                savedMaps={savedMaps}
+                onEnhanceComplete={async (enhancedMaps) => {
+                    for (const map of enhancedMaps) {
+                        try {
+                            const path = `${settings.paths.mappings || ''}/${map.id}.json`;
+                            const content = JSON.stringify(map, null, 2);
+                            await invoke('save_file', { path, content, append: false });
+                        } catch (e) {
+                            console.error(`Failed to save enhanced map ${map.id}`, e);
+                        }
+                    }
+                    loadSavedMaps();
+                    feedback.toast.success(t('mapper.enhancer.btn_done'));
+                }}
+            />
         </div>
     );
 }

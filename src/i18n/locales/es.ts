@@ -875,6 +875,17 @@ export const es = {
                 merging_insights: "Fusionando conocimientos de IA en la pantalla existente: \"{{name}}\" (ID: {{id}}, {{count}} elementos)",
                 new_elements_discovered: "Añadidos {{count}} nuevos elementos descubiertos por la IA. Total: {{total}}",
             },
+            enhancer: {
+                title: "Auditoría y Mejora de Mapeos",
+                description: "Esta herramienta eliminará duplicados programáticamente, estandarizará elementos y usará IA para generar descripciones y nombres semánticos para sus pantallas guardadas.",
+                ready: "Listo para procesar {{count}} pantallas.",
+                btn_cancel: "Cancelar",
+                btn_close: "Cerrar",
+                btn_start: "Iniciar Mejora",
+                btn_enhancing: "Mejorando...",
+                btn_done: "Listo",
+                btn_audit_enhance: "Auditar y Mejorar"
+            },
             modes: {
                 inspect: "Modo Inspección",
                 tap: "Modo Toque",
