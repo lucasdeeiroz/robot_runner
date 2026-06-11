@@ -878,7 +878,15 @@ export const en = {
                 btn_start: "Start Enhancement",
                 btn_enhancing: "Enhancing...",
                 btn_done: "Done",
-                btn_audit_enhance: "Audit & Enhance"
+                btn_audit_enhance: "Audit & Enhance",
+                completed: "Audit and Enhancement Completed",
+                starting_linter: "Starting Programmatic Linter...",
+                removed_duplicates: "Removed {{count}} duplicates from {{name}}",
+                no_enhancement_needed: "All screens and elements are already semantically named. No AI enhancement needed.",
+                cli_fallback: "CLI provider selected. Falling back to Gemini for Batch Enhancement.",
+                api_key_required: "API key is required. Stopping after programmatic Linter.",
+                found_screens: "Found {{count}} screens needing AI enhancement. Processing in batches...",
+                processing_batch: "Processing AI batch {{current}}/{{total}}..."
             },
             modes: {
                 inspect: "Inspect Mode",

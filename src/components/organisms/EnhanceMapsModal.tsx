@@ -19,7 +19,7 @@ export default function EnhanceMapsModal({ isOpen, onClose, savedMaps, onEnhance
     const { t } = useTranslation();
     const { settings } = useSettings();
     const [isEnhancing, setIsEnhancing] = useState(false);
-    const [logs, setLogs] = useState<string[]>([]);
+    const [logs, setLogs] = useState<{msg: string, time: string}[]>([]);
     const [isComplete, setIsComplete] = useState(false);
     const logsEndRef = useRef<HTMLDivElement>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
@@ -64,23 +64,25 @@ export default function EnhanceMapsModal({ isOpen, onClose, savedMaps, onEnhance
             const keys = {
                 gemini: selectedProvider === 'gemini' ? settings.geminiApiKey : undefined,
                 claude: selectedProvider === 'claude' ? settings.claudeApiKey : undefined,
-                openai: selectedProvider === 'openai' ? settings.openaiApiKey : undefined
+                openai: selectedProvider === 'openai' ? settings.openaiApiKey : undefined,
+                antigravity: selectedProvider === 'antigravity-cli' ? settings.antigravityApiKey : undefined
             };
 
             const { enhancedMaps } = await processAndEnhanceMaps(
                 savedMaps, 
                 selectedProvider, 
                 keys, 
-                (msg: string) => { setLogs(prev => [...prev, msg]); },
-                abortControllerRef.current.signal
+                (msg: string) => { setLogs(prev => [...prev, { msg, time: new Date().toLocaleTimeString() }]); },
+                abortControllerRef.current.signal,
+                (k: string, d: string, opts?: any) => t(k, d, opts) as string
             );
             await onEnhanceComplete(enhancedMaps);
             setIsComplete(true);
         } catch (err: any) {
             if (err.name === 'AbortError' || err.message === 'Cancelled by user') {
-                setLogs(prev => [...prev, 'Process cancelled by user.']);
+                setLogs(prev => [...prev, { msg: t('mapper.exploration.cancelled', 'Process cancelled by user.'), time: new Date().toLocaleTimeString() }]);
             } else {
-                setLogs(prev => [...prev, `Critical Error: ${err.message}`]);
+                setLogs(prev => [...prev, { msg: `Critical Error: ${err.message}`, time: new Date().toLocaleTimeString() }]);
             }
         } finally {
             setIsEnhancing(false);
@@ -110,8 +112,8 @@ export default function EnhanceMapsModal({ isOpen, onClose, savedMaps, onEnhance
                     )}
                     {logs.map((log, i) => (
                         <div key={i} className="animate-in fade-in duration-200">
-                            <span className="text-primary/70 mr-2">[{new Date().toLocaleTimeString()}]</span>
-                            {log}
+                            <span className="text-primary/70 mr-2">[{log.time}]</span>
+                            {log.msg}
                         </div>
                     ))}
                     <div ref={logsEndRef} />

@@ -24,6 +24,7 @@ import { useSettings } from '@/lib/settings';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { ConfirmationModal } from '@/components/organisms/ConfirmationModal';
 import EnhanceMapsModal from '@/components/organisms/EnhanceMapsModal';
+import { processAndEnhanceMaps } from '@/lib/dashboard/enhancerEngine';
 import { FlowchartModal } from '@/components/organisms/FlowchartModal';
 import { generateTestLinkXML, generateRobotBDD, generateFlows } from '@/lib/dashboard/flowGenerator';
 import { Button } from '@/components/atoms/Button';
@@ -120,6 +121,8 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     const [isMigrating, setIsMigrating] = useState(false);
     const [isExploring, setIsExploring] = useState(false);
     const isExploringRef = useRef(false);
+    const [isEnhancing, setIsEnhancing] = useState(false);
+    const enhanceAbortControllerRef = useRef<AbortController | null>(null);
     const [explorationLogs, setExplorationLogs] = useState<LogEntry[]>([]);
     const explorerRef = useRef<AutonomousExplorer | null>(null);
     const explorationPromptRef = useRef<string | undefined>(undefined);
@@ -166,7 +169,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         if (!selectedDevice) return false;
         return sessions.some(session => session.status === 'running' && session.deviceUdid === selectedDevice);
     }, [selectedDevice, sessions]);
-    const isMapperBusy = isExploring || (isTestRunningOnSelectedDevice && !settings.allowActionsDuringTest);
+    const isMapperBusy = isExploring || isEnhancing || (isTestRunningOnSelectedDevice && !settings.allowActionsDuringTest);
 
     const {
         screenshot,
@@ -622,15 +625,76 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         setIsExploring(false);
         isExploringRef.current = false;
 
-        if (explorerRef.current) {
-            explorerRef.current.addLog(t('mapper.exploration.stopped', { reason }), "stopped");
-            setExplorationLogs([...explorerRef.current.getLogs()]);
-            explorerRef.current = null;
+        let explorerInstance = explorerRef.current;
+        if (explorerInstance) {
+            explorerInstance.addLog(t('mapper.exploration.stopped', { reason }), "stopped");
+            setExplorationLogs([...explorerInstance.getLogs()]);
         }
 
         // Trigger cleanup to merge Screen_[hash] into actual screens
-        // We use a timeout to let the state settle
-        setTimeout(() => cleanupAndMergeScreens(savedMaps), 0);
+        const finalMaps = await cleanupAndMergeScreens(savedMaps);
+
+        // Start Enhancement Phase
+        setIsEnhancing(true);
+        enhanceAbortControllerRef.current = new AbortController();
+        if (explorerInstance) {
+            explorerInstance.addLog(t('mapper.enhancer.title', 'AI Enhancement'), "info");
+            setExplorationLogs([...explorerInstance.getLogs()]);
+        }
+
+        try {
+            const keys = {
+                gemini: settings.geminiApiKey,
+                claude: settings.claudeApiKey,
+                openai: settings.openaiApiKey,
+                antigravity: settings.antigravityApiKey
+            };
+
+            const provider = settings.aiProvider || 'gemini';
+
+            const { enhancedMaps } = await processAndEnhanceMaps(
+                finalMaps,
+                provider,
+                keys,
+                (msg: string) => {
+                    if (explorerInstance) {
+                        explorerInstance.addLog(msg, "info");
+                        setExplorationLogs([...explorerInstance.getLogs()]);
+                    }
+                },
+                enhanceAbortControllerRef.current.signal,
+                (k: string, d: string, opts?: any) => t(k, d, opts) as string
+            );
+
+            // Save the enhanced maps
+            for (const map of enhancedMaps) {
+                await saveScreenMap(activeProfileId, map, settings.paths?.mappings);
+            }
+            await loadSavedMaps();
+            if (explorerInstance) {
+                explorerInstance.addLog(t('mapper.enhancer.completed'), "finished");
+                setExplorationLogs([...explorerInstance.getLogs()]);
+            }
+        } catch (err: any) {
+            if (err.name === 'AbortError' || err.message === 'Cancelled by user') {
+                if (explorerInstance) {
+                    explorerInstance.addLog(t('mapper.exploration.cancelled'), "warning");
+                    setExplorationLogs([...explorerInstance.getLogs()]);
+                }
+            } else {
+                if (explorerInstance) {
+                    explorerInstance.addLog(`Enhancement Error: ${err.message}`, "error");
+                    setExplorationLogs([...explorerInstance.getLogs()]);
+                }
+            }
+        } finally {
+            setIsEnhancing(false);
+            if (explorerInstance) {
+                // Ensure the logs trigger a re-render
+                setExplorationLogs([...explorerInstance.getLogs()]);
+            }
+            explorerRef.current = null;
+        }
     };
 
     const runExplorationStep = async () => {
@@ -1258,8 +1322,9 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         }
 
         if (mergedAny) {
-            loadSavedMaps();
+            await loadSavedMaps();
         }
+        return finalMaps;
     };
 
     const startExploration = async (customPrompt?: string) => {
@@ -1422,12 +1487,14 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                 {hasApiKey && (
                                     <AiButton
                                         id="mapper_exploration"
-                                        variant={isExploring ? "danger" : "primary"}
+                                        variant={isExploring || isEnhancing ? "danger" : "primary"}
                                         {...isNarrow ? { showTextAlways: false, expandable: false } : { showTextAlways: true }}
-                                        onClick={isExploring ? () => stopExploration(t('mapper.exploration.cancelled')) : (_e, prompt) => startExploration(prompt)}
-                                        isLoading={isExploring}
-                                        label={isExploring ? t('mapper.exploration.stop') : t('mapper.exploration.start')}
-                                        alwaysOpenModal={!isExploring}
+                                        onClick={isExploring ? () => stopExploration(t('mapper.exploration.cancelled')) : isEnhancing ? () => {
+                                            if (enhanceAbortControllerRef.current) enhanceAbortControllerRef.current.abort();
+                                        } : (_e, prompt) => startExploration(prompt)}
+                                        isLoading={isExploring || isEnhancing}
+                                        label={isExploring ? t('mapper.exploration.stop') : isEnhancing ? t('mapper.exploration.stop') : t('mapper.exploration.start')}
+                                        alwaysOpenModal={!(isExploring || isEnhancing)}
                                     />
                                 )}
                                 <Button
@@ -2171,23 +2238,23 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             {explorationLogs.length > 0 && (
                 <div className={clsx(
                     "fixed bottom-6 right-6 w-96 bg-surface p-4 border border-outline-variant/30 rounded-2xl shadow-2xl z-[150] transition-all flex flex-col gap-3",
-                    !isExploring && explorationLogs.length > 0 ? "opacity-90 grayscale-[0.5]" : "opacity-100"
+                    !(isExploring || isEnhancing) && explorationLogs.length > 0 ? "opacity-90 grayscale-[0.5]" : "opacity-100"
                 )}>
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                            <div className={clsx("w-2 h-2 rounded-full", isExploring ? "bg-success animate-pulse" : "bg-on-surface-variant/30")} />
+                            <div className={clsx("w-2 h-2 rounded-full", isExploring || isEnhancing ? "bg-success animate-pulse" : "bg-on-surface-variant/30")} />
                             <h4 className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">
-                                {isExploring ? t('mapper.exploration.active') : t('mapper.exploration.summary')}
+                                {isExploring || isEnhancing ? t('mapper.exploration.active') : t('mapper.exploration.summary')}
                             </h4>
                         </div>
                         <div className="flex gap-1">
-                            {!isExploring && (
+                            {!(isExploring || isEnhancing) && (
                                 <Button variant="ghost" size="icon" onClick={() => setExplorationLogs([])} className="h-6 w-6">
                                     <X size={14} />
                                 </Button>
                             )}
                         </div>
-                        {isExploring && (
+                        {(isExploring || isEnhancing) && (
                             <Button
                                 variant="ghost"
                                 size="sm"
@@ -2206,7 +2273,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                         className="bg-surface-variant/5 rounded-xl p-3 border border-outline-variant/10 overflow-y-auto max-h-80 custom-scrollbar"
                     >
                         <ExplorationLogTree logs={explorationLogs} />
-                        {isExploring && (
+                        {(isExploring || isEnhancing) && (
                             <div className="flex items-center gap-2 text-[10px] text-primary animate-pulse mt-4 px-3 border-l-2 border-primary/30 py-1 font-mono">
                                 <ExpressiveLoading size="xsm" variant="circular" />
                                 {t('mapper.exploration.thinking')}

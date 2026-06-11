@@ -193,7 +193,7 @@ export const AiButton: React.FC<AiButtonProps> = ({
                     <div className="flex items-center gap-0 overflow-hidden shadow-none border-transparent bg-transparent">
                         <div className="shrink-0 flex items-center justify-center">
                             {isLoading ? (
-                                <ExpressiveLoading size="xsm" variant="circular" />
+                                <ExpressiveLoading size="xsm" variant="circular" className="text-current dark:text-current" />
                             ) : (
                                 <Sparkles
                                     size={16}

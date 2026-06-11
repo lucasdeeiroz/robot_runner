@@ -13,7 +13,8 @@ export async function processAndEnhanceMaps(
     provider: string,
     keys: { gemini?: string; claude?: string; openai?: string; antigravity?: string },
     onProgress: (msg: string) => void,
-    abortSignal?: AbortSignal
+    abortSignal?: AbortSignal,
+    t: (key: string, defaultText: string, options?: any) => string = (k, d) => d
 ): Promise<EnhanceResult> {
     const logs: string[] = [];
     const log = (msg: string) => {
@@ -21,7 +22,7 @@ export async function processAndEnhanceMaps(
         onProgress(msg);
     };
 
-    log('Starting Programmatic Linter...');
+    log(t('mapper.enhancer.starting_linter', 'Iniciando Linter Programático...'));
 
     // 1. Programmatic Linter
     const enhancedMaps = JSON.parse(JSON.stringify(maps)) as ScreenMap[];
@@ -36,14 +37,10 @@ export async function processAndEnhanceMaps(
             }
         }
         if (map.elements.length !== uniqueElements.size) {
-            log(`Removed ${map.elements.length - uniqueElements.size} duplicates from ${map.name}`);
+            log(t('mapper.enhancer.removed_duplicates', 'Removidas {{count}} duplicatas de {{name}}', { count: map.elements.length - uniqueElements.size, name: map.name }));
             map.elements = Array.from(uniqueElements.values());
         }
     }
-
-    // Update navigates_to cross-references is not needed if we don't change screen IDs, 
-    // but if the AI changes 'type' or suggests a better name, we might update it.
-    // For now, we only ask AI to improve element names and screen descriptions.
 
     // 2. Filter maps needing enhancement
     const isGenericName = (name: string) => {
@@ -58,35 +55,44 @@ export async function processAndEnhanceMaps(
     });
 
     if (mapsToEnhance.length === 0) {
-        log('All screens and elements are already semantically named. No AI enhancement needed.');
+        log(t('mapper.enhancer.no_enhancement_needed', 'Todas as telas e elementos já estão nomeados semanticamente. Nenhuma melhoria por IA necessária.'));
         return { enhancedMaps, logs };
     }
 
-    if (provider === 'gemini' && !keys.gemini) {
-        log('Gemini API key is required. Stopping after programmatic Linter.');
+    // Fallback CLI providers to Gemini for batch enhancement
+    let effectiveProvider = provider;
+    if (provider === 'claude-code' || provider === 'antigravity-cli') {
+        effectiveProvider = 'gemini';
+        log(t('mapper.enhancer.cli_fallback', 'Provedor CLI selecionado. Usando Gemini como fallback para a Melhoria em Lote.'));
+    }
+
+    if (effectiveProvider === 'gemini' && !keys.gemini) {
+        log(t('mapper.enhancer.api_key_required', 'Chave API do Gemini é necessária. Parando após o Linter programático.'));
         return { enhancedMaps, logs };
     }
-    if (provider === 'claude' && !keys.claude) {
-        log('Claude API key is required. Stopping after programmatic Linter.');
+    if (effectiveProvider === 'claude' && !keys.claude) {
+        log(t('mapper.enhancer.api_key_required', 'Chave API do Claude é necessária. Parando após o Linter programático.'));
         return { enhancedMaps, logs };
     }
-    if (provider === 'openai' && !keys.openai) {
-        log('OpenAI API key is required. Stopping after programmatic Linter.');
+    if (effectiveProvider === 'openai' && !keys.openai) {
+        log(t('mapper.enhancer.api_key_required', 'Chave API da OpenAI é necessária. Parando após o Linter programático.'));
         return { enhancedMaps, logs };
     }
 
-    log(`Found ${mapsToEnhance.length} screens needing AI enhancement. Processing in batches...`);
+    log(t('mapper.enhancer.found_screens', 'Encontradas {{count}} telas precisando de melhoria por IA. Processando em lotes...', { count: mapsToEnhance.length }));
 
     // 3. Chunk and call AI
     const CHUNK_SIZE = 3;
     for (let i = 0; i < mapsToEnhance.length; i += CHUNK_SIZE) {
         if (abortSignal?.aborted) {
-            log('Enhancement cancelled by user.');
+            log(t('mapper.exploration.cancelled', 'Enhancement cancelled'));
             throw new Error('Cancelled by user');
         }
 
         const chunk = mapsToEnhance.slice(i, i + CHUNK_SIZE);
-        log(`Processing AI batch ${Math.floor(i / CHUNK_SIZE) + 1}/${Math.ceil(mapsToEnhance.length / CHUNK_SIZE)}...`);
+        const currentBatch = Math.floor(i / CHUNK_SIZE) + 1;
+        const totalBatches = Math.ceil(mapsToEnhance.length / CHUNK_SIZE);
+        log(t('mapper.enhancer.processing_batch', 'Processando lote IA {{current}}/{{total}}...', { current: currentBatch, total: totalBatches }));
 
         const payload = chunk.map(m => {
             const genericElements = m.elements.filter(el => isGenericName(el.name));
@@ -111,20 +117,20 @@ export async function processAndEnhanceMaps(
         const { withModelRotation } = await import('./aiFallback');
 
         await withModelRotation(
-            provider as 'openai' | 'gemini' | 'claude',
+            effectiveProvider as 'openai' | 'gemini' | 'claude',
             '', // No base model, just use the fallback list sequentially
             async (currentModel) => {
                 let aiOutput = '';
 
-                if (provider === 'gemini') {
+                if (effectiveProvider === 'gemini') {
                     aiOutput = await askGemini(prompt, keys.gemini!, currentModel, getEnhancerSystemPrompt(), undefined, abortSignal);
-                } else if (provider === 'claude') {
+                } else if (effectiveProvider === 'claude') {
                     aiOutput = await askClaude(prompt, keys.claude!, currentModel, getEnhancerSystemPrompt(), undefined, abortSignal);
-                } else if (provider === 'openai') {
+                } else if (effectiveProvider === 'openai') {
                     const { askOpenAI } = await import('./openai');
                     aiOutput = await askOpenAI(prompt, keys.openai!, currentModel, getEnhancerSystemPrompt(), undefined, abortSignal);
                 } else {
-                    throw new Error(`Provider ${provider} is not supported for Batch Enhancement yet.`);
+                    throw new Error(`Provider ${effectiveProvider} is not supported for Batch Enhancement yet.`);
                 }
 
                 // Clean markdown code blocks

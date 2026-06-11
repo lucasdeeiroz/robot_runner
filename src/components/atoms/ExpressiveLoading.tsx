@@ -1,4 +1,5 @@
 import { useMemo, memo } from "react";
+import { twMerge } from "tailwind-merge";
 
 const ExpressiveLoadingComponent = ({ size = "md", className, variant = "linear" }: { size?: "xsm" | "sm" | "md" | "lg", className?: string, variant?: "linear" | "circular" | "skeleton" }) => {
 
@@ -52,7 +53,7 @@ const ExpressiveLoadingComponent = ({ size = "md", className, variant = "linear"
 
         return (
             <div 
-                className={`flex items-center justify-center ${sizePx[size]} ${className || ''} text-primary dark:text-primary/80`}
+                className={twMerge(`flex items-center justify-center ${sizePx[size]} text-primary dark:text-primary/80`, className)}
                 style={{ willChange: 'transform' }}
             >
                 <svg
@@ -104,7 +105,7 @@ const ExpressiveLoadingComponent = ({ size = "md", className, variant = "linear"
 
     return (
         <div 
-            className={`flex items-center justify-center ${heightMap[size]} ${className || ''} text-primary dark:text-primary/80`}
+            className={twMerge(`flex items-center justify-center ${heightMap[size]} text-primary dark:text-primary/80`, className)}
             style={{ willChange: 'transform' }}
         >
             <svg

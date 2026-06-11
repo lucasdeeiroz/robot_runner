@@ -884,7 +884,15 @@ export const es = {
                 btn_start: "Iniciar Mejora",
                 btn_enhancing: "Mejorando...",
                 btn_done: "Listo",
-                btn_audit_enhance: "Auditar y Mejorar"
+                btn_audit_enhance: "Auditar y Mejorar",
+                completed: "Auditoría y Mejora Completadas",
+                starting_linter: "Iniciando Linter Programático...",
+                removed_duplicates: "Eliminados {{count}} duplicados de {{name}}",
+                no_enhancement_needed: "Todas las pantallas y elementos ya están nombrados semánticamente. No se requiere mejora por IA.",
+                cli_fallback: "Proveedor CLI seleccionado. Usando Gemini como respaldo para la Mejora por Lotes.",
+                api_key_required: "Se requiere clave API. Deteniendo después del Linter programático.",
+                found_screens: "Encontradas {{count}} pantallas que necesitan mejora por IA. Procesando en lotes...",
+                processing_batch: "Procesando lote de IA {{current}}/{{total}}..."
             },
             modes: {
                 inspect: "Modo Inspección",
