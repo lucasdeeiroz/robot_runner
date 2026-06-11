@@ -108,45 +108,13 @@ export async function processAndEnhanceMaps(
         });
 
         const prompt = JSON.stringify(payload);
+        const { withModelRotation } = await import('./aiFallback');
 
-        const modelsByProvider: Record<string, string[]> = {
-            'gemini': [
-                'gemini-3.1-flash-lite',
-                'gemini-2.5-flash-lite',
-                'gemini-3.5-flash',
-                'gemini-2.5-flash',
-                'gemini-3-flash-preview'
-            ],
-            'claude': [
-                "claude-haiku-4-5-20251001",
-                "claude-sonnet-4-6",
-                "claude-opus-4-8",
-                "claude-fable"
-            ],
-            'openai': [
-                "gpt-5.4-nano",
-                "gpt-5.4-mini",
-                "gpt-5.4",
-                "gpt-5.5-pro",
-                "gpt-3.5-turbo",
-                "gpt-5.3-codex",
-                "o4-mini-deep-research"
-            ]
-        };
-
-        const activeModels = modelsByProvider[provider] || [];
-        const maxRetries = activeModels.length > 0 ? activeModels.length - 1 : 2;
-
-        let retryCount = 0;
-        let success = false;
-        while (retryCount <= maxRetries && !success) {
-            try {
+        await withModelRotation(
+            provider as 'openai' | 'gemini' | 'claude',
+            '', // No base model, just use the fallback list sequentially
+            async (currentModel) => {
                 let aiOutput = '';
-                const currentModel = activeModels.length > 0 ? activeModels[retryCount] : '';
-
-                if (retryCount > 0 && currentModel) {
-                    log(`[Fallback] Switching to ${currentModel}...`);
-                }
 
                 if (provider === 'gemini') {
                     aiOutput = await askGemini(prompt, keys.gemini!, currentModel, getEnhancerSystemPrompt(), undefined, abortSignal);
@@ -196,23 +164,9 @@ export async function processAndEnhanceMaps(
                         }
                     }
                 }
-
-                success = true;
-            } catch (err: any) {
-                if (err.name === 'AbortError' || err.message === 'Cancelled by user') {
-                    log('Enhancement request aborted.');
-                    throw err;
-                }
-                retryCount++;
-                log(`Error in batch (retry ${retryCount}/${maxRetries}): ${err.message}`);
-                if (retryCount <= maxRetries) {
-                    log(`Waiting 5 seconds before retry to respect rate limits...`);
-                    await new Promise(resolve => setTimeout(resolve, 5000));
-                } else {
-                    log(`Skipping batch after ${maxRetries} failures.`);
-                }
-            }
-        }
+            },
+            log
+        );
 
         // Wait 4 seconds between batches to respect free tier rate limits (15 RPM)
         if (i + CHUNK_SIZE < mapsToEnhance.length) {

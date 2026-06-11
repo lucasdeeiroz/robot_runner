@@ -207,35 +207,8 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                 models = await getOpenAIModels(apiKey);
             }
 
-            // Reorganize models from cheapest/fastest to most expensive/powerful
-            const priorityLists: Record<string, string[]> = {
-                gemini: [
-                    '-flash-lite',
-                    '-flash',
-                    '-flash-preview',
-                    '-pro',
-                    '-flash-lite-latest',
-                    '-flash-latest',
-                    '-flash-preview-latest',
-                    '-pro-latest'
-                ],
-                claude: [
-                    "claude-haiku",
-                    "claude-sonnet",
-                    "claude-opus",
-                    "claude-fable"
-                ],
-                openai: [
-                    "-nano",
-                    "-mini",
-                    "-pro",
-                    "-turbo",
-                    "-codex",
-                    "-deep-research"
-                ]
-            };
-
-            const priorities = priorityLists[provider] || [];
+            const { modelsByProvider } = await import('@/lib/dashboard/aiFallback');
+            const priorities = modelsByProvider[provider] || [];
 
             models.sort((a, b) => {
                 let indexA = -1;

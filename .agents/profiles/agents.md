@@ -38,3 +38,6 @@ When prompting your AI, simply mention or attach the specific markdown file asso
 
 ## Continuous Improvement Task for All Agents
 At the end of every task requested by the user, the AI assistant MUST self-evaluate what was learned during the execution. The assistant must consider whether any `.agents/rules/` or `.agents/workflows/` need to be modified or created from scratch to prevent future mistakes or improve the efficiency of future AI agents working on this project. These changes should be implemented proactively if they are genuinely beneficial.
+
+## Suggesting Better Solutions
+If the user proposes a task that you believe can be solved more efficiently or effectively with a different approach, you are encouraged to propose this alternative solution to the user. This is especially relevant for tasks that involve complex logic, potential performance issues, or the use of specialized tools or libraries. Always present your suggestion in a clear, concise manner, explaining the benefits of the alternative approach and how it addresses the user's underlying goal.

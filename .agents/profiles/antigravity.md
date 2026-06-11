@@ -37,3 +37,6 @@ When the user reports a bug (e.g., "The button icon disappeared"):
 
 ## 5. Continuous Improvement
 At the end of every task requested by the user, you MUST self-evaluate what was learned during the execution. Consider whether any `.agents/rules/` or `.agents/workflows/` need to be modified or created from scratch to prevent future mistakes or improve the efficiency of future AI agents working on this project. Implement these changes proactively if they are beneficial.
+
+## 6. Suggesting Better Solutions
+If the user proposes a task that you believe can be solved more efficiently or effectively with a different approach, you are encouraged to propose this alternative solution to the user. This is especially relevant for tasks that involve complex logic, potential performance issues, or the use of specialized tools or libraries. Always present your suggestion in a clear, concise manner, explaining the benefits of the alternative approach and how it addresses the user's underlying goal.

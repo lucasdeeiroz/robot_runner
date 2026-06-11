@@ -748,9 +748,9 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
             let result: any = null;
             let useAiFallback = false;
-            
+
             const heuristicScreenTemp = explorer.generateHeuristicScreenMap(root);
-            
+
             const previousNav = explorer.getPreviousNavigation();
             // Swipe Screen Merging logic: if the previous action was a swipe, force the generated heuristic
             // screen to use the exact same name as the previous screen, so elements get appended naturally.
@@ -761,20 +761,20 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 // Similarity-based Screen Merging
                 let bestMatch: { name: string, id: string, score: number } | null = null;
                 const currentIds = new Set(heuristicScreenTemp.elements.map(e => e.id));
-                
+
                 for (const existingMap of maps) {
                     if (existingMap.name.startsWith('Screen_')) continue; // Compare only with established screens
-                    
+
                     const existingIds = new Set(existingMap.elements.map(e => e.id));
                     let overlap = 0;
                     currentIds.forEach(id => {
                         if (existingIds.has(id)) overlap++;
                     });
-                    
+
                     // Similarity based on the larger map to ensure minor variations match
                     const maxElements = Math.max(currentIds.size, existingIds.size);
                     const similarity = maxElements > 0 ? overlap / maxElements : 0;
-                    
+
                     // Threshold of 75% similarity to consider it the same screen
                     if (similarity >= 0.75 && (!bestMatch || similarity > bestMatch.score)) {
                         bestMatch = { name: existingMap.name, id: existingMap.id, score: similarity };
@@ -794,7 +794,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                             if (triggerElement) {
                                 const annotation = "Toggles UI state/visibility";
                                 if (!triggerElement.description?.includes(annotation)) {
-                                    triggerElement.description = triggerElement.description 
+                                    triggerElement.description = triggerElement.description
                                         ? `${triggerElement.description} | ${annotation}`
                                         : annotation;
                                 }
@@ -803,7 +803,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                     }
                 }
             }
-            
+
             // Check if we are looping/stuck
             if (explorer.isScreenLooping(heuristicScreenTemp.name, 4)) {
                 useAiFallback = true;
@@ -1041,7 +1041,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 const visitCount = explorer.trackScreenVisit(aiScreen.name, actionFingerprint);
                 if (visitCount >= 4) {
                     explorer.addLog(t('mapper.exploration.loop_detected', { name: aiScreen.name, count: visitCount }), 'warning');
-                    
+
                     if (aiScreen.name === explorer.getInitialScreenName()) {
                         explorer.addLog(t('mapper.exploration.cannot_go_back_from_root', { defaultValue: 'Preventing back action on initial screen to avoid app exit.' }), 'info');
                         stopExploration("Finished (Root screen fully explored)");
@@ -1079,7 +1079,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
                 let targetNode: InspectorNode | null = null;
                 const xpath = shortIdMap[next.targetId] || next.targetId;
-                
+
                 // CRITICAL: Mark element as visited so DFS doesn't click it again infinitely
                 explorer.markElementVisited(xpath);
 
@@ -1177,27 +1177,27 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 }
             } else if (next.type === 'type_text' && next.targetId && next.text) {
                 explorer.addLog(t('mapper.exploration.typing_action', { targetId: next.targetId, text: next.text }), 'action');
-                
+
                 const xpath = shortIdMap[next.targetId] || next.targetId;
                 explorer.markElementVisited(xpath);
-                
+
                 const targetNode = findNodesByLocator(root, xpath)[0];
                 if (targetNode && targetNode.bounds) {
                     // Tap to focus
                     const centerX = Math.round(targetNode.bounds.x + targetNode.bounds.w / 2);
                     const centerY = Math.round(targetNode.bounds.y + targetNode.bounds.h / 2);
                     await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'tap', String(centerX), String(centerY)] });
-                    
+
                     // Small delay to let keyboard appear
                     await new Promise(r => setTimeout(r, 500));
-                    
+
                     // Input text. Replace spaces with %s for adb
                     const escapedText = next.text.replace(/ /g, '%s');
                     await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'text', escapedText] });
-                    
+
                     // Press Enter
                     await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'keyevent', '66'] });
-                    
+
                     explorer.setPreviousNavigation(aiScreen.name, xpath, 'type_text');
                 }
             }
@@ -1227,29 +1227,29 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             if (screen.name.startsWith('Screen_')) {
                 // Find a potential AI screen that shares a high percentage of elements
                 const hashElementIds = new Set(screen.elements.map(e => e.id));
-                
+
                 for (const potentialAiScreen of finalMaps) {
                     if (potentialAiScreen.name.startsWith('Screen_') || potentialAiScreen.id === screen.id) continue;
-                    
+
                     const aiElementIds = new Set(potentialAiScreen.elements.map(e => e.id));
                     let overlap = 0;
                     hashElementIds.forEach(id => {
                         if (aiElementIds.has(id)) overlap++;
                     });
-                    
+
                     // If >= 30% of the hash screen elements exist in the AI screen, assume they are the same
                     if (overlap > 0 && overlap / hashElementIds.size >= 0.3) {
                         // Merge elements
                         const newElements = screen.elements.filter(e => !aiElementIds.has(e.id));
                         potentialAiScreen.elements = [...potentialAiScreen.elements, ...newElements];
-                        
+
                         await saveScreenMap(activeProfileId, potentialAiScreen, settings.paths?.mappings);
                         await deleteScreenMap(activeProfileId, screen.id, settings.paths?.mappings);
 
                         // Delete the hash screen from local copy
                         finalMaps.splice(i, 1);
                         mergedAny = true;
-                        
+
                         explorerRef.current?.addLog(`Merged temporary screen "${screen.name}" into AI screen "${potentialAiScreen.name}"`, "info");
                         break;
                     }
@@ -1571,9 +1571,9 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                         <div className="p-2 border-b border-outline-variant/30 bg-surface-variant/5 flex flex-col gap-2">
                                                             <div className="px-1 text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest flex justify-between items-center">
                                                                 <span>{t('mapper.saved_screens')}</span>
-                                                                <Button 
-                                                                    variant="ghost" 
-                                                                    size="sm" 
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
                                                                     className="h-6 text-[10px] py-0 px-2 flex items-center gap-1 hover:text-primary"
                                                                     onClick={() => {
                                                                         setShowLoadMenu(false);
@@ -1681,6 +1681,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                         variant="ghost"
                                                         size="icon"
                                                         title={t('mapper.action.export_pom')}
+                                                        data-position="left"
                                                         className="hover:text-primary hover:bg-primary/10 transition-all"
                                                     >
                                                         <FileCode size={18} />
@@ -1703,57 +1704,57 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                     <FileClock size={16} /> {t('mapper.saved_elements')}
                                                 </Button>
 
-                                                <div className="flex bg-surface-variant p-1 rounded-2xl">
-                                                    <Button 
-                                                        variant="ghost" 
-                                                        className="text-xs px-3 py-1.5 min-h-[32px] rounded-xl text-on-surface hover:bg-surface flex items-center gap-2"
-                                                        onClick={async () => {
-                                                            try {
-                                                                const maps = await listScreenMaps(activeProfileId, settings.paths?.mappings);
-                                                                const flows = generateFlows(maps);
-                                                                if (flows.length === 0) {
-                                                                    feedback.toast.info(t('mapper.export.no_flows_found', { defaultValue: 'No connected paths found. Connect screens via "navigates_to" first.' }));
-                                                                    return;
-                                                                }
-                                                                
-                                                                const xmlData = generateTestLinkXML(flows);
-                                                                const bddData = generateRobotBDD(flows);
-                                                                
-                                                                await exportMapperData(activeProfileId, settings.paths?.mappings); // Keeping the standard export for maps too if needed
-                                                                
-                                                                const savePathXML = await save({
-                                                                    title: t('mapper.export.save_testlink_xml', { defaultValue: 'Save TestLink Flows (XML)' }),
-                                                                    filters: [{ name: 'XML', extensions: ['xml'] }],
-                                                                    defaultPath: 'flows.xml'
-                                                                });
-
-                                                                if (savePathXML) {
-                                                                    const { writeTextFile } = await import('@tauri-apps/plugin-fs');
-                                                                    await writeTextFile(savePathXML, xmlData);
-                                                                    feedback.toast.success(t('mapper.export.flows_success', { defaultValue: 'TestLink XML exported successfully.' }));
-                                                                }
-                                                                
-                                                                const savePathBDD = await save({
-                                                                    title: t('mapper.export.save_robot_bdd', { defaultValue: 'Save Robot Framework BDD' }),
-                                                                    filters: [{ name: 'Robot', extensions: ['robot'] }],
-                                                                    defaultPath: 'flows.robot'
-                                                                });
-
-                                                                if (savePathBDD) {
-                                                                    const { writeTextFile } = await import('@tauri-apps/plugin-fs');
-                                                                    await writeTextFile(savePathBDD, bddData);
-                                                                    feedback.toast.success(t('mapper.export.flows_success', { defaultValue: 'Robot BDD exported successfully.' }));
-                                                                }
-
-                                                            } catch (err: any) {
-                                                                feedback.toast.error(t('mapper.export.error', { error: err.message }));
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="text-on-surface hover:bg-surface"
+                                                    title={t('mapper.export.export_flows', { defaultValue: 'Export flows' })}
+                                                    data-position="left"
+                                                    onClick={async () => {
+                                                        try {
+                                                            const maps = await listScreenMaps(activeProfileId, settings.paths?.mappings);
+                                                            const flows = generateFlows(maps);
+                                                            if (flows.length === 0) {
+                                                                feedback.toast.info(t('mapper.export.no_flows_found', { defaultValue: 'No connected paths found. Connect screens via "navigates_to" first.' }));
+                                                                return;
                                                             }
-                                                        }}
-                                                    >
-                                                        <Download size={14} />
-                                                        {t('mapper.export.flows', { defaultValue: 'Export Flows' })}
-                                                    </Button>
-                                                </div>
+
+                                                            const xmlData = generateTestLinkXML(flows);
+                                                            const bddData = generateRobotBDD(flows);
+
+                                                            await exportMapperData(activeProfileId, settings.paths?.mappings); // Keeping the standard export for maps too if needed
+
+                                                            const savePathXML = await save({
+                                                                title: t('mapper.export.save_testlink_xml', { defaultValue: 'Save TestLink Flows (XML)' }),
+                                                                filters: [{ name: 'XML', extensions: ['xml'] }],
+                                                                defaultPath: 'flows.xml'
+                                                            });
+
+                                                            if (savePathXML) {
+                                                                const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+                                                                await writeTextFile(savePathXML, xmlData);
+                                                                feedback.toast.success(t('mapper.export.flows_success', { defaultValue: 'TestLink XML exported successfully.' }));
+                                                            }
+
+                                                            const savePathBDD = await save({
+                                                                title: t('mapper.export.save_robot_bdd', { defaultValue: 'Save Robot Framework BDD' }),
+                                                                filters: [{ name: 'Robot', extensions: ['robot'] }],
+                                                                defaultPath: 'flows.robot'
+                                                            });
+
+                                                            if (savePathBDD) {
+                                                                const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+                                                                await writeTextFile(savePathBDD, bddData);
+                                                                feedback.toast.success(t('mapper.export.flows_success', { defaultValue: 'Robot BDD exported successfully.' }));
+                                                            }
+
+                                                        } catch (err: any) {
+                                                            feedback.toast.error(t('mapper.export.error', { error: err.message }));
+                                                        }
+                                                    }}
+                                                >
+                                                    <Download size={14} />
+                                                </Button>
 
                                                 {showElementsMenu && (
                                                     <div className="absolute top-full right-0 mt-2 w-80 bg-surface rounded-xl shadow-xl border border-outline-variant/30 overflow-hidden z-[100] flex flex-col max-h-100">
@@ -2054,9 +2055,9 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                         {/* AI & QA Fields */}
                                                         <div className="mt-6 border-t border-surface-variant pt-4">
                                                             <div className="flex items-center gap-2 mb-4 cursor-pointer" onClick={() => updateElement('assertion_target', !currentElement.assertion_target)}>
-                                                                <Switch 
-                                                                    checked={!!currentElement.assertion_target} 
-                                                                    onCheckedChange={(c) => updateElement('assertion_target', c)} 
+                                                                <Switch
+                                                                    checked={!!currentElement.assertion_target}
+                                                                    onCheckedChange={(c) => updateElement('assertion_target', c)}
                                                                 />
                                                                 <span className="text-sm font-medium text-on-surface">Assertion Target <span className="opacity-50 text-xs ml-1">(Verifies screen load)</span></span>
                                                             </div>
@@ -2089,7 +2090,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                                 />
                                                             </div>
                                                         </div>
-                                                        
+
                                                         {/* Complex Fields */}
                                                         {currentElement.type === 'menu' && (
                                                             <Textarea
@@ -2214,7 +2215,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                     </div>
                 </div>
             )}
-            
+
             <EnhanceMapsModal
                 isOpen={isEnhanceModalOpen}
                 onClose={() => setIsEnhanceModalOpen(false)}

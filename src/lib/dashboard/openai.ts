@@ -1,19 +1,7 @@
-interface OpenAIResponse {
-    choices: {
-        message: {
-            content: string;
-        };
-        finish_reason?: string;
-    }[];
-    error?: {
-        message: string;
-    };
-}
-
 import { ScreenMap, UIElementMap } from '@/lib/types';
 import { AIGenerationType, AutonomousActionResponse } from './gemini';
 import { DeepAnalysisContext } from "./historyAnalysisUtils";
-import { getExplorationPrompt, formatExistingMaps, getRefinedTestCasesPrompt, getRefinedPBIPrompt, getRefinedImprovementPrompt, getRefinedBugPrompt, getRefinedRobotScriptPrompt, getFlowchartLayoutPrompt, getElementNamingPrompt, getScreenTaggingPrompt, getTestHistoryAnalysisPrompt, getExecutionSummaryPrompt, getQAAssistantWrapper, getAutonomousAgentPrompt } from "./prompts";
+import { formatExistingMaps, getExplorationPrompt, getRefinedTestCasesPrompt, getRefinedPBIPrompt, getRefinedImprovementPrompt, getRefinedBugPrompt, getRefinedRobotScriptPrompt, getFlowchartLayoutPrompt, getElementNamingPrompt, getScreenTaggingPrompt, getTestHistoryAnalysisPrompt, getExecutionSummaryPrompt, getQAAssistantWrapper, getAutonomousAgentPrompt } from "./prompts";
 import { fetch } from '@tauri-apps/plugin-http';
 
 function extractBase64Data(imageBase64: string): { mimeType: string, data: string } {
@@ -91,45 +79,15 @@ export async function generateRefinedTestCases(
 
     const systemInstruction = getQAAssistantWrapper(promptString, !!appMapping, mappingContext, customPrompt);
 
-    const url = "https://api.openai.com/v1/chat/completions";
-
-    try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
-            signal,
-            body: JSON.stringify({
-                model: model,
-                messages: [
-                    { role: 'system', content: systemInstruction },
-                    { role: 'user', content: requirements }
-                ],
-                temperature: 0.4
-            })
-        });
-
-        if (!response.ok) {
-            const errData = await response.json().catch(() => ({}));
-            const errMsg = errData.error?.message || (typeof errData === 'string' ? errData : JSON.stringify(errData));
-            throw (new Error(errMsg || `API Error: ${response.statusText}`));
-        }
-
-        const data = await response.json();
-        const text = data.choices?.[0]?.message?.content;
-
-        if (!text) {
-            throw new Error("Empty response from OpenAI");
-        }
-
-        return text.trim();
-
-    } catch (error: any) {
-        console.error("OpenAI API Error:", error);
-        throw error;
-    }
+    return await askOpenAI(
+        requirements,
+        apiKey,
+        model,
+        systemInstruction,
+        undefined,
+        signal,
+        { temperature: 0.4 }
+    );
 }
 
 /**
@@ -141,7 +99,8 @@ export async function askOpenAI(
     model: string,
     systemInstruction?: string,
     imageBase64?: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    options?: any
 ): Promise<string> {
     if (!apiKey) throw new Error("Missing OpenAI API Key");
 
@@ -159,7 +118,24 @@ export async function askOpenAI(
         });
     }
 
-    try {
+    const messages: any[] = [];
+    if (systemInstruction) {
+        messages.push({ role: 'system', content: systemInstruction });
+    }
+    messages.push({ role: 'user', content: userContent });
+
+    const { withModelRotation } = await import('./aiFallback');
+
+    return withModelRotation('openai', model, async (currentModel) => {
+        const body: any = {
+            model: currentModel,
+            messages: messages,
+            temperature: options?.temperature ?? 0.0
+        };
+
+        if (options?.response_format) body.response_format = options.response_format;
+        if (options?.max_tokens) body.max_tokens = options.max_tokens;
+
         const response = await fetch(url, {
             method: 'POST',
             headers: {
@@ -167,14 +143,7 @@ export async function askOpenAI(
                 'Authorization': `Bearer ${apiKey}`
             },
             signal,
-            body: JSON.stringify({
-                model,
-                messages: [
-                    systemInstruction ? { role: 'system', content: systemInstruction } : null,
-                    { role: 'user', content: userContent }
-                ].filter(Boolean),
-                temperature: 0.4
-            })
+            body: JSON.stringify(body)
         });
 
         if (!response.ok) {
@@ -185,13 +154,13 @@ export async function askOpenAI(
 
         const data = await response.json();
         const text = data.choices?.[0]?.message?.content;
-        if (!text) throw new Error("Empty response from OpenAI");
+
+        if (!text) {
+            throw new Error("Empty response from OpenAI");
+        }
 
         return text.trim();
-    } catch (error: any) {
-        console.error("OpenAI API Error (askOpenAI):", error);
-        throw error;
-    }
+    });
 }
 
 export async function getAvailableModels(apiKey: string): Promise<string[]> {
@@ -252,37 +221,20 @@ export async function suggestElementName(
 
     const prompt = getElementNamingPrompt(screenName, elementAttr, language, mappingContext, customPrompt);
 
-    const url = "https://api.openai.com/v1/chat/completions";
-
     try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
+        const content = await askOpenAI(
+            prompt,
+            apiKey,
+            model,
+            "You are a professional QA automation naming assistant. Respond with JSON.",
+            undefined,
             signal,
-            body: JSON.stringify({
-                model,
-                messages: [
-                    { role: 'system', content: "You are a professional QA automation naming assistant. Respond with JSON." },
-                    { role: 'user', content: prompt }
-                ],
+            {
                 response_format: { type: "json_object" },
                 temperature: 0.1,
                 max_tokens: 1024
-            })
-        });
-
-        if (!response.ok) {
-            const errData = await response.json().catch(() => ({}));
-            const errMsg = errData.error?.message || JSON.stringify(errData);
-            throw new Error(errMsg || `API Error: ${response.statusText}`);
-        }
-
-        const data: OpenAIResponse = await response.json();
-        const choice = data.choices?.[0];
-        const content = choice?.message?.content;
+            }
+        );
         
         // DEBUG: Log status and content
         // console.log("[OpenAI Status] Finish Reason:", choice?.finish_reason || "UNKNOWN");
@@ -575,43 +527,16 @@ XML DUMP:
 ${xmlDump.substring(0, 15000)}
 `.trim();
 
-    const url = "https://api.openai.com/v1/chat/completions";
-    const { mimeType, data } = extractBase64Data(screenshotBase64);
-
     try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
+        const content = await askOpenAI(
+            prompt,
+            apiKey,
+            model,
+            systemInstruction,
+            screenshotBase64,
             signal,
-            body: JSON.stringify({
-                model: model,
-                messages: [
-                    { role: 'system', content: systemInstruction },
-                    {
-                        role: 'user',
-                        content: [
-                            { type: "text", text: prompt },
-                            { type: "image_url", image_url: { url: `data:${mimeType};base64,${data}` } }
-                        ]
-                    }
-                ],
-                response_format: { type: "json_object" },
-                temperature: 0.1
-            })
-        });
-
-        if (!response.ok) {
-            const errData = await response.json().catch(() => ({}));
-            throw new Error(errData.error?.message || `API Error: ${response.statusText}`);
-        }
-
-        const resData = await response.json();
-        const content = resData.choices?.[0]?.message?.content;
-        if (!content) throw new Error("Empty response from OpenAI");
-
+            { response_format: { type: "json_object" }, temperature: 0.1 }
+        );
         return safeParseJson(content);
     } catch (error: any) {
         console.error("OpenAI exploreScreen Error:", error);
@@ -645,35 +570,16 @@ CURRENT XML DUMP:
 ${xmlDump.substring(0, 15000)}
 `.trim();
 
-    const url = "https://api.openai.com/v1/chat/completions";
-
     try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
-            body: JSON.stringify({
-                model,
-                messages: [
-                    { role: 'system', content: systemInstruction },
-                    { role: 'user', content: prompt }
-                ],
-                response_format: { type: "json_object" },
-                temperature: 0.2
-            })
-        });
-
-        if (!response.ok) {
-            const errData = await response.json().catch(() => ({}));
-            throw new Error(errData.error?.message || `API Error: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        const content = data.choices?.[0]?.message?.content;
-        if (!content) throw new Error("Empty response from OpenAI");
-
+        const content = await askOpenAI(
+            prompt,
+            apiKey,
+            model,
+            systemInstruction,
+            undefined,
+            undefined,
+            { response_format: { type: "json_object" }, temperature: 0.2 }
+        );
         return safeParseJson<AutonomousActionResponse>(content);
     } catch (error: any) {
         console.error("OpenAI generateAutonomousAction Error:", error);
@@ -697,37 +603,17 @@ export async function reorganizeFlowchartLayout(
     const systemInstruction = getFlowchartLayoutPrompt(language, customPrompt);
     const mappingContext = typeof maps === 'string' ? maps : formatExistingMaps(maps);
 
-    const url = "https://api.openai.com/v1/chat/completions";
-
     try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
+        const prompt = `Current Application Mapping:\n${mappingContext}`;
+        const content = await askOpenAI(
+            prompt,
+            apiKey,
+            model,
+            systemInstruction,
+            undefined,
             signal,
-            body: JSON.stringify({
-                model,
-                messages: [
-                    { role: 'system', content: systemInstruction },
-                    { role: 'user', content: `Current Application Mapping:\n${mappingContext}` }
-                ],
-                response_format: { type: "json_object" },
-                temperature: 0.1,
-                max_tokens: 8192
-            })
-        });
-
-        if (!response.ok) {
-            const errData = await response.json().catch(() => ({}));
-            throw new Error(errData.error?.message || `API Error: ${response.statusText}`);
-        }
-
-        const resData = await response.json();
-        const content = resData.choices?.[0]?.message?.content;
-        if (!content) throw new Error("Empty response from OpenAI");
-
+            { response_format: { type: "json_object" }, temperature: 0.1, max_tokens: 8192 }
+        );
         return safeParseJson(content);
     } catch (error: any) {
         console.error("OpenAI reorganizeFlowchartLayout Error:", error);

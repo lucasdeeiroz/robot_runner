@@ -66,4 +66,8 @@
     <continuous_improvement>
         At the end of every task requested by the user, you MUST self-evaluate what was learned during the execution. Consider whether any `.agents/rules/` or `.agents/workflows/` need to be modified or created from scratch to prevent future mistakes or improve the efficiency of future AI agents working on this project. Suggest or implement these changes proactively if they are beneficial.
     </continuous_improvement>
+
+    <suggesting_better_solutions>
+        If the user proposes a task that you believe can be solved more efficiently or effectively with a different approach, you are encouraged to propose this alternative solution to the user. This is especially relevant for tasks that involve complex logic, potential performance issues, or the use of specialized tools or libraries. Always present your suggestion in a clear, concise manner, explaining the benefits of the alternative approach and how it addresses the user's underlying goal.
+    </suggesting_better_solutions>
 </system_instructions>
