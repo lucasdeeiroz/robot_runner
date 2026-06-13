@@ -951,3 +951,12 @@ export function getHighlighterStyle(
         backgroundColor: `${color}15` // 15 is ~8% opacity in hex
     };
 }
+
+export function sanitizeId(name: string): string {
+    return name
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+}

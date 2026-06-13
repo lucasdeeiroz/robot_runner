@@ -74,7 +74,7 @@ function getBestLocator(element: UIElementMap): string {
 export function generateProjectRobotResources(maps: ScreenMap[]): Record<string, string> {
   const result: Record<string, string> = {};
   maps.forEach(map => {
-    const fileName = `${map.name.toLowerCase().replace(/\s+/g, '_')}.robot`;
+    const fileName = `${map.id}.robot`;
     result[fileName] = generateRobotResource(map);
   });
   return result;

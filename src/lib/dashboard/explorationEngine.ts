@@ -1,5 +1,5 @@
 import { ScreenMap, UIElementMap } from '@/lib/types';
-import { InspectorNode, generateXPath } from '@/lib/inspectorUtils';
+import { InspectorNode, generateXPath, sanitizeId } from '@/lib/inspectorUtils';
 
 export const DESTRUCTIVE_TERMS = ['erase', 'delete', 'remove', 'exclude', 'apagar', 'deletar', 'remover', 'excluir', 'eliminar', 'deletar', 'borrar'];
 export const ESCAPE_TERMS = ['next', 'proceed', 'continue', 'ok', 'confirm', 'save', 'done', 'próximo', 'próxima', 'prosseguir', 'continuar', 'confirmar', 'salvar', 'concluir'];
@@ -38,6 +38,7 @@ export interface ExplorationState {
     maxSteps: number;
     currentStep: number;
     targetPackage?: string;
+    allowedPackages?: string[];
     consecutiveSwipes: number;
     previousElementsSnapshot?: string;
     screenVisitCount: Record<string, number>; // Track how many times each screen was visited
@@ -105,6 +106,8 @@ export class AutonomousExplorer {
             priorityKeywords: config?.priorityKeywords ?? [],
             avoidKeywords: config?.avoidKeywords ?? [],
             forceReexplore: config?.forceReexplore ?? [],
+            targetPackage: config?.targetPackage,
+            allowedPackages: config?.allowedPackages ?? [],
         };
 
         if (config && !config.revisitKnownScreens && knownScreens?.length) {
@@ -520,6 +523,8 @@ export class AutonomousExplorer {
             priorityKeywords: [...this.state.priorityKeywords],
             avoidKeywords: [...this.state.avoidKeywords],
             revisitKnownScreens: false,
+            targetPackage: this.state.targetPackage,
+            allowedPackages: this.state.allowedPackages,
         };
     }
 
@@ -608,7 +613,7 @@ export class AutonomousExplorer {
         let screenName = titleCandidate ? titleCandidate : `Screen_${Math.abs(hash).toString(16).substring(0, 4)}`;
         // Clean up title
         screenName = screenName.trim();
-        const screenId = screenName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        const screenId = sanitizeId(screenName);
 
         return {
             id: screenId,

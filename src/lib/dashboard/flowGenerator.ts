@@ -1,4 +1,5 @@
 import { ScreenMap, FlowMap, FlowStep, NavigationData } from '../types';
+import { sanitizeId } from '@/lib/inspectorUtils';
 
 export function generateFlows(maps: ScreenMap[]): FlowMap[] {
     const flows: FlowMap[] = [];
@@ -35,7 +36,7 @@ export function generateFlows(maps: ScreenMap[]): FlowMap[] {
             if (currentPath.length > 0) {
                 const startScreen = currentPath[0].source_screen;
                 flows.push({
-                    id: `flow_${startScreen}_to_${currentScreen}`.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+                    id: sanitizeId(`flow_${startScreen}_to_${currentScreen}`),
                     name: `Flow from ${startScreen} to ${currentScreen}`,
                     steps: [...currentPath]
                 });

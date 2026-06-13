@@ -8,7 +8,7 @@ import { XMLParser } from 'fast-xml-parser';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { useOutsideClick } from '@/hooks/useOutsideClick';
-import { InspectorNode, transformXmlToTree, generateXPath, findNodesByLocator, findNodesByText } from '@/lib/inspectorUtils';
+import { InspectorNode, transformXmlToTree, generateXPath, findNodesByLocator, findNodesByText, sanitizeId } from '@/lib/inspectorUtils';
 import { feedback } from "@/lib/feedback";
 import { Section } from "@/components/organisms/Section";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
@@ -347,7 +347,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
         debounceTimerRef.current = setTimeout(async () => {
             setIsSaving(true);
-            const screenId = screenName.toLowerCase().replace(/\s+/g, '_');
+            const screenId = sanitizeId(screenName);
 
             // Fetch from latest source (disk) to avoid overwriting newer data (like layout)
             // from other components/tabs
@@ -718,7 +718,8 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             // App Recovery Logic
             let currentPkg = "";
             try {
-                currentPkg = await invoke<string>('get_focused_package', { device: selectedDevice });
+                const pkg = await invoke<string>('get_focused_package', { device: selectedDevice });
+                currentPkg = pkg ? pkg.trim() : "";
             } catch (pkgError) {
                 console.warn("Failed to detect focused package:", pkgError);
                 if (explorer.getState().currentStep === 1) {
@@ -837,7 +838,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             // screen to use the exact same name as the previous screen, so elements get appended naturally.
             if (previousNav && previousNav.actionType === 'swipe' && previousNav.screenName) {
                 heuristicScreenTemp.name = previousNav.screenName;
-                heuristicScreenTemp.id = previousNav.screenName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+                heuristicScreenTemp.id = sanitizeId(previousNav.screenName);
             } else if (heuristicScreenTemp.elements.length > 0) {
                 // Similarity-based Screen Merging
                 let bestMatch: { name: string, id: string, score: number } | null = null;
@@ -1142,7 +1143,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 }
 
                 const map: ScreenMap = {
-                    id: existingMap?.id || aiScreen.name.toLowerCase().replace(/\s+/g, '_'),
+                    id: existingMap?.id || sanitizeId(aiScreen.name),
                     name: aiScreen.name,
                     // Preserve existing metadata: user or previous AI may have added important context
                     type: existingMap?.type || aiScreen.type || 'screen',
@@ -1566,7 +1567,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         }
         const { generateRobotResource } = await import('@/lib/dashboard/pomGenerator');
         const content = generateRobotResource({
-            id: screenName.toLowerCase().replace(/\s+/g, '_'),
+            id: sanitizeId(screenName),
             name: screenName,
             type: screenType,
             elements: mappedElements
@@ -1574,7 +1575,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
         const path = await save({
             filters: [{ name: 'Robot Framework Resource', extensions: ['robot'] }],
-            defaultPath: `${screenName.toLowerCase().replace(/\s+/g, '_')}.robot`
+            defaultPath: `${sanitizeId(screenName)}.robot`
         });
 
         if (path) {
