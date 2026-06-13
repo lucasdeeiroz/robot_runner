@@ -12,7 +12,10 @@ export function Switch({ checked, onCheckedChange, className }: SwitchProps) {
             type="button"
             role="switch"
             aria-checked={checked}
-            onClick={() => onCheckedChange(!checked)}
+            onClick={(e) => {
+                e.stopPropagation();
+                onCheckedChange(!checked);
+            }}
             className={clsx(
                 "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-2xl border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ring-offset-background",
                 checked ? "bg-primary" : "bg-outline-variant",

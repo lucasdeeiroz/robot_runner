@@ -124,6 +124,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     const [isMigrating, setIsMigrating] = useState(false);
     const [isExploring, setIsExploring] = useState(false);
     const isExploringRef = useRef(false);
+    const lastActionRef = useRef<string | null>(null);
     const [isEnhancing, setIsEnhancing] = useState(false);
     const enhanceAbortControllerRef = useRef<AbortController | null>(null);
     const [explorationLogs, setExplorationLogs] = useState<LogEntry[]>([]);
@@ -727,20 +728,34 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
             if (!isExploringRef.current) return;
 
-            let targetPkg = explorer.getTargetPackage();
+            const config = explorer.getConfig();
+            let targetPkg = config.targetPackage || explorer.getTargetPackage();
 
             if (explorer.getState().currentStep === 1 && !targetPkg && currentPkg) {
                 targetPkg = currentPkg;
                 explorer.setTargetPackage(targetPkg);
             }
 
-            if (targetPkg && currentPkg && currentPkg !== targetPkg) {
-                explorer.addLog(t('mapper.exploration.recovering_exit', { current: currentPkg, target: targetPkg }), 'transition');
-                await invoke('launch_package', { device: selectedDevice, package: targetPkg });
+            const isTarget = currentPkg === targetPkg;
+            const isAllowed = config.allowedPackages?.includes(currentPkg);
+
+            if (targetPkg && currentPkg && !isTarget && !isAllowed) {
+                if (lastActionRef.current === 'back') {
+                    explorer.addLog(`[Guard] Fora do escopo após 'voltar'. Iniciando app alvo...`, 'warning');
+                    await invoke('launch_package', { device: selectedDevice, package: targetPkg });
+                } else {
+                    explorer.addLog(`[Guard] Fora do escopo após ação. Matando app intruso (${currentPkg})...`, 'warning');
+                    await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'am', 'force-stop', currentPkg] });
+                }
+                lastActionRef.current = 'guard_recovery';
+                
                 if (!isExploringRef.current) return;
-                // Small delay to let app load
+                // Wait a bit for the system to recover
                 await new Promise(resolve => setTimeout(resolve, 3000));
-                if (!isExploringRef.current) return;
+                
+                setExplorationLogs([...explorer.getLogs()]);
+                explorationTimeoutRef.current = setTimeout(runExplorationStep, 1500);
+                return;
             }
 
             setExplorationLogs([...explorer.getLogs()]);
@@ -1181,6 +1196,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
             // 5. Navigation
             const next = (result.nextAction || { type: 'back' }) as ExplorationAction;
+            lastActionRef.current = next.type;
             if (next.type === 'finish') {
                 explorer.addLog(t('mapper.exploration.finished'), 'finished');
                 stopExploration("Finished");
@@ -1522,6 +1538,17 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
         explorerRef.current.addLog(explorerRef.current.getGraphSummaryLog(currentDiskMaps, t('mapper.exploration.summary_initial', 'Resumo Inicial do Grafo')), 'info');
         setExplorationLogs([...explorerRef.current.getLogs()]);
+
+        lastActionRef.current = 'start';
+        if (config.targetPackage) {
+            try {
+                await invoke('launch_package', { device: selectedDevice, package: config.targetPackage });
+                await new Promise(resolve => setTimeout(resolve, 3000));
+            } catch (e) {
+                console.error("Failed to launch target package on start", e);
+            }
+        }
+
         setIsExploring(true);
         isExploringRef.current = true;
     };

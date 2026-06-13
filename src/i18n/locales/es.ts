@@ -1754,6 +1754,13 @@ export const es = {
                 title: "Usar IA para Refinamiento",
                 desc: "La IA añadirá nuevas reglas a las configuraciones anteriores según tu intención.",
                 placeholder: "Describe brevemente lo que deseas..."
+            },
+            packages: {
+                title: "App Objetivo y Permitidas",
+                target_label: "App Objetivo",
+                allowed_label: "Apps Secundarias Permitidas (App Bundles)",
+                allowed_desc: "Si la exploración abre estas apps, continuará naturalmente sin cerrarlas a la fuerza.",
+                no_secondary: "No hay otros paquetes disponibles en Ajustes."
             }
         },
         auth: {

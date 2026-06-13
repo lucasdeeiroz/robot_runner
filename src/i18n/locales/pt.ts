@@ -1751,6 +1751,13 @@ export const pt = {
                 title: "Usar IA para Refinamento",
                 desc: "A IA irá adicionar novas regras às configurações acima baseada na sua intenção.",
                 placeholder: "Descreva brevemente o que você deseja..."
+            },
+            packages: {
+                title: "App Alvo & Permitidos",
+                target_label: "App Alvo",
+                allowed_label: "Apps Secundários Permitidos (App Bundles)",
+                allowed_desc: "Se a exploração abrir estes apps, continuará naturalmente sem fechá-los à força.",
+                no_secondary: "Nenhum outro pacote disponível nas Configurações."
             }
         },
         auth: {

@@ -9,6 +9,8 @@ export interface ExplorationConfig {
     revisitKnownScreens: boolean;
     escapeTargets?: string[];
     forceReexplore?: string[];
+    targetPackage?: string;
+    allowedPackages?: string[];
 }
 
 export const DEFAULT_EXPLORATION_CONFIG: ExplorationConfig = {
@@ -17,6 +19,8 @@ export const DEFAULT_EXPLORATION_CONFIG: ExplorationConfig = {
     revisitKnownScreens: false,
     escapeTargets: [],
     forceReexplore: [],
+    targetPackage: undefined,
+    allowedPackages: [],
 };
 
 export enum GraphState {
@@ -452,22 +456,28 @@ export class AutonomousExplorer {
 
         traverse(root);
 
-        // Priority 1: Exploring elements (elements that lead to unexplored screens)
-        // Priority 2: Unexplored elements on the current screen
-        let candidates = exploringTargets.length > 0 ? exploringTargets : unvisitedTargets;
+        // Priority 1: Priority Keywords (Global highest priority across all valid targets)
+        // Priority 2: Exploring elements (elements that lead to unexplored screens)
+        // Priority 3: Unexplored elements on the current screen
+        let unvisitedTarget: InspectorNode | null = null;
+        const allTargets = [...exploringTargets, ...unvisitedTargets];
 
-        if (this.state.priorityKeywords.length > 0 && candidates.length > 0) {
+        if (this.state.priorityKeywords.length > 0 && allTargets.length > 0) {
             const keywords = this.state.priorityKeywords.map(k => k.toLowerCase());
-            candidates.sort((a, b) => {
-                const aText = ((a.attributes['text'] || '') + ' ' + (a.attributes['content-desc'] || '')).toLowerCase();
-                const bText = ((b.attributes['text'] || '') + ' ' + (b.attributes['content-desc'] || '')).toLowerCase();
-                const aPriority = keywords.some(k => aText.includes(k));
-                const bPriority = keywords.some(k => bText.includes(k));
-                return (aPriority === bPriority) ? 0 : aPriority ? -1 : 1;
+            const prioritizedTargets = allTargets.filter(node => {
+                const text = ((node.attributes['text'] || '') + ' ' + (node.attributes['content-desc'] || '')).toLowerCase();
+                return keywords.some(k => text.includes(k));
             });
+
+            if (prioritizedTargets.length > 0) {
+                unvisitedTarget = prioritizedTargets[0];
+            }
         }
 
-        const unvisitedTarget = candidates[0] ?? null;
+        if (!unvisitedTarget) {
+            const candidates = exploringTargets.length > 0 ? exploringTargets : unvisitedTargets;
+            unvisitedTarget = candidates[0] ?? null;
+        }
 
         if (unvisitedTarget) {
             const xpath = generateXPath(unvisitedTarget);

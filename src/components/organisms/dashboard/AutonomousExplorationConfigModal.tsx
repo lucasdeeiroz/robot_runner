@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Compass, Focus, Map, X, Sparkles } from 'lucide-react';
@@ -7,7 +8,9 @@ import { ActionCard } from '@/components/atoms/ActionCard';
 import { TagInput } from '@/components/atoms/TagInput';
 import { Switch } from '@/components/atoms/Switch';
 import { Textarea } from '@/components/atoms/Textarea';
+import { Select } from '@/components/atoms/Select';
 import { ExplorationConfig } from '@/lib/dashboard/explorationEngine';
+import { useSettings } from '@/lib/settings';
 
 interface AutonomousExplorationConfigModalProps {
     onClose: () => void;
@@ -25,6 +28,14 @@ export function AutonomousExplorationConfigModal({ onClose, onStart }: Autonomou
     const [escapeTargets, setEscapeTargets] = useState<string[]>([]);
     const [priorityKeywords, setPriorityKeywords] = useState<string[]>([]);
 
+    const { settings } = useSettings();
+    const availablePackages = settings.tools.appPackage
+        ? settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean)
+        : [];
+
+    const [targetPackage, setTargetPackage] = useState<string>(availablePackages[0] || '');
+    const [allowedPackages, setAllowedPackages] = useState<string[]>([]);
+
     const [useAi, setUseAi] = useState(false);
     const [aiPrompt, setAiPrompt] = useState('');
 
@@ -35,11 +46,22 @@ export function AutonomousExplorationConfigModal({ onClose, onStart }: Autonomou
             escapeTargets: limits === 'custom' ? escapeTargets : [],
             forceReexplore: [],
             revisitKnownScreens: mode === 'all' || mode === 'specific',
+            targetPackage: targetPackage || undefined,
+            allowedPackages: allowedPackages,
         };
         onStart(config, aiPrompt, useAi);
     };
 
-    return (
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+        return () => setMounted(false);
+    }, []);
+
+    if (!mounted) return null;
+
+    return createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-surface/80 backdrop-blur-md p-4">
             <motion.div
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -153,6 +175,56 @@ export function AutonomousExplorationConfigModal({ onClose, onStart }: Autonomou
                         )}
                     </AnimatePresence>
 
+                    {/* App Bundles / Packages Section */}
+                    {availablePackages.length > 0 && (
+                        <div className="space-y-4">
+                            <h3 className="text-sm font-bold uppercase tracking-wider text-on-surface-variant/60">
+                                {t('exploration_modal.packages.title', 'Target & Allowed Apps')}
+                            </h3>
+                            <div className="bg-surface-variant/20 p-5 rounded-2xl border border-outline-variant/30 space-y-4">
+                                <Select
+                                    label={t('exploration_modal.packages.target_label', 'Target App')}
+                                    value={targetPackage}
+                                    onChange={(e) => setTargetPackage(e.target.value)}
+                                    options={availablePackages.map(pkg => ({ label: pkg, value: pkg }))}
+                                />
+                                
+                                <div className="space-y-2 pt-2">
+                                    <p className="text-sm font-medium text-on-surface">
+                                        {t('exploration_modal.packages.allowed_label', 'Secondary Allowed Apps (App Bundles)')}
+                                    </p>
+                                    <p className="text-xs text-on-surface-variant/80 mb-2">
+                                        {t('exploration_modal.packages.allowed_desc', 'If exploration opens these apps, it will continue naturally without force-stopping them.')}
+                                    </p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {availablePackages.filter(pkg => pkg !== targetPackage).map(pkg => (
+                                            <div key={pkg} className="flex items-center gap-3 bg-surface p-3 rounded-xl border border-outline-variant/10 cursor-pointer" onClick={() => {
+                                                setAllowedPackages(prev => 
+                                                    prev.includes(pkg) ? prev.filter(p => p !== pkg) : [...prev, pkg]
+                                                );
+                                            }}>
+                                                <Switch 
+                                                    checked={allowedPackages.includes(pkg)}
+                                                    onCheckedChange={(checked) => {
+                                                        setAllowedPackages(prev => 
+                                                            checked ? [...prev, pkg] : prev.filter(p => p !== pkg)
+                                                        );
+                                                    }}
+                                                />
+                                                <span className="text-sm text-on-surface truncate" title={pkg}>{pkg}</span>
+                                            </div>
+                                        ))}
+                                        {availablePackages.filter(pkg => pkg !== targetPackage).length === 0 && (
+                                            <div className="text-xs text-on-surface-variant italic col-span-2">
+                                                {t('exploration_modal.packages.no_secondary', 'No other packages available in Settings.')}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* AI Section */}
                     <div className="bg-primary/5 border border-primary/20 rounded-2xl p-5 space-y-4">
                         <div className="flex items-center justify-between">
@@ -199,6 +271,7 @@ export function AutonomousExplorationConfigModal({ onClose, onStart }: Autonomou
                     </Button>
                 </div>
             </motion.div>
-        </div>
+        </div>,
+        document.body
     );
 }

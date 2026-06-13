@@ -1750,6 +1750,13 @@ export const en = {
                 title: "Use AI for Refinement",
                 desc: "The AI will add new rules to the configurations above based on your intent.",
                 placeholder: "Briefly describe what you want..."
+            },
+            packages: {
+                title: "Target & Allowed Apps",
+                target_label: "Target App",
+                allowed_label: "Secondary Allowed Apps (App Bundles)",
+                allowed_desc: "If exploration opens these apps, it will continue naturally without force-stopping them.",
+                no_secondary: "No other packages available in Settings."
             }
         },
         auth: {
