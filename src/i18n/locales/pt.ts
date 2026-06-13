@@ -869,6 +869,10 @@ export const pt = {
                 merging_insights: "Mesclando insights da IA na tela existente: \"{{name}}\" (ID: {{id}}, {{count}} elementos)",
                 new_elements_discovered: "Adicionados {{count}} novos elementos descobertos pela IA. Total: {{total}}",
                 analyzing_prompt: "Analisando prompt...",
+                summary_initial: "Resumo Inicial do Grafo",
+                summary_final: "Resumo Final do Grafo (Fim da Exploração)",
+                summary_screens: "- Telas: {{exhausted}} Exhausted, {{exploring}} Exploring, {{unexplored}} Unexplored",
+                summary_elements: "- Elementos: {{exhausted}} Exhausted, {{exploring}} Exploring, {{unexplored}} Unexplored",
             },
             enhancer: {
                 title: "Auditoria e Melhoria de Mapeamentos",
@@ -1704,6 +1708,49 @@ export const pt = {
                     title: "Selenium (Pytest)",
                     description: "Automação de navegador padrão usando Python & pytest. Ideal para regressão web robusta."
                 }
+            }
+        },
+        exploration_modal: {
+            title: "Configuração da Exploração Autônoma",
+            subtitle: "Defina como a inteligência artificial deve navegar e mapear o aplicativo.",
+            mode: {
+                title: "Modo de Exploração",
+                new: {
+                    title: "Apenas Telas Novas",
+                    desc: "A exploração irá parar ao encontrar telas conhecidas."
+                },
+                all: {
+                    title: "Explorar Tudo",
+                    desc: "A exploração varrerá todo o aplicativo."
+                },
+                specific: {
+                    title: "Trecho Específico",
+                    desc: "Focar em um caminho específico."
+                }
+            },
+            limits: {
+                title: "Limites de Navegação",
+                default: {
+                    title: "Limites Padrão",
+                    desc: "Carrega configurações seguras padronizadas."
+                },
+                custom: {
+                    title: "Limites Customizados",
+                    desc: "Definir seus próprios termos."
+                }
+            },
+            fields: {
+                blocked: "Termos Bloqueados (Botões proibidos de interagir)",
+                blocked_placeholder: "excluir, deletar",
+                escape: "Termos de Escape (Botões de voltar/cancelar)",
+                escape_placeholder: "voltar, cancelar",
+                priority: "Termos Prioritários (O que clicar primeiro)",
+                priority_placeholder: "configurações, perfil"
+            },
+            ai: {
+                title: "Usar IA para Refinamento",
+                desc: "A IA irá adicionar novas regras às configurações acima baseada na sua intenção.",
+                placeholder: "Descreva brevemente o que você deseja..."
             }
         },
         auth: {

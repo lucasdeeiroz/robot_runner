@@ -4,9 +4,9 @@ import { useSettings } from '@/lib/settings';
 import { Button } from '@/components/atoms/Button';
 import { Select } from '@/components/atoms/Select';
 import { Badge } from '@/components/atoms/Badge';
-import { Compass, Bot, CheckCircle2, Zap, Terminal, Globe, Smartphone } from 'lucide-react';
+import { ActionCard } from '@/components/atoms/ActionCard';
+import { Compass, Bot, Zap, Terminal, Globe, Smartphone } from 'lucide-react';
 import { motion } from 'framer-motion';
-import clsx from 'clsx';
 import { feedback } from '@/lib/feedback';
 
 interface OnboardingProps {
@@ -120,52 +120,22 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                         <h2 className="text-xl font-semibold mb-4 text-center text-on-surface">{t('onboarding.step2_title')}</h2>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {/* Explorer Mode */}
-                            <div
+                            <ActionCard
+                                title={t('onboarding.mode.explorer.title')}
+                                description={t('onboarding.mode.explorer.description')}
+                                icon={<Compass size={24} />}
+                                selected={selectedMode === 'explorer'}
                                 onClick={() => setSelectedMode('explorer')}
-                                className={clsx(
-                                    "relative p-6 rounded-2xl border-2 cursor-pointer transition-all hover:shadow-md",
-                                    selectedMode === 'explorer'
-                                        ? "bg-primary/5 border-primary"
-                                        : "bg-surface border-outline-variant/30 hover:bg-surface-variant/30"
-                                )}
-                            >
-                                {selectedMode === 'explorer' && (
-                                    <div className="absolute top-4 right-4 text-primary dark:text-primary/80">
-                                        <CheckCircle2 size={24} />
-                                    </div>
-                                )}
-                                <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary dark:text-primary/80 mb-4">
-                                    <Compass size={24} />
-                                </div>
-                                <h3 className="text-lg font-bold text-on-surface mb-2">{t('onboarding.mode.explorer.title')}</h3>
-                                <p className="text-sm text-on-surface-variant/80">
-                                    {t('onboarding.mode.explorer.description')}
-                                </p>
-                            </div>
+                            />
 
                             {/* Automator Mode */}
-                            <div
+                            <ActionCard
+                                title={t('onboarding.mode.automator.title')}
+                                description={t('onboarding.mode.automator.description')}
+                                icon={<Bot size={24} />}
+                                selected={selectedMode === 'automator'}
                                 onClick={() => setSelectedMode('automator')}
-                                className={clsx(
-                                    "relative p-6 rounded-2xl border-2 cursor-pointer transition-all hover:shadow-md",
-                                    selectedMode === 'automator'
-                                        ? "bg-primary/5 border-primary"
-                                        : "bg-surface border-outline-variant/30 hover:bg-surface-variant/30"
-                                )}
-                            >
-                                {selectedMode === 'automator' && (
-                                    <div className="absolute top-4 right-4 text-primary dark:text-primary/80">
-                                        <CheckCircle2 size={24} />
-                                    </div>
-                                )}
-                                <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary dark:text-primary/80 mb-4">
-                                    <Bot size={24} />
-                                </div>
-                                <h3 className="text-lg font-bold text-on-surface mb-2">{t('onboarding.mode.automator.title')}</h3>
-                                <p className="text-sm text-on-surface-variant/80">
-                                    {t('onboarding.mode.automator.description')}
-                                </p>
-                            </div>
+                            />
                         </div>
 
                         <div className="flex justify-between mt-8">
@@ -199,52 +169,24 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                         {selectedMode === 'explorer' && (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {/* Mobile Platform */}
-                                <div
+                                <ActionCard
+                                    title={t('onboarding.platform.mobile.title')}
+                                    description={t('onboarding.platform.mobile.description')}
+                                    icon={<Smartphone size={28} />}
+                                    selected={selectedExplorerPlatform === 'mobile'}
                                     onClick={() => setSelectedExplorerPlatform('mobile')}
-                                    className={clsx(
-                                        "relative p-5 rounded-2xl border-2 cursor-pointer transition-all hover:shadow-md flex flex-col items-center justify-center text-center gap-3",
-                                        selectedExplorerPlatform === 'mobile'
-                                            ? "bg-primary/5 border-primary"
-                                            : "bg-surface border-outline-variant/30 hover:bg-surface-variant/30"
-                                    )}
-                                >
-                                    <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center text-primary dark:text-primary/80 mb-2">
-                                        <Smartphone size={28} />
-                                    </div>
-                                    <h3 className="text-lg font-bold text-on-surface">{t('onboarding.platform.mobile.title')}</h3>
-                                    <p className="text-sm text-on-surface-variant/80">
-                                        {t('onboarding.platform.mobile.description')}
-                                    </p>
-                                    {selectedExplorerPlatform === 'mobile' && (
-                                        <div className="absolute top-4 right-4 text-primary">
-                                            <CheckCircle2 size={24} />
-                                        </div>
-                                    )}
-                                </div>
+                                    centered
+                                />
 
                                 {/* Web Platform */}
-                                <div
+                                <ActionCard
+                                    title={t('onboarding.platform.web.title')}
+                                    description={t('onboarding.platform.web.description')}
+                                    icon={<Globe size={28} />}
+                                    selected={selectedExplorerPlatform === 'web'}
                                     onClick={() => setSelectedExplorerPlatform('web')}
-                                    className={clsx(
-                                        "relative p-5 rounded-2xl border-2 cursor-pointer transition-all hover:shadow-md flex flex-col items-center justify-center text-center gap-3",
-                                        selectedExplorerPlatform === 'web'
-                                            ? "bg-primary/5 border-primary"
-                                            : "bg-surface border-outline-variant/30 hover:bg-surface-variant/30"
-                                    )}
-                                >
-                                    <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center text-primary dark:text-primary/80 mb-2">
-                                        <Globe size={28} />
-                                    </div>
-                                    <h3 className="text-lg font-bold text-on-surface">{t('onboarding.platform.web.title')}</h3>
-                                    <p className="text-sm text-on-surface-variant/80">
-                                        {t('onboarding.platform.web.description')}
-                                    </p>
-                                    {selectedExplorerPlatform === 'web' && (
-                                        <div className="absolute top-4 right-4 text-primary">
-                                            <CheckCircle2 size={24} />
-                                        </div>
-                                    )}
-                                </div>
+                                    centered
+                                />
                             </div>
                         )}
 
@@ -256,88 +198,36 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                                     </h3>
                                     <div className="grid grid-cols-1 gap-3">
                                         {/* Robot Framework */}
-                                        <div
+                                        <ActionCard
+                                            title={t('onboarding.framework.robot.title')}
+                                            description={t('onboarding.framework.robot.description')}
+                                            icon={<Bot size={24} />}
+                                            selected={selectedFramework === 'robot'}
                                             onClick={() => setSelectedFramework('robot')}
-                                            className={clsx(
-                                                "relative p-4 rounded-2xl border-2 cursor-pointer transition-all hover:shadow-md flex items-center gap-4",
-                                                selectedFramework === 'robot'
-                                                    ? "bg-primary/5 border-primary"
-                                                    : "bg-surface border-outline-variant/30 hover:bg-surface-variant/30"
-                                            )}
-                                        >
-                                            <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary dark:text-primary/80 flex-shrink-0">
-                                                <Bot size={24} />
-                                            </div>
-                                            <div className="flex-1">
-                                                <h3 className="text-base font-bold text-on-surface">{t('onboarding.framework.robot.title')}</h3>
-                                                <p className="text-xs text-on-surface-variant/80">
-                                                    {t('onboarding.framework.robot.description')}
-                                                </p>
-                                            </div>
-                                            {selectedFramework === 'robot' && (
-                                                <div className="text-primary">
-                                                    <CheckCircle2 size={24} />
-                                                </div>
-                                            )}
-                                        </div>
+                                            orientation="horizontal"
+                                        />
 
                                         {/* Appium Java */}
-                                        <div
+                                        <ActionCard
+                                            title={t('onboarding.framework.appium.title')}
+                                            description={t('onboarding.framework.appium.description')}
+                                            icon={<Terminal size={24} />}
+                                            selected={selectedFramework === 'appium'}
                                             onClick={() => setSelectedFramework('appium')}
-                                            className={clsx(
-                                                "relative p-4 rounded-2xl border-2 cursor-pointer transition-all hover:shadow-md flex items-center gap-4",
-                                                selectedFramework === 'appium'
-                                                    ? "bg-primary/5 border-primary"
-                                                    : "bg-surface border-outline-variant/30 hover:bg-surface-variant/30"
-                                            )}
-                                        >
-                                            <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary dark:text-primary/80 flex-shrink-0">
-                                                <Terminal size={24} />
-                                            </div>
-                                            <div className="flex-1">
-                                                <div className="flex items-center gap-2">
-                                                    <h3 className="text-base font-bold text-on-surface">{t('onboarding.framework.appium.title')}</h3>
-                                                    <Badge variant="info" size="sm" className="font-bold opacity-70">{t('common.beta')}</Badge>
-                                                </div>
-                                                <p className="text-xs text-on-surface-variant/80">
-                                                    {t('onboarding.framework.appium.description')}
-                                                </p>
-                                            </div>
-                                            {selectedFramework === 'appium' && (
-                                                <div className="text-primary">
-                                                    <CheckCircle2 size={24} />
-                                                </div>
-                                            )}
-                                        </div>
+                                            orientation="horizontal"
+                                            badge={<Badge variant="info" size="sm" className="font-bold opacity-70">{t('common.beta')}</Badge>}
+                                        />
 
                                         {/* Maestro */}
-                                        <div
+                                        <ActionCard
+                                            title={t('onboarding.framework.maestro.title')}
+                                            description={t('onboarding.framework.maestro.description')}
+                                            icon={<Zap size={24} />}
+                                            selected={selectedFramework === 'maestro'}
                                             onClick={() => setSelectedFramework('maestro')}
-                                            className={clsx(
-                                                "relative p-4 rounded-2xl border-2 cursor-pointer transition-all hover:shadow-md flex items-center gap-4",
-                                                selectedFramework === 'maestro'
-                                                    ? "bg-primary/5 border-primary"
-                                                    : "bg-surface border-outline-variant/30 hover:bg-surface-variant/30"
-                                            )}
-                                        >
-                                            <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary dark:text-primary/80 flex-shrink-0">
-                                                <Zap size={24} />
-                                            </div>
-                                            <div className="flex-1">
-                                                <div className="flex items-center gap-2">
-                                                    <h3 className="text-base font-bold text-on-surface">{t('onboarding.framework.maestro.title')}</h3>
-                                                    <Badge variant="info" size="sm" className="font-bold opacity-70">{t('common.beta')}</Badge>
-                                                </div>
-                                                <p className="text-xs text-on-surface-variant/80">
-                                                    {t('onboarding.framework.maestro.description')}
-                                                </p>
-                                            </div>
-                                            {selectedFramework === 'maestro' && (
-                                                <div className="text-primary">
-                                                    <CheckCircle2 size={24} />
-                                                </div>
-                                            )}
-                                        </div>
+                                            orientation="horizontal"
+                                            badge={<Badge variant="info" size="sm" className="font-bold opacity-70">{t('common.beta')}</Badge>}
+                                        />
                                     </div>
                                 </div>
 
@@ -347,56 +237,24 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                                     </h3>
                                     <div className="grid grid-cols-1 gap-3">
                                         {/* Cypress */}
-                                        <div
+                                        <ActionCard
+                                            title={t('onboarding.framework.cypress.title')}
+                                            description={t('onboarding.framework.cypress.description')}
+                                            icon={<Globe size={24} />}
+                                            selected={selectedFramework === 'cypress'}
                                             onClick={() => setSelectedFramework('cypress')}
-                                            className={clsx(
-                                                "relative p-4 rounded-2xl border-2 cursor-pointer transition-all hover:shadow-md flex items-center gap-4",
-                                                selectedFramework === 'cypress'
-                                                    ? "bg-primary/5 border-primary"
-                                                    : "bg-surface border-outline-variant/30 hover:bg-surface-variant/30"
-                                            )}
-                                        >
-                                            <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary dark:text-primary/80 flex-shrink-0">
-                                                <Globe size={24} />
-                                            </div>
-                                            <div className="flex-1">
-                                                <h3 className="text-base font-bold text-on-surface">{t('onboarding.framework.cypress.title')}</h3>
-                                                <p className="text-xs text-on-surface-variant/80">
-                                                    {t('onboarding.framework.cypress.description')}
-                                                </p>
-                                            </div>
-                                            {selectedFramework === 'cypress' && (
-                                                <div className="text-primary">
-                                                    <CheckCircle2 size={24} />
-                                                </div>
-                                            )}
-                                        </div>
+                                            orientation="horizontal"
+                                        />
 
                                         {/* Selenium Pytest */}
-                                        <div
+                                        <ActionCard
+                                            title={t('onboarding.framework.selenium.title')}
+                                            description={t('onboarding.framework.selenium.description')}
+                                            icon={<Terminal size={24} />}
+                                            selected={selectedFramework === 'selenium'}
                                             onClick={() => setSelectedFramework('selenium')}
-                                            className={clsx(
-                                                "relative p-4 rounded-2xl border-2 cursor-pointer transition-all hover:shadow-md flex items-center gap-4",
-                                                selectedFramework === 'selenium'
-                                                    ? "bg-primary/5 border-primary"
-                                                    : "bg-surface border-outline-variant/30 hover:bg-surface-variant/30"
-                                            )}
-                                        >
-                                            <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary dark:text-primary/80 flex-shrink-0">
-                                                <Terminal size={24} />
-                                            </div>
-                                            <div className="flex-1">
-                                                <h3 className="text-base font-bold text-on-surface">{t('onboarding.framework.selenium.title')}</h3>
-                                                <p className="text-xs text-on-surface-variant/80">
-                                                    {t('onboarding.framework.selenium.description')}
-                                                </p>
-                                            </div>
-                                            {selectedFramework === 'selenium' && (
-                                                <div className="text-primary">
-                                                    <CheckCircle2 size={24} />
-                                                </div>
-                                            )}
-                                        </div>
+                                            orientation="horizontal"
+                                        />
                                     </div>
                                 </div>
                             </div>

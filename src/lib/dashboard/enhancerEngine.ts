@@ -14,7 +14,7 @@ export async function processAndEnhanceMaps(
     keys: { gemini?: string; claude?: string; openai?: string; antigravity?: string },
     onProgress: (msg: string) => void,
     abortSignal?: AbortSignal,
-    t: (key: string, defaultText: string, options?: any) => string = (k, d) => d
+    t: (key: string, defaultText: string, options?: any) => string = (_k, d) => d
 ): Promise<EnhanceResult> {
     const logs: string[] = [];
     const log = (msg: string) => {
@@ -31,9 +31,14 @@ export async function processAndEnhanceMaps(
     for (const map of enhancedMaps) {
         const uniqueElements = new Map<string, UIElementMap>();
         for (const el of map.elements) {
-            const key = el.xpath || el.android_id || el.accessibility_id || el.text || el.id;
+            const key = el.id; // Use strict XPath ID. Fallbacks like 'text' incorrectly merge distinct elements
             if (!uniqueElements.has(key)) {
                 uniqueElements.set(key, el);
+            } else {
+                // Merge exploration state from duplicates to prevent data loss
+                const existing = uniqueElements.get(key)!;
+                if (el.explored) existing.explored = true;
+                if (el.navigates_to && !existing.navigates_to) existing.navigates_to = el.navigates_to;
             }
         }
         if (map.elements.length !== uniqueElements.size) {
@@ -157,6 +162,12 @@ export async function processAndEnhanceMaps(
                             }
                             if (aiScreen.type && ['screen', 'modal', 'tab', 'drawer'].includes(aiScreen.type)) {
                                 targetMap.type = aiScreen.type as any;
+                            }
+                            if (Array.isArray(aiScreen.tags)) {
+                                targetMap.tags = aiScreen.tags
+                                    .filter((t: any) => typeof t === 'string' && t.trim() !== '')
+                                    .map((t: string) => t.trim())
+                                    .slice(0, 3);
                             }
                             if (Array.isArray(aiScreen.elements)) {
                                 for (const aiEl of aiScreen.elements) {

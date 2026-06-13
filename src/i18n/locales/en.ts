@@ -868,6 +868,10 @@ export const en = {
                 merging_insights: "Merging AI insights into existing screen: \"{{name}}\" (ID: {{id}}, {{count}} elements)",
                 new_elements_discovered: "Added {{count}} new elements discovered by AI. Total: {{total}}",
                 analyzing_prompt: "Analyzing prompt...",
+                summary_initial: "Initial Graph Summary",
+                summary_final: "Final Graph Summary (Exploration Ended)",
+                summary_screens: "- Screens: {{exhausted}} Exhausted, {{exploring}} Exploring, {{unexplored}} Unexplored",
+                summary_elements: "- Elements: {{exhausted}} Exhausted, {{exploring}} Exploring, {{unexplored}} Unexplored",
             },
             enhancer: {
                 title: "Audit & Enhance Maps",
@@ -1703,6 +1707,49 @@ export const en = {
                     title: "Selenium (Pytest)",
                     description: "Standard browser automation using Python & pytest. Best for robust web regression."
                 }
+            }
+        },
+        exploration_modal: {
+            title: "Autonomous Exploration Configuration",
+            subtitle: "Define how the artificial intelligence should navigate and map the application.",
+            mode: {
+                title: "Exploration Mode",
+                new: {
+                    title: "Only New Screens",
+                    desc: "Exploration will stop when encountering known screens."
+                },
+                all: {
+                    title: "Explore Everything",
+                    desc: "Exploration will scan the entire application."
+                },
+                specific: {
+                    title: "Specific Path",
+                    desc: "Focus on a specific navigation path."
+                }
+            },
+            limits: {
+                title: "Navigation Limits",
+                default: {
+                    title: "Default Limits",
+                    desc: "Loads standard safe configurations."
+                },
+                custom: {
+                    title: "Custom Limits",
+                    desc: "Define your own custom keywords."
+                }
+            },
+            fields: {
+                blocked: "Blocked Keywords (Buttons forbidden to interact)",
+                blocked_placeholder: "delete, remove",
+                escape: "Escape Keywords (Back/Cancel buttons)",
+                escape_placeholder: "back, cancel",
+                priority: "Priority Keywords (What to click first)",
+                priority_placeholder: "settings, profile"
+            },
+            ai: {
+                title: "Use AI for Refinement",
+                desc: "The AI will add new rules to the configurations above based on your intent.",
+                placeholder: "Briefly describe what you want..."
             }
         },
         auth: {

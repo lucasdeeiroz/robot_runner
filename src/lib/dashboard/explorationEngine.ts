@@ -1,17 +1,29 @@
 import { ScreenMap, UIElementMap } from '@/lib/types';
 import { InspectorNode, generateXPath } from '@/lib/inspectorUtils';
 
+export const DESTRUCTIVE_TERMS = ['delete', 'remove', 'apagar', 'excluir', 'eliminar', 'deletar', 'borrar'];
+
 export interface ExplorationConfig {
     priorityKeywords: string[];
     avoidKeywords: string[];
     revisitKnownScreens: boolean;
+    escapeTargets?: string[];
+    forceReexplore?: string[];
 }
 
 export const DEFAULT_EXPLORATION_CONFIG: ExplorationConfig = {
     priorityKeywords: [],
     avoidKeywords: [],
     revisitKnownScreens: false,
+    escapeTargets: [],
+    forceReexplore: [],
 };
+
+export enum GraphState {
+    UNEXPLORED = 0,
+    EXPLORING = 1,
+    EXHAUSTED = 2
+}
 
 export interface ExplorationState {
     visitedScreens: string[]; // Screen names
@@ -33,6 +45,7 @@ export interface ExplorationState {
     sessionId?: string; // Session ID for Claude Code continuity
     priorityKeywords: string[];
     avoidKeywords: string[];
+    forceReexplore: string[];
 }
 
 export interface ExplorationAction {
@@ -62,6 +75,10 @@ export interface LogEntry {
 export class AutonomousExplorer {
     private state: ExplorationState;
     private t: (key: string, options?: any) => string;
+    
+    // Graph Machine State
+    private screenGlobalStates: Record<string, GraphState> = {};
+    private elementGlobalStates: Record<string, GraphState> = {};
 
     constructor(
         t: (key: string, options?: any) => string,
@@ -82,6 +99,7 @@ export class AutonomousExplorer {
             actionFingerprints: {},
             priorityKeywords: config?.priorityKeywords ?? [],
             avoidKeywords: config?.avoidKeywords ?? [],
+            forceReexplore: config?.forceReexplore ?? [],
         };
 
         if (config && !config.revisitKnownScreens && knownScreens?.length) {
@@ -244,21 +262,168 @@ export class AutonomousExplorer {
 
     // --- Heuristic DFS Navigation ---
 
+    private calculateGraphStates(knownScreens: ScreenMap[], forceReexplore: string[]) {
+        this.screenGlobalStates = {};
+        this.elementGlobalStates = {};
+
+        const screenMap = new Map<string, ScreenMap>();
+        knownScreens.forEach(s => screenMap.set(s.name, s));
+
+        const inPath = new Set<string>();
+
+        const evaluateScreen = (screenName: string): GraphState => {
+            if (this.screenGlobalStates[screenName] !== undefined) {
+                return this.screenGlobalStates[screenName];
+            }
+
+            if (inPath.has(screenName)) {
+                return GraphState.EXHAUSTED;
+            }
+
+            inPath.add(screenName);
+
+            const screen = screenMap.get(screenName);
+            if (!screen) {
+                inPath.delete(screenName);
+                return GraphState.EXPLORING;
+            }
+
+            if (forceReexplore.includes(screenName)) {
+                this.screenGlobalStates[screenName] = GraphState.EXPLORING;
+                inPath.delete(screenName);
+                return GraphState.EXPLORING;
+            }
+
+            const interactiveElements = screen.elements.filter(e =>
+                e.type === 'button' || e.type === 'input' || e.type === 'checkbox' ||
+                e.type === 'radio' || e.type === 'list_item' || e.type === 'tab' ||
+                e.navigates_to != null
+            );
+
+            let hasUnexplored = false;
+            let hasExploring = false;
+
+            interactiveElements.forEach(el => {
+                const elKey = `${screenName}::${el.id}`;
+                const targets = el.navigates_to ? (Array.isArray(el.navigates_to) ? el.navigates_to : (typeof el.navigates_to === 'string' ? el.navigates_to.split(',') : [el.navigates_to])) : [];
+
+                const isVisited = this.state.visitedElements.includes(el.id) || 
+                                  (el.xpath && this.state.visitedElements.includes(el.xpath)) || 
+                                  el.explored;
+
+                if (targets.length === 0) {
+                    if (isVisited) {
+                        this.elementGlobalStates[elKey] = GraphState.EXHAUSTED;
+                    } else {
+                        this.elementGlobalStates[elKey] = GraphState.UNEXPLORED;
+                        hasUnexplored = true;
+                    }
+                } else {
+                    let elExhausted = true;
+                    let elExploring = false;
+
+                    targets.forEach((t: any) => {
+                        const tState = evaluateScreen(typeof t === 'string' ? t.trim() : t.id || '');
+                        if (tState === GraphState.UNEXPLORED || tState === GraphState.EXPLORING) {
+                            elExhausted = false;
+                            elExploring = true;
+                        }
+                    });
+
+                    if (elExhausted) {
+                        this.elementGlobalStates[elKey] = GraphState.EXHAUSTED;
+                    } else if (elExploring) {
+                        this.elementGlobalStates[elKey] = GraphState.EXPLORING;
+                        hasExploring = true;
+                    } else {
+                        // This fallback theoretically shouldn't happen with the new logic above, but kept for safety.
+                        this.elementGlobalStates[elKey] = GraphState.UNEXPLORED;
+                        hasUnexplored = true;
+                    }
+                }
+            });
+
+            inPath.delete(screenName);
+
+            let finalState = GraphState.EXHAUSTED;
+            if (hasUnexplored || hasExploring) {
+                if (this.state.visitedScreens.includes(screenName)) {
+                    finalState = GraphState.EXPLORING;
+                } else {
+                    finalState = GraphState.UNEXPLORED;
+                }
+            }
+
+            this.screenGlobalStates[screenName] = finalState;
+            return finalState;
+        };
+
+        knownScreens.forEach(s => {
+            evaluateScreen(s.name);
+            if (!forceReexplore.includes(s.name)) {
+                if (!this.state.visitedScreens.includes(s.name)) {
+                    this.state.visitedScreens.push(s.name);
+                }
+            }
+        });
+    }
+
+    public getGraphSummaryLog(maps: ScreenMap[], title: string = 'Resumo Final do Grafo'): string {
+        this.calculateGraphStates(maps, this.state.forceReexplore || []);
+
+        let unexploredScreens = 0;
+        let exploringScreens = 0;
+        let exhaustedScreens = 0;
+
+        let unexploredElements = 0;
+        let exploringElements = 0;
+        let exhaustedElements = 0;
+
+        maps.forEach(m => {
+            const sState = this.screenGlobalStates[m.name];
+            if (sState === GraphState.UNEXPLORED) unexploredScreens++;
+            else if (sState === GraphState.EXPLORING) exploringScreens++;
+            else if (sState === GraphState.EXHAUSTED) exhaustedScreens++;
+
+            m.elements.forEach(e => {
+                if (e.type === 'button' || e.type === 'input' || e.type === 'checkbox' ||
+                    e.type === 'radio' || e.type === 'list_item' || e.type === 'tab' ||
+                    e.navigates_to != null) {
+                    const eState = this.elementGlobalStates[`${m.name}::${e.id}`];
+                    if (eState === GraphState.UNEXPLORED) unexploredElements++;
+                    else if (eState === GraphState.EXPLORING) exploringElements++;
+                    else if (eState === GraphState.EXHAUSTED) exhaustedElements++;
+                }
+            });
+        });
+
+        return `📊 ${title}:\n- Telas: ${exhaustedScreens} Exhausted, ${exploringScreens} Exploring, ${unexploredScreens} Unexplored\n- Elementos: ${exhaustedElements} Exhausted, ${exploringElements} Exploring, ${unexploredElements} Unexplored`;
+    }
+
     /**
      * Finds the next unvisited interactive element on the screen using DFS.
      */
-    public determineHeuristicAction(root: InspectorNode): ExplorationAction | null {
-        const visited = this.state.visitedElements;
+    public determineHeuristicAction(root: InspectorNode, currentScreenName?: string, currentSavedMaps?: ScreenMap[]): ExplorationAction | null {
+        // ALWAYS dynamically recalculate graph states to reflect new mapped UI or visited elements
+        if (currentSavedMaps && currentSavedMaps.length > 0) {
+            this.calculateGraphStates(currentSavedMaps, this.state.forceReexplore || []);
+        }
 
+        if (!currentScreenName) {
+            currentScreenName = this.generateHeuristicScreenMap(root).name;
+        }
+
+        const visited = this.state.visitedElements;
         const staticBlockedTerms = ['back', 'navigate up', 'voltar', 'deletar', 'apagar', 'remover', 'excluir', 'delete', 'remove', 'eliminar', 'borrar'];
         const allBlockedTerms = [...staticBlockedTerms, ...this.state.avoidKeywords.map(k => k.toLowerCase())];
 
         const unvisitedTargets: InspectorNode[] = [];
+        const exploringTargets: InspectorNode[] = [];
 
         const traverse = (node: InspectorNode) => {
-            const isInteractive = node.attributes['clickable'] === 'true' ||
-                                  node.attributes['checkable'] === 'true' ||
-                                  node.attributes['long-clickable'] === 'true' ||
+            const isInteractive = node.attributes['clickable'] === 'true' || 
+                                  node.attributes['checkable'] === 'true' || 
+                                  node.attributes['long-clickable'] === 'true' || 
                                   node.attributes['class']?.includes('EditText') ||
                                   (node.attributes['focusable'] === 'true' && (!!node.attributes['content-desc'] || !!node.attributes['text']));
 
@@ -268,7 +433,18 @@ export class AutonomousExplorer {
                 const text = (node.attributes['text'] || '').toLowerCase();
                 const desc = (node.attributes['content-desc'] || '').toLowerCase();
                 const hasBlockedTerm = allBlockedTerms.some(term => text.includes(term) || desc.includes(term));
-                if (!hasBlockedTerm) unvisitedTargets.push(node);
+                
+                if (!hasBlockedTerm) {
+                    const elKey = `${currentScreenName}::${xpath}`;
+                    const globalState = this.elementGlobalStates[elKey] ?? GraphState.UNEXPLORED;
+                    
+                    if (globalState === GraphState.EXPLORING) {
+                        exploringTargets.push(node);
+                    } else if (globalState === GraphState.UNEXPLORED) {
+                        unvisitedTargets.push(node);
+                    }
+                    // If GraphState.EXHAUSTED, we ignore it
+                }
             }
 
             node.children.forEach(traverse);
@@ -276,10 +452,13 @@ export class AutonomousExplorer {
 
         traverse(root);
 
-        // Sort: priority elements first, DFS order preserved among ties
-        if (this.state.priorityKeywords.length > 0) {
+        // Priority 1: Exploring elements (elements that lead to unexplored screens)
+        // Priority 2: Unexplored elements on the current screen
+        let candidates = exploringTargets.length > 0 ? exploringTargets : unvisitedTargets;
+
+        if (this.state.priorityKeywords.length > 0 && candidates.length > 0) {
             const keywords = this.state.priorityKeywords.map(k => k.toLowerCase());
-            unvisitedTargets.sort((a, b) => {
+            candidates.sort((a, b) => {
                 const aText = ((a.attributes['text'] || '') + ' ' + (a.attributes['content-desc'] || '')).toLowerCase();
                 const bText = ((b.attributes['text'] || '') + ' ' + (b.attributes['content-desc'] || '')).toLowerCase();
                 const aPriority = keywords.some(k => aText.includes(k));
@@ -288,7 +467,7 @@ export class AutonomousExplorer {
             });
         }
 
-        const unvisitedTarget = unvisitedTargets[0] ?? null;
+        const unvisitedTarget = candidates[0] ?? null;
 
         if (unvisitedTarget) {
             const xpath = generateXPath(unvisitedTarget);

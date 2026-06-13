@@ -40,6 +40,7 @@ export interface NavigationData {
 
 export interface UIElementMap {
     id: string; // Unique ID (e.g., resource-id or xpath hash)
+    shortId?: string; // Tree structural position (used for fuzzy merging and tracking)
     name: string; // User-defined name
     type: UIElementType;
     description?: string;
@@ -63,6 +64,7 @@ export interface UIElementMap {
     suggested_interaction?: 'tap' | 'swipe' | 'long_press' | 'type';
     assertion_target?: boolean;
     business_rule?: string;
+    explored?: boolean; // Marks dead-end elements that were clicked but did not navigate
 }
 
 export interface FlowStep {

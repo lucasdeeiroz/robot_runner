@@ -868,12 +868,14 @@ export const es = {
                 recovering_exit: "Salida de la aplicación detectada (Actual: {{current}}, Objetivo: {{target}}). Recuperando...",
                 ai_suggested_layout: "Diseño sugerido por la IA para {{name}} en ({{x}}, {{y}})",
                 swipe_limit_reached: "Límite máximo de deslizamientos alcanzado (10). Forzando regreso.",
-                stopped_reason: "Exploración detenida: {{reason}}",
-                step_marker: "--- Paso {{step}} ---",
-                malformed_json_retry: "La IA devolvió un JSON malformado. Reintentando... ({{error}})",
                 back_updated: "Actualización retroactiva: \"{{prev}}\" → el elemento ahora navega a \"{{current}}\"",
                 merging_insights: "Fusionando conocimientos de IA en la pantalla existente: \"{{name}}\" (ID: {{id}}, {{count}} elementos)",
                 new_elements_discovered: "Añadidos {{count}} nuevos elementos descubiertos por la IA. Total: {{total}}",
+                analyzing_prompt: "Analizando prompt...",
+                summary_initial: "Resumen Inicial del Grafo",
+                summary_final: "Resumen Final del Grafo (Fin de la Exploración)",
+                summary_screens: "- Pantallas: {{exhausted}} Exhausted, {{exploring}} Exploring, {{unexplored}} Unexplored",
+                summary_elements: "- Elementos: {{exhausted}} Exhausted, {{exploring}} Exploring, {{unexplored}} Unexplored",
             },
             enhancer: {
                 title: "Auditoría y Mejora de Mapeos",
@@ -1709,6 +1711,49 @@ export const es = {
                     title: "Selenium (Pytest)",
                     description: "Automatización estándar de navegadores usando Python y pytest. Ideal para una regresión web robusta."
                 }
+            }
+        },
+        exploration_modal: {
+            title: "Configuración de la Exploración Autónoma",
+            subtitle: "Define cómo la inteligencia artificial debe navegar y mapear la aplicación.",
+            mode: {
+                title: "Modo de Exploración",
+                new: {
+                    title: "Solo Pantallas Nuevas",
+                    desc: "La exploración se detendrá al encontrar pantallas conocidas."
+                },
+                all: {
+                    title: "Explorar Todo",
+                    desc: "La exploración escaneará toda la aplicación."
+                },
+                specific: {
+                    title: "Ruta Específica",
+                    desc: "Enfocarse en una ruta de navegación específica."
+                }
+            },
+            limits: {
+                title: "Límites de Navegación",
+                default: {
+                    title: "Límites Predeterminados",
+                    desc: "Carga configuraciones seguras estándar."
+                },
+                custom: {
+                    title: "Límites Personalizados",
+                    desc: "Definir tus propias palabras clave."
+                }
+            },
+            fields: {
+                blocked: "Términos Bloqueados (Botones prohibidos de interactuar)",
+                blocked_placeholder: "eliminar, borrar",
+                escape: "Términos de Escape (Botones de atrás/cancelar)",
+                escape_placeholder: "atrás, cancelar",
+                priority: "Términos Prioritarios (Qué clicar primero)",
+                priority_placeholder: "ajustes, perfil"
+            },
+            ai: {
+                title: "Usar IA para Refinamiento",
+                desc: "La IA añadirá nuevas reglas a las configuraciones anteriores según tu intención.",
+                placeholder: "Describe brevemente lo que deseas..."
             }
         },
         auth: {

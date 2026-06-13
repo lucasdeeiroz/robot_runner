@@ -13,45 +13,82 @@ const LIGHT_MODELS: Record<string, string> = {
  * Always resolves — on any failure or timeout it returns DEFAULT_EXPLORATION_CONFIG.
  */
 export async function analyzeExplorationPrompt(
+    baseConfig: ExplorationConfig,
     userPrompt: string,
+    useAi: boolean,
     settings: AppSettings,
     signal?: AbortSignal
 ): Promise<ExplorationConfig> {
-    const { aiProvider, geminiApiKey, claudeApiKey, openaiApiKey } = settings;
-
-    // CLI providers have no lightweight HTTP equivalent — skip analysis
-    if (aiProvider === 'claude-code' || aiProvider === 'antigravity-cli') {
-        return DEFAULT_EXPLORATION_CONFIG;
+    if (!useAi || !userPrompt || userPrompt.trim() === '') {
+        return baseConfig;
     }
+
+    const { aiProvider, geminiApiKey, claudeApiKey, openaiApiKey } = settings;
 
     const apiKey = aiProvider === 'gemini' ? geminiApiKey
                  : aiProvider === 'claude'  ? claudeApiKey
                  : openaiApiKey;
 
-    if (!apiKey) return DEFAULT_EXPLORATION_CONFIG;
+    if (!apiKey && aiProvider !== 'claude-code' && aiProvider !== 'antigravity-cli') {
+        return baseConfig;
+    }
 
     const lightModel = LIGHT_MODELS[aiProvider] ?? '';
     const systemPrompt = getExplorationInitPrompt();
 
-    // Internal 10s timeout — independent of any external signal
+    // Internal 15s timeout — slightly longer to accommodate CLI startup
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10_000);
+    const timeoutId = setTimeout(() => controller.abort(), 15_000);
     const effectiveSignal = signal ?? controller.signal;
 
     try {
         let rawText = '';
 
         if (aiProvider === 'gemini') {
-            rawText = await callGeminiText(userPrompt, systemPrompt, apiKey, lightModel, effectiveSignal);
+            rawText = await callGeminiText(userPrompt, systemPrompt, apiKey as string, lightModel, effectiveSignal);
         } else if (aiProvider === 'claude') {
-            rawText = await callClaudeText(userPrompt, systemPrompt, apiKey, lightModel, effectiveSignal);
+            rawText = await callClaudeText(userPrompt, systemPrompt, apiKey as string, lightModel, effectiveSignal);
         } else if (aiProvider === 'openai') {
-            rawText = await callOpenAIText(userPrompt, systemPrompt, apiKey, lightModel, effectiveSignal);
+            rawText = await callOpenAIText(userPrompt, systemPrompt, apiKey as string, lightModel, effectiveSignal);
+        } else if (aiProvider === 'claude-code') {
+            const { askClaudeCode } = await import('@/lib/dashboard/claudeCode');
+            // Try to wrap CLI call in a Promise.race with signal
+            const cliPromise = askClaudeCode(userPrompt, settings.paths?.automationRoot || '', systemPrompt, settings.claudeCodeToken);
+            const result = await Promise.race([
+                cliPromise,
+                new Promise<any>((_, reject) => {
+                    if (effectiveSignal.aborted) reject(new Error('Timeout'));
+                    effectiveSignal.addEventListener('abort', () => reject(new Error('Timeout')));
+                })
+            ]);
+            rawText = typeof result === 'string' ? result : result.result;
+        } else if (aiProvider === 'antigravity-cli') {
+            const { askAntigravityCli } = await import('@/lib/dashboard/antigravityCode');
+            const cliPromise = askAntigravityCli(userPrompt, settings.paths?.automationRoot || '', systemPrompt, settings.antigravityApiKey);
+            const result = await Promise.race([
+                cliPromise,
+                new Promise<any>((_, reject) => {
+                    if (effectiveSignal.aborted) reject(new Error('Timeout'));
+                    effectiveSignal.addEventListener('abort', () => reject(new Error('Timeout')));
+                })
+            ]);
+            rawText = typeof result === 'string' ? result : result.result;
         }
 
-        return parseConfig(rawText);
+        const aiConfig = parseConfig(rawText);
+
+        // Merge AI rules with base config
+        return {
+            ...baseConfig,
+            priorityKeywords: [...new Set([...baseConfig.priorityKeywords, ...aiConfig.priorityKeywords])],
+            avoidKeywords: [...new Set([...baseConfig.avoidKeywords, ...aiConfig.avoidKeywords])],
+            escapeTargets: [...new Set([...(baseConfig.escapeTargets || []), ...(aiConfig.escapeTargets || [])])],
+            forceReexplore: [...new Set([...(baseConfig.forceReexplore || []), ...(aiConfig.forceReexplore || [])])]
+        };
+
     } catch {
-        return DEFAULT_EXPLORATION_CONFIG;
+        console.log('[ExplorationInit] Failed to parse config, using base config.');
+        return baseConfig;
     } finally {
         clearTimeout(timeoutId);
     }
@@ -151,12 +188,17 @@ function parseConfig(raw: string): ExplorationConfig {
         const match = raw.match(/\{[\s\S]*\}/);
         if (!match) return DEFAULT_EXPLORATION_CONFIG;
         const parsed = JSON.parse(match[0]);
-        return {
+        const config = {
             priorityKeywords: Array.isArray(parsed.priorityKeywords) ? parsed.priorityKeywords.map(String) : [],
             avoidKeywords:    Array.isArray(parsed.avoidKeywords)    ? parsed.avoidKeywords.map(String)    : [],
+            escapeTargets:    Array.isArray(parsed.escapeTargets)    ? parsed.escapeTargets.map(String)    : [],
+            forceReexplore:   Array.isArray(parsed.forceReexplore)   ? parsed.forceReexplore.map(String)   : [],
             revisitKnownScreens: Boolean(parsed.revisitKnownScreens),
         };
+        console.log('[ExplorationInit] Parsed Configuration from AI:', config);
+        return config;
     } catch {
+        console.log('[ExplorationInit] Failed to parse config, using defaults.');
         return DEFAULT_EXPLORATION_CONFIG;
     }
 }

@@ -1,33 +1,41 @@
 import { ScreenMap, NavigationData } from '@/lib/types';
 import { getRemoteString } from '../remoteConfig';
 import type { ExplorationConfig } from './explorationEngine';
+import { DESTRUCTIVE_TERMS } from './explorationEngine';
 
 /**
  * System prompt for the lightweight pre-analysis step that runs before the DFS starts.
  * The model must return ONLY a JSON object — no markdown, no prose.
  */
 export function getExplorationInitPrompt(): string {
-    return `You are a mobile QA exploration analyzer. Parse the user's exploration goal and extract session constraints.
+  return `You are a mobile QA exploration analyzer. Parse the user's exploration goal and extract session constraints.
 
 Return ONLY a valid JSON object — no markdown, no backticks, no explanation, no extra text:
 {
   "priorityKeywords": ["keyword1", "keyword2"],
   "avoidKeywords":    ["keyword1", "keyword2"],
-  "revisitKnownScreens": false
+  "escapeTargets":    ["keyword1", "keyword2"],
+  "revisitKnownScreens": false,
+  "forceReexplore": ["screenName1", "screenName2"]
 }
 
 Rules:
 - priorityKeywords: short words/phrases (≤3 words) whose presence in an element's text or description marks it as high-priority to explore first.
 - avoidKeywords: short words/phrases that identify elements/sections to skip (destructive actions or out-of-scope areas).
-- revisitKnownScreens: true ONLY if the user explicitly asks to re-map or re-explore everything from scratch.
+- escapeTargets: short words/phrases that identify "back" or "cancel" buttons to escape a screen.
+- revisitKnownScreens: true ONLY if the user explicitly asks to re-map or re-explore EVERYTHING from scratch.
+- forceReexplore: array of screen names or sections the user explicitly asked to re-explore (e.g., "Explore the Profile again"). This will bypass the exhaustion check for specific screens.
 - If no constraints apply, return empty arrays and false.
 
 Examples:
 User: "Explore the payment flow with Pix. Don't touch account settings."
-Response: {"priorityKeywords":["payment","pix","pagamento"],"avoidKeywords":["account settings","configurações de conta"],"revisitKnownScreens":false}
+Response: {"priorityKeywords":["payment","pix","pagamento"],"avoidKeywords":["account settings","configurações de conta"],"escapeTargets":[],"revisitKnownScreens":false,"forceReexplore":[]}
 
 User: "Re-map everything from scratch"
-Response: {"priorityKeywords":[],"avoidKeywords":[],"revisitKnownScreens":true}`;
+Response: {"priorityKeywords":[],"avoidKeywords":[],"escapeTargets":[],"revisitKnownScreens":true,"forceReexplore":[]}
+
+User: "Acesse o Carrinho de compras e explore ele de novo para achar novos botões"
+Response: {"priorityKeywords":["carrinho","cart"],"avoidKeywords":[],"escapeTargets":[],"revisitKnownScreens":false,"forceReexplore":["carrinho"]}`;
 }
 
 /**
@@ -35,15 +43,17 @@ Response: {"priorityKeywords":[],"avoidKeywords":[],"revisitKnownScreens":true}`
  * Returns an empty string when both keyword arrays are empty.
  */
 export function buildExplorationConstraints(config: ExplorationConfig): string {
-    const lines: string[] = [];
-    if (config.priorityKeywords.length > 0) {
-        lines.push(`- Priority elements (explore first): ${config.priorityKeywords.join(', ')}`);
-    }
-    if (config.avoidKeywords.length > 0) {
-        lines.push(`- Avoid clicking elements with: ${config.avoidKeywords.join(', ')}`);
-    }
-    if (lines.length === 0) return '';
-    return `\n\n## Session Constraints\n${lines.join('\n')}`;
+  const lines: string[] = [];
+  if (config.priorityKeywords.length > 0) {
+    lines.push(`- Priority elements (explore first): ${config.priorityKeywords.join(', ')}`);
+  }
+  
+  const allAvoidKeywords = Array.from(new Set([...config.avoidKeywords, ...DESTRUCTIVE_TERMS]));
+  if (allAvoidKeywords.length > 0) {
+    lines.push(`- Avoid clicking elements with: ${allAvoidKeywords.join(', ')}`);
+  }
+  if (lines.length === 0) return '';
+  return `\n\n## Session Constraints\n${lines.join('\n')}`;
 }
 
 /**
@@ -113,7 +123,8 @@ Your goal is to map 100% of a mobile app's UI by discovering every screen, modal
 2. **Exhaustion Strategy**: 
    - On a new screen, **Swipe** (down/up) if scrollable elements exist, until no new elements appear.
    - Click **Unexplored** elements first.
-   - If a screen is fully mapped, use **Back** or navigate to a different **Tab**.
+   - If a button that would navigate to next screen is disabled, analyze the screen to discover what action would enable it.
+   - If a screen is fully mapped, prefer clicking "Save", "Finish", "Confirm", "Next" or similar buttons to escape, if they are non-destructive actions. Only use **Back** if no such buttons exist or navigate to a different **Tab**.
 3. **Tab Priority**: Fully explore the current tab's hierarchy before switching to another tab. Home/Main tab is priority #1.
 4. **Data Entry**: Use "type_text" for inputs. Use only ASCII characters.
 5. **Anti-Loop**: If you see the same screen state twice in your history without progress, try a different branch or go "back".
@@ -522,7 +533,7 @@ Your goal is to execute a test scenario step-by-step on a real device.
 }
 
 export function getEnhancerSystemPrompt(): string {
-    return `You are a UI taxonomy expert. Your task is to analyze batches of mobile UI screens and elements, and provide semantic names and descriptions.
+  return `You are a UI taxonomy expert. Your task is to analyze batches of mobile UI screens and elements, and provide semantic names and descriptions.
 
 Input will be a JSON array of screens with their elements. Elements might have generic names like "Button 2" or "EditText 1".
 
@@ -530,16 +541,18 @@ Tasks:
 1. Generate a brief 1-sentence 'newDescription' for each screen based on its name and elements.
 2. If the screen type is ambiguous, deduce its 'type' (screen, modal, tab, drawer).
 3. Suggest a clear, human-readable 'newScreenName' in PascalCase (e.g. LoginScreen, ProfileTab) for the screen.
-4. For each element, suggest a semantic 'newName' in PascalCase (e.g., SubmitLoginButton, EmailInput) based on its text, description, or xpath.
-5. Keep the 'id' fields EXACTLY as provided so we can map the updates back.
+4. Suggest an array of up to 3 'tags' for the screen. Tags must be singular nouns reflecting the screen's core domain (e.g., "Agendamento", "Dispositivo", "Perfil").
+5. For each element, suggest a semantic 'newName' in PascalCase (e.g., SubmitLoginButton, EmailInput) based on its text, description, or xpath.
+6. Keep the 'id' fields EXACTLY as provided so we can map the updates back.
 
-Return ONLY a valid JSON array matching this format (no markdown, no backticks, no text):
+Return ONLY a valid JSON array matching this format. Do NOT include any markdown code blocks, backticks, introductory text, or concluding remarks:
 [
   {
     "id": "Screen_123",
     "newScreenName": "DashboardScreen",
     "newDescription": "The main dashboard screen showing user stats.",
     "type": "screen",
+    "tags": ["Dashboard", "Estatistica"],
     "elements": [
       {
         "id": "123-abc",

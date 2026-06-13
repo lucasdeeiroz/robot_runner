@@ -37,12 +37,14 @@ import * as gemini from '@/lib/dashboard/gemini';
 import * as claude from '@/lib/dashboard/claude';
 import * as openai from '@/lib/dashboard/openai';
 import * as claudeCli from '@/lib/dashboard/claudeCode';
-import { AutonomousExplorer, LogEntry, ExplorationAction } from '@/lib/dashboard/explorationEngine';
+import { AutonomousExplorer, LogEntry, ExplorationAction, ExplorationConfig } from '@/lib/dashboard/explorationEngine';
+import { analyzeExplorationPrompt } from '@/lib/dashboard/explorationInit';
 import { getAiContext } from '@/lib/dashboard/historyAnalysisUtils';
 import { ExplorationLogTree } from '@/components/molecules/ExplorationLogTree';
 import { useDeviceViewport } from '@/hooks/useDeviceViewport';
 import { DeviceViewport } from '@/components/organisms/DeviceViewport';
 import { useTestSessions } from '@/lib/testSessionStore';
+import { AutonomousExplorationConfigModal } from '@/components/organisms/dashboard/AutonomousExplorationConfigModal';
 
 
 function groupElementsByType<T extends { type: string }>(
@@ -97,6 +99,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
     // AI Suggestion State
     const [isAISuggesting, setIsAISuggesting] = useState(false);
     const [aiSuggestedName, setAiSuggestedName] = useState<string | null>(null);
+    const [isExplorationModalOpen, setIsExplorationModalOpen] = useState(false);
     const [aiJustification, setAiJustification] = useState<string | null>(null);
     const [showAISuggestion, setShowAISuggestion] = useState(false);
     const [isAISuggestingTags, setIsAISuggestingTags] = useState(false);
@@ -632,7 +635,9 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         }
 
         // Trigger cleanup to merge Screen_[hash] into actual screens
-        const finalMaps = await cleanupAndMergeScreens(savedMaps);
+        // CRITICAL FIX: Fetch latest maps from disk so we don't use stale React state closure
+        const currentDiskMaps = await loadSavedMaps();
+        const finalMaps = await cleanupAndMergeScreens(currentDiskMaps);
 
         // Start Enhancement Phase
         setIsEnhancing(true);
@@ -670,8 +675,9 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             for (const map of enhancedMaps) {
                 await saveScreenMap(activeProfileId, map, settings.paths?.mappings);
             }
-            await loadSavedMaps();
+            const veryFinalMaps = await loadSavedMaps();
             if (explorerInstance) {
+                explorerInstance.addLog(explorerInstance.getGraphSummaryLog(veryFinalMaps, t('mapper.exploration.summary_final', 'Resumo Final do Grafo (Fim da Exploração)')), 'info');
                 explorerInstance.addLog(t('mapper.enhancer.completed'), "finished");
                 setExplorationLogs([...explorerInstance.getLogs()]);
             }
@@ -797,23 +803,19 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             let maps = await loadSavedMaps();
             if (!isExploringRef.current) return;
 
-            // OPTIMIZATION 2: DRASTIC context reduction for exploration maps as well
-            const optimizedExplorationMaps = maps.map(m => {
-                const isCurrentScreen = explorer.getPreviousNavigation()?.screenName === m.name;
-                return {
-                    name: m.name,
-                    type: m.type,
-                    description: m.description,
-                    elements: isCurrentScreen
-                        ? m.elements.map(e => ({ name: e.name, type: e.type, navigates_to: e.navigates_to }))
-                        : [] // Don't send elements of other screens to save hundreds of tokens
-                };
-            }).slice(-15); // Limit to last 15 screens to provide enough context without blowing up prompt size
+            // OPTIMIZATION 2: Context reduction for exploration maps
+            const optimizedExplorationMaps = maps.map(m => ({
+                name: m.name,
+                type: m.type,
+                description: m.description,
+                elements: m.elements.map(e => ({ name: e.name, type: e.type, navigates_to: e.navigates_to }))
+            })).slice(-15); // Limit to last 15 screens to provide enough context without blowing up prompt size
 
             let result: any = null;
             let useAiFallback = false;
 
             const heuristicScreenTemp = explorer.generateHeuristicScreenMap(root);
+            console.log(`[DEBUG] Heuristic Screen Generated: ${heuristicScreenTemp.name}`, heuristicScreenTemp.elements.map(e => e.id));
 
             const previousNav = explorer.getPreviousNavigation();
             // Swipe Screen Merging logic: if the previous action was a swipe, force the generated heuristic
@@ -825,18 +827,30 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 // Similarity-based Screen Merging
                 let bestMatch: { name: string, id: string, score: number } | null = null;
                 const currentIds = new Set(heuristicScreenTemp.elements.map(e => e.id));
+                const currentShortIds = new Set(heuristicScreenTemp.elements.map(e => (e as any).shortId).filter(Boolean));
 
                 for (const existingMap of maps) {
-                    if (existingMap.name.startsWith('Screen_')) continue; // Compare only with established screens
-
                     const existingIds = new Set(existingMap.elements.map(e => e.id));
-                    let overlap = 0;
+                    const existingShortIds = new Set(existingMap.elements.map(e => (e as any).shortId).filter(Boolean));
+                    
+                    let overlapId = 0;
                     currentIds.forEach(id => {
-                        if (existingIds.has(id)) overlap++;
+                        if (existingIds.has(id)) overlapId++;
                     });
 
-                    // Similarity based on the larger map to ensure minor variations match
-                    const maxElements = Math.max(currentIds.size, existingIds.size);
+                    let overlapShortId = 0;
+                    currentShortIds.forEach(sid => {
+                        if (existingShortIds.has(sid)) overlapShortId++;
+                    });
+
+                    // Use the best overlap metric
+                    const overlap = Math.max(overlapId, overlapShortId);
+
+                    // Choose the corresponding size denominator
+                    const currentSize = overlap === overlapShortId && currentShortIds.size > 0 ? currentShortIds.size : currentIds.size;
+                    const existingSize = overlap === overlapShortId && existingShortIds.size > 0 ? existingShortIds.size : existingIds.size;
+                    
+                    const maxElements = Math.max(currentSize, existingSize);
                     const similarity = maxElements > 0 ? overlap / maxElements : 0;
 
                     // Threshold of 75% similarity to consider it the same screen
@@ -868,19 +882,33 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 }
             }
 
-            // Check if we are looping/stuck
-            if (explorer.isScreenLooping(heuristicScreenTemp.name, 4)) {
+            // Check if we are looping/stuck or completely blind
+            const loopThreshold = Math.max(4, heuristicScreenTemp.elements.length + 1);
+            if (heuristicScreenTemp.elements.length === 0) {
+                useAiFallback = true;
+                explorer.addLog("Heuristic found 0 interactive elements. Falling back to AI immediately to discover complex elements.", "warning");
+            } else if (explorer.isScreenLooping(heuristicScreenTemp.name, loopThreshold)) {
                 useAiFallback = true;
                 explorer.addLog(t('mapper.exploration.heuristic_stuck', { defaultValue: 'Heuristic seems stuck. Falling back to AI for this step.' }), "warning");
             }
 
             if (!useAiFallback) {
-                const heuristicAction = explorer.determineHeuristicAction(root);
+                const prevNavBefore = explorer.getPreviousNavigation();
+                const heuristicAction = explorer.determineHeuristicAction(root, heuristicScreenTemp.name, maps);
+                
+                // CRITICAL FIX: If determineHeuristicAction updated navigates_to in the previous screen, save it!
+                if (prevNavBefore && prevNavBefore.screenName) {
+                    const prevScreen = maps.find(m => m.name === prevNavBefore.screenName);
+                    if (prevScreen) {
+                        await saveScreenMap(activeProfileId, prevScreen, settings.paths?.mappings);
+                    }
+                }
+
                 if (heuristicAction) {
                     // Match AI format
                     result = {
                         screen: heuristicScreenTemp,
-                        elements: heuristicScreenTemp.elements.map(e => ({ id: e.id, name: e.name, type: e.type, shortId: e.id })),
+                        elements: heuristicScreenTemp.elements.map(e => ({ id: e.id, name: e.name, type: e.type, shortId: (e as any).shortId })),
                         nextAction: heuristicAction,
                         thought: 'Heuristic algorithm picked the next action.',
                         rationale: 'Using code-first DFS algorithm to save tokens.',
@@ -967,7 +995,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                     let updated = false;
 
                     const updatedElements = prevMap.elements.map(el => {
-                        if (el.id === prevNav.targetId) {
+                        if (prevNav.targetId && (el.id === prevNav.targetId || (el as any).shortId === prevNav.targetId || el.id === shortIdMap[prevNav.targetId])) {
                             // Only update if navigates_to is not already set to this destination
                             const existingDest = typeof el.navigates_to === 'string'
                                 ? el.navigates_to
@@ -994,6 +1022,8 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             }
             explorer.clearPreviousNavigation();
 
+            let currentMergedMap: ScreenMap | null = null;
+
             if (aiScreen.name) {
                 // Smart Merging: Check for existing map with same name (resilient matching)
                 const aiNameNormalized = aiScreen.name.trim().toLowerCase();
@@ -1014,11 +1044,34 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
                     // 2. Deep Merge Elements
                     // Start with existing elements and update them if AI saw them again
-                    const aiElementsById = new Map<string, UIElementMap>(aiElements.map((el: UIElementMap) => [el.id, el]));
+                    const aiElementsById = new Map<string, UIElementMap>();
+                    const aiElementsByShortId = new Map<string, UIElementMap>();
+                    
+                    aiElements.forEach((el: UIElementMap) => {
+                        aiElementsById.set(el.id, el);
+                        if ((el as any).shortId) {
+                            aiElementsByShortId.set((el as any).shortId, el);
+                        }
+                    });
+
+                    // We will keep track of which aiElements were merged so we can find the genuinely new ones
+                    const mergedAiIds = new Set<string>();
 
                     mergedElements = existingMap.elements.map((existingEl: UIElementMap) => {
-                        const aiEl = aiElementsById.get(existingEl.id);
+                        let aiEl = aiElementsById.get(existingEl.id);
+                        
+                        // Fuzzy Match by ShortId: If exact XPath matching fails (due to volatile text like clock/dates),
+                        // try to match by the stable tree position (shortId).
+                        if (!aiEl && (existingEl as any).shortId) {
+                            const fuzzyEl = aiElementsByShortId.get((existingEl as any).shortId);
+                            if (fuzzyEl && fuzzyEl.type === existingEl.type) {
+                                aiEl = fuzzyEl;
+                            }
+                        }
+
                         if (!aiEl) return existingEl; // AI didn't see it this time, keep as is
+                        
+                        mergedAiIds.add(aiEl.id);
 
                         // AI saw it! update description and navigates_to
                         const updatedDesc = aiEl.description || existingEl.description || "";
@@ -1031,14 +1084,17 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
                         return {
                             ...existingEl,
+                            id: aiEl.id, // Update the ID (XPath) to the newest one (to fix volatile timestamps for Appium)
+                            name: aiEl.name || existingEl.name, // Update name in case it changed slightly
                             description: updatedDesc,
-                            navigates_to: mergedNav
+                            navigates_to: mergedNav,
+                            explored: existingEl.explored || aiEl.explored,
+                            shortId: (aiEl as any).shortId || (existingEl as any).shortId
                         };
                     });
 
                     // 3. Add genuinely new elements
-                    const existingIds = new Set(existingMap.elements.map(e => e.id));
-                    const genuinelyNew = aiElements.filter((el: UIElementMap) => !existingIds.has(el.id));
+                    const genuinelyNew = aiElements.filter((el: UIElementMap) => !mergedAiIds.has(el.id));
 
                     if (genuinelyNew.length > 0) {
                         mergedElements = [...mergedElements, ...genuinelyNew];
@@ -1081,6 +1137,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                     base64_preview: screenshot || undefined,
                     layout: resolvedLayout
                 };
+                currentMergedMap = map;
 
                 await saveScreenMap(activeProfileId, map, settings.paths?.mappings);
                 explorer.markScreenVisited(aiScreen.name);
@@ -1103,7 +1160,8 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 const next = (result.nextAction || { type: 'back' }) as ExplorationAction;
                 const actionFingerprint = `${aiScreen.name}:${next.type}:${next.targetId || 'none'}`;
                 const visitCount = explorer.trackScreenVisit(aiScreen.name, actionFingerprint);
-                if (visitCount >= 4) {
+                const maxAllowedVisits = Math.max(4, (aiScreen.elements?.length || 0) + 1);
+                if (visitCount >= maxAllowedVisits) {
                     explorer.addLog(t('mapper.exploration.loop_detected', { name: aiScreen.name, count: visitCount }), 'warning');
 
                     if (aiScreen.name === explorer.getInitialScreenName()) {
@@ -1148,7 +1206,8 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 explorer.markElementVisited(xpath);
 
                 // Priority 1: Label-based search
-                const aiElement = aiScreen.elements?.find((el: any) => (el.shortId || el.id) === next.targetId);
+                const aiElement = aiScreen.elements?.find((el: any) => el.shortId === next.targetId || el.id === next.targetId || el.id === xpath);
+                
                 const targetLabel = aiElement?.name || aiElement?.label;
 
                 if (aiElement && targetLabel) {
@@ -1161,6 +1220,39 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 if (!targetNode) {
                     const nodes = findNodesByLocator(root, xpath);
                     if (nodes.length > 0) targetNode = nodes[0];
+                }
+
+                // Find the ACTUAL full map in the global maps array to save the explored state,
+                // otherwise we overwrite the JSON with the incomplete aiScreen and lose historical explored states.
+                // CRITICAL FIX: Use the freshly merged map if available, otherwise fallback to finding it in maps
+                const activeMap = currentMergedMap || maps.find(m => m.id === aiScreen.id || m.name === aiScreen.name);
+                
+                if (activeMap) {
+                    let activeElement = activeMap.elements.find(e => e.id === xpath || e.id === next.targetId || (e as any).shortId === next.targetId);
+                    
+                    if (!activeElement && next.targetId) {
+                        // The AI didn't map this heuristic element. We MUST add it to the map to persist its explored state between sessions.
+                        const finalId = targetNode ? generateXPath(targetNode) : xpath;
+                        activeElement = {
+                            id: finalId,
+                            name: targetNode ? (targetNode.attributes['text'] || targetNode.attributes['content-desc'] || `Element_${finalId.slice(-6)}`) : `Element_${finalId.slice(-6)}`,
+                            type: 'button',
+                            explored: false,
+                        };
+                        activeMap.elements.push(activeElement);
+                        explorer.addLog(`Heuristic element persisted to map: ${activeElement.name}`, 'info');
+                    }
+
+                    if (activeElement && !activeElement.explored) {
+                        activeElement.explored = true;
+                        // Update in memory too so subsequent steps see it immediately
+                        setSavedMaps([...maps]);
+                        await saveScreenMap(activeProfileId, activeMap, settings.paths?.mappings);
+                    }
+                } else if (aiElement && !aiElement.explored) {
+                    // Fallback
+                    aiElement.explored = true;
+                    await saveScreenMap(activeProfileId, aiScreen, settings.paths?.mappings);
                 }
 
                 if (targetNode && targetNode.bounds) {
@@ -1245,7 +1337,50 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 const xpath = shortIdMap[next.targetId] || next.targetId;
                 explorer.markElementVisited(xpath);
 
-                const targetNode = findNodesByLocator(root, xpath)[0];
+                let targetNode: InspectorNode | null = null;
+                const aiElement = aiScreen.elements?.find((el: any) => el.shortId === next.targetId || el.id === next.targetId || el.id === xpath);
+                
+                const targetLabel = aiElement?.name || aiElement?.label;
+
+                if (aiElement && targetLabel) {
+                    const matches = findNodesByText(root, targetLabel);
+                    const bestMatch = matches.find(m => (m.attributes['clickable'] === 'true' || m.attributes['text'] || m.attributes['content-desc'] || m.attributes['class']?.includes('EditText')) && m.bounds && m.bounds.w > 0);
+                    if (bestMatch) targetNode = bestMatch;
+                }
+
+                if (!targetNode) {
+                    const nodes = findNodesByLocator(root, xpath);
+                    if (nodes.length > 0) targetNode = nodes[0];
+                }
+
+                // CRITICAL FIX: Use the freshly merged map if available, otherwise fallback to finding it in maps
+                const activeMap = currentMergedMap || maps.find(m => m.id === aiScreen.id || m.name === aiScreen.name);
+                
+                if (activeMap) {
+                    let activeElement = activeMap.elements.find(e => e.id === xpath || e.id === next.targetId || (e as any).shortId === next.targetId);
+                    
+                    if (!activeElement && next.targetId) {
+                        const finalId = targetNode ? generateXPath(targetNode) : xpath;
+                        activeElement = {
+                            id: finalId,
+                            name: targetNode ? (targetNode.attributes['text'] || targetNode.attributes['content-desc'] || `Element_${finalId.slice(-6)}`) : `Element_${finalId.slice(-6)}`,
+                            type: 'input',
+                            explored: false,
+                        };
+                        activeMap.elements.push(activeElement);
+                        explorer.addLog(`Heuristic element persisted to map: ${activeElement.name}`, 'info');
+                    }
+
+                    if (activeElement && !activeElement.explored) {
+                        activeElement.explored = true;
+                        setSavedMaps([...maps]);
+                        await saveScreenMap(activeProfileId, activeMap, settings.paths?.mappings);
+                    }
+                } else if (aiElement && !aiElement.explored) {
+                    aiElement.explored = true;
+                    await saveScreenMap(activeProfileId, aiScreen, settings.paths?.mappings);
+                }
+
                 if (targetNode && targetNode.bounds) {
                     // Tap to focus
                     const centerX = Math.round(targetNode.bounds.x + targetNode.bounds.w / 2);
@@ -1262,7 +1397,10 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                     // Press Enter
                     await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'keyevent', '66'] });
 
-                    explorer.setPreviousNavigation(aiScreen.name, xpath, 'type_text');
+                    const clickedXPath = generateXPath(targetNode);
+                    explorer.setPreviousNavigation(aiScreen.name, clickedXPath, 'type_text');
+                } else {
+                    await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'keyevent', '4'] });
                 }
             }
 
@@ -1305,7 +1443,43 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                     if (overlap > 0 && overlap / hashElementIds.size >= 0.3) {
                         // Merge elements
                         const newElements = screen.elements.filter(e => !aiElementIds.has(e.id));
+                        
+                        // Merge explored state for overlapping elements to prevent data loss
+                        for (const oldEl of screen.elements) {
+                            if (aiElementIds.has(oldEl.id)) {
+                                const targetAiEl = potentialAiScreen.elements.find(e => e.id === oldEl.id);
+                                if (targetAiEl) {
+                                    if (oldEl.explored) targetAiEl.explored = true;
+                                    if (oldEl.navigates_to && !targetAiEl.navigates_to) targetAiEl.navigates_to = oldEl.navigates_to;
+                                }
+                            }
+                        }
+
                         potentialAiScreen.elements = [...potentialAiScreen.elements, ...newElements];
+
+                        // CRITICAL FIX: Update dangling navigates_to pointers in ALL screens!
+                        // If any element points to the temporary screen that we are about to delete,
+                        // redirect it to the AI screen we just merged into.
+                        for (const otherScreen of finalMaps) {
+                            let updatedOther = false;
+                            for (const el of otherScreen.elements) {
+                                if (el.navigates_to === screen.name || el.navigates_to === screen.id) {
+                                    el.navigates_to = potentialAiScreen.name;
+                                    updatedOther = true;
+                                } else if (typeof el.navigates_to === 'string' && (el.navigates_to.includes(screen.name) || el.navigates_to.includes(screen.id))) {
+                                    // Handle comma separated navigates_to just in case
+                                    el.navigates_to = el.navigates_to
+                                        .split(',')
+                                        .map((t: string) => (t.trim() === screen.name || t.trim() === screen.id) ? potentialAiScreen.name : t.trim())
+                                        .join(', ');
+                                    updatedOther = true;
+                                }
+                            }
+                            // Save the other screen if we modified it
+                            if (updatedOther && otherScreen.id !== potentialAiScreen.id && otherScreen.id !== screen.id) {
+                                await saveScreenMap(activeProfileId, otherScreen, settings.paths?.mappings);
+                            }
+                        }
 
                         await saveScreenMap(activeProfileId, potentialAiScreen, settings.paths?.mappings);
                         await deleteScreenMap(activeProfileId, screen.id, settings.paths?.mappings);
@@ -1327,17 +1501,27 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         return finalMaps;
     };
 
-    const startExploration = async (customPrompt?: string) => {
+    const startExploration = async (config: ExplorationConfig, customPrompt: string, useAi: boolean) => {
+        setIsExplorationModalOpen(false);
         if (!selectedDevice) return;
 
-        if (!customPrompt || customPrompt.trim() === '') {
-            feedback.toast.error(t('mapper.exploration.error_empty_guidelines'));
-            return;
-        }
+        setExplorationLogs([{
+            text: "Parsing configuration and heuristics...",
+            type: "info",
+            timestamp: new Date().toLocaleTimeString(),
+            stepNumber: 0
+        }]);
 
-        explorerRef.current = new AutonomousExplorer(t, 9999);
+        const engineConfig = await analyzeExplorationPrompt(config, customPrompt, useAi, settings);
+
+        // CRITICAL FIX: Fetch latest maps from disk to avoid stale React state
+        const currentDiskMaps = await loadSavedMaps();
+
+        explorerRef.current = new AutonomousExplorer(t, 9999, engineConfig, currentDiskMaps);
         explorationPromptRef.current = customPrompt;
-        setExplorationLogs([]);
+
+        explorerRef.current.addLog(explorerRef.current.getGraphSummaryLog(currentDiskMaps, t('mapper.exploration.summary_initial', 'Resumo Inicial do Grafo')), 'info');
+        setExplorationLogs([...explorerRef.current.getLogs()]);
         setIsExploring(true);
         isExploringRef.current = true;
     };
@@ -1485,17 +1669,21 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                         actions={
                             <>
                                 {hasApiKey && (
-                                    <AiButton
-                                        id="mapper_exploration"
+                                    <Button
                                         variant={isExploring || isEnhancing ? "danger" : "primary"}
-                                        {...isNarrow ? { showTextAlways: false, expandable: false } : { showTextAlways: true }}
+                                        size="sm"
                                         onClick={isExploring ? () => stopExploration(t('mapper.exploration.cancelled')) : isEnhancing ? () => {
                                             if (enhanceAbortControllerRef.current) enhanceAbortControllerRef.current.abort();
-                                        } : (_e, prompt) => startExploration(prompt)}
-                                        isLoading={isExploring || isEnhancing}
-                                        label={isExploring ? t('mapper.exploration.stop') : isEnhancing ? t('mapper.exploration.stop') : t('mapper.exploration.start')}
-                                        alwaysOpenModal={!(isExploring || isEnhancing)}
-                                    />
+                                        } : () => setIsExplorationModalOpen(true)}
+                                        className={clsx(
+                                            "flex items-center gap-2 px-3 py-1.5 transition-colors shadow-sm text-sm font-medium rounded-2xl",
+                                            !(isExploring || isEnhancing) ? "bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-on-primary border-none shadow-primary/20" : ""
+                                        )}
+                                        title={isExploring ? t('mapper.exploration.stop') : isEnhancing ? t('mapper.exploration.stop') : t('mapper.exploration.start')}
+                                    >
+                                        {(isExploring || isEnhancing) ? <X size={16} /> : <Sparkles size={16} />}
+                                        <span className={clsx(isNarrow && "hidden")}>{isExploring ? t('mapper.exploration.stop') : isEnhancing ? t('mapper.exploration.stop') : t('mapper.exploration.start')}</span>
+                                    </Button>
                                 )}
                                 <Button
                                     variant="primary"
@@ -2221,6 +2409,13 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 variant="danger"
                 confirmText={t('mapper.action.delete')}
             />
+
+            {isExplorationModalOpen && (
+                <AutonomousExplorationConfigModal
+                    onClose={() => setIsExplorationModalOpen(false)}
+                    onStart={startExploration}
+                />
+            )}
 
             <ConfirmationModal
                 isOpen={showMigrationModal}
