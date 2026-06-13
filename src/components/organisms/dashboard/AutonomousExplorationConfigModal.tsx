@@ -9,7 +9,7 @@ import { TagInput } from '@/components/atoms/TagInput';
 import { Switch } from '@/components/atoms/Switch';
 import { Textarea } from '@/components/atoms/Textarea';
 import { Select } from '@/components/atoms/Select';
-import { ExplorationConfig } from '@/lib/dashboard/explorationEngine';
+import { ExplorationConfig, DESTRUCTIVE_TERMS, ESCAPE_TERMS } from '@/lib/dashboard/explorationEngine';
 import { useSettings } from '@/lib/settings';
 
 interface AutonomousExplorationConfigModalProps {
@@ -20,30 +20,69 @@ interface AutonomousExplorationConfigModalProps {
 export function AutonomousExplorationConfigModal({ onClose, onStart }: AutonomousExplorationConfigModalProps) {
     const { t } = useTranslation();
 
-    const [mode, setMode] = useState<'new' | 'all' | 'specific'>('new');
-    const [limits, setLimits] = useState<'default' | 'custom'>('default');
+    const [mode, setMode] = useState<'new' | 'all' | 'specific'>(() => {
+        return (localStorage.getItem('exploration_config_mode') as 'new' | 'all' | 'specific') || 'new';
+    });
+    const [limits, setLimits] = useState<'default' | 'custom'>(() => {
+        return (localStorage.getItem('exploration_config_limits') as 'default' | 'custom') || 'default';
+    });
+
+    useEffect(() => {
+        if (mode === 'specific') {
+            setLimits('custom');
+        }
+    }, [mode]);
+
     
     // Custom Tags
-    const [avoidKeywords, setAvoidKeywords] = useState<string[]>([]);
-    const [escapeTargets, setEscapeTargets] = useState<string[]>([]);
-    const [priorityKeywords, setPriorityKeywords] = useState<string[]>([]);
+    const [avoidKeywords, setAvoidKeywords] = useState<string[]>(() => {
+        const saved = localStorage.getItem('exploration_config_avoid');
+        return saved ? JSON.parse(saved) : [];
+    });
+    const [escapeTargets, setEscapeTargets] = useState<string[]>(() => {
+        const saved = localStorage.getItem('exploration_config_escape');
+        return saved ? JSON.parse(saved) : [];
+    });
+    const [priorityKeywords, setPriorityKeywords] = useState<string[]>(() => {
+        const saved = localStorage.getItem('exploration_config_priority');
+        return saved ? JSON.parse(saved) : [];
+    });
 
     const { settings } = useSettings();
     const availablePackages = settings.tools.appPackage
         ? settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean)
         : [];
 
-    const [targetPackage, setTargetPackage] = useState<string>(availablePackages[0] || '');
-    const [allowedPackages, setAllowedPackages] = useState<string[]>([]);
+    const [targetPackage, setTargetPackage] = useState<string>(() => {
+        return localStorage.getItem('exploration_config_targetPackage') || availablePackages[0] || '';
+    });
+    const [allowedPackages, setAllowedPackages] = useState<string[]>(() => {
+        const saved = localStorage.getItem('exploration_config_allowedPackages');
+        return saved ? JSON.parse(saved) : [];
+    });
 
-    const [useAi, setUseAi] = useState(false);
-    const [aiPrompt, setAiPrompt] = useState('');
+    const [useAi, setUseAi] = useState(() => {
+        return localStorage.getItem('exploration_config_useAi') === 'true';
+    });
+    const [aiPrompt, setAiPrompt] = useState(() => {
+        return localStorage.getItem('exploration_config_aiPrompt') || '';
+    });
 
     const handleStart = () => {
+        // Save preferences to local storage for future sessions
+        localStorage.setItem('exploration_config_mode', mode);
+        localStorage.setItem('exploration_config_limits', limits);
+        localStorage.setItem('exploration_config_avoid', JSON.stringify(avoidKeywords));
+        localStorage.setItem('exploration_config_escape', JSON.stringify(escapeTargets));
+        localStorage.setItem('exploration_config_priority', JSON.stringify(priorityKeywords));
+        localStorage.setItem('exploration_config_targetPackage', targetPackage);
+        localStorage.setItem('exploration_config_allowedPackages', JSON.stringify(allowedPackages));
+        localStorage.setItem('exploration_config_useAi', String(useAi));
+        localStorage.setItem('exploration_config_aiPrompt', aiPrompt);
         const config: ExplorationConfig = {
             priorityKeywords: mode === 'specific' ? priorityKeywords : [],
-            avoidKeywords: limits === 'custom' ? avoidKeywords : [],
-            escapeTargets: limits === 'custom' ? escapeTargets : [],
+            avoidKeywords: limits === 'custom' ? (avoidKeywords.length > 0 ? avoidKeywords : DESTRUCTIVE_TERMS) : [],
+            escapeTargets: limits === 'custom' ? (escapeTargets.length > 0 ? escapeTargets : ESCAPE_TERMS) : [],
             forceReexplore: [],
             revisitKnownScreens: mode === 'all' || mode === 'specific',
             targetPackage: targetPackage || undefined,
@@ -130,8 +169,11 @@ export function AutonomousExplorationConfigModal({ onClose, onStart }: Autonomou
                                 title={t('exploration_modal.limits.default.title')}
                                 description={t('exploration_modal.limits.default.desc')}
                                 selected={limits === 'default'}
-                                onClick={() => setLimits('default')}
+                                onClick={() => {
+                                    if (mode !== 'specific') setLimits('default');
+                                }}
                                 orientation="horizontal"
+                                className={mode === 'specific' ? 'opacity-50 pointer-events-none' : ''}
                             />
                             <ActionCard
                                 title={t('exploration_modal.limits.custom.title')}

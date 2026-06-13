@@ -1,7 +1,8 @@
 import { ScreenMap, UIElementMap } from '@/lib/types';
 import { InspectorNode, generateXPath } from '@/lib/inspectorUtils';
 
-export const DESTRUCTIVE_TERMS = ['delete', 'remove', 'apagar', 'excluir', 'eliminar', 'deletar', 'borrar'];
+export const DESTRUCTIVE_TERMS = ['erase', 'delete', 'remove', 'exclude', 'apagar', 'deletar', 'remover', 'excluir', 'eliminar', 'deletar', 'borrar'];
+export const ESCAPE_TERMS = ['next', 'proceed', 'continue', 'ok', 'confirm', 'save', 'done', 'próximo', 'próxima', 'prosseguir', 'continuar', 'confirmar', 'salvar', 'concluir'];
 
 export interface ExplorationConfig {
     priorityKeywords: string[];
@@ -79,7 +80,7 @@ export interface LogEntry {
 export class AutonomousExplorer {
     private state: ExplorationState;
     private t: (key: string, options?: any) => string;
-    
+
     // Graph Machine State
     private screenGlobalStates: Record<string, GraphState> = {};
     private elementGlobalStates: Record<string, GraphState> = {};
@@ -311,9 +312,9 @@ export class AutonomousExplorer {
                 const elKey = `${screenName}::${el.id}`;
                 const targets = el.navigates_to ? (Array.isArray(el.navigates_to) ? el.navigates_to : (typeof el.navigates_to === 'string' ? el.navigates_to.split(',') : [el.navigates_to])) : [];
 
-                const isVisited = this.state.visitedElements.includes(el.id) || 
-                                  (el.xpath && this.state.visitedElements.includes(el.xpath)) || 
-                                  el.explored;
+                const isVisited = this.state.visitedElements.includes(el.id) ||
+                    (el.xpath && this.state.visitedElements.includes(el.xpath)) ||
+                    el.explored;
 
                 if (targets.length === 0) {
                     if (isVisited) {
@@ -425,11 +426,11 @@ export class AutonomousExplorer {
         const exploringTargets: InspectorNode[] = [];
 
         const traverse = (node: InspectorNode) => {
-            const isInteractive = node.attributes['clickable'] === 'true' || 
-                                  node.attributes['checkable'] === 'true' || 
-                                  node.attributes['long-clickable'] === 'true' || 
-                                  node.attributes['class']?.includes('EditText') ||
-                                  (node.attributes['focusable'] === 'true' && (!!node.attributes['content-desc'] || !!node.attributes['text']));
+            const isInteractive = node.attributes['clickable'] === 'true' ||
+                node.attributes['checkable'] === 'true' ||
+                node.attributes['long-clickable'] === 'true' ||
+                node.attributes['class']?.includes('EditText') ||
+                (node.attributes['focusable'] === 'true' && (!!node.attributes['content-desc'] || !!node.attributes['text']));
 
             const xpath = generateXPath(node);
 
@@ -437,11 +438,11 @@ export class AutonomousExplorer {
                 const text = (node.attributes['text'] || '').toLowerCase();
                 const desc = (node.attributes['content-desc'] || '').toLowerCase();
                 const hasBlockedTerm = allBlockedTerms.some(term => text.includes(term) || desc.includes(term));
-                
+
                 if (!hasBlockedTerm) {
                     const elKey = `${currentScreenName}::${xpath}`;
                     const globalState = this.elementGlobalStates[elKey] ?? GraphState.UNEXPLORED;
-                    
+
                     if (globalState === GraphState.EXPLORING) {
                         exploringTargets.push(node);
                     } else if (globalState === GraphState.UNEXPLORED) {
@@ -530,13 +531,13 @@ export class AutonomousExplorer {
         let titleCandidate = "";
 
         const traverse = (node: InspectorNode) => {
-            const isInteractive = node.attributes['clickable'] === 'true' || 
-                                  node.attributes['checkable'] === 'true' || 
-                                  node.attributes['long-clickable'] === 'true' || 
-                                  node.attributes['class']?.includes('EditText') ||
-                                  (node.attributes['focusable'] === 'true' && (!!node.attributes['content-desc'] || !!node.attributes['text'])) ||
-                                  node.attributes['class']?.includes('Button');
-            
+            const isInteractive = node.attributes['clickable'] === 'true' ||
+                node.attributes['checkable'] === 'true' ||
+                node.attributes['long-clickable'] === 'true' ||
+                node.attributes['class']?.includes('EditText') ||
+                (node.attributes['focusable'] === 'true' && (!!node.attributes['content-desc'] || !!node.attributes['text'])) ||
+                node.attributes['class']?.includes('Button');
+
             const xpath = generateXPath(node);
 
             const text = node.attributes['text'] || '';
@@ -552,14 +553,14 @@ export class AutonomousExplorer {
                     isTitleCandidate = true;
                 }
             }
-            
+
             // Feedback message detection heuristic
             let isFeedbackCandidate = false;
             if (!isInteractive && text && text.length > 2 && (
-                resId.toLowerCase().includes('snackbar') || 
-                resId.toLowerCase().includes('message') || 
-                resId.toLowerCase().includes('alert') || 
-                text.toLowerCase().includes('sucesso') || 
+                resId.toLowerCase().includes('snackbar') ||
+                resId.toLowerCase().includes('message') ||
+                resId.toLowerCase().includes('alert') ||
+                text.toLowerCase().includes('sucesso') ||
                 text.toLowerCase().includes('erro')
             )) {
                 isFeedbackCandidate = true;
