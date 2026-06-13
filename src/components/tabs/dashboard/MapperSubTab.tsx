@@ -1291,6 +1291,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                     await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'input', 'keyevent', '4'] });
                 } else {
                     explorer.addLog(t('mapper.exploration.swiping_action', { direction: swipeDirection }), 'action');
+                    explorer.registerSwipeAction("");
 
                     let startX = 540;
                     let startY = 1200;
