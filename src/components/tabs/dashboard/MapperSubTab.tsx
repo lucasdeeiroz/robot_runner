@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import {
     Check, Scan, Home, ArrowLeft, Rows, X, GitGraph, Trash2, Plus, FileClock, SearchCode, ChevronDown, ChevronUp, ChevronRight,
-    FileCode, FileStack, Upload, Download, Eye, EyeClosed, Settings2, Sparkles
+    FileCode, FileStack, Upload, Download, Eye, EyeClosed, Settings2, Sparkles, Save
 } from 'lucide-react';
 import { XMLParser } from 'fast-xml-parser';
 import clsx from 'clsx';
@@ -1561,6 +1561,26 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         }
     }, [isExploring]);
 
+    const handleSaveExplorationLogs = async () => {
+        if (explorationLogs.length === 0) return;
+        try {
+            const content = JSON.stringify(explorationLogs, null, 2);
+            const path = await save({
+                filters: [{ name: 'JSON Logs', extensions: ['json'] }],
+                defaultPath: `exploration_logs_${new Date().toISOString().split('T')[0]}.json`
+            });
+
+            if (path) {
+                await invoke('save_file', { path, content, append: false });
+                feedback.toast.success(t('mapper.feedback.saved'));
+            }
+        } catch (e) {
+            console.error(e);
+            feedback.toast.error(t('mapper.error.save_failed', { defaultValue: 'Failed to save logs' }));
+        }
+    };
+
+
     const handleExportPOM = async () => {
         if (!screenName || mappedElements.length === 0) {
             feedback.toast.error(t('mapper.error.empty_map'));
@@ -2473,9 +2493,14 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                         </div>
                         <div className="flex gap-1">
                             {!(isExploring || isEnhancing) && (
-                                <Button variant="ghost" size="icon" onClick={() => setExplorationLogs([])} className="h-6 w-6">
-                                    <X size={14} />
-                                </Button>
+                                <>
+                                    <Button variant="ghost" size="icon" onClick={handleSaveExplorationLogs} className="h-6 w-6 text-on-surface-variant/80 hover:text-primary transition-colors" title={t('mapper.action.save_logs', { defaultValue: 'Save Logs' })}>
+                                        <Save size={14} />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" onClick={() => setExplorationLogs([])} className="h-6 w-6">
+                                        <X size={14} />
+                                    </Button>
+                                </>
                             )}
                         </div>
                         {(isExploring || isEnhancing) && (
