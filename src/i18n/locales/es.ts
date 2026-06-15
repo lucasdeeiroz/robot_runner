@@ -876,6 +876,11 @@ export const es = {
                 summary_final: "Resumen Final del Grafo (Fin de la Exploración)",
                 summary_screens: "- Pantallas: {{exhausted}} Exhausted, {{exploring}} Exploring, {{unexplored}} Unexplored",
                 summary_elements: "- Elementos: {{exhausted}} Exhausted, {{exploring}} Exploring, {{unexplored}} Unexplored",
+                heuristic_scroll: "Heurística: sin elementos no visitados, intentando hacer scroll",
+                heuristic_scroll_reverse: "Heurística: scroll inverso, no se encontraron elementos nuevos",
+                heuristic_back: "Heurística: atascado, volviendo",
+                heuristic_type: "Heurística: escribiendo texto en un input no visitado",
+                heuristic_click: "Heurística: clicando en un elemento no visitado"
             },
             enhancer: {
                 title: "Auditoría y Mejora de Mapeos",
@@ -967,7 +972,8 @@ export const es = {
                 toggle_stay_awake: "Alternar Mantener Pantalla Encendida",
                 export_json: "Exportar JSON",
                 import_json: "Importar JSON",
-                export_image: "Exportar Imagen"
+                export_image: "Exportar Imagen",
+                save_logs: "Guardar Logs"
             },
             feedback: {
                 mapped: "¡Elemento mapeado!",
@@ -982,13 +988,15 @@ export const es = {
                 new_screen: "Listo para nueva pantalla",
                 deleted: "Mapa eliminado",
                 stay_on_enabled: "Mantener Pantalla Encendida activado",
-                stay_on_disabled: "Mantener Pantalla Encendida desactivado"
+                stay_on_disabled: "Mantener Pantalla Encendida desactivado",
+                logs_saved: "Logs guardados con éxito"
             },
             error: {
                 missing_name: "Por favor proporcione un nombre para el elemento",
                 missing_screen_name: "Por favor proporcione un Nombre para la Pantalla",
                 save_failed: "Error al guardar mapa de pantalla",
-                stay_on_failed: "Error al cambiar el estado de Mantener Pantalla Encendida"
+                stay_on_failed: "Error al cambiar el estado de Mantener Pantalla Encendida",
+                logs_save_failed: "Error al guardar logs"
             },
             confirm: {
                 delete: "¿Está seguro de que desea eliminar este mapa?",

@@ -873,6 +873,11 @@ export const pt = {
                 summary_final: "Resumo Final do Grafo (Fim da Exploração)",
                 summary_screens: "- Telas: {{exhausted}} Exhausted, {{exploring}} Exploring, {{unexplored}} Unexplored",
                 summary_elements: "- Elementos: {{exhausted}} Exhausted, {{exploring}} Exploring, {{unexplored}} Unexplored",
+                heuristic_scroll: "Heurística: sem elementos não visitados, tentando rolar",
+                heuristic_scroll_reverse: "Heurística: rolagem reversa, sem novos elementos",
+                heuristic_back: "Heurística: travado, voltando",
+                heuristic_type: "Heurística: digitando texto em campo não visitado",
+                heuristic_click: "Heurística: clicando em elemento não visitado"
             },
             enhancer: {
                 title: "Auditoria e Melhoria de Mapeamentos",
@@ -964,7 +969,8 @@ export const pt = {
                 toggle_stay_awake: "Alternar Manter Tela Ligada",
                 export_json: "Exportar JSON",
                 import_json: "Importar JSON",
-                export_image: "Exportar Imagem"
+                export_image: "Exportar Imagem",
+                save_logs: "Salvar Logs"
             },
             feedback: {
                 mapped: "Elemento mapeado!",
@@ -979,13 +985,15 @@ export const pt = {
                 new_screen: "Pronto para nova tela",
                 deleted: "Mapa excluído",
                 stay_on_enabled: "Manter Tela Ligada ativado",
-                stay_on_disabled: "Manter Tela Ligada desativado"
+                stay_on_disabled: "Manter Tela Ligada desativado",
+                logs_saved: "Logs salvos com sucesso"
             },
             error: {
                 missing_name: "Por favor, forneça um nome para o elemento",
                 missing_screen_name: "Por favor, forneça um Nome para a Tela",
                 save_failed: "Falha ao salvar mapa da tela",
-                stay_on_failed: "Falha ao alterar estado de Manter Tela Ligada"
+                stay_on_failed: "Falha ao alterar estado de Manter Tela Ligada",
+                logs_save_failed: "Falha ao salvar logs"
             },
             confirm: {
                 delete: "Tem certeza que deseja excluir este mapa?",

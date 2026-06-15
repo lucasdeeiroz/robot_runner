@@ -47,7 +47,7 @@ export function buildExplorationConstraints(config: ExplorationConfig): string {
   if (config.priorityKeywords.length > 0) {
     lines.push(`- Priority elements (explore first): ${config.priorityKeywords.join(', ')}`);
   }
-  
+
   const allAvoidKeywords = Array.from(new Set([...config.avoidKeywords, ...DESTRUCTIVE_TERMS]));
   if (allAvoidKeywords.length > 0) {
     lines.push(`- Avoid clicking elements with: ${allAvoidKeywords.join(', ')}`);
@@ -124,7 +124,7 @@ Your goal is to map 100% of a mobile app's UI by discovering every screen, modal
    - On a new screen, **Swipe** (down/up) if scrollable elements exist, until no new elements appear.
    - Click **Unexplored** elements first.
    - If a button that would navigate to next screen is disabled, analyze the screen to discover what action would enable it.
-   - If a screen is fully mapped, prefer clicking "Save", "Finish", "Confirm", "Next" or similar buttons to escape, if they are non-destructive actions. Only use **Back** if no such buttons exist or navigate to a different **Tab**.
+   - If a screen is fully mapped, prefer clicking "Save", "Finish", "Confirm", "Next" or similar buttons to escape, if they are non-destructive actions. If there are no such buttons, search for a back button in the UI and use it. Only use the system back action if none of these buttons exist, or navigate to a different **Tab**.
 3. **Tab Priority**: Fully explore the current tab's hierarchy before switching to another tab. Home/Main tab is priority #1.
 4. **Data Entry**: Use "type_text" for inputs. Use only ASCII characters.
 5. **Anti-Loop**: If you see the same screen state twice in your history without progress, try a different branch or go "back".

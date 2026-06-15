@@ -492,29 +492,69 @@ export class AutonomousExplorer {
                     type: 'type_text',
                     targetId: xpath,
                     text: 'Test',
-                    details: 'Heuristic: type text into unvisited input'
+                    details: this.t('mapper.exploration.heuristic_type', { defaultValue: 'Heuristic: type text into unvisited input' })
                 };
             }
 
             return {
                 type: 'click',
                 targetId: xpath,
-                details: 'Heuristic: click unvisited element'
+                details: this.t('mapper.exploration.heuristic_click', { defaultValue: 'Heuristic: click unvisited element' })
             };
         }
 
         // If all elements are visited, try scrolling or going back
         if (this.state.consecutiveSwipes < 2) {
-            return {
-                type: 'swipe',
-                direction: 'up',
-                details: 'Heuristic: no unvisited elements, trying to scroll'
+            let scrollDirection: 'up' | 'down' | 'left' | 'right' = 'up';
+            let isHorizontal = false;
+
+            // Find the largest scrollable area
+            let maxScrollArea = 0;
+            const findScrollable = (n: InspectorNode) => {
+                const isScrollableAttr = n.attributes['scrollable'] === 'true';
+                const isScrollClass = n.attributes['class']?.includes('ScrollView') || n.attributes['class']?.includes('RecyclerView') || n.tagName?.includes('ScrollView') || n.tagName?.includes('RecyclerView');
+                
+                if (isScrollableAttr || isScrollClass) {
+                    const boundsMatch = n.attributes['bounds']?.match(/\[(\d+),(\d+)\]\[(\d+),(\d+)\]/);
+                    if (boundsMatch) {
+                        const x1 = parseInt(boundsMatch[1], 10);
+                        const y1 = parseInt(boundsMatch[2], 10);
+                        const x2 = parseInt(boundsMatch[3], 10);
+                        const y2 = parseInt(boundsMatch[4], 10);
+                        const width = x2 - x1;
+                        const height = y2 - y1;
+                        const area = width * height;
+                        if (area > maxScrollArea) {
+                            maxScrollArea = area;
+                            isHorizontal = width > height;
+                        }
+                    }
+                }
+                n.children.forEach(findScrollable);
             };
+            findScrollable(root);
+
+            if (this.state.consecutiveSwipes === 0) {
+                scrollDirection = isHorizontal ? 'left' : 'up';
+                return {
+                    type: 'swipe',
+                    direction: scrollDirection,
+                    details: this.t('mapper.exploration.heuristic_scroll', { defaultValue: 'Heuristic: no unvisited elements, trying to scroll' })
+                };
+            } else {
+                // consecutiveSwipes === 1 means previous scroll didn't find new elements
+                scrollDirection = isHorizontal ? 'right' : 'down';
+                return {
+                    type: 'swipe',
+                    direction: scrollDirection,
+                    details: this.t('mapper.exploration.heuristic_scroll_reverse', { defaultValue: 'Heuristic: scroll reverse, no new elements found' })
+                };
+            }
         }
 
         return {
             type: 'back',
-            details: 'Heuristic: stuck, going back'
+            details: this.t('mapper.exploration.heuristic_back', { defaultValue: 'Heuristic: stuck, going back' })
         };
     }
 

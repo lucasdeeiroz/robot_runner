@@ -1572,11 +1572,11 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
 
             if (path) {
                 await invoke('save_file', { path, content, append: false });
-                feedback.toast.success(t('mapper.feedback.saved'));
+                feedback.toast.success(t('mapper.feedback.logs_saved', { defaultValue: 'Logs saved successfully' }));
             }
         } catch (e) {
             console.error(e);
-            feedback.toast.error(t('mapper.error.save_failed', { defaultValue: 'Failed to save logs' }));
+            feedback.toast.error(t('mapper.error.logs_save_failed', { defaultValue: 'Failed to save logs' }));
         }
     };
 

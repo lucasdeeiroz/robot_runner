@@ -872,6 +872,11 @@ export const en = {
                 summary_final: "Final Graph Summary (Exploration Ended)",
                 summary_screens: "- Screens: {{exhausted}} Exhausted, {{exploring}} Exploring, {{unexplored}} Unexplored",
                 summary_elements: "- Elements: {{exhausted}} Exhausted, {{exploring}} Exploring, {{unexplored}} Unexplored",
+                heuristic_scroll: "Heuristic: no unvisited elements, trying to scroll",
+                heuristic_scroll_reverse: "Heuristic: scroll reverse, no new elements found",
+                heuristic_back: "Heuristic: stuck, going back",
+                heuristic_type: "Heuristic: type text into unvisited input",
+                heuristic_click: "Heuristic: click unvisited element"
             },
             enhancer: {
                 title: "Audit & Enhance Maps",
@@ -963,7 +968,8 @@ export const en = {
                 toggle_stay_awake: "Toggle Keep Screen Awake",
                 export_json: "Export JSON",
                 import_json: "Import JSON",
-                export_image: "Export Image"
+                export_image: "Export Image",
+                save_logs: "Save Logs"
             },
             feedback: {
                 mapped: "Element mapped!",
@@ -978,13 +984,15 @@ export const en = {
                 new_screen: "Ready for new screen",
                 deleted: "Map deleted",
                 stay_on_enabled: "Stay Awake enabled",
-                stay_on_disabled: "Stay Awake disabled"
+                stay_on_disabled: "Stay Awake disabled",
+                logs_saved: "Logs saved successfully"
             },
             error: {
                 missing_name: "Please provide a name for the element",
                 missing_screen_name: "Please provide a Screen Name",
                 save_failed: "Failed to save screen map",
-                stay_on_failed: "Failed to change Stay Awake state"
+                stay_on_failed: "Failed to change Stay Awake state",
+                logs_save_failed: "Failed to save logs"
             },
             confirm: {
                 delete: "Are you sure you want to delete this map?",
