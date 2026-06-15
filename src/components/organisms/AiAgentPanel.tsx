@@ -231,12 +231,13 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
 
         } catch (error: any) {
             console.error("AI Agent Error:", error);
-            logEvent('ai_interaction_error', { error_message: error.message || 'Unknown error' });
-            feedback.toast.raw.error(t('ai_agent.error', { error: error.message }));
+            const errMsg = typeof error === 'string' ? error : (error?.message || String(error));
+            logEvent('ai_interaction_error', { error_message: errMsg });
+            feedback.toast.raw.error(t('ai_agent.error', { error: errMsg }));
             setMessages(prev => [...prev, {
                 id: (Date.now() + 1).toString(),
                 role: 'agent',
-                content: `**Error:** Failed to reach AI Provider. \n\n\`${error.message}\``
+                content: `**Error:** Failed to reach AI Provider. \n\n\`${errMsg}\``
             }]);
         } finally {
             setIsLoading(false);

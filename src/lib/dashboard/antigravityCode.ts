@@ -164,8 +164,9 @@ export async function askAntigravityCli(
         }
         return String(rawResult);
     } catch (error: any) {
-        console.error("[Antigravity CLI] Invocation failed:", error);
-        throw error;
+        console.error("[Antigravity CLI] Invocation failed. Raw Error:", error, "Type:", typeof error);
+        const errorStr = typeof error === 'string' ? error : (error?.message || String(error));
+        throw new Error(errorStr);
     }
 }
 

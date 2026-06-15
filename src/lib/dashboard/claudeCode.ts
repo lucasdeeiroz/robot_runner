@@ -111,13 +111,13 @@ export async function askClaudeCode(
         }
         return String(rawResult);
     } catch (error: any) {
-        console.error("[Claude CLI] Invocation failed:", error);
-        const errorStr = String(error);
+        console.error("[Claude CLI] Invocation failed. Raw Error:", error, "Type:", typeof error);
+        const errorStr = typeof error === 'string' ? error : (error?.message || String(error));
 
         if (errorStr.includes("Not logged in") || errorStr.includes("/login")) {
             throw new Error("Claude CLI: You are not logged in. If you provided a token in settings, check if it is correct. Otherwise, please run 'claude login' in your terminal.");
         }
-        throw error;
+        throw new Error(errorStr);
     }
 }
 
