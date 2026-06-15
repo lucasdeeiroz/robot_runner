@@ -418,6 +418,7 @@ export const pt = {
                 key_required: "Chave API do {{provider}} necessária. Configure em Definições.",
                 types: {
                     test_case: "Casos de Teste (BDD)",
+                    test_case_traditional: "Casos de Teste (Tradicional / Passo a Passo)",
                     pbi: "Item de Backlog (PBI)",
                     improvement: "Melhoria Funcional",
                     bug: "Relatório de Bug"

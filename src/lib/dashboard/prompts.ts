@@ -188,14 +188,44 @@ RULES:
      [Detailed description of the feature and scope]
 
      Scenario: [Scenario Title]
-       Given [preconditions and state]
-       When [actions executed by the user]
-       Then [expected results and state verifications]
+       1. Given [preconditions and state]
+       2. When [actions executed by the user]
+       3. Then [expected results and state verifications]
 3. Map actions and verifications to the mapped elements in the APPLICATION MAPPING context where applicable. 
    - If an element is an "(Assert Target)", ensure there is a "Then" step verifying its presence or correctness.
    - If an element specifies "(Mock: data)", use that exact data in your "When" inputs.
    - If an element specifies "(Rule: id)", append that ID to the scenario or steps for traceability.
-4. Write at least one Happy Path and one Edge Case/Sad Path per feature.
+4. Write AS MANY test cases as possible to comprehensively cover the requirements. Exhaustively cover Happy Paths, Edge Cases, Negative/Sad Paths, Boundary values, and Validation rules. Do not stop at just two scenarios; generate a robust, full suite.
+5. Keep scenarios atomic, independent, and clear.
+6. Number the steps within each scenario sequentially starting from 1 (e.g., 1. Given, 2. When, 3. Then). Do NOT use hierarchical numbering, sub-bullets, or spaces between numbers (e.g., avoid 1.1, 1.2, or "1 2").
+`.trim();
+  const languageDirective = `Language: ${language}.`;
+  return appendCustomPrompt(`${basePrompt}\n${languageDirective}`, customPrompt);
+}
+
+export function getRefinedTraditionalTestCasesPrompt(language: string, customPrompt?: string): string {
+  const basePrompt = getRemoteString('prompt_test_cases_traditional') || `
+You are a Principal QA Automation Architect and QA Analyst.
+Convert the raw requirements into professional, traditional manual Test Cases.
+Do NOT use BDD or Gherkin syntax (no Given/When/Then).
+
+RULES:
+1. Structure the output exactly as follows:
+   Story: [Feature Name]
+     [Detailed description of the feature and scope]
+
+     Scenario 1: [Test Case Title]
+       Steps:
+       1. [Action step 1]
+       - Validar: [Expected result for step 1]
+       2. [Action step 2]
+       - Validar: [Expected result for step 2]
+
+2. You MUST use the word "Validar:", "Verificar:" or "Garantir:" for expected results so they can be parsed correctly.
+3. Map actions and verifications to the mapped elements in the APPLICATION MAPPING context where applicable. 
+   - If an element is an "(Assert Target)", ensure there is a verification step for it.
+   - If an element specifies "(Mock: data)", use that exact data in the inputs.
+4. Write AS MANY test cases as possible to comprehensively cover the requirements. Exhaustively cover Happy Paths, Edge Cases, Negative/Sad Paths, Boundary values, and Validation rules. Do not stop at just two scenarios; generate a robust, full suite.
 5. Keep scenarios atomic, independent, and clear.
 `.trim();
   const languageDirective = `Language: ${language}.`;

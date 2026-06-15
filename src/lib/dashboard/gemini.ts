@@ -16,10 +16,10 @@ interface GeminiResponse {
 
 import { ScreenMap, UIElementMap } from '@/lib/types';
 import { DeepAnalysisContext } from "./historyAnalysisUtils";
-import { getExplorationPrompt, formatExistingMaps, getRefinedTestCasesPrompt, getRefinedPBIPrompt, getRefinedImprovementPrompt, getRefinedBugPrompt, getRefinedRobotScriptPrompt, getFlowchartLayoutPrompt, getElementNamingPrompt, getScreenTaggingPrompt, getTestHistoryAnalysisPrompt, getExecutionSummaryPrompt, getQAAssistantWrapper, getAutonomousAgentPrompt } from "./prompts";
+import { getExplorationPrompt, formatExistingMaps, getRefinedTestCasesPrompt, getRefinedTraditionalTestCasesPrompt, getRefinedPBIPrompt, getRefinedImprovementPrompt, getRefinedBugPrompt, getRefinedRobotScriptPrompt, getFlowchartLayoutPrompt, getElementNamingPrompt, getScreenTaggingPrompt, getTestHistoryAnalysisPrompt, getExecutionSummaryPrompt, getQAAssistantWrapper, getAutonomousAgentPrompt } from "./prompts";
 import { fetch } from '@tauri-apps/plugin-http';
 
-export type AIGenerationType = 'test_case' | 'pbi' | 'improvement' | 'bug' | 'element_name' | 'robot_script' | 'exploration';
+export type AIGenerationType = 'test_case' | 'test_case_traditional' | 'pbi' | 'improvement' | 'bug' | 'element_name' | 'robot_script' | 'exploration';
 
 function extractBase64Data(imageBase64: string): { mimeType: string, data: string } {
     const trimmed = imageBase64.trim();
@@ -88,6 +88,7 @@ export async function generateRefinedTestCases(
     let promptString = "";
     switch (generationType) {
         case 'test_case': promptString = getRefinedTestCasesPrompt(language, customPrompt); break;
+        case 'test_case_traditional': promptString = getRefinedTraditionalTestCasesPrompt(language, customPrompt); break;
         case 'pbi': promptString = getRefinedPBIPrompt(language, customPrompt); break;
         case 'improvement': promptString = getRefinedImprovementPrompt(language, customPrompt); break;
         case 'bug': promptString = getRefinedBugPrompt(language, customPrompt); break;

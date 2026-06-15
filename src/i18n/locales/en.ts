@@ -418,6 +418,7 @@ export const en = {
                 key_required: "{{provider}} API Key required. Please configure it in Settings.",
                 types: {
                     test_case: "Test Cases (BDD)",
+                    test_case_traditional: "Test Cases (Traditional / Step-by-Step)",
                     pbi: "Product Backlog Item (PBI)",
                     improvement: "Functional Improvement",
                     bug: "Bug Report"

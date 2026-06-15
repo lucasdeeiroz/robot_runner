@@ -46,7 +46,7 @@ export function AIGeneratorSubTab({ onNavigate }: AIGeneratorSubTabProps) {
     const parseGeneratedContent = (content: string, defaultType: string): { title: string; description: string } => {
         const lines = content.split('\n');
         let title = "";
-        
+
         for (let line of lines) {
             const trimmed = line.trim();
             if (trimmed.startsWith('#')) {
@@ -57,7 +57,7 @@ export function AIGeneratorSubTab({ onNavigate }: AIGeneratorSubTabProps) {
                 break;
             }
         }
-        
+
         if (!title) {
             for (let line of lines) {
                 const trimmed = line.trim();
@@ -67,50 +67,110 @@ export function AIGeneratorSubTab({ onNavigate }: AIGeneratorSubTabProps) {
                 }
             }
         }
-        
+
         if (title.length > 80) {
             title = title.substring(0, 80) + "...";
         }
         if (!title) {
             title = `AI Generated ${defaultType} - ${new Date().toLocaleDateString()}`;
         }
-        
+
         return {
             title,
             description: content
         };
     };
 
-    const parseTestCasesForTestLink = (content: string): Array<{ name: string; steps: string[] }> => {
+    const parseTestCasesForTestLink = (content: string): Array<{ name: string; summary: string, steps: Array<{ action: string; expectedResult: string }> }> => {
         const lines = content.split('\n');
-        const testCases: Array<{ name: string; steps: string[] }> = [];
-        let currentCaseName = "";
-        let currentSteps: string[] = [];
+        const testCases: Array<{ name: string; summary: string, steps: Array<{ action: string; expectedResult: string }> }> = [];
 
-        for (const line of lines) {
-            const trimmed = line.trim();
-            if (trimmed.startsWith('Scenario:') || trimmed.startsWith('Scenario Outline:') || trimmed.startsWith('Test Case:') || trimmed.startsWith('Caso de Teste:')) {
-                if (currentCaseName) {
-                    testCases.push({ name: currentCaseName, steps: currentSteps.length > 0 ? currentSteps : ["No steps provided"] });
+        let currentCaseName = "";
+        let currentSummaryLines: string[] = [];
+        let currentSteps: Array<{ action: string; expectedResult: string }> = [];
+        let inStepsSection = false;
+
+        const pushCurrentTestCase = () => {
+            if (currentCaseName) {
+                let refinedSteps: Array<{ action: string; expectedResult: string }> = [];
+
+                const isBdd = [...currentSummaryLines, ...currentSteps.map(s => s.action)].some(l => /^(?:\d+[\.)]?\s*)?(?:Given|When|Then|Dado|Quando|Ent[ãa]o)/i.test(l));
+                if (isBdd) {
+                    const allGherkinLines = [...currentSummaryLines, ...currentSteps.map(s => s.action)].filter(l => /^(?:\d+[\.)]?\s*)?(?:Given|When|Then|And|But|Dado|Quando|Ent[ãa]o|E\s|Mas)\b/i.test(l));
+                    for (const line of allGherkinLines) {
+                        if (/^(?:\d+[\.)]?\s*)?(?:Then|Ent[ãa]o)/i.test(line)) {
+                            if (refinedSteps.length > 0) {
+                                refinedSteps[refinedSteps.length - 1].expectedResult += (refinedSteps[refinedSteps.length - 1].expectedResult ? "<br/>" : "") + line;
+                            } else {
+                                refinedSteps.push({ action: "Verificar resultado", expectedResult: line });
+                            }
+                        } else if (/^(?:\d+[\.)]?\s*)?(?:Given|When|And|But|Dado|Quando|E\s|Mas)\b/i.test(line)) {
+                            refinedSteps.push({ action: line, expectedResult: "" });
+                        }
+                    }
+                } else {
+                    for (const step of currentSteps) {
+                        if (/^\s*(?:-|\*|\d+[\.)]?)\s*(?:Verificar|Validar|Garantir|Certificar|Then|Ent[ãa]o)/i.test(step.action)) {
+                            if (refinedSteps.length > 0) {
+                                refinedSteps[refinedSteps.length - 1].expectedResult += (refinedSteps[refinedSteps.length - 1].expectedResult ? "<br/>" : "") + step.action;
+                            } else {
+                                refinedSteps.push({ action: "Verificar resultado", expectedResult: step.action });
+                            }
+                        } else {
+                            refinedSteps.push({ action: step.action, expectedResult: "" });
+                        }
+                    }
                 }
-                currentCaseName = trimmed;
+
+                const thenLine = currentSummaryLines.find(l => /^Then|Ent[ãa]o/i.test(l));
+                if (thenLine && refinedSteps.length > 0 && !refinedSteps[refinedSteps.length - 1].expectedResult) {
+                    refinedSteps[refinedSteps.length - 1].expectedResult = thenLine.replace(/^(?:Then|Ent[ãa]o)\s*/i, '');
+                }
+
+                if (refinedSteps.length === 0) {
+                    refinedSteps.push({ action: "Executar fluxo do cenário", expectedResult: thenLine ? thenLine.replace(/^(?:Then|Ent[ãa]o)\s*/i, '') : "Sucesso" });
+                }
+
+                testCases.push({
+                    name: currentCaseName,
+                    summary: currentSummaryLines.join('<br/>'),
+                    steps: refinedSteps
+                });
+            }
+        };
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const trimmed = line.trim();
+            const isScenario = /^(?:Scenario(?:\s+Outline)?|Cen[áa]rio|Escenario|Test Case|Caso de Teste)[\s\d]*:/i.test(trimmed);
+
+            if (isScenario) {
+                pushCurrentTestCase();
+                currentCaseName = trimmed.replace(/^(?:Scenario(?:\s+Outline)?|Cen[áa]rio|Escenario|Test Case|Caso de Teste)[\s\d]*:\s*/i, '').trim() || trimmed;
+                currentSummaryLines = [];
                 currentSteps = [];
-            } else if (trimmed.startsWith('Given') || trimmed.startsWith('When') || trimmed.startsWith('Then') || trimmed.startsWith('And') || trimmed.startsWith('Dado') || trimmed.startsWith('Quando') || trimmed.startsWith('Então') || trimmed.startsWith('E ') || trimmed.startsWith('- ') || /^\d+\./.test(trimmed)) {
-                if (currentCaseName) {
-                    currentSteps.push(trimmed);
+                inStepsSection = false;
+            } else if (/^(?:Steps:|Passos:|Pasos:)/i.test(trimmed)) {
+                inStepsSection = true;
+            } else if (/^(?:\d+[\.)]?\s*)?(?:Given|When|Then|And|But|Dado|Quando|Ent[ãa]o|E\s|Mas)\b/i.test(trimmed)) {
+                currentSteps.push({ action: trimmed, expectedResult: "" });
+            } else if (/^(?:-|\d+\.)/.test(trimmed)) {
+                currentSteps.push({ action: trimmed, expectedResult: "" });
+            } else if (trimmed.length > 0) {
+                if (!inStepsSection) {
+                    currentSummaryLines.push(trimmed);
                 }
             }
         }
 
-        if (currentCaseName) {
-            testCases.push({ name: currentCaseName, steps: currentSteps.length > 0 ? currentSteps : ["No steps provided"] });
-        }
+        pushCurrentTestCase();
 
         if (testCases.length === 0) {
             const nonComments = lines.map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('#'));
             testCases.push({
                 name: "AI Generated Test Suite",
-                steps: nonComments.length > 0 ? nonComments : ["Execute automated suite."]
+                summary: "Generated from AI requirements.",
+                steps: nonComments.length > 0 ? nonComments.map(c => ({ action: c, expectedResult: "" })) : [{ action: "Execute automated suite.", expectedResult: "Success" }]
             });
         }
 
@@ -284,8 +344,57 @@ export function AIGeneratorSubTab({ onNavigate }: AIGeneratorSubTabProps) {
         }
     };
 
+    const handleExportTestLinkXml = async () => {
+        if (!generatedContent.trim()) return;
+
+        try {
+            const testCases = parseTestCasesForTestLink(generatedContent);
+            const suiteName = `AI Suite - ${new Date().toLocaleDateString()}`;
+
+            let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<testsuite name="${suiteName.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}">\n`;
+
+            testCases.forEach(tc => {
+                xml += `  <testcase name="${tc.name.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}">\n`;
+                xml += `    <summary><![CDATA[<p>${tc.summary}</p>]]></summary>\n`;
+                xml += `    <steps>\n`;
+
+                tc.steps.forEach((step) => {
+                    const actionHtml = step.action ? step.action.replace(/]]>/g, ']]]]><![CDATA[>') : '';
+                    const expectedHtml = step.expectedResult ? step.expectedResult.replace(/]]>/g, ']]]]><![CDATA[>') : '';
+
+                    xml += `      <step>\n`;
+                    xml += `        <actions><![CDATA[<p>${actionHtml}</p>]]></actions>\n`;
+                    xml += `        <expectedresults><![CDATA[<p>${expectedHtml}</p>]]></expectedresults>\n`;
+                    xml += `      </step>\n`;
+                });
+
+                xml += `    </steps>\n`;
+                xml += `  </testcase>\n`;
+            });
+
+            xml += `</testsuite>`;
+
+            const filePath = await save({
+                filters: [{
+                    name: 'TestLink XML',
+                    extensions: ['xml']
+                }],
+                defaultPath: `testlink_${new Date().getTime()}.xml`
+            });
+
+            if (filePath) {
+                await writeTextFile(filePath, xml);
+                feedback.toast.success(t('dashboard.export.success', "Successfully exported!"));
+            }
+        } catch (e) {
+            console.error("Native export failed:", e);
+            feedback.toast.error("dashboard.export.error", e);
+        }
+    };
+
     const typeOptions = [
         { value: 'test_case', label: t('dashboard.generator.types.test_case', "Test Cases (BDD)") },
+        { value: 'test_case_traditional', label: t('dashboard.generator.types.test_case_traditional', "Test Cases (Tradicional / Passo a Passo)") },
         { value: 'robot_script', label: t('dashboard.generator.types.robot_script', "Robot Framework Script") },
         { value: 'pbi', label: t('dashboard.generator.types.pbi', "Product Backlog Item (PBI)") },
         { value: 'improvement', label: t('dashboard.generator.types.improvement', "Functional Improvement") },
@@ -429,7 +538,7 @@ export function AIGeneratorSubTab({ onNavigate }: AIGeneratorSubTabProps) {
                     className="flex-1 font-mono custom-scrollbar resize-none whitespace-pre-wrap text-sm p-4 bg-surface"
                 />
 
-                <div className="grid grid-cols-2 gap-3 mt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
                     <Button
                         variant="outline"
                         onClick={handleExportXlsx}
@@ -490,6 +599,17 @@ export function AIGeneratorSubTab({ onNavigate }: AIGeneratorSubTabProps) {
                             className="justify-center h-10"
                         >
                             {isExportingTestLink ? t('settings.integrations.testing') : "TestLink"}
+                        </Button>
+                    )}
+                    {useMapping && (genType === 'test_case' || genType === 'test_case_traditional') && (
+                        <Button
+                            variant="outline"
+                            onClick={handleExportTestLinkXml}
+                            disabled={!generatedContent}
+                            leftIcon={<FileDown size={16} className="text-orange-500" />}
+                            className="justify-center h-10"
+                        >
+                            {t('dashboard.actions.export_testlink_xml', "TestLink (.xml)")}
                         </Button>
                     )}
                 </div>
