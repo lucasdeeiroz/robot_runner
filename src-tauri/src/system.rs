@@ -52,10 +52,23 @@ pub async fn get_system_versions(
 ) -> SystemVersions {
     let adb_program = get_adb_program(&app);
     let adb_raw = get_version(&adb_program, &["--version"]);
-    let adb = extract_version(&adb_raw, r"Android Debug Bridge version ([\d\.]+)");
+    let adb_bridge = extract_version(&adb_raw, r"Android Debug Bridge version ([\d\.]+)");
+    let adb_sdk = extract_version(&adb_raw, r"Version ([\w\.\-]+)");
+
+    let adb_display = match (adb_bridge, adb_sdk) {
+        (Some(bridge), Some(sdk)) => format!("{} ({})", bridge, sdk),
+        (Some(bridge), None) => bridge,
+        (None, _) => {
+            if adb_raw.contains("Command not allowed") || adb_raw.to_lowercase().contains("error") || !adb_raw.trim().is_empty() {
+                "Custom Binary".to_string()
+            } else {
+                "Not Found".to_string()
+            }
+        }
+    };
 
     let mut versions = SystemVersions {
-        adb: adb.unwrap_or_else(|| "Not Found".to_string()),
+        adb: adb_display,
         node: "Not Checked".to_string(),
         appium: "Not Checked".to_string(),
         uiautomator2: "Not Checked".to_string(),
