@@ -115,6 +115,10 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
     const [testingAzure, setTestingAzure] = useState(false);
     const [testingTestLink, setTestingTestLink] = useState(false);
 
+    // Custom Color State
+    const [showCustomColorModal, setShowCustomColorModal] = useState(false);
+    const [customColorHex, setCustomColorHex] = useState('#ffffff');
+
     const handleTestJira = async () => {
         if (!settings.jira) return;
         setTestingJira(true);
@@ -1553,19 +1557,26 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                             { id: 'orange', hex: '#ea580c' },
                                             { id: 'cyan', hex: '#0891b2' },
                                             { id: 'pink', hex: '#db2777' },
+                                            { id: 'custom', hex: '#ffffff' },
                                         ].map((color) => (
                                             <Button
                                                 key={color.id}
-                                                onClick={() => updateSetting('primaryColor', color.id)}
+                                                onClick={color.id === 'custom' ? () => {
+                                                    setCustomColorHex(settings.primaryColor?.startsWith('#') ? settings.primaryColor : '#ffffff');
+                                                    setShowCustomColorModal(true);
+                                                } : () => updateSetting('primaryColor', color.id)}
                                                 variant="ghost"
                                                 className={clsx(
                                                     "w-6 h-6 rounded-2xl p-0 min-w-0 transition-transform",
-                                                    settings.primaryColor === color.id ? "ring-2 scale-110" : "hover:scale-105"
+                                                    (settings.primaryColor === color.id || (color.id === 'custom' && settings.primaryColor?.startsWith('#'))) ? "ring-2 scale-110" : "hover:scale-105"
                                                 )}
-                                                style={{ backgroundColor: color.hex, borderColor: color.hex, '--tw-ring-color': color.hex } as any}
-                                                title={color.id.charAt(0).toUpperCase() + color.id.slice(1)}
-                                            >
-                                                {settings.primaryColor === color.id && (
+                                                style={{
+                                                    backgroundColor: color.id === 'custom' && settings.primaryColor?.startsWith('#') ? settings.primaryColor : color.hex,
+                                                    borderColor: color.id === 'custom' && settings.primaryColor?.startsWith('#') ? settings.primaryColor : color.hex,
+                                                    '--tw-ring-color': color.id === 'custom' && settings.primaryColor?.startsWith('#') ? settings.primaryColor : color.hex
+                                                } as any}
+                                                title={t(`settings.appearance.${color.id}_color` as any)}>
+                                                {(settings.primaryColor === color.id || (color.id === 'custom' && settings.primaryColor?.startsWith('#'))) && (
                                                     <div className="w-2.5 h-2.5 bg-on-primary rounded-2xl shadow-sm" />
                                                 )}
                                             </Button>
@@ -2009,6 +2020,56 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                     </div>
                 </Section>
             </div>
+
+            {/* Custom Color Modal */}
+            <Modal
+                isOpen={showCustomColorModal}
+                onClose={() => setShowCustomColorModal(false)}
+                title={t('settings.appearance.custom_color')}
+            >
+                <div className="p-4 flex flex-col gap-4">
+                    <p className="text-sm text-on-surface-variant">
+                        {t('settings.appearance.custom_color_description') || 'Select a custom primary color for the application.'}
+                    </p>
+                    <div className="flex gap-4 items-center">
+                        <input
+                            type="color"
+                            value={customColorHex}
+                            onChange={(e) => setCustomColorHex(e.target.value)}
+                            className="w-12 h-12 rounded cursor-pointer border-none p-0 bg-transparent"
+                            style={{ colorScheme: settings.theme }}
+                        />
+                        <Input
+                            type="text"
+                            value={customColorHex}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                setCustomColorHex(val);
+                            }}
+                            placeholder="#RRGGBB"
+                            className="flex-1 font-mono uppercase"
+                        />
+                    </div>
+                </div>
+                <div className="flex justify-end gap-3 p-4 border-t border-outline-variant/30 bg-surface-variant/30">
+                    <Button variant="ghost" onClick={() => setShowCustomColorModal(false)}>
+                        {t('common.cancel')}
+                    </Button>
+                    <Button
+                        variant="primary"
+                        onClick={() => {
+                            if (/^#[0-9A-Fa-f]{6}$/i.test(customColorHex)) {
+                                updateSetting('primaryColor', customColorHex);
+                                setShowCustomColorModal(false);
+                            } else {
+                                feedback.toast.error('Invalid hex color. Please use #RRGGBB format.');
+                            }
+                        }}
+                    >
+                        {t('common.save')}
+                    </Button>
+                </div>
+            </Modal>
         </div>
     );
 }
