@@ -8,6 +8,7 @@ import { AgentAction } from '@/lib/ai/agentProtocol';
 import ReactMarkdown from 'react-markdown';
 import { feedback } from '@/lib/feedback';
 import { invoke } from '@tauri-apps/api/core';
+import { listScreenMaps } from '@/lib/dashboard/mapperPersistence';
 import { useDevices } from '@/lib/deviceStore';
 import { useFileSave } from '@/hooks/useFileSave';
 import { useSelection } from '@/lib/selectionStore';
@@ -16,13 +17,14 @@ import { useSpeechToText } from '@/hooks/useSpeechToText';
 import { useTextToSpeech } from '@/hooks/useTextToSpeech';
 import packageJson from '../../../package.json';
 import { Button } from "@/components/atoms/Button";
+import { Modal } from "@/components/organisms/Modal";
 import clsx from "clsx";
 
 interface AiAgentPanelProps {
     onNavigate: (page: string) => void;
 }
 
-interface Message {
+export interface Message {
     id: string;
     role: 'user' | 'agent';
     content: string;
@@ -61,7 +63,7 @@ const stripMarkdown = (text: string): string => {
 
 export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
     const { t } = useTranslation();
-    const { updateSetting, settings } = useSettings();
+    const { settings, updateSetting, activeProfileId } = useSettings();
     const { devices, selectedDevices, setSelectedDevices } = useDevices();
     const { clearSelection, addItem } = useSelection();
     const { addToolboxSession, setActiveSessionId } = useTestSessions();
@@ -113,6 +115,9 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
             }
         }
     }, [messages, sentViaVoice, speak]);
+
+    const [pendingFileAction, setPendingFileAction] = useState<AgentAction | null>(null);
+    const [originalContent, setOriginalContent] = useState<string | null>(null);
     const endOfMessagesRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -166,14 +171,57 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
         };
     };
 
-    const buildContext = () => {
+    const buildContext = async () => {
         const safeSettingsContext = buildSafeSettingsContext();
+        
+        let mappingsContext = '';
+        try {
+            const maps = await listScreenMaps(activeProfileId, settings.paths?.mappings);
+            if (maps && maps.length > 0) {
+                mappingsContext = `\n- Mappings (${maps.length} screens):\n${JSON.stringify(maps.map(m => ({ id: m.id, name: m.name, elements: m.elements.length })), null, 2)}`;
+            }
+        } catch (e) {
+            console.warn("Could not load mappings for AI context", e);
+        }
+
+        let resourcesContext = '';
+        try {
+            if (settings.paths?.resources) {
+                const resourcesDirFiles = await invoke<any[]>('list_directory', { path: settings.paths.resources });
+                const resourceFiles = resourcesDirFiles.filter(f => !f.is_dir && (f.name.endsWith('.resource') || f.name.endsWith('.robot')));
+                
+                if (resourceFiles.length > 0) {
+                    resourcesContext = `\n- Resource Files:\n`;
+                    for (const rf of resourceFiles) {
+                        try {
+                            const content = await invoke<string>('fs_read_text_file', { path: rf.path });
+                            resourcesContext += `\n--- ${rf.name} ---\n${content}\n`;
+                        } catch (e) {
+                            resourcesContext += `\n--- ${rf.name} --- (Failed to read)\n`;
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn("Could not load resources for AI context", e);
+        }
+
+        let testsDir = '';
+        try {
+            if (settings.paths?.tests) {
+                const testsDirFiles = await invoke<any[]>('list_directory', { path: settings.paths.tests });
+                const testFiles = testsDirFiles.filter(f => !f.is_dir && (f.name.endsWith('.robot') || f.name.endsWith('.txt')));
+                testsDir = `\n- Tests Directory:\n${testFiles.map(f => f.name).join(', ')}`;
+            }
+        } catch (e) {
+            console.warn("Could not load tests directory for AI context", e);
+        }
 
         return `
 - App Version: ${packageJson.version}
 - Active Workspace: ${settings.paths?.automationRoot || 'None'}
 - Active Device: ${activeDeviceUdid || 'None'}
-- Settings Summary: ${JSON.stringify(safeSettingsContext)}
+- Settings Summary: ${JSON.stringify(safeSettingsContext)}${mappingsContext}${resourcesContext}${testsDir}
         `;
     };
 
@@ -193,7 +241,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
         setMessages(prev => [...prev, newUserMessage]);
 
         try {
-            const context = buildContext();
+            const context = await buildContext();
 
             // Format history for the service
             const historyForService = messages.map(m => ({
@@ -472,8 +520,63 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                     feedback.toast.error('toolbox.scrcpy.open_error');
                 }
                 break;
+            case 'create_file':
+                setOriginalContent(null);
+                setPendingFileAction(action);
+                break;
+            case 'modify_file':
+            case 'delete_file':
+                if (action.path) {
+                    const automationRoot = typeof settings.paths.automationRoot === 'string' ? settings.paths.automationRoot.trim() : '';
+                    if (!automationRoot) {
+                        feedback.toast.error('ai_agent.invalid_automation_root');
+                        break;
+                    }
+                    const fullPath = `${automationRoot}/${action.path}`;
+                    try {
+                        const content = await invoke<string>('fs_read_text_file', { path: fullPath });
+                        setOriginalContent(content);
+                    } catch (e) {
+                        setOriginalContent(`// ${t('ai_agent.file_action_failed')}${e}`);
+                    }
+                    setPendingFileAction(action);
+                } else {
+                    feedback.toast.error(`${t('ai_agent.file_path_missing')} ${action.type}`);
+                }
+                break;
             default:
                 feedback.toast.error('ai_agent.action_unwired', { type: action.type });
+        }
+    };
+
+    const confirmFileAction = async () => {
+        if (!pendingFileAction || !pendingFileAction.path) {
+            setPendingFileAction(null);
+            return;
+        }
+        
+        const automationRoot = typeof settings.paths.automationRoot === 'string' ? settings.paths.automationRoot.trim() : '';
+        if (!automationRoot) {
+            feedback.toast.error('ai_agent.invalid_automation_root');
+            setPendingFileAction(null);
+            return;
+        }
+
+        const fullPath = `${automationRoot}/${pendingFileAction.path}`;
+
+        try {
+            if (pendingFileAction.type === 'delete_file') {
+                await invoke('fs_remove_file', { path: fullPath });
+                feedback.toast.success(t('ai_agent.file_deleted'));
+            } else {
+                await invoke('fs_write_text_file', { path: fullPath, content: pendingFileAction.content || '' });
+                feedback.toast.success(pendingFileAction.type === 'create_file' ? t('ai_agent.file_created') : t('ai_agent.file_modified'));
+            }
+        } catch (e: any) {
+            feedback.toast.error(`${t('ai_agent.file_action_failed')}${String(e)}`);
+        } finally {
+            setPendingFileAction(null);
+            setOriginalContent(null);
         }
     };
 
@@ -685,6 +788,45 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                     </button>
                 </div>
             </div>
+
+            {/* File Confirmation Modal */}
+            <Modal
+                isOpen={!!pendingFileAction}
+                onClose={() => setPendingFileAction(null)}
+                title={pendingFileAction?.type === 'delete_file' ? t('ai_agent.confirm_file_deletion') : (pendingFileAction?.type === 'modify_file' ? t('ai_agent.confirm_file_modification') : t('ai_agent.confirm_file_creation'))}
+                className="max-w-4xl"
+            >
+                {pendingFileAction && (
+                    <div className="space-y-4">
+                        <p className="text-sm text-on-surface-variant">
+                            <strong>{t('ai_agent.path')}</strong> {pendingFileAction.path}
+                        </p>
+                        
+                        <div className="flex gap-4 min-h-[300px] max-h-[60vh]">
+                            {pendingFileAction.type !== 'create_file' && (
+                                <div className="flex-1 overflow-auto border border-outline-variant/30 rounded-lg p-4 bg-surface-variant/20">
+                                    <h4 className="text-xs font-semibold mb-2 text-on-surface-variant uppercase">{t('ai_agent.original_content')}</h4>
+                                    <pre className="text-xs font-mono whitespace-pre-wrap">{originalContent}</pre>
+                                </div>
+                            )}
+                            
+                            {pendingFileAction.type !== 'delete_file' && (
+                                <div className="flex-1 overflow-auto border border-outline-variant/30 rounded-lg p-4 bg-surface-variant/20">
+                                    <h4 className="text-xs font-semibold mb-2 text-on-surface-variant uppercase">{t('ai_agent.new_content')}</h4>
+                                    <pre className="text-xs font-mono whitespace-pre-wrap">{pendingFileAction.content}</pre>
+                                </div>
+                            )}
+                        </div>
+                        
+                        <div className="flex justify-end gap-2 pt-4 border-t border-outline-variant/20">
+                            <Button variant="ghost" onClick={() => setPendingFileAction(null)}>{t('ai_agent.cancel')}</Button>
+                            <Button onClick={confirmFileAction}>
+                                {t('ai_agent.confirm')}
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </Modal>
         </div>
     );
 }

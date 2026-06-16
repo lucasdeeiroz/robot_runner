@@ -234,6 +234,11 @@ pub fn fs_mkdir(path: String) -> AppResult<()> {
 
 #[command]
 pub fn fs_write_text_file(path: String, content: String) -> AppResult<()> {
+    if let Some(parent) = std::path::Path::new(&path).parent() {
+        if !parent.exists() {
+            std::fs::create_dir_all(parent).map_err(|e| AppError::FileSystemError(e.to_string()))?;
+        }
+    }
     std::fs::write(&path, content).map_err(|e| AppError::FileSystemError(e.to_string()))
 }
 

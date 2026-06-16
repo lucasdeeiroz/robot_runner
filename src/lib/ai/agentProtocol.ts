@@ -11,8 +11,12 @@ export type AgentActionType =
     | 'take_screenshot'
     | 'open_toolbox'
     | 'open_inspector'
+    | 'open_inspector'
     | 'open_scrcpy'
-    | 'change_setting';
+    | 'change_setting'
+    | 'create_file'
+    | 'modify_file'
+    | 'delete_file';
 
 export interface AgentAction {
     type: AgentActionType;
@@ -23,6 +27,7 @@ export interface AgentAction {
     command?: string; // For execute_adb
     setting_key?: string; // For change_setting
     setting_value?: any; // For change_setting
+    content?: string; // For create_file and modify_file
     description?: string; // Human readable description of what this action does
 }
 
@@ -52,15 +57,16 @@ export const AGENT_JSON_SCHEMA = {
                 properties: {
                     type: {
                         type: "string",
-                        enum: ["navigate", "run_test", "execute_adb", "capture_logcat", "take_screenshot", "open_toolbox", "open_inspector", "open_scrcpy", "change_setting"]
+                        enum: ["navigate", "run_test", "execute_adb", "capture_logcat", "take_screenshot", "open_toolbox", "open_inspector", "open_scrcpy", "change_setting", "create_file", "modify_file", "delete_file"]
                     },
                     target: { type: "string", description: "Target tab or subtab for navigate: 'home' (Home), 'run' (Executar testes/tests subtab), 'connect' (Conectar/connect subtab), 'inspector' (Inspector subtab), 'history' (Test history), 'scenarios' (Scenario Generator), 'images' (Image Editor), 'dashboard_history' (Dashboard History), 'mapper' or 'mapeador' (Device Mapper)." },
-                    path: { type: "string", description: "File path or name of the test. ALWAYS provide this if the action is run_test." },
+                    path: { type: "string", description: "File path or name. ALWAYS provide this if the action is run_test, create_file, modify_file, or delete_file. For file manipulation, it must be the relative path inside the automation root." },
                     device: { type: "string", description: "Device name or serial. Provide this if the user specifies a device." },
                     command: { type: "string", description: "ADB command to execute." },
                     setting_key: { type: "string", description: "Setting key to change." },
                     setting_value: { description: "Setting value to apply. Can be a string, number, or boolean." },
-                    description: { type: "string", description: "A brief, human-readable description of this action (e.g., 'Navigating to Settings')." }
+                    content: { type: "string", description: "The complete string content of the file. Required for create_file and modify_file." },
+                    description: { type: "string", description: "A brief, human-readable description of this action (e.g., 'Navigating to Settings', 'Creating login test')." }
                 },
                 required: ["type", "description"]
             }
@@ -97,6 +103,11 @@ RULES:
     - "histórico", "history" -> 'history'
     - "configurações", "settings" -> 'settings'
     - "sobre", "about" -> 'about'
+12. If you are asked to create, modify or delete files for Robot Framework, you MUST adhere to the following rules:
+    - Separate logic from tests: Test files (.robot) should ONLY contain BDD (Gherkin) scenarios.
+    - All technical implementations (clicks, waits, etc) MUST reside in resource files (.resource) following the Page Object Model (POM) architecture.
+    - Keywords MUST be parameterized to maximize reuse.
+    - Imports must be efficient and scoped correctly.
 
 JSON SCHEMA TO FOLLOW:
 ${JSON.stringify(AGENT_JSON_SCHEMA, null, 2)}
