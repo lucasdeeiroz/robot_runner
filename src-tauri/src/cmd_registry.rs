@@ -55,6 +55,7 @@ macro_rules! generate_robot_runner_handler {
             crate::adb::media::stop_screen_recording,
             crate::adb::network::get_device_ip,
             crate::files::list_directory,
+            crate::files::list_directory_recursive,
             crate::files::save_file,
             crate::files::read_file,
             crate::files::read_file_tail,

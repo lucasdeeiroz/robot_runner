@@ -1124,6 +1124,7 @@ export const en = {
                 ai_analysis: "AI Analysis",
                 ai_analysis_header: "Detailed Analysis",
                 summarize_run: "Summarize Execution",
+                generate_ai_test: "Generate Robot Test (AI)",
                 summary_title: "Execution Summary",
                 summary_rationale: "Analysis Basis",
                 ai_analysis_placeholder: "Click to perform a smart root cause analysis using AI.",

@@ -178,7 +178,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
         try {
             const maps = await listScreenMaps(activeProfileId, settings.paths?.mappings);
             if (maps && maps.length > 0) {
-                mappingsContext = `\n- Mappings (${maps.length} screens):\n${JSON.stringify(maps.map(m => ({ id: m.id, name: m.name, elements: m.elements.length })), null, 2)}`;
+                mappingsContext = `\n- Mappings (${maps.length} screens):\n${JSON.stringify(maps.map(m => ({ id: m.id, name: m.name, elements: m.elements.map(e => ({ name: e.name, type: e.type, short_id: e.shortId })) })), null, 2)}`;
             }
         } catch (e) {
             console.warn("Could not load mappings for AI context", e);
@@ -187,17 +187,24 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
         let resourcesContext = '';
         try {
             if (settings.paths?.resources) {
-                const resourcesDirFiles = await invoke<any[]>('list_directory', { path: settings.paths.resources });
+                const resourcesDirFiles = await invoke<any[]>('list_directory_recursive', { path: settings.paths.resources });
                 const resourceFiles = resourcesDirFiles.filter(f => !f.is_dir && (f.name.endsWith('.resource') || f.name.endsWith('.robot')));
                 
                 if (resourceFiles.length > 0) {
                     resourcesContext = `\n- Resource Files:\n`;
+                    let resourceFilesRead = 0;
                     for (const rf of resourceFiles) {
-                        try {
-                            const content = await invoke<string>('fs_read_text_file', { path: rf.path });
-                            resourcesContext += `\n--- ${rf.name} ---\n${content}\n`;
-                        } catch (e) {
-                            resourcesContext += `\n--- ${rf.name} --- (Failed to read)\n`;
+                        if (resourceFilesRead < 3) {
+                            try {
+                                const content = await invoke<string>('fs_read_text_file', { path: rf.path });
+                                const truncated = content.length > 2500 ? content.substring(0, 2500) + '\n...[TRUNCATED]' : content;
+                                resourcesContext += `\n--- ${rf.name} ---\n${truncated}\n`;
+                                resourceFilesRead++;
+                            } catch (e) {
+                                resourcesContext += `\n--- ${rf.name} --- (Failed to read)\n`;
+                            }
+                        } else {
+                            resourcesContext += `\n--- ${rf.name} --- (Content hidden to save tokens)\n`;
                         }
                     }
                 }
@@ -209,9 +216,26 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
         let testsDir = '';
         try {
             if (settings.paths?.tests) {
-                const testsDirFiles = await invoke<any[]>('list_directory', { path: settings.paths.tests });
+                const testsDirFiles = await invoke<any[]>('list_directory_recursive', { path: settings.paths.tests });
                 const testFiles = testsDirFiles.filter(f => !f.is_dir && (f.name.endsWith('.robot') || f.name.endsWith('.txt')));
-                testsDir = `\n- Tests Directory:\n${testFiles.map(f => f.name).join(', ')}`;
+                if (testFiles.length > 0) {
+                    testsDir = `\n- Test Files:\n`;
+                    let testFilesRead = 0;
+                    for (const tf of testFiles) {
+                        if (testFilesRead < 3) {
+                            try {
+                                const content = await invoke<string>('fs_read_text_file', { path: tf.path });
+                                const truncated = content.length > 2500 ? content.substring(0, 2500) + '\n...[TRUNCATED]' : content;
+                                testsDir += `\n--- ${tf.name} ---\n${truncated}\n`;
+                                testFilesRead++;
+                            } catch (e) {
+                                testsDir += `\n--- ${tf.name} --- (Failed to read)\n`;
+                            }
+                        } else {
+                            testsDir += `\n--- ${tf.name} --- (Content hidden to save tokens)\n`;
+                        }
+                    }
+                }
             }
         } catch (e) {
             console.warn("Could not load tests directory for AI context", e);
@@ -243,8 +267,8 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
         try {
             const context = await buildContext();
 
-            // Format history for the service
-            const historyForService = messages.map(m => ({
+            // Format history for the service, optimizing tokens by sending only the last 15 messages
+            const historyForService = messages.slice(-15).map(m => ({
                 role: m.role,
                 content: m.content
             }));
@@ -291,6 +315,18 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
             setIsLoading(false);
         }
     };
+
+    useEffect(() => {
+        const handleAiAgentPrompt = (e: CustomEvent) => {
+            const { prompt } = e.detail;
+            if (prompt && !isLoading) {
+                handleSend(prompt);
+            }
+        };
+
+        window.addEventListener('ai_agent_prompt', handleAiAgentPrompt as EventListener);
+        return () => window.removeEventListener('ai_agent_prompt', handleAiAgentPrompt as EventListener);
+    }, [isLoading, input, messages, settings]);
 
     const handleExecuteAction = async (action: AgentAction) => {
         if (action.type !== 'run_test' && action.type !== 'capture_logcat') {

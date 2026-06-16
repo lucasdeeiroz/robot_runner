@@ -1125,6 +1125,7 @@ export const pt = {
                 ai_analysis: "Análise de IA",
                 ai_analysis_header: "Análise Detalhada",
                 summarize_run: "Resumir Execução",
+                generate_ai_test: "Gerar Teste Robot (IA)",
                 summary_title: "Resumo da Execução",
                 summary_rationale: "Base da Análise",
                 ai_analysis_placeholder: "Clique para realizar uma análise inteligente da causa raiz usando IA.",

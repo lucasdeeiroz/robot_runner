@@ -61,6 +61,46 @@ pub fn list_directory(path: Option<String>) -> AppResult<Vec<FileEntry>> {
 }
 
 #[command]
+pub fn list_directory_recursive(path: String) -> AppResult<Vec<FileEntry>> {
+    let mut entries = Vec::new();
+    let mut stack = vec![std::path::PathBuf::from(&path)];
+
+    while let Some(current_dir) = stack.pop() {
+        if let Ok(read_dir) = fs::read_dir(&current_dir) {
+            for entry in read_dir.flatten() {
+                let path_buf = entry.path();
+                if let Ok(metadata) = fs::metadata(&path_buf) {
+                    let name = entry.file_name().to_string_lossy().to_string();
+                    if name.starts_with('.') {
+                        continue;
+                    }
+
+                    if metadata.is_dir() {
+                        stack.push(path_buf.clone());
+                    }
+
+                    // Use relative path for name to show folder structure
+                    let relative_name = if let Ok(rel) = path_buf.strip_prefix(&path) {
+                        rel.to_string_lossy().to_string().replace("\\", "/")
+                    } else {
+                        name.clone()
+                    };
+
+                    entries.push(FileEntry {
+                        name: relative_name,
+                        path: path_buf.to_string_lossy().to_string(),
+                        is_dir: metadata.is_dir(),
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(entries)
+}
+
+
+#[command]
 pub fn save_file(path: String, content: String, append: bool) -> AppResult<()> {
     use std::io::Write;
 

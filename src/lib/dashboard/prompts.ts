@@ -536,9 +536,9 @@ Your goal is to execute a test scenario step-by-step on a real device.
 3. **Report**: Explain why you chose this plan.
 
 ## Action Rules
-- **click**: Use 'adb shell input tap X Y'. Extract coordinates from the XML dump (bounds="[x1,y1][x2,y2]").
-- **type**: Use 'adb shell input text "..."'. Ensure the field is focused first or click it.
-- **swipe**: Use 'adb shell input swipe X1 Y1 X2 Y2 [duration]'.
+- **click**: Use 'adb shell input tap X Y'. Extract coordinates from the XML dump (bounds="[x1,y1][x2,y2]"). You MUST populate the 'locator' field with the exact XPath or ID of the element you are clicking.
+- **type**: Use 'adb shell input text "..."'. Ensure the field is focused first or click it. You MUST populate the 'locator' field.
+- **swipe**: Use 'adb shell input swipe X1 Y1 X2 Y2 [duration]'. If swiping an element, provide its locator.
 - **back**: Use 'adb shell input keyevent 4'.
 - **wait**: Use if you expect a slow transition.
 - **finish**: Use ONLY when the entire scenario/goal is confirmed as COMPLETED and SUCCESSFUL.
@@ -551,6 +551,7 @@ Your goal is to execute a test scenario step-by-step on a real device.
     {
       "type": "click|type|swipe|back|wait|finish|fail",
       "command": "adb shell input ...",
+      "locator": "MANDATORY: The exact XPath, resource-id, or identifier of the element interacted with",
       "details": "Concise description of what this command does (e.g., 'Clicking the Login button')."
     }
   ],

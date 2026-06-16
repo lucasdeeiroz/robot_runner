@@ -572,11 +572,13 @@ export interface AutonomousActionResponse {
     actions: {
         type: 'click' | 'type' | 'swipe' | 'back' | 'wait' | 'finish' | 'fail';
         command: string;
+        locator?: string;
         details: string;
     }[];
     action?: { // Fallback for backward compatibility
         type: 'click' | 'type' | 'swipe' | 'back' | 'wait' | 'finish' | 'fail';
         command: string;
+        locator?: string;
         details: string;
     };
     isStepCompleted: boolean;

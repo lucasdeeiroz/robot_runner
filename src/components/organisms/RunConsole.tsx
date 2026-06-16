@@ -88,7 +88,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
     const [showDebugConsole, setShowDebugConsole] = useState(false);
     const [stickToBottom, setStickToBottom] = useState(true);
 
-    const { settings } = useSettings();
+    const { settings, updateSetting } = useSettings();
     const [isSummarizing, setIsSummarizing] = useState(false);
     const [summary, setSummary] = useState<string | null>(null);
     const [summaryError, setSummaryError] = useState<string | null>(null);
@@ -328,7 +328,26 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                 setAiStatus(t('run_tab.console.ai_steps.executing', { action: currentAction.details, defaultValue: `Executing: ${currentAction.details}` }));
             } else {
                 setAiStatus(t('run_tab.console.ai_steps.dumping', { defaultValue: 'Dumping screen hierarchy...' }));
-                const xml = await invoke<string>("get_xml_dump", { deviceId: session.deviceUdid });
+                const rawXml = await invoke<string>("get_xml_dump", { deviceId: session.deviceUdid });
+                
+                // Inject 'instance' attribute into XML so AI can match Appium's behavior
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(rawXml, "application/xml");
+                let xml = rawXml;
+                if (doc.getElementsByTagName("parsererror").length === 0) {
+                    const classCounts: Record<string, number> = {};
+                    const elements = doc.getElementsByTagName("*");
+                    for (let i = 0; i < elements.length; i++) {
+                        const el = elements[i];
+                        const className = el.getAttribute("class");
+                        if (className) {
+                            const count = classCounts[className] || 0;
+                            el.setAttribute("instance", count.toString());
+                            classCounts[className] = count + 1;
+                        }
+                    }
+                    xml = new XMLSerializer().serializeToString(doc);
+                }
 
                 setAiStatus(t('run_tab.console.ai_steps.thinking', { defaultValue: 'AI is thinking...' }));
 
@@ -385,7 +404,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                 throw new Error("Failed to retrieve or parse autonomous action plan");
             }
 
-            const actionDesc = `[Step ${aiStepCount + 1}] ${currentAction.type.toUpperCase()}: ${currentAction.details}`;
+            const actionDesc = `[Step ${aiStepCount + 1}] ${currentAction.type.toUpperCase()}: ${currentAction.details} ${currentAction.locator ? `(Locator: ${currentAction.locator})` : ''}`.trim();
             setAiHistory(prev => [...prev, actionDesc]);
             setAiStepCount(prev => prev + 1);
 
@@ -605,6 +624,28 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                             >
                                 <RefreshCw size={12} />
                             </Button>
+                            {!isAiLoopActive && aiHistory.length > 0 && (
+                                <>
+                                    <div className="h-3 w-[1px] bg-primary/20 mx-1" />
+                                    <AiButton
+                                        id="run_generate_ai_test"
+                                        isLoading={false}
+                                        onClick={() => {
+                                            const historyStr = aiHistory.map((h, i) => `[Step ${i+1}] ${h}`).join('\n');
+                                            const prompt = `Gere os testes automatizados em Robot Framework (arquivos .robot e .resource) para este fluxo que acabou de ser mapeado com sucesso pela engine de exploração autônoma:\n\n${historyStr}`;
+                                            if (!settings.aiChatEnabled) {
+                                                updateSetting('aiChatEnabled', true);
+                                            }
+                                            setTimeout(() => {
+                                                window.dispatchEvent(new CustomEvent('ai_agent_prompt', { detail: { prompt } }));
+                                            }, 200);
+                                        }}
+                                        label={t('run_tab.console.generate_ai_test')}
+                                        variant="primary"
+                                        className="h-6"
+                                    />
+                                </>
+                            )}
                         </div>
                     )}
                 </div>

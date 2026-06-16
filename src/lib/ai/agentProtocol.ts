@@ -65,7 +65,7 @@ export const AGENT_JSON_SCHEMA = {
                     command: { type: "string", description: "ADB command to execute." },
                     setting_key: { type: "string", description: "Setting key to change." },
                     setting_value: { description: "Setting value to apply. Can be a string, number, or boolean." },
-                    content: { type: "string", description: "The complete string content of the file. Required for create_file and modify_file." },
+                    content: { type: "string", description: "The complete string content of the file. Required for create_file and modify_file. WARNING: For modify_file, you MUST provide the ENTIRE updated file content without any placeholders or omissions, as the file will be completely overwritten." },
                     description: { type: "string", description: "A brief, human-readable description of this action (e.g., 'Navigating to Settings', 'Creating login test')." }
                 },
                 required: ["type", "description"]
@@ -106,8 +106,13 @@ RULES:
 12. If you are asked to create, modify or delete files for Robot Framework, you MUST adhere to the following rules:
     - Separate logic from tests: Test files (.robot) should ONLY contain BDD (Gherkin) scenarios.
     - All technical implementations (clicks, waits, etc) MUST reside in resource files (.resource) following the Page Object Model (POM) architecture.
-    - Keywords MUST be parameterized to maximize reuse.
+    - Keywords MUST be parameterized to maximize reuse, including the Gherkin steps (e.g., '\${GHERKIN} I do something', so it can be used as 'When I do something').
     - Imports must be efficient and scoped correctly.
+    - Analyze existing test files (.robot) to learn and reuse their 'Suite Setup', 'Test Setup', 'Suite Teardown', and 'Test Teardown' configurations when creating new tests.
+    - The app does not magically open on the target screen. When creating tests for a specific screen, you MUST include the necessary Gherkin steps and Resource Keywords to navigate from the App's initial state (e.g. Home or Login) to the target screen.
+    - When interacting with mapped screen elements, ALWAYS use the element's 'short_id' as the locator parameter. NEVER use the screen's 'id'.
+    - Observe the existing folder structure in 'tests/' and 'resources/'. Always place new files inside appropriate subdirectories (e.g., by feature or screen) matching the existing project organization, rather than creating them at the root.
+    - For 'modify_file' actions, you MUST provide the FULL and COMPLETE updated content of the file. Do NOT use placeholders (like '...', '// rest of the code', etc.). The file will be completely overwritten by your output.
 
 JSON SCHEMA TO FOLLOW:
 ${JSON.stringify(AGENT_JSON_SCHEMA, null, 2)}
