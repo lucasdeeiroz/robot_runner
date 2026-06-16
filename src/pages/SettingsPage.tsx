@@ -1277,7 +1277,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                                     icon: <Terminal size={16} />
                                                 }
                                             ]}
-                                            disabled={systemCheckStatus?.missingAppium?.length > 0}
+                                            disabled={systemCheckStatus?.missingAppium?.length > 0 || settings.noAppiumForRobot}
                                             variant="primary"
                                             className="shadow-lg hover:shadow-xl transition-all"
                                         />
@@ -1287,6 +1287,32 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                         >
 
                             <div className="grid grid-cols-2 gap-4 mb-4">
+                                {settings.automationFramework === 'robot' && (
+                                    <div className="col-span-1 md:col-span-2 flex items-center pt-2">
+                                        <Button
+                                            type="button"
+                                            id="noAppiumForRobot"
+                                            role="checkbox"
+                                            aria-checked={settings.noAppiumForRobot || false}
+                                            onClick={() => updateSetting('noAppiumForRobot', !settings.noAppiumForRobot)}
+                                            className="flex items-center gap-2.5 text-left focus:outline-none select-none cursor-pointer group bg-transparent shadow-none hover:bg-transparent"
+                                        >
+                                            <div className={clsx(
+                                                "w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0 cursor-pointer",
+                                                settings.noAppiumForRobot
+                                                    ? "bg-primary border-primary text-on-primary"
+                                                    : "border-outline-variant/30 bg-surface/50 group-hover:border-outline"
+                                            )}>
+                                                {settings.noAppiumForRobot && (
+                                                    <div className="w-2 h-2 bg-on-primary rounded-2xl animate-in zoom-in-50 duration-200" />
+                                                )}
+                                            </div>
+                                            <span className="text-xs font-semibold text-on-surface-variant/80 select-none cursor-pointer">
+                                                {t('settings.tool_config.no_appium_for_robot')}
+                                            </span>
+                                        </Button>
+                                    </div>
+                                )}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
                                         <Input
@@ -1294,7 +1320,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                             type="text"
                                             value={settings.appiumHost}
                                             onChange={(e) => updateSetting('appiumHost', e.target.value)}
-                                            disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
+                                            disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0 || settings.noAppiumForRobot}
                                         />
                                     </div>
                                     <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
@@ -1303,7 +1329,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                             type="number"
                                             value={settings.appiumPort}
                                             onChange={(e) => updateSetting('appiumPort', Number(e.target.value))}
-                                            disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
+                                            disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0 || settings.noAppiumForRobot}
                                         />
                                     </div>
                                 </div>
@@ -1313,7 +1339,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                         type="text"
                                         value={settings.appiumBasePath}
                                         onChange={(e) => updateSetting('appiumBasePath', e.target.value)}
-                                        disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
+                                        disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0 || settings.noAppiumForRobot}
                                         placeholder="/wd/hub"
                                     />
                                 </div>
@@ -1325,35 +1351,9 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                         type="text"
                                         value={settings.tools.appiumArgs}
                                         onChange={(e) => updateSetting('tools', { ...settings.tools, appiumArgs: e.target.value })}
-                                        disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
+                                        disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0 || settings.noAppiumForRobot}
                                         placeholder="--allow-insecure chromedriver"
                                     />
-                                    {settings.automationFramework === 'robot' && (
-                                        <div className="col-span-1 md:col-span-2 flex items-center pt-2">
-                                            <Button
-                                                type="button"
-                                                id="noAppiumForRobot"
-                                                role="checkbox"
-                                                aria-checked={settings.noAppiumForRobot || false}
-                                                onClick={() => updateSetting('noAppiumForRobot', !settings.noAppiumForRobot)}
-                                                className="flex items-center gap-2.5 text-left focus:outline-none select-none cursor-pointer group bg-transparent shadow-none hover:bg-transparent"
-                                            >
-                                                <div className={clsx(
-                                                    "w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0 cursor-pointer",
-                                                    settings.noAppiumForRobot
-                                                        ? "bg-primary border-primary text-on-primary"
-                                                        : "border-outline-variant/30 bg-surface/50 group-hover:border-outline"
-                                                )}>
-                                                    {settings.noAppiumForRobot && (
-                                                        <div className="w-2 h-2 bg-on-primary rounded-2xl animate-in zoom-in-50 duration-200" />
-                                                    )}
-                                                </div>
-                                                <span className="text-xs font-semibold text-on-surface-variant/80 select-none cursor-pointer">
-                                                    {t('settings.tool_config.no_appium_for_robot')}
-                                                </span>
-                                            </Button>
-                                        </div>
-                                    )}
                                 </div>
                             </div>
 
