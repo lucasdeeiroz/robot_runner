@@ -1548,7 +1548,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                 {/* Primary Color */}
                                 <div>
                                     {/* <h3 className="text-sm font-medium text-on-surface-variant/80 mb-3">{t('settings.appearance.primary_color')}</h3> */}
-                                    <div className="flex flex-wrap gap-3">
+                                    <div className="grid grid-cols-4 md:grid-cols-4 lg:grid-cols-8 gap-3">
                                         {[
                                             { id: 'blue', hex: '#2563eb' },
                                             { id: 'red', hex: '#dc2626' },
