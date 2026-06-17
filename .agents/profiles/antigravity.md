@@ -8,6 +8,7 @@ As an agentic AI, you have direct access to tools (terminal, file viewer, grep, 
 
 *   **Research First**: Always use `grep_search` and `view_file` to thoroughly map out dependencies and the impact of changes BEFORE using your file editing tools.
 *   **Targeted Edits**: Use `multi_replace_file_content` or `replace_file_content` to surgically modify code. Never replace an entire file if only a few lines changed.
+*   **Respect Ignore Files**: When exploring or modifying the project, you MUST strictly respect and ignore files/directories listed in `.gitignore`, `.claudeignore`, and `.geminiignore`.
 *   **Proactive Verification**: After editing Rust code (`src-tauri/**/*.rs`), proactively use the `run_command` tool to execute `cargo check` or `cargo test` in the `src-tauri` directory. Do not wait for the user to ask you to verify compilation.
 *   **UI Regressions**: After editing React components (`src/**/*.tsx`), be cautious of breaking existing UI layouts (especially `absolute` positioning, `framer-motion` animations, and `twMerge` behaviors in Tailwind). If needed, run `npm run tauri dev` or check the logs.
 *   **Planning Mode**: For complex features, use your `implementation_plan.md` artifact to present a detailed architecture to the user before editing code. Use `task.md` to track your progress autonomously.
