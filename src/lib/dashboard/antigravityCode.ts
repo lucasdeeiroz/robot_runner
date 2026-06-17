@@ -102,13 +102,23 @@ export async function askAntigravityCli(
 
     let fullPrompt = prompt + formatReminder;
 
+    let tempFilePath: string | null = null;
+    let promptToPass = fullPrompt;
+
     try {
+        if (fullPrompt.length > 7000) {
+            const { join } = await import('@tauri-apps/api/path');
+            tempFilePath = await join(projectRoot, '.rr_prompt.tmp');
+            await invoke('fs_write_text_file', { path: tempFilePath, content: fullPrompt });
+            promptToPass = "Read the file .rr_prompt.tmp for your full instructions and history. Execute the request.";
+        }
+
         const cleanBase64 = options?.imageBase64?.includes('base64,') 
             ? options.imageBase64.split('base64,')[1] 
             : options?.imageBase64;
 
         const rawResult = await invoke<string>('call_antigravity_cli', {
-            prompt: fullPrompt,
+            prompt: promptToPass,
             projectRoot,
             apiKey,
             systemInstruction,
@@ -116,6 +126,12 @@ export async function askAntigravityCli(
             jsonSchema: options?.jsonSchema ? JSON.stringify(options.jsonSchema) : undefined,
             resumeSessionId: options?.resumeSessionId
         });
+
+        if (tempFilePath) {
+            try {
+                await invoke('fs_remove_file', { path: tempFilePath });
+            } catch(e) {}
+        }
 
         if (!rawResult) return "";
 
@@ -164,6 +180,12 @@ export async function askAntigravityCli(
         }
         return String(rawResult);
     } catch (error: any) {
+        if (tempFilePath) {
+            try {
+                const { invoke } = await import('@tauri-apps/api/core');
+                await invoke('fs_remove_file', { path: tempFilePath });
+            } catch(e) {}
+        }
         console.error("[Antigravity CLI] Invocation failed. Raw Error:", error, "Type:", typeof error);
         const errorStr = typeof error === 'string' ? error : (error?.message || String(error));
         throw new Error(errorStr);

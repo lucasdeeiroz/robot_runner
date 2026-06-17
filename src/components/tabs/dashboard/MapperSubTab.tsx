@@ -2035,8 +2035,8 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                             });
 
                                                             if (savePathXML) {
-                                                                const { writeTextFile } = await import('@tauri-apps/plugin-fs');
-                                                                await writeTextFile(savePathXML, xmlData);
+                                                                const { invoke } = await import('@tauri-apps/api/core');
+                                                                await invoke('fs_write_text_file', { path: savePathXML, content: xmlData });
                                                                 feedback.toast.success(t('mapper.export.flows_success', { defaultValue: 'TestLink XML exported successfully.' }));
                                                             }
 
@@ -2047,8 +2047,8 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                                             });
 
                                                             if (savePathBDD) {
-                                                                const { writeTextFile } = await import('@tauri-apps/plugin-fs');
-                                                                await writeTextFile(savePathBDD, bddData);
+                                                                const { invoke } = await import('@tauri-apps/api/core');
+                                                                await invoke('fs_write_text_file', { path: savePathBDD, content: bddData });
                                                                 feedback.toast.success(t('mapper.export.flows_success', { defaultValue: 'Robot BDD exported successfully.' }));
                                                             }
 

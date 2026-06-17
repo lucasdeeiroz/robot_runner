@@ -35,6 +35,7 @@ export interface AgentResponse {
     reply: string;
     suggested_prompts?: string[];
     actions?: AgentAction[];
+    needs_context_files?: string[];
 }
 
 export const AGENT_JSON_SCHEMA = {
@@ -70,6 +71,11 @@ export const AGENT_JSON_SCHEMA = {
                 },
                 required: ["type", "description"]
             }
+        },
+        needs_context_files: {
+            type: "array",
+            items: { type: "string" },
+            description: "If you need to read specific project files from the index, list their EXACT PATHS here (e.g. '.agents/profiles/qa_specialist.md')."
         }
     },
     required: ["reply"]
@@ -114,6 +120,7 @@ RULES:
     - Observe the existing folder structure in 'tests/' and 'resources/'. Always place new files inside appropriate subdirectories (e.g., by feature or screen) matching the existing project organization, rather than creating them at the root.
     - For 'modify_file' actions, you MUST provide the FULL and COMPLETE updated content of the file. Do NOT use placeholders (like '...', '// rest of the code', etc.). The file will be completely overwritten by your output.
 13. When reading, exploring, or modifying the file system, you MUST strictly respect and ignore all files and directories specified in .gitignore, .claudeignore, and .geminiignore files.
+14. If you see an index of project files and you need more context from one or more of them to complete the user's request, return an array of their exact paths in the 'needs_context_files' field. You will receive a second prompt with their contents. If you do this, leave 'actions' and 'suggested_prompts' empty, and provide a brief explanation in 'reply'.
 
 JSON SCHEMA TO FOLLOW:
 ${JSON.stringify(AGENT_JSON_SCHEMA, null, 2)}

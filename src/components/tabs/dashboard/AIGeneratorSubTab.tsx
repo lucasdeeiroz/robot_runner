@@ -19,7 +19,7 @@ import { getAiContext } from '@/lib/dashboard/historyAnalysisUtils';
 import { exportToXlsx, exportToDocx } from '@/lib/dashboard/export';
 import { addToHistory } from './HistoryPanel';
 import { save } from '@tauri-apps/plugin-dialog';
-import { writeTextFile } from '@tauri-apps/plugin-fs';
+import { invoke } from '@tauri-apps/api/core';
 import clsx from 'clsx';
 import { createJiraIssue } from '@/lib/integrations/jira';
 import { createAzureWorkItem } from '@/lib/integrations/azureDevOps';
@@ -335,7 +335,7 @@ export function AIGeneratorSubTab({ onNavigate }: AIGeneratorSubTabProps) {
             });
 
             if (filePath) {
-                await writeTextFile(filePath, generatedContent);
+                await invoke('fs_write_text_file', { path: filePath, content: generatedContent });
                 feedback.toast.success(t('dashboard.export.success', "Successfully exported!"));
             }
         } catch (e) {
@@ -383,7 +383,7 @@ export function AIGeneratorSubTab({ onNavigate }: AIGeneratorSubTabProps) {
             });
 
             if (filePath) {
-                await writeTextFile(filePath, xml);
+                await invoke('fs_write_text_file', { path: filePath, content: xml });
                 feedback.toast.success(t('dashboard.export.success', "Successfully exported!"));
             }
         } catch (e) {

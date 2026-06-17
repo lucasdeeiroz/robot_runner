@@ -91,8 +91,8 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
             });
 
             if (filePath) {
-                const { writeTextFile } = await import('@tauri-apps/plugin-fs');
-                await writeTextFile(filePath, xmlDump);
+                const { invoke } = await import('@tauri-apps/api/core');
+                await invoke('fs_write_text_file', { path: filePath, content: xmlDump });
                 feedback.toast.success(t('inspector.export_xml_success'));
             }
         } catch (e) {

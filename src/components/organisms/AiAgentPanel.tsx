@@ -278,7 +278,16 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                 historyForService,
                 context,
                 settings,
-                settings.aiSessionId
+                settings.aiSessionId,
+                (event) => {
+                    if (event.type === 'context_requested') {
+                        setMessages(prev => [...prev, {
+                            id: (Date.now() + Math.random()).toString(),
+                            role: 'agent',
+                            content: `*${t('ai_agent.context_requested', 'I am reading additional project files to better understand the context...')}*`
+                        }]);
+                    }
+                }
             );
 
             if (response.sessionId && response.sessionId !== settings.aiSessionId) {

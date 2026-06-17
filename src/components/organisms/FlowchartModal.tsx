@@ -115,9 +115,9 @@ export function FlowchartModal({ isOpen, onClose, maps = [], onEditScreen, onRef
         const path = await save({ filters: [{ name: 'JSON', extensions: ['json'] }], defaultPath: 'mapper_backup.json' });
         if (path) {
             try {
-                const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+                const { invoke } = await import('@tauri-apps/api/core');
                 const content = await exportMapperData(activeProfileId, settings.paths?.mappings);
-                await writeTextFile(path, content);
+                await invoke('fs_write_text_file', { path: path, content: content });
                 feedback.toast.success(t('mapper.flowchart.export_success'));
             } catch (error) { feedback.toast.error(t('mapper.flowchart.export_error')); }
         }
