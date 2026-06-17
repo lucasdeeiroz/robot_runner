@@ -154,6 +154,7 @@ export const pt = {
             file_action_failed: "Falha ao executar ação de arquivo: ",
             invalid_automation_root: "A raiz de automação não está configurada. Configure uma raiz válida antes de executar um teste.",
             no_active_device: "Nenhum dispositivo ativo selecionado.",
+            context_requested: "Lendo contexto adicional de {{file}}...",
             suggested_prompts: {
                 settings: "\"Ir para configurações\"",
                 color: "\"Mudar minha cor principal para verde\"",

@@ -154,6 +154,7 @@ export const en = {
             file_action_failed: "Failed to execute file action: ",
             invalid_automation_root: "Automation root is not configured. Please set a valid automation root before running a test.",
             no_active_device: "No active device selected.",
+            context_requested: "Reading additional context from {{file}}...",
             suggested_prompts: {
                 settings: "\"Go to settings\"",
                 color: "\"Change my primary color to green\"",

@@ -284,7 +284,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                         setMessages(prev => [...prev, {
                             id: (Date.now() + Math.random()).toString(),
                             role: 'agent',
-                            content: `*${t('ai_agent.context_requested', 'I am reading additional project files to better understand the context...')}*`
+                            content: `*${t('ai_agent.context_requested', { file: event.file, defaultValue: 'I am reading additional project files to better understand the context...' })}*`
                         }]);
                     }
                 }

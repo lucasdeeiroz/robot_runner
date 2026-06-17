@@ -90,7 +90,7 @@ export async function askAgent(
     context: string,
     settings: AppSettings,
     resumeSessionId?: string,
-    onProgress?: (event: { type: 'context_requested' }) => void
+    onProgress?: (event: { type: 'context_requested', file?: string }) => void
 ): Promise<AgentServiceResponse> {
     let projectSpecificContext = "";
     if (settings.paths?.automationRoot) {
@@ -187,7 +187,7 @@ export async function askAgent(
         // RAG loop implementation for API providers
         if (result.needs_context_files && Array.isArray(result.needs_context_files) && result.needs_context_files.length > 0) {
             if (onProgress) {
-                onProgress({ type: 'context_requested' });
+                onProgress({ type: 'context_requested', file: result.needs_context_files.join(', ') });
             }
 
             const { join } = await import('@tauri-apps/api/path');
