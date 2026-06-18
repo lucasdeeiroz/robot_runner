@@ -491,6 +491,7 @@ export async function exploreScreen(
     elements: UIElementMap[];
     nextAction: { type: 'click' | 'back' | 'swipe' | 'finish' | 'type_text'; targetId?: string; direction?: 'up' | 'down' | 'left' | 'right'; text?: string; details?: string };
     rationale: string;
+    needs_context_files?: string[];
 }> {
     if (!apiKey) throw new Error("Missing Claude API Key");
 

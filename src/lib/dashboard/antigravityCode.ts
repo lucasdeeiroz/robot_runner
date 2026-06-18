@@ -242,6 +242,7 @@ export async function exploreScreen(
     rationale: string;
     thought?: string;
     session_id?: string;
+    needs_context_files?: string[];
 }> {
     const systemInstruction = getExplorationPrompt(language, customPrompt);
 

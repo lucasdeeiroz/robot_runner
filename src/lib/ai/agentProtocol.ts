@@ -75,7 +75,7 @@ export const AGENT_JSON_SCHEMA = {
         needs_context_files: {
             type: "array",
             items: { type: "string" },
-            description: "If you need to read specific project files from the index, list their EXACT PATHS here (e.g. '.agents/profiles/qa_specialist.md')."
+            description: "If you need to read specific project files from the RAG index (such as .agents rules, .robot tests, .resource files, .json mappings, or .md docs), list their EXACT PATHS here (e.g. '.agents/profiles/qa_specialist.md' or 'tests/login.robot')."
         }
     },
     required: ["reply"]

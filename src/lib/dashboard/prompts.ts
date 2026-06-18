@@ -168,7 +168,8 @@ Your goal is to map 100% of a mobile app's UI by discovering every screen, modal
     "text": "ascii_text",
     "details": "Specific reason for this action based on your strategy" 
   },
-  "rationale": "High-level reason for this step in the global exploration plan."
+  "rationale": "High-level reason for this step in the global exploration plan.",
+  "needs_context_files": ["optional array of file paths from the project index to read before continuing"]
 }
 `.trim();
 

@@ -1,5 +1,6 @@
 use crate::db::LogDb;
 use crate::files::read_file_tail_internal;
+use ignore::WalkBuilder;
 use roxmltree;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -192,6 +193,10 @@ fn get_history_analysis_context(params: AiContextParams) -> Result<AiContextResp
             })
     });
 
+    if let Some(root) = params.automation_root {
+        append_project_index(&mut context, &root);
+    }
+
     Ok(AiContextResponse {
         context,
         metadata: serde_json::json!({ 
@@ -284,68 +289,9 @@ fn get_exploration_context(params: AiContextParams) -> Result<AiContextResponse,
         });
     }
 
-    // Automation Context: Inject snippets of existing test files to help the IA understand the project style
+    // Automation Context: Inject file index to help the IA explore if it needs files
     if let Some(root) = params.automation_root {
-        if Path::new(&root).exists() {
-            context.push_str("\n\n### AUTOMATION CONTEXT (Existing Test Patterns)\n");
-            const MAX_SCAN_DEPTH: usize = 5;
-            const MAX_DISCOVERED_ROBOT_FILES: usize = 200;
-            const MAX_FILES_IN_CONTEXT: usize = 3;
-            const MAX_CHARS_PER_FILE: usize = 1000;
-            const MAX_TOTAL_CHARS: usize = 3000;
-
-            let mut robot_files: Vec<(std::path::PathBuf, SystemTime)> =
-                Vec::with_capacity(MAX_DISCOVERED_ROBOT_FILES);
-            for entry in WalkDir::new(&root)
-                .max_depth(MAX_SCAN_DEPTH)
-                .follow_links(false)
-                .into_iter()
-                .filter_map(Result::ok)
-            {
-                if !entry.file_type().is_file() {
-                    continue;
-                }
-                if entry.path().extension().and_then(|s| s.to_str()) != Some("robot") {
-                    continue;
-                }
-
-                let modified = entry
-                    .metadata()
-                    .ok()
-                    .and_then(|m| m.modified().ok())
-                    .unwrap_or(SystemTime::UNIX_EPOCH);
-                robot_files.push((entry.path().to_path_buf(), modified));
-
-                if robot_files.len() >= MAX_DISCOVERED_ROBOT_FILES {
-                    break;
-                }
-            }
-
-            robot_files.sort_by(|a, b| b.1.cmp(&a.1));
-
-            let mut count = 0;
-            let mut total_chars = 0;
-            for (path, _) in robot_files.iter().take(MAX_FILES_IN_CONTEXT) {
-                if total_chars >= MAX_TOTAL_CHARS {
-                    break;
-                }
-                if let Ok(content) = fs::read_to_string(path) {
-                    count += 1;
-                    context.push_str(&format!(
-                        "\n--- File Pattern {} ({}) ---\n",
-                        count,
-                        path.file_name().unwrap_or_default().to_string_lossy()
-                    ));
-
-                    let remaining_chars = MAX_TOTAL_CHARS.saturating_sub(total_chars);
-                    let file_char_limit = remaining_chars.min(MAX_CHARS_PER_FILE);
-                    let snippet = content.chars().take(file_char_limit).collect::<String>();
-                    total_chars += snippet.chars().count();
-                    context.push_str(&snippet);
-                    context.push_str("\n");
-                }
-            }
-        }
+        append_project_index(&mut context, &root);
     }
 
     Ok(AiContextResponse { context, metadata })
@@ -608,8 +554,67 @@ fn get_flowchart_layout_context(
         context.push_str("No screens mapped yet for this profile.\n");
     }
 
+    if let Some(root) = params.automation_root {
+        append_project_index(&mut context, &root);
+    }
+
     Ok(AiContextResponse {
         context,
         metadata: serde_json::json!({ "screen_count": screen_count, "profile_id": profile_id }),
     })
+}
+
+fn append_project_index(context: &mut String, root: &str) {
+    if !Path::new(root).exists() {
+        return;
+    }
+
+    context.push_str("\n\n### AUTOMATION PROJECT FILES (RAG INDEX)\n");
+    context.push_str("You can request to read any of these files by returning their exact path in your JSON response under `needs_context_files`.\n\n");
+
+    let mut builder = WalkBuilder::new(root);
+    builder.max_depth(Some(6));
+    builder.hidden(true); // Ignore hidden files/folders natively
+
+    // Add custom ignore files
+    let custom_ignores = [".claudeignore", ".geminiignore", ".antigravityignore"];
+    for ig in custom_ignores {
+        let ig_path = Path::new(root).join(ig);
+        if ig_path.exists() {
+            builder.add_custom_ignore_filename(ig);
+        }
+    }
+
+    let walker = builder.build();
+    for result in walker {
+        if let Ok(entry) = result {
+            if entry.file_type().map_or(true, |ft| ft.is_dir()) {
+                continue;
+            }
+
+            let path = entry.path();
+            let path_str = path.to_string_lossy().replace("\\", "/");
+
+            // Hardcode exclusions for common heavy/unrelated directories
+            if path_str.contains("/node_modules/")
+                || path_str.contains("/.firebase/")
+                || path_str.contains("/.github/")
+                || path_str.contains("/.robocop_cache/")
+                || path_str.contains("/.vscode/")
+                || path_str.contains("/dist/")
+                || path_str.contains("/venv/")
+                || path_str.contains("/.venv/")
+            {
+                continue;
+            }
+
+            // Allowed extensions (excluding xml, db, txt as per user request)
+            if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
+                if matches!(ext, "json" | "robot" | "resource" | "md") {
+                    let rel_path = path.strip_prefix(root).unwrap_or(path);
+                    context.push_str(&format!("- {}\n", rel_path.to_string_lossy().replace("\\", "/")));
+                }
+            }
+        }
+    }
 }

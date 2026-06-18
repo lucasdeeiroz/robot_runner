@@ -185,7 +185,9 @@ export async function askAgent(
         let { result, newSessionId } = await invokeProvider(fullPrompt, resumeSessionId);
 
         // RAG loop implementation for API providers
-        if (result.needs_context_files && Array.isArray(result.needs_context_files) && result.needs_context_files.length > 0) {
+        let loops = 0;
+        while (result.needs_context_files && Array.isArray(result.needs_context_files) && result.needs_context_files.length > 0 && loops < 3) {
+            loops++;
             if (onProgress) {
                 onProgress({ type: 'context_requested', file: result.needs_context_files.join(', ') });
             }
@@ -215,9 +217,9 @@ export async function askAgent(
             }
 
             // Re-invoke with the added context
-            const secondCall = await invokeProvider(fullPrompt, resumeSessionId);
-            result = secondCall.result;
-            newSessionId = secondCall.newSessionId;
+            const subsequentCall = await invokeProvider(fullPrompt, resumeSessionId);
+            result = subsequentCall.result;
+            newSessionId = subsequentCall.newSessionId;
         }
 
         return {

@@ -40,6 +40,7 @@ import * as claudeCli from '@/lib/dashboard/claudeCode';
 import { AutonomousExplorer, LogEntry, ExplorationAction, ExplorationConfig } from '@/lib/dashboard/explorationEngine';
 import { analyzeExplorationPrompt } from '@/lib/dashboard/explorationInit';
 import { getAiContext } from '@/lib/dashboard/historyAnalysisUtils';
+import { withRagLoop } from '@/lib/ai/ragLoop';
 import { ExplorationLogTree } from '@/components/molecules/ExplorationLogTree';
 import { useDeviceViewport } from '@/hooks/useDeviceViewport';
 import { DeviceViewport } from '@/components/organisms/DeviceViewport';
@@ -943,24 +944,38 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                 for (let attempt = 0; attempt < 2; attempt++) {
                     try {
                         const customPrompt = explorationPromptRef.current;
-                        if (aiProvider === 'gemini') {
-                            result = await gemini.exploreScreen(simplifiedXml, screenshot || "", apiKey as string, model, lang, optimizedExplorationMaps as any, explorer.getFormattedLogs(), undefined, customPrompt);
-                        } else if (aiProvider === 'openai') {
-                            result = await openai.exploreScreen(simplifiedXml, screenshot || "", apiKey as string, model, lang, optimizedExplorationMaps as any, explorer.getFormattedLogs(), undefined, customPrompt);
-                        } else if (aiProvider === 'claude') {
-                            result = await claude.exploreScreen(simplifiedXml, screenshot || "", apiKey as string, model, lang, optimizedExplorationMaps as any, explorer.getFormattedLogs(), undefined, customPrompt);
-                        } else if (aiProvider === 'claude-code') {
-                            result = await claudeCli.exploreScreen(simplifiedXml, settings.paths.automationRoot || '', lang, optimizedExplorationMaps as any, explorer.getFormattedLogs(), customPrompt, settings.claudeCodeToken, explorer.getSessionId(), screenshot || undefined);
-                            if (result.session_id) {
-                                explorer.setSessionId(result.session_id);
+                        
+                        result = await withRagLoop(
+                            settings.paths.automationRoot || '',
+                            customPrompt,
+                            (files) => {
+                                explorer.addLog(t('mapper.exploration.reading_context', { files: files.join(', ') }), 'info');
+                                setExplorationLogs([...explorer.getLogs()]);
+                            },
+                            async (currentPrompt) => {
+                                if (aiProvider === 'gemini') {
+                                    return await gemini.exploreScreen(simplifiedXml, screenshot || "", apiKey as string, model, lang, optimizedExplorationMaps as any, explorer.getFormattedLogs(), undefined, currentPrompt);
+                                } else if (aiProvider === 'openai') {
+                                    return await openai.exploreScreen(simplifiedXml, screenshot || "", apiKey as string, model, lang, optimizedExplorationMaps as any, explorer.getFormattedLogs(), undefined, currentPrompt);
+                                } else if (aiProvider === 'claude') {
+                                    return await claude.exploreScreen(simplifiedXml, screenshot || "", apiKey as string, model, lang, optimizedExplorationMaps as any, explorer.getFormattedLogs(), undefined, currentPrompt);
+                                } else if (aiProvider === 'claude-code') {
+                                    const r = await claudeCli.exploreScreen(simplifiedXml, settings.paths.automationRoot || '', lang, optimizedExplorationMaps as any, explorer.getFormattedLogs(), currentPrompt, settings.claudeCodeToken, explorer.getSessionId(), screenshot || undefined);
+                                    if (r.session_id) {
+                                        explorer.setSessionId(r.session_id);
+                                    }
+                                    return r;
+                                } else if (aiProvider === 'antigravity-cli') {
+                                    const { exploreScreen } = await import('@/lib/dashboard/antigravityCode');
+                                    const r = await exploreScreen(simplifiedXml, settings.paths.automationRoot || '', lang, optimizedExplorationMaps as any, explorer.getFormattedLogs(), currentPrompt, settings.antigravityApiKey, explorer.getSessionId(), screenshot || undefined);
+                                    if (r.session_id) {
+                                        explorer.setSessionId(r.session_id);
+                                    }
+                                    return r;
+                                }
+                                throw new Error("Invalid provider");
                             }
-                        } else if (aiProvider === 'antigravity-cli') {
-                            const { exploreScreen } = await import('@/lib/dashboard/antigravityCode');
-                            result = await exploreScreen(simplifiedXml, settings.paths.automationRoot || '', lang, optimizedExplorationMaps as any, explorer.getFormattedLogs(), customPrompt, settings.antigravityApiKey, explorer.getSessionId(), screenshot || undefined);
-                            if (result.session_id) {
-                                explorer.setSessionId(result.session_id);
-                            }
-                        }
+                        );
                         break; // Success
                     } catch (parseError: any) {
                         if (attempt === 0 && parseError.message?.includes('JSON')) {
