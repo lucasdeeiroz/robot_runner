@@ -587,6 +587,8 @@ export const pt = {
                 recents: "Recentes"
             },
             modal: {
+                edit_step_locator: "Editar Locator do Passo",
+                format: "Formato",
                 edit_xpath: "Editar XPath",
                 edit_uiselector: "Editar Seletor UIAutomator",
                 edit_selector: "Editar Seletor",
@@ -657,7 +659,8 @@ export const pt = {
                     double_tap: "Toque Duplo",
                     long_press: "Toque Longo",
                     swipe: "Deslizar",
-                    drag_drop: "Arrastar e Soltar"
+                    drag_drop: "Arrastar e Soltar",
+                    assert: "Asserção"
                 },
                 directions: {
                     up: "Para Cima",

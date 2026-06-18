@@ -587,6 +587,8 @@ export const en = {
                 recents: "Recents"
             },
             modal: {
+                edit_step_locator: "Edit Step Locator",
+                format: "Format",
                 edit_xpath: "Edit XPath",
                 edit_uiselector: "Edit UIAutomator Selector",
                 edit_selector: "Edit Selector",
@@ -657,7 +659,8 @@ export const en = {
                     double_tap: "Double Tap",
                     long_press: "Long Press",
                     swipe: "Swipe",
-                    drag_drop: "Drag & Drop"
+                    drag_drop: "Drag & Drop",
+                    assert: "Assert"
                 },
                 directions: {
                     up: "Up",

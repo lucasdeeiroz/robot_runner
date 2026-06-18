@@ -30,6 +30,7 @@ export interface Message {
     content: string;
     actions?: AgentAction[];
     suggestedPrompts?: string[];
+    hidden?: boolean;
 }
 
 const stripMarkdown = (text: string): string => {
@@ -249,7 +250,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
         `;
     };
 
-    const handleSend = async (overrideInput?: string) => {
+    const handleSend = async (overrideInput?: string, isHidden: boolean = false) => {
         const textToSend = overrideInput || input;
         if (!textToSend.trim()) return;
 
@@ -259,7 +260,8 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
         const newUserMessage: Message = {
             id: Date.now().toString(),
             role: 'user',
-            content: textToSend
+            content: textToSend,
+            hidden: isHidden
         };
 
         setMessages(prev => [...prev, newUserMessage]);
@@ -327,9 +329,9 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
 
     useEffect(() => {
         const handleAiAgentPrompt = (e: CustomEvent) => {
-            const { prompt } = e.detail;
+            const { prompt, hidden } = e.detail;
             if (prompt && !isLoading) {
-                handleSend(prompt);
+                handleSend(prompt, hidden);
             }
         };
 
@@ -698,7 +700,7 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                         </div>
                     </div>
                 ) : (
-                    messages.map((msg) => (
+                    messages.filter(m => !m.hidden).map((msg) => (
                         <div key={msg.id} className={`flex flex-col gap-1 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                             <div className="flex items-end gap-2 max-w-[90%]">
                                 {msg.role === 'agent' && (

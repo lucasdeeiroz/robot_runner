@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useRef } from 'react';
-import { Check, Scan, Home, ArrowLeft, Rows, X, Search, Pencil, Copy, ChevronDown, ChevronUp, Videotape, Play, Trash2, Code, Move, MousePointer2, ArrowRight, ArrowUp, ArrowDown, Download, RefreshCw } from 'lucide-react';
+import { Check, Scan, Home, ArrowLeft, Rows, X, Search, Pencil, Copy, ChevronDown, ChevronUp, Videotape, Play, Trash2, Code, Move, MousePointer2, ArrowRight, ArrowUp, ArrowDown, Download, RefreshCw, CheckSquare } from 'lucide-react';
 import clsx from 'clsx';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
@@ -42,6 +42,7 @@ interface RecordingStep {
     action: string;
     params: RecorderOptions;
     node: InspectorNode | null;
+    locator?: string;
 }
 
 export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = false }: InspectorSubTabProps) {
@@ -102,7 +103,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
     };
 
     // AI Suggestion State
-    const { settings, is_test_mode } = useSettings();
+    const { settings, is_test_mode, updateSetting } = useSettings();
     const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
     const [aiRationale, setAiRationale] = useState<string | null>(null);
     const [aiError, setAiError] = useState<string | null>(null);
@@ -128,6 +129,7 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
 
     // Locator Editing State
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editingStepId, setEditingStepId] = useState<number | null>(null);
     const [editingAttr, setEditingAttr] = useState<'resource-id' | 'content-desc' | 'xpath' | 'uiselector' | null>(null);
     const [editOptions, setEditOptions] = useState({
         type: 'equals' as 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'matches',
@@ -286,6 +288,33 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
                 addons: options.selectedAddons
             }));
         }
+    };
+
+    const handleEditStep = (stepId: number) => {
+        const step = recordedSteps.find(s => s.id === stepId);
+        if (!step || !step.node) return;
+        setEditingStepId(step.id);
+
+        setSelectedNode(step.node);
+        setEditingAttr('xpath');
+
+        let initialAttr = 'resource-id';
+        const attrs = step.node.attributes;
+        if (!attrs[initialAttr]) {
+            if (attrs['content-desc']) initialAttr = 'content-desc';
+            else if (attrs['text']) initialAttr = 'text';
+            else if (attrs['class']) initialAttr = 'class';
+        }
+
+        const newOpts = {
+            ...editOptions,
+            type: 'equals' as const,
+            xpathAttr: initialAttr,
+            selectedAddons: []
+        };
+        setEditOptions(newOpts);
+        setCustomLocator(step.locator || generateXPath(step.node, initialAttr, newOpts.type, newOpts.kinship, []));
+        setIsEditModalOpen(true);
     };
 
     /**
@@ -695,16 +724,37 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                                                 addTapAnimation(centerX + params.offsetX, centerY + params.offsetY);
                                             }
                                         }
-                                    }
 
-                                    setRecordedSteps(prev => [...prev, { id: Date.now(), action, params, node: selectedNode }]);
+                                        const defaultLocator = selectedNode.attributes['resource-id']
+                                            ? `id=${selectedNode.attributes['resource-id']}`
+                                            : generateXPath(selectedNode);
+
+                                        setRecordedSteps(prev => [...prev, { id: Date.now(), action, params, node: selectedNode, locator: defaultLocator }]);
+                                    }
                                 }}
                                 onRemoveStep={(id: number) => setRecordedSteps(prev => prev.filter(s => s.id !== id))}
+                                onEditStep={handleEditStep}
                                 onClear={() => setRecordedSteps([])}
                                 onCopy={() => {
                                     const code = generateRobotCode(recordedSteps);
                                     navigator.clipboard.writeText(code);
                                     feedback.toast.success('common.copied');
+                                }}
+                                onGenerateAI={() => {
+                                    const historyStr = recordedSteps.map((s, i) => `[Step ${i + 1}] Action: ${s.action.toUpperCase()}, Locator: ${s.locator}`).join('\n');
+                                    const prompt = `Gere os testes automatizados em Robot Framework (arquivos .robot e .resource) para este fluxo que acabei de gravar manualmente no Gravador.
+
+IMPORTANTE: Você DEVE utilizar EXATAMENTE os locators fornecidos na lista abaixo para mapear as variáveis do Page Object, pois esses locators foram gerados e validados pelo Robot Runner. Não tente "adivinhar" o elemento nem converter o locator (ex: não converta UiSelector para XPath). Preserve a string do locator exatamente como repassada.
+Responda usando o idioma ${settings.language === 'pt_BR' ? 'Português (BR)' : settings.language === 'es_ES' ? 'Espanhol' : 'Inglês'}.
+
+Fluxo Gravado:
+${historyStr}`;
+                                    if (!settings.aiChatEnabled) {
+                                        updateSetting('aiChatEnabled', true);
+                                    }
+                                    setTimeout(() => {
+                                        window.dispatchEvent(new CustomEvent('ai_agent_prompt', { detail: { prompt, hidden: true } }));
+                                    }, 200);
                                 }}
                                 availableNodes={availableNodes}
                                 onSelectNode={setSelectedNode}
@@ -837,11 +887,39 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
 
             <Modal
                 isOpen={isEditModalOpen}
-                onClose={() => setIsEditModalOpen(false)}
-                title={editingAttr === 'xpath' ? t('inspector.modal.edit_xpath') : (editingAttr === 'uiselector' ? t('inspector.modal.edit_uiselector', 'Edit UIAutomator Selector') : t('inspector.modal.edit_selector'))}
+                onClose={() => { setIsEditModalOpen(false); setEditingStepId(null); }}
+                title={editingStepId !== null ? t('inspector.modal.edit_step_locator', 'Edit Step Locator') : (editingAttr === 'xpath' ? t('inspector.modal.edit_xpath') : (editingAttr === 'uiselector' ? t('inspector.modal.edit_uiselector', 'Edit UIAutomator Selector') : t('inspector.modal.edit_selector')))}
                 className="max-w-md"
             >
                 <div className="space-y-4">
+                    {editingStepId !== null && (
+                        <div className="space-y-1">
+                            <label className="text-xs font-medium text-on-surface-variant/80">{t('inspector.modal.format', 'Format')}</label>
+                            <Select
+                                value={editingAttr || 'xpath'}
+                                onChange={(e) => {
+                                    const newAttr = e.target.value as any;
+                                    setEditingAttr(newAttr);
+                                    if (!selectedNode) return;
+                                    if (newAttr === 'xpath') {
+                                        setCustomLocator(generateXPath(selectedNode, editOptions.xpathAttr, editOptions.type, editOptions.kinship, editOptions.selectedAddons));
+                                    } else if (newAttr === 'uiselector') {
+                                        setCustomLocator(generateUiSelector(selectedNode, {
+                                            attr: editOptions.xpathAttr as any,
+                                            type: editOptions.type,
+                                            kinship: editOptions.kinship,
+                                            useUiSelectorWrapper: editOptions.useUiSelectorWrapper,
+                                            addons: editOptions.selectedAddons
+                                        }));
+                                    }
+                                }}
+                                options={[
+                                    { label: 'XPath', value: 'xpath' },
+                                    { label: 'UiSelector', value: 'uiselector' }
+                                ]}
+                            />
+                        </div>
+                    )}
                     <div className="space-y-1">
                         <label className="text-xs font-medium text-on-surface-variant/80">{t('inspector.modal.match_type', 'Match Type')}</label>
                         <Select
@@ -975,6 +1053,17 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                             </Button>
                         </div>
                     </div>
+                    {editingStepId !== null && (
+                        <div className="pt-4 flex justify-end">
+                            <Button variant="primary" onClick={() => {
+                                setRecordedSteps(prev => prev.map(s => s.id === editingStepId ? { ...s, locator: customLocator } : s));
+                                setIsEditModalOpen(false);
+                                setEditingStepId(null);
+                            }}>
+                                {t('common.save', 'Save')}
+                            </Button>
+                        </div>
+                    )}
                 </div>
             </Modal>
         </div>
@@ -991,8 +1080,10 @@ interface RecordingPaneProps {
     onSelectNode: (node: InspectorNode) => void;
     onHoverNode: (node: InspectorNode | null) => void;
     onRemoveStep: (id: number) => void;
+    onEditStep: (id: number) => void;
     onClear: () => void;
     onCopy: () => void;
+    onGenerateAI: () => void;
     t: any;
 }
 
@@ -1006,11 +1097,13 @@ function RecordingPane({
     onSelectNode,
     onHoverNode,
     onRemoveStep,
+    onEditStep,
     onClear,
     onCopy,
+    onGenerateAI,
     t
 }: RecordingPaneProps) {
-    const [activeTab, setActiveTab] = useState<'tap' | 'swipe' | 'drag'>('tap');
+    const [activeTab, setActiveTab] = useState<'tap' | 'swipe' | 'drag' | 'assert'>('tap');
 
     return (
         <div className="flex flex-col h-full bg-surface">
@@ -1049,6 +1142,17 @@ function RecordingPane({
                         leftIcon={<Play size={14} className="rotate-90" />}
                     >
                         {t('inspector.recorder.actions.drag_drop')}
+                    </Button>
+                    <Button
+                        variant={activeTab === 'assert' ? 'primary' : 'ghost'}
+                        onClick={() => setActiveTab('assert')}
+                        className={clsx(
+                            "flex-1 flex items-center justify-center py-2 text-xs font-bold rounded-lg",
+                            activeTab !== 'assert' && "text-on-surface-variant/70"
+                        )}
+                        leftIcon={<CheckSquare size={14} />}
+                    >
+                        {t('inspector.recorder.actions.assert', 'Assert')}
                     </Button>
                 </div>
 
@@ -1181,7 +1285,11 @@ function RecordingPane({
                             )}
                         </div>
 
-                        {activeTab === 'tap' ? (
+                        {activeTab === 'assert' ? (
+                            <div className="grid grid-cols-1 gap-2">
+                                <Button size="sm" onClick={() => onAddStep('assert', options)} className="w-full text-[10px] h-8 bg-success/20 text-success hover:bg-success/30 border-success/30">{t('inspector.recorder.actions.assert', 'Assert Element')}</Button>
+                            </div>
+                        ) : activeTab === 'tap' ? (
                             <div className="grid grid-cols-3 gap-2">
                                 <Button size="sm" onClick={() => onAddStep('tap', options)} className="w-full text-[10px] h-8">{t('inspector.recorder.actions.tap')}</Button>
                                 <Button size="sm" onClick={() => onAddStep('double_tap', options)} variant="outline" className="w-full text-[10px] h-8">{t('inspector.recorder.actions.double_tap')}</Button>
@@ -1226,14 +1334,23 @@ function RecordingPane({
                             {t('inspector.recorder.clear')}
                         </Button>
                         <Button
-                            variant="primary"
-                            className="w-auto h-8 shadow-lg shadow-primary/20 text-xs"
+                            variant="outline"
+                            className="w-auto h-8 text-xs px-3"
                             disabled={recordedSteps.length === 0}
                             onClick={onCopy}
                         >
-                            <Copy size={16} className="mr-2" />
+                            <Copy size={14} className="mr-2" />
                             {t('inspector.recorder.copy')}
                         </Button>
+                        <AiButton
+                            id="recorder_generate_ai_test"
+                            isLoading={false}
+                            disabled={recordedSteps.length === 0}
+                            onClick={onGenerateAI}
+                            label={t('run_tab.console.generate_ai_test', 'Gerar Teste Robot (IA)')}
+                            variant="primary"
+                            className="h-8 text-xs shadow-lg shadow-primary/20 px-3"
+                        />
                     </div>
                 </div>
 
@@ -1259,9 +1376,12 @@ function RecordingPane({
                                         </span>
                                     </div>
                                     <div className="text-[10px] text-on-surface-variant/60 font-mono truncate">
-                                        {step.node?.attributes['resource-id']?.split('/').pop() || (step.node ? generateXPath(step.node) : 'Unknown')}
+                                        {step.locator || (step.node?.attributes['resource-id']?.split('/').pop() || (step.node ? generateXPath(step.node) : 'Unknown'))}
                                     </div>
                                 </div>
+                                <Button variant="ghost" size="sm" onClick={() => onEditStep(step.id)} className="opacity-0 group-hover:opacity-100 h-7 w-7 p-0 text-on-surface-variant/40 hover:text-primary hover:bg-primary/10 transition-all mr-1">
+                                    <Pencil size={14} />
+                                </Button>
                                 <Button variant="ghost" size="sm" onClick={() => onRemoveStep(step.id)} className="opacity-0 group-hover:opacity-100 h-7 w-7 p-0 text-on-surface-variant/40 hover:text-error hover:bg-error/10 transition-all">
                                     <X size={14} />
                                 </Button>
@@ -1281,9 +1401,9 @@ function generateRobotCode(steps: RecordingStep[]) {
 
     steps.forEach(step => {
         if (!step.node) return;
-        const locator = step.node.attributes['resource-id']
+        const locator = step.locator || (step.node.attributes['resource-id']
             ? `id=${step.node.attributes['resource-id']}`
-            : generateXPath(step.node);
+            : generateXPath(step.node));
 
         const action = step.action;
         const p = step.params;
@@ -1300,6 +1420,8 @@ function generateRobotCode(steps: RecordingStep[]) {
         } else if (action.startsWith('drag_')) {
             const dir = action.split('_')[1];
             lines.push(`    Drag And Drop    ${locator}    direction=${dir}    duration=${p.duration}`);
+        } else if (action === 'assert') {
+            lines.push(`    Wait Until Element Is Visible    ${locator}    timeout=15`);
         }
     });
 

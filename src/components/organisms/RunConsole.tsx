@@ -286,7 +286,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                         const { summarizeExecution } = await import('@/lib/dashboard/antigravityCode');
                         result = await summarizeExecution(tree, settings.paths.automationRoot || '', language, failureContext?.map(f => f.message) || [], failureContext, customPrompt, settings.antigravityApiKey);
                     }
-                    
+
                     if (result) {
                         break; // Success, exit retry loop
                     }
@@ -329,7 +329,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
             } else {
                 setAiStatus(t('run_tab.console.ai_steps.dumping', { defaultValue: 'Dumping screen hierarchy...' }));
                 const rawXml = await invoke<string>("get_xml_dump", { deviceId: session.deviceUdid });
-                
+
                 // Inject 'instance' attribute into XML so AI can match Appium's behavior
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(rawXml, "application/xml");
@@ -379,7 +379,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                                 parsedActions = [response.action];
                             }
                         }
-                        
+
                         if (parsedActions && parsedActions.length > 0) {
                             pendingActionsRef.current = parsedActions;
                             currentThought = response.thought || "AI generated a new action plan.";
@@ -442,7 +442,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                 }
                 await invoke("run_adb_command", { device: session.deviceUdid, args });
                 addSessionLog(runId, `[ADB] Executed: adb -s ${session.deviceUdid} ${args.join(' ')}`);
-                
+
                 // If there are more actions in queue, use a very short delay, otherwise standard wait
                 const waitTime = pendingActionsRef.current.length > 0 ? 500 : 2000;
                 await new Promise(r => setTimeout(r, waitTime));
@@ -558,9 +558,9 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                     {!isRunning && tree.length > 0 && (
                         <div className="flex items-center gap-1">
                             {session?.outputDir && (
-                                    <Button
-                                        variant="ghost" size="icon"
-                                        onClick={async () => {
+                                <Button
+                                    variant="ghost" size="icon"
+                                    onClick={async () => {
                                         let path = session.outputDir!;
                                         // Safety check: ensure we open a directory, not a file
                                         if (path.toLowerCase().endsWith('.xml') || path.toLowerCase().endsWith('.html')) {
@@ -576,10 +576,10 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                                             console.error("Failed to open log folder:", e);
                                         }
                                     }}
-                                        className="w-8 h-8 rounded-full text-on-surface-variant/80 hover:text-primary"
-                                        data-tooltip={t('run_tab.console.open_output_dir')}
-                                        data-position="left"
-                                    >
+                                    className="w-8 h-8 rounded-full text-on-surface-variant/80 hover:text-primary"
+                                    data-tooltip={t('run_tab.console.open_output_dir')}
+                                    data-position="left"
+                                >
                                     <FolderOpen size={14} />
                                 </Button>
                             )}
@@ -631,13 +631,13 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                                         id="run_generate_ai_test"
                                         isLoading={false}
                                         onClick={() => {
-                                            const historyStr = aiHistory.map((h, i) => `[Step ${i+1}] ${h}`).join('\n');
+                                            const historyStr = aiHistory.map((h, i) => `[Step ${i + 1}] ${h}`).join('\n');
                                             const prompt = `Gere os testes automatizados em Robot Framework (arquivos .robot e .resource) para este fluxo que acabou de ser mapeado com sucesso pela engine de exploração autônoma:\n\n${historyStr}`;
                                             if (!settings.aiChatEnabled) {
                                                 updateSetting('aiChatEnabled', true);
                                             }
                                             setTimeout(() => {
-                                                window.dispatchEvent(new CustomEvent('ai_agent_prompt', { detail: { prompt } }));
+                                                window.dispatchEvent(new CustomEvent('ai_agent_prompt', { detail: { prompt, hidden: true } }));
                                             }, 200);
                                         }}
                                         label={t('run_tab.console.generate_ai_test')}
