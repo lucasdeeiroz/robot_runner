@@ -629,7 +629,7 @@ Error Message: ${(node as TestNode).failureDetail?.message}
                                 />
                                 <div className="flex items-center gap-4">
                                     <Button
-                                        className="px-6 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-all font-medium border border-white/10 flex items-center gap-2 group"
+                                        className="px-6 py-2.5 bg-surface/80 hover:bg-surface-variant text-on-surface rounded-full backdrop-blur-md transition-all font-medium border border-outline-variant/30 flex items-center gap-2 group"
                                         onClick={() => setPreviewImage(null)}
                                     >
                                         <XCircle size={18} className="text-white/70 group-hover:text-white transition-colors" />

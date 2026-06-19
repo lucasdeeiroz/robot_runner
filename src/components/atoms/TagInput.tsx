@@ -90,8 +90,9 @@ export function TagInput({
                         {tag}
                         {!disabled && (
                             <Button
+                                variant="unstyled"
                                 onClick={() => removeTag(tag)}
-                                className="hover:bg-transparent hover:text-error transition-colors p-1 bg-transparent border-none shadow-none"
+                                className="hover:text-error transition-colors p-0.5 ml-1 opacity-70 hover:opacity-100"
                             >
                                 <X size={12} />
                             </Button>

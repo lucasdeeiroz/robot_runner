@@ -6,8 +6,8 @@ use std::process::{Child, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Duration;
-use tauri::{State, AppHandle};
+use std::time::{Duration, Instant};
+use tauri::{State, AppHandle, Emitter};
 
 // Structure to hold the process and the shared buffer
 pub struct LogcatProcess {
@@ -69,6 +69,7 @@ pub fn start_logcat(
     let thread_child_mutex = child_mutex.clone();
     let thread_should_stop = should_stop.clone();
     let thread_adb_program = adb_program;
+    let thread_app_handle = app.clone();
 
     thread::spawn(move || {
         let device_id = thread_device;
@@ -137,6 +138,8 @@ pub fn start_logcat(
                         let reader_buffer = thread_buffer.clone();
                         let reader_output_file = thread_output_file.clone();
                         let reader_should_stop = thread_should_stop.clone();
+                        let reader_app_handle = thread_app_handle.clone();
+                        let reader_device_id = device_id.clone();
 
                         thread::spawn(move || {
                             let reader = BufReader::new(out);
@@ -145,6 +148,15 @@ pub fn start_logcat(
                             } else {
                                 None
                             };
+
+                            let mut chunk = Vec::new();
+                            let mut last_emit = Instant::now();
+
+                            #[derive(Clone, serde::Serialize)]
+                            struct LogcatPayload {
+                                device: String,
+                                lines: Vec<String>,
+                            }
 
                             for line in reader.lines() {
                                 // Stop reading if global stop is requested
@@ -159,14 +171,35 @@ pub fn start_logcat(
                                     }
                                     // Buffer
                                     if let Ok(mut b) = reader_buffer.lock() {
-                                        b.push(l);
+                                        b.push(l.clone());
                                         if b.len() > 10000 {
                                             b.drain(0..1000);
                                         }
                                     }
+
+                                    chunk.push(l);
+
+                                    if chunk.len() >= 50 || last_emit.elapsed().as_millis() >= 200 {
+                                        let payload = LogcatPayload {
+                                            device: reader_device_id.clone(),
+                                            lines: chunk.clone(),
+                                        };
+                                        let _ = reader_app_handle.emit("logcat-data", payload);
+                                        chunk.clear();
+                                        last_emit = Instant::now();
+                                    }
                                 } else {
                                     break; // Stream broken or process killed
                                 }
+                            }
+                            
+                            // Emit remaining lines if any
+                            if !chunk.is_empty() {
+                                let payload = LogcatPayload {
+                                    device: reader_device_id.clone(),
+                                    lines: chunk,
+                                };
+                                let _ = reader_app_handle.emit("logcat-data", payload);
                             }
                         });
                     }

@@ -160,6 +160,8 @@ E clico na Guia    ${btn_home}    ${btn_dispositivos}
 
 Novos locators pertencem ao arquivo apropriado em `resources/variaveis/`.
 
+**Aviso Importante sobre Conversão de Locators:** Quando instruído a gerar testes a partir de um log do Robot Runner ou Gravador, VOCÊ DEVE PRESERVAR os locators exatos informados no prompt (ex: `new UiSelector().description(...)`). Não tente traduzi-los ou convertê-los para XPath ou outro formato. Use a string providenciada como está.
+
 ---
 
 ## Qualidade de código

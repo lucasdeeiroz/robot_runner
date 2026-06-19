@@ -347,7 +347,7 @@ export function ImageEditor() {
                     onMouseUp={handleMouseUp}
                     onMouseLeave={() => setIsDrawing(false)}
                     className={clsx(
-                        "bg-white shadow-sm cursor-crosshair max-w-full max-h-full object-contain",
+                        "bg-surface shadow-sm cursor-crosshair max-w-full max-h-full object-contain",
                         currentTool === null && "cursor-default"
                     )}
                     style={{ maxWidth: '100%', maxHeight: '100%' }}

@@ -805,34 +805,42 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                             }
                         }}
                         placeholder={t('ai_agent.placeholder')}
-                        className="w-full bg-surface-variant/30 text-on-surface rounded-xl pl-4 pr-20 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm resize-none custom-scrollbar border border-outline-variant/30"
+                        className="w-full bg-surface-variant/30 text-on-surface rounded-xl pl-4 pr-24 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm resize-none custom-scrollbar border border-outline-variant/30"
                         rows={3}
                         disabled={isLoading}
                     />
-                    <button
-                        onClick={() => {
-                            if (isListening) {
-                                stopListening();
-                            } else {
-                                startListening();
-                            }
-                        }}
-                        disabled={isLoading}
-                        title={isListening ? t('ai_agent.mic_active') : t('ai_agent.mic_inactive')}
-                        className={`absolute right-12 bottom-2 p-2 rounded-lg transition-all ${isListening
-                            ? 'bg-error text-on-error animate-pulse shadow-lg shadow-error/50 scale-110'
-                            : 'bg-transparent text-on-surface-variant hover:bg-transparent hover:text-primary'
-                            }`}
-                    >
-                        {isListening ? <MicOff size={16} /> : <Mic size={16} />}
-                    </button>
-                    <button
-                        onClick={() => handleSend()}
-                        disabled={!input.trim() || isLoading}
-                        className="absolute right-2 bottom-2 p-2 rounded-lg bg-primary text-on-primary hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-primary/20"
-                    >
-                        {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                    </button>
+                    <div className="absolute right-2 bottom-2 flex items-center gap-1">
+                        <Button
+                            variant="unstyled"
+                            size="icon"
+                            onClick={() => {
+                                if (isListening) {
+                                    stopListening();
+                                } else {
+                                    startListening();
+                                }
+                            }}
+                            disabled={isLoading}
+                            title={isListening ? t('ai_agent.mic_active') : t('ai_agent.mic_inactive')}
+                            aria-label={isListening ? t('ai_agent.mic_active') : t('ai_agent.mic_inactive')}
+                            className={`transition-all ${isListening
+                                ? 'bg-error text-on-error animate-pulse shadow-lg shadow-error/50 scale-110'
+                                : 'bg-transparent text-on-surface-variant hover:bg-surface-variant/50 hover:text-primary'
+                                }`}
+                        >
+                            {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+                        </Button>
+                        <Button
+                            variant="unstyled"
+                            size="icon"
+                            onClick={() => handleSend()}
+                            disabled={!input.trim() || isLoading}
+                            aria-label={t('ai_agent.send')}
+                            className="bg-primary text-on-primary hover:brightness-110 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-primary/20"
+                        >
+                            {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                        </Button>
+                    </div>
                 </div>
             </div>
 

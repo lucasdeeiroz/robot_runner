@@ -31,7 +31,8 @@ pub async fn get_connected_devices(app: AppHandle) -> Result<Vec<Device>, String
     let mut device_tasks = Vec::new();
 
     for line in stdout.lines() {
-        if line.is_empty() || line.starts_with("List of devices") {
+        let trimmed_line = line.trim();
+        if trimmed_line.is_empty() || trimmed_line.starts_with("List of devices") || trimmed_line.starts_with('*') || trimmed_line.starts_with("adb server") {
             continue;
         }
 

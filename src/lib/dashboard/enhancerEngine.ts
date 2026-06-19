@@ -25,7 +25,7 @@ export async function processAndEnhanceMaps(
     log(t('mapper.enhancer.starting_linter', 'Iniciando Linter Programático...'));
 
     // 1. Programmatic Linter
-    const enhancedMaps = JSON.parse(JSON.stringify(maps)) as ScreenMap[];
+    const enhancedMaps = structuredClone(maps) as ScreenMap[];
 
     // De-duplicate elements
     for (const map of enhancedMaps) {

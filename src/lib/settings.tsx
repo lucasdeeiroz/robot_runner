@@ -254,24 +254,24 @@ async function decryptValue(val: string | undefined | null): Promise<string> {
     }
 }
 
-async function processSettingsSecrets(settings: any, mode: 'encrypt' | 'decrypt'): Promise<any> {
-    const copy = JSON.parse(JSON.stringify(settings));
+async function processSettingsSecrets<T>(settings: T, mode: 'encrypt' | 'decrypt'): Promise<T> {
+    const copy = structuredClone(settings);
     const fn = mode === 'encrypt' ? encryptValue : decryptValue;
 
     for (const path of SECRET_PATHS) {
-        let parent = copy;
+        let parent: unknown = copy;
         for (let i = 0; i < path.length - 1; i++) {
-            if (parent && typeof parent === 'object') {
+            if (isObject(parent)) {
                 parent = parent[path[i]];
             } else {
                 parent = undefined;
                 break;
             }
         }
-        if (parent && typeof parent === 'object') {
+        if (isObject(parent)) {
             const lastKey = path[path.length - 1];
             if (parent[lastKey] !== undefined && parent[lastKey] !== null) {
-                parent[lastKey] = await fn(parent[lastKey]);
+                parent[lastKey] = await fn(parent[lastKey] as string);
             }
         }
     }
@@ -279,7 +279,7 @@ async function processSettingsSecrets(settings: any, mode: 'encrypt' | 'decrypt'
 }
 
 async function processStoreDataSecrets(data: SettingsStoreData, mode: 'encrypt' | 'decrypt'): Promise<SettingsStoreData> {
-    const copy = JSON.parse(JSON.stringify(data));
+    const copy = structuredClone(data);
     if (copy.profiles) {
         for (const pid of Object.keys(copy.profiles)) {
             if (copy.profiles[pid]?.settings) {
@@ -389,7 +389,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         }, 8000);
 
         try {
-            const saved: any = await store.get('app_config');
+            const saved = await store.get<SettingsStoreData>('app_config');
             clearTimeout(safetyTimer);
 
             if (saved) {
@@ -428,7 +428,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                 } else {
                     // It's the old flat format. Migrate to Default Profile.
                     console.info("Migrating legacy settings to Default Profile...");
-                    const migratedSettings = deepMerge(DEFAULT_SETTINGS, decryptedSaved);
+                    const migratedSettings = deepMerge(DEFAULT_SETTINGS, decryptedSaved as unknown as Partial<AppSettings>);
                     migratedSettings.aiChatEnabled = false;
                     migratedSettings.aiTestModeEnabled = false;
                     const newStoreData: SettingsStoreData = {
@@ -746,21 +746,25 @@ export function useSettings() {
 }
 
 // Simple deep merge helper
-function deepMerge(target: any, source: any): any {
+function deepMerge<T>(target: T, source: Partial<T>): T {
     const output = { ...target };
     if (isObject(target) && isObject(source)) {
         Object.keys(source).forEach(key => {
-            if (isObject(source[key])) {
-                if (!(key in target)) Object.assign(output, { [key]: source[key] });
-                else output[key] = deepMerge(target[key], source[key]);
+            const k = key as keyof T;
+            if (isObject(source[k])) {
+                if (!(k in target)) {
+                    (output as Record<string, unknown>)[k as string] = source[k];
+                } else {
+                    (output as Record<string, unknown>)[k as string] = deepMerge(target[k] as Record<string, unknown>, source[k] as Record<string, unknown>);
+                }
             } else {
-                Object.assign(output, { [key]: source[key] });
+                (output as Record<string, unknown>)[k as string] = source[k];
             }
         });
     }
     return output;
 }
 
-function isObject(item: any) {
-    return (item && typeof item === 'object' && !Array.isArray(item));
+function isObject(item: unknown): item is Record<string, unknown> {
+    return (item !== null && typeof item === 'object' && !Array.isArray(item));
 }

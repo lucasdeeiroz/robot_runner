@@ -61,19 +61,17 @@ impl LogDb {
         self.conn.transaction()
     }
 
-    pub fn insert_node(
-        tx: &rusqlite::Transaction,
+
+
+    pub fn insert_node_stmt(
+        stmt: &mut rusqlite::Statement,
         id: &str,
         parent_id: &str,
         node_type: &str,
         json_payload: &str,
         order_index: i32,
     ) -> Result<()> {
-        tx.execute(
-            "INSERT INTO log_nodes (id, parent_id, node_type, json_payload, order_index)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![id, parent_id, node_type, json_payload, order_index],
-        )?;
+        stmt.execute(params![id, parent_id, node_type, json_payload, order_index])?;
         Ok(())
     }
 

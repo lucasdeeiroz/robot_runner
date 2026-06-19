@@ -4,6 +4,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { Play, Square, Eraser, AlignLeft, Package as PackageIcon, FolderSearch, Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 import { useSettings } from "@/lib/settings";
 import { feedback } from "@/lib/feedback";
@@ -93,47 +94,53 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
         }
     }, [selectedDevice]);
 
-    // Setup polling with offset
+    // Setup event listening
     useEffect(() => {
-        let interval: NodeJS.Timeout;
-        let pollingOffset = 0; // Local offset for this session
+        let unlisten: UnlistenFn | undefined;
+        let isSubscribed = true;
 
         const shouldStream = isStreaming && selectedDevice && (!isTestRunning || allowActionsDuringTest);
 
-        if (shouldStream) { // Pause polling during active tests unless allowed
-
-            interval = setInterval(async () => {
-                try {
-                    const result = await invoke<[string[], number]>('fetch_logcat_buffer', {
-                        device: selectedDevice,
-                        offset: pollingOffset
+        if (shouldStream) { // Pause streaming during active tests unless allowed
+            // Get history first
+            invoke<[string[], number]>('fetch_logcat_buffer', {
+                device: selectedDevice,
+                offset: 0
+            }).then((result) => {
+                if (!isSubscribed) return;
+                const historyLines = result[0];
+                if (historyLines && historyLines.length > 0) {
+                    setLogs(prev => {
+                        const updated = [...historyLines];
+                        if (updated.length > 5000) return updated.slice(-5000);
+                        return updated;
                     });
-                    const newLines = result[0];
-                    const totalLen = result[1];
-
-                    if (totalLen < pollingOffset) {
-                        pollingOffset = 0;
-                    } else {
-                        if (newLines && newLines.length > 0) {
-                            setLogs(prev => {
-                                const updated = [...prev, ...newLines];
-                                if (updated.length > 5000) return updated.slice(-5000);
-                                return updated;
-                            });
-                        }
-                        // Only update offset if it actually grew
-                        if (totalLen > pollingOffset) {
-                            pollingOffset = totalLen;
-                        }
-                    }
-                } catch (e) {
-                    feedback.toast.error("logcat.errors.fetch_failed", e);
                 }
-            }, 200); // 200ms
+            }).catch(e => {
+                feedback.toast.error("logcat.errors.fetch_failed", e);
+            });
+
+            // Listen for new chunks
+            listen<{ device: string, lines: string[] }>('logcat-data', (event) => {
+                if (event.payload.device === selectedDevice) {
+                    setLogs(prev => {
+                        const updated = [...prev, ...event.payload.lines];
+                        if (updated.length > 5000) return updated.slice(-5000);
+                        return updated;
+                    });
+                }
+            }).then(un => {
+                if (isSubscribed) {
+                    unlisten = un;
+                } else {
+                    un();
+                }
+            });
         }
 
         return () => {
-            if (interval) clearInterval(interval);
+            isSubscribed = false;
+            if (unlisten) unlisten();
         };
     }, [isStreaming, selectedDevice, isTestRunning, allowActionsDuringTest]);
 

@@ -461,7 +461,7 @@ export function AIGeneratorSubTab({ onNavigate }: AIGeneratorSubTabProps) {
                                     aria-hidden="true"
                                     className={clsx(
                                         useMapping ? 'translate-x-5' : 'translate-x-0',
-                                        'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'
+                                        'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-surface shadow ring-0 transition duration-200 ease-in-out'
                                     )}
                                 />
                             </Switch>

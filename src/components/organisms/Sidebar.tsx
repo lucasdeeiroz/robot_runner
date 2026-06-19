@@ -322,8 +322,9 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                     {updateAvailable && (
                         <Button
                             variant="unstyled"
+                            size="sm"
                             onClick={() => onNavigate('about')}
-                            className="text-error font-bold bg-error-container px-1.5 py-0.5 rounded-2xl hover:bg-error-container/80 transition-colors animate-pulse cursor-pointer shrink-0"
+                            className="text-[10px] text-error font-bold bg-error-container px-2 py-0.5 rounded-2xl hover:bg-error-container/80 transition-colors animate-pulse cursor-pointer shrink-0 h-auto"
                         >
                             {t('about.update_badge')}
                         </Button>
