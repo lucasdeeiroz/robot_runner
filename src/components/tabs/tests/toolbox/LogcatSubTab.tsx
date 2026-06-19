@@ -110,7 +110,7 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
                 if (!isSubscribed) return;
                 const historyLines = result[0];
                 if (historyLines && historyLines.length > 0) {
-                    setLogs(prev => {
+                    setLogs(() => {
                         const updated = [...historyLines];
                         if (updated.length > 5000) return updated.slice(-5000);
                         return updated;
