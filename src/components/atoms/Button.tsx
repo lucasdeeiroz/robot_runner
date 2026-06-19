@@ -7,7 +7,7 @@ import { twMerge } from 'tailwind-merge';
 import { HTMLMotionProps } from 'framer-motion';
 
 export interface ButtonProps extends HTMLMotionProps<"button"> {
-    variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'warning' | 'success';
+    variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'warning' | 'success' | 'link' | 'unstyled';
     size?: 'sm' | 'md' | 'lg' | 'icon';
     isLoading?: boolean;
     leftIcon?: React.ReactNode;
@@ -30,13 +30,15 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
     ...props
 }, ref) => {
     const variants = {
-        primary: 'bg-primary/10 hover:bg-secondary-container text-primary dark:text-primary/80 shadow-sm border border-transparent',
+        primary: 'bg-primary text-on-primary shadow-sm border border-transparent',
         secondary: 'bg-surface text-on-surface/80 border border-outline-variant/30 hover:bg-surface-variant/50 shadow-sm',
         outline: 'bg-transparent border border-outline-variant/30 text-on-surface/80 hover:bg-surface-variant/30',
         ghost: 'bg-transparent text-on-surface-variant/80 hover:bg-surface-variant/30 hover:text-on-surface/80',
-        danger: 'bg-error hover:bg-error/90 text-on-error shadow-sm border border-transparent',
-        warning: 'bg-warning-container/20 hover:bg-warning-container/40 text-on-warning-container shadow-sm border border-warning-container/10',
-        success: 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 shadow-sm border border-transparent',
+        danger: 'bg-error text-on-error shadow-sm border border-transparent',
+        warning: 'bg-warning text-on-warning shadow-sm border border-transparent',
+        success: 'bg-success text-on-success shadow-sm border border-transparent',
+        link: 'bg-transparent text-primary hover:underline shadow-none',
+        unstyled: 'bg-transparent shadow-none p-0 h-auto',
     };
 
     const sizes = {
@@ -46,11 +48,22 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
         icon: 'h-9 w-9 p-0',
     };
 
+    const noHoverEffectVariants = ['link', 'unstyled'];
+    const solidVariants = ['primary', 'danger', 'warning', 'success'];
+
+    const hoverProps = (!disabled && !isLoading && !noHoverEffectVariants.includes(variant))
+        ? { scale: 1.02, filter: solidVariants.includes(variant) ? "brightness(1.1)" : "brightness(1)" }
+        : undefined;
+
+    const tapProps = (!disabled && !isLoading && !noHoverEffectVariants.includes(variant))
+        ? { scale: 0.95 }
+        : undefined;
+
     return (
         <motion.button
             ref={ref}
-            whileHover={!disabled && !isLoading ? { scale: 1.02, filter: "brightness(1.05)" } : undefined}
-            whileTap={!disabled && !isLoading ? { scale: 0.95 } : undefined}
+            whileHover={hoverProps}
+            whileTap={tapProps}
             transition={{ type: "spring", stiffness: 400, damping: 17 }}
             className={twMerge(
                 'inline-flex items-center justify-center rounded-2xl font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50 select-none cursor-pointer',

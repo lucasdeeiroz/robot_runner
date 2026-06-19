@@ -55,6 +55,7 @@ macro_rules! generate_robot_runner_handler {
             crate::adb::media::stop_screen_recording,
             crate::adb::network::get_device_ip,
             crate::files::list_directory,
+            crate::files::list_directory_recursive,
             crate::files::save_file,
             crate::files::read_file,
             crate::files::read_file_tail,
@@ -98,7 +99,16 @@ macro_rules! generate_robot_runner_handler {
             crate::adb::shell::adb_settings_put,
             crate::adb::shell::adb_settings_get,
             crate::adb::shell::get_notifications,
-            crate::adb::shell::get_events
+            crate::adb::shell::get_events,
+            crate::security::encrypt_secret,
+            crate::security::decrypt_secret,
+            crate::git::get_git_status,
+            crate::git::git_stage_file,
+            crate::git::git_unstage_file,
+            crate::git::git_commit,
+            crate::git::git_push,
+            crate::git::git_fetch,
+            crate::git::git_pull
         ]
     };
 }

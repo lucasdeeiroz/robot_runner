@@ -7,6 +7,7 @@ import { feedback } from './feedback';
 import { logDataFootprint } from './metrics';
 import { db, auth as firebaseAuth } from './firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { sendWebhookNotification, WebhookPayload } from './integrations/webhooks';
 
 export interface TestSession {
     runId: string;
@@ -170,6 +171,50 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                             failCount: failMatch ? parseInt(failMatch[1]) : (exit_code !== 0 ? 1 : 0),
                             duration: duration
                         }).catch(err => console.error("[Firebase] History sync failed:", err));
+                    }
+
+                    // Webhook Notification Trigger
+                    if (settings.webhooks) {
+                        const lastLogs = sessionToFinish.logs.slice(-50).join('\n');
+                        const passMatch = lastLogs.match(/Tests Passed:\s*(\d+)/i) || lastLogs.match(/PASS:\s*(\d+)/i);
+                        const failMatch = lastLogs.match(/Tests Failed:\s*(\d+)/i) || lastLogs.match(/FAIL:\s*(\d+)/i);
+                        
+                        let duration = 'N/A';
+                        const suiteEndMatch = lastLogs.match(/\[RR-SUITE-END\].*?\|\s*(\d+)\s*$/m);
+                        if (suiteEndMatch) {
+                            const ms = parseInt(suiteEndMatch[1]);
+                            duration = ms > 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
+                        } else {
+                            const ms = Date.now() - sessionToFinish.startTime;
+                            duration = ms > 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
+                        }
+
+                        const status: 'passed' | 'failed' = exit_code === 0 ? 'passed' : 'failed';
+                        const shouldNotify = (status === 'passed' && settings.webhooks.notifyOnPass) ||
+                                             (status === 'failed' && settings.webhooks.notifyOnFail);
+                        
+                        if (shouldNotify) {
+                            const extractedSuiteName = sessionToFinish.testPath.split(/[\\/]/).pop()?.split('.')[0] || 'Unknown';
+                            const passCount = passMatch ? parseInt(passMatch[1]) : (exit_code === 0 ? 1 : 0);
+                            const failCount = failMatch ? parseInt(failMatch[1]) : (exit_code !== 0 ? 1 : 0);
+                            
+                            const payload: WebhookPayload = {
+                                suiteName: extractedSuiteName,
+                                status,
+                                passCount,
+                                failCount,
+                                duration,
+                                deviceName: sessionToFinish.deviceName,
+                                framework: sessionToFinish.framework
+                            };
+                            
+                            if (settings.webhooks.slackUrl) {
+                                sendWebhookNotification('slack', settings.webhooks.slackUrl, payload).catch(err => console.error("Slack webhook failed:", err));
+                            }
+                            if (settings.webhooks.teamsUrl) {
+                                sendWebhookNotification('teams', settings.webhooks.teamsUrl, payload).catch(err => console.error("Teams webhook failed:", err));
+                            }
+                        }
                     }
                 }
 

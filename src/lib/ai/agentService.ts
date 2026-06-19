@@ -16,31 +16,71 @@ export interface AgentServiceResponse {
  * markdown code fences or extra text before/after the JSON object.
  */
 function safeParseJson<T>(content: string): T {
+    if (!content || typeof content !== 'string') return content as any;
     const trimmed = content.trim();
     try {
         return JSON.parse(trimmed);
     } catch (e) {
-        const firstBrace = content.indexOf('{');
-        const firstBracket = content.indexOf('[');
-        const startIndex = (firstBrace !== -1 && firstBracket !== -1)
-            ? Math.min(firstBrace, firstBracket)
-            : (firstBrace !== -1 ? firstBrace : (firstBracket !== -1 ? firstBracket : -1));
+        try {
+            const firstBrace = content.indexOf('{');
+            const lastBrace = content.lastIndexOf('}');
+            const firstBracket = content.indexOf('[');
+            const lastBracket = content.lastIndexOf(']');
 
-        const lastBrace = content.lastIndexOf('}');
-        const lastBracket = content.lastIndexOf(']');
-        const endIndex = Math.max(lastBrace, lastBracket);
+            let startIndex = -1;
+            let endIndex = -1;
 
-        if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
-            const jsonString = content.substring(startIndex, endIndex + 1);
-            try {
-                return JSON.parse(jsonString);
-            } catch (e2: any) {
-                console.error("[AI Agent] Failed to parse extracted JSON content:", jsonString);
-                throw new Error(`Failed to parse extracted JSON: ${e2.message}`);
+            if (firstBrace !== -1 && (firstBracket === -1 || (firstBrace < firstBracket && firstBrace !== -1))) {
+                startIndex = firstBrace;
+                endIndex = lastBrace;
+            } else if (firstBracket !== -1) {
+                startIndex = firstBracket;
+                endIndex = lastBracket;
             }
+
+            if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+                const jsonString = content.substring(startIndex, endIndex + 1);
+                return JSON.parse(jsonString);
+            }
+        } catch (innerError) {
+            // ignore
         }
         console.error("[AI Agent] No valid JSON structure found in content:", content);
         throw e;
+    }
+}
+
+async function getProjectAgentContext(automationRoot: string): Promise<string> {
+    try {
+        const { join } = await import('@tauri-apps/api/path');
+        const { invoke } = await import('@tauri-apps/api/core');
+
+        let indexContext = "AVAILABLE PROJECT FILES INDEX:\n";
+        const agentsDir = await join(automationRoot, '.agents');
+
+        const scanAndIndex = async (subDir: string, categoryName: string) => {
+            try {
+                const targetDir = await join(agentsDir, subDir);
+                const entries = await invoke<any[]>('list_directory', { path: targetDir });
+                for (const entry of entries) {
+                    if (!entry.is_dir && entry.name && (entry.name.endsWith('.md') || entry.name.endsWith('.txt'))) {
+                        const relativePath = `.agents/${subDir}/${entry.name}`;
+                        indexContext += `- [${categoryName}] ${entry.name} (Path: ${relativePath})\n`;
+                    }
+                }
+            } catch (e) {
+                // Ignore if directory doesn't exist
+            }
+        };
+
+        await scanAndIndex('profiles', 'Profile');
+        await scanAndIndex('rules', 'Rule');
+        await scanAndIndex('workflows', 'Workflow');
+
+        return indexContext;
+    } catch (e) {
+        console.error("Error reading project agent context:", e);
+        return "";
     }
 }
 
@@ -49,9 +89,19 @@ export async function askAgent(
     history: { role: 'user' | 'agent'; content: string }[],
     context: string,
     settings: AppSettings,
-    resumeSessionId?: string
+    resumeSessionId?: string,
+    onProgress?: (event: { type: 'context_requested', file?: string }) => void
 ): Promise<AgentServiceResponse> {
-    const systemInstruction = getAgentSystemInstruction(context, settings.language);
+    let projectSpecificContext = "";
+    if (settings.paths?.automationRoot) {
+        projectSpecificContext = await getProjectAgentContext(settings.paths.automationRoot);
+    }
+    
+    const combinedContext = projectSpecificContext 
+        ? `${context}\n\n${projectSpecificContext}` 
+        : context;
+
+    const systemInstruction = getAgentSystemInstruction(combinedContext, settings.language);
     const provider = settings.aiProvider;
 
     // For APIs that don't support native continuous sessions like the CLIs do,
@@ -67,67 +117,113 @@ export async function askAgent(
         }
     }
 
-    try {
+    const invokeProvider = async (promptToUse: string, sessionIdToUse?: string): Promise<{ result: AgentResponse, newSessionId?: string }> => {
         let result: any;
-        let newSessionId = resumeSessionId;
+        let newSessionId = sessionIdToUse;
 
         if (provider === 'antigravity-cli') {
             const response = await askAntigravityCli(
-                fullPrompt,
+                promptToUse,
                 settings.paths.automationRoot,
                 systemInstruction,
                 settings.antigravityApiKey,
                 {
                     jsonSchema: AGENT_JSON_SCHEMA,
-                    resumeSessionId
+                    resumeSessionId: sessionIdToUse
                 }
             );
             
             if (typeof response !== 'string' && response.structured_output) {
                 result = response.structured_output;
-                newSessionId = response.session_id || resumeSessionId;
+                newSessionId = response.session_id || sessionIdToUse;
             } else {
-                 result = typeof response === 'string' ? JSON.parse(response) : JSON.parse(response.result);
+                 const rawText = typeof response === 'string' ? response : response.result;
+                 result = safeParseJson(rawText);
             }
         } 
         else if (provider === 'claude-code') {
             const response = await askClaudeCode(
-                fullPrompt,
+                promptToUse,
                 settings.paths.automationRoot,
                 systemInstruction,
                 settings.claudeCodeToken,
                 {
                     jsonSchema: AGENT_JSON_SCHEMA,
-                    resumeSessionId,
+                    resumeSessionId: sessionIdToUse,
                     allowedTools: ['Read', 'View', 'Edit', 'Glob', 'Grep', 'LS', 'Bash'] // Allow Claude to fully assist with reading, writing, and executing
                 }
             );
 
             if (typeof response !== 'string' && response.structured_output) {
                 result = response.structured_output;
-                newSessionId = response.session_id || resumeSessionId;
+                newSessionId = response.session_id || sessionIdToUse;
             } else {
-                 result = typeof response === 'string' ? JSON.parse(response) : JSON.parse(response.result);
+                 const rawText = typeof response === 'string' ? response : response.result;
+                 result = safeParseJson(rawText);
             }
         }
         else if (provider === 'gemini') {
-             const raw = await askGemini(fullPrompt, settings.geminiApiKey || '', settings.geminiModel, systemInstruction);
+             const raw = await askGemini(promptToUse, settings.geminiApiKey || '', settings.geminiModel, systemInstruction);
              result = safeParseJson(raw);
         }
         else if (provider === 'claude') {
-             const raw = await askClaude(fullPrompt, settings.claudeApiKey || '', settings.claudeModel, systemInstruction);
+             const raw = await askClaude(promptToUse, settings.claudeApiKey || '', settings.claudeModel, systemInstruction);
              result = safeParseJson(raw);
         }
         else if (provider === 'openai') {
-             const raw = await askOpenAI(fullPrompt, settings.openaiApiKey || '', settings.openaiModel, systemInstruction);
+             const raw = await askOpenAI(promptToUse, settings.openaiApiKey || '', settings.openaiModel, systemInstruction);
              result = safeParseJson(raw);
         }
         else {
             throw new Error(`Unsupported provider: ${provider}`);
         }
+        
+        return { result: result as AgentResponse, newSessionId };
+    };
+
+    try {
+        let { result, newSessionId } = await invokeProvider(fullPrompt, resumeSessionId);
+
+        // RAG loop implementation for API providers
+        let loops = 0;
+        while (result.needs_context_files && Array.isArray(result.needs_context_files) && result.needs_context_files.length > 0 && loops < 3) {
+            loops++;
+            if (onProgress) {
+                onProgress({ type: 'context_requested', file: result.needs_context_files.join(', ') });
+            }
+
+            const { join } = await import('@tauri-apps/api/path');
+            const { invoke } = await import('@tauri-apps/api/core');
+            let extraFileContents = "";
+
+            for (const path of result.needs_context_files) {
+                try {
+                    const fullPath = await join(settings.paths.automationRoot || '', path);
+                    const content = await invoke<string>('fs_read_text_file', { path: fullPath });
+                    extraFileContents += `\n--- CONTENT OF ${path} ---\n${content}\n`;
+                } catch (e) {
+                    extraFileContents += `\n--- CONTENT OF ${path} ---\n(File could not be read: ${e})\n`;
+                }
+            }
+
+            const followUpPrompt = `Here are the contents of the files you requested:\n${extraFileContents}\nNow please provide your final answer to the user's original request.`;
+            
+            if (provider !== 'antigravity-cli' && provider !== 'claude-code') {
+                // Manually append the previous interaction to the prompt
+                fullPrompt += `\n\nAGENT: ${JSON.stringify(result)}\n\nUSER (SYSTEM): ${followUpPrompt}`;
+            } else {
+                fullPrompt = followUpPrompt;
+                resumeSessionId = newSessionId; 
+            }
+
+            // Re-invoke with the added context
+            const subsequentCall = await invokeProvider(fullPrompt, resumeSessionId);
+            result = subsequentCall.result;
+            newSessionId = subsequentCall.newSessionId;
+        }
 
         return {
-            response: result as AgentResponse,
+            response: result,
             sessionId: newSessionId
         };
     } catch (error) {

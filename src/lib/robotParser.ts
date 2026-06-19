@@ -101,7 +101,7 @@ export type LinearNode =
     | SuiteEndNode 
     | { type: 'test-start', name: string, id: string, doc?: string, originalLine?: string }
     | { type: 'test-end', name: string, status: 'PASS' | 'FAIL' | 'SKIP', id: string, doc?: string, ret?: string }
-    | { type: 'maestro-suite-start' | 'maestro-suite-end' | 'maestro-test-start' | 'maestro-test-end' | 'maven-suite-start' | 'maven-suite-end' | 'maven-test-start' | 'maven-test-end', name: string, id: string, status?: any, content?: any }
+    | { type: 'maestro-suite-start' | 'maestro-suite-end' | 'maestro-test-start' | 'maestro-test-end' | 'maven-suite-start' | 'maven-suite-end' | 'maven-test-start' | 'maven-test-end', name: string, id: string, status?: string, content?: string }
     | AiThoughtNode
     | AiActionNode
     | AdbExecutedNode;
@@ -172,7 +172,7 @@ const resolveScreenshot = async (src: string | undefined, outputXmlPath: string,
     }
 };
 
-const directScreenshotSrc = (obj: any): string | undefined => {
+const directScreenshotSrc = (obj: Record<string, any>): string | undefined => {
     const msgs = Array.isArray(obj.msg) ? obj.msg : (obj.msg ? [obj.msg] : []);
     for (const m of msgs) {
         const txt = typeof m === 'object' ? (m["#text"] || "") : String(m ?? "");
@@ -184,7 +184,7 @@ const directScreenshotSrc = (obj: any): string | undefined => {
     return undefined;
 };
 
-const deepScreenshotSrc = (obj: any): string | undefined => {
+const deepScreenshotSrc = (obj: Record<string, any>): string | undefined => {
     if (!obj || typeof obj !== 'object') return undefined;
 
     // 1. Direct check in this node's messages
@@ -220,12 +220,12 @@ const deepScreenshotSrc = (obj: any): string | undefined => {
     return undefined;
 };
 
-const parseArgs = (obj: any): string[] => {
+const parseArgs = (obj: Record<string, any>): string[] => {
     const args: string[] = [];
     
     // 1. Standard <arg> elements (used by Keywords and some FOR loops)
     const arr = Array.isArray(obj.arg) ? obj.arg : (obj.arg ? [obj.arg] : []);
-    const standardArgs = arr.map((a: any) => typeof a === 'object' ? (a["#text"] || "") : String(a ?? ""));
+    const standardArgs = arr.map((a: any) => typeof a === 'object' && a !== null ? (a["#text"] || "") : String(a ?? ""));
 
     // 2. IF / ELSE IF / WHILE condition attribute
     if (obj.condition) {
@@ -235,7 +235,7 @@ const parseArgs = (obj: any): string[] => {
     // 3. FOR loop and ITERation variables and values
     const vars = Array.isArray(obj.var) ? obj.var : (obj.var ? [obj.var] : []);
     const varDisplay = vars.map((v: any) => {
-        if (typeof v === 'object') {
+        if (typeof v === 'object' && v !== null) {
             const vName = v.name || v.key;
             const vText = v["#text"] !== undefined ? v["#text"] : (v.value !== undefined ? v.value : v.val);
             
@@ -250,7 +250,9 @@ const parseArgs = (obj: any): string[] => {
     
     const values = Array.isArray(obj.value) ? obj.value : (obj.value ? [obj.value] : []);
     const valueTexts = values.map((v: any) => {
-        if (typeof v === 'object') return v["#text"] !== undefined ? v["#text"] : (v.value || v.val || "");
+        if (typeof v === 'object' && v !== null) {
+            return v["#text"] !== undefined ? v["#text"] : (v.value || v.val || "");
+        }
         return String(v ?? "");
     });
 
@@ -292,10 +294,10 @@ const hashString = (input: string): string => {
     return Math.abs(hash).toString(36);
 };
 
-const parseMsgChildren = (obj: any): LogNode[] => {
+const parseMsgChildren = (obj: Record<string, any>): LogNode[] => {
     const msgs = Array.isArray(obj.msg) ? obj.msg : (obj.msg ? [obj.msg] : []);
     return msgs
-        .map((m: any) => typeof m === 'object' ? (m["#text"] || "") : String(m ?? ""))
+        .map((m: any) => typeof m === 'object' && m !== null ? (m["#text"] || "") : String(m ?? ""))
         .map((txt: string) => txt.replace(/<\?xml(?:[^>]*)?>\s*<hierarchy[\s\S]*?<\/hierarchy>/gi, '').trim())
         .filter((txt: string) => txt && !txt.includes("src="))
         .map((txt: string, index: number): LogNode => {
@@ -330,7 +332,7 @@ const parseMsgChildren = (obj: any): LogNode[] => {
 };
 
 export const mapXmlNode = async (
-    obj: any,
+    obj: Record<string, any>,
     outputXmlPath: string,
     _readImageBase64: (path: string) => Promise<string>,
     nodeType?: string,
@@ -399,7 +401,7 @@ export const mapXmlNode = async (
 
         const normalizedSuiteStatus: 'PASS' | 'FAIL' | 'SKIP' | 'RUNNING' | 'NOT_RUN' =
             statusStr === 'PASS' || statusStr === 'FAIL' || statusStr === 'SKIP' || statusStr === 'RUNNING' || statusStr === 'NOT_RUN' || statusStr === 'NOT RUN'
-                ? (statusStr === 'NOT RUN' ? 'NOT_RUN' : statusStr as any)
+                ? (statusStr === 'NOT RUN' ? 'NOT_RUN' : statusStr as 'PASS' | 'FAIL' | 'SKIP' | 'RUNNING')
                 : 'FAIL';
 
         return { 
@@ -445,7 +447,7 @@ export const mapXmlNode = async (
 
         const normalizedStatus: 'PASS' | 'FAIL' | 'SKIP' | 'RUNNING' | 'NOT_RUN' =
             statusStr === 'PASS' || statusStr === 'FAIL' || statusStr === 'SKIP' || statusStr === 'RUNNING' || statusStr === 'NOT RUN' || statusStr === 'NOT_RUN'
-                ? (statusStr === 'NOT RUN' ? 'NOT_RUN' : statusStr as any)
+                ? (statusStr === 'NOT RUN' ? 'NOT_RUN' : statusStr as 'PASS' | 'FAIL' | 'SKIP' | 'RUNNING')
                 : 'FAIL';
 
         const failures: Record<string, { message: string, screenshotPath?: string, name: string }> = {};

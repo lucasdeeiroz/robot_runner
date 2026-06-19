@@ -52,7 +52,7 @@ export const FlowNode = React.memo(({
             <div className="absolute inset-0 z-0 flex items-center justify-center bg-surface-variant/20 rounded-xl overflow-hidden">
                 {data.base64_preview ? (
                     <img
-                        src={`data:image/png;base64,${data.base64_preview}`}
+                        src={data.base64_preview.startsWith('data:') ? data.base64_preview : `data:image/png;base64,${data.base64_preview}`}
                         className="w-full h-full object-contain opacity-90 transition-opacity group-hover/card:opacity-100 placeholder:opacity-100"
                         alt={data.name}
                     />

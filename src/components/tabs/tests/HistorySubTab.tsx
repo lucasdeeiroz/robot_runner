@@ -125,16 +125,16 @@ export function HistorySubTab({ onNavigate }: HistorySubTabProps) {
             if (currentUser && activeProfileName) {
                 try {
                     const allGlobalLogs = await fetchGlobalHistory(currentUser.uid, activeProfileName);
-                    
+
                     // Filter global logs by active framework (allowing legacy logs where framework is null/missing)
                     const globalLogs = allGlobalLogs.filter(log => !log.framework || log.framework === currentFramework);
-                    
+
                     // 3. Merge & Deduplicate
                     // Rule 1: Use run_id for absolute matching if available.
                     // Rule 2: Fallback to name+timestamp for older/missing records.
                     const merged = [...filteredLocalLogs];
                     const matchedLocalIndices = new Set<number>();
-                    
+
                     // Helper to normalize IDs for comparison (strips 'run_' prefix if present)
                     const normalizeId = (id?: string | null) => id?.replace(/^run_/, '') || '';
 
@@ -144,7 +144,7 @@ export function HistorySubTab({ onNavigate }: HistorySubTabProps) {
 
                         // Find the best local match that hasn't been used yet
                         let matchedIdx = -1;
-                        
+
                         // Pass 1: Try absolute run_id match
                         matchedIdx = filteredLocalLogs.findIndex((lLog, idx) => {
                             if (matchedLocalIndices.has(idx)) return false;
@@ -156,7 +156,7 @@ export function HistorySubTab({ onNavigate }: HistorySubTabProps) {
                         if (matchedIdx === -1) {
                             matchedIdx = filteredLocalLogs.findIndex((lLog, idx) => {
                                 if (matchedLocalIndices.has(idx)) return false;
-                                
+
                                 const timeDiff = Math.abs(new Date(lLog.timestamp).getTime() - new Date(gLog.timestamp).getTime());
                                 const cleanLName = decodeHtml(lLog.suite_name).toLowerCase();
                                 const cleanGName = decodeHtml(gLog.suite_name).toLowerCase();
@@ -395,7 +395,8 @@ export function HistorySubTab({ onNavigate }: HistorySubTabProps) {
                             variant="ghost"
                             size="sm"
                             className="p-1.5 text-on-surface-variant/80 hover:bg-surface-variant/30 rounded-2xl transition-colors h-auto"
-                            title={t('tests_page.actions.refresh')}
+                            data-tooltip={t('tests_page.actions.refresh')}
+                            data-position="left"
                         >
                             {loadingHistory ? <ExpressiveLoading size="xsm" variant="circular" /> : <RefreshCw size={16} />}
                         </Button>
@@ -496,18 +497,18 @@ export function HistorySubTab({ onNavigate }: HistorySubTabProps) {
 
                     {showCharts && (
                         <div className="flex items-center bg-surface/50 border border-outline-variant/30 rounded-lg p-1">
-                            <button
+                            <Button
                                 onClick={() => setCountMethod('suites')}
-                                className={clsx("px-3 py-1.5 text-xs font-medium rounded-md transition-colors", countMethod === 'suites' ? "bg-primary/20 text-primary" : "text-on-surface-variant hover:bg-on-surface/5")}
+                                className={clsx("m-0 p-0 px-3 text-xs font-medium rounded-md transition-colors", countMethod === 'suites' ? "bg-primary/20 text-primary" : "bg-transparent shadow-none text-on-surface-variant hover:bg-on-surface/5")}
                             >
                                 {t('tests_page.charts.count_by_suites')}
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                                 onClick={() => setCountMethod('tests')}
-                                className={clsx("px-3 py-1.5 text-xs font-medium rounded-md transition-colors", countMethod === 'tests' ? "bg-primary/20 text-primary" : "text-on-surface-variant hover:bg-on-surface/5")}
+                                className={clsx("m-0 p-0 px-3 text-xs font-medium rounded-md transition-colors", countMethod === 'tests' ? "bg-primary/20 text-primary" : "bg-transparent shadow-none text-on-surface-variant hover:bg-on-surface/5")}
                             >
                                 {t('tests_page.charts.count_by_tests')}
-                            </button>
+                            </Button>
                         </div>
                     )}
                 </div>
@@ -606,8 +607,8 @@ export function HistorySubTab({ onNavigate }: HistorySubTabProps) {
 
                             return (
                                 <div
-                                    key={item.type === 'header' 
-                                        ? `header-${item.groupName}` 
+                                    key={item.type === 'header'
+                                        ? `header-${item.groupName}`
                                         : `${(item as any).run_id || (item as any).id || (item as any).path || virtualRow.index}`
                                     }
                                     data-index={virtualRow.index}

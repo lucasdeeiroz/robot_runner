@@ -8,7 +8,21 @@ use std::os::windows::process::CommandExt;
 pub fn get_adb_program(app: &AppHandle) -> String {
     let state = app.state::<AdbState>();
     let custom_path = state.custom_path.lock().unwrap();
-    custom_path.clone().unwrap_or_else(|| "adb".to_string())
+    if let Some(path) = &*custom_path {
+        let path_path = std::path::Path::new(path);
+        if path_path.is_dir() {
+            #[cfg(target_os = "windows")]
+            {
+                return path_path.join("adb.exe").to_string_lossy().to_string();
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                return path_path.join("adb").to_string_lossy().to_string();
+            }
+        }
+        return path.clone();
+    }
+    "adb".to_string()
 }
 
 /// Creates a new synchronous std::process::Command with suppression of console windows on Windows.

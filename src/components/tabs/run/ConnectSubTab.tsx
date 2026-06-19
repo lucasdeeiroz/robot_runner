@@ -312,7 +312,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                     <div>
                         <div className="flex justify-between items-center mb-1">
                             <label className="block text-xs font-medium text-on-surface-variant/80 ml-1">{t('connect.labels.ip')}</label>
-                            <button
+                            <Button
                                 onClick={() => {
                                     navigator.clipboard.readText().then(text => {
                                         // Try to parse host:port or tcp://host:port
@@ -327,11 +327,13 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                                         }
                                     }).catch(() => setStatusMsg({ text: t('connect.status.clipboard_error'), type: 'error' }));
                                 }}
-                                className="text-[10px] text-primary dark:text-primary/80 hover:underline cursor-pointer"
-                                title="Paste host:port or ngrok url"
+                                variant="link"
+                                className="text-[10px]"
+                                title={t('connect.actions.paste_tooltip', "Paste host:port or ngrok url")}
+                                tooltipPosition="top"
                             >
                                 {t('connect.actions.paste_url') || "Paste URL"}
-                            </button>
+                            </Button>
                         </div>
                         <Input
                             placeholder="0.tcp.ngrok.io"
@@ -344,14 +346,16 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                         <div className="flex justify-between items-center mb-1">
                             <label className="block text-xs font-medium text-on-surface-variant/80 ml-1">{t('connect.labels.port')}</label>
                             {selectedDevice && (
-                                <button
+                                <Button
                                     onClick={handleEnableTcpIp}
-                                    className="text-[10px] text-primary dark:text-primary/80 hover:underline cursor-pointer"
+                                    variant="link"
+                                    className="text-[10px]"
                                     disabled={loading}
                                     title={t('connect.actions.enable_tcpip_tooltip', "Run 'adb tcpip 5555'")}
+                                    tooltipPosition="top"
                                 >
                                     {t('connect.actions.enable_tcpip', "Enable 5555")}
-                                </button>
+                                </Button>
                             )}
                         </div>
                         <Input
@@ -362,7 +366,13 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                         />
                     </div>
                     <div>
-                        <label className="block text-xs font-medium text-on-surface-variant/80 mb-1 ml-1">{t('connect.labels.code')}</label>
+                        <div className="flex justify-between items-center mb-1">
+                            <label className="block text-xs font-medium text-on-surface-variant/80 mb-1 ml-1">{t('connect.labels.code')}</label>
+                            <Button
+                                className="p-0 m-0 bg-transparent hover:bg-transparent shadow-none rounded-none"
+                            >
+                            </Button>
+                        </div>
                         <Input
                             placeholder="123456"
                             value={code}
@@ -453,9 +463,9 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                                     <span className="font-mono text-sm text-on-surface/80">••••••••</span>
                                 </div>
                             </div>
-                            <button className="w-full py-2 bg-purple-600 text-on-primary rounded-2xl font-medium flex items-center justify-center gap-2">
-                                <Link size={18} /> {t('connect.actions.start_tunnel')}
-                            </button>
+                            <Button className="w-full py-2 bg-purple-600 hover:bg-purple-500 text-on-primary rounded-2xl justify-center" leftIcon={<Link size={18} />}>
+                                {t('connect.actions.start_tunnel')}
+                            </Button>
                         </div>
                     ) : (
                         !ngrokUrl && !ngrokLoading ? (
@@ -500,7 +510,8 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                                                     size="sm"
                                                     onClick={() => { navigator.clipboard.writeText(ngrokUrl); setNgrokStatusMsg({ text: t('connect.actions.copy'), type: 'success' }); }}
                                                     className="p-1 h-auto text-on-surface/80 hover:text-on-surface-variant/80"
-                                                    title="Copy URL"
+                                                    data-tooltip={t('connect.actions.copy_tooltip', "Copy URL")}
+                                                    data-position="left"
                                                 >
                                                     <Copy size={16} />
                                                 </Button>

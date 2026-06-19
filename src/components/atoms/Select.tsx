@@ -1,6 +1,7 @@
 import React, { SelectHTMLAttributes, forwardRef, useState, useRef, useEffect } from 'react';
 import { twMerge } from 'tailwind-merge';
 import { ChevronDown, Check } from 'lucide-react';
+import { Button } from "@/components/atoms/Button";
 
 export interface SelectOption {
     label: string;
@@ -13,6 +14,7 @@ export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
     error?: string;
     containerClassName?: string;
     leftIcon?: React.ReactNode;
+    dropdownPosition?: 'top' | 'bottom';
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(({
@@ -23,6 +25,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(({
     id,
     containerClassName,
     leftIcon,
+    dropdownPosition = 'bottom',
     value,
     onChange,
     disabled,
@@ -59,7 +62,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(({
 
     const handleSelect = (optionValue: string | number) => {
         if (disabled) return;
-        
+
         if (selectRef.current) {
             selectRef.current.value = String(optionValue);
             // Dispatch a real change event to trigger React onChange
@@ -81,12 +84,12 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(({
                 </label>
             )}
             <div className="relative group">
-                <button
+                <Button
                     type="button"
                     disabled={disabled}
                     onClick={() => setIsOpen(!isOpen)}
                     className={twMerge(
-                        "w-full text-left appearance-none rounded-2xl border border-outline-variant/20 bg-surface-variant/10 hover:bg-surface-variant/20 dark:bg-surface/10 dark:hover:bg-surface/20 px-4 py-2.5 pr-10 text-sm font-medium text-on-surface/90",
+                        "justify-start w-full text-left appearance-none rounded-2xl border border-outline-variant/20 bg-surface-variant/10 hover:bg-surface-variant/20 dark:bg-surface/10 dark:hover:bg-surface/20 px-4 py-2.5 pr-10 text-sm font-medium text-on-surface/90",
                         "focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary",
                         "disabled:cursor-not-allowed disabled:opacity-50",
                         "transition-all duration-300 ease-in-out cursor-pointer flex items-center gap-2",
@@ -102,7 +105,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(({
                         </div>
                     )}
                     <span className="truncate">{selectedOption?.label || ""}</span>
-                </button>
+                </Button>
                 <div className={twMerge(
                     "pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/80 transition-transform duration-300",
                     isOpen && "rotate-180"
@@ -131,24 +134,28 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(({
 
                 {/* Modern Custom Dropdown List with glassmorphic backdrop and soft animations */}
                 {isOpen && (
-                    <div className="absolute left-0 mt-2 min-w-full w-max max-w-xs md:max-w-md max-h-60 overflow-y-auto rounded-2xl border border-outline-variant/20 bg-surface/90 dark:bg-surface/95 backdrop-blur-xl shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-200 origin-top scrollbar-thin scrollbar-thumb-outline-variant/30">
+                    <div className={twMerge(
+                        "absolute left-0 min-w-full w-max max-w-xs md:max-w-md max-h-60 overflow-y-auto rounded-2xl border border-outline-variant/20 bg-surface/90 dark:bg-surface/95 backdrop-blur-xl shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-200 scrollbar-thin scrollbar-thumb-outline-variant/30",
+                        dropdownPosition === 'top' ? "bottom-full mb-2 origin-bottom" : "top-full mt-2 origin-top"
+                    )}>
                         {options.map((option) => {
                             const isSelected = String(option.value) === String(currentValue);
                             return (
-                                <button
+                                <Button
+                                    variant="unstyled"
                                     key={option.value}
                                     type="button"
                                     onClick={() => handleSelect(option.value)}
                                     className={twMerge(
                                         "w-full text-left px-3.5 py-2.5 text-sm rounded-xl transition-all duration-200 flex items-center justify-between",
-                                        isSelected 
-                                            ? "bg-primary/10 text-primary font-semibold" 
+                                        isSelected
+                                            ? "bg-primary/10 text-primary font-semibold"
                                             : "text-on-surface/80 hover:bg-surface-variant/40 hover:text-on-surface"
                                     )}
                                 >
                                     <span className="truncate">{option.label}</span>
                                     {isSelected && <Check size={14} className="text-primary shrink-0 ml-2" />}
-                                </button>
+                                </Button>
                             );
                         })}
                     </div>

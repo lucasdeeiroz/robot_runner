@@ -1,6 +1,16 @@
 import { useSettings } from "@/lib/settings";
-import { Moon, Sun, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2, Settings as SettingsIcon, Sparkles, FileJson, RefreshCcw } from "lucide-react";
+import { Moon, Sun, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2, Settings as SettingsIcon, Sparkles, FileJson, RefreshCcw, GitBranch, Link2, Briefcase, ChevronDown } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+
+const Slack = ({ size = 18 }: { size?: number }) => (
+    <svg viewBox="0 0 24 24" width={size} height={size} stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
+        <rect width="8" height="8" x="3" y="3" rx="2" />
+        <path d="M12 3v18" />
+        <path d="M3 12h18" />
+        <rect width="8" height="8" x="13" y="13" rx="2" />
+    </svg>
+);
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useTestSessions } from "@/lib/testSessionStore";
@@ -18,18 +28,22 @@ import { getAvailableModels as getOpenAIModels } from "@/lib/dashboard/openai";
 import { migrateScreenMaps } from "@/lib/dashboard/mapperPersistence";
 import { Modal } from "@/components/organisms/Modal";
 import { ConfirmationModal } from "@/components/organisms/ConfirmationModal";
+import { testJiraConnection } from "@/lib/integrations/jira";
+import { testAzureConnection } from "@/lib/integrations/azureDevOps";
+import { testTestLinkConnection } from "@/lib/integrations/testLink";
 
 // Atoms
 import { Button } from "@/components/atoms/Button";
 import { Input } from "@/components/atoms/Input";
 import { Section } from "@/components/organisms/Section";
 import { PageHeader } from "@/components/organisms/PageHeader";
+import { Switch } from "@/components/atoms/Switch";
 
 // New Components
 import { Select } from "@/components/atoms/Select";
 import { SplitButton } from "@/components/molecules/SplitButton";
 import { PathInput } from "@/components/molecules/PathInput";
-import { TagInput } from "@/components/molecules/TagInput";
+import { TagInput } from "@/components/atoms/TagInput";
 import { SegmentedControl } from "@/components/molecules/SegmentedControl";
 import { InfoCard } from "@/components/molecules/InfoCard";
 import { LogoInput } from "@/components/molecules/LogoInput";
@@ -57,6 +71,23 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
     const [isMigrating, setIsMigrating] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
 
+    // Integrations Modal state
+    const [showIntegrationsModal, setShowIntegrationsModal] = useState(false);
+    const [expandedIntegrations, setExpandedIntegrations] = useState<Record<string, boolean>>({
+        jira: false,
+        azure: false,
+        testlink: false,
+        git: false,
+        webhooks: false,
+    });
+
+    const toggleIntegrationExpanded = (key: string) => {
+        setExpandedIntegrations(prev => ({
+            ...prev,
+            [key]: !prev[key]
+        }));
+    };
+
     // Responsive State
     const containerRef = useRef<HTMLDivElement>(null);
     const [isNarrow, setIsNarrow] = useState(false);
@@ -78,6 +109,66 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
     const { isFeatureEnabled } = useRemoteConfig();
     const isCypressEnabled = isFeatureEnabled('is_cypress_enabled');
     const isSeleniumEnabled = isFeatureEnabled('is_selenium_enabled');
+
+    // Integrations Connection Testing
+    const [testingJira, setTestingJira] = useState(false);
+    const [testingAzure, setTestingAzure] = useState(false);
+    const [testingTestLink, setTestingTestLink] = useState(false);
+
+    // Custom Color State
+    const [showCustomColorModal, setShowCustomColorModal] = useState(false);
+    const [customColorHex, setCustomColorHex] = useState('#ffffff');
+
+    const handleTestJira = async () => {
+        if (!settings.jira) return;
+        setTestingJira(true);
+        try {
+            const success = await testJiraConnection(settings.jira);
+            if (success) {
+                feedback.toast.success(t('settings.integrations.jira.connection_success'));
+            } else {
+                feedback.toast.error(t('settings.integrations.jira.connection_failed'));
+            }
+        } catch (e: any) {
+            feedback.toast.error(t('common.error_occurred') + ': ' + e.message);
+        } finally {
+            setTestingJira(false);
+        }
+    };
+
+    const handleTestAzure = async () => {
+        if (!settings.azureDevOps) return;
+        setTestingAzure(true);
+        try {
+            const success = await testAzureConnection(settings.azureDevOps);
+            if (success) {
+                feedback.toast.success(t('settings.integrations.azure.connection_success'));
+            } else {
+                feedback.toast.error(t('settings.integrations.azure.connection_failed'));
+            }
+        } catch (e: any) {
+            feedback.toast.error(t('common.error_occurred') + ': ' + e.message);
+        } finally {
+            setTestingAzure(false);
+        }
+    };
+
+    const handleTestTestLink = async () => {
+        if (!settings.testLink) return;
+        setTestingTestLink(true);
+        try {
+            const success = await testTestLinkConnection(settings.testLink);
+            if (success) {
+                feedback.toast.success(t('settings.integrations.testlink.connection_success'));
+            } else {
+                feedback.toast.error(t('settings.integrations.testlink.connection_failed'));
+            }
+        } catch (e: any) {
+            feedback.toast.error(t('common.error_occurred') + ': ' + e.message);
+        } finally {
+            setTestingTestLink(false);
+        }
+    };
 
 
     const handleRestartADB = async () => {
@@ -119,6 +210,27 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
             } else if (provider === 'openai') {
                 models = await getOpenAIModels(apiKey);
             }
+
+            const { modelsByProvider } = await import('@/lib/dashboard/aiFallback');
+            const priorities = modelsByProvider[provider] || [];
+
+            models.sort((a, b) => {
+                let indexA = -1;
+                let indexB = -1;
+                if (provider === 'gemini' || provider === 'openai') {
+                    indexA = priorities.findIndex(p => a === p || a.endsWith(p));
+                    indexB = priorities.findIndex(p => b === p || b.endsWith(p));
+                } else {
+                    indexA = priorities.findIndex(p => a === p || a.startsWith(p));
+                    indexB = priorities.findIndex(p => b === p || b.startsWith(p));
+                }
+
+                if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+                if (indexA !== -1) return -1;
+                if (indexB !== -1) return 1;
+                return a.localeCompare(b);
+            });
+
             setAvailableModels(models);
         } catch (e: any) {
             setModelFetchError(e.message || "Failed to fetch models");
@@ -371,6 +483,529 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                 description={t('settings.profiles.confirm_delete')}
                 confirmText={t('common.delete')}
             />
+
+            {/* Third-Party Integrations Modal */}
+            <Modal
+                isOpen={showIntegrationsModal}
+                onClose={() => setShowIntegrationsModal(false)}
+                title={t('settings.integrations.title')}
+                className="max-w-2xl"
+            >
+                <div className="space-y-4">
+                    {/* Jira */}
+                    {isFeatureEnabled('is_integration_jira_enabled') && (
+                        <div className="border border-outline-variant/30 rounded-2xl bg-surface/30 overflow-hidden">
+                            <div
+                                className="flex items-center justify-between p-4 cursor-pointer hover:bg-surface-variant/10 transition-colors select-none"
+                                onClick={() => toggleIntegrationExpanded('jira')}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                                        <Briefcase size={18} />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-semibold text-on-surface">{t('settings.integrations.jira.title')}</h3>
+                                        <span className="text-xs text-on-surface-variant/80">
+                                            {settings.jira?.enabled ? t('settings.integrations.enabled') : t('settings.integrations.disabled')}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                                    <Switch
+                                        checked={settings.jira?.enabled || false}
+                                        onCheckedChange={(checked) => updateSetting('jira', {
+                                            host: settings.jira?.host || '',
+                                            email: settings.jira?.email || '',
+                                            apiToken: settings.jira?.apiToken || '',
+                                            projectKey: settings.jira?.projectKey || '',
+                                            enabled: checked
+                                        })}
+                                    />
+                                    <Button
+                                        type="button"
+                                        onClick={() => toggleIntegrationExpanded('jira')}
+                                        className={clsx(
+                                            "p-1.5 text-on-surface-variant/80 hover:text-on-surface bg-transparent shadow-none hover:bg-surface-variant/30 rounded-2xl transition-all duration-200",
+                                            expandedIntegrations.jira && "transform rotate-180"
+                                        )}
+                                    >
+                                        <ChevronDown size={20} />
+                                    </Button>
+                                </div>
+                            </div>
+                            <AnimatePresence initial={false}>
+                                {expandedIntegrations.jira && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: "auto", opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        transition={{ duration: 0.2 }}
+                                        className="overflow-hidden"
+                                    >
+                                        <div className="p-4 pt-0 border-t border-outline-variant/10 space-y-3">
+                                            <div className="h-2" />
+                                            <Input
+                                                label={t('settings.integrations.jira.host')}
+                                                type="text"
+                                                value={settings.jira?.host || ''}
+                                                onChange={(e) => updateSetting('jira', {
+                                                    host: e.target.value,
+                                                    email: settings.jira?.email || '',
+                                                    apiToken: settings.jira?.apiToken || '',
+                                                    projectKey: settings.jira?.projectKey || '',
+                                                    enabled: settings.jira?.enabled || false
+                                                })}
+                                                placeholder="e.g. your-company.atlassian.net"
+                                            />
+                                            <Input
+                                                label={t('settings.integrations.jira.email')}
+                                                type="email"
+                                                value={settings.jira?.email || ''}
+                                                onChange={(e) => updateSetting('jira', {
+                                                    host: settings.jira?.host || '',
+                                                    email: e.target.value,
+                                                    apiToken: settings.jira?.apiToken || '',
+                                                    projectKey: settings.jira?.projectKey || '',
+                                                    enabled: settings.jira?.enabled || false
+                                                })}
+                                                placeholder="e.g. name@company.com"
+                                            />
+                                            <Input
+                                                label={t('settings.integrations.jira.token')}
+                                                type="password"
+                                                value={settings.jira?.apiToken || ''}
+                                                onChange={(e) => updateSetting('jira', {
+                                                    host: settings.jira?.host || '',
+                                                    email: settings.jira?.email || '',
+                                                    apiToken: e.target.value,
+                                                    projectKey: settings.jira?.projectKey || '',
+                                                    enabled: settings.jira?.enabled || false
+                                                })}
+                                                placeholder="Atlassian API Token"
+                                            />
+                                            <Input
+                                                label={t('settings.integrations.jira.project')}
+                                                type="text"
+                                                value={settings.jira?.projectKey || ''}
+                                                onChange={(e) => updateSetting('jira', {
+                                                    host: settings.jira?.host || '',
+                                                    email: settings.jira?.email || '',
+                                                    apiToken: settings.jira?.apiToken || '',
+                                                    projectKey: e.target.value,
+                                                    enabled: settings.jira?.enabled || false
+                                                })}
+                                                placeholder="e.g. PROJ"
+                                            />
+                                            <div className="flex justify-end pt-2">
+                                                <Button
+                                                    onClick={handleTestJira}
+                                                    disabled={testingJira || !settings.jira?.host || !settings.jira?.email || !settings.jira?.apiToken || !settings.jira?.projectKey}
+                                                    variant="secondary"
+                                                    size="sm"
+                                                >
+                                                    {testingJira ? t('settings.integrations.testing') : t('settings.integrations.test_connection')}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    )}
+
+                    {/* Azure DevOps */}
+                    {isFeatureEnabled('is_integration_azure_enabled') && (
+                        <div className="border border-outline-variant/30 rounded-2xl bg-surface/30 overflow-hidden">
+                            <div
+                                className="flex items-center justify-between p-4 cursor-pointer hover:bg-surface-variant/10 transition-colors select-none"
+                                onClick={() => toggleIntegrationExpanded('azure')}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                                        <Briefcase size={18} />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-semibold text-on-surface">{t('settings.integrations.azure.title')}</h3>
+                                        <span className="text-xs text-on-surface-variant/80">
+                                            {settings.azureDevOps?.enabled ? t('settings.integrations.enabled') : t('settings.integrations.disabled')}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                                    <Switch
+                                        checked={settings.azureDevOps?.enabled || false}
+                                        onCheckedChange={(checked) => updateSetting('azureDevOps', {
+                                            org: settings.azureDevOps?.org || '',
+                                            project: settings.azureDevOps?.project || '',
+                                            pat: settings.azureDevOps?.pat || '',
+                                            enabled: checked
+                                        })}
+                                    />
+                                    <Button
+                                        type="button"
+                                        onClick={() => toggleIntegrationExpanded('azure')}
+                                        className={clsx(
+                                            "p-1.5 text-on-surface-variant/80 hover:text-on-surface bg-transparent shadow-none hover:bg-surface-variant/30 rounded-2xl transition-all duration-200",
+                                            expandedIntegrations.azure && "transform rotate-180"
+                                        )}
+                                    >
+                                        <ChevronDown size={20} />
+                                    </Button>
+                                </div>
+                            </div>
+                            <AnimatePresence initial={false}>
+                                {expandedIntegrations.azure && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: "auto", opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        transition={{ duration: 0.2 }}
+                                        className="overflow-hidden"
+                                    >
+                                        <div className="p-4 pt-0 border-t border-outline-variant/10 space-y-3">
+                                            <div className="h-2" />
+                                            <Input
+                                                label={t('settings.integrations.azure.org')}
+                                                type="text"
+                                                value={settings.azureDevOps?.org || ''}
+                                                onChange={(e) => updateSetting('azureDevOps', {
+                                                    org: e.target.value,
+                                                    project: settings.azureDevOps?.project || '',
+                                                    pat: settings.azureDevOps?.pat || '',
+                                                    enabled: settings.azureDevOps?.enabled || false
+                                                })}
+                                                placeholder="Organization Name"
+                                            />
+                                            <Input
+                                                label={t('settings.integrations.azure.project')}
+                                                type="text"
+                                                value={settings.azureDevOps?.project || ''}
+                                                onChange={(e) => updateSetting('azureDevOps', {
+                                                    org: settings.azureDevOps?.org || '',
+                                                    project: e.target.value,
+                                                    pat: settings.azureDevOps?.pat || '',
+                                                    enabled: settings.azureDevOps?.enabled || false
+                                                })}
+                                                placeholder="Project Name"
+                                            />
+                                            <Input
+                                                label={t('settings.integrations.azure.pat')}
+                                                type="password"
+                                                value={settings.azureDevOps?.pat || ''}
+                                                onChange={(e) => updateSetting('azureDevOps', {
+                                                    org: settings.azureDevOps?.org || '',
+                                                    project: settings.azureDevOps?.project || '',
+                                                    pat: e.target.value,
+                                                    enabled: settings.azureDevOps?.enabled || false
+                                                })}
+                                                placeholder="Personal Access Token"
+                                            />
+                                            <div className="flex justify-end pt-2">
+                                                <Button
+                                                    onClick={handleTestAzure}
+                                                    disabled={testingAzure || !settings.azureDevOps?.org || !settings.azureDevOps?.project || !settings.azureDevOps?.pat}
+                                                    variant="secondary"
+                                                    size="sm"
+                                                >
+                                                    {testingAzure ? t('settings.integrations.testing') : t('settings.integrations.test_connection')}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    )}
+
+                    {/* TestLink */}
+                    {isFeatureEnabled('is_integration_testlink_enabled') && (
+                        <div className="border border-outline-variant/30 rounded-2xl bg-surface/30 overflow-hidden">
+                            <div
+                                className="flex items-center justify-between p-4 cursor-pointer hover:bg-surface-variant/10 transition-colors select-none"
+                                onClick={() => toggleIntegrationExpanded('testlink')}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                                        <Server size={18} />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-semibold text-on-surface">{t('settings.integrations.testlink.title')}</h3>
+                                        <span className="text-xs text-on-surface-variant/80">
+                                            {settings.testLink?.enabled ? t('settings.integrations.enabled') : t('settings.integrations.disabled')}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                                    <Switch
+                                        checked={settings.testLink?.enabled || false}
+                                        onCheckedChange={(checked) => updateSetting('testLink', {
+                                            url: settings.testLink?.url || '',
+                                            devKey: settings.testLink?.devKey || '',
+                                            projectId: settings.testLink?.projectId || '',
+                                            enabled: checked
+                                        })}
+                                    />
+                                    <Button
+                                        type="button"
+                                        onClick={() => toggleIntegrationExpanded('testlink')}
+                                        className={clsx(
+                                            "p-1.5 text-on-surface-variant/80 hover:text-on-surface bg-transparent shadow-none hover:bg-surface-variant/30 rounded-2xl transition-all duration-200",
+                                            expandedIntegrations.testlink && "transform rotate-180"
+                                        )}
+                                    >
+                                        <ChevronDown size={20} />
+                                    </Button>
+                                </div>
+                            </div>
+                            <AnimatePresence initial={false}>
+                                {expandedIntegrations.testlink && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: "auto", opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        transition={{ duration: 0.2 }}
+                                        className="overflow-hidden"
+                                    >
+                                        <div className="p-4 pt-0 border-t border-outline-variant/10 space-y-3">
+                                            <div className="h-2" />
+                                            <Input
+                                                label={t('settings.integrations.testlink.url')}
+                                                type="text"
+                                                value={settings.testLink?.url || ''}
+                                                onChange={(e) => updateSetting('testLink', {
+                                                    url: e.target.value,
+                                                    devKey: settings.testLink?.devKey || '',
+                                                    projectId: settings.testLink?.projectId || '',
+                                                    enabled: settings.testLink?.enabled || false
+                                                })}
+                                                placeholder="e.g. http://localhost/testlink/lib/api/xmlrpc/v1/xmlrpc.php"
+                                            />
+                                            <Input
+                                                label={t('settings.integrations.testlink.devkey')}
+                                                type="password"
+                                                value={settings.testLink?.devKey || ''}
+                                                onChange={(e) => updateSetting('testLink', {
+                                                    url: settings.testLink?.url || '',
+                                                    devKey: e.target.value,
+                                                    projectId: settings.testLink?.projectId || '',
+                                                    enabled: settings.testLink?.enabled || false
+                                                })}
+                                                placeholder="Developer Key"
+                                            />
+                                            <Input
+                                                label={t('settings.integrations.testlink.projectid')}
+                                                type="text"
+                                                value={settings.testLink?.projectId || ''}
+                                                onChange={(e) => updateSetting('testLink', {
+                                                    url: settings.testLink?.url || '',
+                                                    devKey: settings.testLink?.devKey || '',
+                                                    projectId: e.target.value,
+                                                    enabled: settings.testLink?.enabled || false
+                                                })}
+                                                placeholder="Numerical Project ID"
+                                            />
+                                            <div className="flex justify-end pt-2">
+                                                <Button
+                                                    onClick={handleTestTestLink}
+                                                    disabled={testingTestLink || !settings.testLink?.url || !settings.testLink?.devKey || !settings.testLink?.projectId}
+                                                    variant="secondary"
+                                                    size="sm"
+                                                >
+                                                    {testingTestLink ? t('settings.integrations.testing') : t('settings.integrations.test_connection')}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    )}
+
+                    {/* Git */}
+                    {isFeatureEnabled('is_integration_git_enabled') && (
+                        <div className="border border-outline-variant/30 rounded-2xl bg-surface/30 overflow-hidden">
+                            <div
+                                className="flex items-center justify-between p-4 cursor-pointer hover:bg-surface-variant/10 transition-colors select-none"
+                                onClick={() => toggleIntegrationExpanded('git')}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                                        <GitBranch size={18} />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-semibold text-on-surface">{t('settings.integrations.git.title')}</h3>
+                                        <span className="text-xs text-on-surface-variant/80">
+                                            {settings.git?.enabled ? t('settings.integrations.enabled') : t('settings.integrations.disabled')}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                                    <Switch
+                                        checked={settings.git?.enabled || false}
+                                        onCheckedChange={(checked) => updateSetting('git', {
+                                            enabled: checked,
+                                            showBadges: settings.git?.showBadges || false
+                                        })}
+                                    />
+                                    <Button
+                                        type="button"
+                                        onClick={() => toggleIntegrationExpanded('git')}
+                                        className={clsx(
+                                            "p-1.5 text-on-surface-variant/80 hover:text-on-surface bg-transparent shadow-none hover:bg-surface-variant/30 rounded-2xl transition-all duration-200",
+                                            expandedIntegrations.git && "transform rotate-180"
+                                        )}
+                                    >
+                                        <ChevronDown size={20} />
+                                    </Button>
+                                </div>
+                            </div>
+                            <AnimatePresence initial={false}>
+                                {expandedIntegrations.git && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: "auto", opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        transition={{ duration: 0.2 }}
+                                        className="overflow-hidden"
+                                    >
+                                        <div className="p-4 pt-0 border-t border-outline-variant/10 space-y-3">
+                                            <div className="h-2" />
+                                            <div className="flex items-center justify-between py-1">
+                                                <span className="text-xs font-semibold text-on-surface-variant/80 select-none">
+                                                    {t('settings.integrations.git.badges')}
+                                                </span>
+                                                <Switch
+                                                    checked={settings.git?.showBadges || false}
+                                                    onCheckedChange={(checked) => updateSetting('git', {
+                                                        enabled: settings.git?.enabled || false,
+                                                        showBadges: checked
+                                                    })}
+                                                />
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    )}
+
+                    {/* Webhooks */}
+                    {isFeatureEnabled('is_integration_webhooks_enabled') && (
+                        <div className="border border-outline-variant/30 rounded-2xl bg-surface/30 overflow-hidden">
+                            <div
+                                className="flex items-center justify-between p-4 cursor-pointer hover:bg-surface-variant/10 transition-colors select-none"
+                                onClick={() => toggleIntegrationExpanded('webhooks')}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                                        <Slack size={18} />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-semibold text-on-surface">{t('settings.integrations.webhooks.title')}</h3>
+                                        <span className="text-xs text-on-surface-variant/80">
+                                            {(settings.webhooks?.notifyOnPass || settings.webhooks?.notifyOnFail) ? t('settings.integrations.enabled') : t('settings.integrations.disabled')}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                                    <Switch
+                                        checked={settings.webhooks?.notifyOnPass || settings.webhooks?.notifyOnFail || false}
+                                        onCheckedChange={(checked) => {
+                                            updateSetting('webhooks', {
+                                                slackUrl: settings.webhooks?.slackUrl || '',
+                                                teamsUrl: settings.webhooks?.teamsUrl || '',
+                                                notifyOnPass: checked,
+                                                notifyOnFail: checked
+                                            });
+                                        }}
+                                    />
+                                    <Button
+                                        type="button"
+                                        onClick={() => toggleIntegrationExpanded('webhooks')}
+                                        className={clsx(
+                                            "p-1.5 text-on-surface-variant/80 hover:text-on-surface bg-transparent shadow-none hover:bg-surface-variant/30 rounded-2xl transition-all duration-200",
+                                            expandedIntegrations.webhooks && "transform rotate-180"
+                                        )}
+                                    >
+                                        <ChevronDown size={20} />
+                                    </Button>
+                                </div>
+                            </div>
+                            <AnimatePresence initial={false}>
+                                {expandedIntegrations.webhooks && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: "auto", opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        transition={{ duration: 0.2 }}
+                                        className="overflow-hidden"
+                                    >
+                                        <div className="p-4 pt-0 border-t border-outline-variant/10 space-y-3">
+                                            <div className="h-2" />
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <Input
+                                                    label={t('settings.integrations.webhooks.slack_url')}
+                                                    type="text"
+                                                    value={settings.webhooks?.slackUrl || ''}
+                                                    onChange={(e) => updateSetting('webhooks', {
+                                                        slackUrl: e.target.value,
+                                                        teamsUrl: settings.webhooks?.teamsUrl || '',
+                                                        notifyOnPass: settings.webhooks?.notifyOnPass || false,
+                                                        notifyOnFail: settings.webhooks?.notifyOnFail || false
+                                                    })}
+                                                    placeholder="https://hooks.slack.com/services/..."
+                                                />
+                                                <Input
+                                                    label={t('settings.integrations.webhooks.teams_url')}
+                                                    type="text"
+                                                    value={settings.webhooks?.teamsUrl || ''}
+                                                    onChange={(e) => updateSetting('webhooks', {
+                                                        slackUrl: settings.webhooks?.slackUrl || '',
+                                                        teamsUrl: e.target.value,
+                                                        notifyOnPass: settings.webhooks?.notifyOnPass || false,
+                                                        notifyOnFail: settings.webhooks?.notifyOnFail || false
+                                                    })}
+                                                    placeholder="https://your-company.webhook.office.com/..."
+                                                />
+                                            </div>
+                                            <div className="flex gap-6 pt-2">
+                                                <div className="flex items-center gap-2.5">
+                                                    <span className="text-xs font-semibold text-on-surface-variant/80 select-none">
+                                                        {t('settings.integrations.webhooks.notify_pass')}
+                                                    </span>
+                                                    <Switch
+                                                        checked={settings.webhooks?.notifyOnPass || false}
+                                                        onCheckedChange={(checked) => updateSetting('webhooks', {
+                                                            slackUrl: settings.webhooks?.slackUrl || '',
+                                                            teamsUrl: settings.webhooks?.teamsUrl || '',
+                                                            notifyOnPass: checked,
+                                                            notifyOnFail: settings.webhooks?.notifyOnFail || false
+                                                        })}
+                                                    />
+                                                </div>
+                                                <div className="flex items-center gap-2.5">
+                                                    <span className="text-xs font-semibold text-on-surface-variant/80 select-none">
+                                                        {t('settings.integrations.webhooks.notify_fail')}
+                                                    </span>
+                                                    <Switch
+                                                        checked={settings.webhooks?.notifyOnFail || false}
+                                                        onCheckedChange={(checked) => updateSetting('webhooks', {
+                                                            slackUrl: settings.webhooks?.slackUrl || '',
+                                                            teamsUrl: settings.webhooks?.teamsUrl || '',
+                                                            notifyOnPass: settings.webhooks?.notifyOnPass || false,
+                                                            notifyOnFail: checked
+                                                        })}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    )}
+                </div>
+            </Modal>
 
             {/* Page Header */}
             <PageHeader
@@ -642,7 +1277,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                                     icon: <Terminal size={16} />
                                                 }
                                             ]}
-                                            disabled={systemCheckStatus?.missingAppium?.length > 0}
+                                            disabled={systemCheckStatus?.missingAppium?.length > 0 || settings.noAppiumForRobot}
                                             variant="primary"
                                             className="shadow-lg hover:shadow-xl transition-all"
                                         />
@@ -652,6 +1287,32 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                         >
 
                             <div className="grid grid-cols-2 gap-4 mb-4">
+                                {settings.automationFramework === 'robot' && (
+                                    <div className="col-span-1 md:col-span-2 flex items-center pt-2">
+                                        <Button
+                                            type="button"
+                                            id="noAppiumForRobot"
+                                            role="checkbox"
+                                            aria-checked={settings.noAppiumForRobot || false}
+                                            onClick={() => updateSetting('noAppiumForRobot', !settings.noAppiumForRobot)}
+                                            className="flex items-center gap-2.5 text-left focus:outline-none select-none cursor-pointer group bg-transparent shadow-none hover:bg-transparent"
+                                        >
+                                            <div className={clsx(
+                                                "w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0 cursor-pointer",
+                                                settings.noAppiumForRobot
+                                                    ? "bg-primary border-primary text-on-primary"
+                                                    : "border-outline-variant/30 bg-surface/50 group-hover:border-outline"
+                                            )}>
+                                                {settings.noAppiumForRobot && (
+                                                    <div className="w-2 h-2 bg-on-primary rounded-2xl animate-in zoom-in-50 duration-200" />
+                                                )}
+                                            </div>
+                                            <span className="text-xs font-semibold text-on-surface-variant/80 select-none cursor-pointer">
+                                                {t('settings.tool_config.no_appium_for_robot')}
+                                            </span>
+                                        </Button>
+                                    </div>
+                                )}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
                                         <Input
@@ -659,7 +1320,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                             type="text"
                                             value={settings.appiumHost}
                                             onChange={(e) => updateSetting('appiumHost', e.target.value)}
-                                            disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
+                                            disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0 || settings.noAppiumForRobot}
                                         />
                                     </div>
                                     <div title={settings.tools.appiumArgs && systemCheckStatus?.missingAppium?.length > 0 ? "Appium dependencies missing" : ""}>
@@ -668,7 +1329,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                             type="number"
                                             value={settings.appiumPort}
                                             onChange={(e) => updateSetting('appiumPort', Number(e.target.value))}
-                                            disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
+                                            disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0 || settings.noAppiumForRobot}
                                         />
                                     </div>
                                 </div>
@@ -678,7 +1339,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                         type="text"
                                         value={settings.appiumBasePath}
                                         onChange={(e) => updateSetting('appiumBasePath', e.target.value)}
-                                        disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
+                                        disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0 || settings.noAppiumForRobot}
                                         placeholder="/wd/hub"
                                     />
                                 </div>
@@ -690,35 +1351,9 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                         type="text"
                                         value={settings.tools.appiumArgs}
                                         onChange={(e) => updateSetting('tools', { ...settings.tools, appiumArgs: e.target.value })}
-                                        disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0}
+                                        disabled={appiumStatus.running || systemCheckStatus?.missingAppium?.length > 0 || settings.noAppiumForRobot}
                                         placeholder="--allow-insecure chromedriver"
                                     />
-                                    {settings.automationFramework === 'robot' && (
-                                        <div className="col-span-1 md:col-span-2 flex items-center pt-2">
-                                            <button
-                                                type="button"
-                                                id="noAppiumForRobot"
-                                                role="checkbox"
-                                                aria-checked={settings.noAppiumForRobot || false}
-                                                onClick={() => updateSetting('noAppiumForRobot', !settings.noAppiumForRobot)}
-                                                className="flex items-center gap-2.5 text-left focus:outline-none select-none cursor-pointer group"
-                                            >
-                                                <div className={clsx(
-                                                    "w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0 cursor-pointer",
-                                                    settings.noAppiumForRobot
-                                                        ? "bg-primary border-primary text-on-primary"
-                                                        : "border-outline-variant/30 bg-surface/50 group-hover:border-outline"
-                                                )}>
-                                                    {settings.noAppiumForRobot && (
-                                                        <div className="w-2 h-2 bg-on-primary rounded-2xl animate-in zoom-in-50 duration-200" />
-                                                    )}
-                                                </div>
-                                                <span className="text-xs font-semibold text-on-surface-variant/80 select-none cursor-pointer">
-                                                    {t('settings.tool_config.no_appium_for_robot')}
-                                                </span>
-                                            </button>
-                                        </div>
-                                    )}
                                 </div>
                             </div>
 
@@ -807,15 +1442,8 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                     <TagInput
                                         label={t('settings.tool_config.app_packages')}
                                         tags={settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean)}
-                                        onAdd={(tag) => {
-                                            const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
-                                            if (!current.includes(tag)) {
-                                                updateSetting('tools', { ...settings.tools, appPackage: [...current, tag].join(', ') });
-                                            }
-                                        }}
-                                        onRemove={(tag) => {
-                                            const current = settings.tools.appPackage.split(',').map(p => p.trim()).filter(Boolean);
-                                            updateSetting('tools', { ...settings.tools, appPackage: current.filter(t => t !== tag).join(', ') });
+                                        onChange={(tags) => {
+                                            updateSetting('tools', { ...settings.tools, appPackage: tags.join(', ') });
                                         }}
                                         placeholder={t('settings.tool_config.add_package_placeholder')}
                                     />
@@ -849,7 +1477,23 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
 
 
                 {/* Path Configuration */}
-                <Section title={t('settings.paths.title')} icon={FolderOpen}>
+                <Section
+                    title={t('settings.paths.title')}
+                    icon={FolderOpen}
+                    menus={
+                        isFeatureEnabled('is_integrations_enabled') && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setShowIntegrationsModal(true)}
+                                leftIcon={<Link2 size={16} />}
+                                className="text-on-surface/80 hover:text-primary hover:bg-primary/10"
+                            >
+                                {t('settings.integrations.title')}
+                            </Button>
+                        )
+                    }
+                >
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {(['automationRoot', 'resources', 'tests', 'suites', 'logs', 'logcat', 'screenshots', 'recordings', 'mappings'] as Array<keyof typeof settings.paths>).map((key) => {
                             const isTestingPath = ['automationRoot', 'resources', 'tests', 'suites'].includes(key);
@@ -904,7 +1548,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                 {/* Primary Color */}
                                 <div>
                                     {/* <h3 className="text-sm font-medium text-on-surface-variant/80 mb-3">{t('settings.appearance.primary_color')}</h3> */}
-                                    <div className="flex flex-wrap gap-3">
+                                    <div className="grid grid-cols-4 md:grid-cols-4 lg:grid-cols-8 gap-3">
                                         {[
                                             { id: 'blue', hex: '#2563eb' },
                                             { id: 'red', hex: '#dc2626' },
@@ -913,19 +1557,26 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                             { id: 'orange', hex: '#ea580c' },
                                             { id: 'cyan', hex: '#0891b2' },
                                             { id: 'pink', hex: '#db2777' },
+                                            { id: 'custom', hex: '#ffffff' },
                                         ].map((color) => (
                                             <Button
                                                 key={color.id}
-                                                onClick={() => updateSetting('primaryColor', color.id)}
+                                                onClick={color.id === 'custom' ? () => {
+                                                    setCustomColorHex(settings.primaryColor?.startsWith('#') ? settings.primaryColor : '#ffffff');
+                                                    setShowCustomColorModal(true);
+                                                } : () => updateSetting('primaryColor', color.id)}
                                                 variant="ghost"
                                                 className={clsx(
                                                     "w-6 h-6 rounded-2xl p-0 min-w-0 transition-transform",
-                                                    settings.primaryColor === color.id ? "ring-2 scale-110" : "hover:scale-105"
+                                                    (settings.primaryColor === color.id || (color.id === 'custom' && settings.primaryColor?.startsWith('#'))) ? "ring-2 scale-110" : "hover:scale-105"
                                                 )}
-                                                style={{ backgroundColor: color.hex, borderColor: color.hex, '--tw-ring-color': color.hex } as any}
-                                                title={color.id.charAt(0).toUpperCase() + color.id.slice(1)}
-                                            >
-                                                {settings.primaryColor === color.id && (
+                                                style={{
+                                                    backgroundColor: color.id === 'custom' && settings.primaryColor?.startsWith('#') ? settings.primaryColor : color.hex,
+                                                    borderColor: color.id === 'custom' && settings.primaryColor?.startsWith('#') ? settings.primaryColor : color.hex,
+                                                    '--tw-ring-color': color.id === 'custom' && settings.primaryColor?.startsWith('#') ? settings.primaryColor : color.hex
+                                                } as any}
+                                                title={t(`settings.appearance.${color.id}_color` as any)}>
+                                                {(settings.primaryColor === color.id || (color.id === 'custom' && settings.primaryColor?.startsWith('#'))) && (
                                                     <div className="w-2.5 h-2.5 bg-on-primary rounded-2xl shadow-sm" />
                                                 )}
                                             </Button>
@@ -1034,15 +1685,16 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                                 </div>
                                             ) : availableModels.length > 0 ? (
                                                 availableModels.map(model => (
-                                                    <button 
-                                                        key={model} 
+                                                    <Button
+                                                        variant="unstyled"
+                                                        key={model}
                                                         type="button"
-                                                        className="w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0" 
+                                                        className="justify-start w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0"
                                                         onMouseDown={() => { updateSetting('geminiModel', model); setShowModelList(false); }}
                                                         onClick={() => { updateSetting('geminiModel', model); setShowModelList(false); }}
                                                     >
                                                         {model}
-                                                    </button>
+                                                    </Button>
                                                 ))
                                             ) : (
                                                 <div className="px-3 py-4 text-sm text-on-surface-variant/60 italic text-center">
@@ -1095,15 +1747,16 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                                 </div>
                                             ) : availableModels.length > 0 ? (
                                                 availableModels.map(model => (
-                                                    <button 
-                                                        key={model} 
+                                                    <Button
+                                                        variant="unstyled"
+                                                        key={model}
                                                         type="button"
-                                                        className="w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0" 
+                                                        className="justify-start w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0"
                                                         onMouseDown={() => { updateSetting('claudeModel', model); setShowModelList(false); }}
                                                         onClick={() => { updateSetting('claudeModel', model); setShowModelList(false); }}
                                                     >
                                                         {model}
-                                                    </button>
+                                                    </Button>
                                                 ))
                                             ) : (
                                                 <div className="px-3 py-4 text-sm text-on-surface-variant/60 italic text-center">
@@ -1156,15 +1809,16 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                                 </div>
                                             ) : availableModels.length > 0 ? (
                                                 availableModels.map(model => (
-                                                    <button 
-                                                        key={model} 
+                                                    <Button
+                                                        variant="unstyled"
+                                                        key={model}
                                                         type="button"
-                                                        className="w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0" 
+                                                        className="justify-start w-full text-left px-3 py-2 text-sm text-on-surface/80 hover:bg-primary/10 hover:text-primary transition-colors border-b border-outline-variant/5 last:border-0"
                                                         onMouseDown={() => { updateSetting('openaiModel', model); setShowModelList(false); }}
                                                         onClick={() => { updateSetting('openaiModel', model); setShowModelList(false); }}
                                                     >
                                                         {model}
-                                                    </button>
+                                                    </Button>
                                                 ))
                                             ) : (
                                                 <div className="px-3 py-4 text-sm text-on-surface-variant/60 italic text-center">
@@ -1200,14 +1854,14 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                             <div className={`w-2 h-2 rounded-full ${isClaudeCodeInstalled ? 'bg-success' : 'bg-error animate-pulse'}`} />
                                             <span className="text-xs font-medium text-on-surface-variant">
                                                 {isClaudeCodeInstalled
-                                                    ? t('settings.ai.claude_code.installed', { version: claudeCodeVersion }) 
+                                                    ? t('settings.ai.claude_code.installed', { version: claudeCodeVersion })
                                                     : t('settings.ai.claude_code.not_installed')
                                                 }
                                             </span>
                                         </div>
-                                        <Button 
-                                            variant="secondary" 
-                                            size="sm" 
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
                                             onClick={() => checkSystemVersions()}
                                             className="h-8 px-3 text-[11px]"
                                         >
@@ -1254,14 +1908,14 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                                             <div className={`w-2 h-2 rounded-full ${isAntigravityInstalled ? 'bg-success' : 'bg-error animate-pulse'}`} />
                                             <span className="text-xs font-medium text-on-surface-variant">
                                                 {isAntigravityInstalled
-                                                    ? t('settings.ai.antigravity.installed', { version: antigravityVersion }) 
+                                                    ? t('settings.ai.antigravity.installed', { version: antigravityVersion })
                                                     : t('settings.ai.antigravity.not_installed')
                                                 }
                                             </span>
                                         </div>
-                                        <Button 
-                                            variant="secondary" 
-                                            size="sm" 
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
                                             onClick={() => checkSystemVersions()}
                                             className="h-8 px-3 text-[11px]"
                                         >
@@ -1301,6 +1955,8 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                     </Section>
                 </div>
 
+
+
                 {/* System Versions */}
                 <Section
                     title={t('settings.system.title')}
@@ -1327,9 +1983,9 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                         </Button>
                     }
                 >
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         {systemVersions ? (
-                            (['adb', 'node', 'appium', 'uiautomator2', 'python', 'robot', 'appium_lib', 'java', 'maven', 'maestro', 'scrcpy', 'ngrok'] as Array<keyof typeof systemVersions>)
+                            (['adb', 'node', 'appium', 'uiautomator2', 'scrcpy', 'python', 'robot', 'appium_lib', 'java', 'maven', 'maestro', 'ngrok'] as Array<keyof typeof systemVersions>)
                                 .filter(key => {
                                     if (key === 'ngrok' && !isNgrokEnabled) return false;
                                     if (is_test_mode === 'web' && ['adb', 'scrcpy'].includes(key)) return false;
@@ -1364,6 +2020,56 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                     </div>
                 </Section>
             </div>
+
+            {/* Custom Color Modal */}
+            <Modal
+                isOpen={showCustomColorModal}
+                onClose={() => setShowCustomColorModal(false)}
+                title={t('settings.appearance.custom_color')}
+            >
+                <div className="p-4 flex flex-col gap-4">
+                    <p className="text-sm text-on-surface-variant">
+                        {t('settings.appearance.custom_color_description') || 'Select a custom primary color for the application.'}
+                    </p>
+                    <div className="flex gap-4 items-center">
+                        <input
+                            type="color"
+                            value={customColorHex}
+                            onChange={(e) => setCustomColorHex(e.target.value)}
+                            className="w-12 h-12 rounded cursor-pointer border-none p-0 bg-transparent"
+                            style={{ colorScheme: settings.theme }}
+                        />
+                        <Input
+                            type="text"
+                            value={customColorHex}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                setCustomColorHex(val);
+                            }}
+                            placeholder="#RRGGBB"
+                            className="flex-1 font-mono uppercase"
+                        />
+                    </div>
+                </div>
+                <div className="flex justify-end gap-3 p-4 border-t border-outline-variant/30 bg-surface-variant/30">
+                    <Button variant="ghost" onClick={() => setShowCustomColorModal(false)}>
+                        {t('common.cancel')}
+                    </Button>
+                    <Button
+                        variant="primary"
+                        onClick={() => {
+                            if (/^#[0-9A-Fa-f]{6}$/i.test(customColorHex)) {
+                                updateSetting('primaryColor', customColorHex);
+                                setShowCustomColorModal(false);
+                            } else {
+                                feedback.toast.error('Invalid hex color. Please use #RRGGBB format.');
+                            }
+                        }}
+                    >
+                        {t('common.save')}
+                    </Button>
+                </div>
+            </Modal>
         </div>
     );
 }

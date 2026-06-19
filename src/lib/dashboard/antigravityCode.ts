@@ -49,6 +49,42 @@ export interface AntigravityCLIResponse {
     usage?: any;
 }
 
+/**
+ * Inspects a parsed CLI response for Google API / Gemini error payloads and throws
+ * a descriptive Error if found. Handles quota exhaustion (429), auth failures (401),
+ * and other API-level errors so callers receive a clean, translatable message.
+ */
+function detectApiError(parsed: any): void {
+    const err = parsed?.error;
+    if (!err) return;
+
+    const code: number = err.code ?? 0;
+    const message: string = err.message ?? 'Unknown API error';
+    const status: string = err.status ?? '';
+
+    if (code === 429 || status === 'RESOURCE_EXHAUSTED') {
+        // Extract the human-readable reset delay from ErrorInfo details if present
+        let resetDelay = '';
+        const details: any[] = err.details ?? [];
+        for (const detail of details) {
+            if (detail?.metadata?.quotaResetDelay) {
+                resetDelay = detail.metadata.quotaResetDelay;
+                break;
+            }
+        }
+        const resetSuffix = resetDelay ? ` Resets in ${resetDelay}.` : '';
+        throw new Error(`QUOTA_EXHAUSTED:${resetSuffix || message}`);
+    }
+
+    if (code === 401 || status === 'UNAUTHENTICATED') {
+        throw new Error(`AUTH_ERROR:${message}`);
+    }
+
+    // Generic API error fallback
+    throw new Error(`API_ERROR:${message}`);
+}
+
+
 export async function askAntigravityCli(
     prompt: string,
     projectRoot: string,
@@ -66,13 +102,23 @@ export async function askAntigravityCli(
 
     let fullPrompt = prompt + formatReminder;
 
+    let tempFilePath: string | null = null;
+    let promptToPass = fullPrompt;
+
     try {
+        if (fullPrompt.length > 7000) {
+            const { join } = await import('@tauri-apps/api/path');
+            tempFilePath = await join(projectRoot, '.rr_prompt.tmp');
+            await invoke('fs_write_text_file', { path: tempFilePath, content: fullPrompt });
+            promptToPass = "Read the file .rr_prompt.tmp for your full instructions and history. Execute the request.";
+        }
+
         const cleanBase64 = options?.imageBase64?.includes('base64,') 
             ? options.imageBase64.split('base64,')[1] 
             : options?.imageBase64;
 
         const rawResult = await invoke<string>('call_antigravity_cli', {
-            prompt: fullPrompt,
+            prompt: promptToPass,
             projectRoot,
             apiKey,
             systemInstruction,
@@ -81,19 +127,26 @@ export async function askAntigravityCli(
             resumeSessionId: options?.resumeSessionId
         });
 
+        if (tempFilePath) {
+            try {
+                await invoke('fs_remove_file', { path: tempFilePath });
+            } catch(e) {}
+        }
+
         if (!rawResult) return "";
 
         const parsed = safeParseJson<any>(rawResult);
         if (parsed && typeof parsed === 'object') {
-            const mainContent = parsed.response !== undefined 
-                ? parsed.response 
-                : (parsed.result !== undefined ? parsed.result : (parsed.completion || parsed.text || parsed.content));
+            // Detect and surface API-level errors (quota, auth, etc.) before any extraction
+            detectApiError(parsed);
+            detectApiError(parsed.response);
 
             if (options?.jsonSchema) {
-                const structured = typeof mainContent === 'string' ? safeParseJson<any>(mainContent) : mainContent;
+                const targetObject = parsed.response !== undefined ? parsed.response : parsed;
+                const structured = typeof targetObject === 'string' ? safeParseJson<any>(targetObject) : targetObject;
                 if (structured && typeof structured === 'object') {
                     return {
-                        result: typeof mainContent === 'string' ? mainContent : JSON.stringify(mainContent),
+                        result: typeof targetObject === 'string' ? targetObject : JSON.stringify(targetObject),
                         structured_output: structured,
                         session_id: parsed.session_id,
                         usage: parsed.usage || parsed.stats
@@ -101,14 +154,41 @@ export async function askAntigravityCli(
                 }
             }
 
+            let mainContent = parsed.response !== undefined 
+                ? parsed.response 
+                : (parsed.result !== undefined ? parsed.result : (parsed.completion || parsed.text || parsed.content));
+
+            if (mainContent === undefined) {
+                mainContent = parsed;
+            }
+
+            if (mainContent && typeof mainContent === 'object') {
+                mainContent = mainContent.reply !== undefined 
+                    ? mainContent.reply 
+                    : (mainContent.result !== undefined 
+                        ? mainContent.result 
+                        : (mainContent.text !== undefined 
+                            ? mainContent.text 
+                            : (mainContent.content !== undefined 
+                                ? mainContent.content 
+                                : mainContent)));
+            }
+
             if (mainContent !== undefined) {
-                return String(mainContent);
+                return typeof mainContent === 'object' ? JSON.stringify(mainContent) : String(mainContent);
             }
         }
         return String(rawResult);
     } catch (error: any) {
-        console.error("[Antigravity CLI] Invocation failed:", error);
-        throw error;
+        if (tempFilePath) {
+            try {
+                const { invoke } = await import('@tauri-apps/api/core');
+                await invoke('fs_remove_file', { path: tempFilePath });
+            } catch(e) {}
+        }
+        console.error("[Antigravity CLI] Invocation failed. Raw Error:", error, "Type:", typeof error);
+        const errorStr = typeof error === 'string' ? error : (error?.message || String(error));
+        throw new Error(errorStr);
     }
 }
 
@@ -126,12 +206,7 @@ export async function generateRefinedTestCases(
         mappingContext = appMapping;
     } else if (Array.isArray(appMapping) && appMapping.length > 0) {
         mappingContext = "\n\nAPPLICATION MAPPING:\n";
-        appMapping.forEach(screen => {
-            mappingContext += `- Screen: "${screen.name}" (${screen.type})\n`;
-            screen.elements.forEach(el => {
-                mappingContext += `  * Element: "${el.name}" (Type: ${el.type})\n`;
-            });
-        });
+        mappingContext += formatExistingMaps(appMapping);
     }
 
     let promptString = "";
@@ -167,6 +242,7 @@ export async function exploreScreen(
     rationale: string;
     thought?: string;
     session_id?: string;
+    needs_context_files?: string[];
 }> {
     const systemInstruction = getExplorationPrompt(language, customPrompt);
 

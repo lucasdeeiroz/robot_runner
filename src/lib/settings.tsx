@@ -90,6 +90,35 @@ export interface AppSettings {
     aiTestModeEnabled: boolean;
     aiSessionId?: string;
     updateChannel?: 'stable' | 'beta' | 'alpha';
+    azureDevOps?: {
+        org: string;
+        project: string;
+        pat: string;
+        enabled: boolean;
+    };
+    jira?: {
+        host: string;
+        email: string;
+        apiToken: string;
+        projectKey: string;
+        enabled: boolean;
+    };
+    testLink?: {
+        url: string;
+        devKey: string;
+        projectId: string;
+        enabled: boolean;
+    };
+    git?: {
+        enabled: boolean;
+        showBadges: boolean;
+    };
+    webhooks?: {
+        slackUrl: string;
+        teamsUrl: string;
+        notifyOnPass: boolean;
+        notifyOnFail: boolean;
+    };
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -142,7 +171,36 @@ const DEFAULT_SETTINGS: AppSettings = {
     aiSessionId: undefined,
     updateChannel: 'stable',
     customAdbPath: '',
-    noAppiumForRobot: false
+    noAppiumForRobot: false,
+    azureDevOps: {
+        org: '',
+        project: '',
+        pat: '',
+        enabled: false
+    },
+    jira: {
+        host: '',
+        email: '',
+        apiToken: '',
+        projectKey: '',
+        enabled: false
+    },
+    testLink: {
+        url: '',
+        devKey: '',
+        projectId: '',
+        enabled: false
+    },
+    git: {
+        enabled: false,
+        showBadges: false
+    },
+    webhooks: {
+        slackUrl: '',
+        teamsUrl: '',
+        notifyOnPass: false,
+        notifyOnFail: false
+    }
 };
 
 export interface Profile {
@@ -154,6 +212,82 @@ export interface Profile {
 interface SettingsStoreData {
     activeProfileId: string;
     profiles: Record<string, Profile>;
+}
+
+const SECRET_PATHS = [
+    ['geminiApiKey'],
+    ['antigravityApiKey'],
+    ['claudeApiKey'],
+    ['openaiApiKey'],
+    ['claudeCodeToken'],
+    ['tools', 'ngrokToken'],
+    ['azureDevOps', 'pat'],
+    ['jira', 'apiToken'],
+    ['testLink', 'devKey'],
+    ['webhooks', 'slackUrl'],
+    ['webhooks', 'teamsUrl']
+];
+
+async function encryptValue(val: string | undefined | null): Promise<string> {
+    if (!val || typeof val !== 'string' || val.trim() === '' || val.startsWith('enc:')) {
+        return val || '';
+    }
+    try {
+        const encrypted = await invoke<string>('encrypt_secret', { plainText: val });
+        return `enc:${encrypted}`;
+    } catch (e) {
+        console.error("Encryption failed for secret:", e);
+        return val;
+    }
+}
+
+async function decryptValue(val: string | undefined | null): Promise<string> {
+    if (!val || typeof val !== 'string' || !val.startsWith('enc:')) {
+        return val || '';
+    }
+    try {
+        const encryptedPart = val.substring(4);
+        return await invoke<string>('decrypt_secret', { encryptedText: encryptedPart });
+    } catch (e) {
+        console.error("Decryption failed for secret:", e);
+        return '';
+    }
+}
+
+async function processSettingsSecrets<T>(settings: T, mode: 'encrypt' | 'decrypt'): Promise<T> {
+    const copy = structuredClone(settings);
+    const fn = mode === 'encrypt' ? encryptValue : decryptValue;
+
+    for (const path of SECRET_PATHS) {
+        let parent: unknown = copy;
+        for (let i = 0; i < path.length - 1; i++) {
+            if (isObject(parent)) {
+                parent = parent[path[i]];
+            } else {
+                parent = undefined;
+                break;
+            }
+        }
+        if (isObject(parent)) {
+            const lastKey = path[path.length - 1];
+            if (parent[lastKey] !== undefined && parent[lastKey] !== null) {
+                parent[lastKey] = await fn(parent[lastKey] as string);
+            }
+        }
+    }
+    return copy;
+}
+
+async function processStoreDataSecrets(data: SettingsStoreData, mode: 'encrypt' | 'decrypt'): Promise<SettingsStoreData> {
+    const copy = structuredClone(data);
+    if (copy.profiles) {
+        for (const pid of Object.keys(copy.profiles)) {
+            if (copy.profiles[pid]?.settings) {
+                copy.profiles[pid].settings = await processSettingsSecrets(copy.profiles[pid].settings, mode);
+            }
+        }
+    }
+    return copy;
 }
 // Initial Check Status Interface
 export interface SystemCheckStatus {
@@ -255,15 +389,22 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         }, 8000);
 
         try {
-            const saved: any = await store.get('app_config');
+            const saved = await store.get<SettingsStoreData>('app_config');
             clearTimeout(safetyTimer);
 
             if (saved) {
+                let decryptedSaved = saved;
+                try {
+                    decryptedSaved = await processStoreDataSecrets(saved, 'decrypt');
+                } catch (e) {
+                    console.error("[Settings] Decryption of store data failed:", e);
+                }
+
                 // Migration Logic
-                if (saved.profiles) {
+                if (decryptedSaved.profiles) {
                     // It's already the new format
                     // Just ensure defaults for missing fields in existing profiles
-                    const migrated = { ...saved };
+                    const migrated = { ...decryptedSaved };
                     Object.keys(migrated.profiles).forEach(pid => {
                         migrated.profiles[pid].settings = deepMerge(DEFAULT_SETTINGS, migrated.profiles[pid].settings);
                         migrated.profiles[pid].settings.aiChatEnabled = false;
@@ -287,7 +428,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                 } else {
                     // It's the old flat format. Migrate to Default Profile.
                     console.info("Migrating legacy settings to Default Profile...");
-                    const migratedSettings = deepMerge(DEFAULT_SETTINGS, saved);
+                    const migratedSettings = deepMerge(DEFAULT_SETTINGS, decryptedSaved as unknown as Partial<AppSettings>);
                     migratedSettings.aiChatEnabled = false;
                     migratedSettings.aiTestModeEnabled = false;
                     const newStoreData: SettingsStoreData = {
@@ -300,11 +441,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                     // Save immediately
                     saveStore(newStoreData);
                 }
-            }
-            // Initial sync
-            if (saved && saved.profiles) {
-                const activeId = saved.activeProfileId;
-                const paths = saved.profiles[activeId]?.settings?.paths;
+
+                // Initial sync
+                const activeId = decryptedSaved.activeProfileId;
+                const paths = decryptedSaved.profiles[activeId]?.settings?.paths;
                 if (paths) {
                     const sanitizedPaths = sanitizeWorkspacePaths(Object.values(paths));
                     if (sanitizedPaths.length > 0) {
@@ -329,10 +469,14 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             .catch(e => console.error("[Security] Sync failed:", e));
     };
 
-    const saveStore = (data: SettingsStoreData) => {
-        store.set('app_config', data).then(() => store.save()).catch(e => {
+    const saveStore = async (data: SettingsStoreData) => {
+        try {
+            const encryptedData = await processStoreDataSecrets(data, 'encrypt');
+            await store.set('app_config', encryptedData);
+            await store.save();
+        } catch (e) {
             feedback.toast.error("settings.save_error", e);
-        });
+        }
     };
 
     const updateSetting = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
@@ -602,21 +746,25 @@ export function useSettings() {
 }
 
 // Simple deep merge helper
-function deepMerge(target: any, source: any): any {
+function deepMerge<T>(target: T, source: Partial<T>): T {
     const output = { ...target };
     if (isObject(target) && isObject(source)) {
         Object.keys(source).forEach(key => {
-            if (isObject(source[key])) {
-                if (!(key in target)) Object.assign(output, { [key]: source[key] });
-                else output[key] = deepMerge(target[key], source[key]);
+            const k = key as keyof T;
+            if (isObject(source[k])) {
+                if (!(k in target)) {
+                    (output as Record<string, unknown>)[k as string] = source[k];
+                } else {
+                    (output as Record<string, unknown>)[k as string] = deepMerge(target[k] as Record<string, unknown>, source[k] as Record<string, unknown>);
+                }
             } else {
-                Object.assign(output, { [key]: source[key] });
+                (output as Record<string, unknown>)[k as string] = source[k];
             }
         });
     }
     return output;
 }
 
-function isObject(item: any) {
-    return (item && typeof item === 'object' && !Array.isArray(item));
+function isObject(item: unknown): item is Record<string, unknown> {
+    return (item !== null && typeof item === 'object' && !Array.isArray(item));
 }

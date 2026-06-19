@@ -69,13 +69,24 @@ export async function askClaudeCode(
         ? `SYSTEM_INSTRUCTIONS:\n${systemInstruction}${formatReminder}\n\nUSER_REQUEST:\n${prompt}`
         : prompt + formatReminder;
 
+    let tempFilePath: string | null = null;
+    let promptToPass = fullPrompt;
+
     try {
+        if (fullPrompt.length > 7000) {
+            const { join } = await import('@tauri-apps/api/path');
+            const { invoke } = await import('@tauri-apps/api/core');
+            tempFilePath = await join(projectRoot, '.rr_prompt.tmp');
+            await invoke('fs_write_text_file', { path: tempFilePath, content: fullPrompt });
+            promptToPass = "Read the file .rr_prompt.tmp for your full instructions and history. Execute the request.";
+        }
+
         const cleanBase64 = options?.imageBase64?.includes('base64,') 
             ? options.imageBase64.split('base64,')[1] 
             : options?.imageBase64;
 
         const rawResult = await invoke<string>('call_claude_code_cli', {
-            prompt: fullPrompt,
+            prompt: promptToPass,
             projectRoot,
             token,
             imageBase64: cleanBase64,
@@ -83,6 +94,13 @@ export async function askClaudeCode(
             jsonSchema: options?.jsonSchema ? JSON.stringify(options.jsonSchema) : undefined,
             resumeSessionId: options?.resumeSessionId
         });
+
+        if (tempFilePath) {
+            try {
+                const { invoke } = await import('@tauri-apps/api/core');
+                await invoke('fs_remove_file', { path: tempFilePath });
+            } catch(e) {}
+        }
 
         if (!rawResult) return "";
 
@@ -111,13 +129,19 @@ export async function askClaudeCode(
         }
         return String(rawResult);
     } catch (error: any) {
-        console.error("[Claude CLI] Invocation failed:", error);
-        const errorStr = String(error);
+        if (tempFilePath) {
+            try {
+                const { invoke } = await import('@tauri-apps/api/core');
+                await invoke('fs_remove_file', { path: tempFilePath });
+            } catch(e) {}
+        }
+        console.error("[Claude CLI] Invocation failed. Raw Error:", error, "Type:", typeof error);
+        const errorStr = typeof error === 'string' ? error : (error?.message || String(error));
 
         if (errorStr.includes("Not logged in") || errorStr.includes("/login")) {
             throw new Error("Claude CLI: You are not logged in. If you provided a token in settings, check if it is correct. Otherwise, please run 'claude login' in your terminal.");
         }
-        throw error;
+        throw new Error(errorStr);
     }
 }
 
@@ -135,12 +159,7 @@ export async function generateRefinedTestCases(
         mappingContext = appMapping;
     } else if (Array.isArray(appMapping) && appMapping.length > 0) {
         mappingContext = "\n\nAPPLICATION MAPPING:\n";
-        appMapping.forEach(screen => {
-            mappingContext += `- Screen: "${screen.name}" (${screen.type})\n`;
-            screen.elements.forEach(el => {
-                mappingContext += `  * Element: "${el.name}" (Type: ${el.type})\n`;
-            });
-        });
+        mappingContext += formatExistingMaps(appMapping);
     }
 
     let promptString = "";
@@ -175,6 +194,7 @@ export async function exploreScreen(
     rationale: string;
     thought?: string;
     session_id?: string;
+    needs_context_files?: string[];
 }> {
     const systemInstruction = getExplorationPrompt(language, customPrompt);
 

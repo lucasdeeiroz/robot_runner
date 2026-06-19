@@ -4,6 +4,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { Play, Square, Eraser, AlignLeft, Package as PackageIcon, FolderSearch, Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 import { useSettings } from "@/lib/settings";
 import { feedback } from "@/lib/feedback";
@@ -93,47 +94,53 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
         }
     }, [selectedDevice]);
 
-    // Setup polling with offset
+    // Setup event listening
     useEffect(() => {
-        let interval: NodeJS.Timeout;
-        let pollingOffset = 0; // Local offset for this session
+        let unlisten: UnlistenFn | undefined;
+        let isSubscribed = true;
 
         const shouldStream = isStreaming && selectedDevice && (!isTestRunning || allowActionsDuringTest);
 
-        if (shouldStream) { // Pause polling during active tests unless allowed
-
-            interval = setInterval(async () => {
-                try {
-                    const result = await invoke<[string[], number]>('fetch_logcat_buffer', {
-                        device: selectedDevice,
-                        offset: pollingOffset
+        if (shouldStream) { // Pause streaming during active tests unless allowed
+            // Get history first
+            invoke<[string[], number]>('fetch_logcat_buffer', {
+                device: selectedDevice,
+                offset: 0
+            }).then((result) => {
+                if (!isSubscribed) return;
+                const historyLines = result[0];
+                if (historyLines && historyLines.length > 0) {
+                    setLogs(prev => {
+                        const updated = [...historyLines];
+                        if (updated.length > 5000) return updated.slice(-5000);
+                        return updated;
                     });
-                    const newLines = result[0];
-                    const totalLen = result[1];
-
-                    if (totalLen < pollingOffset) {
-                        pollingOffset = 0;
-                    } else {
-                        if (newLines && newLines.length > 0) {
-                            setLogs(prev => {
-                                const updated = [...prev, ...newLines];
-                                if (updated.length > 5000) return updated.slice(-5000);
-                                return updated;
-                            });
-                        }
-                        // Only update offset if it actually grew
-                        if (totalLen > pollingOffset) {
-                            pollingOffset = totalLen;
-                        }
-                    }
-                } catch (e) {
-                    feedback.toast.error("logcat.errors.fetch_failed", e);
                 }
-            }, 200); // 200ms
+            }).catch(e => {
+                feedback.toast.error("logcat.errors.fetch_failed", e);
+            });
+
+            // Listen for new chunks
+            listen<{ device: string, lines: string[] }>('logcat-data', (event) => {
+                if (event.payload.device === selectedDevice) {
+                    setLogs(prev => {
+                        const updated = [...prev, ...event.payload.lines];
+                        if (updated.length > 5000) return updated.slice(-5000);
+                        return updated;
+                    });
+                }
+            }).then(un => {
+                if (isSubscribed) {
+                    unlisten = un;
+                } else {
+                    un();
+                }
+            });
         }
 
         return () => {
-            if (interval) clearInterval(interval);
+            isSubscribed = false;
+            if (unlisten) unlisten();
         };
     }, [isStreaming, selectedDevice, isTestRunning, allowActionsDuringTest]);
 
@@ -314,20 +321,20 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
                             <div className="flex items-center gap-2 px-3 py-1 bg-warning/10 text-warning rounded-2xl text-[11px] font-medium border border-warning/20">
                                 <FolderSearch size={14} />
                                 <span>{t('logcat.not_saving')}</span>
-                                <button
+                                <Button
                                     onClick={handleConfigurePath}
                                     className="underline hover:text-warning/80 ml-1"
                                 >
                                     {t('logcat.configure_path')}
-                                </button>
+                                </Button>
                                 {onNavigate && (
-                                    <button
+                                    <Button
                                         onClick={() => onNavigate?.('settings')}
                                         className="flex items-center gap-1 hover:text-warning/80 ml-2 border-l border-warning/20 pl-2"
                                     >
                                         <Settings size={12} />
                                         {t('common.go_to_settings')}
-                                    </button>
+                                    </Button>
                                 )}
                             </div>
                         )}
@@ -338,7 +345,8 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
                                 variant="ghost"
                                 size="sm"
                                 className="px-3 py-1.5 ml-2 rounded-2xl text-xs font-medium items-center justify-center gap-2 bg-surface text-on-surface/80 border border-outline-variant/30 hover:bg-surface-variant/50 transition-colors h-auto"
-                                title={t('logcat.clear')}
+                                data-tooltip={t('logcat.clear')}
+                                data-position="left"
                             >
                                 <Eraser size={14} />
                             </Button>
@@ -434,7 +442,8 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
                                     <span
                                         className="text-primary dark:text-primary/80 underline cursor-pointer hover:opacity-80"
                                         onClick={() => invoke('open_path', { path: log.replace(t('feedback.saved_to_prefix') + ' ', '') })}
-                                        title={t('logcat.open_file', 'Click to open file')}
+                                        data-tooltip={t('logcat.open_file', 'Click to open file')}
+                                        data-position="top"
                                     >
                                         {log}
                                     </span>

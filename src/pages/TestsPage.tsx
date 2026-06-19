@@ -256,14 +256,14 @@ export function TestsPage({ onNavigate }: TestsPageProps) {
                     <div className="flex items-center gap-2">
                         {sessions.length >= 2 ? (
                             <Button
-                                variant="ghost"
+                                variant="unstyled"
                                 size="icon"
                                 onClick={() => setIsGridView(!isGridView)}
                                 className={clsx(
-                                    "rounded-2xl border transition-all shrink-0",
+                                    "rounded-2xl border transition-all shrink-0 flex items-center justify-center",
                                     isGridView
                                         ? "bg-primary/10 border-none text-primary dark:text-primary/80"
-                                        : "bg-transparent border-none text-on-surface-variant/80 hover:text-on-surface-variant/80 hover:bg-surface-variant/30"
+                                        : "border-none text-on-surface-variant/80 hover:text-on-surface-variant/80 hover:bg-surface-variant/30"
                                 )}
                                 title={isGridView ? t('toolbox.actions.switch_to_tabs') : t('toolbox.actions.switch_to_grid')}
                             >
@@ -287,14 +287,14 @@ export function TestsPage({ onNavigate }: TestsPageProps) {
                         />
                         <div ref={settingsRef} className="relative">
                             <Button
-                                variant="ghost"
+                                variant="unstyled"
                                 size="icon"
                                 onClick={() => setIsSettingsOpen(!isSettingsOpen)}
                                 className={clsx(
-                                    "rounded-2xl border transition-all shrink-0 h-8 w-8",
+                                    "rounded-2xl border transition-all shrink-0 h-8 w-8 flex items-center justify-center",
                                     isSettingsOpen
                                         ? "bg-primary/10 border-none text-primary dark:text-primary/80"
-                                        : "bg-transparent border-none text-on-surface-variant/80 hover:text-on-surface-variant/80 hover:bg-surface-variant/30"
+                                        : "border-none text-on-surface-variant/80 hover:text-on-surface-variant/80 hover:bg-surface-variant/30"
                                 )}
                                 title={t('settings.title')}
                             >

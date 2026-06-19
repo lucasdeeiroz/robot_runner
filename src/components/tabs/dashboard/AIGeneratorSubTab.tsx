@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    Wand2, Eraser, FileDown, FileText, Copy, Trash2, AlertCircle, CheckCircle2, Settings
+    Wand2, Eraser, FileDown, FileText, Copy, Trash2, AlertCircle, CheckCircle2, Settings, Briefcase, Server
 } from 'lucide-react';
 import { Button } from '@/components/atoms/Button';
 import { Textarea } from '@/components/atoms/Textarea';
@@ -19,8 +19,11 @@ import { getAiContext } from '@/lib/dashboard/historyAnalysisUtils';
 import { exportToXlsx, exportToDocx } from '@/lib/dashboard/export';
 import { addToHistory } from './HistoryPanel';
 import { save } from '@tauri-apps/plugin-dialog';
-import { writeTextFile } from '@tauri-apps/plugin-fs';
+import { invoke } from '@tauri-apps/api/core';
 import clsx from 'clsx';
+import { createJiraIssue } from '@/lib/integrations/jira';
+import { createAzureWorkItem } from '@/lib/integrations/azureDevOps';
+import { createTestLinkSuiteAndCases } from '@/lib/integrations/testLink';
 
 interface AIGeneratorSubTabProps {
     onNavigate?: (page: string) => void;
@@ -35,6 +38,208 @@ export function AIGeneratorSubTab({ onNavigate }: AIGeneratorSubTabProps) {
     const [genType, setGenType] = useState<AIGenerationType>('test_case');
     const [useMapping, setUseMapping] = useState(true);
     const [isGenerating, setIsGenerating] = useState(false);
+
+    const [isExportingJira, setIsExportingJira] = useState(false);
+    const [isExportingAzure, setIsExportingAzure] = useState(false);
+    const [isExportingTestLink, setIsExportingTestLink] = useState(false);
+
+    const parseGeneratedContent = (content: string, defaultType: string): { title: string; description: string } => {
+        const lines = content.split('\n');
+        let title = "";
+
+        for (let line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('#')) {
+                title = trimmed.replace(/^#+\s*/, '');
+                break;
+            } else if (trimmed.startsWith('Title:') || trimmed.startsWith('Summary:')) {
+                title = trimmed.replace(/^(Title|Summary):\s*/i, '');
+                break;
+            }
+        }
+
+        if (!title) {
+            for (let line of lines) {
+                const trimmed = line.trim();
+                if (trimmed) {
+                    title = trimmed;
+                    break;
+                }
+            }
+        }
+
+        if (title.length > 80) {
+            title = title.substring(0, 80) + "...";
+        }
+        if (!title) {
+            title = `AI Generated ${defaultType} - ${new Date().toLocaleDateString()}`;
+        }
+
+        return {
+            title,
+            description: content
+        };
+    };
+
+    const parseTestCasesForTestLink = (content: string): Array<{ name: string; summary: string, steps: Array<{ action: string; expectedResult: string }> }> => {
+        const lines = content.split('\n');
+        const testCases: Array<{ name: string; summary: string, steps: Array<{ action: string; expectedResult: string }> }> = [];
+
+        let currentCaseName = "";
+        let currentSummaryLines: string[] = [];
+        let currentSteps: Array<{ action: string; expectedResult: string }> = [];
+        let inStepsSection = false;
+
+        const pushCurrentTestCase = () => {
+            if (currentCaseName) {
+                let refinedSteps: Array<{ action: string; expectedResult: string }> = [];
+
+                const isBdd = [...currentSummaryLines, ...currentSteps.map(s => s.action)].some(l => /^(?:\d+[\.)]?\s*)?(?:Given|When|Then|Dado|Quando|Ent[ãa]o)/i.test(l));
+                if (isBdd) {
+                    const allGherkinLines = [...currentSummaryLines, ...currentSteps.map(s => s.action)].filter(l => /^(?:\d+[\.)]?\s*)?(?:Given|When|Then|And|But|Dado|Quando|Ent[ãa]o|E\s|Mas)\b/i.test(l));
+                    for (const line of allGherkinLines) {
+                        if (/^(?:\d+[\.)]?\s*)?(?:Then|Ent[ãa]o)/i.test(line)) {
+                            if (refinedSteps.length > 0) {
+                                refinedSteps[refinedSteps.length - 1].expectedResult += (refinedSteps[refinedSteps.length - 1].expectedResult ? "<br/>" : "") + line;
+                            } else {
+                                refinedSteps.push({ action: "Verificar resultado", expectedResult: line });
+                            }
+                        } else if (/^(?:\d+[\.)]?\s*)?(?:Given|When|And|But|Dado|Quando|E\s|Mas)\b/i.test(line)) {
+                            refinedSteps.push({ action: line, expectedResult: "" });
+                        }
+                    }
+                } else {
+                    for (const step of currentSteps) {
+                        if (/^\s*(?:-|\*|\d+[\.)]?)\s*(?:Verificar|Validar|Garantir|Certificar|Then|Ent[ãa]o)/i.test(step.action)) {
+                            if (refinedSteps.length > 0) {
+                                refinedSteps[refinedSteps.length - 1].expectedResult += (refinedSteps[refinedSteps.length - 1].expectedResult ? "<br/>" : "") + step.action;
+                            } else {
+                                refinedSteps.push({ action: "Verificar resultado", expectedResult: step.action });
+                            }
+                        } else {
+                            refinedSteps.push({ action: step.action, expectedResult: "" });
+                        }
+                    }
+                }
+
+                const thenLine = currentSummaryLines.find(l => /^Then|Ent[ãa]o/i.test(l));
+                if (thenLine && refinedSteps.length > 0 && !refinedSteps[refinedSteps.length - 1].expectedResult) {
+                    refinedSteps[refinedSteps.length - 1].expectedResult = thenLine.replace(/^(?:Then|Ent[ãa]o)\s*/i, '');
+                }
+
+                if (refinedSteps.length === 0) {
+                    refinedSteps.push({ action: "Executar fluxo do cenário", expectedResult: thenLine ? thenLine.replace(/^(?:Then|Ent[ãa]o)\s*/i, '') : "Sucesso" });
+                }
+
+                testCases.push({
+                    name: currentCaseName,
+                    summary: currentSummaryLines.join('<br/>'),
+                    steps: refinedSteps
+                });
+            }
+        };
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const trimmed = line.trim();
+            const isScenario = /^(?:Scenario(?:\s+Outline)?|Cen[áa]rio|Escenario|Test Case|Caso de Teste)[\s\d]*:/i.test(trimmed);
+
+            if (isScenario) {
+                pushCurrentTestCase();
+                currentCaseName = trimmed.replace(/^(?:Scenario(?:\s+Outline)?|Cen[áa]rio|Escenario|Test Case|Caso de Teste)[\s\d]*:\s*/i, '').trim() || trimmed;
+                currentSummaryLines = [];
+                currentSteps = [];
+                inStepsSection = false;
+            } else if (/^(?:Steps:|Passos:|Pasos:)/i.test(trimmed)) {
+                inStepsSection = true;
+            } else if (/^(?:\d+[\.)]?\s*)?(?:Given|When|Then|And|But|Dado|Quando|Ent[ãa]o|E\s|Mas)\b/i.test(trimmed)) {
+                currentSteps.push({ action: trimmed, expectedResult: "" });
+            } else if (/^(?:-|\d+\.)/.test(trimmed)) {
+                currentSteps.push({ action: trimmed, expectedResult: "" });
+            } else if (trimmed.length > 0) {
+                if (!inStepsSection) {
+                    currentSummaryLines.push(trimmed);
+                }
+            }
+        }
+
+        pushCurrentTestCase();
+
+        if (testCases.length === 0) {
+            const nonComments = lines.map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('#'));
+            testCases.push({
+                name: "AI Generated Test Suite",
+                summary: "Generated from AI requirements.",
+                steps: nonComments.length > 0 ? nonComments.map(c => ({ action: c, expectedResult: "" })) : [{ action: "Execute automated suite.", expectedResult: "Success" }]
+            });
+        }
+
+        return testCases;
+    };
+
+    const handleExportJira = async () => {
+        if (!generatedContent.trim()) return;
+        if (!settings.jira?.enabled || !settings.jira?.host || !settings.jira?.email || !settings.jira?.apiToken || !settings.jira?.projectKey) {
+            feedback.toast.error(t('settings.integrations.jira.export_failed') + ": Integration is not configured or disabled.");
+            onNavigate?.('settings');
+            return;
+        }
+
+        setIsExportingJira(true);
+        try {
+            const type = genType === 'bug' ? 'Bug' : 'Story';
+            const { title, description } = parseGeneratedContent(generatedContent, type);
+            const res = await createJiraIssue(title, description, type, settings.jira);
+            feedback.toast.success(t('settings.integrations.jira.export_success', { key: res.key }));
+        } catch (e: any) {
+            feedback.toast.error(t('settings.integrations.jira.export_failed') + ": " + (e.message || String(e)));
+        } finally {
+            setIsExportingJira(false);
+        }
+    };
+
+    const handleExportAzure = async () => {
+        if (!generatedContent.trim()) return;
+        if (!settings.azureDevOps?.enabled || !settings.azureDevOps?.org || !settings.azureDevOps?.project || !settings.azureDevOps?.pat) {
+            feedback.toast.error(t('settings.integrations.azure.export_failed') + ": Integration is not configured or disabled.");
+            onNavigate?.('settings');
+            return;
+        }
+
+        setIsExportingAzure(true);
+        try {
+            const type = genType === 'bug' ? 'Bug' : 'PBI';
+            const { title, description } = parseGeneratedContent(generatedContent, type);
+            const htmlDescription = description.replace(/\n/g, '<br/>');
+            const res = await createAzureWorkItem(title, htmlDescription, type, settings.azureDevOps);
+            feedback.toast.success(t('settings.integrations.azure.export_success', { id: res.id }));
+        } catch (e: any) {
+            feedback.toast.error(t('settings.integrations.azure.export_failed') + ": " + (e.message || String(e)));
+        } finally {
+            setIsExportingAzure(false);
+        }
+    };
+
+    const handleExportTestLink = async () => {
+        if (!generatedContent.trim()) return;
+        if (!settings.testLink?.enabled || !settings.testLink?.url || !settings.testLink?.devKey || !settings.testLink?.projectId) {
+            feedback.toast.error(t('settings.integrations.testlink.export_failed') + ": Integration is not configured or disabled.");
+            onNavigate?.('settings');
+            return;
+        }
+
+        setIsExportingTestLink(true);
+        try {
+            const testCases = parseTestCasesForTestLink(generatedContent);
+            const suiteName = `AI Suite - ${new Date().toLocaleDateString()}`;
+            await createTestLinkSuiteAndCases(suiteName, testCases, settings.testLink);
+            feedback.toast.success(t('settings.integrations.testlink.export_success'));
+        } catch (e: any) {
+            feedback.toast.error(t('settings.integrations.testlink.export_failed') + ": " + (e.message || String(e)));
+        } finally {
+            setIsExportingTestLink(false);
+        }
+    };
 
     const provider = settings.aiProvider || 'gemini';
     const apiKey = provider === 'gemini' ? settings.geminiApiKey : provider === 'claude' ? settings.claudeApiKey : provider === 'openai' ? settings.openaiApiKey : 'CLI_MODE';
@@ -130,7 +335,55 @@ export function AIGeneratorSubTab({ onNavigate }: AIGeneratorSubTabProps) {
             });
 
             if (filePath) {
-                await writeTextFile(filePath, generatedContent);
+                await invoke('fs_write_text_file', { path: filePath, content: generatedContent });
+                feedback.toast.success(t('dashboard.export.success', "Successfully exported!"));
+            }
+        } catch (e) {
+            console.error("Native export failed:", e);
+            feedback.toast.error("dashboard.export.error", e);
+        }
+    };
+
+    const handleExportTestLinkXml = async () => {
+        if (!generatedContent.trim()) return;
+
+        try {
+            const testCases = parseTestCasesForTestLink(generatedContent);
+            const suiteName = `AI Suite - ${new Date().toLocaleDateString()}`;
+
+            let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<testsuite name="${suiteName.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}">\n`;
+
+            testCases.forEach(tc => {
+                xml += `  <testcase name="${tc.name.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}">\n`;
+                xml += `    <summary><![CDATA[<p>${tc.summary}</p>]]></summary>\n`;
+                xml += `    <steps>\n`;
+
+                tc.steps.forEach((step) => {
+                    const actionHtml = step.action ? step.action.replace(/]]>/g, ']]]]><![CDATA[>') : '';
+                    const expectedHtml = step.expectedResult ? step.expectedResult.replace(/]]>/g, ']]]]><![CDATA[>') : '';
+
+                    xml += `      <step>\n`;
+                    xml += `        <actions><![CDATA[<p>${actionHtml}</p>]]></actions>\n`;
+                    xml += `        <expectedresults><![CDATA[<p>${expectedHtml}</p>]]></expectedresults>\n`;
+                    xml += `      </step>\n`;
+                });
+
+                xml += `    </steps>\n`;
+                xml += `  </testcase>\n`;
+            });
+
+            xml += `</testsuite>`;
+
+            const filePath = await save({
+                filters: [{
+                    name: 'TestLink XML',
+                    extensions: ['xml']
+                }],
+                defaultPath: `testlink_${new Date().getTime()}.xml`
+            });
+
+            if (filePath) {
+                await invoke('fs_write_text_file', { path: filePath, content: xml });
                 feedback.toast.success(t('dashboard.export.success', "Successfully exported!"));
             }
         } catch (e) {
@@ -141,6 +394,7 @@ export function AIGeneratorSubTab({ onNavigate }: AIGeneratorSubTabProps) {
 
     const typeOptions = [
         { value: 'test_case', label: t('dashboard.generator.types.test_case', "Test Cases (BDD)") },
+        { value: 'test_case_traditional', label: t('dashboard.generator.types.test_case_traditional', "Test Cases (Tradicional / Passo a Passo)") },
         { value: 'robot_script', label: t('dashboard.generator.types.robot_script', "Robot Framework Script") },
         { value: 'pbi', label: t('dashboard.generator.types.pbi', "Product Backlog Item (PBI)") },
         { value: 'improvement', label: t('dashboard.generator.types.improvement', "Functional Improvement") },
@@ -207,7 +461,7 @@ export function AIGeneratorSubTab({ onNavigate }: AIGeneratorSubTabProps) {
                                     aria-hidden="true"
                                     className={clsx(
                                         useMapping ? 'translate-x-5' : 'translate-x-0',
-                                        'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'
+                                        'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-surface shadow ring-0 transition duration-200 ease-in-out'
                                     )}
                                 />
                             </Switch>
@@ -284,7 +538,7 @@ export function AIGeneratorSubTab({ onNavigate }: AIGeneratorSubTabProps) {
                     className="flex-1 font-mono custom-scrollbar resize-none whitespace-pre-wrap text-sm p-4 bg-surface"
                 />
 
-                <div className="grid grid-cols-2 gap-3 mt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
                     <Button
                         variant="outline"
                         onClick={handleExportXlsx}
@@ -309,9 +563,53 @@ export function AIGeneratorSubTab({ onNavigate }: AIGeneratorSubTabProps) {
                             onClick={handleExportRobot}
                             disabled={!generatedContent}
                             leftIcon={<FileText size={16} />}
-                            className="justify-center h-10 lg:col-span-1 md:col-span-2"
+                            className="justify-center h-10 lg:col-span-2 md:col-span-2"
                         >
                             {t('dashboard.actions.export_robot', "Robot Script (.robot)")}
+                        </Button>
+                    )}
+                    {settings.jira?.enabled && (
+                        <Button
+                            variant="outline"
+                            onClick={handleExportJira}
+                            disabled={!generatedContent || isExportingJira}
+                            leftIcon={<Briefcase size={16} className="text-primary" />}
+                            className="justify-center h-10"
+                        >
+                            {isExportingJira ? t('settings.integrations.testing') : "Jira Software"}
+                        </Button>
+                    )}
+                    {settings.azureDevOps?.enabled && (
+                        <Button
+                            variant="outline"
+                            onClick={handleExportAzure}
+                            disabled={!generatedContent || isExportingAzure}
+                            leftIcon={<Briefcase size={16} className="text-blue-500" />}
+                            className="justify-center h-10"
+                        >
+                            {isExportingAzure ? t('settings.integrations.testing') : "Azure DevOps"}
+                        </Button>
+                    )}
+                    {settings.testLink?.enabled && (
+                        <Button
+                            variant="outline"
+                            onClick={handleExportTestLink}
+                            disabled={!generatedContent || isExportingTestLink || genType === 'robot_script'}
+                            leftIcon={<Server size={16} className="text-orange-500" />}
+                            className="justify-center h-10"
+                        >
+                            {isExportingTestLink ? t('settings.integrations.testing') : "TestLink"}
+                        </Button>
+                    )}
+                    {useMapping && (genType === 'test_case' || genType === 'test_case_traditional') && (
+                        <Button
+                            variant="outline"
+                            onClick={handleExportTestLinkXml}
+                            disabled={!generatedContent}
+                            leftIcon={<FileDown size={16} className="text-orange-500" />}
+                            className="justify-center h-10"
+                        >
+                            {t('dashboard.actions.export_testlink_xml', "TestLink (.xml)")}
                         </Button>
                     )}
                 </div>

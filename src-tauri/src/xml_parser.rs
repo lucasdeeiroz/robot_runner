@@ -374,6 +374,10 @@ fn parse_robot_xml_sax_internal<R: tauri::Runtime>(
         .begin_transaction()
         .map_err(|e| AppError::DbError(format!("Transaction error: {}", e)))?;
 
+    let mut insert_stmt = tx.prepare(
+        "INSERT INTO log_nodes (id, parent_id, node_type, json_payload, order_index) VALUES (?1, ?2, ?3, ?4, ?5)"
+    ).map_err(|e| AppError::DbError(e.to_string()))?;
+
     let file = fs::File::open(xml_path)
         .map_err(|e| AppError::IoError(format!("Failed to open XML: {}", e)))?;
     let mut reader = Reader::from_reader(BufReader::new(file));
@@ -665,17 +669,17 @@ fn parse_robot_xml_sax_internal<R: tauri::Runtime>(
                                     LogNode::Keyword(_) => "keyword",
                                     LogNode::Text(_) => "text",
                                 };
-                                let json_payload = serde_json::to_string(&popped).unwrap();
+                                let json_payload = serde_json::to_string(&popped).map_err(|e| AppError::ParserError(e.to_string()))?;
 
-                                LogDb::insert_node(
-                                    &tx,
+                                LogDb::insert_node_stmt(
+                                    &mut insert_stmt,
                                     &id,
                                     &parent_id,
                                     node_type,
                                     &json_payload,
                                     order_counter,
                                 )
-                                .unwrap();
+                                .map_err(|e| AppError::DbError(e.to_string()))?;
 
                                 if let Some(parent) = stack.last_mut() {
                                     append_child_stats(parent, &popped);
@@ -813,16 +817,16 @@ fn parse_robot_xml_sax_internal<R: tauri::Runtime>(
                                 LogNode::Text(_) => "text",
                             };
 
-                            let json_payload = serde_json::to_string(&popped).unwrap();
-                            LogDb::insert_node(
-                                &tx,
+                            let json_payload = serde_json::to_string(&popped).map_err(|e| AppError::ParserError(e.to_string()))?;
+                            LogDb::insert_node_stmt(
+                                &mut insert_stmt,
                                 &id,
                                 &parent_id,
                                 node_type,
                                 &json_payload,
                                 order_counter,
                             )
-                            .unwrap();
+                            .map_err(|e| AppError::DbError(e.to_string()))?;
 
                             if let Some(parent) = stack.last_mut() {
                                 append_child_stats(parent, &popped);
@@ -912,8 +916,8 @@ fn parse_robot_xml_sax_internal<R: tauri::Runtime>(
                                     let node_enum = LogNode::Text(c);
                                     let json_payload = serde_json::to_string(&node_enum)
                                         .map_err(|e| AppError::ParserError(e.to_string()))?;
-                                    LogDb::insert_node(
-                                        &tx,
+                                    LogDb::insert_node_stmt(
+                                        &mut insert_stmt,
                                         node_enum.id(),
                                         parent.id(),
                                         "text",
@@ -935,6 +939,8 @@ fn parse_robot_xml_sax_internal<R: tauri::Runtime>(
         }
         buf.clear();
     }
+
+    drop(insert_stmt);
 
     tx.commit()
         .map_err(|e| AppError::DbError(format!("Commit error: {}", e)))?;

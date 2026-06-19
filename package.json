@@ -1,7 +1,7 @@
 {
   "name": "robot_runner",
   "private": true,
-  "version": "2.3.1-alpha1",
+  "version": "2.3.1-alpha7",
   "type": "module",
   "engines": {
     "node": ">=22.0.0"

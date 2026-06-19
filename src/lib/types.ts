@@ -33,10 +33,14 @@ export interface NavigationData {
     sourceHandle?: string;
     targetHandle?: string;
     vertices?: { x: number; y: number }[];
+    // QA & Routing
+    trigger_action?: 'tap' | 'swipe' | 'long_press' | 'type';
+    is_happy_path?: boolean;
 }
 
 export interface UIElementMap {
     id: string; // Unique ID (e.g., resource-id or xpath hash)
+    shortId?: string; // Tree structural position (used for fuzzy merging and tracking)
     name: string; // User-defined name
     type: UIElementType;
     description?: string;
@@ -53,6 +57,29 @@ export interface UIElementMap {
     // Complex Types
     menu_options?: string[]; // For 'menu' type
     parent_screen?: string; // For 'tab' type
+
+    // AI & QA Hints
+    primary_locator?: string;
+    expected_data?: string; 
+    suggested_interaction?: 'tap' | 'swipe' | 'long_press' | 'type';
+    assertion_target?: boolean;
+    business_rule?: string;
+    explored?: boolean; // Marks dead-end elements that were clicked but did not navigate
+}
+
+export interface FlowStep {
+    step_number: number;
+    source_screen: string;
+    action: string;
+    element_name: string;
+    expected_result: string;
+}
+
+export interface FlowMap {
+    id: string;
+    name: string;
+    description?: string;
+    steps: FlowStep[];
 }
 
 export interface ScreenMap {

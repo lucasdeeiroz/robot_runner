@@ -65,12 +65,7 @@ export async function generateRefinedTestCases(
         mappingContext = appMapping;
     } else if (Array.isArray(appMapping) && appMapping.length > 0) {
         mappingContext = "\n\nAPPLICATION MAPPING (Use these element names and types for precision):\n";
-        appMapping.forEach(screen => {
-            mappingContext += `- Screen: "${screen.name}" (${screen.type})\n`;
-            screen.elements.forEach(el => {
-                mappingContext += `  * Element: "${el.name}" (Type: ${el.type})\n`;
-            });
-        });
+        mappingContext += formatExistingMaps(appMapping);
     }
 
     let promptString = "";
@@ -84,48 +79,15 @@ export async function generateRefinedTestCases(
 
     const systemInstruction = getQAAssistantWrapper(promptString, !!appMapping, mappingContext, customPrompt);
 
-    const url = "https://api.anthropic.com/v1/messages";
-
-    try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': apiKey,
-                'anthropic-version': '2023-06-01',
-                'anthropic-dangerous-direct-browser-access': 'true'
-            },
-            signal,
-            body: JSON.stringify({
-                model: model,
-                max_tokens: 4096,
-                system: systemInstruction,
-                messages: [
-                    { role: 'user', content: requirements }
-                ],
-                temperature: 0.4
-            })
-        });
-
-        if (!response.ok) {
-            const errData = await response.json().catch(() => ({}));
-            const errMsg = errData.error?.message || (typeof errData === 'string' ? errData : JSON.stringify(errData));
-            throw (new Error(errMsg || `API Error: ${response.statusText}`));
-        }
-
-        const data = await response.json();
-        const text = data.content?.[0]?.text;
-
-        if (!text) {
-            throw new Error("Empty response from Claude");
-        }
-
-        return text.trim();
-
-    } catch (error: any) {
-        console.error("Claude API Error:", error);
-        throw error;
-    }
+    return await askClaude(
+        requirements,
+        apiKey,
+        model,
+        systemInstruction,
+        undefined,
+        signal,
+        { temperature: 0.4, max_tokens: 4096 }
+    );
 }
 
 /**
@@ -137,12 +99,12 @@ export async function askClaude(
     model: string,
     systemInstruction?: string,
     imageBase64?: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    options?: any
 ): Promise<string> {
     if (!apiKey) throw new Error("Missing Claude API Key");
 
     const url = "https://api.anthropic.com/v1/messages";
-
     const content: any[] = [];
 
     if (imageBase64) {
@@ -159,7 +121,17 @@ export async function askClaude(
 
     content.push({ type: "text", text: prompt });
 
-    try {
+    const { withModelRotation } = await import('./aiFallback');
+
+    return withModelRotation('claude', model, async (currentModel) => {
+        const body: any = {
+            model: currentModel,
+            max_tokens: options?.max_tokens ?? 4096,
+            system: systemInstruction,
+            messages: [{ role: 'user', content }],
+            temperature: options?.temperature ?? 0.4
+        };
+
         const response = await fetch(url, {
             method: 'POST',
             headers: {
@@ -169,13 +141,7 @@ export async function askClaude(
                 'anthropic-dangerous-direct-browser-access': 'true'
             },
             signal,
-            body: JSON.stringify({
-                model,
-                max_tokens: 4096,
-                system: systemInstruction,
-                messages: [{ role: 'user', content }],
-                temperature: 0.4
-            })
+            body: JSON.stringify(body)
         });
 
         if (!response.ok) {
@@ -189,10 +155,7 @@ export async function askClaude(
         if (!text) throw new Error("Empty response from Claude");
 
         return text.trim();
-    } catch (error: any) {
-        console.error("Claude API Error (askClaude):", error, content);
-        throw error;
-    }
+    });
 }
 
 export async function getAvailableModels(apiKey: string): Promise<string[]> {
@@ -247,52 +210,24 @@ export async function suggestElementName(
         mappingContext = appMapping;
     } else if (Array.isArray(appMapping) && appMapping.length > 0) {
         mappingContext = "\n\nAPPLICATION MAPPING (Context of other screens for naming consistency):\n";
-        appMapping.forEach(screen => {
-            mappingContext += `- Screen: "${screen.name}"\n`;
-            screen.elements.forEach(el => {
-                mappingContext += `  * Element: "${el.name}" (Type: ${el.type})\n`;
-            });
-        });
+        mappingContext += formatExistingMaps(appMapping);
     }
 
     const prompt = getElementNamingPrompt(screenName, elementAttr, language, mappingContext, customPrompt);
-    const url = "https://api.anthropic.com/v1/messages";
-
-    const body = {
-        model,
-        max_tokens: 1024,
-        system: "You are a professional QA automation naming assistant. Respond with a valid JSON object containing 'name' and 'justification'.",
-        messages: [
-            { role: 'user', content: prompt }
-        ],
-        temperature: 0.1
-    };
-
     try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': apiKey,
-                'anthropic-version': '2023-06-01',
-                'anthropic-dangerous-direct-browser-access': 'true'
-            },
+        const content = await askClaude(
+            prompt,
+            apiKey,
+            model,
+            "You are a professional QA automation naming assistant. Respond with a valid JSON object containing 'name' and 'justification'.",
+            undefined,
             signal,
-            body: JSON.stringify(body)
-        });
-
-        if (!response.ok) {
-            const errData = await response.json().catch(() => ({}));
-            const errMsg = errData.error?.message || JSON.stringify(errData);
-            throw new Error(errMsg || `API Error: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        const content = data.content?.[0]?.text;
+            { max_tokens: 1024, temperature: 0.1 }
+        );
         
         // DEBUG: Log status and content
-        console.log("[Claude Status] Stop Reason:", data.stop_reason || "UNKNOWN");
-        console.log("[Claude Raw Content]:", content);
+        // console.log("[Claude Status] Stop Reason:", data.stop_reason || "UNKNOWN");
+        // console.log("[Claude Raw Content]:", content);
 
         if (!content) {
             throw new Error("Empty AI response");
@@ -329,7 +264,7 @@ export async function suggestElementName(
                         name: nameMatch[1],
                         justification: justificationMatch ? justificationMatch[1] : ""
                     };
-                    console.log("[Claude] Fuzzy extraction successful:", parsed);
+                    // console.log("[Claude] Fuzzy extraction successful:", parsed);
                 }
             }
 
@@ -556,6 +491,7 @@ export async function exploreScreen(
     elements: UIElementMap[];
     nextAction: { type: 'click' | 'back' | 'swipe' | 'finish' | 'type_text'; targetId?: string; direction?: 'up' | 'down' | 'left' | 'right'; text?: string; details?: string };
     rationale: string;
+    needs_context_files?: string[];
 }> {
     if (!apiKey) throw new Error("Missing Claude API Key");
 
@@ -582,55 +518,16 @@ XML DUMP:
 ${xmlDump.substring(0, 15000)}
 `.trim();
 
-    const url = "https://api.anthropic.com/v1/messages";
-    const { mimeType, data } = extractBase64Data(screenshotBase64);
-
     try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': apiKey,
-                'anthropic-version': '2023-06-01',
-                'anthropic-dangerous-direct-browser-access': 'true'
-            },
+        const content = await askClaude(
+            prompt,
+            apiKey,
+            model,
+            systemInstruction,
+            screenshotBase64,
             signal,
-            body: JSON.stringify({
-                model,
-                max_tokens: 4096,
-                system: systemInstruction,
-                messages: [
-                    {
-                        role: 'user',
-                        content: [
-                            {
-                                type: "image",
-                                source: {
-                                    type: "base64",
-                                    media_type: mimeType,
-                                    data
-                                }
-                            },
-                            {
-                                type: "text",
-                                text: prompt
-                            }
-                        ]
-                    }
-                ],
-                temperature: 0.1
-            })
-        });
-
-        if (!response.ok) {
-            const errData = await response.json().catch(() => ({}));
-            throw new Error(errData.error?.message || `API Error: ${response.statusText}`);
-        }
-
-        const resData = await response.json();
-        const content = resData.content?.[0]?.text;
-        if (!content) throw new Error("Empty response from Claude");
-
+            { max_tokens: 4096, temperature: 0.1 }
+        );
         return safeParseJson(content);
     } catch (error: any) {
         console.error("Claude exploreScreen Error:", error);
@@ -654,38 +551,16 @@ export async function reorganizeFlowchartLayout(
     const systemInstruction = getFlowchartLayoutPrompt(language, customPrompt);
     const mappingContext = typeof maps === 'string' ? maps : formatExistingMaps(maps);
 
-    const url = "https://api.anthropic.com/v1/messages";
-
     try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': apiKey,
-                'anthropic-version': '2023-06-01',
-                'anthropic-dangerous-direct-browser-access': 'true'
-            },
+        const content = await askClaude(
+            `Current Application Mapping:\n${mappingContext}`,
+            apiKey,
+            model,
+            systemInstruction,
+            undefined,
             signal,
-            body: JSON.stringify({
-                model,
-                max_tokens: 8192,
-                system: systemInstruction,
-                messages: [
-                    { role: 'user', content: `Current Application Mapping:\n${mappingContext}` }
-                ],
-                temperature: 0.1
-            })
-        });
-
-        if (!response.ok) {
-            const errData = await response.json().catch(() => ({}));
-            throw new Error(errData.error?.message || `API Error: ${response.statusText}`);
-        }
-
-        const resData = await response.json();
-        const content = resData.content?.[0]?.text;
-        if (!content) throw new Error("Empty response from Claude");
-
+            { max_tokens: 8192, temperature: 0.1 }
+        );
         return safeParseJson(content);
     } catch (error: any) {
         console.error("Claude reorganizeFlowchartLayout Error:", error);
@@ -723,37 +598,16 @@ CURRENT XML DUMP:
 ${xmlDump.substring(0, 15000)}
 `.trim();
 
-    const url = "https://api.anthropic.com/v1/messages";
-
     try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': apiKey,
-                'anthropic-version': '2023-06-01',
-                'anthropic-dangerous-direct-browser-access': 'true'
-            },
-            body: JSON.stringify({
-                model: model,
-                max_tokens: 4096,
-                system: systemInstruction,
-                messages: [
-                    { role: 'user', content: prompt }
-                ],
-                temperature: 0.2
-            })
-        });
-
-        if (!response.ok) {
-            const errData = await response.json().catch(() => ({}));
-            throw new Error(errData.error?.message || `API Error: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        const content = data.content?.[0]?.text;
-        if (!content) throw new Error("Empty response from Claude");
-
+        const content = await askClaude(
+            prompt,
+            apiKey,
+            model,
+            systemInstruction,
+            undefined,
+            undefined,
+            { max_tokens: 4096, temperature: 0.2 }
+        );
         return safeParseJson<AutonomousActionResponse>(content);
     } catch (error: any) {
         console.error("Claude generateAutonomousAction Error:", error);

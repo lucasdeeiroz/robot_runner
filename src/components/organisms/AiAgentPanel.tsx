@@ -8,6 +8,7 @@ import { AgentAction } from '@/lib/ai/agentProtocol';
 import ReactMarkdown from 'react-markdown';
 import { feedback } from '@/lib/feedback';
 import { invoke } from '@tauri-apps/api/core';
+import { listScreenMaps } from '@/lib/dashboard/mapperPersistence';
 import { useDevices } from '@/lib/deviceStore';
 import { useFileSave } from '@/hooks/useFileSave';
 import { useSelection } from '@/lib/selectionStore';
@@ -15,17 +16,21 @@ import { useTestSessions } from '@/lib/testSessionStore';
 import { useSpeechToText } from '@/hooks/useSpeechToText';
 import { useTextToSpeech } from '@/hooks/useTextToSpeech';
 import packageJson from '../../../package.json';
+import { Button } from "@/components/atoms/Button";
+import { Modal } from "@/components/organisms/Modal";
+import clsx from "clsx";
 
 interface AiAgentPanelProps {
     onNavigate: (page: string) => void;
 }
 
-interface Message {
+export interface Message {
     id: string;
     role: 'user' | 'agent';
     content: string;
     actions?: AgentAction[];
     suggestedPrompts?: string[];
+    hidden?: boolean;
 }
 
 const stripMarkdown = (text: string): string => {
@@ -59,7 +64,7 @@ const stripMarkdown = (text: string): string => {
 
 export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
     const { t } = useTranslation();
-    const { updateSetting, settings } = useSettings();
+    const { settings, updateSetting, activeProfileId } = useSettings();
     const { devices, selectedDevices, setSelectedDevices } = useDevices();
     const { clearSelection, addItem } = useSelection();
     const { addToolboxSession, setActiveSessionId } = useTestSessions();
@@ -111,6 +116,9 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
             }
         }
     }, [messages, sentViaVoice, speak]);
+
+    const [pendingFileAction, setPendingFileAction] = useState<AgentAction | null>(null);
+    const [originalContent, setOriginalContent] = useState<string | null>(null);
     const endOfMessagesRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -164,18 +172,85 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
         };
     };
 
-    const buildContext = () => {
+    const buildContext = async () => {
         const safeSettingsContext = buildSafeSettingsContext();
+        
+        let mappingsContext = '';
+        try {
+            const maps = await listScreenMaps(activeProfileId, settings.paths?.mappings);
+            if (maps && maps.length > 0) {
+                mappingsContext = `\n- Mappings (${maps.length} screens):\n${JSON.stringify(maps.map(m => ({ id: m.id, name: m.name, elements: m.elements.map(e => ({ name: e.name, type: e.type, short_id: e.shortId })) })), null, 2)}`;
+            }
+        } catch (e) {
+            console.warn("Could not load mappings for AI context", e);
+        }
+
+        let resourcesContext = '';
+        try {
+            if (settings.paths?.resources) {
+                const resourcesDirFiles = await invoke<any[]>('list_directory_recursive', { path: settings.paths.resources });
+                const resourceFiles = resourcesDirFiles.filter(f => !f.is_dir && (f.name.endsWith('.resource') || f.name.endsWith('.robot')));
+                
+                if (resourceFiles.length > 0) {
+                    resourcesContext = `\n- Resource Files:\n`;
+                    let resourceFilesRead = 0;
+                    for (const rf of resourceFiles) {
+                        if (resourceFilesRead < 3) {
+                            try {
+                                const content = await invoke<string>('fs_read_text_file', { path: rf.path });
+                                const truncated = content.length > 2500 ? content.substring(0, 2500) + '\n...[TRUNCATED]' : content;
+                                resourcesContext += `\n--- ${rf.name} ---\n${truncated}\n`;
+                                resourceFilesRead++;
+                            } catch (e) {
+                                resourcesContext += `\n--- ${rf.name} --- (Failed to read)\n`;
+                            }
+                        } else {
+                            resourcesContext += `\n--- ${rf.name} --- (Content hidden to save tokens)\n`;
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn("Could not load resources for AI context", e);
+        }
+
+        let testsDir = '';
+        try {
+            if (settings.paths?.tests) {
+                const testsDirFiles = await invoke<any[]>('list_directory_recursive', { path: settings.paths.tests });
+                const testFiles = testsDirFiles.filter(f => !f.is_dir && (f.name.endsWith('.robot') || f.name.endsWith('.txt')));
+                if (testFiles.length > 0) {
+                    testsDir = `\n- Test Files:\n`;
+                    let testFilesRead = 0;
+                    for (const tf of testFiles) {
+                        if (testFilesRead < 3) {
+                            try {
+                                const content = await invoke<string>('fs_read_text_file', { path: tf.path });
+                                const truncated = content.length > 2500 ? content.substring(0, 2500) + '\n...[TRUNCATED]' : content;
+                                testsDir += `\n--- ${tf.name} ---\n${truncated}\n`;
+                                testFilesRead++;
+                            } catch (e) {
+                                testsDir += `\n--- ${tf.name} --- (Failed to read)\n`;
+                            }
+                        } else {
+                            testsDir += `\n--- ${tf.name} --- (Content hidden to save tokens)\n`;
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn("Could not load tests directory for AI context", e);
+        }
 
         return `
 - App Version: ${packageJson.version}
 - Active Workspace: ${settings.paths?.automationRoot || 'None'}
 - Active Device: ${activeDeviceUdid || 'None'}
-- Settings Summary: ${JSON.stringify(safeSettingsContext)}
+- Settings Summary: ${JSON.stringify(safeSettingsContext)}${mappingsContext}${resourcesContext}${testsDir}
         `;
     };
 
-    const handleSend = async (overrideInput?: string) => {
+    const handleSend = async (overrideInput?: string, isHidden: boolean = false) => {
         const textToSend = overrideInput || input;
         if (!textToSend.trim()) return;
 
@@ -185,16 +260,17 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
         const newUserMessage: Message = {
             id: Date.now().toString(),
             role: 'user',
-            content: textToSend
+            content: textToSend,
+            hidden: isHidden
         };
 
         setMessages(prev => [...prev, newUserMessage]);
 
         try {
-            const context = buildContext();
+            const context = await buildContext();
 
-            // Format history for the service
-            const historyForService = messages.map(m => ({
+            // Format history for the service, optimizing tokens by sending only the last 15 messages
+            const historyForService = messages.slice(-15).map(m => ({
                 role: m.role,
                 content: m.content
             }));
@@ -204,7 +280,16 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                 historyForService,
                 context,
                 settings,
-                settings.aiSessionId
+                settings.aiSessionId,
+                (event) => {
+                    if (event.type === 'context_requested') {
+                        setMessages(prev => [...prev, {
+                            id: (Date.now() + Math.random()).toString(),
+                            role: 'agent',
+                            content: `*${t('ai_agent.context_requested', { file: event.file, defaultValue: 'I am reading additional project files to better understand the context...' })}*`
+                        }]);
+                    }
+                }
             );
 
             if (response.sessionId && response.sessionId !== settings.aiSessionId) {
@@ -229,17 +314,30 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
 
         } catch (error: any) {
             console.error("AI Agent Error:", error);
-            logEvent('ai_interaction_error', { error_message: error.message || 'Unknown error' });
-            feedback.toast.raw.error(t('ai_agent.error', { error: error.message }));
+            const errMsg = typeof error === 'string' ? error : (error?.message || String(error));
+            logEvent('ai_interaction_error', { error_message: errMsg });
+            feedback.toast.raw.error(t('ai_agent.error', { error: errMsg }));
             setMessages(prev => [...prev, {
                 id: (Date.now() + 1).toString(),
                 role: 'agent',
-                content: `**Error:** Failed to reach AI Provider. \n\n\`${error.message}\``
+                content: `**Error:** Failed to reach AI Provider. \n\n\`${errMsg}\``
             }]);
         } finally {
             setIsLoading(false);
         }
     };
+
+    useEffect(() => {
+        const handleAiAgentPrompt = (e: CustomEvent) => {
+            const { prompt, hidden } = e.detail;
+            if (prompt && !isLoading) {
+                handleSend(prompt, hidden);
+            }
+        };
+
+        window.addEventListener('ai_agent_prompt', handleAiAgentPrompt as EventListener);
+        return () => window.removeEventListener('ai_agent_prompt', handleAiAgentPrompt as EventListener);
+    }, [isLoading, input, messages, settings]);
 
     const handleExecuteAction = async (action: AgentAction) => {
         if (action.type !== 'run_test' && action.type !== 'capture_logcat') {
@@ -469,8 +567,63 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                     feedback.toast.error('toolbox.scrcpy.open_error');
                 }
                 break;
+            case 'create_file':
+                setOriginalContent(null);
+                setPendingFileAction(action);
+                break;
+            case 'modify_file':
+            case 'delete_file':
+                if (action.path) {
+                    const automationRoot = typeof settings.paths.automationRoot === 'string' ? settings.paths.automationRoot.trim() : '';
+                    if (!automationRoot) {
+                        feedback.toast.error('ai_agent.invalid_automation_root');
+                        break;
+                    }
+                    const fullPath = `${automationRoot}/${action.path}`;
+                    try {
+                        const content = await invoke<string>('fs_read_text_file', { path: fullPath });
+                        setOriginalContent(content);
+                    } catch (e) {
+                        setOriginalContent(`// ${t('ai_agent.file_action_failed')}${e}`);
+                    }
+                    setPendingFileAction(action);
+                } else {
+                    feedback.toast.error(`${t('ai_agent.file_path_missing')} ${action.type}`);
+                }
+                break;
             default:
                 feedback.toast.error('ai_agent.action_unwired', { type: action.type });
+        }
+    };
+
+    const confirmFileAction = async () => {
+        if (!pendingFileAction || !pendingFileAction.path) {
+            setPendingFileAction(null);
+            return;
+        }
+        
+        const automationRoot = typeof settings.paths.automationRoot === 'string' ? settings.paths.automationRoot.trim() : '';
+        if (!automationRoot) {
+            feedback.toast.error('ai_agent.invalid_automation_root');
+            setPendingFileAction(null);
+            return;
+        }
+
+        const fullPath = `${automationRoot}/${pendingFileAction.path}`;
+
+        try {
+            if (pendingFileAction.type === 'delete_file') {
+                await invoke('fs_remove_file', { path: fullPath });
+                feedback.toast.success(t('ai_agent.file_deleted'));
+            } else {
+                await invoke('fs_write_text_file', { path: fullPath, content: pendingFileAction.content || '' });
+                feedback.toast.success(pendingFileAction.type === 'create_file' ? t('ai_agent.file_created') : t('ai_agent.file_modified'));
+            }
+        } catch (e: any) {
+            feedback.toast.error(`${t('ai_agent.file_action_failed')}${String(e)}`);
+        } finally {
+            setPendingFileAction(null);
+            setOriginalContent(null);
         }
     };
 
@@ -499,7 +652,8 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <button
+                    <Button
+                        variant="ghost" size="sm"
                         onClick={() => {
                             stopSpeaking();
                             setMessages([]);
@@ -507,17 +661,18 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                             updateSetting('aiSessionId', undefined);
                             feedback.toast.success('ai_agent.session_cleared');
                         }}
-                        className="text-xs text-on-surface-variant hover:text-error transition-colors"
+                        className="text-xs text-on-surface hover:text-error h-8"
                     >
                         {t('ai_agent.clear_session', 'Clear')}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         onClick={handleClose}
                         className="p-1.5 rounded-lg bg-surface-variant/20 hover:bg-error/20 text-on-surface-variant hover:text-error transition-all"
-                        title={t('common.close', 'Close')}
+                        data-tooltip={t('common.close', 'Close')}
+                        data-position="left"
                     >
                         <X size={18} />
-                    </button>
+                    </Button>
                 </div>
             </div>
 
@@ -533,19 +688,19 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                             {t('ai_agent.welcome_desc')}
                         </p>
                         <div className="flex flex-col gap-2 w-full max-w-[280px]">
-                            <button onClick={() => handleSend(t('ai_agent.suggested_prompts.settings'))} className="text-xs text-left p-2 rounded-lg bg-surface-variant/30 hover:bg-primary/10 text-on-surface-variant transition-colors border border-outline-variant/30">
+                            <Button onClick={() => handleSend(t('ai_agent.suggested_prompts.settings'))} className="text-xs text-left p-2 rounded-lg bg-surface-variant/30 hover:bg-primary/10 text-on-surface-variant transition-colors border border-outline-variant/30">
                                 {t('ai_agent.suggested_prompts.settings')}
-                            </button>
-                            <button onClick={() => handleSend(t('ai_agent.suggested_prompts.color'))} className="text-xs text-left p-2 rounded-lg bg-surface-variant/30 hover:bg-primary/10 text-on-surface-variant transition-colors border border-outline-variant/30">
+                            </Button>
+                            <Button onClick={() => handleSend(t('ai_agent.suggested_prompts.color'))} className="text-xs text-left p-2 rounded-lg bg-surface-variant/30 hover:bg-primary/10 text-on-surface-variant transition-colors border border-outline-variant/30">
                                 {t('ai_agent.suggested_prompts.color')}
-                            </button>
-                            <button onClick={() => handleSend(t('ai_agent.suggested_prompts.help'))} className="text-xs text-left p-2 rounded-lg bg-surface-variant/30 hover:bg-primary/10 text-on-surface-variant transition-colors border border-outline-variant/30">
+                            </Button>
+                            <Button onClick={() => handleSend(t('ai_agent.suggested_prompts.help'))} className="text-xs text-left p-2 rounded-lg bg-surface-variant/30 hover:bg-primary/10 text-on-surface-variant transition-colors border border-outline-variant/30">
                                 {t('ai_agent.suggested_prompts.help')}
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 ) : (
-                    messages.map((msg) => (
+                    messages.filter(m => !m.hidden).map((msg) => (
                         <div key={msg.id} className={`flex flex-col gap-1 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                             <div className="flex items-end gap-2 max-w-[90%]">
                                 {msg.role === 'agent' && (
@@ -567,7 +722,8 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
 
                             {msg.role === 'agent' && (
                                 <div className="flex items-center gap-2 ml-8 mt-1">
-                                    <button
+                                    <Button
+                                        variant="ghost" size="icon"
                                         onClick={() => {
                                             if (currentlySpeakingMsgId === msg.id) {
                                                 stopSpeaking();
@@ -577,12 +733,12 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                                                 setCurrentlySpeakingMsgId(msg.id);
                                             }
                                         }}
-                                        title={currentlySpeakingMsgId === msg.id ? t('ai_agent.stop_speak_title') : t('ai_agent.speak_title')}
-                                        className={`p-1 rounded-md hover:bg-primary/10 transition-colors ${currentlySpeakingMsgId === msg.id ? 'text-primary animate-pulse' : 'text-on-surface-variant/60 hover:text-primary'
-                                            }`}
+                                        data-tooltip={currentlySpeakingMsgId === msg.id ? t('ai_agent.stop_speak_title') : t('ai_agent.speak_title')}
+                                        data-position="right"
+                                        className={clsx("w-6 h-6 rounded-full hover:bg-primary/10", currentlySpeakingMsgId === msg.id ? 'text-primary animate-pulse' : 'text-on-surface-variant/60 hover:text-primary')}
                                     >
                                         {currentlySpeakingMsgId === msg.id ? <VolumeX size={14} /> : <Volume2 size={14} />}
-                                    </button>
+                                    </Button>
                                 </div>
                             )}
 
@@ -596,13 +752,13 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                                                 <span className="text-xs font-bold uppercase tracking-wider">{t('ai_agent.action_proposed', 'Action Proposed')}</span>
                                             </div>
                                             <p className="text-sm text-on-surface">{action.description}</p>
-                                            <button
+                                            <Button
                                                 onClick={() => handleExecuteAction(action)}
                                                 className="mt-1 flex items-center justify-center gap-2 w-full py-1.5 bg-primary/10 hover:bg-primary text-primary hover:text-on-primary rounded-lg transition-colors text-xs font-bold"
                                             >
                                                 <Play size={12} fill="currentColor" />
                                                 {t('ai_agent.confirm_execute')}
-                                            </button>
+                                            </Button>
                                         </div>
                                     ))}
                                 </div>
@@ -611,13 +767,13 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                             {msg.suggestedPrompts && msg.suggestedPrompts.length > 0 && (
                                 <div className="mt-2 ml-8 flex flex-wrap gap-2 w-full max-w-[85%]">
                                     {msg.suggestedPrompts.map((prompt, idx) => (
-                                        <button
+                                        <Button
                                             key={idx}
                                             onClick={() => handleSend(prompt)}
                                             className="text-xs px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary text-primary hover:text-on-primary transition-all font-semibold border border-primary/20 shadow-sm"
                                         >
                                             {prompt}
-                                        </button>
+                                        </Button>
                                     ))}
                                 </div>
                             )}
@@ -649,36 +805,83 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                             }
                         }}
                         placeholder={t('ai_agent.placeholder')}
-                        className="w-full bg-surface-variant/30 text-on-surface rounded-xl pl-4 pr-20 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm resize-none custom-scrollbar border border-outline-variant/30"
+                        className="w-full bg-surface-variant/30 text-on-surface rounded-xl pl-4 pr-24 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm resize-none custom-scrollbar border border-outline-variant/30"
                         rows={3}
                         disabled={isLoading}
                     />
-                    <button
-                        onClick={() => {
-                            if (isListening) {
-                                stopListening();
-                            } else {
-                                startListening();
-                            }
-                        }}
-                        disabled={isLoading}
-                        title={isListening ? t('ai_agent.mic_active') : t('ai_agent.mic_inactive')}
-                        className={`absolute right-12 bottom-2 p-2 rounded-lg transition-all ${isListening
+                    <div className="absolute right-2 bottom-2 flex items-center gap-1">
+                        <Button
+                            variant="unstyled"
+                            size="icon"
+                            onClick={() => {
+                                if (isListening) {
+                                    stopListening();
+                                } else {
+                                    startListening();
+                                }
+                            }}
+                            disabled={isLoading}
+                            title={isListening ? t('ai_agent.mic_active') : t('ai_agent.mic_inactive')}
+                            aria-label={isListening ? t('ai_agent.mic_active') : t('ai_agent.mic_inactive')}
+                            className={`transition-all ${isListening
                                 ? 'bg-error text-on-error animate-pulse shadow-lg shadow-error/50 scale-110'
-                                : 'bg-surface-variant/50 text-on-surface-variant hover:bg-primary/20 hover:text-primary'
-                            }`}
-                    >
-                        {isListening ? <MicOff size={16} /> : <Mic size={16} />}
-                    </button>
-                    <button
-                        onClick={() => handleSend()}
-                        disabled={!input.trim() || isLoading}
-                        className="absolute right-2 bottom-2 p-2 rounded-lg bg-primary text-on-primary hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-primary/20"
-                    >
-                        {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                    </button>
+                                : 'bg-transparent text-on-surface-variant hover:bg-surface-variant/50 hover:text-primary'
+                                }`}
+                        >
+                            {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+                        </Button>
+                        <Button
+                            variant="unstyled"
+                            size="icon"
+                            onClick={() => handleSend()}
+                            disabled={!input.trim() || isLoading}
+                            aria-label={t('ai_agent.send')}
+                            className="bg-primary text-on-primary hover:brightness-110 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-primary/20"
+                        >
+                            {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                        </Button>
+                    </div>
                 </div>
             </div>
+
+            {/* File Confirmation Modal */}
+            <Modal
+                isOpen={!!pendingFileAction}
+                onClose={() => setPendingFileAction(null)}
+                title={pendingFileAction?.type === 'delete_file' ? t('ai_agent.confirm_file_deletion') : (pendingFileAction?.type === 'modify_file' ? t('ai_agent.confirm_file_modification') : t('ai_agent.confirm_file_creation'))}
+                className="max-w-4xl"
+            >
+                {pendingFileAction && (
+                    <div className="space-y-4">
+                        <p className="text-sm text-on-surface-variant">
+                            <strong>{t('ai_agent.path')}</strong> {pendingFileAction.path}
+                        </p>
+                        
+                        <div className="flex gap-4 min-h-[300px] max-h-[60vh]">
+                            {pendingFileAction.type !== 'create_file' && (
+                                <div className="flex-1 overflow-auto border border-outline-variant/30 rounded-lg p-4 bg-surface-variant/20">
+                                    <h4 className="text-xs font-semibold mb-2 text-on-surface-variant uppercase">{t('ai_agent.original_content')}</h4>
+                                    <pre className="text-xs font-mono whitespace-pre-wrap">{originalContent}</pre>
+                                </div>
+                            )}
+                            
+                            {pendingFileAction.type !== 'delete_file' && (
+                                <div className="flex-1 overflow-auto border border-outline-variant/30 rounded-lg p-4 bg-surface-variant/20">
+                                    <h4 className="text-xs font-semibold mb-2 text-on-surface-variant uppercase">{t('ai_agent.new_content')}</h4>
+                                    <pre className="text-xs font-mono whitespace-pre-wrap">{pendingFileAction.content}</pre>
+                                </div>
+                            )}
+                        </div>
+                        
+                        <div className="flex justify-end gap-2 pt-4 border-t border-outline-variant/20">
+                            <Button variant="ghost" onClick={() => setPendingFileAction(null)}>{t('ai_agent.cancel')}</Button>
+                            <Button onClick={confirmFileAction}>
+                                {t('ai_agent.confirm')}
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </Modal>
         </div>
     );
 }

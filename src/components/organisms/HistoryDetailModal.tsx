@@ -20,6 +20,7 @@ import * as openai from '@/lib/dashboard/openai';
 import * as claude from '@/lib/dashboard/claude';
 import * as claudeCli from '@/lib/dashboard/claudeCode';
 import clsx from 'clsx';
+import { Button } from "@/components/atoms/Button";
 
 
 interface ParseProgress {
@@ -209,7 +210,7 @@ export function HistoryDetailModal({ isOpen, onClose, log, onUpdateLog }: Histor
                 throw new Error("Missing API Key");
             }
 
-            let result: string;
+            let result: string = "";
             const language = i18n.language || 'en';
 
             // Fetch failure context from DB if available
@@ -225,7 +226,7 @@ export function HistoryDetailModal({ isOpen, onClose, log, onUpdateLog }: Histor
             let base64Screenshot: string | undefined = undefined;
             const firstScreenshotNode = failureContext?.find(f => f.failureDetail?.screenshotPath || f.failure_detail?.screenshot_path || f.screenshotPath);
             const screenshotPath = firstScreenshotNode?.failureDetail?.screenshotPath || firstScreenshotNode?.failure_detail?.screenshot_path || firstScreenshotNode?.screenshotPath;
-            
+
             if (screenshotPath) {
                 try {
                     base64Screenshot = await invoke<string>('read_compressed_image_base64', { path: screenshotPath });
@@ -234,17 +235,31 @@ export function HistoryDetailModal({ isOpen, onClose, log, onUpdateLog }: Histor
                 }
             }
 
-            if (provider === 'openai') {
-                result = await openai.summarizeExecution(tree, apiKey!, model!, language, failureContext, undefined, customPrompt, base64Screenshot);
-            } else if (provider === 'claude') {
-                result = await claude.summarizeExecution(tree, apiKey!, model!, language, failureContext, undefined, customPrompt, base64Screenshot);
-            } else if (provider === 'claude-code') {
-                result = await claudeCli.summarizeExecution(tree, settings.paths.automationRoot || '', language, failureContext?.map(f => f.message) || [], failureContext, customPrompt, settings.claudeCodeToken, base64Screenshot);
-            } else if (provider === 'antigravity-cli') {
-                const { summarizeExecution } = await import('@/lib/dashboard/antigravityCode');
-                result = await summarizeExecution(tree, settings.paths.automationRoot || '', language, failureContext?.map(f => f.message) || [], failureContext, customPrompt, settings.antigravityApiKey, base64Screenshot);
-            } else {
-                result = await gemini.summarizeExecution(tree, apiKey!, model!, language, failureContext, undefined, customPrompt, base64Screenshot);
+            // Attempt AI call with one retry
+            for (let attempt = 0; attempt < 2; attempt++) {
+                try {
+                    if (provider === 'openai') {
+                        result = await openai.summarizeExecution(tree, apiKey!, model!, language, failureContext, undefined, customPrompt, base64Screenshot);
+                    } else if (provider === 'claude') {
+                        result = await claude.summarizeExecution(tree, apiKey!, model!, language, failureContext, undefined, customPrompt, base64Screenshot);
+                    } else if (provider === 'claude-code') {
+                        result = await claudeCli.summarizeExecution(tree, settings.paths.automationRoot || '', language, failureContext?.map(f => f.message) || [], failureContext, customPrompt, settings.claudeCodeToken, base64Screenshot);
+                    } else if (provider === 'antigravity-cli') {
+                        const { summarizeExecution } = await import('@/lib/dashboard/antigravityCode');
+                        result = await summarizeExecution(tree, settings.paths.automationRoot || '', language, failureContext?.map(f => f.message) || [], failureContext, customPrompt, settings.antigravityApiKey, base64Screenshot);
+                    } else {
+                        result = await gemini.summarizeExecution(tree, apiKey!, model!, language, failureContext, undefined, customPrompt, base64Screenshot);
+                    }
+                    
+                    if (result) {
+                        break; // Success, exit retry loop
+                    }
+                } catch (e: any) {
+                    if (attempt === 1) {
+                        throw e; // Rethrow on the last attempt
+                    }
+                    console.warn(`AI Summarization attempt ${attempt + 1} failed, retrying...`, e);
+                }
             }
 
             setSummary(result);
@@ -335,17 +350,19 @@ export function HistoryDetailModal({ isOpen, onClose, log, onUpdateLog }: Histor
                                     {log.device_udid ? ` (${log.device_udid})` : ''}
                                 </div>
                             )}
-                            <button
+                            <Button
+                                variant="ghost" size="icon"
                                 onClick={() => openLog(log.path)}
                                 disabled={log.is_remote && !log.xml_path}
                                 className={clsx(
-                                    "p-1 rounded transition-colors text-on-surface-variant/80",
-                                    log.is_remote && !log.xml_path ? "opacity-20 cursor-not-allowed" : "hover:bg-surface-variant/30 hover:text-primary"
+                                    "w-6 h-6 rounded",
+                                    log.is_remote && !log.xml_path ? "opacity-20 cursor-not-allowed" : "hover:text-primary"
                                 )}
-                                title={log.is_remote && !log.xml_path ? t('tests_page.local_only_action', "Ação disponível apenas localmente") : t('run_tab.console.open_output_dir')}
+                                data-tooltip={log.is_remote && !log.xml_path ? t('tests_page.local_only_action', "Ação disponível apenas localmente") : t('run_tab.console.open_output_dir')}
+                                data-position='bottom'
                             >
                                 <FolderOpen size={14} />
-                            </button>
+                            </Button>
                         </div>
 
                         <div className="flex-1" />
