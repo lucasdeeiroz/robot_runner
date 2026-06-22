@@ -3,7 +3,7 @@ import { askClaudeCode } from '@/lib/dashboard/claudeCode';
 import { askGemini } from '@/lib/dashboard/gemini';
 import { askClaude } from '@/lib/dashboard/claude';
 import { askOpenAI } from '@/lib/dashboard/openai';
-import { getAgentSystemInstruction, AGENT_JSON_SCHEMA, AgentResponse } from './agentProtocol';
+import { getAgentSystemInstruction, getAgentJsonSchema, AgentResponse } from './agentProtocol';
 import { AppSettings } from '@/lib/settings';
 
 export interface AgentServiceResponse {
@@ -128,7 +128,7 @@ export async function askAgent(
                 systemInstruction,
                 settings.antigravityApiKey,
                 {
-                    jsonSchema: AGENT_JSON_SCHEMA,
+                    jsonSchema: getAgentJsonSchema(),
                     resumeSessionId: sessionIdToUse
                 }
             );
@@ -148,7 +148,7 @@ export async function askAgent(
                 systemInstruction,
                 settings.claudeCodeToken,
                 {
-                    jsonSchema: AGENT_JSON_SCHEMA,
+                    jsonSchema: getAgentJsonSchema(),
                     resumeSessionId: sessionIdToUse,
                     allowedTools: ['Read', 'View', 'Edit', 'Glob', 'Grep', 'LS', 'Bash'] // Allow Claude to fully assist with reading, writing, and executing
                 }

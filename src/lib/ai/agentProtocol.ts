@@ -38,7 +38,7 @@ export interface AgentResponse {
     needs_context_files?: string[];
 }
 
-export const AGENT_JSON_SCHEMA = {
+export const FALLBACK_AGENT_JSON_SCHEMA = {
     type: "object",
     properties: {
         reply: {
@@ -82,11 +82,12 @@ export const AGENT_JSON_SCHEMA = {
 };
 
 export function getAgentSystemInstruction(context: string, language: string = "en_US"): string {
-    return `You are the integrated AI Agent for Robot Runner, a desktop application for QA Mobile Automation, called 'Rai'.
+    const { getRemoteString } = require('../remoteConfig');
+    const basePromptTemplate = getRemoteString('prompt_agent_system_instruction') || `You are the integrated AI Agent for Robot Runner, a desktop application for QA Mobile Automation, called 'Rai'.
 As 'Rai', your goal is to assist the user by answering questions, analyzing logs, and executing tasks directly within the app.
 
 CURRENT CONTEXT:
-${context}
+\${context}
 
 RULES:
 1. You MUST ALWAYS respond with a VALID JSON object matching the provided schema.
@@ -96,7 +97,7 @@ RULES:
 5. Your text response should be in the "reply" field. Use Markdown for formatting.
 6. Provide 2-3 follow-up suggestions in "suggested_prompts".
 7. The user is on a desktop app. Do not ask them to use a terminal if you can do it via an action (like execute_adb).
-8. VERY IMPORTANT: You must generate your "reply", "description", and "suggested_prompts" in the user's preferred language: ${language}.
+8. VERY IMPORTANT: You must generate your "reply", "description", and "suggested_prompts" in the user's preferred language: \${language}.
 9. If the user asks to inspect a device, inspect an element, or open the inspector, you MUST use the "open_inspector" action instead of "open_toolbox".
 10. If the user asks to mirror the screen, control the screen, or launch screen sharing/scrcpy, you MUST use the "open_scrcpy" action.
 11. If the user asks to go to a feature, screen, or functionality, trigger a 'navigate' action with the correct target. For example:
@@ -112,7 +113,7 @@ RULES:
 12. If you are asked to create, modify or delete files for Robot Framework, you MUST adhere to the following rules:
     - Separate logic from tests: Test files (.robot) should ONLY contain BDD (Gherkin) scenarios.
     - All technical implementations (clicks, waits, etc) MUST reside in resource files (.resource) following the Page Object Model (POM) architecture.
-    - Keywords MUST be parameterized to maximize reuse, including the Gherkin steps (e.g., '\${GHERKIN} I do something', so it can be used as 'When I do something').
+    - Keywords MUST be parameterized to maximize reuse, including the Gherkin steps (e.g., '\\\${GHERKIN} I do something', so it can be used as 'When I do something').
     - Imports must be efficient and scoped correctly.
     - Analyze existing test files (.robot) to learn and reuse their 'Suite Setup', 'Test Setup', 'Suite Teardown', and 'Test Teardown' configurations when creating new tests.
     - The app does not magically open on the target screen. When creating tests for a specific screen, you MUST include the necessary Gherkin steps and Resource Keywords to navigate from the App's initial state (e.g. Home or Login) to the target screen.
@@ -123,6 +124,25 @@ RULES:
 14. If you see an index of project files and you need more context from one or more of them to complete the user's request, return an array of their exact paths in the 'needs_context_files' field. You will receive a second prompt with their contents. If you do this, leave 'actions' and 'suggested_prompts' empty, and provide a brief explanation in 'reply'.
 
 JSON SCHEMA TO FOLLOW:
-${JSON.stringify(AGENT_JSON_SCHEMA, null, 2)}
-`;
+\${jsonSchema}`;
+
+    const jsonSchemaString = JSON.stringify(getAgentJsonSchema(), null, 2);
+
+    return basePromptTemplate
+        .replace('${context}', context)
+        .replace('${language}', language)
+        .replace('${jsonSchema}', jsonSchemaString);
 }
+
+export const getAgentJsonSchema = () => {
+    const { getRemoteString } = require('../remoteConfig');
+    const remoteStr = getRemoteString('agent_json_schema');
+    if (remoteStr) {
+        try {
+            return JSON.parse(remoteStr);
+        } catch (e) {
+            console.error("Failed to parse remote agent_json_schema", e);
+        }
+    }
+    return FALLBACK_AGENT_JSON_SCHEMA;
+};

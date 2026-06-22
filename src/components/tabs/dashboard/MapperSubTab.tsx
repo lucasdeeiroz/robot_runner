@@ -8,6 +8,7 @@ import { XMLParser } from 'fast-xml-parser';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { useOutsideClick } from '@/hooks/useOutsideClick';
+import { getRemoteString } from '@/lib/remoteConfig';
 import { InspectorNode, transformXmlToTree, generateXPath, findNodesByLocator, findNodesByText, sanitizeId } from '@/lib/inspectorUtils';
 import { feedback } from "@/lib/feedback";
 import { Section } from "@/components/organisms/Section";
@@ -1550,7 +1551,11 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         // CRITICAL FIX: Fetch latest maps from disk to avoid stale React state
         const currentDiskMaps = await loadSavedMaps();
 
-        explorerRef.current = new AutonomousExplorer(t, 9999, engineConfig, currentDiskMaps);
+        const circuitBreakerStr = getRemoteString('max_exploration_circuit_breaker') || '50';
+        const circuitBreaker = parseInt(circuitBreakerStr, 10) || 50;
+        const maxSteps = Math.min(settings.maxExplorationSteps || 30, circuitBreaker);
+
+        explorerRef.current = new AutonomousExplorer(t, maxSteps, engineConfig, currentDiskMaps);
         explorationPromptRef.current = customPrompt;
 
         explorerRef.current.addLog(explorerRef.current.getGraphSummaryLog(currentDiskMaps, t('mapper.exploration.summary_initial', 'Resumo Inicial do Grafo')), 'info');

@@ -9,7 +9,7 @@ import { TagInput } from '@/components/atoms/TagInput';
 import { Switch } from '@/components/atoms/Switch';
 import { Textarea } from '@/components/atoms/Textarea';
 import { Select } from '@/components/atoms/Select';
-import { ExplorationConfig, DESTRUCTIVE_TERMS, ESCAPE_TERMS } from '@/lib/dashboard/explorationEngine';
+import { ExplorationConfig, getDestructiveTerms, getEscapeTerms } from '@/lib/dashboard/explorationEngine';
 import { useSettings } from '@/lib/settings';
 
 interface AutonomousExplorationConfigModalProps {
@@ -81,8 +81,8 @@ export function AutonomousExplorationConfigModal({ onClose, onStart }: Autonomou
         localStorage.setItem('exploration_config_aiPrompt', aiPrompt);
         const config: ExplorationConfig = {
             priorityKeywords: mode === 'specific' ? priorityKeywords : [],
-            avoidKeywords: limits === 'custom' ? (avoidKeywords.length > 0 ? avoidKeywords : DESTRUCTIVE_TERMS) : [],
-            escapeTargets: limits === 'custom' ? (escapeTargets.length > 0 ? escapeTargets : ESCAPE_TERMS) : [],
+            avoidKeywords: limits === 'custom' ? (avoidKeywords.length > 0 ? avoidKeywords : getDestructiveTerms()) : [],
+            escapeTargets: limits === 'custom' ? (escapeTargets.length > 0 ? escapeTargets : getEscapeTerms()) : [],
             forceReexplore: [],
             revisitKnownScreens: mode === 'all' || mode === 'specific',
             targetPackage: targetPackage || undefined,

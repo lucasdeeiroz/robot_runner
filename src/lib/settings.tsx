@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { invoke } from '@tauri-apps/api/core';
 import { feedback } from './feedback';
 import { checkForUpdates, UpdateInfo } from './updater';
+import { getRemoteString } from './remoteConfig';
 
 export interface SystemVersions {
     adb: string;
@@ -121,18 +122,18 @@ export interface AppSettings {
     };
 }
 
-const DEFAULT_SETTINGS: AppSettings = {
+const getDefaultSettings = (): AppSettings => ({
     theme: 'dark',
     language: 'en_US',
     primaryColor: 'blue',
     aiProvider: 'gemini',
     geminiApiKey: '',
     antigravityApiKey: '',
-    geminiModel: 'gemini-1.5-flash',
+    geminiModel: getRemoteString('default_gemini_model') || 'gemini-3.1-flash-lite',
     claudeApiKey: '',
-    claudeModel: 'claude-3-5-sonnet-20240620',
+    claudeModel: getRemoteString('default_claude_model') || 'claude-3-5-sonnet-20240620',
     openaiApiKey: '',
-    openaiModel: 'gpt-4o',
+    openaiModel: getRemoteString('default_openai_model') || 'gpt-4o',
     recycleDeviceViews: false, // Default to false
     allowActionsDuringTest: false, // Default to false (blocking)
     saveLogs: false, // Default to false
@@ -152,8 +153,8 @@ const DEFAULT_SETTINGS: AppSettings = {
         mappings: '',
     },
     tools: {
-        appiumArgs: '--relaxed-security',
-        scrcpyArgs: '-m 1024 -b 2M --max-fps=30 --no-audio --stay-awake',
+        appiumArgs: getRemoteString('default_appium_args') || '--relaxed-security',
+        scrcpyArgs: getRemoteString('default_scrcpy_args') || '-m 1024 -b 2M --max-fps=30 --no-audio --stay-awake',
         robotArgs: '--split-log',
         maestroArgs: '',
         appiumJavaArgs: 'test',
@@ -201,7 +202,7 @@ const DEFAULT_SETTINGS: AppSettings = {
         notifyOnPass: false,
         notifyOnFail: false
     }
-};
+});
 
 export interface Profile {
     id: string;
@@ -330,7 +331,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const [storeData, setStoreData] = useState<SettingsStoreData>({
         activeProfileId: 'default',
         profiles: {
-            'default': { id: 'default', name: 'Default', settings: DEFAULT_SETTINGS }
+            'default': { id: 'default', name: 'Default', settings: getDefaultSettings() }
         }
     });
     const [activeWebUrl, setActiveWebUrl] = useState<string>('https://google.com');
@@ -406,9 +407,18 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                     // Just ensure defaults for missing fields in existing profiles
                     const migrated = { ...decryptedSaved };
                     Object.keys(migrated.profiles).forEach(pid => {
-                        migrated.profiles[pid].settings = deepMerge(DEFAULT_SETTINGS, migrated.profiles[pid].settings);
+                        migrated.profiles[pid].settings = deepMerge(getDefaultSettings(), migrated.profiles[pid].settings);
                         migrated.profiles[pid].settings.aiChatEnabled = false;
                         migrated.profiles[pid].settings.aiTestModeEnabled = false;
+                        
+                        // Active Migration for Remote Config overrides
+                        const s = migrated.profiles[pid].settings;
+                        const ds = getDefaultSettings();
+                        if (s.geminiModel === 'gemini-1.5-flash' || s.geminiModel === 'gemini-3.1-flash-lite') s.geminiModel = ds.geminiModel;
+                        if (s.claudeModel === 'claude-3-5-sonnet-20240620') s.claudeModel = ds.claudeModel;
+                        if (s.openaiModel === 'gpt-4o') s.openaiModel = ds.openaiModel;
+                        if (s.tools.scrcpyArgs === '-m 1024 -b 2M --max-fps=30 --no-audio --stay-awake') s.tools.scrcpyArgs = ds.tools.scrcpyArgs;
+                        if (s.tools.appiumArgs === '--relaxed-security') s.tools.appiumArgs = ds.tools.appiumArgs;
                     });
 
                     // Validate activeProfileId
@@ -419,7 +429,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                             migrated.activeProfileId = migrated.profiles['default'] ? 'default' : availableIds[0];
                         } else {
                             // Should not happen if we found profiles, but just in case
-                            migrated.profiles = { 'default': { id: 'default', name: 'Default', settings: DEFAULT_SETTINGS } };
+                            migrated.profiles = { 'default': { id: 'default', name: 'Default', settings: getDefaultSettings() } };
                             migrated.activeProfileId = 'default';
                         }
                     }
@@ -428,9 +438,18 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                 } else {
                     // It's the old flat format. Migrate to Default Profile.
                     console.info("Migrating legacy settings to Default Profile...");
-                    const migratedSettings = deepMerge(DEFAULT_SETTINGS, decryptedSaved as unknown as Partial<AppSettings>);
+                    const migratedSettings = deepMerge(getDefaultSettings(), decryptedSaved as unknown as Partial<AppSettings>);
                     migratedSettings.aiChatEnabled = false;
                     migratedSettings.aiTestModeEnabled = false;
+                    
+                    // Active Migration for old flat format
+                    const ds = getDefaultSettings();
+                    if (migratedSettings.geminiModel === 'gemini-1.5-flash' || migratedSettings.geminiModel === 'gemini-3.1-flash-lite') migratedSettings.geminiModel = ds.geminiModel;
+                    if (migratedSettings.claudeModel === 'claude-3-5-sonnet-20240620') migratedSettings.claudeModel = ds.claudeModel;
+                    if (migratedSettings.openaiModel === 'gpt-4o') migratedSettings.openaiModel = ds.openaiModel;
+                    if (migratedSettings.tools.scrcpyArgs === '-m 1024 -b 2M --max-fps=30 --no-audio --stay-awake') migratedSettings.tools.scrcpyArgs = ds.tools.scrcpyArgs;
+                    if (migratedSettings.tools.appiumArgs === '--relaxed-security') migratedSettings.tools.appiumArgs = ds.tools.appiumArgs;
+
                     const newStoreData: SettingsStoreData = {
                         activeProfileId: 'default',
                         profiles: {
@@ -517,7 +536,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         const newProfile: Profile = {
             id,
             name,
-            settings: DEFAULT_SETTINGS
+            settings: getDefaultSettings()
         };
         const newData = {
             ...storeData,

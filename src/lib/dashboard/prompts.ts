@@ -1,14 +1,14 @@
 import { ScreenMap, NavigationData } from '@/lib/types';
 import { getRemoteString } from '../remoteConfig';
 import type { ExplorationConfig } from './explorationEngine';
-import { DESTRUCTIVE_TERMS } from './explorationEngine';
+import { getDestructiveTerms } from './explorationEngine';
 
 /**
  * System prompt for the lightweight pre-analysis step that runs before the DFS starts.
  * The model must return ONLY a JSON object — no markdown, no prose.
  */
 export function getExplorationInitPrompt(): string {
-  return `You are a mobile QA exploration analyzer. Parse the user's exploration goal and extract session constraints.
+  return getRemoteString('prompt_exploration_init') || `You are a mobile QA exploration analyzer. Parse the user's exploration goal and extract session constraints.
 
 Return ONLY a valid JSON object — no markdown, no backticks, no explanation, no extra text:
 {
@@ -48,7 +48,7 @@ export function buildExplorationConstraints(config: ExplorationConfig): string {
     lines.push(`- Priority elements (explore first): ${config.priorityKeywords.join(', ')}`);
   }
 
-  const allAvoidKeywords = Array.from(new Set([...config.avoidKeywords, ...DESTRUCTIVE_TERMS]));
+  const allAvoidKeywords = Array.from(new Set([...config.avoidKeywords, ...getDestructiveTerms()]));
   if (allAvoidKeywords.length > 0) {
     lines.push(`- Avoid clicking elements with: ${allAvoidKeywords.join(', ')}`);
   }
@@ -503,17 +503,25 @@ Analyze the test failure provided (error message + screenshot if available).
  * Standardizes the "Senior QA Specialist" wrapper for refined test cases.
  */
 export function getQAAssistantWrapper(promptString: string, appMapping: boolean, mappingContext: string, customPrompt?: string): string {
-  const basePrompt = `
+  const basePromptTemplate = getRemoteString('prompt_qa_assistant_wrapper') || `
 You are a Senior QA Specialist and Product Owner assistant.
 
-${promptString}
+\${promptString}
 
 RULES:
 1. Output ONLY the raw content without markdown code blocks, headers, or introductory text.
 2. Keep the content professional, concise, and technically accurate.
-3. ${appMapping ? "PRIORITIZE using the names and screens provided in the APPLICATION MAPPING context below. If a requirement mentions an action that matches a mapped element, use that element's specific name." : "Use generic but clear terminology."}
-${mappingContext}
+3. \${appMapping}
+\${mappingContext}
 `.trim();
+
+  const appMappingText = appMapping ? "PRIORITIZE using the names and screens provided in the APPLICATION MAPPING context below. If a requirement mentions an action that matches a mapped element, use that element's specific name." : "Use generic but clear terminology.";
+  
+  const basePrompt = basePromptTemplate
+    .replace('${promptString}', promptString)
+    .replace('${appMapping}', appMappingText)
+    .replace('${mappingContext}', mappingContext);
+
   return appendCustomPrompt(basePrompt, customPrompt);
 }
 
@@ -565,7 +573,7 @@ Your goal is to execute a test scenario step-by-step on a real device.
 }
 
 export function getEnhancerSystemPrompt(): string {
-  return `You are a UI taxonomy expert. Your task is to analyze batches of mobile UI screens and elements, and provide semantic names and descriptions.
+  return getRemoteString('prompt_enhancer_system') || `You are a UI taxonomy expert. Your task is to analyze batches of mobile UI screens and elements, and provide semantic names and descriptions.
 
 Input will be a JSON array of screens with their elements. Elements might have generic names like "Button 2" or "EditText 1".
 

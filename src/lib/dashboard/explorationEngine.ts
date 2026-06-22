@@ -1,9 +1,16 @@
 import { ScreenMap, UIElementMap } from '@/lib/types';
 import { InspectorNode, generateXPath, sanitizeId } from '@/lib/inspectorUtils';
+import { getRemoteString } from '@/lib/remoteConfig';
 
-export const DESTRUCTIVE_TERMS = ['erase', 'delete', 'remove', 'exclude', 'apagar', 'deletar', 'remover', 'excluir', 'eliminar', 'deletar', 'borrar'];
-export const ESCAPE_TERMS = ['next', 'proceed', 'continue', 'ok', 'confirm', 'save', 'done', 'próximo', 'próxima', 'prosseguir', 'continuar', 'confirmar', 'salvar', 'concluir'];
+export const getDestructiveTerms = () => {
+    const remote = getRemoteString('exploration_destructive_terms');
+    return remote ? remote.split(',').map(s => s.trim().toLowerCase()) : ['erase', 'delete', 'remove', 'exclude', 'apagar', 'deletar', 'remover', 'excluir', 'eliminar', 'deletar', 'borrar'];
+};
 
+export const getEscapeTerms = () => {
+    const remote = getRemoteString('exploration_escape_terms');
+    return remote ? remote.split(',').map(s => s.trim().toLowerCase()) : ['next', 'proceed', 'continue', 'ok', 'confirm', 'save', 'done', 'próximo', 'próxima', 'prosseguir', 'continuar', 'confirmar', 'salvar', 'concluir'];
+};
 export interface ExplorationConfig {
     priorityKeywords: string[];
     avoidKeywords: string[];
