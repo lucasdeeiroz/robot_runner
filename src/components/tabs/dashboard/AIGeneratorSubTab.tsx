@@ -263,17 +263,35 @@ export function AIGeneratorSubTab({ onNavigate }: AIGeneratorSubTabProps) {
             let aiResponse = "";
             const currentLang = i18n.language === 'pt' ? 'Portuguese' : i18n.language === 'es' ? 'Spanish' : 'English';
 
-            if (provider === 'gemini') {
-                aiResponse = await generateWithGemini(requirements, apiKey as string, model, currentLang, mapsContext as any, genType, undefined, customPrompt);
-            } else if (provider === 'claude') {
-                aiResponse = await generateWithClaude(requirements, apiKey as string, model, currentLang, mapsContext as any, genType, undefined, customPrompt);
-            } else if (provider === 'openai') {
-                aiResponse = await generateWithOpenAI(requirements, apiKey as string, model, currentLang, mapsContext as any, genType, undefined, customPrompt);
-            } else if (provider === 'claude-code') {
-                aiResponse = await generateWithClaudeCode(requirements, settings.paths.automationRoot || '', currentLang, mapsContext as any, genType, customPrompt, settings.claudeCodeToken);
-            } else if (provider === 'antigravity-cli') {
-                const { generateRefinedTestCases } = await import('@/lib/dashboard/antigravityCode');
-                aiResponse = await generateRefinedTestCases(requirements, settings.paths.automationRoot || '', currentLang, mapsContext as any, genType, customPrompt, settings.antigravityApiKey);
+            let attempts = 0;
+            const maxAttempts = 3;
+
+            while (attempts < maxAttempts) {
+                try {
+                    if (provider === 'gemini') {
+                        aiResponse = await generateWithGemini(requirements, apiKey as string, model, currentLang, mapsContext as any, genType, undefined, customPrompt);
+                    } else if (provider === 'claude') {
+                        aiResponse = await generateWithClaude(requirements, apiKey as string, model, currentLang, mapsContext as any, genType, undefined, customPrompt);
+                    } else if (provider === 'openai') {
+                        aiResponse = await generateWithOpenAI(requirements, apiKey as string, model, currentLang, mapsContext as any, genType, undefined, customPrompt);
+                    } else if (provider === 'claude-code') {
+                        aiResponse = await generateWithClaudeCode(requirements, settings.paths.automationRoot || '', currentLang, mapsContext as any, genType, customPrompt, settings.claudeCodeToken);
+                    } else if (provider === 'antigravity-cli') {
+                        const { generateRefinedTestCases } = await import('@/lib/dashboard/antigravityCode');
+                        aiResponse = await generateRefinedTestCases(requirements, settings.paths.automationRoot || '', currentLang, mapsContext as any, genType, customPrompt, settings.antigravityApiKey);
+                    }
+                    break; // Success
+                } catch (error: any) {
+                    attempts++;
+                    console.warn(`AI Generator Error (Attempt ${attempts} of ${maxAttempts}):`, error);
+                    
+                    if (attempts < maxAttempts) {
+                        feedback.toast.info(t('ai_agent.retry_attempt', { defaultValue: `Connection failed. Retrying... (${attempts}/${maxAttempts})` }));
+                        await new Promise(resolve => setTimeout(resolve, 2000 * attempts));
+                    } else {
+                        throw error;
+                    }
+                }
             }
 
             setGeneratedContent(aiResponse);

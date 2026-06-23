@@ -275,22 +275,50 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                 content: m.content
             }));
 
-            const response = await askAgent(
-                textToSend,
-                historyForService,
-                context,
-                settings,
-                settings.aiSessionId,
-                (event) => {
-                    if (event.type === 'context_requested') {
+            let response;
+            let attempts = 0;
+            const maxAttempts = 3;
+
+            while (attempts < maxAttempts) {
+                try {
+                    response = await askAgent(
+                        textToSend,
+                        historyForService,
+                        context,
+                        settings,
+                        settings.aiSessionId,
+                        (event) => {
+                            if (event.type === 'context_requested') {
+                                setMessages(prev => [...prev, {
+                                    id: (Date.now() + Math.random()).toString(),
+                                    role: 'agent',
+                                    content: `*${t('ai_agent.context_requested', { file: event.file, defaultValue: 'I am reading additional project files to better understand the context...' })}*`
+                                }]);
+                            }
+                        }
+                    );
+                    break; // Success
+                } catch (error: any) {
+                    attempts++;
+                    console.warn(`AI Agent Error (Attempt ${attempts} of ${maxAttempts}):`, error);
+                    
+                    if (attempts < maxAttempts) {
                         setMessages(prev => [...prev, {
                             id: (Date.now() + Math.random()).toString(),
                             role: 'agent',
-                            content: `*${t('ai_agent.context_requested', { file: event.file, defaultValue: 'I am reading additional project files to better understand the context...' })}*`
+                            content: `*${t('ai_agent.retry_attempt', { defaultValue: `Connection failed. Retrying... (${attempts}/${maxAttempts})` })}*`
                         }]);
+                        await new Promise(resolve => setTimeout(resolve, 2000 * attempts));
+                    } else {
+                        throw error;
                     }
                 }
-            );
+            }
+
+            // At this point we either have a valid response or it threw
+            if (!response) {
+                throw new Error("Failed to get response after retries");
+            }
 
             if (response.sessionId && response.sessionId !== settings.aiSessionId) {
                 updateSetting('aiSessionId', response.sessionId);

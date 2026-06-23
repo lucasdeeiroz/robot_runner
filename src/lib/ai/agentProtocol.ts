@@ -3,6 +3,8 @@
  * It provides the Types and the JSON Schema that the AI provider must adhere to.
  */
 
+import { getRemoteString } from '../remoteConfig';
+
 export type AgentActionType =
     | 'navigate'
     | 'run_test'
@@ -82,7 +84,6 @@ export const FALLBACK_AGENT_JSON_SCHEMA = {
 };
 
 export function getAgentSystemInstruction(context: string, language: string = "en_US"): string {
-    const { getRemoteString } = require('../remoteConfig');
     const basePromptTemplate = getRemoteString('prompt_agent_system_instruction') || `You are the integrated AI Agent for Robot Runner, a desktop application for QA Mobile Automation, called 'Rai'.
 As 'Rai', your goal is to assist the user by answering questions, analyzing logs, and executing tasks directly within the app.
 
@@ -120,6 +121,7 @@ RULES:
     - When interacting with mapped screen elements, ALWAYS use the element's 'short_id' as the locator parameter. NEVER use the screen's 'id'.
     - Observe the existing folder structure in 'tests/' and 'resources/'. Always place new files inside appropriate subdirectories (e.g., by feature or screen) matching the existing project organization, rather than creating them at the root.
     - For 'modify_file' actions, you MUST provide the FULL and COMPLETE updated content of the file. Do NOT use placeholders (like '...', '// rest of the code', etc.). The file will be completely overwritten by your output.
+    - CRITICAL: Be exhaustive and comprehensive. When creating tests, you MUST generate comprehensive edge cases, negative tests, boundary conditions, and validation rules to ensure robust test coverage. Do NOT just cover the basic happy path.
 13. When reading, exploring, or modifying the file system, you MUST strictly respect and ignore all files and directories specified in .gitignore, .claudeignore, and .geminiignore files.
 14. If you see an index of project files and you need more context from one or more of them to complete the user's request, return an array of their exact paths in the 'needs_context_files' field. You will receive a second prompt with their contents. If you do this, leave 'actions' and 'suggested_prompts' empty, and provide a brief explanation in 'reply'.
 
@@ -129,13 +131,12 @@ JSON SCHEMA TO FOLLOW:
     const jsonSchemaString = JSON.stringify(getAgentJsonSchema(), null, 2);
 
     return basePromptTemplate
-        .replace('${context}', context)
-        .replace('${language}', language)
-        .replace('${jsonSchema}', jsonSchemaString);
+        .replace('\${context}', context)
+        .replace('\${language}', language)
+        .replace('\${jsonSchema}', jsonSchemaString);
 }
 
 export const getAgentJsonSchema = () => {
-    const { getRemoteString } = require('../remoteConfig');
     const remoteStr = getRemoteString('agent_json_schema');
     if (remoteStr) {
         try {

@@ -196,7 +196,7 @@ RULES:
    - If an element is an "(Assert Target)", ensure there is a "Then" step verifying its presence or correctness.
    - If an element specifies "(Mock: data)", use that exact data in your "When" inputs.
    - If an element specifies "(Rule: id)", append that ID to the scenario or steps for traceability.
-4. Write AS MANY test cases as possible to comprehensively cover the requirements. Exhaustively cover Happy Paths, Edge Cases, Negative/Sad Paths, Boundary values, and Validation rules. Do not stop at just two scenarios; generate a robust, full suite.
+4. CRITICAL: You MUST write an exhaustive suite of test cases. Do NOT just cover the happy path. You MUST generate comprehensive test cases covering Edge Cases, Negative/Sad Paths, Boundary values, and Validation rules. Generate at least 5-10 scenarios if applicable, ensuring maximum coverage.
 5. Keep scenarios atomic, independent, and clear.
 6. Number the steps within each scenario sequentially starting from 1 (e.g., 1. Given, 2. When, 3. Then). Do NOT use hierarchical numbering, sub-bullets, or spaces between numbers (e.g., avoid 1.1, 1.2, or "1 2").
 `.trim();
@@ -226,7 +226,7 @@ RULES:
 3. Map actions and verifications to the mapped elements in the APPLICATION MAPPING context where applicable. 
    - If an element is an "(Assert Target)", ensure there is a verification step for it.
    - If an element specifies "(Mock: data)", use that exact data in the inputs.
-4. Write AS MANY test cases as possible to comprehensively cover the requirements. Exhaustively cover Happy Paths, Edge Cases, Negative/Sad Paths, Boundary values, and Validation rules. Do not stop at just two scenarios; generate a robust, full suite.
+4. CRITICAL: You MUST write an exhaustive suite of test cases. Do NOT just cover the happy path. You MUST generate comprehensive test cases covering Edge Cases, Negative/Sad Paths, Boundary values, and Validation rules. Generate at least 5-10 scenarios if applicable, ensuring maximum coverage.
 5. Keep scenarios atomic, independent, and clear.
 `.trim();
   const languageDirective = `Language: ${language}.`;
@@ -304,6 +304,7 @@ RULES:
    - For elements marked with "(Mock: data)", use that mock data as the default variable value in the script.
    - For elements marked with "(Rule: id)", add a \`[Tags] rule_id\` to the test case.
 8. Ensure the script is valid and follows best practices for mobile automation.
+9. CRITICAL: You MUST write an exhaustive suite of test cases. Do NOT just cover the happy path. You MUST generate comprehensive test cases covering Edge Cases, Negative/Sad Paths, Boundary values, and Validation rules. Generate at least 5-10 scenarios if applicable, ensuring maximum coverage.
 `.trim();
   const languageDirective = `Language: ${language}.`;
   return appendCustomPrompt(`${basePrompt}\n${languageDirective}`, customPrompt);
