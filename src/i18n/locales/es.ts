@@ -1678,7 +1678,45 @@ export const es = {
                 mirror: "Espejo",
                 performance: "Rendimiento",
                 apps: "Apps",
-                webview: "Webview"
+                webview: "Webview",
+                hardware: "Hardware"
+            },
+            hardware: {
+                battery: {
+                    title: "Simulación de Batería",
+                    set_level: "Nivel (%)",
+                    quick_actions: "Acciones Rápidas",
+                    unplug: "Desconectar",
+                    unplug_desc: "Simular estado desconectado (descargando)",
+                    reset: "Restablecer",
+                    reset_desc: "Restablecer estado físico",
+                    set_success: "Batería ajustada a {{level}}%",
+                    set_error: "Error al ajustar la batería",
+                    unplug_success: "Batería desconectada (descargando)",
+                    unplug_error: "Error al desconectar la batería",
+                    reset_success: "Estado de batería restablecido",
+                    reset_error: "Error al restablecer la batería"
+                },
+                connectivity: {
+                    title: "Conectividad",
+                    wifi: "WiFi",
+                    mobile_data: "Datos Móviles",
+                    airplane_mode: "Modo Avión",
+                    wifi_success: "Estado de WiFi cambiado",
+                    wifi_error: "Error al cambiar WiFi",
+                    data_success: "Estado de Datos Móviles cambiado",
+                    data_error: "Error al cambiar datos móviles",
+                    airplane_success: "Modo Avión cambiado",
+                    airplane_error: "Error al cambiar Modo Avión"
+                },
+                broadcast: {
+                    title: "Broadcasts del Sistema",
+                    intent_action: "Acción (Intent Action)",
+                    extras: "Extras (Opcional)",
+                    send: "Enviar Broadcast",
+                    success: "Broadcast enviado",
+                    error: "Error al enviar broadcast"
+                }
             },
             actions: {
                 screenshot: "Capturar Pantalla",

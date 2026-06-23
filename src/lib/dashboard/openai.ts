@@ -3,6 +3,7 @@ import { AIGenerationType, AutonomousActionResponse } from './gemini';
 import { DeepAnalysisContext } from "./historyAnalysisUtils";
 import { formatExistingMaps, getExplorationPrompt, getRefinedTestCasesPrompt, getRefinedPBIPrompt, getRefinedImprovementPrompt, getRefinedBugPrompt, getRefinedRobotScriptPrompt, getFlowchartLayoutPrompt, getElementNamingPrompt, getScreenTaggingPrompt, getTestHistoryAnalysisPrompt, getExecutionSummaryPrompt, getQAAssistantWrapper, getAutonomousAgentPrompt } from "./prompts";
 import { fetch } from '@tauri-apps/plugin-http';
+import { withModelRotation } from './aiFallback';
 
 function extractBase64Data(imageBase64: string): { mimeType: string, data: string } {
     const trimmed = imageBase64.trim();
@@ -124,7 +125,7 @@ export async function askOpenAI(
     }
     messages.push({ role: 'user', content: userContent });
 
-    const { withModelRotation } = await import('./aiFallback');
+    
 
     return withModelRotation('openai', model, async (currentModel) => {
         const body: any = {

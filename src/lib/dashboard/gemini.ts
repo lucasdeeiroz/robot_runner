@@ -15,6 +15,7 @@ interface GeminiResponse {
 }
 
 import { ScreenMap, UIElementMap } from '@/lib/types';
+import { withModelRotation } from './aiFallback';
 import { DeepAnalysisContext } from "./historyAnalysisUtils";
 import { getExplorationPrompt, formatExistingMaps, getRefinedTestCasesPrompt, getRefinedTraditionalTestCasesPrompt, getRefinedPBIPrompt, getRefinedImprovementPrompt, getRefinedBugPrompt, getRefinedRobotScriptPrompt, getFlowchartLayoutPrompt, getElementNamingPrompt, getScreenTaggingPrompt, getTestHistoryAnalysisPrompt, getExecutionSummaryPrompt, getQAAssistantWrapper, getAutonomousAgentPrompt } from "./prompts";
 import { fetch } from '@tauri-apps/plugin-http';
@@ -134,7 +135,7 @@ export async function askGemini(
         });
     }
 
-    const { withModelRotation } = await import('./aiFallback');
+    
 
     return withModelRotation('gemini', model, async (currentModel) => {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${apiKey}`;

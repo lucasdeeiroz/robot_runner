@@ -9,6 +9,8 @@ pub mod scrcpy;
 pub mod shell;
 pub mod stats;
 pub mod wireless;
+pub mod hardware;
+pub mod dmesg;
 
 pub struct AdbState {
     pub custom_path: Mutex<Option<String>>,

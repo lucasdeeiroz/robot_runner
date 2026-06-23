@@ -1,6 +1,8 @@
 import { ExplorationConfig, DEFAULT_EXPLORATION_CONFIG } from './explorationEngine';
 import { getExplorationInitPrompt } from './prompts';
 import type { AppSettings } from '@/lib/settings';
+import { askClaudeCode } from '@/lib/dashboard/claudeCode';
+import { askAntigravityCli } from '@/lib/dashboard/antigravityCode';
 
 const LIGHT_MODELS: Record<string, string> = {
     gemini: 'gemini-2.5-flash',
@@ -51,7 +53,6 @@ export async function analyzeExplorationPrompt(
         } else if (aiProvider === 'openai') {
             rawText = await callOpenAIText(userPrompt, systemPrompt, apiKey as string, lightModel, effectiveSignal);
         } else if (aiProvider === 'claude-code') {
-            const { askClaudeCode } = await import('@/lib/dashboard/claudeCode');
             // Try to wrap CLI call in a Promise.race with signal
             const cliPromise = askClaudeCode(userPrompt, settings.paths?.automationRoot || '', systemPrompt, settings.claudeCodeToken);
             const result = await Promise.race([
@@ -63,7 +64,6 @@ export async function analyzeExplorationPrompt(
             ]);
             rawText = typeof result === 'string' ? result : result.result;
         } else if (aiProvider === 'antigravity-cli') {
-            const { askAntigravityCli } = await import('@/lib/dashboard/antigravityCode');
             const cliPromise = askAntigravityCli(userPrompt, settings.paths?.automationRoot || '', systemPrompt, settings.antigravityApiKey);
             const result = await Promise.race([
                 cliPromise,

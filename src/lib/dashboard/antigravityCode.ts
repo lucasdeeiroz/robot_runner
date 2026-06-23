@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { ScreenMap, UIElementMap } from '@/lib/types';
 import { AIGenerationType, AutonomousActionResponse } from './gemini';
 import { getExplorationPrompt, formatExistingMaps, getRefinedTestCasesPrompt, getRefinedPBIPrompt, getRefinedImprovementPrompt, getRefinedBugPrompt, getRefinedRobotScriptPrompt, getFlowchartLayoutPrompt, getQAAssistantWrapper, getExecutionSummaryPrompt, getAutonomousAgentPrompt } from "./prompts";
+import { join } from '@tauri-apps/api/path';
 
 /**
  * Robustly parses JSON from a string that might contain markdown backticks or other noise.
@@ -107,7 +108,6 @@ export async function askAntigravityCli(
 
     try {
         if (fullPrompt.length > 7000) {
-            const { join } = await import('@tauri-apps/api/path');
             tempFilePath = await join(projectRoot, '.rr_prompt.tmp');
             await invoke('fs_write_text_file', { path: tempFilePath, content: fullPrompt });
             promptToPass = "Read the file .rr_prompt.tmp for your full instructions and history. Execute the request.";
@@ -182,7 +182,6 @@ export async function askAntigravityCli(
     } catch (error: any) {
         if (tempFilePath) {
             try {
-                const { invoke } = await import('@tauri-apps/api/core');
                 await invoke('fs_remove_file', { path: tempFilePath });
             } catch(e) {}
         }

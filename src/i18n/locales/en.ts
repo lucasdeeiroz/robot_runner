@@ -1674,7 +1674,45 @@ export const en = {
                 mirror: "Mirror",
                 performance: "Performance",
                 apps: "Apps",
-                webview: "Webview"
+                webview: "Webview",
+                hardware: "Hardware"
+            },
+            hardware: {
+                battery: {
+                    title: "Battery Mocking",
+                    set_level: "Set Level (%)",
+                    quick_actions: "Quick Actions",
+                    unplug: "Unplug",
+                    unplug_desc: "Simulate unplugged state",
+                    reset: "Reset",
+                    reset_desc: "Reset to physical state",
+                    set_success: "Battery set to {{level}}%",
+                    set_error: "Failed to set battery",
+                    unplug_success: "Battery unplugged (discharging)",
+                    unplug_error: "Failed to unplug battery",
+                    reset_success: "Battery status reset",
+                    reset_error: "Failed to reset battery"
+                },
+                connectivity: {
+                    title: "Connectivity",
+                    wifi: "WiFi",
+                    mobile_data: "Mobile Data",
+                    airplane_mode: "Airplane Mode",
+                    wifi_success: "WiFi toggled",
+                    wifi_error: "Failed to toggle WiFi",
+                    data_success: "Mobile Data toggled",
+                    data_error: "Failed to toggle Mobile Data",
+                    airplane_success: "Airplane mode toggled",
+                    airplane_error: "Failed to toggle Airplane mode"
+                },
+                broadcast: {
+                    title: "System Broadcasts",
+                    intent_action: "Intent Action",
+                    extras: "Extras (Optional)",
+                    send: "Send Broadcast",
+                    success: "Broadcast sent",
+                    error: "Failed to send broadcast"
+                }
             },
             actions: {
                 screenshot: "Take Screenshot",

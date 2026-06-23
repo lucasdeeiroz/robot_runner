@@ -121,7 +121,7 @@ RULES:
     - When interacting with mapped screen elements, ALWAYS use the element's 'short_id' as the locator parameter. NEVER use the screen's 'id'.
     - Observe the existing folder structure in 'tests/' and 'resources/'. Always place new files inside appropriate subdirectories (e.g., by feature or screen) matching the existing project organization, rather than creating them at the root.
     - For 'modify_file' actions, you MUST provide the FULL and COMPLETE updated content of the file. Do NOT use placeholders (like '...', '// rest of the code', etc.). The file will be completely overwritten by your output.
-    - CRITICAL: Be exhaustive and comprehensive. When creating tests, you MUST generate comprehensive edge cases, negative tests, boundary conditions, and validation rules to ensure robust test coverage. Do NOT just cover the basic happy path.
+    - CRITICAL: You MUST be extremely exhaustive and comprehensive. When creating tests, you MUST generate at least 10-15 scenarios, including edge cases, negative/sad paths, boundary conditions, empty states, and validation rules to ensure robust test coverage. Do NOT just cover the basic happy path. You will be penalized if you provide only basic tests.
 13. When reading, exploring, or modifying the file system, you MUST strictly respect and ignore all files and directories specified in .gitignore, .claudeignore, and .geminiignore files.
 14. If you see an index of project files and you need more context from one or more of them to complete the user's request, return an array of their exact paths in the 'needs_context_files' field. You will receive a second prompt with their contents. If you do this, leave 'actions' and 'suggested_prompts' empty, and provide a brief explanation in 'reply'.
 

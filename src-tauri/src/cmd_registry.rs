@@ -108,7 +108,19 @@ macro_rules! generate_robot_runner_handler {
             crate::git::git_commit,
             crate::git::git_push,
             crate::git::git_fetch,
-            crate::git::git_pull
+            crate::git::git_pull,
+            crate::adb::hardware::adb_hardware_battery_set,
+            crate::adb::hardware::adb_hardware_battery_reset,
+            crate::adb::hardware::adb_hardware_battery_unplug,
+            crate::adb::hardware::adb_hardware_network_wifi,
+            crate::adb::hardware::adb_hardware_network_data,
+            crate::adb::hardware::adb_hardware_airplane_mode,
+            crate::adb::hardware::adb_hardware_send_broadcast,
+            crate::adb::dmesg::start_dmesg,
+            crate::adb::dmesg::stop_dmesg,
+            crate::adb::dmesg::is_dmesg_active,
+            crate::adb::dmesg::get_dmesg_details,
+            crate::adb::dmesg::fetch_dmesg_buffer
         ]
     };
 }

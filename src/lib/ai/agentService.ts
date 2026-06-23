@@ -5,6 +5,8 @@ import { askClaude } from '@/lib/dashboard/claude';
 import { askOpenAI } from '@/lib/dashboard/openai';
 import { getAgentSystemInstruction, getAgentJsonSchema, AgentResponse } from './agentProtocol';
 import { AppSettings } from '@/lib/settings';
+import { invoke } from '@tauri-apps/api/core';
+import { join } from '@tauri-apps/api/path';
 
 export interface AgentServiceResponse {
     response: AgentResponse;
@@ -52,9 +54,6 @@ function safeParseJson<T>(content: string): T {
 
 async function getProjectAgentContext(automationRoot: string): Promise<string> {
     try {
-        const { join } = await import('@tauri-apps/api/path');
-        const { invoke } = await import('@tauri-apps/api/core');
-
         let indexContext = "AVAILABLE PROJECT FILES INDEX:\n";
         const agentsDir = await join(automationRoot, '.agents');
 
@@ -191,9 +190,6 @@ export async function askAgent(
             if (onProgress) {
                 onProgress({ type: 'context_requested', file: result.needs_context_files.join(', ') });
             }
-
-            const { join } = await import('@tauri-apps/api/path');
-            const { invoke } = await import('@tauri-apps/api/core');
             let extraFileContents = "";
 
             for (const path of result.needs_context_files) {
