@@ -1025,6 +1025,13 @@ export const pt = {
             save_error: "Falha ao salvar dados de performance",
             record_error: "Falha ao iniciar gravação",
             title: "Desempenho do Dispositivo",
+            history: "Histórico de Performance",
+            general_history: "Histórico do Sistema",
+            app_history: "Histórico do App",
+            ram_history: "Uso de RAM (MB)",
+            fps_history: "App FPS",
+            system_ram: "RAM do Sistema",
+            app_ram: "RAM do App",
             auto_on: "Auto-Atualizar Ligado",
             auto_off: "Auto-Atualizar Desligado",
             refresh: "Atualizar Agora",
@@ -1667,6 +1674,17 @@ export const pt = {
             },
             rerun: {
                 init_error: "Falha ao iniciar reexecução"
+            },
+            dmesg: {
+                start_error: "Falha ao iniciar dmesg",
+                saved: "Logs do Dmesg salvos",
+                stop_error: "Falha ao parar dmesg",
+                select_device: "Selecione um dispositivo para visualizar os logs do Kernel",
+                title: "Logs do Kernel (dmesg)",
+                analyze_ai: "Analisar com IA",
+                waiting: "Aguardando logs do kernel...",
+                no_logs: "Sem logs. Clique em Iniciar.",
+                ai_analysis_title: "Análise de IA do Log do Kernel"
             },
             tabs: {
                 console: "Console de Teste",

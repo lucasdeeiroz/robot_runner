@@ -1024,6 +1024,13 @@ export const en = {
             save_error: "Failed to save performance data",
             record_error: "Failed to start recording",
             title: "Device Performance",
+            history: "Performance History",
+            general_history: "System History",
+            app_history: "App History",
+            ram_history: "RAM Usage (MB)",
+            fps_history: "App FPS",
+            system_ram: "System RAM",
+            app_ram: "App RAM",
             auto_on: "Auto-Refresh On",
             auto_off: "Auto-Refresh Off",
             refresh: "Refresh Now",
@@ -1665,7 +1672,18 @@ export const en = {
                 open_error: "Failed to open Scrcpy"
             },
             rerun: {
-                init_error: "Failed to initiate rerun"
+                init_error: "Failed to initialize rerun"
+            },
+            dmesg: {
+                start_error: "Failed to start dmesg",
+                saved: "Dmesg logs saved",
+                stop_error: "Failed to stop dmesg",
+                select_device: "Select a device to view Kernel Logs",
+                title: "Kernel Logs (dmesg)",
+                analyze_ai: "Analyze with AI",
+                waiting: "Waiting for kernel logs...",
+                no_logs: "No logs. Click Start.",
+                ai_analysis_title: "Kernel Log AI Analysis"
             },
             tabs: {
                 console: "Test Console",

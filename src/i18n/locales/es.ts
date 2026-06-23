@@ -1028,6 +1028,13 @@ export const es = {
             save_error: "Error al guardar datos de rendimiento",
             record_error: "Error al iniciar grabación",
             title: "Rendimiento del Dispositivo",
+            history: "Historial de Rendimiento",
+            general_history: "Historial del Sistema",
+            app_history: "Historial de la Aplicación",
+            ram_history: "Uso de RAM (MB)",
+            fps_history: "FPS de la App",
+            system_ram: "RAM del Sistema",
+            app_ram: "RAM de la App",
             auto_on: "Auto-Actualizar Encendido",
             auto_off: "Auto-Actualizar Apagado",
             refresh: "Actualizar Ahora",
@@ -1669,7 +1676,25 @@ export const es = {
                 open_error: "Error al abrir Scrcpy"
             },
             rerun: {
-                init_error: "Error al iniciar reejecución"
+                init_error: "Fallo al iniciar reejecución"
+            },
+            dmesg: {
+                start_error: "Error al iniciar dmesg",
+                saved: "Registros de Dmesg guardados",
+                stop_error: "Error al detener dmesg",
+                select_device: "Seleccione un dispositivo para ver los registros del kernel",
+                title: "Registros del Kernel (dmesg)",
+                analyze_ai: "Analizar con IA",
+                waiting: "Esperando registros del kernel...",
+                no_logs: "Sin registros. Haga clic en Iniciar.",
+                ai_analysis_title: "Análisis con IA del Registro del Kernel"
+            },
+            performance: {
+                history: "Historial",
+                ram_history: "Historial RAM",
+                fps_history: "Historial FPS",
+                system_ram: "RAM Sistema",
+                app_ram: "RAM App"
             },
             tabs: {
                 console: "Consola de Prueba",
