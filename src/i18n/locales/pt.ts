@@ -1030,6 +1030,7 @@ export const pt = {
             app_history: "Histórico do App",
             ram_history: "Uso de RAM (MB)",
             fps_history: "App FPS",
+            fps: "FPS",
             system_ram: "RAM do Sistema",
             app_ram: "RAM do App",
             auto_on: "Auto-Atualizar Ligado",

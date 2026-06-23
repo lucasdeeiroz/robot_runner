@@ -340,7 +340,7 @@ export function PerformanceSubTab({
                                     </Card>
 
                                     {/* App FPS */}
-                                    <Card title="FPS" icon={<Eye size={24} className="text-success" />}>
+                                    <Card title={t('performance.fps', 'FPS')} icon={<Eye size={24} className="text-success" />}>
                                         <div className="flex items-end gap-2 mt-2">
                                             <span className="text-4xl font-bold text-on-surface/50">
                                                 {formatFPS(stats.app_stats.fps)}
@@ -426,7 +426,7 @@ export function PerformanceSubTab({
                                                             formatter={(value: any, name: any) => {
                                                                 if (name === 'app_stats.ram_used') return [(Number(value) / 1024).toFixed(1) + ' MB', t('performance.app_ram', 'App RAM')];
                                                                 if (name === 'app_stats.cpu_usage') return [Number(value).toFixed(1) + '%', t('performance.cpu', 'CPU')];
-                                                                if (name === 'app_stats.fps') return [Math.round(Number(value)) + ' fps', 'FPS'];
+                                                                if (name === 'app_stats.fps') return [Math.round(Number(value)) + ' fps', t('performance.fps', 'FPS')];
                                                                 return [value, name];
                                                             }}
                                                         />

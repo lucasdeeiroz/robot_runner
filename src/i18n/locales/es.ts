@@ -1033,6 +1033,7 @@ export const es = {
             app_history: "Historial de la Aplicación",
             ram_history: "Uso de RAM (MB)",
             fps_history: "FPS de la App",
+            fps: "FPS",
             system_ram: "RAM del Sistema",
             app_ram: "RAM de la App",
             auto_on: "Auto-Actualizar Encendido",
