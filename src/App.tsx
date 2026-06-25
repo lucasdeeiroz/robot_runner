@@ -220,7 +220,7 @@ function AppContent() {
   // Only check system versions AFTER settings are loaded
   useEffect(() => {
     if (!settings_loading) {
-      checkSystemVersions();
+      checkSystemVersions(undefined, undefined, true);
       checkForAppUpdate(false); // Silent global check on startup
     }
   }, [settings_loading]);

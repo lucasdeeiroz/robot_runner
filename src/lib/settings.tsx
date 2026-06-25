@@ -258,6 +258,7 @@ async function decryptValue(val: string | undefined | null): Promise<string> {
 async function processSettingsSecrets<T>(settings: T, mode: 'encrypt' | 'decrypt'): Promise<T> {
     const copy = structuredClone(settings);
     const fn = mode === 'encrypt' ? encryptValue : decryptValue;
+    const promises: Promise<void>[] = [];
 
     for (const path of SECRET_PATHS) {
         let parent: unknown = copy;
@@ -272,22 +273,35 @@ async function processSettingsSecrets<T>(settings: T, mode: 'encrypt' | 'decrypt
         if (isObject(parent)) {
             const lastKey = path[path.length - 1];
             if (parent[lastKey] !== undefined && parent[lastKey] !== null) {
-                parent[lastKey] = await fn(parent[lastKey] as string);
+                // Ensure we capture the exact parent reference and key for the promise
+                const p = parent;
+                const k = lastKey;
+                promises.push(
+                    fn(p[k] as string).then(val => { p[k] = val; })
+                );
             }
         }
     }
+    await Promise.all(promises);
     return copy;
 }
 
 async function processStoreDataSecrets(data: SettingsStoreData, mode: 'encrypt' | 'decrypt'): Promise<SettingsStoreData> {
     const copy = structuredClone(data);
+    const promises: Promise<void>[] = [];
+
     if (copy.profiles) {
         for (const pid of Object.keys(copy.profiles)) {
             if (copy.profiles[pid]?.settings) {
-                copy.profiles[pid].settings = await processSettingsSecrets(copy.profiles[pid].settings, mode);
+                promises.push(
+                    processSettingsSecrets(copy.profiles[pid].settings, mode).then(settings => {
+                        copy.profiles[pid].settings = settings;
+                    })
+                );
             }
         }
     }
+    await Promise.all(promises);
     return copy;
 }
 // Initial Check Status Interface
@@ -314,7 +328,7 @@ interface SettingsContextType {
     loading: boolean;
     hasHydrated: boolean;
     systemVersions: SystemVersions | null;
-    checkSystemVersions: (forceUsageMode?: 'explorer' | 'automator', forceFramework?: 'robot' | 'appium' | 'maestro' | 'cypress' | 'selenium') => Promise<void>;
+    checkSystemVersions: (forceUsageMode?: 'explorer' | 'automator', forceFramework?: 'robot' | 'appium' | 'maestro' | 'cypress' | 'selenium', silent?: boolean) => Promise<void>;
     systemCheckStatus: SystemCheckStatus;
     updateInfo: UpdateInfo | null;
     checkForAppUpdate: (manual?: boolean) => Promise<void>;
@@ -611,20 +625,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         missingTunnelling: []
     });
 
-    const checkSystemVersions = async (forceUsageMode?: 'explorer' | 'automator', forceFramework?: 'robot' | 'appium' | 'maestro' | 'cypress' | 'selenium') => {
-        setSystemCheckStatus(prev => ({ ...prev, loading: true }));
-        try {
-            // Use provided overrides or fall back to current settings
-            const mode = forceUsageMode || activeProfile.settings.usageMode;
-            const framework = forceFramework || activeProfile.settings.automationFramework || 'robot';
+    const checkSystemVersions = async (forceUsageMode?: 'explorer' | 'automator', forceFramework?: 'robot' | 'appium' | 'maestro' | 'cypress' | 'selenium', silent: boolean = false) => {
+        const mode = forceUsageMode || activeProfile.settings.usageMode;
+        const framework = forceFramework || activeProfile.settings.automationFramework || 'robot';
 
-            // Conditionally skip ngrok and automator dependencies checks
-            const versions = await invoke<SystemVersions>('get_system_versions', {
-                checkAutomator: mode !== 'explorer',
-                framework: framework,
-                checkNgrok: isNgrokEnabled
-            });
-
+        const processVersions = (versions: SystemVersions) => {
             setSystemVersions(versions);
 
             const missingCritical: string[] = [];
@@ -693,6 +698,35 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                 missingMirroring,
                 missingTunnelling
             });
+        };
+
+        const cacheKey = `cached_system_versions_${mode}_${framework}_${isNgrokEnabled}`;
+        
+        if (!silent) {
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                try {
+                    const parsedVersions = JSON.parse(cached) as SystemVersions;
+                    processVersions(parsedVersions);
+                    // Continue to background fetch
+                } catch (e) {
+                    setSystemCheckStatus(prev => ({ ...prev, loading: true }));
+                }
+            } else {
+                setSystemCheckStatus(prev => ({ ...prev, loading: true }));
+            }
+        }
+
+        try {
+            // Conditionally skip ngrok and automator dependencies checks
+            const versions = await invoke<SystemVersions>('get_system_versions', {
+                checkAutomator: mode !== 'explorer',
+                framework: framework,
+                checkNgrok: isNgrokEnabled
+            });
+
+            localStorage.setItem(cacheKey, JSON.stringify(versions));
+            processVersions(versions);
 
         } catch (e) {
             feedback.toast.error("settings.versions_load_error", e);
