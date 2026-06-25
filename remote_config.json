@@ -108,7 +108,7 @@
     },
     "is_ask_rai_enabled": {
       "defaultValue": {
-        "value": "beta"
+        "value": "true"
       },
       "valueType": "STRING"
     },
@@ -141,7 +141,7 @@
     },
     "is_ai_test_mode_enabled": {
       "defaultValue": {
-        "value": "dev"
+        "value": "true"
       },
       "valueType": "STRING"
     },
@@ -235,7 +235,7 @@
     },
     "min_app_version": {
       "defaultValue": {
-        "value": "2.3.0-stable1"
+        "value": "2.3.1-stable1"
       },
       "valueType": "STRING"
     },
