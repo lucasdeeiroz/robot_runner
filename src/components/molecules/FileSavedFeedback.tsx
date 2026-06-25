@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useTranslation } from "react-i18next";
+import { Button } from "@/components/atoms/Button";
 
 interface FileSavedFeedbackProps {
     path: string | null;
@@ -24,12 +25,14 @@ export function FileSavedFeedback({ path, onClose, className = "" }: FileSavedFe
                 {path}
             </span>
             {onClose && (
-                <button
+                <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={onClose}
-                    className="ml-2 hover:bg-success/10 rounded p-1 transition-colors"
+                    className="ml-2 rounded-full p-1.5 hover:bg-success/20 hover:text-success transition-colors h-auto w-auto"
                 >
                     <X size={14} />
-                </button>
+                </Button>
             )}
         </div>
     );

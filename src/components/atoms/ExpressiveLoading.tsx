@@ -1,5 +1,5 @@
 import { useMemo, memo } from "react";
-import { motion } from "framer-motion";
+import { twMerge } from "tailwind-merge";
 
 const ExpressiveLoadingComponent = ({ size = "md", className, variant = "linear" }: { size?: "xsm" | "sm" | "md" | "lg", className?: string, variant?: "linear" | "circular" | "skeleton" }) => {
 
@@ -53,14 +53,16 @@ const ExpressiveLoadingComponent = ({ size = "md", className, variant = "linear"
 
         return (
             <div 
-                className={`flex items-center justify-center ${sizePx[size]} ${className || ''} text-primary dark:text-primary/80`}
+                className={twMerge(`flex items-center justify-center ${sizePx[size]} text-primary dark:text-primary/80`, className)}
                 style={{ willChange: 'transform' }}
             >
-                <motion.svg
+                <svg
                     viewBox="0 0 48 48"
                     className="w-full h-full overflow-visible"
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+                    style={{
+                        animation: 'expressive-spin 1.5s linear infinite',
+                        transformOrigin: 'center'
+                    }}
                 >
                     {/* Background Track */}
                     <path
@@ -74,33 +76,19 @@ const ExpressiveLoadingComponent = ({ size = "md", className, variant = "linear"
                     />
 
                     {/* The "Snake" Scanner */}
-                    <motion.path
+                    <path
                         d={circularPath}
                         fill="none"
                         stroke="currentColor"
                         strokeWidth={strokeWidthMap[size]}
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        initial={{ pathLength: 0.1, pathOffset: 0 }}
-                        animate={{
-                            pathLength: [0.1, 0.4, 0.1],
-                            pathOffset: [0, 1]
-                        }}
-                        transition={{
-                            pathLength: {
-                                duration: 2,
-                                repeat: Infinity,
-                                ease: "easeInOut",
-                                repeatType: "reverse"
-                            },
-                            pathOffset: {
-                                duration: 2.5,
-                                repeat: Infinity,
-                                ease: "linear"
-                            }
+                        strokeDasharray="30 120"
+                        style={{
+                            animation: 'expressive-dash 1.5s linear infinite'
                         }}
                     />
-                </motion.svg>
+                </svg>
             </div>
         );
     }
@@ -117,7 +105,7 @@ const ExpressiveLoadingComponent = ({ size = "md", className, variant = "linear"
 
     return (
         <div 
-            className={`flex items-center justify-center ${heightMap[size]} ${className || ''} text-primary dark:text-primary/80`}
+            className={twMerge(`flex items-center justify-center ${heightMap[size]} text-primary dark:text-primary/80`, className)}
             style={{ willChange: 'transform' }}
         >
             <svg
@@ -137,30 +125,16 @@ const ExpressiveLoadingComponent = ({ size = "md", className, variant = "linear"
                 />
 
                 {/* The "Snake" (Indicator) */}
-                <motion.path
+                <path
                     d={pathData}
                     fill="none"
                     stroke="currentColor"
                     strokeWidth={strokeWidthMap[size]}
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    initial={{ pathLength: 0, pathOffset: 0 }}
-                    animate={{
-                        pathLength: [0.15, 0.3, 0.15],
-                        pathOffset: [0, 1]
-                    }}
-                    transition={{
-                        pathLength: {
-                            duration: 1.5,
-                            repeat: Infinity,
-                            ease: "easeInOut",
-                            repeatType: "reverse"
-                        },
-                        pathOffset: {
-                            duration: 2,
-                            repeat: Infinity,
-                            ease: "linear"
-                        }
+                    strokeDasharray="30 170"
+                    style={{
+                        animation: 'expressive-linear-dash 1.5s linear infinite'
                     }}
                 />
             </svg>
@@ -169,3 +143,4 @@ const ExpressiveLoadingComponent = ({ size = "md", className, variant = "linear"
 };
 
 export const ExpressiveLoading = memo(ExpressiveLoadingComponent);
+

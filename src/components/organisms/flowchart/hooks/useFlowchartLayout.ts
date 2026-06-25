@@ -175,7 +175,7 @@ export function useFlowchartLayout({ maps = [], activeProfileId, onRefresh, sett
         abortControllerRef.current = controller;
 
         try {
-            console.log("[Flowchart] Fetching AI context for layout...");
+            // console.log("[Flowchart] Fetching AI context for layout...");
             const { context } = await getAiContext('flowchart_layout', { 
                 profile_id: activeProfileId,
                 custom_mappings_dir: mappingsPath
@@ -186,13 +186,13 @@ export function useFlowchartLayout({ maps = [], activeProfileId, onRefresh, sett
             if (!context || context.trim() === "") {
                 console.warn("[Flowchart] AI context is empty. Reorganization might fail or do nothing.");
             } else {
-                console.log("[Flowchart] AI Context acquired (length):", context.length);
+                // console.log("[Flowchart] AI Context acquired (length):", context.length);
             }
 
             const provider = settings.aiProvider || 'gemini';
             const language = settings.language || 'en';
             
-            console.log(`[Flowchart] Using provider: ${provider}`);
+            // console.log(`[Flowchart] Using provider: ${provider}`);
 
             let result;
             if (provider === 'openai') {
@@ -215,7 +215,7 @@ export function useFlowchartLayout({ maps = [], activeProfileId, onRefresh, sett
 
             if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
 
-            console.log("[Flowchart] AI Reorganization result:", result);
+            // console.log("[Flowchart] AI Reorganization result:", result);
 
             if (result && result.nodes) {
                 setLayout(prev => {
@@ -243,9 +243,9 @@ export function useFlowchartLayout({ maps = [], activeProfileId, onRefresh, sett
                         };
                     });
 
-                    console.log(`[Flowchart AI] Reorganized ${Object.keys(newNodes).length} nodes. Coordinates changed: ${changedCount}`);
-                    console.log("[Flowchart AI] Previous positions:", prev.nodes);
-                    console.log("[Flowchart AI] New positions proposed:", newNodes);
+                    // console.log(`[Flowchart AI] Reorganized ${Object.keys(newNodes).length} nodes. Coordinates changed: ${changedCount}`);
+                    // console.log("[Flowchart AI] Previous positions:", prev.nodes);
+                    // console.log("[Flowchart AI] New positions proposed:", newNodes);
                     if (changeDetails.length > 0) {
                         console.log("[Flowchart AI] Changed elements details:", changeDetails);
                     } else {

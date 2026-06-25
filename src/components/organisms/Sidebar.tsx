@@ -25,6 +25,7 @@ import { useTestSessions } from "@/lib/testSessionStore";
 import { useAuth } from '@/lib/authStore';
 
 import { useRemoteConfig } from '@/lib/RemoteConfigProvider';
+import { Button } from "@/components/atoms/Button";
 
 interface SidebarProps {
     activePage: string;
@@ -133,9 +134,10 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                         </motion.div>
                     )}
                 </AnimatePresence>
-                <button
+                <Button
+                    variant="ghost" size="icon"
                     onClick={() => setCollapsed(!collapsed)}
-                    className="p-1 hover:bg-surface-variant/50 rounded-2xl text-on-surface-variant/80 hover:text-on-surface/80 transition-transform active:scale-95"
+                    className="w-8 h-8 rounded-full text-on-surface-variant/80 hover:text-on-surface/80 transition-transform active:scale-95"
                 >
                     <motion.div
                         animate={{ rotate: collapsed ? 0 : 180 }}
@@ -144,23 +146,24 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                     >
                         <Menu size={20} />
                     </motion.div>
-                </button>
+                </Button>
             </div>
 
             {/* Navigation */}
             <nav className="flex-1 p-2 space-y-1">
                 {navItems.map((item) => (
-                    <button
+                    <Button
+                        variant="unstyled"
                         key={item.id}
                         onClick={() => {
                             onNavigate(item.id);
                             logEvent('feature_opened', { feature_name: item.id });
                         }}
                         className={cn(
-                            "group w-full flex items-center p-2 rounded-2xl transition-all duration-200 active:scale-95 relative",
+                            "group w-full flex items-center justify-start p-2 rounded-2xl transition-all duration-200 active:scale-95 relative hover:shadow-lg",
                             activePage === item.id
                                 ? "bg-primary/10 text-primary dark:text-primary/80 shadow-primary/20"
-                                : "text-on-surface-variant/80 hover:bg-surface-variant/50 hover:text-on-surface/80",
+                                : "bg-transparent text-on-surface-variant/80 hover:bg-surface-variant/50 hover:text-on-surface/80",
                             collapsed ? "justify-center" : "gap-3"
                         )}
                         data-tooltip={collapsed ? item.label : undefined}
@@ -205,17 +208,17 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                                 </motion.span>
                             )}
                         </AnimatePresence>
-                    </button>
+                    </Button>
                 ))}
             </nav>
 
             {/* AI Chat Agent Button */}
             {hasApiKey && isAiEnabled && isAskRaiEnabled && (
                 <div className="px-2 pb-2">
-                    <button
+                    <Button
                         onClick={handleAiChatToggle}
                         className={cn(
-                            "w-full flex items-center p-2 rounded-2xl transition-all duration-200 active:scale-95 relative group",
+                            "w-full flex items-center justify-start p-2 rounded-2xl transition-all duration-200 active:scale-95 relative group",
                             settings.aiChatEnabled
                                 ? "bg-primary text-on-primary shadow-lg shadow-primary/30"
                                 : "bg-surface-variant/30 text-primary hover:bg-primary/10 border border-primary/20",
@@ -251,7 +254,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                                 </motion.span>
                             )}
                         </AnimatePresence>
-                    </button>
+                    </Button>
                 </div>
             )}
 
@@ -259,7 +262,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
             <div className="px-2 pb-2">
                 <div
                     className={cn(
-                        "group flex items-center gap-3 p-2 rounded-2xl bg-surface-variant/20 border border-outline-variant/30 relative",
+                        "group flex items-center gap-3 p-2 rounded-2xl bg-surface-variant/20 border border-outline-variant/30 relative shadow-lg",
                         collapsed ? "justify-center" : "px-3"
                     )}
                     data-tooltip={collapsed ? (user?.displayName || user?.email?.split('@')[0]) : undefined}
@@ -287,14 +290,15 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                         )}
                     </AnimatePresence>
                     {!collapsed && (
-                        <button
+                        <Button
+                            variant="ghost" size="icon"
                             onClick={signOut}
-                            className="p-1.5 hover:bg-error/10 text-on-surface-variant hover:text-error rounded-xl transition-all active:scale-95"
+                            className="w-8 h-8 hover:bg-error/10 text-on-surface-variant hover:text-error rounded-xl transition-all active:scale-95"
                             data-tooltip={t('auth.logout')}
                             data-position="top"
                         >
                             <LogOut size={16} />
-                        </button>
+                        </Button>
                     )}
                 </div>
             </div>
@@ -316,12 +320,14 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                         </span>
                     </div>
                     {updateAvailable && (
-                        <button
+                        <Button
+                            variant="unstyled"
+                            size="sm"
                             onClick={() => onNavigate('about')}
-                            className="text-error font-bold bg-error-container px-1.5 py-0.5 rounded-2xl hover:bg-error-container/80 transition-colors animate-pulse cursor-pointer shrink-0"
+                            className="text-[10px] text-error font-bold bg-error-container px-2 py-0.5 rounded-2xl hover:bg-error-container/80 transition-colors animate-pulse cursor-pointer shrink-0 h-auto"
                         >
                             {t('about.update_badge')}
-                        </button>
+                        </Button>
                     )}
                 </div>}
                 {collapsed && <div className="text-[10px] flex flex-col gap-1 justify-center items-center">

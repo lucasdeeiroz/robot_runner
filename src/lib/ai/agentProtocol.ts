@@ -3,6 +3,8 @@
  * It provides the Types and the JSON Schema that the AI provider must adhere to.
  */
 
+import { getRemoteString } from '../remoteConfig';
+
 export type AgentActionType =
     | 'navigate'
     | 'run_test'
@@ -11,8 +13,12 @@ export type AgentActionType =
     | 'take_screenshot'
     | 'open_toolbox'
     | 'open_inspector'
+    | 'open_inspector'
     | 'open_scrcpy'
-    | 'change_setting';
+    | 'change_setting'
+    | 'create_file'
+    | 'modify_file'
+    | 'delete_file';
 
 export interface AgentAction {
     type: AgentActionType;
@@ -23,6 +29,7 @@ export interface AgentAction {
     command?: string; // For execute_adb
     setting_key?: string; // For change_setting
     setting_value?: any; // For change_setting
+    content?: string; // For create_file and modify_file
     description?: string; // Human readable description of what this action does
 }
 
@@ -30,9 +37,10 @@ export interface AgentResponse {
     reply: string;
     suggested_prompts?: string[];
     actions?: AgentAction[];
+    needs_context_files?: string[];
 }
 
-export const AGENT_JSON_SCHEMA = {
+export const FALLBACK_AGENT_JSON_SCHEMA = {
     type: "object",
     properties: {
         reply: {
@@ -52,29 +60,35 @@ export const AGENT_JSON_SCHEMA = {
                 properties: {
                     type: {
                         type: "string",
-                        enum: ["navigate", "run_test", "execute_adb", "capture_logcat", "take_screenshot", "open_toolbox", "open_inspector", "open_scrcpy", "change_setting"]
+                        enum: ["navigate", "run_test", "execute_adb", "capture_logcat", "take_screenshot", "open_toolbox", "open_inspector", "open_scrcpy", "change_setting", "create_file", "modify_file", "delete_file"]
                     },
                     target: { type: "string", description: "Target tab or subtab for navigate: 'home' (Home), 'run' (Executar testes/tests subtab), 'connect' (Conectar/connect subtab), 'inspector' (Inspector subtab), 'history' (Test history), 'scenarios' (Scenario Generator), 'images' (Image Editor), 'dashboard_history' (Dashboard History), 'mapper' or 'mapeador' (Device Mapper)." },
-                    path: { type: "string", description: "File path or name of the test. ALWAYS provide this if the action is run_test." },
+                    path: { type: "string", description: "File path or name. ALWAYS provide this if the action is run_test, create_file, modify_file, or delete_file. For file manipulation, it must be the relative path inside the automation root." },
                     device: { type: "string", description: "Device name or serial. Provide this if the user specifies a device." },
                     command: { type: "string", description: "ADB command to execute." },
                     setting_key: { type: "string", description: "Setting key to change." },
                     setting_value: { description: "Setting value to apply. Can be a string, number, or boolean." },
-                    description: { type: "string", description: "A brief, human-readable description of this action (e.g., 'Navigating to Settings')." }
+                    content: { type: "string", description: "The complete string content of the file. Required for create_file and modify_file. WARNING: For modify_file, you MUST provide the ENTIRE updated file content without any placeholders or omissions, as the file will be completely overwritten." },
+                    description: { type: "string", description: "A brief, human-readable description of this action (e.g., 'Navigating to Settings', 'Creating login test')." }
                 },
                 required: ["type", "description"]
             }
+        },
+        needs_context_files: {
+            type: "array",
+            items: { type: "string" },
+            description: "If you need to read specific project files from the RAG index (such as .agents rules, .robot tests, .resource files, .json mappings, or .md docs), list their EXACT PATHS here (e.g. '.agents/profiles/qa_specialist.md' or 'tests/login.robot')."
         }
     },
     required: ["reply"]
 };
 
 export function getAgentSystemInstruction(context: string, language: string = "en_US"): string {
-    return `You are the integrated AI Agent for Robot Runner, a desktop application for QA Mobile Automation, called 'Rai'.
+    const basePromptTemplate = getRemoteString('prompt_agent_system_instruction') || `You are the integrated AI Agent for Robot Runner, a desktop application for QA Mobile Automation, called 'Rai'.
 As 'Rai', your goal is to assist the user by answering questions, analyzing logs, and executing tasks directly within the app.
 
 CURRENT CONTEXT:
-${context}
+\${context}
 
 RULES:
 1. You MUST ALWAYS respond with a VALID JSON object matching the provided schema.
@@ -84,7 +98,7 @@ RULES:
 5. Your text response should be in the "reply" field. Use Markdown for formatting.
 6. Provide 2-3 follow-up suggestions in "suggested_prompts".
 7. The user is on a desktop app. Do not ask them to use a terminal if you can do it via an action (like execute_adb).
-8. VERY IMPORTANT: You must generate your "reply", "description", and "suggested_prompts" in the user's preferred language: ${language}.
+8. VERY IMPORTANT: You must generate your "reply", "description", and "suggested_prompts" in the user's preferred language: \${language}.
 9. If the user asks to inspect a device, inspect an element, or open the inspector, you MUST use the "open_inspector" action instead of "open_toolbox".
 10. If the user asks to mirror the screen, control the screen, or launch screen sharing/scrcpy, you MUST use the "open_scrcpy" action.
 11. If the user asks to go to a feature, screen, or functionality, trigger a 'navigate' action with the correct target. For example:
@@ -97,8 +111,39 @@ RULES:
     - "histórico", "history" -> 'history'
     - "configurações", "settings" -> 'settings'
     - "sobre", "about" -> 'about'
+12. If you are asked to create, modify or delete files for Robot Framework, you MUST adhere to the following rules:
+    - Separate logic from tests: Test files (.robot) should ONLY contain BDD (Gherkin) scenarios.
+    - All technical implementations (clicks, waits, etc) MUST reside in resource files (.resource) following the Page Object Model (POM) architecture.
+    - Keywords MUST be parameterized to maximize reuse, including the Gherkin steps (e.g., '\\\${GHERKIN} I do something', so it can be used as 'When I do something').
+    - Imports must be efficient and scoped correctly.
+    - Analyze existing test files (.robot) to learn and reuse their 'Suite Setup', 'Test Setup', 'Suite Teardown', and 'Test Teardown' configurations when creating new tests.
+    - The app does not magically open on the target screen. When creating tests for a specific screen, you MUST include the necessary Gherkin steps and Resource Keywords to navigate from the App's initial state (e.g. Home or Login) to the target screen.
+    - When interacting with mapped screen elements, ALWAYS use the element's 'short_id' as the locator parameter. NEVER use the screen's 'id'.
+    - Observe the existing folder structure in 'tests/' and 'resources/'. Always place new files inside appropriate subdirectories (e.g., by feature or screen) matching the existing project organization, rather than creating them at the root.
+    - For 'modify_file' actions, you MUST provide the FULL and COMPLETE updated content of the file. Do NOT use placeholders (like '...', '// rest of the code', etc.). The file will be completely overwritten by your output.
+    - CRITICAL: You MUST be extremely exhaustive and comprehensive. When creating tests, you MUST generate at least 10-15 scenarios, including edge cases, negative/sad paths, boundary conditions, empty states, and validation rules to ensure robust test coverage. Do NOT just cover the basic happy path. You will be penalized if you provide only basic tests.
+13. When reading, exploring, or modifying the file system, you MUST strictly respect and ignore all files and directories specified in .gitignore, .claudeignore, and .geminiignore files.
+14. If you see an index of project files and you need more context from one or more of them to complete the user's request, return an array of their exact paths in the 'needs_context_files' field. You will receive a second prompt with their contents. If you do this, leave 'actions' and 'suggested_prompts' empty, and provide a brief explanation in 'reply'.
 
 JSON SCHEMA TO FOLLOW:
-${JSON.stringify(AGENT_JSON_SCHEMA, null, 2)}
-`;
+\${jsonSchema}`;
+
+    const jsonSchemaString = JSON.stringify(getAgentJsonSchema(), null, 2);
+
+    return basePromptTemplate
+        .replace('\${context}', context)
+        .replace('\${language}', language)
+        .replace('\${jsonSchema}', jsonSchemaString);
 }
+
+export const getAgentJsonSchema = () => {
+    const remoteStr = getRemoteString('agent_json_schema');
+    if (remoteStr) {
+        try {
+            return JSON.parse(remoteStr);
+        } catch (e) {
+            console.error("Failed to parse remote agent_json_schema", e);
+        }
+    }
+    return FALLBACK_AGENT_JSON_SCHEMA;
+};

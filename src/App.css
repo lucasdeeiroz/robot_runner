@@ -357,3 +357,19 @@ button:hover .rai-letter-r-ghost,
   opacity: 1;
   transform: translateY(-50%) scale(1);
 }
+
+/* ExpressiveLoading Keyframes */
+@keyframes expressive-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes expressive-dash {
+  0% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -150; }
+}
+
+@keyframes expressive-linear-dash {
+  0% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -200; }
+}

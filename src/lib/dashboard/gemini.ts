@@ -15,11 +15,12 @@ interface GeminiResponse {
 }
 
 import { ScreenMap, UIElementMap } from '@/lib/types';
+import { withModelRotation } from './aiFallback';
 import { DeepAnalysisContext } from "./historyAnalysisUtils";
-import { getExplorationPrompt, formatExistingMaps, getRefinedTestCasesPrompt, getRefinedPBIPrompt, getRefinedImprovementPrompt, getRefinedBugPrompt, getRefinedRobotScriptPrompt, getFlowchartLayoutPrompt, getElementNamingPrompt, getScreenTaggingPrompt, getTestHistoryAnalysisPrompt, getExecutionSummaryPrompt, getQAAssistantWrapper, getAutonomousAgentPrompt } from "./prompts";
+import { getExplorationPrompt, formatExistingMaps, getRefinedTestCasesPrompt, getRefinedTraditionalTestCasesPrompt, getRefinedPBIPrompt, getRefinedImprovementPrompt, getRefinedBugPrompt, getRefinedRobotScriptPrompt, getFlowchartLayoutPrompt, getElementNamingPrompt, getScreenTaggingPrompt, getTestHistoryAnalysisPrompt, getExecutionSummaryPrompt, getQAAssistantWrapper, getAutonomousAgentPrompt } from "./prompts";
 import { fetch } from '@tauri-apps/plugin-http';
 
-export type AIGenerationType = 'test_case' | 'pbi' | 'improvement' | 'bug' | 'element_name' | 'robot_script' | 'exploration';
+export type AIGenerationType = 'test_case' | 'test_case_traditional' | 'pbi' | 'improvement' | 'bug' | 'element_name' | 'robot_script' | 'exploration';
 
 function extractBase64Data(imageBase64: string): { mimeType: string, data: string } {
     const trimmed = imageBase64.trim();
@@ -82,17 +83,13 @@ export async function generateRefinedTestCases(
         mappingContext = appMapping;
     } else if (Array.isArray(appMapping) && appMapping.length > 0) {
         mappingContext = "\n\nAPPLICATION MAPPING (Use these element names and types for precision):\n";
-        appMapping.forEach(screen => {
-            mappingContext += `- Screen: "${screen.name}" (${screen.type})\n`;
-            screen.elements.forEach(el => {
-                mappingContext += `  * Element: "${el.name}" (Type: ${el.type})\n`;
-            });
-        });
+        mappingContext += formatExistingMaps(appMapping);
     }
 
     let promptString = "";
     switch (generationType) {
         case 'test_case': promptString = getRefinedTestCasesPrompt(language, customPrompt); break;
+        case 'test_case_traditional': promptString = getRefinedTraditionalTestCasesPrompt(language, customPrompt); break;
         case 'pbi': promptString = getRefinedPBIPrompt(language, customPrompt); break;
         case 'improvement': promptString = getRefinedImprovementPrompt(language, customPrompt); break;
         case 'bug': promptString = getRefinedBugPrompt(language, customPrompt); break;
@@ -101,49 +98,15 @@ export async function generateRefinedTestCases(
 
     const systemInstruction = getQAAssistantWrapper(promptString, !!appMapping, mappingContext, customPrompt);
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
-    try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            signal,
-            body: JSON.stringify({
-                contents: [{
-                    role: 'user',
-                    parts: [{ text: requirements }]
-                }],
-                system_instruction: {
-                    parts: [{ text: systemInstruction }]
-                },
-                generationConfig: {
-                    temperature: 0.4,
-                    maxOutputTokens: 8192,
-                }
-            })
-        });
-
-        if (!response.ok) {
-            const errData = await response.json().catch(() => ({}));
-            const errMsg = errData.error?.message || (typeof errData === 'string' ? errData : JSON.stringify(errData));
-            throw (new Error(errMsg || `API Error: ${response.statusText}`));
-        }
-
-        const data: GeminiResponse = await response.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-        if (!text) {
-            throw new Error("Empty response from Gemini");
-        }
-
-        return text.trim();
-
-    } catch (error: any) {
-        console.error("Gemini API Error:", error);
-        throw error;
-    }
+    return await askGemini(
+        requirements,
+        apiKey,
+        model,
+        systemInstruction,
+        undefined,
+        signal,
+        { temperature: 0.4, maxOutputTokens: 8192 }
+    );
 }
 
 /**
@@ -155,11 +118,10 @@ export async function askGemini(
     model: string,
     systemInstruction?: string,
     imageBase64?: string, // Data URL format
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    options?: any
 ): Promise<string> {
     if (!apiKey) throw new Error("Missing Gemini API Key");
-
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     const parts: any[] = [{ text: prompt }];
 
@@ -173,21 +135,32 @@ export async function askGemini(
         });
     }
 
-    try {
+    
+
+    return withModelRotation('gemini', model, async (currentModel) => {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${apiKey}`;
+        
+        const body: any = {
+            contents: [{ role: 'user', parts }],
+            generationConfig: {
+                temperature: options?.temperature ?? 0.4,
+                maxOutputTokens: options?.maxOutputTokens ?? 8192,
+            }
+        };
+
+        if (systemInstruction) {
+            body.system_instruction = { parts: [{ text: systemInstruction }] };
+        }
+        
+        if (options?.responseMimeType) {
+            body.generationConfig.responseMimeType = options.responseMimeType;
+        }
+
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             signal,
-            body: JSON.stringify({
-                contents: [{ role: 'user', parts }],
-                system_instruction: systemInstruction ? {
-                    parts: [{ text: systemInstruction }]
-                } : undefined,
-                generationConfig: {
-                    temperature: 0.4,
-                    maxOutputTokens: 2048,
-                }
-            })
+            body: JSON.stringify(body)
         });
 
         if (!response.ok) {
@@ -201,10 +174,7 @@ export async function askGemini(
         if (!text) throw new Error("Empty response from Gemini");
 
         return text.trim();
-    } catch (error: any) {
-        console.error("Gemini API Error (askGemini):", error);
-        throw error;
-    }
+    });
 }
 
 export async function getAvailableModels(apiKey: string): Promise<string[]> {
@@ -244,55 +214,27 @@ export async function suggestElementName(
         mappingContext = appMapping;
     } else if (Array.isArray(appMapping) && appMapping.length > 0) {
         mappingContext = "\n\nAPPLICATION MAPPING (Context of other screens for naming consistency):\n";
-        appMapping.forEach(screen => {
-            mappingContext += `- Screen: "${screen.name}"\n`;
-            screen.elements.forEach(el => {
-                mappingContext += `  * Element: "${el.name}" (Type: ${el.type})\n`;
-            });
-        });
+        mappingContext += formatExistingMaps(appMapping);
     }
 
     const prompt = getElementNamingPrompt(screenName, elementAttr, language, mappingContext, customPrompt);
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
-    const body = {
-        contents: [{
-            parts: [{ text: prompt }]
-        }],
-        generationConfig: {
-            temperature: 0.1,
-            topK: 1,
-            topP: 1,
-            maxOutputTokens: 1024,
-        }
-    };
-
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal,
-        body: JSON.stringify(body)
-    });
-
-    const data: GeminiResponse = await response.json();
-
-    if (data.error) {
-        throw new Error(data.error.message);
-    }
-
-    const candidate = data.candidates?.[0];
-    const content = candidate?.content?.parts?.[0]?.text;
-
-    // DEBUG: Always log context about the completion
-    console.log("[Gemini Status] Finish Reason:", candidate?.finishReason || "UNKNOWN");
-    console.log("[Gemini Raw Content]:", content);
-
-    if (!content) {
-        if (candidate?.finishReason === "SAFETY") {
+    let content = "";
+    try {
+        content = await askGemini(
+            prompt,
+            apiKey,
+            model,
+            "You are a professional QA automation naming assistant. Respond with JSON.",
+            undefined,
+            signal,
+            { temperature: 0.1, maxOutputTokens: 1024 }
+        );
+    } catch (error: any) {
+        if (error.message.includes("SAFETY")) {
             throw new Error("AI response blocked by safety filters. Try a different element.");
         }
-        throw new Error("Empty AI response");
+        throw error;
     }
 
     try {
@@ -326,7 +268,7 @@ export async function suggestElementName(
                     name: nameMatch[1],
                     justification: justificationMatch ? justificationMatch[1] : ""
                 };
-                console.log("[Gemini] Fuzzy extraction successful:", parsed);
+                // console.log("[Gemini] Fuzzy extraction successful:", parsed);
             }
         }
 
@@ -552,6 +494,7 @@ export async function exploreScreen(
     elements: UIElementMap[];
     nextAction: { type: 'click' | 'back' | 'swipe' | 'finish' | 'type_text'; targetId?: string; direction?: 'up' | 'down' | 'left' | 'right'; text?: string; details?: string };
     rationale: string;
+    needs_context_files?: string[];
 }> {
     if (!apiKey) throw new Error("Missing Gemini API Key");
 
@@ -578,38 +521,15 @@ XML DUMP:
 ${xmlDump.substring(0, 15000)}
 `.trim();
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
-    const { mimeType, data } = extractBase64Data(screenshotBase64);
-
-    const body = {
-        contents: [{
-            parts: [
-                { text: prompt },
-                { inline_data: { mime_type: mimeType, data: data } }
-            ]
-        }],
-        system_instruction: {
-            parts: [{ text: systemInstruction }]
-        },
-        generationConfig: {
-            temperature: 0.1,
-            responseMimeType: "application/json"
-        }
-    };
-
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+    const content = await askGemini(
+        prompt,
+        apiKey,
+        model,
+        systemInstruction,
+        screenshotBase64,
         signal,
-        body: JSON.stringify(body)
-    });
-
-    const dataRes: GeminiResponse = await response.json();
-    if (dataRes.error) throw new Error(dataRes.error.message);
-
-    const content = dataRes.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!content) throw new Error("Empty AI response");
+        { temperature: 0.1, responseMimeType: "application/json" }
+    );
 
     return safeParseJson(content);
 }
@@ -630,49 +550,19 @@ export async function reorganizeFlowchartLayout(
     const systemInstruction = getFlowchartLayoutPrompt(language, customPrompt);
     const mappingContext = typeof maps === 'string' ? maps : formatExistingMaps(maps);
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
 
     try {
-        console.log("[Gemini] Reorganizing flowchart layout with model:", model);
-        const requestBody = JSON.stringify({
-            contents: [{
-                role: 'user',
-                parts: [{ text: `Current Application Mapping:\n${mappingContext}` }]
-            }],
-            system_instruction: {
-                parts: [{ text: systemInstruction }]
-            },
-            generationConfig: {
-                temperature: 0.1,
-                responseMimeType: "application/json",
-                maxOutputTokens: 8192
-            }
-        });
-
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+        const content = await askGemini(
+            `Current Application Mapping:\n${mappingContext}`,
+            apiKey,
+            model,
+            systemInstruction,
+            undefined,
             signal,
-            body: requestBody
-        });
-
-        if (!response.ok) {
-            const errData = await response.json().catch(() => ({}));
-            console.error("[Gemini] API Error Response:", errData);
-            throw new Error(errData.error?.message || `API Error: ${response.statusText}`);
-        }
-
-        const resData = await response.json();
-        console.log("[Gemini] Raw Response Data:", resData);
-
-        const resText = resData.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!resText) {
-            console.error("[Gemini] Empty or invalid response structure:", resData);
-            throw new Error("Empty response from Gemini");
-        }
-
-        console.log("[Gemini] Extracted response text:", resText);
-        return safeParseJson(resText);
+            { temperature: 0.1, responseMimeType: "application/json", maxOutputTokens: 8192 }
+        );
+        return safeParseJson(content);
     } catch (error: any) {
         console.error("Gemini reorganizeFlowchartLayout Error:", error);
         throw error;
@@ -681,9 +571,16 @@ export async function reorganizeFlowchartLayout(
 
 export interface AutonomousActionResponse {
     thought: string;
-    action: {
+    actions: {
         type: 'click' | 'type' | 'swipe' | 'back' | 'wait' | 'finish' | 'fail';
         command: string;
+        locator?: string;
+        details: string;
+    }[];
+    action?: { // Fallback for backward compatibility
+        type: 'click' | 'type' | 'swipe' | 'back' | 'wait' | 'finish' | 'fail';
+        command: string;
+        locator?: string;
         details: string;
     };
     isStepCompleted: boolean;
@@ -702,37 +599,28 @@ export async function generateAutonomousAction(
     if (!apiKey) throw new Error("Missing Gemini API Key");
 
     const promptString = getAutonomousAgentPrompt(language, customPrompt);
-    const body = {
-        contents: [
-            {
-                parts: [
-                    { text: promptString },
-                    { text: `TARGET SCENARIO:\n${targetScenario}` },
-                    { text: `SESSION HISTORY:\n${history.join('\n')}` },
-                    { text: `CURRENT XML DUMP:\n${xmlDump}` }
-                ]
-            }
-        ],
-        generationConfig: {
-            temperature: 0.2,
-            topP: 0.8,
-            topK: 40
-        }
-    };
+    const promptText = `
+${promptString}
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-    });
+TARGET SCENARIO:
+${targetScenario}
 
-    if (!response.ok) {
-        const errData = await response.json() as any;
-        throw new Error(errData.error?.message || `Gemini API error: ${response.status}`);
-    }
+SESSION HISTORY:
+${history.join('\n')}
 
-    const data = await response.json() as GeminiResponse;
-    const text = data.candidates[0].content.parts[0].text;
+CURRENT XML DUMP:
+${xmlDump}
+    `.trim();
+
+    const text = await askGemini(
+        promptText,
+        apiKey,
+        model,
+        undefined,
+        undefined,
+        undefined,
+        { temperature: 0.2, topP: 0.8, topK: 40 }
+    );
 
     return safeParseJson<AutonomousActionResponse>(text);
 }

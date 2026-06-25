@@ -66,9 +66,16 @@ export async function checkForUpdates(channel: 'stable' | 'beta' | 'alpha' = 'st
             if (!response.ok) throw new Error(`GitHub API Error: ${response.statusText}`);
             const releases = await response.json() as GitHubRelease[];
             
-            targetRelease = releases.find(r => r.tag_name.toLowerCase().includes(`-${channel}`)) || null;
-            if (!targetRelease) {
-                targetRelease = releases.find(r => !r.prerelease) || releases[0] || null;
+            if (channel === 'alpha') {
+                targetRelease = releases[0] || null;
+            } else if (channel === 'beta') {
+                targetRelease = releases.find(r => {
+                    const tag = r.tag_name.toLowerCase();
+                    return !tag.includes('-alpha') && !tag.includes('-dev');
+                }) || null;
+                if (!targetRelease) {
+                    targetRelease = releases.find(r => !r.prerelease) || releases[0] || null;
+                }
             }
         }
 

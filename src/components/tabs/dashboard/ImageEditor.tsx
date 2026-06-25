@@ -347,7 +347,7 @@ export function ImageEditor() {
                     onMouseUp={handleMouseUp}
                     onMouseLeave={() => setIsDrawing(false)}
                     className={clsx(
-                        "bg-white shadow-sm cursor-crosshair max-w-full max-h-full object-contain",
+                        "bg-surface shadow-sm cursor-crosshair max-w-full max-h-full object-contain",
                         currentTool === null && "cursor-default"
                     )}
                     style={{ maxWidth: '100%', maxHeight: '100%' }}
@@ -358,7 +358,7 @@ export function ImageEditor() {
                 variant="primary"
                 onClick={handleCopyCanvas}
                 leftIcon={<Copy size={16} />}
-                className="w-full justify-center shadow-lg shadow-primary/20 hover:bg-secondary-container"
+                className="w-full justify-center shadow-lg shadow-primary/20"
             >
                 {t('dashboard.image.copy', "Copy Image")}
             </Button>

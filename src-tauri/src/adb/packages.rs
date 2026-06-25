@@ -118,11 +118,30 @@ pub async fn install_package(
 
 #[command]
 pub async fn get_focused_package(app: AppHandle, device: String) -> Result<String, String> {
-    // Secure command: shell dumpsys activity top
+    // Try dumpsys window first (most reliable for current focus)
+    if let Ok(output) = run_adb(&app, device.clone(), vec!["shell", "dumpsys", "window"]).await {
+        for line in output.lines() {
+            if line.contains("mCurrentFocus") || line.contains("mFocusedApp") {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                for part in parts {
+                    if part.contains("/") {
+                        let clean = part.replace("}", "").replace("{", "");
+                        if let Some(slash_idx) = clean.find('/') {
+                            if slash_idx > 0 {
+                                return Ok(clean[..slash_idx].to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Fallback: dumpsys activity top
     let output = run_adb(&app, device, vec!["shell", "dumpsys", "activity", "top"]).await?;
 
     for line in output.lines() {
-        if line.contains("TASK:") || line.contains("topApp=ActivityRecord") {
+        if line.contains("TASK:") || line.contains("topApp=ActivityRecord") || line.contains("ACTIVITY ") {
             let parts: Vec<&str> = line.split_whitespace().collect();
             for part in parts {
                 if part.contains("/") {
@@ -162,6 +181,11 @@ pub async fn launch_package(app: AppHandle, device: String, package: String) -> 
 pub async fn set_stay_on(app: AppHandle, device: String, enabled: bool) -> Result<String, String> {
     let mode = if enabled { "3" } else { "0" }; // 3 is AC+USB, 0 is Off
     run_adb(&app, device, vec!["shell", "settings", "put", "system", "stay_on_while_plugged_in", mode]).await
+}
+
+#[command]
+pub async fn pull_apk(app: AppHandle, device: String, path: String, destination: String) -> Result<String, String> {
+    run_adb(&app, device, vec!["pull", &path, &destination]).await
 }
 
 // Internal Helper

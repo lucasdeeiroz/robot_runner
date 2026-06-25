@@ -28,7 +28,7 @@ interface TestsSubTabProps {
 type SelectionMode = 'file' | 'folder' | 'args';
 
 export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTabProps) {
-    const { settings, updateSetting, is_test_mode } = useSettings();
+    const { settings, updateSetting, is_test_mode, activeProfileId, profiles } = useSettings();
     const { t } = useTranslation();
     const [mode, setMode] = useState<SelectionMode>('file');
     const [launchStatus, setLaunchStatus] = useState("");
@@ -246,6 +246,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
 
             const targets = selectedDevices.length > 0 ? selectedDevices : [null];
             const workingDir = settings.paths.automationRoot || "";
+            const activeProfileName = profiles.find(p => p.id === activeProfileId)?.name || 'Default';
 
             for (const deviceUdid of targets) {
                 const runId = uuidv4();
@@ -446,7 +447,8 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     devVer,
                     finalTests || undefined,
                     isAiAgent,
-                    aiPrompt
+                    aiPrompt,
+                    activeProfileName
                 );
 
                 if (isAiAgent) {
@@ -463,6 +465,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                         runId,
                         testPath: finalTestPath,
                         outputDir: logDir,
+                        logs_path: activeProfileName,
                         device: deviceUdid === 'local' ? null : deviceUdid,
                         argumentsFile: finalArgsFile,
                         timestampOutputs: settings.saveLogs,
@@ -476,6 +479,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                         runId,
                         testPath: finalTestPath,
                         outputDir: logDir,
+                        logs_path: activeProfileName,
                         device: deviceUdid === 'local' ? null : deviceUdid,
                         maestroArgs: settings.tools.maestroArgs,
                         working_dir: settings.paths.automationRoot,
@@ -488,6 +492,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                         runId,
                         projectPath: finalTestPath,
                         outputDir: logDir,
+                        logs_path: activeProfileName,
                         appiumJavaArgs: settings.tools.appiumJavaArgs
                     }).catch(e => {
                         feedback.toast.error("tests.launch_failed", e);
@@ -497,6 +502,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                         runId,
                         testPath: finalTestPath,
                         outputDir: logDir,
+                        logs_path: activeProfileName,
                         browser: deviceUdid || 'chrome',
                         cypressArgs: settings.tools.cypressArgs,
                         workingDir
@@ -508,6 +514,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                         runId,
                         testPath: finalTestPath,
                         outputDir: logDir,
+                        logs_path: activeProfileName,
                         browser: deviceUdid || 'chrome',
                         seleniumArgs: settings.tools.seleniumArgs,
                         workingDir
@@ -625,6 +632,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                                                 isSelected ? "text-primary" : "text-on-surface-variant/40 hover:text-primary"
                                             )}
                                             title={t('tests.select_tests')}
+                                            tooltipPosition="left"
                                         >
                                             <ChartNoAxesGantt size={14} />
                                         </Button>
@@ -651,6 +659,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                                                 isSelected ? "text-primary" : "text-on-surface-variant/40 hover:text-primary"
                                             )}
                                             title={t('tests.select_args')}
+                                            tooltipPosition="left"
                                         >
                                             <Settings2 size={14} />
                                         </Button>
@@ -672,8 +681,8 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     className={clsx("shrink-0 gap-6 justify-between", isNarrow ? "w-fit" : "w-48")}
                     menus={
                         <>
-                        <SelectionCounter/>
-                        <div className="mt-6 border-t border-outline-variant/30"/>
+                            <SelectionCounter />
+                            <div className="mt-6 border-t border-outline-variant/30" />
                         </>
                     }
                     actions={
@@ -707,7 +716,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                                 onClick={() => handleRun()}
                                 disabled={selectedDevices.length === 0 || items.length === 0 || isLaunching}
                                 title={t('tests.run_selected')}
-                                className="w-full py-6 font-bold hover:bg-secondary-container"
+                                className="w-full py-6 font-bold"
                                 leftIcon={!isLaunching ? <Play size={18} fill="currentColor" /> : <ExpressiveLoading size="sm" variant="circular" />}
                             >
                                 {!isNarrow && (
@@ -777,7 +786,7 @@ function TestSelectorModal({ isOpen, onClose, tests, selected, onToggle, onSelec
                         {type === 'test' ? <FileCode size={18} className="text-primary" /> : <Settings2 size={18} className="text-primary" />}
                         {type === 'test' ? t('tests.selector.title') : t('tests.selector.args_title', "Selecione Argumentos")}
                     </h3>
-                    <button onClick={onClose} className="p-1 hover:bg-surface-variant/50 rounded-lg transition-colors"><X size={18} /></button>
+                    <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full"><X size={18} /></Button>
                 </div>
 
                 {type === 'test' && (
@@ -821,11 +830,11 @@ function TestSelectorModal({ isOpen, onClose, tests, selected, onToggle, onSelec
 
                 <div className="p-4 border-t border-outline-variant/10 flex items-center justify-between bg-surface-variant/10">
                     <div className="flex items-center gap-2">
-                        <button onClick={onSelectAll} className="text-[11px] font-bold text-primary hover:underline">{t('tests.selector.all')}</button>
+                        <Button variant="link" size="sm" onClick={onSelectAll} className="p-0 font-bold">{t('tests.selector.all')}</Button>
                         <div className="w-1 h-1 bg-outline-variant rounded-full" />
-                        <button onClick={onClearAll} className="text-[11px] font-bold text-on-surface-variant/60 hover:text-error">{t('tests.selector.none')}</button>
+                        <Button variant="link" size="sm" onClick={onClearAll} className="p-0 font-bold text-on-surface-variant/60 hover:text-error">{t('tests.selector.none')}</Button>
                     </div>
-                    <Button variant="primary" size="sm" onClick={onConfirm} disabled={isLoading} className="rounded-xl px-6 hover:bg-secondary-container">{t('tests.selector.close')}</Button>
+                    <Button variant="primary" size="sm" onClick={onConfirm} isLoading={isLoading} className="rounded-xl px-6">{t('tests.selector.close')}</Button>
                 </div>
             </div>
         </div>

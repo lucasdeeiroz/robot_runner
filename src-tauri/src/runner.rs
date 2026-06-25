@@ -299,6 +299,20 @@ t.start()
     }
 
     let mut cmd = new_tokio_command("python");
+    
+    // Inject the custom ADB path into the PATH environment variable so that 
+    // Appium and other child processes use the configured ADB executable.
+    let adb_path_obj = std::path::Path::new(&adb_program);
+    if adb_path_obj.is_absolute() {
+        if let Some(parent) = adb_path_obj.parent() {
+            if let Ok(current_path) = std::env::var("PATH") {
+                let sep = if cfg!(target_os = "windows") { ";" } else { ":" };
+                let new_path = format!("{}{}{}", parent.to_string_lossy(), sep, current_path);
+                cmd.env("PATH", new_path);
+            }
+        }
+    }
+
     cmd.env("ADB", &adb_program);
     cmd.env("PYTHONIOENCODING", "utf-8");
     cmd.env("PYTHONUTF8", "1");
@@ -395,6 +409,17 @@ pub async fn run_maestro_test(
         cmd.args(cmd_args);
     }
 
+    let adb_path_obj = std::path::Path::new(&adb_program);
+    if adb_path_obj.is_absolute() {
+        if let Some(parent) = adb_path_obj.parent() {
+            if let Ok(current_path) = std::env::var("PATH") {
+                let sep = if cfg!(target_os = "windows") { ";" } else { ":" };
+                let new_path = format!("{}{}{}", parent.to_string_lossy(), sep, current_path);
+                cmd.env("PATH", new_path);
+            }
+        }
+    }
+
     cmd.env("ADB", &adb_program);
     cmd.env("JAVA_TOOL_OPTIONS", "-Dfile.encoding=UTF-8");
 
@@ -463,6 +488,17 @@ pub async fn run_appium_test(
         }
     } else {
         cmd.arg("test");
+    }
+
+    let adb_path_obj = std::path::Path::new(&adb_program);
+    if adb_path_obj.is_absolute() {
+        if let Some(parent) = adb_path_obj.parent() {
+            if let Ok(current_path) = std::env::var("PATH") {
+                let sep = if cfg!(target_os = "windows") { ";" } else { ":" };
+                let new_path = format!("{}{}{}", parent.to_string_lossy(), sep, current_path);
+                cmd.env("PATH", new_path);
+            }
+        }
     }
 
     cmd.env("ADB", &adb_program);
@@ -598,6 +634,7 @@ pub async fn run_cypress_test(
     run_id: String,
     test_path: String,
     output_dir: String,
+    logs_path: Option<String>,
     browser: Option<String>,
     cypress_args: Option<String>,
     working_dir: Option<String>,
@@ -611,6 +648,7 @@ pub async fn run_cypress_test(
     #[derive(Serialize)]
     struct RunMetadata {
         run_id: String,
+        logs_path: Option<String>,
         framework: String,
         test_path: String,
         timestamp: String,
@@ -618,6 +656,7 @@ pub async fn run_cypress_test(
 
     let metadata = RunMetadata {
         run_id: run_id.clone(),
+        logs_path: logs_path.clone(),
         framework: "cypress".to_string(),
         test_path: test_path.clone(),
         timestamp: chrono::Local::now().to_rfc3339(),
@@ -656,6 +695,7 @@ pub async fn run_selenium_test(
     run_id: String,
     test_path: String,
     output_dir: String,
+    logs_path: Option<String>,
     browser: Option<String>,
     selenium_args: Option<String>,
     working_dir: Option<String>,
@@ -669,6 +709,7 @@ pub async fn run_selenium_test(
     #[derive(Serialize)]
     struct RunMetadata {
         run_id: String,
+        logs_path: Option<String>,
         framework: String,
         test_path: String,
         timestamp: String,
@@ -676,6 +717,7 @@ pub async fn run_selenium_test(
 
     let metadata = RunMetadata {
         run_id: run_id.clone(),
+        logs_path: logs_path.clone(),
         framework: "selenium".to_string(),
         test_path: test_path.clone(),
         timestamp: chrono::Local::now().to_rfc3339(),

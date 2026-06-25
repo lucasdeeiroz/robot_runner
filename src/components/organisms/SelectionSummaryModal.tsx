@@ -57,14 +57,15 @@ export function SelectionSummaryModal({ isOpen, onClose }: SelectionSummaryModal
                     )}
                 </div>
 
-                <button
+                <Button
+                    variant="ghost" size="icon"
                     onClick={() => removeItem(item.id)}
-                    className="p-2 opacity-0 group-hover:opacity-100 hover:bg-error/10 hover:text-error rounded-xl transition-all"
+                    className="opacity-0 group-hover:opacity-100 w-8 h-8 rounded-xl hover:bg-error/10 hover:text-error transition-all"
                     data-tooltip={t('tests.selection.remove')}
                     data-position="top"
                 >
                     <Trash2 size={16} />
-                </button>
+                </Button>
             </div>
         );
     };
@@ -107,12 +108,13 @@ export function SelectionSummaryModal({ isOpen, onClose }: SelectionSummaryModal
                                 >
                                     {t('tests.selection.clear_all')}
                                 </Button>
-                                <button
+                                <Button
+                                    variant="ghost" size="icon"
                                     onClick={onClose}
-                                    className="p-2 hover:bg-surface-variant/50 rounded-full transition-colors"
+                                    className="w-8 h-8 rounded-full hover:bg-surface-variant/50 transition-all"
                                 >
-                                    <X size={24} />
-                                </button>
+                                    <X size={20} />
+                                </Button>
                             </div>
                         </div>
 
@@ -169,7 +171,7 @@ export function SelectionSummaryModal({ isOpen, onClose }: SelectionSummaryModal
 
                         {/* Footer */}
                         <div className="p-6 border-t border-outline-variant/30 flex justify-end bg-surface/50 backdrop-blur-md">
-                            <Button onClick={onClose} variant="primary" className="px-8 hover:bg-secondary-container">
+                            <Button onClick={onClose} variant="primary" className="px-8">
                                 {t('common.close', 'Close')}
                             </Button>
                         </div>

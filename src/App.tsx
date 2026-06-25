@@ -124,7 +124,9 @@ function AppContent() {
       pink: '#be123c',
     };
 
-    const colorHex = colors[settings.primaryColor] || colors.blue;
+    const colorHex = settings.primaryColor?.startsWith('#') 
+      ? settings.primaryColor 
+      : (colors[settings.primaryColor] || colors.blue);
 
     // Generate and apply Material 3 theme manually to match Tailwind's expected RGB format
     try {
@@ -218,7 +220,7 @@ function AppContent() {
   // Only check system versions AFTER settings are loaded
   useEffect(() => {
     if (!settings_loading) {
-      checkSystemVersions();
+      checkSystemVersions(undefined, undefined, true);
       checkForAppUpdate(false); // Silent global check on startup
     }
   }, [settings_loading]);

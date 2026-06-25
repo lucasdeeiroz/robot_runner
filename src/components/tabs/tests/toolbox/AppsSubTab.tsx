@@ -1,10 +1,10 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useTranslation } from "react-i18next";
-import { Search, Smartphone, Package, Trash2, Snowflake, PlayCircle, Eraser, Upload, ArrowDownAZ, RefreshCw } from "lucide-react";
+import { Search, Smartphone, Package, Trash2, Snowflake, PlayCircle, Eraser, Upload, ArrowDownAZ, RefreshCw, Rocket, Download } from "lucide-react";
 import clsx from "clsx";
 import { useTestSessions } from "@/lib/testSessionStore";
-import { open } from '@tauri-apps/plugin-dialog';
+import { open, save } from '@tauri-apps/plugin-dialog';
 import { toast } from "sonner";
 import { Virtuoso } from "react-virtuoso";
 
@@ -202,6 +202,35 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
         }
     };
 
+    const handleLaunch = async (pkg: string) => {
+        try {
+            await invoke("launch_package", { device: activeDevice, package: pkg });
+            toast.success(t('apps.success.launched', { pkg, defaultValue: `Launched ${pkg}` }));
+        } catch (e) {
+            toast.error(String(e));
+        }
+    };
+
+    const handleDownload = async (pkg: PackageInfo) => {
+        try {
+            const destination = await save({
+                filters: [{ name: 'APK', extensions: ['apk'] }],
+                defaultPath: `${pkg.name}.apk`
+            });
+            if (destination) {
+                const toastId = toast.loading(t('apps.status.downloading', { pkg: pkg.name, defaultValue: `Downloading ${pkg.name}...` }));
+                try {
+                    await invoke("pull_apk", { device: activeDevice, path: pkg.path, destination });
+                    toast.success(t('apps.success.downloaded', { pkg: pkg.name, defaultValue: `Downloaded ${pkg.name}` }), { id: toastId });
+                } catch (err) {
+                    toast.error(String(err), { id: toastId });
+                }
+            }
+        } catch (e) {
+            toast.error(String(e));
+        }
+    };
+
     /*
     const handleBackup = async (pkg: PackageInfo) => {
         // ...
@@ -226,7 +255,8 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
                             variant="ghost"
                             size="sm"
                             className="p-1.5 hover:bg-surface-variant/50 text-on-surface-variant/80 rounded transition-colors h-auto"
-                            title={t('apps.actions.refresh')}
+                            data-tooltip={t('apps.actions.refresh')}
+                            data-position="left"
                         >
                             {loading ? <ExpressiveLoading size="xsm" variant="circular" /> : <RefreshCw size={14} />}
                         </Button>
@@ -235,7 +265,8 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
                             variant="ghost"
                             size="sm"
                             className="p-1.5 hover:bg-surface-variant/50 text-on-surface-variant/80 rounded transition-colors h-auto"
-                            title={sortBy === 'name' ? t('apps.actions.sort_by_package') : t('apps.actions.sort_by_name')}
+                            data-tooltip={sortBy === 'name' ? t('apps.actions.sort_by_package') : t('apps.actions.sort_by_name')}
+                            data-position="left"
                         >
                             {sortBy === 'name' ? <ArrowDownAZ size={14} /> : <Package size={14} />}
                         </Button>
@@ -247,7 +278,8 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
                                 "p-1.5 rounded border text-xs flex items-center gap-1.5 transition-colors h-auto",
                                 showSystem ? "bg-primary-container border-primary-container text-on-primary-container" : "bg-transparent border-outline-variant/30 text-on-surface-variant/80 hover:text-on-surface/80"
                             )}
-                            title={t('apps.toggle_system', "Toggle System Apps")}
+                            data-tooltip={t('apps.toggle_system', "Toggle System Apps")}
+                            data-position="left"
                         >
                             <Smartphone size={14} />
                             {/* <span className="hidden xl:inline">System</span> */}
@@ -332,7 +364,7 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
                 ) : (
                     <Virtuoso
                         data={filtered}
-                        className="custom-scrollbar"
+                        className="custom-scrollbar overflow-y-auto"
                         style={{ height: '100%' }}
                         itemContent={(_index, pkg) => (
                             <div className="px-3 py-2 border-b border-outline-variant/30 hover:bg-surface-variant/20 group flex items-center gap-3">
@@ -354,28 +386,36 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
                                     <div className="text-xs text-on-surface-variant/80 truncate font-mono opacity-70 flex items-center gap-2">
                                         <span>{pkg.name}</span>
                                         <span className="text-outline-variant px-1">•</span>
-                                        <span title={String(pkg.path)} className="truncate max-w-[150px] cursor-help hover:text-on-surface/80 transition-colors">
+                                        <span data-tooltip={String(pkg.path)} data-position="left" className="truncate max-w-[150px] cursor-help hover:text-on-surface/80 transition-colors">
                                             {pkg.path}
                                         </span>
                                     </div>
                                 </div>
 
                                 <div className="flex items-center gap-1 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Button size="icon" variant="ghost" onClick={() => handleLaunch(String(pkg.name))} className="h-7 w-7 hover:bg-success/10 text-success/80 rounded" data-tooltip={t('apps.actions.launch', "Launch")} data-position="left">
+                                        <Rocket size={14} />
+                                    </Button>
+
+                                    <Button size="icon" variant="ghost" onClick={() => handleDownload(pkg)} className="h-7 w-7 hover:bg-primary/10 text-primary/80 rounded" data-tooltip={t('apps.actions.download', "Download APK")} data-position="left">
+                                        <Download size={14} />
+                                    </Button>
+
                                     {pkg.is_disabled ? (
-                                        <Button size="icon" variant="ghost" onClick={() => confirmFreeze(String(pkg.name), false)} className="h-7 w-7 hover:bg-primary/10 text-info-container/80 rounded" title={t('apps.actions.enable', "Enable")}>
+                                        <Button size="icon" variant="ghost" onClick={() => confirmFreeze(String(pkg.name), false)} className="h-7 w-7 hover:bg-primary/10 text-info-container/80 rounded" data-tooltip={t('apps.actions.enable', "Enable")} data-position="left">
                                             <PlayCircle size={14} />
                                         </Button>
                                     ) : (
-                                        <Button size="icon" variant="ghost" onClick={() => confirmFreeze(String(pkg.name), true)} className="h-7 w-7 hover:bg-sky-500/10 text-sky-400 rounded" title={t('apps.actions.disable', "Freeze")}>
+                                        <Button size="icon" variant="ghost" onClick={() => confirmFreeze(String(pkg.name), true)} className="h-7 w-7 hover:bg-sky-500/10 text-sky-400 rounded" data-tooltip={t('apps.actions.disable', "Freeze")} data-position="left">
                                             <Snowflake size={14} />
                                         </Button>
                                     )}
 
-                                    <Button size="icon" variant="ghost" onClick={() => confirmClear(String(pkg.name))} className="h-7 w-7 hover:bg-warning/10 text-warning-container/40 rounded" title={t('apps.actions.clear', "Clear Data")}>
+                                    <Button size="icon" variant="ghost" onClick={() => confirmClear(String(pkg.name))} className="h-7 w-7 hover:bg-warning/10 text-warning-container/40 rounded" data-tooltip={t('apps.actions.clear', "Clear Data")} data-position="left">
                                         <Eraser size={14} />
                                     </Button>
 
-                                    <Button size="icon" variant="ghost" onClick={() => confirmUninstall(String(pkg.name))} className="h-7 w-7 hover:bg-error/10 text-error-container/60 rounded" title={t('apps.actions.uninstall', "Uninstall")}>
+                                    <Button size="icon" variant="ghost" onClick={() => confirmUninstall(String(pkg.name))} className="h-7 w-7 hover:bg-error/10 text-error-container/60 rounded" data-tooltip={t('apps.actions.uninstall', "Uninstall")} data-position="left">
                                         <Trash2 size={14} />
                                     </Button>
                                 </div>

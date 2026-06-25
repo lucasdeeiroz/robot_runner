@@ -1,6 +1,7 @@
 import { twMerge } from 'tailwind-merge';
 import { LucideIcon, X } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { Button } from "@/components/atoms/Button";
 
 export interface TabItem {
     id: string;
@@ -46,7 +47,7 @@ export const Tabs = ({
 
     // Revised active/inactive styles to rely on motion div for background
     const activeText = 'text-primary';
-    const inactiveText = 'text-on-surface-variant/80 hover:text-on-surface/80';
+    const inactiveText = 'text-on-surface-variant/80 hover:text-on-surface/80 hover:bg-surface-variant/30';
 
     // Unique IDs for this instance
     const activeTabId = layoutId ? `${layoutId}-activeTab` : "activeTab";
@@ -63,19 +64,20 @@ export const Tabs = ({
             {tabs.map((tab) => {
                 const isActive = tab.selected !== undefined ? tab.selected : activeId === tab.id;
                 return (
-                    <button
+                    <Button
                         key={tab.id}
+                        variant="unstyled"
                         onClick={() => onChange(tab.id)}
                         className={twMerge(
                             itemBase,
                             // Only apply flex-1 for horizontal pills to spread them (Removed per user request for left-alignment)
                             // variant === 'pills' && orientation === 'horizontal' && "flex-1 justify-center", // OLD
-                            variant === 'pills' && orientation === 'horizontal' && "justify-center",
+                            variant === 'pills' && orientation === 'horizontal' && "justify-center bg-transparent shadow-none",
                             isActive ? activeText : inactiveText,
                             // Vertical adjustments
-                            orientation === 'vertical' && "justify-start w-full text-left",
+                            orientation === 'vertical' && "justify-start w-full text-left bg-transparent shadow-none",
                             // Remove rounded corners for underline vertical
-                            variant === 'underline' && orientation === 'vertical' && "border-b-0 border-l-2 -ml-[1px]",
+                            variant === 'underline' && orientation === 'vertical' && "justify-start border-b-0 border-l-2 -ml-[1px] bg-transparent shadow-none",
                         )}
                         data-tooltip={tab.tooltip}
                         data-position={tab.tooltipPosition || "top"}
@@ -83,7 +85,7 @@ export const Tabs = ({
                         {isActive && variant === 'pills' && (
                             <motion.div
                                 layoutId={tab.selected !== undefined ? `${activeTabId}-${tab.id}` : activeTabId}
-                                className="absolute inset-0 bg-surface rounded-2xl shadow-sm border border-outline-variant/30"
+                                className="absolute inset-0 bg-primary/10 rounded-2xl shadow-s border border-outline-variant/30"
                                 transition={{ type: "spring", duration: 0.5 }}
                             />
                         )}
@@ -124,7 +126,7 @@ export const Tabs = ({
                                 <X size={14} className={isActive ? "text-primary" : "text-on-surface-variant"} />
                             </div>
                         )}
-                    </button>
+                    </Button>
                 );
             })}
         </div>

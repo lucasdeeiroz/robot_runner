@@ -4,6 +4,7 @@ import clsx from "clsx";
 import { createPortal } from "react-dom";
 
 import { AnimatePresence, motion } from "framer-motion";
+import { Button } from "@/components/atoms/Button";
 
 interface SplitButtonAction {
     label: string;
@@ -93,37 +94,37 @@ export function SplitButton({ primaryAction, secondaryActions, className, disabl
                 variant === 'danger' && "bg-error text-on-error hover:shadow-md",
                 variant === 'secondary' && "bg-surface-variant/50 text-on-surface hover:bg-surface-variant border border-outline-variant/30"
             )}>
-                <button
+                <Button
                     type="button"
                     onClick={effectivePrimary.onClick}
                     disabled={disabled || effectivePrimary.disabled}
                     className={clsx(
-                        "h-full px-4 text-sm font-medium flex items-center gap-2 rounded-l-2xl outline-none",
+                        "h-full px-4 text-sm font-medium text-on-error bg-transparent hover:bg-transparent shadow-none flex items-center gap-2 rounded-l-2xl outline-none",
                         showDropdown ? "pr-2" : "rounded-r-2xl pr-4",
                         disabled && "opacity-50 cursor-not-allowed"
                     )}
                 >
                     {effectivePrimary.icon && <span>{effectivePrimary.icon}</span>}
                     {effectivePrimary.label}
-                </button>
+                </Button>
 
                 {showDropdown && (
                     <>
                         {/* Separator Line */}
                         <div className={clsx("w-[1px] h-5 self-center", separatorStyles[variant], disabled && "opacity-30")} />
 
-                        <button
+                        <Button
                             ref={buttonRef}
                             type="button"
                             onClick={() => !disabled && setIsOpen(!isOpen)}
                             disabled={disabled}
                             className={clsx(
-                                "h-full pl-1.5 pr-2 rounded-r-2xl flex items-center justify-center outline-none",
+                                "h-full pl-1.5 pr-2 rounded-r-2xl flex items-center justify-center outline-none text-on-error bg-transparent hover:bg-transparent shadow-none",
                                 disabled && "opacity-50 cursor-not-allowed"
                             )}
                         >
                             <ChevronDown size={16} className={clsx("transition-transform duration-300", isOpen && "rotate-180")} />
-                        </button>
+                        </Button>
                     </>
                 )}
             </div>
@@ -176,7 +177,7 @@ export function SplitButton({ primaryAction, secondaryActions, className, disabl
                                 }
 
                                 return (
-                                    <button
+                                    <Button
                                         key={idx}
                                         type="button"
                                         onClick={() => {
@@ -184,11 +185,11 @@ export function SplitButton({ primaryAction, secondaryActions, className, disabl
                                             setIsOpen(false);
                                         }}
                                         disabled={action.disabled}
-                                        className="w-full text-left px-4 py-2 text-sm text-on-surface/90 hover:bg-primary/5 active:bg-primary/10 flex items-center gap-2.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="m-0 w-full text-left px-4 py-2 text-sm bg-transparent shadow-none rounded-none text-on-surface/90 hover:bg-primary/5 active:bg-primary/10 flex items-center gap-2.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         {action.icon && <span className="text-on-surface-variant">{action.icon}</span>}
                                         {action.label}
-                                    </button>
+                                    </Button>
                                 );
                             })}
                         </motion.div>

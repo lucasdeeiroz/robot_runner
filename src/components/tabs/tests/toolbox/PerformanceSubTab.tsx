@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { open } from "@tauri-apps/plugin-dialog";
 import { AlertTriangle, Activity, Cpu, Battery, CircuitBoard, Play, Square, Package as PackageIcon, Eye, RefreshCw, Zap, FolderSearch, Settings } from "lucide-react";
 import clsx from "clsx";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 import { useSettings } from "@/lib/settings";
 import { feedback } from "@/lib/feedback";
 import { WarningModal } from "@/components/organisms/WarningModal";
@@ -17,6 +18,7 @@ import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 interface PerformanceSubTabProps {
     selectedDevice: string;
     stats: DeviceStats | null;
+    history: (DeviceStats & { timestamp: number })[];
     error: string | null;
     autoRefresh: boolean;
     setAutoRefresh: (val: boolean) => void;
@@ -39,6 +41,7 @@ interface PerformanceSubTabProps {
 export function PerformanceSubTab({
     selectedDevice,
     stats,
+    history,
     error,
     autoRefresh,
     setAutoRefresh,
@@ -147,7 +150,8 @@ export function PerformanceSubTab({
                                 variant="ghost"
                                 size="sm"
                                 className="p-1.5 hover:bg-surface-variant/30 rounded transition-all active:scale-95 h-auto"
-                                title={t('performance.refresh')}
+                                data-tooltip={t('performance.refresh')}
+                                data-position="left"
                             >
                                 {isLoading ? (
                                     <ExpressiveLoading size="xsm" variant="circular" className="text-on-surface-variant/80" />
@@ -172,20 +176,20 @@ export function PerformanceSubTab({
                             <div className="flex items-center gap-2 px-3 py-1 bg-warning/10 text-warning rounded-2xl text-[11px] font-medium border border-warning/20">
                                 <FolderSearch size={14} />
                                 <span>{t('logcat.not_saving')}</span>
-                                <button
+                                <Button
                                     onClick={handleConfigurePath}
                                     className="underline hover:text-warning/80 ml-1"
                                 >
                                     {t('logcat.configure_path')}
-                                </button>
+                                </Button>
                                 {onNavigate && (
-                                    <button
+                                    <Button
                                         onClick={() => onNavigate?.('settings')}
                                         className="flex items-center gap-1 hover:text-warning/80 ml-2 border-l border-warning/20 pl-2"
                                     >
                                         <Settings size={12} />
                                         {t('common.go_to_settings')}
-                                    </button>
+                                    </Button>
                                 )}
                             </div>
                         )}
@@ -216,7 +220,8 @@ export function PerformanceSubTab({
                             size="sm"
                             disabled={(isTestRunning && !allowActionsDuringTest && !forceEnable)}
                             leftIcon={isRecording ? <Square size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
-                            title={isRecording ? t('performance.stop_record') : t('performance.start_record')}
+                            data-tooltip={isRecording ? t('performance.stop_record') : t('performance.start_record')}
+                            data-position="left"
                         >
                             {!isNarrow && (isRecording ? t('performance.recording') : "REC")}
                         </Button>
@@ -243,8 +248,8 @@ export function PerformanceSubTab({
                         <Activity size={48} className="opacity-20 mb-4" />
                         <h4 className="font-bold text-on-surface mb-2">{t('performance.status.paused_test', "Monitoring Paused")}</h4>
                         <p className="max-w-xs mb-6 opacity-70 italic">{t('performance.paused_description', "Performance polling is disabled to avoid interference with the running test.")}</p>
-                        
-                        <Button 
+
+                        <Button
                             onClick={() => setShowHighImpactWarning(true)}
                             variant="secondary"
                             size="sm"
@@ -335,7 +340,7 @@ export function PerformanceSubTab({
                                     </Card>
 
                                     {/* App FPS */}
-                                    <Card title="FPS" icon={<Eye size={24} className="text-success" />}>
+                                    <Card title={t('performance.fps', 'FPS')} icon={<Eye size={24} className="text-success" />}>
                                         <div className="flex items-end gap-2 mt-2">
                                             <span className="text-4xl font-bold text-on-surface/50">
                                                 {formatFPS(stats.app_stats.fps)}
@@ -343,6 +348,96 @@ export function PerformanceSubTab({
                                         </div>
                                         <ProgressBar value={stats.app_stats.fps} max={120} color="bg-success" />
                                     </Card>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Charts Section */}
+                        {history.length > 1 && (
+                            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 mt-8">
+                                <h3 className="text-xs font-semibold text-on-surface-variant/80 uppercase tracking-wider mb-3 ml-1">{t('performance.history', 'Performance History')}</h3>
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                    <Card title={t('performance.general_history', 'System History')} icon={<Activity size={20} className="text-primary" />}>
+                                        <div className="h-64 w-full mt-4">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <AreaChart data={history} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
+                                                    <defs>
+                                                        <linearGradient id="colorSysRam" x1="0" y1="0" x2="0" y2="1">
+                                                            <stop offset="5%" stopColor="#a855f7" stopOpacity={0.3} />
+                                                            <stop offset="95%" stopColor="#a855f7" stopOpacity={0} />
+                                                        </linearGradient>
+                                                        <linearGradient id="colorSysCpu" x1="0" y1="0" x2="0" y2="1">
+                                                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                                                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                                                        </linearGradient>
+                                                        <linearGradient id="colorBattery" x1="0" y1="0" x2="0" y2="1">
+                                                            <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
+                                                            <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
+                                                        </linearGradient>
+                                                    </defs>
+                                                    <XAxis dataKey="timestamp" tickFormatter={(tick) => new Date(tick).toLocaleTimeString([], { hour12: false, minute: '2-digit', second: '2-digit' })} stroke="currentColor" className="text-[10px] opacity-50" />
+                                                    <YAxis yAxisId="left" stroke="currentColor" className="text-[10px] opacity-50" tickFormatter={(val) => (val / 1024).toFixed(0)} />
+                                                    <YAxis yAxisId="right" orientation="right" stroke="currentColor" className="text-[10px] opacity-50" domain={[0, 100]} tickFormatter={(val) => `${val}%`} />
+                                                    <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-10" vertical={false} />
+                                                    <RechartsTooltip 
+                                                        contentStyle={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-outline-variant)', borderRadius: '8px', fontSize: '12px', color: 'var(--color-on-surface)' }}
+                                                        labelFormatter={(label) => new Date(label).toLocaleTimeString()}
+                                                        formatter={(value: any, name: any) => {
+                                                            if (name === 'ram_used') return [(Number(value) / 1024).toFixed(1) + ' MB', t('performance.system_ram', 'System RAM')];
+                                                            if (name === 'cpu_usage') return [Number(value).toFixed(1) + '%', t('performance.cpu', 'CPU')];
+                                                            if (name === 'battery_level') return [Number(value).toFixed(0) + '%', t('performance.battery', 'Battery')];
+                                                            return [value, name];
+                                                        }}
+                                                    />
+                                                    <Area yAxisId="left" type="monotone" dataKey="ram_used" stroke="#a855f7" fillOpacity={1} fill="url(#colorSysRam)" isAnimationActive={false} name="ram_used" />
+                                                    <Area yAxisId="right" type="monotone" dataKey="cpu_usage" stroke="#3b82f6" fillOpacity={1} fill="url(#colorSysCpu)" isAnimationActive={false} name="cpu_usage" />
+                                                    <Area yAxisId="right" type="monotone" dataKey="battery_level" stroke="#22c55e" fillOpacity={1} fill="url(#colorBattery)" isAnimationActive={false} name="battery_level" />
+                                                </AreaChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    </Card>
+
+                                    {selectedPackage && (
+                                        <Card title={t('performance.app_history', 'App History')} icon={<PackageIcon size={20} className="text-pink-500" />}>
+                                            <div className="h-64 w-full mt-4">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <AreaChart data={history} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
+                                                        <defs>
+                                                            <linearGradient id="colorAppRam" x1="0" y1="0" x2="0" y2="1">
+                                                                <stop offset="5%" stopColor="#ec4899" stopOpacity={0.3} />
+                                                                <stop offset="95%" stopColor="#ec4899" stopOpacity={0} />
+                                                            </linearGradient>
+                                                            <linearGradient id="colorAppCpu" x1="0" y1="0" x2="0" y2="1">
+                                                                <stop offset="5%" stopColor="#f97316" stopOpacity={0.3} />
+                                                                <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                                                            </linearGradient>
+                                                            <linearGradient id="colorAppFps" x1="0" y1="0" x2="0" y2="1">
+                                                                <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
+                                                                <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
+                                                            </linearGradient>
+                                                        </defs>
+                                                        <XAxis dataKey="timestamp" tickFormatter={(tick) => new Date(tick).toLocaleTimeString([], { hour12: false, minute: '2-digit', second: '2-digit' })} stroke="currentColor" className="text-[10px] opacity-50" />
+                                                        <YAxis yAxisId="left" stroke="currentColor" className="text-[10px] opacity-50" tickFormatter={(val) => (val / 1024).toFixed(0)} />
+                                                        <YAxis yAxisId="right" orientation="right" stroke="currentColor" className="text-[10px] opacity-50" domain={[0, 120]} />
+                                                        <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-10" vertical={false} />
+                                                        <RechartsTooltip 
+                                                            contentStyle={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-outline-variant)', borderRadius: '8px', fontSize: '12px', color: 'var(--color-on-surface)' }}
+                                                            labelFormatter={(label) => new Date(label).toLocaleTimeString()}
+                                                            formatter={(value: any, name: any) => {
+                                                                if (name === 'app_stats.ram_used') return [(Number(value) / 1024).toFixed(1) + ' MB', t('performance.app_ram', 'App RAM')];
+                                                                if (name === 'app_stats.cpu_usage') return [Number(value).toFixed(1) + '%', t('performance.cpu', 'CPU')];
+                                                                if (name === 'app_stats.fps') return [Math.round(Number(value)) + ' fps', t('performance.fps', 'FPS')];
+                                                                return [value, name];
+                                                            }}
+                                                        />
+                                                        <Area yAxisId="left" type="monotone" dataKey="app_stats.ram_used" stroke="#ec4899" fillOpacity={1} fill="url(#colorAppRam)" isAnimationActive={false} name="app_stats.ram_used" />
+                                                        <Area yAxisId="right" type="monotone" dataKey="app_stats.cpu_usage" stroke="#f97316" fillOpacity={1} fill="url(#colorAppCpu)" isAnimationActive={false} name="app_stats.cpu_usage" />
+                                                        <Area yAxisId="right" type="monotone" dataKey="app_stats.fps" stroke="#22c55e" fillOpacity={1} fill="url(#colorAppFps)" isAnimationActive={false} name="app_stats.fps" />
+                                                    </AreaChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        </Card>
+                                    )}
                                 </div>
                             </div>
                         )}

@@ -53,7 +53,8 @@ export function FlowchartHeader({
                 {missedScreensCount > 0 && (
                     <div
                         className="flex items-center gap-1.5 px-3 py-1 bg-warning/10 text-warning border border-warning/20 rounded-lg text-xs font-medium animate-pulse cursor-help"
-                        title={t('mapper.flowchart.ai_missed_help', 'These screens were placed in the quarantine area on the right.')}
+                        data-tooltip={t('mapper.flowchart.ai_missed_help', 'These screens were placed in the quarantine area on the right.')}
+                        data-position="bottom"
                     >
                         <AlertTriangle size={14} />
                         {t('mapper.flowchart.ai_missed_count', { count: missedScreensCount })}
@@ -67,35 +68,50 @@ export function FlowchartHeader({
                     isLoading={isReorganizing}
                 />
                 <Button
+                    variant="ghost"
                     onClick={onImport}
                     className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full"
-                    title={t('mapper.flowchart.import')}>
+                    data-tooltip={t('mapper.flowchart.import')}
+                    data-position="bottom"
+                >
                     <Download size={16} />
                 </Button>
                 <Button
+                    variant="ghost"
                     onClick={onExport}
                     className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full"
-                    title={t('mapper.flowchart.export')}>
+                    data-tooltip={t('mapper.flowchart.export')}
+                    data-position="bottom"
+                >
                     <Upload size={16} />
                 </Button>
                 <div className="h-4 w-px bg-outline-variant/30 mx-2" />
                 <Button
+                    variant="ghost"
                     onClick={onSave}
-                    className="p-2 bg-primary/10 hover:bg-primary/90 text-primary hover:text-on-primary rounded-full shadow-md transition-all active:scale-95"
-                    title={t('common.save')}>
+                    className="p-2 bg-primary/10 hover:bg-primary hover:text-on-primary text-primary rounded-full shadow-md transition-all active:scale-95"
+                    data-tooltip={t('common.save')}
+                    data-position="bottom"
+                >
                     <Save size={16} className="stroke-[2.5]" />
                 </Button>
                 <div className="h-4 w-px bg-outline-variant/30 mx-2" />
                 <Button
+                    variant="ghost"
                     onClick={onClearCurvatures}
                     className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full"
-                    title={t('mapper.flowchart.clear_curvatures', 'Clear all edge curvatures')}>
+                    data-tooltip={t('mapper.flowchart.clear_curvatures', 'Clear all edge curvatures')}
+                    data-position="bottom"
+                >
                     <Eraser size={16} />
                 </Button>
                 <Button
+                    variant="ghost"
                     onClick={onExportImage}
                     className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full transition-colors"
-                    title={t('mapper.flowchart.export_image')}>
+                    data-tooltip={t('mapper.flowchart.export_image')}
+                    data-position="bottom"
+                >
                     <Camera size={16} />
                 </Button>
                 <div className="h-4 w-px bg-outline-variant/30 mx-2" />
@@ -113,26 +129,32 @@ export function FlowchartHeader({
                     />
                 </div>
                 <Button
+                    variant="ghost"
                     onClick={onCenterView}
                     className="p-2 hover:bg-primary/10 text-primary dark:text-primary/80 rounded-full"
-                    title={t('mapper.flowchart.center_view')}>
+                    data-tooltip={t('mapper.flowchart.center_view')}
+                    data-position="bottom"
+                >
                     <Maximize size={16} />
                 </Button>
                 <div className="h-6 w-px bg-outline-variant/30 mx-2" />
                 <div className="flex bg-surface-variant/30 rounded-lg p-1 mr-4">
                     <Button
+                        variant="ghost"
                         onClick={() => onZoom(-0.1)}
                         className="p-1.5 hover:bg-surface/50 rounded text-on-surface-variant">
                         <ZoomOut size={16} />
                     </Button>
                     <span className="px-2 text-xs flex items-center text-on-surface-variant/80 min-w-[3rem] justify-center">{Math.round(scale * 100)}%</span>
                     <Button
+                        variant="ghost"
                         onClick={() => onZoom(0.1)}
                         className="p-1.5 hover:bg-surface/50 rounded text-on-surface-variant">
                         <ZoomIn size={16} />
                     </Button>
                 </div>
                 <Button
+                    variant="ghost"
                     onClick={onClose}
                     className="p-2 hover:bg-error/10 hover:text-error rounded-full transition-colors text-on-surface/60">
                     <X size={16} />

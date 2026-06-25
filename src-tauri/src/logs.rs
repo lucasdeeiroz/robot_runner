@@ -43,6 +43,7 @@ static RE_FILENAME_TS: Lazy<Regex> = Lazy::new(|| Regex::new(r"(\d{8}-\d{6})").u
 pub struct TestLog {
     run_id: Option<String>,
     logs_path: Option<String>,
+    framework: Option<String>,
     path: String,
     suite_name: String,
     status: String,
@@ -368,6 +369,7 @@ fn parse_log_entry(folder_path: &Path, xml_path: &Path, mtime: u64) -> Option<Te
         return Some(TestLog {
             run_id,
             logs_path,
+            framework: Some(framework.clone()),
             path: abs_folder_path.to_string_lossy().to_string(),
             xml_path: xml_path.to_string_lossy().to_string(),
             suite_name,
@@ -441,6 +443,7 @@ fn parse_log_entry(folder_path: &Path, xml_path: &Path, mtime: u64) -> Option<Te
     Some(TestLog {
         run_id,
         logs_path,
+        framework: Some(framework.clone()),
         path: abs_folder_path.to_string_lossy().to_string(),
         xml_path: xml_path.to_string_lossy().to_string(),
         suite_name: format!("[{}] {}", framework.to_uppercase(), suite_name),

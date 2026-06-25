@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { Folder, File as FileIcon, ChevronRight, CornerLeftUp, FileText, FileCode, FolderSearch, Settings } from "lucide-react";
+import { Folder, File as FileIcon, ChevronRight, CornerLeftUp, FileText, FileCode, FolderSearch, Settings, RefreshCw, ArrowDownToLine, CirclePlus, CircleMinus, GitCommitVertical, CloudUpload } from "lucide-react";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
@@ -9,6 +9,9 @@ import { WarningModal } from "@/components/organisms/WarningModal";
 import { feedback } from "@/lib/feedback";
 import { useSelection } from "@/lib/selectionStore";
 import { useSettings } from "@/lib/settings";
+import { Button } from "@/components/atoms/Button";
+import { Input } from "@/components/atoms/Input";
+import { Modal } from "@/components/organisms/Modal";
 
 export interface FileEntry {
     name: string;
@@ -30,14 +33,14 @@ interface FileExplorerProps {
     onNavigate?: (page: string) => void;
 }
 
-export function FileExplorer({ 
-    initialPath = ".", 
-    onSelect, 
-    onCancel, 
-    selectionMode = 'file', 
-    title: _title, 
-    onSelectionChange, 
-    allowHideFooter = false, 
+export function FileExplorer({
+    initialPath = ".",
+    onSelect,
+    onCancel,
+    selectionMode = 'file',
+    title: _title,
+    onSelectionChange,
+    allowHideFooter = false,
     renderEntryExtra,
     isMultiSelect = true,
     fallbackType,
@@ -53,6 +56,174 @@ export function FileExplorer({
     const [error, setError] = useState<string | null>(null);
     const [selectedEntry, setSelectedEntry] = useState<FileEntry | null>(null);
     const [warningModal, setWarningModal] = useState<{ isOpen: boolean, message: string }>({ isOpen: false, message: '' });
+
+    const [gitStatusEntries, setGitStatusEntries] = useState<Record<string, 'untracked' | 'modified' | 'staged' | 'deleted'>>({});
+    const [gitCommitMessage, setGitCommitMessage] = useState("");
+    const [showCommitModal, setShowCommitModal] = useState(false);
+    const [committing, setCommitting] = useState(false);
+    const [pushing, setPushing] = useState(false);
+    const [fetching, setFetching] = useState(false);
+    const [pulling, setPulling] = useState(false);
+
+    const getRelativePath = (entryPath: string) => {
+        if (!rootPath) return entryPath;
+        let rel = entryPath;
+        if (entryPath.startsWith(rootPath)) {
+            rel = entryPath.slice(rootPath.length);
+        }
+        return rel.replace(/\\/g, '/').replace(/^[\\/]/, '');
+    };
+
+    const fetchGitStatus = async () => {
+        if (!settings.git?.enabled || !rootPath) {
+            setGitStatusEntries({});
+            return;
+        }
+        try {
+            const statusList = await invoke<any[]>('get_git_status', { repoPath: rootPath });
+            const mapping: Record<string, 'untracked' | 'modified' | 'staged' | 'deleted'> = {};
+            statusList.forEach(item => {
+                const normPath = item.file_path.replace(/\\/g, '/').replace(/^[\\/]/, '');
+                mapping[normPath] = item.status;
+            });
+            setGitStatusEntries(mapping);
+        } catch (e) {
+            console.error("Failed to fetch git status:", e);
+        }
+    };
+
+    const getGitStatusForEntry = (entry: FileEntry) => {
+        if (!settings.git?.enabled) return null;
+
+        const relPath = getRelativePath(entry.path);
+
+        // 1. Check direct match or explicit parent folder untracked status
+        for (const [filePath, status] of Object.entries(gitStatusEntries)) {
+            const cleanKey = filePath.replace(/\/$/, '');
+            if (relPath === cleanKey) {
+                return status;
+            }
+            // Inherit ONLY if the parent folder itself is explicitly untracked as a whole
+            if (status === 'untracked' && relPath.startsWith(`${cleanKey}/`)) {
+                return 'untracked';
+            }
+        }
+
+        // 2. If it's a directory, check children changes to calculate its badge
+        if (entry.is_dir) {
+            const prefix = relPath ? `${relPath}/` : '';
+            let hasModified = false;
+            let hasUntracked = false;
+            let hasStaged = false;
+
+            for (const [filePath, status] of Object.entries(gitStatusEntries)) {
+                if (filePath.startsWith(prefix)) {
+                    if (status === 'modified' || status === 'deleted') hasModified = true;
+                    if (status === 'untracked') hasUntracked = true;
+                    if (status === 'staged') hasStaged = true;
+                }
+            }
+
+            // Show badge for directory based on children changes
+            if (hasModified) return 'modified';
+            if (hasStaged) return 'staged';
+            if (hasUntracked) return 'untracked';
+        }
+
+        return null;
+    };
+
+    const getFolderActionStatus = (entry: FileEntry): 'untracked' | 'modified' | 'staged' | 'deleted' | null => {
+        if (!entry.is_dir) return getGitStatusForEntry(entry);
+
+        const relPath = getRelativePath(entry.path);
+        const prefix = relPath ? `${relPath}/` : '';
+
+        const childStatuses = new Set<string>();
+
+        // Check if the folder itself has a status, or gather child statuses
+        for (const [filePath, status] of Object.entries(gitStatusEntries)) {
+            const cleanKey = filePath.replace(/\/$/, '');
+            if (cleanKey === relPath) {
+                childStatuses.add(status);
+            } else if (filePath.startsWith(prefix)) {
+                childStatuses.add(status);
+            }
+        }
+
+        // Only allow action if all changed children inside share the same status
+        if (childStatuses.size === 1) {
+            const status = Array.from(childStatuses)[0];
+            return status as 'untracked' | 'modified' | 'staged' | 'deleted';
+        }
+
+        return null;
+    };
+
+    const handleGitCommit = async () => {
+        if (!rootPath || !gitCommitMessage.trim()) return;
+        setCommitting(true);
+        try {
+            await invoke('git_commit', { repoPath: rootPath, message: gitCommitMessage.trim() });
+            feedback.toast.success(t('file_explorer.git_commit_success', "Successfully committed changes!"));
+            setGitCommitMessage("");
+            setShowCommitModal(false);
+            fetchGitStatus();
+        } catch (err) {
+            feedback.toast.error(String(err));
+        } finally {
+            setCommitting(false);
+        }
+    };
+
+    const handleGitPush = async () => {
+        if (!rootPath) return;
+        setPushing(true);
+        try {
+            await invoke('git_push', { repoPath: rootPath });
+            feedback.toast.success(t('file_explorer.git_push_success', "Successfully pushed changes to remote repository!"));
+        } catch (err) {
+            feedback.toast.error(String(err));
+        } finally {
+            setPushing(false);
+        }
+    };
+
+    const handleGitFetch = async () => {
+        if (!rootPath) return;
+        setFetching(true);
+        try {
+            await invoke('git_fetch', { repoPath: rootPath });
+            feedback.toast.success(t('file_explorer.git_fetch_success', "Fetched from remote."));
+            fetchGitStatus();
+        } catch (err) {
+            feedback.toast.error(String(err));
+        } finally {
+            setFetching(false);
+        }
+    };
+
+    const handleGitPull = async () => {
+        if (!rootPath) return;
+        setPulling(true);
+        try {
+            await invoke('git_pull', { repoPath: rootPath });
+            feedback.toast.success(t('file_explorer.git_pull_success', "Successfully pulled changes from remote."));
+            fetchGitStatus();
+        } catch (err) {
+            feedback.toast.error(String(err));
+        } finally {
+            setPulling(false);
+        }
+    };
+
+    useEffect(() => {
+        if (settings.git?.enabled && rootPath) {
+            fetchGitStatus();
+        } else {
+            setGitStatusEntries({});
+        }
+    }, [settings.git?.enabled, rootPath, currentPath]);
 
     useEffect(() => {
         loadDirectory(currentPath);
@@ -108,7 +279,7 @@ export function FileExplorer({
             } else {
                 setSelectedEntry(entry);
                 if (onSelectionChange) onSelectionChange(entry);
-                
+
                 if (isMultiSelect && selectionMode === 'directory' && !entry.is_dir === false) {
                     toggleItem({
                         path: entry.path,
@@ -191,20 +362,74 @@ export function FileExplorer({
             />
             {/* Header / Breadcrumb */}
             {!isPathUnconfigured && (
-                <div className="flex items-center gap-2 mb-2 p-2 bg-transparent backdrop-blur-md rounded-2xl border border-outline-variant/30 shrink-0">
-                    <button
+                <div className="flex items-center gap-2 mb-2 p-2 bg-transparent backdrop-blur-md rounded-2xl border border-outline-variant/30 shrink-0 overflow-visible">
+                    <Button
+                        variant="ghost" size="icon"
                         onClick={handleUp}
                         disabled={currentPath === rootPath}
-                        className="p-1 hover:bg-surface-variant/50 rounded transition-colors text-on-surface-variant/80 disabled:opacity-30 disabled:cursor-not-allowed"
-                        title={t('file_explorer.up')}
+                        className="w-8 h-8 rounded-full text-on-surface-variant/80 disabled:opacity-30 disabled:cursor-not-allowed"
+                        data-tooltip={t('file_explorer.up')}
+                        data-position="right"
                     >
                         <CornerLeftUp size={18} />
-                    </button>
+                    </Button>
                     <div className="flex-1 font-mono text-sm truncate px-2 text-on-surface/80">
-                        {rootPath && currentPath.startsWith(rootPath) 
+                        {rootPath && currentPath.startsWith(rootPath)
                             ? (currentPath === rootPath ? './' : currentPath.replace(rootPath, '').replace(/^[\\/]/, ''))
                             : currentPath}
                     </div>
+                    {settings.git?.enabled && (
+                        <div className="flex items-center gap-0.5 border-l border-outline-variant/20 pl-2">
+                            {/* Fetch */}
+                            <Button
+                                variant="ghost" size="sm"
+                                onClick={handleGitFetch}
+                                disabled={fetching}
+                                className="h-6 w-8 p-0 rounded-lg text-on-surface-variant/70 hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                                data-tooltip={t('file_explorer.git_fetch_tooltip', "Fetch from remote")}
+                                data-position="left"
+                                aria-label={t('file_explorer.git_fetch_tooltip', "Fetch from remote")}
+                            >
+                                <RefreshCw size={15} className={fetching ? 'animate-spin' : ''} />
+                            </Button>
+                            {/* Pull */}
+                            <Button
+                                variant="ghost" size="sm"
+                                onClick={handleGitPull}
+                                disabled={pulling}
+                                className="h-6 w-8 p-0 rounded-lg text-on-surface-variant/70 hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                                data-tooltip={t('file_explorer.git_pull_tooltip', "Pull from remote")}
+                                data-position="left"
+                                aria-label={t('file_explorer.git_pull_tooltip', "Pull from remote")}
+                            >
+                                <ArrowDownToLine size={15} />
+                            </Button>
+                            {/* Commit */}
+                            <Button
+                                variant="ghost" size="sm"
+                                onClick={() => setShowCommitModal(true)}
+                                disabled={!Object.values(gitStatusEntries).some(s => s === 'staged')}
+                                className="h-6 w-8 p-0 rounded-lg text-on-surface-variant/70 hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                                data-tooltip={t('file_explorer.git_commit_btn_tooltip', "Commit staged changes")}
+                                data-position="left"
+                                aria-label={t('file_explorer.git_commit_btn_tooltip', "Commit staged changes")}
+                            >
+                                <GitCommitVertical size={15} />
+                            </Button>
+                            {/* Push */}
+                            <Button
+                                variant="ghost" size="sm"
+                                onClick={handleGitPush}
+                                disabled={pushing}
+                                className="h-6 w-8 p-0 rounded-lg text-on-surface-variant/70 hover:text-secondary hover:bg-secondary/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                                data-tooltip={t('file_explorer.git_push_tooltip', "Push to remote")}
+                                data-position="left"
+                                aria-label={t('file_explorer.git_push_tooltip', "Push to remote")}
+                            >
+                                <CloudUpload size={15} />
+                            </Button>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -220,27 +445,27 @@ export function FileExplorer({
                                 {t('file_explorer.not_configured')}
                             </h3>
                             <p className="text-sm text-on-surface-variant max-w-xs mx-auto">
-                                {fallbackType === 'tests' 
+                                {fallbackType === 'tests'
                                     ? t('file_explorer.configure_tests')
                                     : t('file_explorer.configure_suites')}
                             </p>
                         </div>
-                        <button
+                        <Button
                             onClick={handleSelectFolder}
                             className="flex items-center gap-2 px-6 py-2.5 bg-primary text-on-primary rounded-2xl text-sm font-medium hover:bg-primary/90 transition-all shadow-md active:scale-95"
                         >
                             <Folder size={18} />
                             {t('file_explorer.select_folder_btn')}
-                        </button>
+                        </Button>
 
                         {onNavigate && (
-                            <button
+                            <Button
                                 onClick={() => onNavigate?.('settings')}
                                 className="flex items-center gap-2 px-6 py-2 text-on-surface-variant/60 hover:text-primary transition-all text-sm"
                             >
                                 <Settings size={14} />
                                 {t('common.go_to_settings', "Go to Settings")}
-                            </button>
+                            </Button>
                         )}
                     </div>
                 ) : (
@@ -255,9 +480,9 @@ export function FileExplorer({
                         {error && (
                             <div className="flex flex-col items-center justify-center h-full text-error">
                                 <span className="text-sm">{error}</span>
-                                <button onClick={() => loadDirectory(".")} className="mt-4 text-xs underline">
+                                <Button onClick={() => loadDirectory(".")} className="mt-4 text-xs underline">
                                     {t('file_explorer.reset')}
-                                </button>
+                                </Button>
                             </div>
                         )}
 
@@ -272,8 +497,8 @@ export function FileExplorer({
                                             onClick={() => handleEntryClick(entry)}
                                             onDoubleClick={() => entry.is_dir ? handleNavigate(entry.path) : (onSelect && onSelect(entry.path))}
                                             className={clsx(
-                                                "flex items-center gap-3 px-3 py-2 rounded-2xl cursor-pointer text-sm select-none transition-all",
-                                                isSelected 
+                                                "flex items-center gap-3 px-3 py-2 rounded-2xl cursor-pointer text-sm select-none transition-all group",
+                                                isSelected
                                                     ? "bg-secondary-container/50 text-on-secondary-container ring-1 ring-primary/30"
                                                     : isActive
                                                         ? "bg-secondary-container/30 text-on-secondary-container"
@@ -297,6 +522,88 @@ export function FileExplorer({
                                             <span className={clsx("truncate flex-1", isSelected && "text-primary font-medium")}>
                                                 {entry.name}
                                             </span>
+                                            {(() => {
+                                                const gitStatus = getGitStatusForEntry(entry);
+                                                if (!gitStatus) return null;
+
+                                                const actionStatus = entry.is_dir ? getFolderActionStatus(entry) : gitStatus;
+                                                let badgeColor = "";
+                                                let badgeLabel = "";
+                                                switch (gitStatus) {
+                                                    case 'modified':
+                                                        badgeColor = "bg-amber-500/10 text-amber-500 border-amber-500/20";
+                                                        badgeLabel = "M";
+                                                        break;
+                                                    case 'staged':
+                                                        badgeColor = "bg-blue-500/10 text-blue-500 border-blue-500/20";
+                                                        badgeLabel = "A";
+                                                        break;
+                                                    case 'untracked':
+                                                        badgeColor = "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
+                                                        badgeLabel = "U";
+                                                        break;
+                                                    case 'deleted':
+                                                        badgeColor = "bg-rose-500/10 text-rose-500 border-rose-500/20";
+                                                        badgeLabel = "D";
+                                                        break;
+                                                }
+
+                                                return (
+                                                    <div className="flex items-center gap-2 shrink-0">
+                                                        {(actionStatus === 'untracked' || actionStatus === 'modified' || actionStatus === 'deleted') && (
+                                                            <Button
+                                                                variant="ghost" size="icon"
+                                                                onClick={async (e) => {
+                                                                    e.stopPropagation();
+                                                                    try {
+                                                                        await invoke('git_stage_file', { repoPath: rootPath, filePath: getRelativePath(entry.path) });
+                                                                        feedback.toast.success(t('file_explorer.staged_success', { file: entry.name }));
+                                                                        fetchGitStatus();
+                                                                    } catch (err) {
+                                                                        feedback.toast.error(String(err));
+                                                                    }
+                                                                }}
+                                                                className="opacity-0 group-hover:opacity-100 w-6 h-6 rounded-lg text-primary hover:bg-primary/20"
+                                                                data-tooltip={t('file_explorer.git_stage_tooltip', "Stage changes")}
+                                                                data-position="left"
+                                                                aria-label={t('file_explorer.git_stage_tooltip', "Stage changes")}
+                                                            >
+                                                                <CirclePlus size={14} />
+                                                            </Button>
+                                                        )}
+                                                        {actionStatus === 'staged' && (
+                                                            <Button
+                                                                variant="ghost" size="icon"
+                                                                onClick={async (e) => {
+                                                                    e.stopPropagation();
+                                                                    try {
+                                                                        await invoke('git_unstage_file', { repoPath: rootPath, filePath: getRelativePath(entry.path) });
+                                                                        feedback.toast.success(t('file_explorer.unstaged_success', { file: entry.name }));
+                                                                        fetchGitStatus();
+                                                                    } catch (err) {
+                                                                        feedback.toast.error(String(err));
+                                                                    }
+                                                                }}
+                                                                className="opacity-0 group-hover:opacity-100 w-6 h-6 rounded-lg text-warning hover:text-amber-500 hover:bg-amber-500/20"
+                                                                data-tooltip={t('file_explorer.git_unstage_tooltip', "Unstage changes")}
+                                                                data-position="left"
+                                                                aria-label={t('file_explorer.git_unstage_tooltip', "Unstage changes")}
+                                                            >
+                                                                <CircleMinus size={14} />
+                                                            </Button>
+                                                        )}
+                                                        {settings.git?.showBadges && (
+                                                            <span
+                                                                className={clsx("text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border cursor-help", badgeColor)}
+                                                                data-tooltip={t(`file_explorer.git_status_${gitStatus}`)}
+                                                                data-position="left"
+                                                            >
+                                                                {badgeLabel}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
                                             {renderEntryExtra && renderEntryExtra(entry, isSelected)}
                                             {entry.is_dir && <ChevronRight size={14} className="text-on-surface/80 opacity-50" />}
                                         </div>
@@ -319,20 +626,62 @@ export function FileExplorer({
                     <div className="flex-1 text-xs text-on-surface/80 truncate">
                         {selectedEntry ? selectedEntry.name : selectionMode === 'directory' ? t('file_explorer.current') : t('file_explorer.no_selection')}
                     </div>
-                    <button
+                    <Button
                         onClick={() => onCancel?.()}
                         className="px-4 py-2 rounded-2xl text-sm font-medium text-on-surface-variant/80 hover:bg-surface-variant/30 transition-colors"
                     >
                         {t('file_explorer.cancel')}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         onClick={handleConfirm}
                         disabled={!selectedEntry && selectionMode === 'file'}
                         className="px-4 py-2 rounded-2xl text-sm font-medium bg-primary text-on-primary hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {selectionMode === 'directory' ? t('file_explorer.select_folder') : t('file_explorer.select_file')}
-                    </button>
+                    </Button>
                 </div>
+            )}
+
+            {/* Git Commit Modal */}
+            {settings.git?.enabled && (
+                <Modal
+                    isOpen={showCommitModal}
+                    onClose={() => {
+                        setShowCommitModal(false);
+                        setGitCommitMessage("");
+                    }}
+                    title={t('file_explorer.git_commit_title', "Commit Changes")}
+                    className="max-w-md"
+                >
+                    <div className="space-y-4">
+                        <Input
+                            label={t('file_explorer.git_commit_message_label', "Commit Message")}
+                            type="text"
+                            value={gitCommitMessage}
+                            onChange={(e) => setGitCommitMessage(e.target.value)}
+                            placeholder={t('file_explorer.git_commit_placeholder', "e.g. update test scripts")}
+                            autoFocus
+                        />
+                        <div className="flex justify-end gap-3 pt-2">
+                            <Button
+                                variant="secondary"
+                                onClick={() => {
+                                    setShowCommitModal(false);
+                                    setGitCommitMessage("");
+                                }}
+                            >
+                                {t('common.cancel', "Cancel")}
+                            </Button>
+                            <Button
+                                variant="primary"
+                                onClick={handleGitCommit}
+                                disabled={!gitCommitMessage.trim() || committing}
+                            >
+                                {committing ? t('file_explorer.committing', "Committing...") : t('file_explorer.commit', "Commit")}
+                            </Button>
+                        </div>
+                    </div>
+                </Modal>
             )}
         </div>
     );

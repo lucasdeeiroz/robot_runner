@@ -139,8 +139,22 @@ export const en = {
             mic_active: "Listening...",
             mic_inactive: "Voice input",
             mic_permission_error: "Microphone permission error or not supported",
+            file_path_missing: "File path is missing for action",
+            confirm_file_deletion: "Confirm File Deletion",
+            confirm_file_modification: "Confirm File Modification",
+            confirm_file_creation: "Confirm File Creation",
+            path: "Path:",
+            original_content: "Original Content",
+            new_content: "New Content",
+            cancel: "Cancel",
+            confirm: "Confirm",
+            file_deleted: "File deleted successfully.",
+            file_created: "File created successfully.",
+            file_modified: "File modified successfully.",
+            file_action_failed: "Failed to execute file action: ",
             invalid_automation_root: "Automation root is not configured. Please set a valid automation root before running a test.",
             no_active_device: "No active device selected.",
+            context_requested: "Reading additional context from {{file}}...",
             suggested_prompts: {
                 settings: "\"Go to settings\"",
                 color: "\"Change my primary color to green\"",
@@ -178,7 +192,9 @@ export const en = {
                 allow_downgrade: "Allow Downgrade (-d)",
                 grant_permissions: "Grant Permissions (-g)",
                 allow_test: "Allow Test APKs (-t)",
-                install_sdcard: "Install to SD Card (-s)"
+                install_sdcard: "Install to SD Card (-s)",
+                launch: "Launch App",
+                download: "Download APK"
             },
             search_placeholder: "Search packages...",
             toggle_system: "Toggle System Apps",
@@ -187,14 +203,17 @@ export const en = {
             status: {
                 installing: "Installing APK...",
                 disabled_badge: "Disabled",
-                paused_test: "App list refresh paused during test"
+                paused_test: "App list refresh paused during test",
+                downloading: "Downloading {{pkg}}..."
             },
             success: {
                 uninstalled: "Package {{pkg}} uninstalled successfully",
                 disabled: "Package {{pkg}} disabled",
                 enabled: "Package {{pkg}} enabled",
                 cleared: "Data cleared for {{pkg}}",
-                installed: "APK installed successfully"
+                installed: "APK installed successfully",
+                launched: "Launched {{pkg}}",
+                downloaded: "Downloaded {{pkg}}"
             },
             error: {
                 install_failed: "Installation failed: {{error}}"
@@ -232,6 +251,9 @@ export const en = {
             }
         },
         common: {
+            start: "Start",
+            pause: "Pause",
+            reset: "Reset",
             loading_taking_too_long: "Loading is taking longer than expected...",
             continue_anyway: "Continue anyway",
             refresh: "Refresh",
@@ -259,6 +281,8 @@ export const en = {
             clear: "Clear",
             coming_soon: "Module {{module}} coming soon...",
             error_occurred: "An error occurred: {{error}}",
+            failed_to_pull_video: "Failed to pull video",
+            failed_to_pull_screenshot: "Failed to pull screenshot from device",
             delete: "Delete",
             edit: "Edit",
             go_to_settings: "Go to Settings",
@@ -413,6 +437,7 @@ export const en = {
                 key_required: "{{provider}} API Key required. Please configure it in Settings.",
                 types: {
                     test_case: "Test Cases (BDD)",
+                    test_case_traditional: "Test Cases (Traditional / Step-by-Step)",
                     pbi: "Product Backlog Item (PBI)",
                     improvement: "Functional Improvement",
                     bug: "Bug Report"
@@ -481,7 +506,32 @@ export const en = {
             not_configured: "Path not configured",
             configure_tests: "Please configure the Tests Directory in Settings or select it below.",
             configure_suites: "Please configure the Suites Directory in Settings or select it below.",
-            select_folder_btn: "Select Folder"
+            select_folder_btn: "Select Folder",
+            git_commit_title: "Commit Changes",
+            git_commit_btn_tooltip: "Commit staged changes",
+            git_push: "Push to remote",
+            pushing: "Pushing...",
+            push: "Push",
+            git_commit_message_label: "Commit Message",
+            git_commit_placeholder: "e.g. update test scripts",
+            committing: "Committing...",
+            commit: "Commit",
+            staged_success: "Staged {{file}} successfully",
+            git_commit_success: "Successfully committed changes!",
+            git_push_success: "Successfully pushed changes to remote repository!",
+            git_stage_tooltip: "Stage changes",
+            git_stage: "Stage",
+            git_status_modified: "Modified",
+            git_status_staged: "Staged (Ready to Commit)",
+            git_status_untracked: "Untracked",
+            git_status_deleted: "Deleted",
+            git_fetch_tooltip: "Fetch from remote",
+            git_fetch_success: "Fetched from remote successfully.",
+            git_pull_tooltip: "Pull from remote",
+            git_pull_success: "Successfully pulled changes from remote.",
+            git_push_tooltip: "Push to remote",
+            git_unstage_tooltip: "Unstage changes",
+            unstaged_success: "Unstaged {{file}} successfully"
         },
         inspector: {
             overlay: {
@@ -542,6 +592,8 @@ export const en = {
                 recents: "Recents"
             },
             modal: {
+                edit_step_locator: "Edit Step Locator",
+                format: "Format",
                 edit_xpath: "Edit XPath",
                 edit_uiselector: "Edit UIAutomator Selector",
                 edit_selector: "Edit Selector",
@@ -595,7 +647,9 @@ export const en = {
                 suggested_selector: "Suggested Selector",
                 ai_rationale: "AI Rationale",
                 rationale: "Rationale",
-                ai_error_generic: "AI suggestion failed."
+                ai_error_generic: "AI suggestion failed.",
+                ai_error_quota: "AI quota exhausted. {{detail}}",
+                ai_error_auth: "AI authentication failed. Check your API key."
             },
             recorder: {
                 title: "Steps Recorder",
@@ -610,7 +664,8 @@ export const en = {
                     double_tap: "Double Tap",
                     long_press: "Long Press",
                     swipe: "Swipe",
-                    drag_drop: "Drag & Drop"
+                    drag_drop: "Drag & Drop",
+                    assert: "Assert"
                 },
                 directions: {
                     up: "Up",
@@ -835,6 +890,35 @@ export const en = {
                 back_updated: "Back-updated \"{{prev}}\" → element navigates to \"{{current}}\"",
                 merging_insights: "Merging AI insights into existing screen: \"{{name}}\" (ID: {{id}}, {{count}} elements)",
                 new_elements_discovered: "Added {{count}} new elements discovered by AI. Total: {{total}}",
+                analyzing_prompt: "Analyzing prompt...",
+                summary_initial: "Initial Graph Summary",
+                summary_final: "Final Graph Summary (Exploration Ended)",
+                summary_screens: "- Screens: {{exhausted}} Exhausted, {{exploring}} Exploring, {{unexplored}} Unexplored",
+                summary_elements: "- Elements: {{exhausted}} Exhausted, {{exploring}} Exploring, {{unexplored}} Unexplored",
+                heuristic_scroll: "Heuristic: no unvisited elements, trying to scroll",
+                heuristic_scroll_reverse: "Heuristic: scroll reverse, no new elements found",
+                heuristic_back: "Heuristic: stuck, going back",
+                heuristic_type: "Heuristic: type text into unvisited input",
+                heuristic_click: "Heuristic: click unvisited element"
+            },
+            enhancer: {
+                title: "Audit & Enhance Maps",
+                description: "This tool will programmatically remove duplicates, standardize elements, and use AI to generate semantic names and descriptions for your saved screens.",
+                ready: "Ready to process {{count}} screens.",
+                btn_cancel: "Cancel",
+                btn_close: "Close",
+                btn_start: "Start Enhancement",
+                btn_enhancing: "Enhancing...",
+                btn_done: "Done",
+                btn_audit_enhance: "Audit & Enhance",
+                completed: "Audit and Enhancement Completed",
+                starting_linter: "Starting Programmatic Linter...",
+                removed_duplicates: "Removed {{count}} duplicates from {{name}}",
+                no_enhancement_needed: "All screens and elements are already semantically named. No AI enhancement needed.",
+                cli_fallback: "CLI provider selected. Falling back to Gemini for Batch Enhancement.",
+                api_key_required: "API key is required. Stopping after programmatic Linter.",
+                found_screens: "Found {{count}} screens needing AI enhancement. Processing in batches...",
+                processing_batch: "Processing AI batch {{current}}/{{total}}..."
             },
             modes: {
                 inspect: "Inspect Mode",
@@ -907,7 +991,8 @@ export const en = {
                 toggle_stay_awake: "Toggle Keep Screen Awake",
                 export_json: "Export JSON",
                 import_json: "Import JSON",
-                export_image: "Export Image"
+                export_image: "Export Image",
+                save_logs: "Save Logs"
             },
             feedback: {
                 mapped: "Element mapped!",
@@ -922,13 +1007,15 @@ export const en = {
                 new_screen: "Ready for new screen",
                 deleted: "Map deleted",
                 stay_on_enabled: "Stay Awake enabled",
-                stay_on_disabled: "Stay Awake disabled"
+                stay_on_disabled: "Stay Awake disabled",
+                logs_saved: "Logs saved successfully"
             },
             error: {
                 missing_name: "Please provide a name for the element",
                 missing_screen_name: "Please provide a Screen Name",
                 save_failed: "Failed to save screen map",
-                stay_on_failed: "Failed to change Stay Awake state"
+                stay_on_failed: "Failed to change Stay Awake state",
+                logs_save_failed: "Failed to save logs"
             },
             confirm: {
                 delete: "Are you sure you want to delete this map?",
@@ -942,6 +1029,14 @@ export const en = {
             save_error: "Failed to save performance data",
             record_error: "Failed to start recording",
             title: "Device Performance",
+            history: "Performance History",
+            general_history: "System History",
+            app_history: "App History",
+            ram_history: "RAM Usage (MB)",
+            fps_history: "App FPS",
+            fps: "FPS",
+            system_ram: "System RAM",
+            app_ram: "App RAM",
             auto_on: "Auto-Refresh On",
             auto_off: "Auto-Refresh Off",
             refresh: "Refresh Now",
@@ -1046,11 +1141,14 @@ export const en = {
                 ai_analysis: "AI Analysis",
                 ai_analysis_header: "Detailed Analysis",
                 summarize_run: "Summarize Execution",
+                generate_ai_test: "Generate Robot Test (AI)",
                 summary_title: "Execution Summary",
                 summary_rationale: "Analysis Basis",
                 ai_analysis_placeholder: "Click to perform a smart root cause analysis using AI.",
                 ai_analysis_error: "AI analysis failed",
                 ai_error_generic: "AI analysis failed.",
+                ai_error_quota: "AI quota exhausted. {{detail}}",
+                ai_error_auth: "AI authentication failed. Check your API key.",
                 ai_error_details: "Error Details:",
                 ai_error_copy: "Copy Error",
                 ai_history: {
@@ -1139,6 +1237,15 @@ export const en = {
                 light: "Light",
                 dark: "Dark",
                 primary_color: "Primary Color",
+                blue_color: "Blue",
+                red_color: "Red",
+                green_color: "Green",
+                purple_color: "Purple",
+                orange_color: "Orange",
+                cyan_color: "Cyan",
+                pink_color: "Pink",
+                custom_color: "Custom",
+                custom_color_description: "Select a custom primary color for the application.",
                 sidebar_logo: "Sidebar Logo",
                 logo_light: "Light Mode",
                 logo_dark: "Dark Mode",
@@ -1271,6 +1378,68 @@ export const en = {
                 allow_actions_during_test: "Allow actions during test",
                 allow_actions_during_test_desc: "Enable Logcat, Performance Monitoring, and other tools even while a test is running"
             },
+            integrations: {
+                title: "Third-Party Integrations",
+                enabled: "Enabled",
+                disabled: "Disabled",
+                jira: {
+                    title: "Jira Software",
+                    host: "Jira Cloud Host URL",
+                    email: "Atlassian Account Email",
+                    token: "API Token",
+                    project: "Project Key",
+                    connection_success: "Successfully connected to Jira!",
+                    connection_failed: "Failed to connect to Jira. Check details.",
+                    export_success: "Issue created successfully: {{key}}",
+                    export_failed: "Failed to create Jira issue"
+                },
+                azure: {
+                    title: "Azure DevOps",
+                    org: "Organization Name",
+                    project: "Project Name",
+                    pat: "Personal Access Token (PAT)",
+                    connection_success: "Successfully connected to Azure DevOps!",
+                    connection_failed: "Failed to connect to Azure DevOps. Check details.",
+                    export_success: "Work item created successfully: #{{id}}",
+                    export_failed: "Failed to create Azure Work Item"
+                },
+                testlink: {
+                    title: "TestLink",
+                    url: "XML-RPC Endpoint URL",
+                    devkey: "Developer Key (API Key)",
+                    projectid: "Project ID (Numerical)",
+                    connection_success: "Successfully connected to TestLink!",
+                    connection_failed: "Failed to connect to TestLink. Check details.",
+                    export_success: "Suite and test cases exported to TestLink!",
+                    export_failed: "Failed to export to TestLink"
+                },
+                git: {
+                    title: "Git Integration",
+                    enabled: "Enable Git Integration",
+                    badges: "Show status badges in File Explorer",
+                    status_clean: "Clean",
+                    status_modified: "Modified",
+                    status_untracked: "Untracked",
+                    status_staged: "Staged",
+                    stage_all: "Stage All Changes",
+                    stage_file: "Stage File",
+                    commit: "Commit",
+                    commit_msg: "Commit Message",
+                    commit_success: "Committed successfully!",
+                    push: "Push Changes",
+                    push_success: "Pushed successfully!",
+                    not_installed: "Git CLI is not installed or not in system PATH."
+                },
+                webhooks: {
+                    title: "Slack & MS Teams Webhooks",
+                    slack_url: "Slack Webhook URL",
+                    teams_url: "MS Teams Webhook URL",
+                    notify_pass: "Notify on Test Pass",
+                    notify_fail: "Notify on Test Fail"
+                },
+                test_connection: "Test Connection",
+                testing: "Testing..."
+            }
         },
         settings_page: {
             path_auto_updated: "Path automatically updated: {{path}}",
@@ -1410,6 +1579,7 @@ export const en = {
                 args_one: "{{count}} arg file",
                 args_other: "{{count}} arg files",
                 clear_all: "Clear All",
+                cleared: "Selection cleared",
                 remove: "Remove"
             },
             target: "Target",
@@ -1508,7 +1678,18 @@ export const en = {
                 open_error: "Failed to open Scrcpy"
             },
             rerun: {
-                init_error: "Failed to initiate rerun"
+                init_error: "Failed to initialize rerun"
+            },
+            dmesg: {
+                start_error: "Failed to start dmesg",
+                saved: "Dmesg logs saved",
+                stop_error: "Failed to stop dmesg",
+                select_device: "Select a device to view Kernel Logs",
+                title: "Kernel Logs (dmesg)",
+                analyze_ai: "Analyze with AI",
+                waiting: "Waiting for kernel logs...",
+                no_logs: "No logs. Click Start.",
+                ai_analysis_title: "Kernel Log AI Analysis"
             },
             tabs: {
                 console: "Test Console",
@@ -1517,7 +1698,45 @@ export const en = {
                 mirror: "Mirror",
                 performance: "Performance",
                 apps: "Apps",
-                webview: "Webview"
+                webview: "Webview",
+                hardware: "Hardware"
+            },
+            hardware: {
+                battery: {
+                    title: "Battery Mocking",
+                    set_level: "Set Level (%)",
+                    quick_actions: "Quick Actions",
+                    unplug: "Unplug",
+                    unplug_desc: "Simulate unplugged state",
+                    reset: "Reset",
+                    reset_desc: "Reset to physical state",
+                    set_success: "Battery set to {{level}}%",
+                    set_error: "Failed to set battery",
+                    unplug_success: "Battery unplugged (discharging)",
+                    unplug_error: "Failed to unplug battery",
+                    reset_success: "Battery status reset",
+                    reset_error: "Failed to reset battery"
+                },
+                connectivity: {
+                    title: "Connectivity",
+                    wifi: "WiFi",
+                    mobile_data: "Mobile Data",
+                    airplane_mode: "Airplane Mode",
+                    wifi_success: "WiFi toggled",
+                    wifi_error: "Failed to toggle WiFi",
+                    data_success: "Mobile Data toggled",
+                    data_error: "Failed to toggle Mobile Data",
+                    airplane_success: "Airplane mode toggled",
+                    airplane_error: "Failed to toggle Airplane mode"
+                },
+                broadcast: {
+                    title: "System Broadcasts",
+                    intent_action: "Intent Action",
+                    extras: "Extras (Optional)",
+                    send: "Send Broadcast",
+                    success: "Broadcast sent",
+                    error: "Failed to send broadcast"
+                }
             },
             actions: {
                 screenshot: "Take Screenshot",
@@ -1586,6 +1805,56 @@ export const en = {
                     title: "Selenium (Pytest)",
                     description: "Standard browser automation using Python & pytest. Best for robust web regression."
                 }
+            }
+        },
+        exploration_modal: {
+            title: "Autonomous Exploration Configuration",
+            subtitle: "Define how the artificial intelligence should navigate and map the application.",
+            mode: {
+                title: "Exploration Mode",
+                new: {
+                    title: "Only New Screens",
+                    desc: "Exploration will stop when encountering known screens."
+                },
+                all: {
+                    title: "Explore Everything",
+                    desc: "Exploration will scan the entire application."
+                },
+                specific: {
+                    title: "Specific Path",
+                    desc: "Focus on a specific navigation path."
+                }
+            },
+            limits: {
+                title: "Navigation Limits",
+                default: {
+                    title: "Default Limits",
+                    desc: "Loads standard safe configurations."
+                },
+                custom: {
+                    title: "Custom Limits",
+                    desc: "Define your own custom keywords."
+                }
+            },
+            fields: {
+                blocked: "Blocked Keywords (Buttons forbidden to interact)",
+                blocked_placeholder: "delete, remove",
+                escape: "Escape Keywords (Back/Cancel buttons)",
+                escape_placeholder: "back, cancel",
+                priority: "Priority Keywords (What to click first)",
+                priority_placeholder: "settings, profile"
+            },
+            ai: {
+                title: "Use AI for Refinement",
+                desc: "The AI will add new rules to the configurations above based on your intent.",
+                placeholder: "Briefly describe what you want..."
+            },
+            packages: {
+                title: "Target & Allowed Apps",
+                target_label: "Target App",
+                allowed_label: "Secondary Allowed Apps (App Bundles)",
+                allowed_desc: "If exploration opens these apps, it will continue naturally without force-stopping them.",
+                no_secondary: "No other packages available in Settings."
             }
         },
         auth: {

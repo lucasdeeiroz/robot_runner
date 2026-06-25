@@ -5,6 +5,7 @@ import { ChevronRight, ChevronLeft, RotateCcw, Play, X } from 'lucide-react';
 import { useSettings } from "@/lib/settings";
 import { feedback } from '@/lib/feedback';
 import { SLIDES_DATA } from './slidesData';
+import { Button } from "@/components/atoms/Button";
 
 export function PresentationPanel() {
     const { t } = useTranslation();
@@ -47,7 +48,7 @@ export function PresentationPanel() {
         <div className="w-80 h-full border-r border-outline-variant/30 flex flex-col bg-gradient-to-b from-surface to-surface-container select-none overflow-hidden relative group">
             {/* Background Decorative Element */}
             <div className="absolute top-[-10%] right-[-10%] w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
-            
+
             {/* Header */}
             <div className="p-6 h-16 flex items-center justify-between border-b border-outline-variant/20 relative z-10 shrink-0">
                 <div className="flex items-center gap-2">
@@ -56,26 +57,27 @@ export function PresentationPanel() {
                         Presentation
                     </span>
                 </div>
-                
+
                 <div className="flex items-center gap-4">
                     <div className="text-[10px] font-mono text-on-surface-variant/40">
                         {currentSlideIndex + 1} / {SLIDES_DATA.length}
                     </div>
-                    <button
+                    <Button
                         onClick={(e) => {
                             e.stopPropagation();
                             handleClose();
                         }}
-                        className="p-1.5 rounded-lg bg-surface-variant/20 hover:bg-error/20 text-on-surface-variant hover:text-error transition-all"
-                        title="Close Presentation"
+                        className="p-1.5 rounded-full bg-transparent hover:bg-error/20 text-on-surface-variant hover:text-error shadow-none hover:shadow-lg transition-all"
+                        data-tooltip={t('common.close')}
+                        data-position="left"
                     >
                         <X size={18} />
-                    </button>
+                    </Button>
                 </div>
             </div>
 
             {/* Slide Area */}
-            <div 
+            <div
                 className="flex-1 flex flex-col p-8 cursor-pointer active:scale-[0.99] transition-transform overflow-y-auto custom-scrollbar"
                 onClick={handleNext}
             >
@@ -114,7 +116,7 @@ export function PresentationPanel() {
 
                         {/* Click to continue hint */}
                         {activePointsCount === 0 && (
-                            <motion.div 
+                            <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: [0, 1, 0] }}
                                 transition={{ repeat: Infinity, duration: 2 }}
@@ -130,28 +132,28 @@ export function PresentationPanel() {
 
             {/* Footer / Controls */}
             <div className="p-6 grid grid-cols-3 gap-3 border-t border-outline-variant/20 bg-surface/30 backdrop-blur-sm shrink-0">
-                <button
+                <Button
                     onClick={(e) => { e.stopPropagation(); handleBack(); }}
                     disabled={currentSlideIndex === 0 && activePointsCount === 0}
                     className="flex items-center justify-center p-3 rounded-2xl bg-surface-variant/30 text-on-surface-variant hover:bg-surface-variant/50 transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
                     title={t('presentation.prev')}
                 >
                     <ChevronLeft size={20} />
-                </button>
-                <button
+                </Button>
+                <Button
                     onClick={(e) => { e.stopPropagation(); handleReset(); }}
                     className="flex items-center justify-center p-3 rounded-2xl bg-surface-variant/30 text-on-surface-variant hover:bg-surface-variant/50 transition-colors"
                     title={t('presentation.reset')}
                 >
                     <RotateCcw size={18} />
-                </button>
-                <button
+                </Button>
+                <Button
                     onClick={(e) => { e.stopPropagation(); handleNext(); }}
                     className="flex items-center justify-center p-3 rounded-2xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
                     title={t('presentation.next')}
                 >
                     <ChevronRight size={20} />
-                </button>
+                </Button>
             </div>
         </div>
     );

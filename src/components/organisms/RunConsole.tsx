@@ -19,6 +19,7 @@ import * as claude from "@/lib/dashboard/claude";
 import * as claudeCli from "@/lib/dashboard/claudeCode";
 import * as antigravityCode from "@/lib/dashboard/antigravityCode";
 import { useCallback } from "react";
+import { Button } from "@/components/atoms/Button";
 
 interface RunConsoleProps {
     runId: string;
@@ -87,7 +88,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
     const [showDebugConsole, setShowDebugConsole] = useState(false);
     const [stickToBottom, setStickToBottom] = useState(true);
 
-    const { settings } = useSettings();
+    const { settings, updateSetting } = useSettings();
     const [isSummarizing, setIsSummarizing] = useState(false);
     const [summary, setSummary] = useState<string | null>(null);
     const [summaryError, setSummaryError] = useState<string | null>(null);
@@ -97,6 +98,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
     const [aiStatus, setAiStatus] = useState<string>("");
     const [aiHistory, setAiHistory] = useState<string[]>([]);
     const [aiStepCount, setAiStepCount] = useState(0);
+    const pendingActionsRef = useRef<any[]>([]);
 
     const rawContainerRef = useRef<VirtuosoHandle>(null);
     const fancyContainerRef = useRef<HTMLDivElement>(null);
@@ -225,10 +227,10 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                 // Try to find the detected output XML from logs first, then fallback to output.xml
                 const outputPath = session.outputDir!;
                 const outputXmlPath = session.outputXmlPath || `${outputPath.replace(/[\\/]+$/, "")}/output.xml`;
-                
+
                 // Invalidate XML parsing cache for this path to ensure we read the new test results
                 invalidateCache(outputXmlPath);
-                
+
                 const result = await parseXmlBackground(outputXmlPath);
                 if (!cancelled && result) {
                     setTree([result.rootSuite]);
@@ -266,20 +268,34 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                 }
             }
 
-            if (provider === 'gemini') {
-                if (!settings.geminiApiKey) throw new Error("Missing Gemini API Key");
-                result = await gemini.summarizeExecution(tree, settings.geminiApiKey as string, settings.geminiModel || '', language, failureContext, undefined, customPrompt);
-            } else if (provider === 'openai') {
-                if (!settings.openaiApiKey) throw new Error("Missing OpenAI API Key");
-                result = await openai.summarizeExecution(tree, settings.openaiApiKey as string, settings.openaiModel || '', language, failureContext, undefined, customPrompt);
-            } else if (provider === 'claude') {
-                if (!settings.claudeApiKey) throw new Error("Missing Claude API Key");
-                result = await claude.summarizeExecution(tree, settings.claudeApiKey as string, settings.claudeModel || '', language, failureContext, undefined, customPrompt);
-            } else if (provider === 'claude-code') {
-                result = await claudeCli.summarizeExecution(tree, settings.paths.automationRoot || '', language, failureContext?.map(f => f.message) || [], failureContext, customPrompt, settings.claudeCodeToken);
-            } else if (provider === 'antigravity-cli') {
-                const { summarizeExecution } = await import('@/lib/dashboard/antigravityCode');
-                result = await summarizeExecution(tree, settings.paths.automationRoot || '', language, failureContext?.map(f => f.message) || [], failureContext, customPrompt, settings.antigravityApiKey);
+            // Attempt AI call with one retry
+            for (let attempt = 0; attempt < 2; attempt++) {
+                try {
+                    if (provider === 'gemini') {
+                        if (!settings.geminiApiKey) throw new Error("Missing Gemini API Key");
+                        result = await gemini.summarizeExecution(tree, settings.geminiApiKey as string, settings.geminiModel || '', language, failureContext, undefined, customPrompt);
+                    } else if (provider === 'openai') {
+                        if (!settings.openaiApiKey) throw new Error("Missing OpenAI API Key");
+                        result = await openai.summarizeExecution(tree, settings.openaiApiKey as string, settings.openaiModel || '', language, failureContext, undefined, customPrompt);
+                    } else if (provider === 'claude') {
+                        if (!settings.claudeApiKey) throw new Error("Missing Claude API Key");
+                        result = await claude.summarizeExecution(tree, settings.claudeApiKey as string, settings.claudeModel || '', language, failureContext, undefined, customPrompt);
+                    } else if (provider === 'claude-code') {
+                        result = await claudeCli.summarizeExecution(tree, settings.paths.automationRoot || '', language, failureContext?.map(f => f.message) || [], failureContext, customPrompt, settings.claudeCodeToken);
+                    } else if (provider === 'antigravity-cli') {
+                        const { summarizeExecution } = await import('@/lib/dashboard/antigravityCode');
+                        result = await summarizeExecution(tree, settings.paths.automationRoot || '', language, failureContext?.map(f => f.message) || [], failureContext, customPrompt, settings.antigravityApiKey);
+                    }
+
+                    if (result) {
+                        break; // Success, exit retry loop
+                    }
+                } catch (e: any) {
+                    if (attempt === 1) {
+                        throw e; // Rethrow on the last attempt
+                    }
+                    console.warn(`AI Summarization attempt ${attempt + 1} failed, retrying...`, e);
+                }
             }
 
             setSummary(result);
@@ -294,46 +310,109 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
     // AI Agent Autonomous Loop Logic
     const runAiStep = useCallback(async () => {
         const provider = settings.aiProvider || 'gemini';
-        
+
         if (!session?.deviceUdid || !isAiLoopActive) return;
-        
+
         // Key validation based on provider
         if (provider === 'gemini' && !settings.geminiApiKey) return;
         if (provider === 'openai' && !settings.openaiApiKey) return;
         if (provider === 'claude' && !settings.claudeApiKey) return;
 
-        setAiStatus(t('run_tab.console.ai_steps.dumping', { defaultValue: 'Dumping screen hierarchy...' }));
         try {
-            const xml = await invoke<string>("get_xml_dump", { deviceId: session.deviceUdid });
-            
-            setAiStatus(t('run_tab.console.ai_steps.thinking', { defaultValue: 'AI is thinking...' }));
-            
-            let response: gemini.AutonomousActionResponse;
-            const target = session.aiPrompt || session.testPath;
-            const lang = i18n.language;
+            let currentAction: any = null;
+            let currentThought: string = "";
 
-            if (provider === 'gemini') {
-                response = await gemini.generateAutonomousAction(xml, target, aiHistory, settings.geminiApiKey as string, settings.geminiModel || 'gemini-1.5-pro', lang);
-            } else if (provider === 'openai') {
-                response = await openai.generateAutonomousAction(xml, target, aiHistory, settings.openaiApiKey as string, settings.openaiModel || 'gpt-4o', lang);
-            } else if (provider === 'claude') {
-                response = await claude.generateAutonomousAction(xml, target, aiHistory, settings.claudeApiKey as string, settings.claudeModel || 'claude-3-5-sonnet-latest', lang);
-            } else if (provider === 'antigravity-cli') {
-                response = await antigravityCode.generateAutonomousAction(xml, target, aiHistory, settings.paths.automationRoot || '', lang, undefined, settings.antigravityApiKey);
-            } else if (provider === 'claude-code') {
-                response = await claudeCli.generateAutonomousAction(xml, target, aiHistory, settings.paths.automationRoot || '', lang, undefined, settings.claudeCodeToken);
+            if (pendingActionsRef.current.length > 0) {
+                currentAction = pendingActionsRef.current.shift();
+                currentThought = "Executing next planned action.";
+                setAiStatus(t('run_tab.console.ai_steps.executing', { action: currentAction.details, defaultValue: `Executing: ${currentAction.details}` }));
             } else {
-                throw new Error(`Unsupported AI provider for Autonomous Agent: ${provider}`);
+                setAiStatus(t('run_tab.console.ai_steps.dumping', { defaultValue: 'Dumping screen hierarchy...' }));
+                const rawXml = await invoke<string>("get_xml_dump", { deviceId: session.deviceUdid });
+
+                // Inject 'instance' attribute into XML so AI can match Appium's behavior
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(rawXml, "application/xml");
+                let xml = rawXml;
+                if (doc.getElementsByTagName("parsererror").length === 0) {
+                    const classCounts: Record<string, number> = {};
+                    const elements = doc.getElementsByTagName("*");
+                    for (let i = 0; i < elements.length; i++) {
+                        const el = elements[i];
+                        const className = el.getAttribute("class");
+                        if (className) {
+                            const count = classCounts[className] || 0;
+                            el.setAttribute("instance", count.toString());
+                            classCounts[className] = count + 1;
+                        }
+                    }
+                    xml = new XMLSerializer().serializeToString(doc);
+                }
+
+                setAiStatus(t('run_tab.console.ai_steps.thinking', { defaultValue: 'AI is thinking...' }));
+
+                let response: gemini.AutonomousActionResponse = null as any;
+                const target = session.aiPrompt || session.testPath;
+                const lang = i18n.language;
+
+                // Attempt AI call with one retry
+                for (let attempt = 0; attempt < 2; attempt++) {
+                    try {
+                        if (provider === 'gemini') {
+                            response = await gemini.generateAutonomousAction(xml, target, aiHistory, settings.geminiApiKey as string, settings.geminiModel || 'gemini-1.5-pro', lang);
+                        } else if (provider === 'openai') {
+                            response = await openai.generateAutonomousAction(xml, target, aiHistory, settings.openaiApiKey as string, settings.openaiModel || 'gpt-4o', lang);
+                        } else if (provider === 'claude') {
+                            response = await claude.generateAutonomousAction(xml, target, aiHistory, settings.claudeApiKey as string, settings.claudeModel || 'claude-3-5-sonnet-latest', lang);
+                        } else if (provider === 'antigravity-cli') {
+                            response = await antigravityCode.generateAutonomousAction(xml, target, aiHistory, settings.paths.automationRoot || '', lang, undefined, settings.antigravityApiKey);
+                        } else if (provider === 'claude-code') {
+                            response = await claudeCli.generateAutonomousAction(xml, target, aiHistory, settings.paths.automationRoot || '', lang, undefined, settings.claudeCodeToken);
+                        } else {
+                            throw new Error(`Unsupported AI provider for Autonomous Agent: ${provider}`);
+                        }
+
+                        // Planner-Executor compatibility: support 'actions' array or fallback to 'action' object
+                        let parsedActions = response.actions;
+                        if (!parsedActions || parsedActions.length === 0) {
+                            if (response.action) {
+                                parsedActions = [response.action];
+                            }
+                        }
+
+                        if (parsedActions && parsedActions.length > 0) {
+                            pendingActionsRef.current = parsedActions;
+                            currentThought = response.thought || "AI generated a new action plan.";
+                            break; // Success, exit retry loop
+                        } else {
+                            throw new Error("Invalid format returned by AI for autonomous action");
+                        }
+                    } catch (e: any) {
+                        if (attempt === 1) {
+                            throw e; // Rethrow on the last attempt
+                        }
+                        console.warn(`AI Autonomous Action attempt ${attempt + 1} failed, retrying...`, e);
+                    }
+                }
+
+                if (pendingActionsRef.current.length > 0) {
+                    currentAction = pendingActionsRef.current.shift();
+                }
             }
 
-            const actionDesc = `[Step ${aiStepCount + 1}] ${response.action.type.toUpperCase()}: ${response.action.details}`;
+            if (!currentAction) {
+                throw new Error("Failed to retrieve or parse autonomous action plan");
+            }
+
+            const actionDesc = `[Step ${aiStepCount + 1}] ${currentAction.type.toUpperCase()}: ${currentAction.details} ${currentAction.locator ? `(Locator: ${currentAction.locator})` : ''}`.trim();
             setAiHistory(prev => [...prev, actionDesc]);
             setAiStepCount(prev => prev + 1);
 
-            addSessionLog(runId, `[AI Agent] Thought: ${response.thought}`);
-            addSessionLog(runId, `[AI Agent] Action: ${response.action.details}`);
+            addSessionLog(runId, `[AI Agent] Thought: ${currentThought}`);
+            addSessionLog(runId, `[AI Agent] Action: ${currentAction.details}`);
 
-            if (response.action.type === 'finish') {
+            if (currentAction.type === 'finish') {
+                pendingActionsRef.current = []; // Clear queue
                 setIsAiLoopActive(false);
                 setAiStatus(t('run_tab.console.ai_steps.finished', { defaultValue: 'Goal completed successfully!' }));
                 addSessionLog(runId, `[System] AI Agent mission completed.`);
@@ -341,18 +420,19 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                 return;
             }
 
-            if (response.action.type === 'fail') {
+            if (currentAction.type === 'fail') {
+                pendingActionsRef.current = []; // Clear queue
                 setIsAiLoopActive(false);
                 setAiStatus(t('run_tab.console.ai_steps.failed', { defaultValue: 'AI Agent failed to complete the goal.' }));
-                addSessionLog(runId, `[Error] AI Agent aborted: ${response.action.details}`);
+                addSessionLog(runId, `[Error] AI Agent aborted: ${currentAction.details}`);
                 markSessionFinished(runId, '1');
                 return;
             }
 
-            if (response.action.command) {
-                setAiStatus(t('run_tab.console.ai_steps.executing', { action: response.action.details, defaultValue: `Executing: ${response.action.details}` }));
+            if (currentAction.command) {
+                setAiStatus(t('run_tab.console.ai_steps.executing', { action: currentAction.details, defaultValue: `Executing: ${currentAction.details}` }));
 
-                const rawCommand = response.action.command.trim();
+                const rawCommand = currentAction.command.trim();
                 const parsedArgs = parseCommandArgs(rawCommand);
                 let args = [...parsedArgs];
                 if (args[0] === 'adb') args = args.slice(1);
@@ -362,7 +442,11 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                 }
                 await invoke("run_adb_command", { device: session.deviceUdid, args });
                 addSessionLog(runId, `[ADB] Executed: adb -s ${session.deviceUdid} ${args.join(' ')}`);
-            } else if (response.action.type === 'wait') {
+
+                // If there are more actions in queue, use a very short delay, otherwise standard wait
+                const waitTime = pendingActionsRef.current.length > 0 ? 500 : 2000;
+                await new Promise(r => setTimeout(r, waitTime));
+            } else if (currentAction.type === 'wait') {
                 setAiStatus(t('run_tab.console.ai_steps.waiting', { defaultValue: 'Waiting for transition...' }));
                 await new Promise(r => setTimeout(r, 2000));
             }
@@ -438,37 +522,44 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
             <div className="flex items-center justify-between p-2 border-b border-outline-variant/30 bg-surface/80 backdrop-blur shrink-0 z-20">
                 <span className="text-xs text-on-surface-variant/80 font-mono truncate px-2" title={testPath}>{testPath}</span>
                 <div className="flex items-center gap-1">
-                    <button
+                    <Button
+                        variant="ghost" size="icon"
                         onClick={() => setIsRawMode(!isRawMode)}
-                        className="p-1 hover:bg-surface-variant/30 rounded transition-colors text-on-surface-variant/80 hover:text-warning"
-                        title={isRawMode ? t('run_tab.console.fancy_mode') : t('run_tab.console.raw_mode')}
+                        className="w-8 h-8 rounded-full text-on-surface-variant/80 hover:text-warning"
+                        data-tooltip={isRawMode ? t('run_tab.console.fancy_mode') : t('run_tab.console.raw_mode')}
+                        data-position="left"
                     >
                         <Star size={14} fill={!isRawMode ? "currentColor" : "none"} className={clsx(!isRawMode && "text-warning-container/40")} />
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                        variant="ghost" size="icon"
                         onClick={() => setShowDebugConsole(!showDebugConsole)}
                         className={clsx(
-                            "p-1 hover:bg-surface-variant/30 rounded transition-colors",
-                            showDebugConsole ? "text-primary bg-primary/10" : "text-on-surface-variant/80 hover:text-primary"
+                            "w-8 h-8 rounded-full",
+                            showDebugConsole ? "text-primary bg-primary/10 hover:bg-primary/20" : "text-on-surface-variant/80 hover:text-primary"
                         )}
-                        title={showDebugConsole ? t('run_tab.console.debug_off') : t('run_tab.console.debug_on')}
+                        data-tooltip={showDebugConsole ? t('run_tab.console.debug_off') : t('run_tab.console.debug_on')}
+                        data-position="left"
                     >
                         <Terminal size={14} />
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                        variant="ghost" size="icon"
                         onClick={() => setIsKeepAwake(!isKeepAwake)}
                         className={clsx(
-                            "p-1 hover:bg-surface-variant/30 rounded transition-colors",
-                            isKeepAwake ? "text-primary" : "text-on-surface-variant/80 hover:text-primary"
+                            "w-8 h-8 rounded-full",
+                            isKeepAwake ? "text-primary hover:text-primary/80" : "text-on-surface-variant/80 hover:text-primary"
                         )}
-                        title={t('run_tab.console.keep_awake')}
+                        data-tooltip={t('run_tab.console.keep_awake')}
+                        data-position="left"
                     >
                         {isKeepAwake ? <Eye size={14} /> : <EyeOff size={14} />}
-                    </button>
+                    </Button>
                     {!isRunning && tree.length > 0 && (
                         <div className="flex items-center gap-1">
                             {session?.outputDir && (
-                                <button
+                                <Button
+                                    variant="ghost" size="icon"
                                     onClick={async () => {
                                         let path = session.outputDir!;
                                         // Safety check: ensure we open a directory, not a file
@@ -485,11 +576,12 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                                             console.error("Failed to open log folder:", e);
                                         }
                                     }}
-                                    className="p-1 hover:bg-surface-variant/30 rounded transition-colors text-on-surface-variant/80 hover:text-primary"
-                                    title={t('run_tab.console.open_output_dir')}
+                                    className="w-8 h-8 rounded-full text-on-surface-variant/80 hover:text-primary"
+                                    data-tooltip={t('run_tab.console.open_output_dir')}
+                                    data-position="left"
                                 >
                                     <FolderOpen size={14} />
-                                </button>
+                                </Button>
                             )}
                             <AiButton
                                 id="run_summary"
@@ -507,27 +599,53 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                             <span className="text-[10px] font-bold text-primary uppercase tracking-wider">AI AGENT MODE</span>
                             <div className="h-3 w-[1px] bg-primary/20 mx-1" />
                             <span className="text-[10px] text-on-surface-variant/70 font-medium">{aiStatus || 'Initializing...'}</span>
-                            <button
+                            <Button
+                                variant="ghost"
                                 onClick={() => setIsAiLoopActive(!isAiLoopActive)}
                                 className={clsx(
                                     "ml-2 p-1 rounded-md transition-all hover:scale-110",
                                     isAiLoopActive ? "text-error hover:bg-error/10" : "text-success hover:bg-success/10"
                                 )}
-                                title={isAiLoopActive ? t('common.pause') : t('common.start')}
+                                data-tooltip={isAiLoopActive ? t('common.pause') : t('common.start')}
+                                data-position="left"
                             >
                                 {isAiLoopActive ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                                variant="ghost" size="icon"
                                 onClick={() => {
                                     setAiHistory([]);
                                     setAiStepCount(0);
                                     setIsAiLoopActive(true);
                                 }}
-                                className="p-1 text-on-surface-variant/60 hover:text-primary rounded-md hover:bg-primary/10 transition-all"
-                                title={t('common.reset')}
+                                className="w-6 h-6 rounded-full text-on-surface-variant/60 hover:text-primary hover:bg-primary/10"
+                                data-tooltip={t('common.reset')}
+                                data-position="left"
                             >
                                 <RefreshCw size={12} />
-                            </button>
+                            </Button>
+                            {!isAiLoopActive && aiHistory.length > 0 && (
+                                <>
+                                    <div className="h-3 w-[1px] bg-primary/20 mx-1" />
+                                    <AiButton
+                                        id="run_generate_ai_test"
+                                        isLoading={false}
+                                        onClick={() => {
+                                            const historyStr = aiHistory.map((h, i) => `[Step ${i + 1}] ${h}`).join('\n');
+                                            const prompt = `Gere os testes automatizados em Robot Framework (arquivos .robot e .resource) para este fluxo que acabou de ser mapeado com sucesso pela engine de exploração autônoma:\n\n${historyStr}`;
+                                            if (!settings.aiChatEnabled) {
+                                                updateSetting('aiChatEnabled', true);
+                                            }
+                                            setTimeout(() => {
+                                                window.dispatchEvent(new CustomEvent('ai_agent_prompt', { detail: { prompt, hidden: true } }));
+                                            }, 200);
+                                        }}
+                                        label={t('run_tab.console.generate_ai_test')}
+                                        variant="primary"
+                                        className="h-6"
+                                    />
+                                </>
+                            )}
                         </div>
                     )}
                 </div>
@@ -677,12 +795,13 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
                             <Terminal size={14} className="text-primary" />
                             <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/70">{t('run_tab.console.debug_output')}</span>
                         </div>
-                        <button
+                        <Button
+                            variant="ghost" size="icon"
                             onClick={() => setShowDebugConsole(false)}
-                            className="p-1 hover:bg-surface-variant/30 rounded text-on-surface-variant/60"
+                            className="w-8 h-8 rounded-full text-on-surface-variant/60"
                         >
                             <X size={14} />
-                        </button>
+                        </Button>
                     </div>
                     <div className="flex-1 min-h-0 p-3 font-mono text-[11px] leading-relaxed overflow-y-auto custom-scrollbar bg-black/5 shadow-inner">
                         <Virtuoso

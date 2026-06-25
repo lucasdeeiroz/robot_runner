@@ -32,6 +32,7 @@ export function usePerformanceRecorder(
 ) {
     const { t } = useTranslation();
     const [stats, setStats] = useState<DeviceStats | null>(null);
+    const [history, setHistory] = useState<(DeviceStats & { timestamp: number })[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [autoRefresh, setAutoRefresh] = useState(initialAutoRefresh);
     const [selectedPackage, setSelectedPackage] = useState<string>("");
@@ -62,6 +63,11 @@ export function usePerformanceRecorder(
                 package: selectedPackage || null
             });
             setStats(data);
+            setHistory(prev => {
+                const newHistory = [...prev, { ...data, timestamp: Date.now() }];
+                if (newHistory.length > 60) return newHistory.slice(newHistory.length - 60);
+                return newHistory;
+            });
             setError(null);
         } catch (e) {
             if (!isTestRunning) { // Suppress errors during tests to avoid spamming the UI if ADB is busy
@@ -199,6 +205,7 @@ export function usePerformanceRecorder(
 
     return {
         stats,
+        history,
         error,
         autoRefresh,
         setAutoRefresh,

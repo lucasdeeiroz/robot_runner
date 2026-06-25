@@ -12,6 +12,7 @@ pub struct ServiceStatusUpdate {
 
 pub fn start_heartbeat_monitor(app_handle: AppHandle) {
     tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(Duration::from_secs(5)).await;
         loop {
             let appium_state = app_handle.state::<crate::appium::AppiumState>();
 

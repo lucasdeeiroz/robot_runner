@@ -1,4 +1,41 @@
-import { ScreenMap } from '@/lib/types';
+import { ScreenMap, UIElementMap } from '@/lib/types';
+import { InspectorNode, generateXPath, sanitizeId } from '@/lib/inspectorUtils';
+import { getRemoteString } from '@/lib/remoteConfig';
+
+export const getDestructiveTerms = () => {
+    const remote = getRemoteString('exploration_destructive_terms');
+    return remote ? remote.split(',').map(s => s.trim().toLowerCase()) : ['erase', 'delete', 'remove', 'exclude', 'apagar', 'deletar', 'remover', 'excluir', 'eliminar', 'deletar', 'borrar'];
+};
+
+export const getEscapeTerms = () => {
+    const remote = getRemoteString('exploration_escape_terms');
+    return remote ? remote.split(',').map(s => s.trim().toLowerCase()) : ['next', 'proceed', 'continue', 'ok', 'confirm', 'save', 'done', 'próximo', 'próxima', 'prosseguir', 'continuar', 'confirmar', 'salvar', 'concluir'];
+};
+export interface ExplorationConfig {
+    priorityKeywords: string[];
+    avoidKeywords: string[];
+    revisitKnownScreens: boolean;
+    escapeTargets?: string[];
+    forceReexplore?: string[];
+    targetPackage?: string;
+    allowedPackages?: string[];
+}
+
+export const DEFAULT_EXPLORATION_CONFIG: ExplorationConfig = {
+    priorityKeywords: [],
+    avoidKeywords: [],
+    revisitKnownScreens: false,
+    escapeTargets: [],
+    forceReexplore: [],
+    targetPackage: undefined,
+    allowedPackages: [],
+};
+
+export enum GraphState {
+    UNEXPLORED = 0,
+    EXPLORING = 1,
+    EXHAUSTED = 2
+}
 
 export interface ExplorationState {
     visitedScreens: string[]; // Screen names
@@ -8,15 +45,20 @@ export interface ExplorationState {
     maxSteps: number;
     currentStep: number;
     targetPackage?: string;
+    allowedPackages?: string[];
     consecutiveSwipes: number;
     previousElementsSnapshot?: string;
     screenVisitCount: Record<string, number>; // Track how many times each screen was visited
     actionFingerprints: Record<string, number>; // Track repeated screen:action:target combos
+    initialScreenName?: string; // The first screen mapped in the session
     // Back-update tracking: what was the last navigation that brought us here?
     previousScreenName?: string;
     previousActionTargetId?: string; // short_id of the element clicked on the previous screen
     previousActionType?: string; // type of action (click, etc.)
     sessionId?: string; // Session ID for Claude Code continuity
+    priorityKeywords: string[];
+    avoidKeywords: string[];
+    forceReexplore: string[];
 }
 
 export interface ExplorationAction {
@@ -30,6 +72,7 @@ export interface ExplorationAction {
 export interface ExplorationResult {
     newScreen: ScreenMap;
     nextAction: ExplorationAction;
+    isHeuristic?: boolean;
 }
 
 export interface LogEntry {
@@ -46,7 +89,16 @@ export class AutonomousExplorer {
     private state: ExplorationState;
     private t: (key: string, options?: any) => string;
 
-    constructor(t: (key: string, options?: any) => string, initialMaxSteps: number = 9999) {
+    // Graph Machine State
+    private screenGlobalStates: Record<string, GraphState> = {};
+    private elementGlobalStates: Record<string, GraphState> = {};
+
+    constructor(
+        t: (key: string, options?: any) => string,
+        initialMaxSteps: number = 9999,
+        config?: ExplorationConfig,
+        knownScreens?: ScreenMap[]
+    ) {
         this.t = t;
         this.state = {
             visitedScreens: [],
@@ -58,7 +110,16 @@ export class AutonomousExplorer {
             consecutiveSwipes: 0,
             screenVisitCount: {},
             actionFingerprints: {},
+            priorityKeywords: config?.priorityKeywords ?? [],
+            avoidKeywords: config?.avoidKeywords ?? [],
+            forceReexplore: config?.forceReexplore ?? [],
+            targetPackage: config?.targetPackage,
+            allowedPackages: config?.allowedPackages ?? [],
         };
+
+        if (config && !config.revisitKnownScreens && knownScreens?.length) {
+            knownScreens.forEach(s => this.markScreenVisited(s.name));
+        }
     }
 
     public addLog(message: string, type: LogEntry['type'] = 'info', stepNumber?: number) {
@@ -123,6 +184,16 @@ export class AutonomousExplorer {
 
     public getTargetPackage(): string | undefined {
         return this.state.targetPackage;
+    }
+
+    public setInitialScreenName(name: string) {
+        if (!this.state.initialScreenName) {
+            this.state.initialScreenName = name;
+        }
+    }
+
+    public getInitialScreenName(): string | undefined {
+        return this.state.initialScreenName;
     }
 
     /**
@@ -202,5 +273,401 @@ export class AutonomousExplorer {
 
     public getSessionId(): string | undefined {
         return this.state.sessionId;
+    }
+
+    // --- Heuristic DFS Navigation ---
+
+    private calculateGraphStates(knownScreens: ScreenMap[], forceReexplore: string[]) {
+        this.screenGlobalStates = {};
+        this.elementGlobalStates = {};
+
+        const screenMap = new Map<string, ScreenMap>();
+        knownScreens.forEach(s => screenMap.set(s.name, s));
+
+        const inPath = new Set<string>();
+
+        const evaluateScreen = (screenName: string): GraphState => {
+            if (this.screenGlobalStates[screenName] !== undefined) {
+                return this.screenGlobalStates[screenName];
+            }
+
+            if (inPath.has(screenName)) {
+                return GraphState.EXHAUSTED;
+            }
+
+            inPath.add(screenName);
+
+            const screen = screenMap.get(screenName);
+            if (!screen) {
+                inPath.delete(screenName);
+                return GraphState.EXPLORING;
+            }
+
+            if (forceReexplore.includes(screenName)) {
+                this.screenGlobalStates[screenName] = GraphState.EXPLORING;
+                inPath.delete(screenName);
+                return GraphState.EXPLORING;
+            }
+
+            const interactiveElements = screen.elements.filter(e =>
+                e.type === 'button' || e.type === 'input' || e.type === 'checkbox' ||
+                e.type === 'radio' || e.type === 'list_item' || e.type === 'tab' ||
+                e.navigates_to != null
+            );
+
+            let hasUnexplored = false;
+            let hasExploring = false;
+
+            interactiveElements.forEach(el => {
+                const elKey = `${screenName}::${el.id}`;
+                const targets = el.navigates_to ? (Array.isArray(el.navigates_to) ? el.navigates_to : (typeof el.navigates_to === 'string' ? el.navigates_to.split(',') : [el.navigates_to])) : [];
+
+                const isVisited = this.state.visitedElements.includes(el.id) ||
+                    (el.xpath && this.state.visitedElements.includes(el.xpath)) ||
+                    el.explored;
+
+                if (targets.length === 0) {
+                    if (isVisited) {
+                        this.elementGlobalStates[elKey] = GraphState.EXHAUSTED;
+                    } else {
+                        this.elementGlobalStates[elKey] = GraphState.UNEXPLORED;
+                        hasUnexplored = true;
+                    }
+                } else {
+                    let elExhausted = true;
+                    let elExploring = false;
+
+                    targets.forEach((t: any) => {
+                        const tState = evaluateScreen(typeof t === 'string' ? t.trim() : t.id || '');
+                        if (tState === GraphState.UNEXPLORED || tState === GraphState.EXPLORING) {
+                            elExhausted = false;
+                            elExploring = true;
+                        }
+                    });
+
+                    if (elExhausted) {
+                        this.elementGlobalStates[elKey] = GraphState.EXHAUSTED;
+                    } else if (elExploring) {
+                        this.elementGlobalStates[elKey] = GraphState.EXPLORING;
+                        hasExploring = true;
+                    } else {
+                        // This fallback theoretically shouldn't happen with the new logic above, but kept for safety.
+                        this.elementGlobalStates[elKey] = GraphState.UNEXPLORED;
+                        hasUnexplored = true;
+                    }
+                }
+            });
+
+            inPath.delete(screenName);
+
+            let finalState = GraphState.EXHAUSTED;
+            if (hasUnexplored || hasExploring) {
+                if (this.state.visitedScreens.includes(screenName)) {
+                    finalState = GraphState.EXPLORING;
+                } else {
+                    finalState = GraphState.UNEXPLORED;
+                }
+            }
+
+            this.screenGlobalStates[screenName] = finalState;
+            return finalState;
+        };
+
+        knownScreens.forEach(s => {
+            evaluateScreen(s.name);
+            if (!forceReexplore.includes(s.name)) {
+                if (!this.state.visitedScreens.includes(s.name)) {
+                    this.state.visitedScreens.push(s.name);
+                }
+            }
+        });
+    }
+
+    public getGraphSummaryLog(maps: ScreenMap[], title: string = 'Resumo Final do Grafo'): string {
+        this.calculateGraphStates(maps, this.state.forceReexplore || []);
+
+        let unexploredScreens = 0;
+        let exploringScreens = 0;
+        let exhaustedScreens = 0;
+
+        let unexploredElements = 0;
+        let exploringElements = 0;
+        let exhaustedElements = 0;
+
+        maps.forEach(m => {
+            const sState = this.screenGlobalStates[m.name];
+            if (sState === GraphState.UNEXPLORED) unexploredScreens++;
+            else if (sState === GraphState.EXPLORING) exploringScreens++;
+            else if (sState === GraphState.EXHAUSTED) exhaustedScreens++;
+
+            m.elements.forEach(e => {
+                if (e.type === 'button' || e.type === 'input' || e.type === 'checkbox' ||
+                    e.type === 'radio' || e.type === 'list_item' || e.type === 'tab' ||
+                    e.navigates_to != null) {
+                    const eState = this.elementGlobalStates[`${m.name}::${e.id}`];
+                    if (eState === GraphState.UNEXPLORED) unexploredElements++;
+                    else if (eState === GraphState.EXPLORING) exploringElements++;
+                    else if (eState === GraphState.EXHAUSTED) exhaustedElements++;
+                }
+            });
+        });
+
+        return `📊 ${title}:\n- Telas: ${exhaustedScreens} Exhausted, ${exploringScreens} Exploring, ${unexploredScreens} Unexplored\n- Elementos: ${exhaustedElements} Exhausted, ${exploringElements} Exploring, ${unexploredElements} Unexplored`;
+    }
+
+    /**
+     * Finds the next unvisited interactive element on the screen using DFS.
+     */
+    public determineHeuristicAction(root: InspectorNode, currentScreenName?: string, currentSavedMaps?: ScreenMap[]): ExplorationAction | null {
+        // ALWAYS dynamically recalculate graph states to reflect new mapped UI or visited elements
+        if (currentSavedMaps && currentSavedMaps.length > 0) {
+            this.calculateGraphStates(currentSavedMaps, this.state.forceReexplore || []);
+        }
+
+        if (!currentScreenName) {
+            currentScreenName = this.generateHeuristicScreenMap(root).name;
+        }
+
+        const visited = this.state.visitedElements;
+        const staticBlockedTerms = ['back', 'navigate up', 'voltar', 'deletar', 'apagar', 'remover', 'excluir', 'delete', 'remove', 'eliminar', 'borrar'];
+        const allBlockedTerms = [...staticBlockedTerms, ...this.state.avoidKeywords.map(k => k.toLowerCase())];
+
+        const unvisitedTargets: InspectorNode[] = [];
+        const exploringTargets: InspectorNode[] = [];
+
+        const traverse = (node: InspectorNode) => {
+            const isInteractive = node.attributes['clickable'] === 'true' ||
+                node.attributes['checkable'] === 'true' ||
+                node.attributes['long-clickable'] === 'true' ||
+                node.attributes['class']?.includes('EditText') ||
+                (node.attributes['focusable'] === 'true' && (!!node.attributes['content-desc'] || !!node.attributes['text']));
+
+            const xpath = generateXPath(node);
+
+            if (isInteractive && xpath && !visited.includes(xpath)) {
+                const text = (node.attributes['text'] || '').toLowerCase();
+                const desc = (node.attributes['content-desc'] || '').toLowerCase();
+                const hasBlockedTerm = allBlockedTerms.some(term => text.includes(term) || desc.includes(term));
+
+                if (!hasBlockedTerm) {
+                    const elKey = `${currentScreenName}::${xpath}`;
+                    const globalState = this.elementGlobalStates[elKey] ?? GraphState.UNEXPLORED;
+
+                    if (globalState === GraphState.EXPLORING) {
+                        exploringTargets.push(node);
+                    } else if (globalState === GraphState.UNEXPLORED) {
+                        unvisitedTargets.push(node);
+                    }
+                    // If GraphState.EXHAUSTED, we ignore it
+                }
+            }
+
+            node.children.forEach(traverse);
+        };
+
+        traverse(root);
+
+        // Priority 1: Priority Keywords (Global highest priority across all valid targets)
+        // Priority 2: Exploring elements (elements that lead to unexplored screens)
+        // Priority 3: Unexplored elements on the current screen
+        let unvisitedTarget: InspectorNode | null = null;
+        const allTargets = [...exploringTargets, ...unvisitedTargets];
+
+        if (this.state.priorityKeywords.length > 0 && allTargets.length > 0) {
+            const keywords = this.state.priorityKeywords.map(k => k.toLowerCase());
+            const prioritizedTargets = allTargets.filter(node => {
+                const text = ((node.attributes['text'] || '') + ' ' + (node.attributes['content-desc'] || '')).toLowerCase();
+                return keywords.some(k => text.includes(k));
+            });
+
+            if (prioritizedTargets.length > 0) {
+                unvisitedTarget = prioritizedTargets[0];
+            }
+        }
+
+        if (!unvisitedTarget) {
+            const candidates = exploringTargets.length > 0 ? exploringTargets : unvisitedTargets;
+            unvisitedTarget = candidates[0] ?? null;
+        }
+
+        if (unvisitedTarget) {
+            const xpath = generateXPath(unvisitedTarget);
+            const isInput = unvisitedTarget.attributes['class']?.includes('EditText');
+
+            if (isInput) {
+                return {
+                    type: 'type_text',
+                    targetId: xpath,
+                    text: 'Test',
+                    details: this.t('mapper.exploration.heuristic_type', { defaultValue: 'Heuristic: type text into unvisited input' })
+                };
+            }
+
+            return {
+                type: 'click',
+                targetId: xpath,
+                details: this.t('mapper.exploration.heuristic_click', { defaultValue: 'Heuristic: click unvisited element' })
+            };
+        }
+
+        // If all elements are visited, try scrolling or going back
+        if (this.state.consecutiveSwipes < 2) {
+            let scrollDirection: 'up' | 'down' | 'left' | 'right' = 'up';
+            let isHorizontal = false;
+
+            // Find the largest scrollable area
+            let maxScrollArea = 0;
+            const findScrollable = (n: InspectorNode) => {
+                const isScrollableAttr = n.attributes['scrollable'] === 'true';
+                const isScrollClass = n.attributes['class']?.includes('ScrollView') || n.attributes['class']?.includes('RecyclerView') || n.tagName?.includes('ScrollView') || n.tagName?.includes('RecyclerView');
+                
+                if (isScrollableAttr || isScrollClass) {
+                    const boundsMatch = n.attributes['bounds']?.match(/\[(\d+),(\d+)\]\[(\d+),(\d+)\]/);
+                    if (boundsMatch) {
+                        const x1 = parseInt(boundsMatch[1], 10);
+                        const y1 = parseInt(boundsMatch[2], 10);
+                        const x2 = parseInt(boundsMatch[3], 10);
+                        const y2 = parseInt(boundsMatch[4], 10);
+                        const width = x2 - x1;
+                        const height = y2 - y1;
+                        const area = width * height;
+                        if (area > maxScrollArea) {
+                            maxScrollArea = area;
+                            isHorizontal = width > height;
+                        }
+                    }
+                }
+                n.children.forEach(findScrollable);
+            };
+            findScrollable(root);
+
+            if (this.state.consecutiveSwipes === 0) {
+                scrollDirection = isHorizontal ? 'left' : 'up';
+                return {
+                    type: 'swipe',
+                    direction: scrollDirection,
+                    details: this.t('mapper.exploration.heuristic_scroll', { defaultValue: 'Heuristic: no unvisited elements, trying to scroll' })
+                };
+            } else {
+                // consecutiveSwipes === 1 means previous scroll didn't find new elements
+                scrollDirection = isHorizontal ? 'right' : 'down';
+                return {
+                    type: 'swipe',
+                    direction: scrollDirection,
+                    details: this.t('mapper.exploration.heuristic_scroll_reverse', { defaultValue: 'Heuristic: scroll reverse, no new elements found' })
+                };
+            }
+        }
+
+        return {
+            type: 'back',
+            details: this.t('mapper.exploration.heuristic_back', { defaultValue: 'Heuristic: stuck, going back' })
+        };
+    }
+
+    public getConfig(): ExplorationConfig {
+        return {
+            priorityKeywords: [...this.state.priorityKeywords],
+            avoidKeywords: [...this.state.avoidKeywords],
+            revisitKnownScreens: false,
+            targetPackage: this.state.targetPackage,
+            allowedPackages: this.state.allowedPackages,
+        };
+    }
+
+    /**
+     * Generates a basic ScreenMap using code heuristics instead of AI.
+     */
+    public generateHeuristicScreenMap(root: InspectorNode): ScreenMap {
+        const elements: UIElementMap[] = [];
+        let titleCandidate = "";
+
+        const traverse = (node: InspectorNode) => {
+            const isInteractive = node.attributes['clickable'] === 'true' ||
+                node.attributes['checkable'] === 'true' ||
+                node.attributes['long-clickable'] === 'true' ||
+                node.attributes['class']?.includes('EditText') ||
+                (node.attributes['focusable'] === 'true' && (!!node.attributes['content-desc'] || !!node.attributes['text'])) ||
+                node.attributes['class']?.includes('Button');
+
+            const xpath = generateXPath(node);
+
+            const text = node.attributes['text'] || '';
+            const desc = node.attributes['content-desc'] || '';
+            const resId = node.attributes['resource-id'] || '';
+
+            // Title detection heuristic (often a large text view at the top, or a Toolbar title)
+            let isTitleCandidate = false;
+            if (!titleCandidate && text && text.length < 30 && (node.attributes['class']?.includes('TextView') || node.tagName.includes('TextView')) && !isInteractive) {
+                // If it's near the top (bounds check could go here if we had bounds, but let's just pick the first prominent text)
+                if (text.length > 2) {
+                    titleCandidate = text;
+                    isTitleCandidate = true;
+                }
+            }
+
+            // Feedback message detection heuristic
+            let isFeedbackCandidate = false;
+            if (!isInteractive && text && text.length > 2 && (
+                resId.toLowerCase().includes('snackbar') ||
+                resId.toLowerCase().includes('message') ||
+                resId.toLowerCase().includes('alert') ||
+                text.toLowerCase().includes('sucesso') ||
+                text.toLowerCase().includes('erro')
+            )) {
+                isFeedbackCandidate = true;
+            }
+
+            if ((isInteractive || isTitleCandidate || isFeedbackCandidate) && xpath) {
+                let elementName = text || desc;
+                if (!elementName && resId) {
+                    elementName = resId.split('/').pop() || 'Element';
+                    // clean up snake_case
+                    elementName = elementName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                }
+                if (!elementName) {
+                    elementName = `${node.attributes['class']?.split('.').pop() || 'View'} ${elements.length + 1}`;
+                }
+
+                let elType: UIElementMap['type'] = 'button';
+                if (!isInteractive) elType = 'text';
+                else if (node.attributes['class']?.includes('EditText')) elType = 'input';
+                else if (node.attributes['class']?.includes('CheckBox')) elType = 'checkbox';
+                else if (node.attributes['class']?.includes('Switch')) elType = 'checkbox'; // use checkbox as fallback for switch
+                else if (node.attributes['class']?.includes('Image')) elType = 'image';
+
+                elements.push({
+                    id: xpath,
+                    name: elementName,
+                    type: elType,
+                    assertion_target: (!isInteractive && (isTitleCandidate || isFeedbackCandidate)) ? true : undefined
+                });
+            }
+
+            node.children.forEach(traverse);
+        };
+
+        traverse(root);
+
+        // Generate a simple layout hash to differentiate screens if no title is found
+        const elementsHash = elements.map(e => e.id).sort().join('|');
+        let hash = 0;
+        for (let i = 0; i < elementsHash.length; i++) {
+            hash = ((hash << 5) - hash) + elementsHash.charCodeAt(i);
+            hash |= 0;
+        }
+
+        let screenName = titleCandidate ? titleCandidate : `Screen_${Math.abs(hash).toString(16).substring(0, 4)}`;
+        // Clean up title
+        screenName = screenName.trim();
+        const screenId = sanitizeId(screenName);
+
+        return {
+            id: screenId,
+            name: screenName,
+            type: 'screen', // default heuristic
+            description: 'Heuristically generated screen map.',
+            elements
+        };
     }
 }

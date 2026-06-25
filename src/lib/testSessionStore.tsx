@@ -7,6 +7,7 @@ import { feedback } from './feedback';
 import { logDataFootprint } from './metrics';
 import { db, auth as firebaseAuth } from './firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { sendWebhookNotification, WebhookPayload } from './integrations/webhooks';
 
 export interface TestSession {
     runId: string;
@@ -34,6 +35,7 @@ export interface TestSession {
     startTime: number;
     isAiAgent?: boolean;
     aiPrompt?: string;
+    profileName?: string;
 }
 
 interface TestOutputPayload {
@@ -48,7 +50,7 @@ interface TestFinishedPayload {
 
 interface TestSessionContextType {
     sessions: TestSession[];
-    addSession: (runId: string, deviceUdid: string, deviceName: string, testPath: string, framework: 'robot' | 'maestro' | 'appium' | 'cypress' | 'selenium', timestampOutputs: boolean, outputDir?: string, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string, selectedTests?: string[], isAiAgent?: boolean, aiPrompt?: string) => void;
+    addSession: (runId: string, deviceUdid: string, deviceName: string, testPath: string, framework: 'robot' | 'maestro' | 'appium' | 'cypress' | 'selenium', timestampOutputs: boolean, outputDir?: string, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string, selectedTests?: string[], isAiAgent?: boolean, aiPrompt?: string, profileName?: string) => void;
     addToolboxSession: (deviceUdid: string, deviceName: string, deviceModel?: string, androidVersion?: string) => void; // New action
     rerunSession: (runId: string, rerunFailedFrom?: string) => Promise<void>;
     stopSession: (runId: string) => Promise<void>;
@@ -69,7 +71,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
     const [sessions, setSessions] = useState<TestSession[]>([]);
     const [activeSessionId, setActiveSessionId] = useState<string | 'dashboard'>('dashboard');
     const [appiumRunning, setAppiumRunning] = useState(false);
-    const { settings, activeProfileId } = useSettings();
+    const { settings, activeProfileId, profiles } = useSettings();
     const isTestRunning = useMemo(() => sessions.some(s => s.status === 'running'), [sessions]);
 
     // Periodic Appium Status Check
@@ -150,9 +152,11 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
 
                         const extractedSuiteName = sessionToFinish.testPath.split(/[\\/]/).pop()?.split('.')[0] || 'Unknown';
                         
+                        const resolvedProfileName = sessionToFinish.profileName || 'Default';
+
                         addDoc(historyRef, {
                             runId: sessionToFinish.runId,
-                            logsPath: activeProfileId,
+                            logsPath: resolvedProfileName,
                             testPath: sessionToFinish.testPath,
                             suiteName: extractedSuiteName,
                             status: exit_code === 0 ? 'passed' : 'failed',
@@ -167,6 +171,50 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                             failCount: failMatch ? parseInt(failMatch[1]) : (exit_code !== 0 ? 1 : 0),
                             duration: duration
                         }).catch(err => console.error("[Firebase] History sync failed:", err));
+                    }
+
+                    // Webhook Notification Trigger
+                    if (settings.webhooks) {
+                        const lastLogs = sessionToFinish.logs.slice(-50).join('\n');
+                        const passMatch = lastLogs.match(/Tests Passed:\s*(\d+)/i) || lastLogs.match(/PASS:\s*(\d+)/i);
+                        const failMatch = lastLogs.match(/Tests Failed:\s*(\d+)/i) || lastLogs.match(/FAIL:\s*(\d+)/i);
+                        
+                        let duration = 'N/A';
+                        const suiteEndMatch = lastLogs.match(/\[RR-SUITE-END\].*?\|\s*(\d+)\s*$/m);
+                        if (suiteEndMatch) {
+                            const ms = parseInt(suiteEndMatch[1]);
+                            duration = ms > 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
+                        } else {
+                            const ms = Date.now() - sessionToFinish.startTime;
+                            duration = ms > 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
+                        }
+
+                        const status: 'passed' | 'failed' = exit_code === 0 ? 'passed' : 'failed';
+                        const shouldNotify = (status === 'passed' && settings.webhooks.notifyOnPass) ||
+                                             (status === 'failed' && settings.webhooks.notifyOnFail);
+                        
+                        if (shouldNotify) {
+                            const extractedSuiteName = sessionToFinish.testPath.split(/[\\/]/).pop()?.split('.')[0] || 'Unknown';
+                            const passCount = passMatch ? parseInt(passMatch[1]) : (exit_code === 0 ? 1 : 0);
+                            const failCount = failMatch ? parseInt(failMatch[1]) : (exit_code !== 0 ? 1 : 0);
+                            
+                            const payload: WebhookPayload = {
+                                suiteName: extractedSuiteName,
+                                status,
+                                passCount,
+                                failCount,
+                                duration,
+                                deviceName: sessionToFinish.deviceName,
+                                framework: sessionToFinish.framework
+                            };
+                            
+                            if (settings.webhooks.slackUrl) {
+                                sendWebhookNotification('slack', settings.webhooks.slackUrl, payload).catch(err => console.error("Slack webhook failed:", err));
+                            }
+                            if (settings.webhooks.teamsUrl) {
+                                sendWebhookNotification('teams', settings.webhooks.teamsUrl, payload).catch(err => console.error("Teams webhook failed:", err));
+                            }
+                        }
                     }
                 }
 
@@ -193,11 +241,11 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
             unlistenOutputPromise.then(f => f());
             unlistenFinishedPromise.then(f => f());
         };
-    }, [activeProfileId, settings.paths.logs]);
+    }, []);
 
 
 
-    const addSession = useCallback((runId: string, deviceUdid: string, deviceName: string, testPath: string, framework: 'robot' | 'maestro' | 'appium' | 'cypress' | 'selenium', timestampOutputs: boolean, outputDir?: string, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string, selectedTests?: string[], isAiAgent?: boolean, aiPrompt?: string) => {
+    const addSession = useCallback((runId: string, deviceUdid: string, deviceName: string, testPath: string, framework: 'robot' | 'maestro' | 'appium' | 'cypress' | 'selenium', timestampOutputs: boolean, outputDir?: string, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string, selectedTests?: string[], isAiAgent?: boolean, aiPrompt?: string, profileName?: string) => {
         setSessions(prev => {
             // Check for recycling
             if (settings.recycleDeviceViews) {
@@ -231,7 +279,8 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                         sessionEpoch: (existing.sessionEpoch || 0) + 1, // Force RunConsole remount
                         startTime: Date.now(),
                         isAiAgent,
-                        aiPrompt
+                        aiPrompt,
+                        profileName
                     };
 
                     setTimeout(() => setActiveSessionId(existing.runId), 0); // Focus it
@@ -261,7 +310,8 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     sessionEpoch: 0,
                     startTime: Date.now(),
                     isAiAgent,
-                    aiPrompt
+                    aiPrompt,
+                    profileName
                 }
             ];
         });
@@ -384,8 +434,26 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
             outputDir = settings.paths.logs || "../test_results";
         }
 
+        const activeProfileName = profiles.find(p => p.id === activeProfileId)?.name || 'Default';
+        const sessionProfileName = session.profileName || activeProfileName;
+
         // Add new session immediately
-        addSession(newRunId, session.deviceUdid, session.deviceName, session.testPath, session.framework, session.timestampOutputs || false, outputDir, session.argumentsFile, session.deviceModel, session.androidVersion, session.selectedTests);
+        addSession(
+            newRunId,
+            session.deviceUdid,
+            session.deviceName,
+            session.testPath,
+            session.framework,
+            session.timestampOutputs || false,
+            outputDir,
+            session.argumentsFile,
+            session.deviceModel,
+            session.androidVersion,
+            session.selectedTests,
+            session.isAiAgent,
+            session.aiPrompt,
+            sessionProfileName
+        );
 
         try {
             // Check Appium (Skip for Maestro, Cypress, Selenium, or if Robot is selected and noAppiumForRobot is enabled)
@@ -414,7 +482,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     runId: newRunId,
                     testPath: session.testPath === session.argumentsFile ? null : session.testPath,
                     outputDir: outputDir,
-                    logs_path: settings.paths.logs,
+                    logs_path: sessionProfileName,
                     device: session.deviceUdid === 'local' ? null : session.deviceUdid,
                     argumentsFile: session.argumentsFile,
                     deviceModel: session.deviceModel,
@@ -428,7 +496,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     runId: newRunId,
                     testPath: session.testPath,
                     outputDir: outputDir,
-                    logs_path: settings.paths.logs,
+                    logs_path: sessionProfileName,
                     device: session.deviceUdid === 'local' ? null : session.deviceUdid,
                     maestroArgs: settings.tools.maestroArgs,
                     working_dir: settings.paths.automationRoot,
@@ -439,7 +507,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     runId: newRunId,
                     projectPath: session.testPath,
                     outputDir: outputDir,
-                    logs_path: settings.paths.logs,
+                    logs_path: sessionProfileName,
                     appiumJavaArgs: settings.tools.appiumJavaArgs
                 });
             } else if (fw === 'cypress') {
@@ -447,6 +515,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     runId: newRunId,
                     testPath: session.testPath,
                     outputDir: outputDir,
+                    logs_path: sessionProfileName,
                     browser: session.deviceUdid || 'chrome',
                     cypressArgs: settings.tools.cypressArgs,
                     workingDir: settings.paths.automationRoot
@@ -456,6 +525,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     runId: newRunId,
                     testPath: session.testPath,
                     outputDir: outputDir,
+                    logs_path: sessionProfileName,
                     browser: session.deviceUdid || 'chrome',
                     seleniumArgs: settings.tools.seleniumArgs,
                     workingDir: settings.paths.automationRoot
@@ -471,7 +541,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                 return s;
             }));
         }
-    }, [sessions, settings, addSession]);
+    }, [sessions, settings, addSession, activeProfileId, profiles]);
 
     const clearSession = useCallback((runId: string) => {
         setSessions(prev => {

@@ -139,8 +139,22 @@ export const es = {
             mic_active: "Escuchando...",
             mic_inactive: "Entrada de voz",
             mic_permission_error: "Error de permiso de micrófono o no compatible",
+            file_path_missing: "Falta la ruta del archivo para la acción",
+            confirm_file_deletion: "Confirmar Eliminación de Archivo",
+            confirm_file_modification: "Confirmar Modificación de Archivo",
+            confirm_file_creation: "Confirmar Creación de Archivo",
+            path: "Ruta:",
+            original_content: "Contenido Original",
+            new_content: "Nuevo Contenido",
+            cancel: "Cancelar",
+            confirm: "Confirmar",
+            file_deleted: "Archivo eliminado exitosamente.",
+            file_created: "Archivo creado exitosamente.",
+            file_modified: "Archivo modificado exitosamente.",
+            file_action_failed: "Error al ejecutar la acción de archivo: ",
             invalid_automation_root: "La raíz de automatización no está configurada. Configure una raíz válida antes de ejecutar una prueba.",
             no_active_device: "No hay dispositivo activo seleccionado.",
+            context_requested: "Leyendo contexto adicional de {{file}}...",
             suggested_prompts: {
                 settings: "\"Ir a configuración\"",
                 color: "\"Cambiar mi color principal a verde\"",
@@ -178,7 +192,9 @@ export const es = {
                 allow_downgrade: "Permitir Downgrade (-d)",
                 grant_permissions: "Conceder Permisos (-g)",
                 allow_test: "Permitir APKs de Prueba (-t)",
-                install_sdcard: "Instalar en Tarjeta SD (-s)"
+                install_sdcard: "Instalar en Tarjeta SD (-s)",
+                launch: "Abrir App",
+                download: "Descargar APK"
             },
             search_placeholder: "Buscar paquetes...",
             toggle_system: "Mostrar Apps del Sistema",
@@ -187,14 +203,17 @@ export const es = {
             status: {
                 installing: "Instalando APK...",
                 disabled_badge: "Deshabilitado",
-                paused_test: "Actualización de apps pausada por prueba"
+                paused_test: "Actualización de apps pausada por prueba",
+                downloading: "Descargando {{pkg}}..."
             },
             success: {
                 uninstalled: "{{pkg}} desinstalado con éxito",
                 disabled: "{{pkg}} deshabilitado",
                 enabled: "{{pkg}} habilitado",
                 cleared: "Datos borrados para {{pkg}}",
-                installed: "APK instalado con éxito"
+                installed: "APK instalado con éxito",
+                launched: "{{pkg}} abierto con éxito",
+                downloaded: "{{pkg}} descargado con éxito"
             },
             error: {
                 install_failed: "Fallo en la instalación: {{error}}"
@@ -232,6 +251,9 @@ export const es = {
             }
         },
         common: {
+            start: "Iniciar",
+            pause: "Pausar",
+            reset: "Reiniciar",
             loading_taking_too_long: "La carga está tardando más de lo esperado...",
             continue_anyway: "Continuar de todos modos",
             refresh: "Actualizar",
@@ -259,6 +281,8 @@ export const es = {
             clear: "Limpiar",
             coming_soon: "Módulo {{module}} próximamente...",
             error_occurred: "Ocurrió un error: {{error}}",
+            failed_to_pull_video: "Error al extraer video",
+            failed_to_pull_screenshot: "Error al extraer captura de pantalla del dispositivo",
             delete: "Eliminar",
             edit: "Editar",
             go_to_settings: "Ir a Configuración",
@@ -413,6 +437,7 @@ export const es = {
                 key_required: "Clave API de {{provider}} requerida. Configure en Ajustes.",
                 types: {
                     test_case: "Casos de Prueba (BDD)",
+                    test_case_traditional: "Casos de Prueba (Tradicional / Paso a Paso)",
                     pbi: "Ítem de Backlog (PBI)",
                     improvement: "Mejora Funcional",
                     bug: "Informe de Error"
@@ -481,7 +506,32 @@ export const es = {
             not_configured: "Ruta no configurada",
             configure_tests: "Configure el Directorio de Pruebas en Ajustes o selecciónelo a continuación.",
             configure_suites: "Configure el Directorio de Suites en Ajustes o selecciónelo a continuación.",
-            select_folder_btn: "Seleccionar Carpeta"
+            select_folder_btn: "Seleccionar Carpeta",
+            git_commit_title: "Confirmar Cambios (Commit)",
+            git_commit_btn_tooltip: "Confirmar cambios preparados (Commit)",
+            git_push: "Enviar al remoto (Push)",
+            pushing: "Enviando...",
+            push: "Enviar (Push)",
+            git_commit_message_label: "Mensaje de Commit",
+            git_commit_placeholder: "Ej: actualizar scripts de prueba",
+            committing: "Confirmando...",
+            commit: "Confirmar (Commit)",
+            staged_success: "{{file}} preparado (staged) con éxito",
+            git_commit_success: "¡Cambios confirmados (committed) con éxito!",
+            git_push_success: "¡Cambios enviados al repositorio remoto con éxito!",
+            git_stage_tooltip: "Preparar cambios (stage)",
+            git_stage: "Preparar",
+            git_status_modified: "Modificado",
+            git_status_staged: "Listo para Commit (Staged)",
+            git_status_untracked: "No Rastreado",
+            git_status_deleted: "Eliminado",
+            git_fetch_tooltip: "Sincronizar con remoto (Fetch)",
+            git_fetch_success: "Sincronización con el remoto completada.",
+            git_pull_tooltip: "Descargar cambios del remoto (Pull)",
+            git_pull_success: "Cambios descargados del remoto con éxito.",
+            git_push_tooltip: "Enviar al remoto (Push)",
+            git_unstage_tooltip: "Quitar del stage (Unstage)",
+            unstaged_success: "{{file}} quitado del stage con éxito"
         },
         inspector: {
             overlay: {
@@ -542,6 +592,8 @@ export const es = {
                 recents: "Recientes"
             },
             modal: {
+                edit_step_locator: "Editar Localizador del Paso",
+                format: "Formato",
                 edit_xpath: "Editar XPath",
                 edit_uiselector: "Editar Selector UIAutomator",
                 edit_selector: "Editar Selector",
@@ -595,7 +647,9 @@ export const es = {
                 suggested_selector: "Selector Sugerido",
                 ai_rationale: "Justificación de IA",
                 rationale: "Justificación",
-                ai_error_generic: "Fallo en la sugerencia de IA."
+                ai_error_generic: "Fallo en la sugerencia de IA.",
+                ai_error_quota: "Cuota de IA agotada. {{detail}}",
+                ai_error_auth: "Error de autenticación de IA. Verifica tu clave API."
             },
             recorder: {
                 title: "Grabador de Pasos",
@@ -610,7 +664,8 @@ export const es = {
                     double_tap: "Doble Toque",
                     long_press: "Presión Larga",
                     swipe: "Deslizar",
-                    drag_drop: "Arrastrar y Soltar"
+                    drag_drop: "Arrastrar y Soltar",
+                    assert: "Aserción"
                 },
                 directions: {
                     up: "Arriba",
@@ -836,12 +891,38 @@ export const es = {
                 recovering_exit: "Salida de la aplicación detectada (Actual: {{current}}, Objetivo: {{target}}). Recuperando...",
                 ai_suggested_layout: "Diseño sugerido por la IA para {{name}} en ({{x}}, {{y}})",
                 swipe_limit_reached: "Límite máximo de deslizamientos alcanzado (10). Forzando regreso.",
-                stopped_reason: "Exploración detenida: {{reason}}",
-                step_marker: "--- Paso {{step}} ---",
-                malformed_json_retry: "La IA devolvió un JSON malformado. Reintentando... ({{error}})",
                 back_updated: "Actualización retroactiva: \"{{prev}}\" → el elemento ahora navega a \"{{current}}\"",
                 merging_insights: "Fusionando conocimientos de IA en la pantalla existente: \"{{name}}\" (ID: {{id}}, {{count}} elementos)",
                 new_elements_discovered: "Añadidos {{count}} nuevos elementos descubiertos por la IA. Total: {{total}}",
+                analyzing_prompt: "Analizando prompt...",
+                summary_initial: "Resumen Inicial del Grafo",
+                summary_final: "Resumen Final del Grafo (Fin de la Exploración)",
+                summary_screens: "- Pantallas: {{exhausted}} Exhausted, {{exploring}} Exploring, {{unexplored}} Unexplored",
+                summary_elements: "- Elementos: {{exhausted}} Exhausted, {{exploring}} Exploring, {{unexplored}} Unexplored",
+                heuristic_scroll: "Heurística: sin elementos no visitados, intentando hacer scroll",
+                heuristic_scroll_reverse: "Heurística: scroll inverso, no se encontraron elementos nuevos",
+                heuristic_back: "Heurística: atascado, volviendo",
+                heuristic_type: "Heurística: escribiendo texto en un input no visitado",
+                heuristic_click: "Heurística: clicando en un elemento no visitado"
+            },
+            enhancer: {
+                title: "Auditoría y Mejora de Mapeos",
+                description: "Esta herramienta eliminará duplicados programáticamente, estandarizará elementos y usará IA para generar descripciones y nombres semánticos para sus pantallas guardadas.",
+                ready: "Listo para procesar {{count}} pantallas.",
+                btn_cancel: "Cancelar",
+                btn_close: "Cerrar",
+                btn_start: "Iniciar Mejora",
+                btn_enhancing: "Mejorando...",
+                btn_done: "Listo",
+                btn_audit_enhance: "Auditar y Mejorar",
+                completed: "Auditoría y Mejora Completadas",
+                starting_linter: "Iniciando Linter Programático...",
+                removed_duplicates: "Eliminados {{count}} duplicados de {{name}}",
+                no_enhancement_needed: "Todas las pantallas y elementos ya están nombrados semánticamente. No se requiere mejora por IA.",
+                cli_fallback: "Proveedor CLI seleccionado. Usando Gemini como respaldo para la Mejora por Lotes.",
+                api_key_required: "Se requiere clave API. Deteniendo después del Linter programático.",
+                found_screens: "Encontradas {{count}} pantallas que necesitan mejora por IA. Procesando en lotes...",
+                processing_batch: "Procesando lote de IA {{current}}/{{total}}..."
             },
             modes: {
                 inspect: "Modo Inspección",
@@ -914,7 +995,8 @@ export const es = {
                 toggle_stay_awake: "Alternar Mantener Pantalla Encendida",
                 export_json: "Exportar JSON",
                 import_json: "Importar JSON",
-                export_image: "Exportar Imagen"
+                export_image: "Exportar Imagen",
+                save_logs: "Guardar Logs"
             },
             feedback: {
                 mapped: "¡Elemento mapeado!",
@@ -929,13 +1011,15 @@ export const es = {
                 new_screen: "Listo para nueva pantalla",
                 deleted: "Mapa eliminado",
                 stay_on_enabled: "Mantener Pantalla Encendida activado",
-                stay_on_disabled: "Mantener Pantalla Encendida desactivado"
+                stay_on_disabled: "Mantener Pantalla Encendida desactivado",
+                logs_saved: "Logs guardados con éxito"
             },
             error: {
                 missing_name: "Por favor proporcione un nombre para el elemento",
                 missing_screen_name: "Por favor proporcione un Nombre para la Pantalla",
                 save_failed: "Error al guardar mapa de pantalla",
-                stay_on_failed: "Error al cambiar el estado de Mantener Pantalla Encendida"
+                stay_on_failed: "Error al cambiar el estado de Mantener Pantalla Encendida",
+                logs_save_failed: "Error al guardar logs"
             },
             confirm: {
                 delete: "¿Está seguro de que desea eliminar este mapa?",
@@ -949,6 +1033,14 @@ export const es = {
             save_error: "Error al guardar datos de rendimiento",
             record_error: "Error al iniciar grabación",
             title: "Rendimiento del Dispositivo",
+            history: "Historial de Rendimiento",
+            general_history: "Historial del Sistema",
+            app_history: "Historial de la Aplicación",
+            ram_history: "Uso de RAM (MB)",
+            fps_history: "FPS de la App",
+            fps: "FPS",
+            system_ram: "RAM del Sistema",
+            app_ram: "RAM de la App",
             auto_on: "Auto-Actualizar Encendido",
             auto_off: "Auto-Actualizar Apagado",
             refresh: "Actualizar Ahora",
@@ -1053,11 +1145,14 @@ export const es = {
                 ai_analysis: "Análisis de IA",
                 ai_analysis_header: "Análisis Detallado",
                 summarize_run: "Resumir Ejecución",
+                generate_ai_test: "Generar Prueba Robot (IA)",
                 summary_title: "Resumen de la Ejecución",
                 summary_rationale: "Base del Análisis",
                 ai_analysis_placeholder: "Haga clic para realizar un análisis inteligente da causa raíz usando IA.",
                 ai_analysis_error: "Fallo en el análisis de IA",
                 ai_error_generic: "Análisis de IA fallido.",
+                ai_error_quota: "Cuota de IA agotada. {{detail}}",
+                ai_error_auth: "Error de autenticación de IA. Verifica tu clave API.",
                 ai_error_details: "Detalles del Error:",
                 ai_error_copy: "Copiar error",
                 ai_history: {
@@ -1146,6 +1241,15 @@ export const es = {
                 light: "Claro",
                 dark: "Oscuro",
                 primary_color: "Color Primario",
+                blue_color: "Azul",
+                red_color: "Rojo",
+                green_color: "Verde",
+                purple_color: "Morado",
+                orange_color: "Naranja",
+                cyan_color: "Cian",
+                pink_color: "Rosa",
+                custom_color: "Personalizado",
+                custom_color_description: "Seleccione un color primario personalizado para la aplicación.",
                 sidebar_logo: "Logo de la Barra Lateral",
                 logo_light: "Modo Claro",
                 logo_dark: "Modo Oscuro",
@@ -1278,6 +1382,68 @@ export const es = {
                 allow_actions_during_test: "Permitir acciones durante la prueba",
                 allow_actions_during_test_desc: "Habilita Logcat, Monitor de Performance y otras herramientas incluso mientras se ejecuta una prueba"
             },
+            integrations: {
+                title: "Integraciones de Terceros",
+                enabled: "Habilitado",
+                disabled: "Deshabilitado",
+                jira: {
+                    title: "Jira Software",
+                    host: "URL del Host de Jira Cloud",
+                    email: "Correo de Cuenta Atlassian",
+                    token: "API Token",
+                    project: "Clave del Proyecto (Project Key)",
+                    connection_success: "¡Conectado a Jira con éxito!",
+                    connection_failed: "Error al conectar a Jira. Verifique los detalles.",
+                    export_success: "Incidencia creada con éxito: {{key}}",
+                    export_failed: "Error al crear incidencia en Jira"
+                },
+                azure: {
+                    title: "Azure DevOps",
+                    org: "Nombre de la Organización",
+                    project: "Nombre del Proyecto",
+                    pat: "Token de Acceso Personal (PAT)",
+                    connection_success: "¡Conectado a Azure DevOps con éxito!",
+                    connection_failed: "Error al conectar a Azure DevOps. Verifique los detalles.",
+                    export_success: "Elemento de trabajo creado con éxito: #{{id}}",
+                    export_failed: "Error al crear elemento de trabajo en Azure"
+                },
+                testlink: {
+                    title: "TestLink",
+                    url: "URL del Endpoint XML-RPC",
+                    devkey: "Clave del Desarrollador (Dev Key / API Key)",
+                    projectid: "ID del Proyecto (Numérico)",
+                    connection_success: "¡Conectado a TestLink con éxito!",
+                    connection_failed: "Error al conectar a TestLink. Verifique los detalles.",
+                    export_success: "¡Suite y casos de prueba exportados a TestLink!",
+                    export_failed: "Error al exportar a TestLink"
+                },
+                git: {
+                    title: "Integración con Git",
+                    enabled: "Habilitar Integración con Git",
+                    badges: "Mostrar marcadores de estado en el Explorador de Archivos",
+                    status_clean: "Limpio",
+                    status_modified: "Modificado",
+                    status_untracked: "No rastreado",
+                    status_staged: "Preparado (Staged)",
+                    stage_all: "Preparar todos los cambios",
+                    stage_file: "Preparar archivo (Stage)",
+                    commit: "Commit",
+                    commit_msg: "Mensaje del Commit",
+                    commit_success: "¡Commit realizado con éxito!",
+                    push: "Enviar cambios (Push)",
+                    push_success: "¡Push realizado con éxito!",
+                    not_installed: "Git CLI no está instalado o no está en el PATH del sistema."
+                },
+                webhooks: {
+                    title: "Webhooks de Slack y MS Teams",
+                    slack_url: "URL del Webhook de Slack",
+                    teams_url: "URL del Webhook de MS Teams",
+                    notify_pass: "Notificar cuando la Prueba Pase",
+                    notify_fail: "Notificar cuando la Prueba Falle"
+                },
+                test_connection: "Probar Conexión",
+                testing: "Probando..."
+            }
         },
         settings_page: {
             path_auto_updated: "Ruta actualizada automáticamente: {{path}}",
@@ -1417,6 +1583,7 @@ export const es = {
                 args_one: "{{count}} archivo de args",
                 args_other: "{{count}} archivos de args",
                 clear_all: "Limpiar Todo",
+                cleared: "Selección borrada",
                 remove: "Remover"
             },
             target: "Objetivo",
@@ -1515,7 +1682,25 @@ export const es = {
                 open_error: "Error al abrir Scrcpy"
             },
             rerun: {
-                init_error: "Error al iniciar reejecución"
+                init_error: "Fallo al iniciar reejecución"
+            },
+            dmesg: {
+                start_error: "Error al iniciar dmesg",
+                saved: "Registros de Dmesg guardados",
+                stop_error: "Error al detener dmesg",
+                select_device: "Seleccione un dispositivo para ver los registros del kernel",
+                title: "Registros del Kernel (dmesg)",
+                analyze_ai: "Analizar con IA",
+                waiting: "Esperando registros del kernel...",
+                no_logs: "Sin registros. Haga clic en Iniciar.",
+                ai_analysis_title: "Análisis con IA del Registro del Kernel"
+            },
+            performance: {
+                history: "Historial",
+                ram_history: "Historial RAM",
+                fps_history: "Historial FPS",
+                system_ram: "RAM Sistema",
+                app_ram: "RAM App"
             },
             tabs: {
                 console: "Consola de Prueba",
@@ -1524,7 +1709,45 @@ export const es = {
                 mirror: "Espejo",
                 performance: "Rendimiento",
                 apps: "Apps",
-                webview: "Webview"
+                webview: "Webview",
+                hardware: "Hardware"
+            },
+            hardware: {
+                battery: {
+                    title: "Simulación de Batería",
+                    set_level: "Nivel (%)",
+                    quick_actions: "Acciones Rápidas",
+                    unplug: "Desconectar",
+                    unplug_desc: "Simular estado desconectado (descargando)",
+                    reset: "Restablecer",
+                    reset_desc: "Restablecer estado físico",
+                    set_success: "Batería ajustada a {{level}}%",
+                    set_error: "Error al ajustar la batería",
+                    unplug_success: "Batería desconectada (descargando)",
+                    unplug_error: "Error al desconectar la batería",
+                    reset_success: "Estado de batería restablecido",
+                    reset_error: "Error al restablecer la batería"
+                },
+                connectivity: {
+                    title: "Conectividad",
+                    wifi: "WiFi",
+                    mobile_data: "Datos Móviles",
+                    airplane_mode: "Modo Avión",
+                    wifi_success: "Estado de WiFi cambiado",
+                    wifi_error: "Error al cambiar WiFi",
+                    data_success: "Estado de Datos Móviles cambiado",
+                    data_error: "Error al cambiar datos móviles",
+                    airplane_success: "Modo Avión cambiado",
+                    airplane_error: "Error al cambiar Modo Avión"
+                },
+                broadcast: {
+                    title: "Broadcasts del Sistema",
+                    intent_action: "Acción (Intent Action)",
+                    extras: "Extras (Opcional)",
+                    send: "Enviar Broadcast",
+                    success: "Broadcast enviado",
+                    error: "Error al enviar broadcast"
+                }
             },
             actions: {
                 screenshot: "Capturar Pantalla",
@@ -1593,6 +1816,56 @@ export const es = {
                     title: "Selenium (Pytest)",
                     description: "Automatización estándar de navegadores usando Python y pytest. Ideal para una regresión web robusta."
                 }
+            }
+        },
+        exploration_modal: {
+            title: "Configuración de la Exploración Autónoma",
+            subtitle: "Define cómo la inteligencia artificial debe navegar y mapear la aplicación.",
+            mode: {
+                title: "Modo de Exploración",
+                new: {
+                    title: "Solo Pantallas Nuevas",
+                    desc: "La exploración se detendrá al encontrar pantallas conocidas."
+                },
+                all: {
+                    title: "Explorar Todo",
+                    desc: "La exploración escaneará toda la aplicación."
+                },
+                specific: {
+                    title: "Ruta Específica",
+                    desc: "Enfocarse en una ruta de navegación específica."
+                }
+            },
+            limits: {
+                title: "Límites de Navegación",
+                default: {
+                    title: "Límites Predeterminados",
+                    desc: "Carga configuraciones seguras estándar."
+                },
+                custom: {
+                    title: "Límites Personalizados",
+                    desc: "Definir tus propias palabras clave."
+                }
+            },
+            fields: {
+                blocked: "Términos Bloqueados (Botones prohibidos de interactuar)",
+                blocked_placeholder: "eliminar, borrar",
+                escape: "Términos de Escape (Botones de atrás/cancelar)",
+                escape_placeholder: "atrás, cancelar",
+                priority: "Términos Prioritarios (Qué clicar primero)",
+                priority_placeholder: "ajustes, perfil"
+            },
+            ai: {
+                title: "Usar IA para Refinamiento",
+                desc: "La IA añadirá nuevas reglas a las configuraciones anteriores según tu intención.",
+                placeholder: "Describe brevemente lo que deseas..."
+            },
+            packages: {
+                title: "App Objetivo y Permitidas",
+                target_label: "App Objetivo",
+                allowed_label: "Apps Secundarias Permitidas (App Bundles)",
+                allowed_desc: "Si la exploración abre estas apps, continuará naturalmente sin cerrarlas a la fuerza.",
+                no_secondary: "No hay otros paquetes disponibles en Ajustes."
             }
         },
         auth: {

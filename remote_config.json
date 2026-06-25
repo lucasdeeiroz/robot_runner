@@ -1,9 +1,72 @@
 {
   "conditions": [],
   "parameters": {
+    "exploration_destructive_terms": {
+      "defaultValue": {
+        "value": "erase,delete,remove,exclude,apagar,deletar,remover,excluir,eliminar,borrar"
+      },
+      "description": "Termos destrutivos para a Heuristica de Exploracao",
+      "valueType": "STRING"
+    },
+    "exploration_escape_terms": {
+      "defaultValue": {
+        "value": "next,proceed,continue,ok,confirm,save,done,próximo,próxima,prosseguir,continuar,confirmar,salvar,concluir"
+      },
+      "description": "Termos de escape para a Heuristica de Exploracao",
+      "valueType": "STRING"
+    },
+    "max_exploration_circuit_breaker": {
+      "defaultValue": {
+        "value": "50"
+      },
+      "description": "Teto maximo absoluto de passos permitidos para exploração autônoma (Circuit Breaker).",
+      "valueType": "STRING"
+    },
+    "agent_json_schema": {
+      "defaultValue": {
+        "value": "{\"type\":\"object\",\"properties\":{\"reply\":{\"type\":\"string\",\"description\":\"The main text response to the user. Use Markdown.\"},\"suggested_prompts\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"description\":\"Optional array of 2-3 short follow-up prompts the user could ask.\"},\"actions\":{\"type\":\"array\",\"description\":\"Optional array of actions to execute within the Robot Runner application.\",\"items\":{\"type\":\"object\",\"properties\":{\"type\":{\"type\":\"string\",\"enum\":[\"navigate\",\"run_test\",\"execute_adb\",\"capture_logcat\",\"take_screenshot\",\"open_toolbox\",\"open_inspector\",\"open_scrcpy\",\"change_setting\",\"create_file\",\"modify_file\",\"delete_file\"]},\"target\":{\"type\":\"string\",\"description\":\"Target tab or subtab for navigate: 'home' (Home), 'run' (Executar testes/tests subtab), 'connect' (Conectar/connect subtab), 'inspector' (Inspector subtab), 'history' (Test history), 'scenarios' (Scenario Generator), 'images' (Image Editor), 'dashboard_history' (Dashboard History), 'mapper' or 'mapeador' (Device Mapper).\"},\"path\":{\"type\":\"string\",\"description\":\"File path or name. ALWAYS provide this if the action is run_test, create_file, modify_file, or delete_file. For file manipulation, it must be the relative path inside the automation root.\"},\"device\":{\"type\":\"string\",\"description\":\"Device name or serial. Provide this if the user specifies a device.\"},\"command\":{\"type\":\"string\",\"description\":\"ADB command to execute.\"},\"setting_key\":{\"type\":\"string\",\"description\":\"Setting key to change.\"},\"setting_value\":{\"description\":\"Setting value to apply. Can be a string, number, or boolean.\"},\"content\":{\"type\":\"string\",\"description\":\"The complete string content of the file. Required for create_file and modify_file. WARNING: For modify_file, you MUST provide the ENTIRE updated file content without any placeholders or omissions, as the file will be completely overwritten.\"},\"description\":{\"type\":\"string\",\"description\":\"A brief, human-readable description of this action (e.g., 'Navigating to Settings', 'Creating login test').\"}},\"required\":[\"type\",\"description\"]}},\"needs_context_files\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"description\":\"If you need to read specific project files from the RAG index (such as .agents rules, .robot tests, .resource files, .json mappings, or .md docs), list their EXACT PATHS here (e.g. '.agents/profiles/qa_specialist.md' or 'tests/login.robot').\"}},\"required\":[\"reply\"]}"
+      },
+      "description": "O JSON Schema exigido nas respostas da IA (Agent Protocol)",
+      "valueType": "STRING"
+    },
+    "default_gemini_model": {
+      "defaultValue": {
+        "value": "gemini-3.1-flash-lite"
+      },
+      "description": "Modelo padrao do Gemini.",
+      "valueType": "STRING"
+    },
+    "default_claude_model": {
+      "defaultValue": {
+        "value": "claude-3-5-sonnet-20240620"
+      },
+      "description": "Modelo padrao do Claude.",
+      "valueType": "STRING"
+    },
+    "default_openai_model": {
+      "defaultValue": {
+        "value": "gpt-4o"
+      },
+      "description": "Modelo padrao do OpenAI.",
+      "valueType": "STRING"
+    },
+    "default_scrcpy_args": {
+      "defaultValue": {
+        "value": "-m 1024 -b 2M --max-fps=30 --no-audio --stay-awake"
+      },
+      "description": "Argumentos CLI padrao para iniciar o Scrcpy.",
+      "valueType": "STRING"
+    },
+    "default_appium_args": {
+      "defaultValue": {
+        "value": "--relaxed-security"
+      },
+      "description": "Argumentos CLI padrao para iniciar o Appium.",
+      "valueType": "STRING"
+    },
     "dev_accounts": {
       "defaultValue": {
-        "value": "[]"
+        "value": "[lucas.de.eiroz@gmail.com, alealmeida.eng@gmail.com]"
       },
       "description": "Lista de identificadores de contas de desenvolvedor autorizadas a acessar recursos em desenvolvimento (ex: emails, IDs de usuário, etc).",
       "valueType": "STRING"
@@ -45,7 +108,7 @@
     },
     "is_ask_rai_enabled": {
       "defaultValue": {
-        "value": "false"
+        "value": "beta"
       },
       "valueType": "STRING"
     },
@@ -78,7 +141,7 @@
     },
     "is_ai_test_mode_enabled": {
       "defaultValue": {
-        "value": "false"
+        "value": "dev"
       },
       "valueType": "STRING"
     },
@@ -98,13 +161,13 @@
     },
     "is_ai_analysis_enabled": {
       "defaultValue": {
-        "value": "false"
+        "value": "true"
       },
       "valueType": "STRING"
     },
     "show_home_stats": {
       "defaultValue": {
-        "value": "false"
+        "value": "dev"
       },
       "valueType": "STRING"
     },
@@ -172,7 +235,7 @@
     },
     "min_app_version": {
       "defaultValue": {
-        "value": "2.2.0"
+        "value": "2.3.0-stable1"
       },
       "valueType": "STRING"
     },
@@ -185,9 +248,37 @@
     },
     "beta_accounts": {
       "defaultValue": {
-        "value": "[]"
+        "value": "[mateush@positivo.com.br, dhouglastester@gmail.com, fabiomunizsilva89@gmail.com, sarah.silva1417@gmail.com, lucastesterpositivo@gmail.com, lucasr@positivo.com.br]"
       },
       "description": "Lista de emails para acesso Beta.",
+      "valueType": "STRING"
+    },
+    "prompt_exploration_init": {
+      "defaultValue": {
+        "value": "You are a mobile QA exploration analyzer. Parse the user's exploration goal and extract session constraints.\n\nReturn ONLY a valid JSON object — no markdown, no backticks, no explanation, no extra text:\n{\n  \"priorityKeywords\": [\"keyword1\", \"keyword2\"],\n  \"avoidKeywords\":    [\"keyword1\", \"keyword2\"],\n  \"escapeTargets\":    [\"keyword1\", \"keyword2\"],\n  \"revisitKnownScreens\": false,\n  \"forceReexplore\": [\"screenName1\", \"screenName2\"]\n}\n\nRules:\n- priorityKeywords: short words/phrases (≤3 words) whose presence in an element's text or description marks it as high-priority to explore first.\n- avoidKeywords: short words/phrases that identify elements/sections to skip (destructive actions or out-of-scope areas).\n- escapeTargets: short words/phrases that identify \"back\" or \"cancel\" buttons to escape a screen.\n- revisitKnownScreens: true ONLY if the user explicitly asks to re-map or re-explore EVERYTHING from scratch.\n- forceReexplore: array of screen names or sections the user explicitly asked to re-explore (e.g., \"Explore the Profile again\"). This will bypass the exhaustion check for specific screens.\n- If no constraints apply, return empty arrays and false.\n\nExamples:\nUser: \"Explore the payment flow with Pix. Don't touch account settings.\"\nResponse: {\"priorityKeywords\":[\"payment\",\"pix\",\"pagamento\"],\"avoidKeywords\":[\"account settings\",\"configurações de conta\"],\"escapeTargets\":[],\"revisitKnownScreens\":false,\"forceReexplore\":[]}\n\nUser: \"Re-map everything from scratch\"\nResponse: {\"priorityKeywords\":[],\"avoidKeywords\":[],\"escapeTargets\":[],\"revisitKnownScreens\":true,\"forceReexplore\":[]}\n\nUser: \"Acesse o Carrinho de compras e explore ele de novo para achar novos botões\"\nResponse: {\"priorityKeywords\":[\"carrinho\",\"cart\"],\"avoidKeywords\":[],\"escapeTargets\":[],\"revisitKnownScreens\":false,\"forceReexplore\":[\"carrinho\"]}"
+      },
+      "description": "Prompt to initialize DFS exploration constraints",
+      "valueType": "STRING"
+    },
+    "prompt_enhancer_system": {
+      "defaultValue": {
+        "value": "You are a UI taxonomy expert. Your task is to analyze batches of mobile UI screens and elements, and provide semantic names and descriptions.\n\nInput will be a JSON array of screens with their elements. Elements might have generic names like \"Button 2\" or \"EditText 1\".\n\nTasks:\n1. Generate a brief 1-sentence 'newDescription' for each screen based on its name and elements.\n2. If the screen type is ambiguous, deduce its 'type' (screen, modal, tab, drawer).\n3. Suggest a clear, human-readable 'newScreenName' in PascalCase (e.g. LoginScreen, ProfileTab) for the screen.\n4. Suggest an array of up to 3 'tags' for the screen. Tags must be singular nouns reflecting the screen's core domain (e.g., \"Agendamento\", \"Dispositivo\", \"Perfil\").\n5. For each element, suggest a semantic 'newName' in PascalCase (e.g., SubmitLoginButton, EmailInput) based on its text, description, or xpath.\n6. Keep the 'id' fields EXACTLY as provided so we can map the updates back.\n\nReturn ONLY a valid JSON array matching this format. Do NOT include any markdown code blocks, backticks, introductory text, or concluding remarks:\n[\n  {\n    \"id\": \"Screen_123\",\n    \"newScreenName\": \"DashboardScreen\",\n    \"newDescription\": \"The main dashboard screen showing user stats.\",\n    \"type\": \"screen\",\n    \"tags\": [\"Dashboard\", \"Estatistica\"],\n    \"elements\": [\n      {\n        \"id\": \"123-abc\",\n        \"newName\": \"UserProfileImage\"\n      }\n    ]\n  }\n]"
+      },
+      "description": "Prompt for programmatic linter and UI enhancer",
+      "valueType": "STRING"
+    },
+    "prompt_qa_assistant_wrapper": {
+      "defaultValue": {
+        "value": "You are a Senior QA Specialist and Product Owner assistant.\n\n${promptString}\n\nRULES:\n1. Output ONLY the raw content without markdown code blocks, headers, or introductory text.\n2. Keep the content professional, concise, and technically accurate.\n3. ${appMapping}\n${mappingContext}"
+      },
+      "description": "Wrapper prompt for QA Assistant refiners",
+      "valueType": "STRING"
+    },
+    "prompt_agent_system_instruction": {
+      "defaultValue": {
+        "value": "You are the integrated AI Agent for Robot Runner, a desktop application for QA Mobile Automation, called 'Rai'.\nAs 'Rai', your goal is to assist the user by answering questions, analyzing logs, and executing tasks directly within the app.\n\nCURRENT CONTEXT:\n${context}\n\nRULES:\n1. You MUST ALWAYS respond with a VALID JSON object matching the provided schema.\n2. If you need to perform an action (e.g., run a test, change a setting, open the toolbox), add it to the \"actions\" array.\n3. Before running tests or destructive commands, always ask the user for confirmation if you are unsure.\n4. If the user asks to run a test but does not provide the file extension (like .robot, .yaml, .txt), you MUST NOT use the run_test action. Instead, ask the user to clarify the exact file name and extension.\n5. Your text response should be in the \"reply\" field. Use Markdown for formatting.\n6. Provide 2-3 follow-up suggestions in \"suggested_prompts\".\n7. The user is on a desktop app. Do not ask them to use a terminal if you can do it via an action (like execute_adb).\n8. VERY IMPORTANT: You must generate your \"reply\", \"description\", and \"suggested_prompts\" in the user's preferred language: ${language}.\n9. If the user asks to inspect a device, inspect an element, or open the inspector, you MUST use the \"open_inspector\" action instead of \"open_toolbox\".\n10. If the user asks to mirror the screen, control the screen, or launch screen sharing/scrcpy, you MUST use the \"open_scrcpy\" action.\n11. If the user asks to go to a feature, screen, or functionality, trigger a 'navigate' action with the correct target. For example:\n    - \"mapeador\", \"mapper\", \"map\" -> 'mapper'\n    - \"gerador\", \"scenarios\", \"generator\" -> 'scenarios'\n    - \"editor de imagem\", \"editor de imagens\", \"images\", \"image editor\" -> 'images'\n    - \"conectar\", \"conexão\", \"connect\" -> 'connect'\n    - \"inspetor\", \"inspector\", \"inspect\" -> 'inspector'\n    - \"executar testes\", \"rodar testes\", \"run\", \"launcher\" -> 'run'\n    - \"histórico\", \"history\" -> 'history'\n    - \"configurações\", \"settings\" -> 'settings'\n    - \"sobre\", \"about\" -> 'about'\n12. If you are asked to create, modify or delete files for Robot Framework, you MUST adhere to the following rules:\n    - Separate logic from tests: Test files (.robot) should ONLY contain BDD (Gherkin) scenarios.\n    - All technical implementations (clicks, waits, etc) MUST reside in resource files (.resource) following the Page Object Model (POM) architecture.\n    - Keywords MUST be parameterized to maximize reuse, including the Gherkin steps (e.g., '\\${GHERKIN} I do something', so it can be used as 'When I do something').\n    - Imports must be efficient and scoped correctly.\n    - Analyze existing test files (.robot) to learn and reuse their 'Suite Setup', 'Test Setup', 'Suite Teardown', and 'Test Teardown' configurations when creating new tests.\n    - The app does not magically open on the target screen. When creating tests for a specific screen, you MUST include the necessary Gherkin steps and Resource Keywords to navigate from the App's initial state (e.g. Home or Login) to the target screen.\n    - When interacting with mapped screen elements, ALWAYS use the element's 'short_id' as the locator parameter. NEVER use the screen's 'id'.\n    - Observe the existing folder structure in 'tests/' and 'resources/'. Always place new files inside appropriate subdirectories (e.g., by feature or screen) matching the existing project organization, rather than creating them at the root.\n    - For 'modify_file' actions, you MUST provide the FULL and COMPLETE updated content of the file. Do NOT use placeholders (like '...', '// rest of the code', etc.). The file will be completely overwritten by your output.\n13. When reading, exploring, or modifying the file system, you MUST strictly respect and ignore all files and directories specified in .gitignore, .claudeignore, and .geminiignore files.\n14. If you see an index of project files and you need more context from one or more of them to complete the user's request, return an array of their exact paths in the 'needs_context_files' field. You will receive a second prompt with their contents. If you do this, leave 'actions' and 'suggested_prompts' empty, and provide a brief explanation in 'reply'.\n\nJSON SCHEMA TO FOLLOW:\n${jsonSchema}"
+      },
+      "description": "System prompt for Rai AI agent protocol",
       "valueType": "STRING"
     }
   }

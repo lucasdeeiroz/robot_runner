@@ -23,6 +23,7 @@ import { feedback } from "@/lib/feedback";
 import { AiButton } from "../atoms/AiButton";
 import { AiResponse } from "./AiResponse";
 import { getFailureAnalysisPrompt } from "@/lib/dashboard/prompts";
+import { Button } from "@/components/atoms/Button";
 
 interface LogTreeProps {
     node: LogNode;
@@ -85,8 +86,8 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({
     const hasMetadata = !!((node as any).doc || (node as any).ret || (node as any).aiAnalysis);
     const hasFailure = node.type === 'test' && !!(node as TestNode).failureDetail;
     const hasLogs = node.type === 'test' && (node as TestNode).logs && (node as TestNode).logs.length > 0;
-    const hasScreenshot = (node.type === 'keyword' && !!(node as KeywordNode).screenshotPath) || 
-                          (node.type === 'test' && !!(node as TestNode).failureDetail?.screenshotPath);
+    const hasScreenshot = (node.type === 'keyword' && !!(node as KeywordNode).screenshotPath) ||
+        (node.type === 'test' && !!(node as TestNode).failureDetail?.screenshotPath);
 
     // A node can be expanded if it has any children, lazy-load flag, documentation, return values, logs, failure details or screenshots
     const canExpand = (node as any).hasChildren || hasChildrenArray || hasLazyChildren || hasMetadata || hasFailure || hasLogs || hasScreenshot;
@@ -191,7 +192,7 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({
         const isThought = node.type === 'ai-thought';
         const isAction = node.type === 'ai-action';
         const Icon = isThought ? Bot : isAction ? Play : Terminal;
-        
+
         const borderClass = isThought ? "border-primary/20" : isAction ? "border-secondary/20" : "border-tertiary/20";
         const bgClass = isThought ? "bg-primary/5" : isAction ? "bg-secondary/5" : "bg-tertiary/5";
         const leftBarClass = isThought ? "bg-primary/40" : isAction ? "bg-secondary/40" : "bg-tertiary/40";
@@ -443,7 +444,7 @@ Error Message: ${(node as TestNode).failureDetail?.message}
                                                             result = await askClaude(prompt, settings.claudeApiKey || '', settings.claudeModel, systemInstruction, screenshot);
                                                         } else if (provider === 'openai') {
                                                             result = await askOpenAI(prompt, settings.openaiApiKey || '', settings.openaiModel, systemInstruction, screenshot);
-                                                         } else if (provider === 'claude-code') {
+                                                        } else if (provider === 'claude-code') {
                                                             const response = await askClaudeCode(prompt, settings.paths.automationRoot || '', systemInstruction, settings.claudeCodeToken, { imageBase64: screenshot });
                                                             result = typeof response === 'string' ? response : response.result;
                                                         } else if (provider === 'antigravity-cli') {
@@ -464,8 +465,19 @@ Error Message: ${(node as TestNode).failureDetail?.message}
                                                         }
                                                     } catch (err: any) {
                                                         console.error("AI Analysis Error:", err);
-                                                        setAiError(err.message || String(err));
-                                                        feedback.toast.error(t('run_tab.console.ai_error_generic'));
+                                                        const msg: string = err.message || String(err);
+                                                        if (msg.startsWith('QUOTA_EXHAUSTED:')) {
+                                                            const detail = msg.replace('QUOTA_EXHAUSTED:', '').trim();
+                                                            setAiError(t('run_tab.console.ai_error_quota', { detail }));
+                                                            feedback.toast.error(t('run_tab.console.ai_error_quota', { detail }), { duration: 8000 });
+                                                        } else if (msg.startsWith('AUTH_ERROR:')) {
+                                                            setAiError(t('run_tab.console.ai_error_auth'));
+                                                            feedback.toast.error(t('run_tab.console.ai_error_auth'));
+                                                        } else {
+                                                            setAiError(msg);
+                                                            feedback.toast.error(t('run_tab.console.ai_error_generic'));
+                                                        }
+
                                                     } finally {
                                                         setIsAnalyzing(false);
                                                     }
@@ -595,36 +607,38 @@ Error Message: ${(node as TestNode).failureDetail?.message}
             )}
 
             {/* Fullscreen Preview Portal */}
-            {previewImage && createPortal(
+            {createPortal(
                 <AnimatePresence>
-                    <div
-                        className="fixed inset-0 z-[20000] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md cursor-zoom-out"
-                        onClick={() => setPreviewImage(null)}
-                    >
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                            className="relative max-w-full max-h-full flex flex-col items-center gap-4"
-                            onClick={(e) => e.stopPropagation()}
+                    {previewImage && (
+                        <div
+                            className="fixed inset-0 z-[200000] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md cursor-zoom-out"
+                            onClick={() => setPreviewImage(null)}
                         >
-                            <img
-                                src={previewImage}
-                                alt="Full size preview"
-                                className="max-w-full max-h-[85vh] rounded-xl shadow-2xl border border-white/10"
-                            />
-                            <div className="flex items-center gap-4">
-                                <button
-                                    className="px-6 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-all font-medium border border-white/10 flex items-center gap-2 group"
-                                    onClick={() => setPreviewImage(null)}
-                                >
-                                    <XCircle size={18} className="text-white/70 group-hover:text-white transition-colors" />
-                                    {t('common.close')}
-                                </button>
-                            </div>
-                        </motion.div>
-                    </div>
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                                transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                                className="relative max-w-full max-h-full flex flex-col items-center gap-4"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <img
+                                    src={previewImage}
+                                    alt="Full size preview"
+                                    className="max-w-full max-h-[85vh] rounded-xl shadow-2xl border border-white/10"
+                                />
+                                <div className="flex items-center gap-4">
+                                    <Button
+                                        className="px-6 py-2.5 bg-surface/80 hover:bg-surface-variant text-on-surface rounded-full backdrop-blur-md transition-all font-medium border border-outline-variant/30 flex items-center gap-2 group"
+                                        onClick={() => setPreviewImage(null)}
+                                    >
+                                        <XCircle size={18} className="text-white/70 group-hover:text-white transition-colors" />
+                                        {t('common.close')}
+                                    </Button>
+                                </div>
+                            </motion.div>
+                        </div>
+                    )}
                 </AnimatePresence>,
                 document.body
             )}

@@ -3,7 +3,7 @@ import { AlertCircle, X, AlertTriangle } from "lucide-react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { AnimatePresence, motion } from "framer-motion";
-import { Button } from "../atoms/Button";
+import { Button } from "@/components/atoms/Button";
 
 interface WarningModalProps {
     isOpen: boolean;
@@ -62,12 +62,13 @@ export function WarningModal({
                                 <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${colorClass}`}>
                                     <Icon size={24} />
                                 </div>
-                                <button
+                                <Button
+                                    variant="ghost" size="icon"
                                     onClick={onClose}
-                                    className="p-2 -mr-2 text-on-surface/40 hover:text-on-surface/80 hover:bg-surface-variant/50 rounded-xl transition-all"
+                                    className="w-8 h-8 -mr-2 text-on-surface/40 hover:text-on-surface/80 rounded-xl"
                                 >
                                     <X size={20} />
-                                </button>
+                                </Button>
                             </div>
 
                             <h3 className="text-xl font-bold text-on-surface mb-2">

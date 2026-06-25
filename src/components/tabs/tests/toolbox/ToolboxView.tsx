@@ -5,10 +5,12 @@ import { invoke } from "@tauri-apps/api/core";
 import { useSettings } from "@/lib/settings";
 import { logEvent } from "@/lib/analytics";
 import { LogcatSubTab } from "./LogcatSubTab";
+import { DmesgSubTab } from "./DmesgSubTab";
 import { AppsSubTab } from "./AppsSubTab";
 import { useTranslation } from "react-i18next";
 import { CommandsSubTab } from "./CommandsSubTab";
 import { PerformanceSubTab } from "./PerformanceSubTab";
+import { HardwareSubTab } from "./HardwareSubTab";
 import { RunConsole } from "@/components/organisms/RunConsole";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 import { TestSession, useTestSessions } from "@/lib/testSessionStore";
@@ -28,7 +30,7 @@ interface ToolboxViewProps {
     onNavigate?: (page: string) => void;
 }
 
-type ToolTab = 'console' | 'logcat' | 'performance' | 'commands' | 'apps' | 'webview';
+type ToolTab = 'console' | 'logcat' | 'dmesg' | 'performance' | 'commands' | 'apps' | 'webview' | 'hardware';
 
 export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxViewProps) {
     const { stopSession, rerunSession, setSessionActiveTool } = useTestSessions();
@@ -42,7 +44,7 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
     );
     const [isGridView, setIsGridView] = useState(false);
     const [visibleToolsInGrid, setVisibleToolsInGrid] = useState<Set<ToolTab>>(
-        isWebMode ? new Set(['console', 'webview']) : new Set(['console', 'logcat', 'performance'])
+        isWebMode ? new Set(['console', 'webview']) : new Set(['console', 'logcat', 'dmesg', 'performance', 'hardware'])
     );
 
     // Responsive State
@@ -129,8 +131,7 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
             }, 'feedback.screenshot_saved');
             recordingSaver.clearFeedback();
         } catch (e) {
-            const message = e instanceof Error ? e.message : String(e);
-            feedback.toast.error("toolbox.screenshot.error", message);
+            console.error("Screenshot failed:", e);
         }
     };
 
@@ -150,7 +151,7 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                     setIsRecording(false);
                 }
             } catch (e) {
-                feedback.toast.error("toolbox.recording.stop_error", e);
+                console.error("Stop recording failed:", e);
                 setIsRecording(false);
             }
         } else {
@@ -223,7 +224,7 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                 setActiveTool(tool);
             }
             // Reset grid visibility
-            setVisibleToolsInGrid(isWebMode ? new Set(['console', 'webview']) : new Set(['console', 'logcat', 'commands', 'performance']));
+            setVisibleToolsInGrid(isWebMode ? new Set(['console', 'webview']) : new Set(['console', 'logcat', 'dmesg', 'commands', 'performance', 'hardware']));
         }
     }, [isGridView, visibleToolsInGrid.size, session.type, isWebMode]);
 
@@ -323,6 +324,13 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                         tooltip: (isCompact || isNarrow) ? t('toolbox.tabs.logcat') : undefined
                     },
                     {
+                        id: 'dmesg',
+                        label: (!isCompact && !isNarrow) ? "Kernel Logs" : "",
+                        icon: Terminal,
+                        selected: isGridView ? visibleToolsInGrid.has('dmesg') : activeTool === 'dmesg',
+                        tooltip: (isCompact || isNarrow) ? "Kernel Logs" : undefined
+                    },
+                    {
                         id: 'performance',
                         label: (!isCompact && !isNarrow) ? t('toolbox.tabs.performance') : "",
                         icon: Cpu,
@@ -342,6 +350,13 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                         icon: Package,
                         selected: isGridView ? visibleToolsInGrid.has('apps') : activeTool === 'apps',
                         tooltip: (isCompact || isNarrow) ? t('toolbox.tabs.apps') : undefined
+                    },
+                    {
+                        id: 'hardware',
+                        label: (!isCompact && !isNarrow) ? "Hardware" : "",
+                        icon: Cpu, // We'll change to something else if needed, like Battery or Server
+                        selected: isGridView ? visibleToolsInGrid.has('hardware') : activeTool === 'hardware',
+                        tooltip: (isCompact || isNarrow) ? "Hardware" : undefined
                     }
                 ]}
                 activeId={activeTool}
@@ -357,7 +372,7 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                                 if (!isGridView) {
                                     const defaults: ToolTab[] = isWebMode
                                         ? ['console', 'webview']
-                                        : ['console', 'logcat', 'performance'];
+                                        : ['console', 'logcat', 'dmesg', 'performance'];
                                     setVisibleToolsInGrid(new Set([...defaults, activeTool]));
                                 }
                                 setIsGridView(!isGridView);
@@ -510,7 +525,7 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                     {(() => {
                         const allTools: ToolTab[] = isWebMode
                             ? ['console', 'webview']
-                            : ['console', 'logcat', 'performance', 'commands', 'apps'];
+                            : ['console', 'logcat', 'dmesg', 'performance', 'commands', 'apps', 'hardware'];
                         const visibleTools = allTools.filter(t =>
                             visibleToolsInGrid.has(t) && (t !== 'console' || session.type === 'test')
                         );
@@ -522,9 +537,11 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                             const titleMap: Record<string, string> = {
                                 'console': t('toolbox.tabs.console'),
                                 'logcat': t('toolbox.tabs.logcat'),
+                                'dmesg': "Kernel Logs",
                                 'commands': t('toolbox.tabs.commands'),
                                 'performance': t('toolbox.tabs.performance'),
                                 'apps': t('toolbox.tabs.apps'),
+                                'hardware': "Hardware",
                                 'webview': t('toolbox.tabs.webview', 'Webview')
                             };
 
@@ -545,7 +562,8 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                                     {tool === 'console' && (
                                         <RunConsole key={`console-${session.runId}-${session.sessionEpoch}`} runId={session.runId} logs={session.logs} isSessionRunning={session.status === 'running' || session.status === 'stopping'} testPath={session.testPath} />
                                     )}
-                                    {tool === 'logcat' && <LogcatSubTab key={session.deviceUdid} selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} onNavigate={onNavigate} />}
+                                    {tool === 'logcat' && <LogcatSubTab key={`logcat-${session.deviceUdid}`} selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} onNavigate={onNavigate} />}
+                                    {tool === 'dmesg' && <DmesgSubTab key={`dmesg-${session.deviceUdid}`} selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} onNavigate={onNavigate} />}
                                     {tool === 'commands' && <CommandsSubTab selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
                                     {tool === 'performance' && (
                                         <PerformanceSubTab
@@ -560,6 +578,7 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                                         />
                                     )}
                                     {tool === 'apps' && <AppsSubTab isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
+                                    {tool === 'hardware' && <HardwareSubTab selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
                                     {tool === 'webview' && (
                                         <div className="h-full w-full flex flex-col p-2 overflow-hidden bg-surface-variant/10 min-h-0">
                                             <DeviceViewport
@@ -600,7 +619,11 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                     </div>
 
                     <div className={clsx("h-full flex-1 min-h-0 flex flex-col", activeTool === 'logcat' ? "flex" : "hidden")}>
-                        <LogcatSubTab key={session.deviceUdid} selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} onNavigate={onNavigate} />
+                        <LogcatSubTab key={`logcat-${session.deviceUdid}`} selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} onNavigate={onNavigate} />
+                    </div>
+
+                    <div className={clsx("h-full flex-1 min-h-0 flex flex-col", activeTool === 'dmesg' ? "flex" : "hidden")}>
+                        <DmesgSubTab key={`dmesg-${session.deviceUdid}`} selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} onNavigate={onNavigate} />
                     </div>
 
                     <div className={clsx("h-full flex-1 min-h-0 flex flex-col", activeTool === 'commands' ? "flex" : "hidden")}>
@@ -622,6 +645,10 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
 
                     <div className={clsx("h-full flex-1 min-h-0 flex flex-col", activeTool === 'apps' ? "flex" : "hidden")}>
                         <AppsSubTab isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />
+                    </div>
+
+                    <div className={clsx("h-full flex-1 min-h-0 flex flex-col", activeTool === 'hardware' ? "flex" : "hidden")}>
+                        <HardwareSubTab selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />
                     </div>
 
                     <div className={clsx("h-full flex-1 min-h-0 flex flex-col overflow-hidden bg-surface-variant/10 p-4", activeTool === 'webview' ? "flex" : "hidden")}>

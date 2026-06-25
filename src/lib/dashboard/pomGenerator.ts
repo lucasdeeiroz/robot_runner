@@ -21,6 +21,18 @@ export function generateRobotResource(screenMap: ScreenMap): string {
   lines.push('');
   lines.push('*** Keywords ***');
   
+  // Screen-level Assertion Keyword
+  const assertionElements = screenMap.elements.filter(e => e.assertion_target);
+  if (assertionElements.length > 0) {
+    lines.push(`Verify ${screenMap.name} Loaded`);
+    lines.push(`    [Documentation]    Verify that the ${screenMap.name} screen is fully loaded by checking assertion targets.`);
+    assertionElements.forEach(el => {
+        const varName = el.name.replace(/\s+/g, '_').toUpperCase();
+        lines.push(`    Wait Until Element Is Visible    \${${screenPrefix}_${varName}}    timeout=15s`);
+    });
+    lines.push('');
+  }
+  
   // Add common interaction keywords for each element
   screenMap.elements.forEach(el => {
     const varName = el.name.replace(/\s+/g, '_').toUpperCase();
@@ -52,16 +64,17 @@ export function generateRobotResource(screenMap: ScreenMap): string {
 }
 
 function getBestLocator(element: UIElementMap): string {
+  if (element.primary_locator) return element.primary_locator;
   if (element.accessibility_id) return `accessibility_id=${element.accessibility_id}`;
   if (element.android_id) return `id=${element.android_id}`;
   if (element.text) return `text=${element.text}`;
-  return `xpath=${element.id}`;
+  return `xpath=${element.xpath || element.id}`;
 }
 
 export function generateProjectRobotResources(maps: ScreenMap[]): Record<string, string> {
   const result: Record<string, string> = {};
   maps.forEach(map => {
-    const fileName = `${map.name.toLowerCase().replace(/\s+/g, '_')}.robot`;
+    const fileName = `${map.id}.robot`;
     result[fileName] = generateRobotResource(map);
   });
   return result;
