@@ -192,7 +192,9 @@ export const en = {
                 allow_downgrade: "Allow Downgrade (-d)",
                 grant_permissions: "Grant Permissions (-g)",
                 allow_test: "Allow Test APKs (-t)",
-                install_sdcard: "Install to SD Card (-s)"
+                install_sdcard: "Install to SD Card (-s)",
+                launch: "Launch App",
+                download: "Download APK"
             },
             search_placeholder: "Search packages...",
             toggle_system: "Toggle System Apps",
@@ -201,14 +203,17 @@ export const en = {
             status: {
                 installing: "Installing APK...",
                 disabled_badge: "Disabled",
-                paused_test: "App list refresh paused during test"
+                paused_test: "App list refresh paused during test",
+                downloading: "Downloading {{pkg}}..."
             },
             success: {
                 uninstalled: "Package {{pkg}} uninstalled successfully",
                 disabled: "Package {{pkg}} disabled",
                 enabled: "Package {{pkg}} enabled",
                 cleared: "Data cleared for {{pkg}}",
-                installed: "APK installed successfully"
+                installed: "APK installed successfully",
+                launched: "Launched {{pkg}}",
+                downloaded: "Downloaded {{pkg}}"
             },
             error: {
                 install_failed: "Installation failed: {{error}}"

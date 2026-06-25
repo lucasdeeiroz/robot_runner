@@ -183,6 +183,11 @@ pub async fn set_stay_on(app: AppHandle, device: String, enabled: bool) -> Resul
     run_adb(&app, device, vec!["shell", "settings", "put", "system", "stay_on_while_plugged_in", mode]).await
 }
 
+#[command]
+pub async fn pull_apk(app: AppHandle, device: String, path: String, destination: String) -> Result<String, String> {
+    run_adb(&app, device, vec!["pull", &path, &destination]).await
+}
+
 // Internal Helper
 async fn run_adb(app: &AppHandle, device: String, args: Vec<&str>) -> Result<String, String> {
     let program = get_adb_program(app);

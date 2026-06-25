@@ -78,6 +78,7 @@ macro_rules! generate_robot_runner_handler {
             crate::adb::packages::install_package,
             crate::adb::packages::get_focused_package,
             crate::adb::packages::launch_package,
+            crate::adb::packages::pull_apk,
             crate::adb::packages::set_stay_on,
             crate::runner::get_robot_test_cases,
             crate::xml_parser::parse_robot_xml,
