@@ -36,7 +36,7 @@ pub async fn get_device_stats(
     // 1. Prepare async tasks for base device stats
     let battery_task = run_adb_shell(&app, &device, "dumpsys battery");
     let meminfo_task = run_adb_shell(&app, &device, "cat /proc/meminfo");
-    let top_task = run_adb_shell(&app, &device, "dumpsys cpuinfo");
+    let top_task = run_adb_shell(&app, &device, "top -n 2 -d 0.5");
     let activity_task = run_adb_shell(&app, &device, "dumpsys activity top");
     let power_task = run_adb_shell(&app, &device, "dumpsys power");
 
@@ -196,50 +196,72 @@ fn extract_kb(line: &str) -> Option<u64> {
 }
 
 fn parse_cpu_usage(output: &str) -> Option<f32> {
+    let mut last_cpu: Option<f32> = None;
     for line in output.lines() {
-        if line.contains("TOTAL:") {
-            let trimmed = line.trim();
+        let trimmed = line.trim();
+        
+        if trimmed.contains("TOTAL:") {
             if let Some(percent_str) = trimmed.split('%').next() {
                 if let Ok(val) = percent_str.trim().parse::<f32>() {
-                    return Some(val);
+                    last_cpu = Some(val);
                 }
             }
-        } else if line.contains("%cpu") {
-            // Fallback to top parsing if cpuinfo didn't have TOTAL
-            let parts: Vec<&str> = line.split_whitespace().collect();
+        } else if trimmed.contains("%cpu") && trimmed.contains("%idle") {
+            let parts: Vec<&str> = trimmed.split_whitespace().collect();
             let mut total_cap = 0.0;
             let mut idle = 0.0;
-
-            for part in parts {
-                if part.contains("%cpu") {
+            for part in &parts {
+                if part.ends_with("%cpu") {
                     if let Ok(val) = part.replace("%cpu", "").parse::<f32>() {
                         total_cap = val;
                     }
-                } else if part.contains("%idle") {
+                } else if part.ends_with("%idle") {
                     if let Ok(val) = part.replace("%idle", "").parse::<f32>() {
                         idle = val;
                     }
                 }
             }
-
             if total_cap > 0.0 {
                 let used = total_cap - idle;
                 let normalized = (used / total_cap) * 100.0;
-                return Some(normalized);
+                last_cpu = Some(normalized);
             }
+        } else if trimmed.starts_with("User ") && trimmed.contains("System ") {
+            let clean = trimmed.replace('%', "").replace(',', "");
+            let parts: Vec<&str> = clean.split_whitespace().collect();
+            let mut total_used = 0.0;
+            for (i, p) in parts.iter().enumerate() {
+                if (*p == "User" || *p == "System" || *p == "IOW" || *p == "IRQ") && i + 1 < parts.len() {
+                    if let Ok(val) = parts[i+1].parse::<f32>() {
+                        total_used += val;
+                    }
+                }
+            }
+            last_cpu = Some(total_used);
         }
     }
-    None
+    last_cpu
 }
 
-async fn get_app_cpu(app: &AppHandle, device: &str, package: &str, fallback_top_output: &str) -> Option<f32> {
+async fn get_app_cpu(app: &AppHandle, device: &str, package: &str, top_output: &str) -> Option<f32> {
     let pid_output = run_adb_shell(app, device, &format!("pidof {}", package)).await;
-    let pid = pid_output.split_whitespace().next().unwrap_or("");
+    
+    let mut clean_pid = "";
+    for line in pid_output.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('*') || trimmed.starts_with("adb server") {
+            continue;
+        }
+        if !trimmed.is_empty() {
+            clean_pid = trimmed.split_whitespace().next().unwrap_or("");
+            break;
+        }
+    }
+    let pid = clean_pid;
+    
+    let mut found_cpu: Option<f32> = None;
     
     if !pid.is_empty() && pid.chars().all(char::is_numeric) {
-        let top_output = run_adb_shell(app, device, &format!("top -n 2 -d 0.5 -p {}", pid)).await;
-        
-        let mut found_cpu: Option<f32> = None;
         for line in top_output.lines().rev() {
             if line.contains(pid) {
                 let parts: Vec<&str> = line.split_whitespace().collect();
@@ -258,23 +280,31 @@ async fn get_app_cpu(app: &AppHandle, device: &str, package: &str, fallback_top_
                 }
             }
         }
-        
-        if let Some(cpu) = found_cpu {
-            return Some(cpu);
-        }
     }
 
-    for line in fallback_top_output.lines() {
-        if line.contains(package) {
-            let trimmed = line.trim();
-            if let Some(percent_str) = trimmed.split('%').next() {
-                if let Ok(val) = percent_str.trim().parse::<f32>() {
-                    return Some(val);
+    if found_cpu.is_none() {
+        let pkg_search = if package.len() > 15 { &package[0..15] } else { package };
+        for line in top_output.lines().rev() {
+            if line.contains(pkg_search) {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                for (i, p) in parts.iter().enumerate() {
+                    if i > 3 && p.len() == 1 && (*p == "S" || *p == "R" || *p == "D" || *p == "Z" || *p == "I" || *p == "T") {
+                        if i + 1 < parts.len() {
+                            if let Ok(cpu) = parts[i + 1].replace("%", "").parse::<f32>() {
+                                found_cpu = Some(cpu);
+                                break;
+                            }
+                        }
+                    }
+                }
+                if found_cpu.is_some() {
+                    break;
                 }
             }
         }
     }
-    None
+
+    Some(found_cpu.unwrap_or(0.0))
 }
 
 async fn get_app_ram(app: &AppHandle, device: &str, package: &str) -> Option<u64> {
