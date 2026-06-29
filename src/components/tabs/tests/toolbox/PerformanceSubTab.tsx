@@ -95,20 +95,20 @@ export function PerformanceSubTab({
         return () => observer.disconnect();
     }, []);
 
-    const formatBytes = (kb: number, showUnit: boolean = true) => {
-        if (!kb || kb === 0) return t('performance.na', 'N/A');
+    const formatBytes = (kb: number | undefined | null, showUnit: boolean = true) => {
+        if (kb === undefined || kb === null || isNaN(kb)) return t('performance.na', 'N/A');
         if (kb > 1024 * 1024) return <>{(kb / (1024 * 1024)).toFixed(1)} {showUnit && <span className="text-sm text-on-surface-variant/80 font-normal">GB</span>}</>;
         if (kb > 1024) return <>{(kb / 1024).toFixed(1)} {showUnit && <span className="text-sm text-on-surface-variant/80 font-normal">MB</span>}</>;
         return <>{kb} {showUnit && <span className="text-sm text-on-surface-variant/80 font-normal">KB</span>}</>;
     };
 
-    const formatRate = (val: number, unit: string, additional?: string) => {
-        if (!val || val === 0) return t('performance.na', 'N/A');
+    const formatRate = (val: number | undefined | null, unit: string, additional?: string) => {
+        if (val === undefined || val === null || isNaN(val)) return t('performance.na', 'N/A');
         return <>{val.toFixed(1)} <span className="text-sm text-on-surface-variant/80 font-normal">{unit} {additional}</span></>;
     };
 
-    const formatFPS = (val: number) => {
-        if (!val || val === 0) return t('performance.na', 'N/A');
+    const formatFPS = (val: number | undefined | null) => {
+        if (val === undefined || val === null || isNaN(val)) return t('performance.na', 'N/A');
         return <>{Math.round(val)} <span className="text-sm text-on-surface-variant/80 font-normal">fps</span></>;
     };
 
