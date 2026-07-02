@@ -713,7 +713,10 @@ export const pt = {
             analyzing: "Analisando logs...",
             not_saving: "Não está salvando em arquivo",
             configure_path: "Configurar Caminho",
-            select_dir_title: "Selecionar Diretório para Logcat"
+            select_dir_title: "Selecionar Diretório para Logcat",
+            options: {
+                clear_before_start: "Limpar logs antes de iniciar (-c)"
+            }
         },
         mapper: {
             title: "Mapeador",

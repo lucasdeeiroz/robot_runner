@@ -15,6 +15,7 @@ import { Select } from "@/components/atoms/Select";
 import { Modal } from "@/components/organisms/Modal";
 import { AiButton } from '@/components/atoms/AiButton';
 import { AiResponse } from "@/components/molecules/AiResponse";
+import { SplitButton } from "@/components/molecules/SplitButton";
 import * as gemini from "@/lib/dashboard/gemini";
 import * as claude from "@/lib/dashboard/claude";
 import * as openai from "@/lib/dashboard/openai";
@@ -34,6 +35,7 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
     const virtuosoRef = useRef<VirtuosoHandle>(null);
     const { settings, updateSetting } = useSettings();
     const [currentDumpFile, setCurrentDumpFile] = useState<string | null>(null);
+    const [clearBeforeStart, setClearBeforeStart] = useState(false);
 
     const handleConfigurePath = async () => {
         const selected = await open({
@@ -200,6 +202,15 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
 
         try {
             setLogs([]); // Clear previous logs for clarity
+
+            if (clearBeforeStart) {
+                try {
+                    await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'logcat', '-c'] });
+                } catch (e) {
+                    console.warn("Failed to clear logcat:", e);
+                }
+            }
+
             await invoke('start_logcat', {
                 device: selectedDevice,
                 filter: activeFilter,
@@ -389,15 +400,23 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
                 }
                 actions={
                     <div className="flex gap-2">
-                        <Button
-                            onClick={isStreaming ? stopLogcat : startLogcat}
-                            variant={isStreaming ? "danger" : "primary"}
-                            size="sm"
+                        <SplitButton
                             disabled={isTestRunning && !allowActionsDuringTest}
-                            leftIcon={isStreaming ? <Square size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
-                        >
-                            {!isNarrow && t(isStreaming ? 'logcat.stop' : 'logcat.start')}
-                        </Button>
+                            variant={isStreaming ? "danger" : "primary"}
+                            primaryAction={{
+                                label: !isNarrow ? t(isStreaming ? 'logcat.stop' : 'logcat.start') : "",
+                                onClick: isStreaming ? stopLogcat : startLogcat,
+                                icon: isStreaming ? <Square size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />
+                            }}
+                            secondaryActions={[
+                                {
+                                    label: t('logcat.options.clear_before_start', 'Clear logs before starting (-c)'),
+                                    type: 'checkbox',
+                                    checked: clearBeforeStart,
+                                    onClick: () => setClearBeforeStart(prev => !prev)
+                                }
+                            ]}
+                        />
                         <AiButton
                             id="logcat_analysis"
                             isLoading={isAiLoading}

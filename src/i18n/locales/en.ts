@@ -713,7 +713,10 @@ export const en = {
             analyzing: "Analyzing logs...",
             not_saving: "Not saving to file",
             configure_path: "Configure Path",
-            select_dir_title: "Select Directory for Logcat"
+            select_dir_title: "Select Directory for Logcat",
+            options: {
+                clear_before_start: "Clear logs before starting (-c)"
+            }
         },
         mapper: {
             title: "Mapper",
