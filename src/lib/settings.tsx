@@ -323,6 +323,7 @@ interface SettingsContextType {
     activeProfileId: string;
     profiles: Profile[];
     updateSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
+    setMultipleSettings: (newSettings: Partial<AppSettings>) => void;
     createProfile: (name: string) => void;
     switchProfile: (id: string) => void;
     renameProfile: (id: string, name: string) => void;
@@ -541,6 +542,39 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             // Sync permissions if paths changed
             if (key === 'paths') {
                 syncWorkspaces(value as Record<string, string>);
+            }
+
+            return newData;
+        });
+    };
+
+    const setMultipleSettings = (newSettings: Partial<AppSettings>) => {
+        setStoreData((currentStoreData) => {
+            const activeId = currentStoreData.activeProfileId;
+            const currentProfile = currentStoreData.profiles[activeId];
+
+            if (!currentProfile) {
+                feedback.toast.error("settings.profile_not_found");
+                return currentStoreData;
+            }
+
+            const updatedSettings = deepMerge(currentProfile.settings, newSettings);
+            const updatedProfile = { ...currentProfile, settings: updatedSettings };
+
+            const newData = {
+                ...currentStoreData,
+                profiles: {
+                    ...currentStoreData.profiles,
+                    [activeId]: updatedProfile
+                }
+            };
+
+            // Fire and forget save to disk
+            saveStore(newData);
+
+            // Sync permissions if paths changed
+            if (newSettings.paths) {
+                syncWorkspaces(newSettings.paths as Record<string, string>);
             }
 
             return newData;
@@ -770,6 +804,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             activeProfileId: storeData.activeProfileId,
             profiles: Object.values(storeData.profiles),
             updateSetting,
+            setMultipleSettings,
             createProfile,
             switchProfile,
             renameProfile,

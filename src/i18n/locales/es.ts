@@ -251,6 +251,10 @@ export const es = {
             }
         },
         common: {
+            keep: "Conservar",
+            keep_all: "Conservar Todo",
+            clear_all: "Borrar Todo",
+
             start: "Iniciar",
             pause: "Pausar",
             reset: "Reiniciar",
@@ -1783,6 +1787,18 @@ export const es = {
             check_error: "Error al buscar actualizaciones"
         },
         onboarding: {
+            error_invalid_json: "Archivo JSON inválido",
+            error_read_file: "Error al leer el archivo",
+            success_import: "Configuraciones importadas con éxito",
+            path_automation_root: "Raíz de Automatización:",
+            path_custom_adb: "Ruta ADB Personalizada:",
+            step_import_title: "Importar Configuraciones",
+            step_import_description: "¿Tienes un archivo settings.json anterior que quieras importar para omitir la configuración manual? Las claves de la API de IA se ignorarán por seguridad.",
+            import_button: "Importar settings.json",
+            skip_import: "No, configurar manualmente",
+            path_warning_title: "Rutas Locales Detectadas",
+            path_warning_description: "El archivo importado contiene rutas locales absolutas. ¿Quieres conservarlas o borrarlas?",
+
             title: "¡Bienvenido a Robot Runner!",
             description: "Vamos a configurar tu perfil para optimizar tu experiencia. Solo tomará un momento.",
             step1_title: "Selecciona tu Idioma",

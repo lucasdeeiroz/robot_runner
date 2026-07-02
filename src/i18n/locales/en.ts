@@ -251,6 +251,10 @@ export const en = {
             }
         },
         common: {
+            keep: "Keep",
+            keep_all: "Keep All",
+            clear_all: "Clear All",
+
             start: "Start",
             pause: "Pause",
             reset: "Reset",
@@ -1772,6 +1776,18 @@ export const en = {
             check_error: "Failed to check for updates"
         },
         onboarding: {
+            error_invalid_json: "Invalid JSON file",
+            error_read_file: "Failed to read file",
+            success_import: "Settings imported successfully",
+            path_automation_root: "Automation Root:",
+            path_custom_adb: "Custom ADB Path:",
+            step_import_title: "Import Settings",
+            step_import_description: "Do you have a previous settings.json file you want to import to skip manual configuration? AI API Keys will be safely ignored.",
+            import_button: "Import settings.json",
+            skip_import: "No, configure manually",
+            path_warning_title: "Local Paths Detected",
+            path_warning_description: "The imported file contains absolute local paths. Do you want to keep them or clear them?",
+
             title: "Welcome to Robot Runner!",
             description: "Let's set up your profile to optimize your experience. This will only take a moment.",
             step1_title: "Select your Language",
