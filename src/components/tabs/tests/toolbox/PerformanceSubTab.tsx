@@ -7,8 +7,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsToolti
 import { useSettings } from "@/lib/settings";
 import { feedback } from "@/lib/feedback";
 import { WarningModal } from "@/components/organisms/WarningModal";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { invoke } from "@tauri-apps/api/core";
+
 import { FileSavedFeedback } from "@/components/molecules/FileSavedFeedback";
 import { Section } from "@/components/organisms/Section";
 import { DeviceStats } from "@/hooks/usePerformanceRecorder";
@@ -37,6 +36,15 @@ interface PerformanceSubTabProps {
     forceEnable?: boolean;
     setForceEnable?: (val: boolean) => void;
     onNavigate?: (page: string) => void;
+
+    // Stopwatch State from hook
+    laps?: { keyword: string, timestamp: number, deltaMs: number }[];
+    setLaps?: (val: any) => void;
+    deltaUnit?: 'ms' | 's' | 'min' | 'h';
+    setDeltaUnit?: (val: any) => void;
+    isStopwatchRunning?: boolean;
+    handleRemoveLap?: (index: number) => void;
+    handleToggleStopwatch?: () => void;
 }
 
 export function PerformanceSubTab({
@@ -59,7 +67,15 @@ export function PerformanceSubTab({
     isLoading = false,
     forceEnable = false,
     setForceEnable,
-    onNavigate
+    onNavigate,
+
+    laps = [],
+    setLaps,
+    deltaUnit = 'ms',
+    setDeltaUnit,
+    isStopwatchRunning = false,
+    handleRemoveLap,
+    handleToggleStopwatch
 }: PerformanceSubTabProps) {
     const { t } = useTranslation();
     const { settings, updateSetting } = useSettings();
@@ -67,105 +83,6 @@ export function PerformanceSubTab({
 
     const keywords = settings.logcatKeywords || [];
     const [newKeyword, setNewKeyword] = useState('');
-    const [laps, setLaps] = useState<{ keyword: string, timestamp: number, deltaMs: number }[]>([]);
-    const [deltaUnit, setDeltaUnit] = useState<'ms' | 's' | 'min' | 'h'>('ms');
-
-    const handleRemoveLap = (index: number) => {
-        setLaps(prev => {
-            const newLaps = prev.filter((_, i) => i !== index);
-            return newLaps.map((lap, i) => {
-                const deltaMs = i > 0 ? lap.timestamp - newLaps[i - 1].timestamp : 0;
-                return { ...lap, deltaMs };
-            });
-        });
-    };
-
-    const formatDelta = (deltaMs: number, unit: 'ms' | 's' | 'min' | 'h') => {
-        if (deltaMs === 0) return `+0${unit}`;
-        switch (unit) {
-            case 'ms': return `+${deltaMs}ms`;
-            case 's': return `+${(deltaMs / 1000).toFixed(3)}s`;
-            case 'min': return `+${(deltaMs / 60000).toFixed(3)}min`;
-            case 'h': return `+${(deltaMs / 3600000).toFixed(3)}h`;
-            default: return `+${deltaMs}ms`;
-        }
-    };
-
-    const [isStopwatchRunning, setIsStopwatchRunning] = useState(false);
-
-    const handleToggleStopwatch = async () => {
-        if (isStopwatchRunning) {
-            try {
-                await invoke('stop_logcat', { device: selectedDevice });
-            } catch (e) {
-                console.error(e);
-            }
-            setIsStopwatchRunning(false);
-        } else {
-            setLaps([]);
-            try {
-                // Limpa o buffer do logcat no device
-                await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'logcat', '-c'] });
-
-                // Inicia o logcat através do backend otimizado (logcat.rs)
-                await invoke('start_logcat', {
-                    device: selectedDevice,
-                    filter: selectedPackage || null,
-                    level: "V",
-                    outputFile: null
-                });
-                setIsStopwatchRunning(true);
-            } catch (e: any) {
-                // Se já estiver rodando, não é um erro fatal, apenas assumimos que está rodando.
-                if (typeof e === 'string' && e.includes('already running')) {
-                    setIsStopwatchRunning(true);
-                } else {
-                    console.error(e);
-                    feedback.toast.error(String(e));
-                }
-            }
-        }
-    };
-
-    useEffect(() => {
-        let unlisten: UnlistenFn | undefined;
-        let isSubscribed = true;
-
-        if (isStopwatchRunning && keywords.length > 0 && selectedDevice) {
-            listen<{ device: string, lines: string[] }>('logcat-data', (event) => {
-                if (event.payload.device === selectedDevice) {
-                    const lines = event.payload.lines;
-                    for (const line of lines) {
-                        for (const kw of keywords) {
-                            if (line.includes(kw)) {
-                                setLaps(prev => {
-                                    const now = Date.now();
-                                    const deltaMs = prev.length > 0 ? now - prev[prev.length - 1].timestamp : 0;
-                                    return [...prev, { keyword: kw, timestamp: now, deltaMs }];
-                                });
-                            }
-                        }
-                    }
-                }
-            }).then(un => {
-                if (isSubscribed) unlisten = un;
-                else un();
-            });
-        }
-
-        return () => {
-            isSubscribed = false;
-            if (unlisten) unlisten();
-        };
-    }, [isStopwatchRunning, keywords, selectedDevice]);
-
-    useEffect(() => {
-        return () => {
-            if (isStopwatchRunning) {
-                invoke('stop_logcat', { device: selectedDevice }).catch(console.error);
-            }
-        };
-    }, [isStopwatchRunning]);
 
     const handleConfigurePath = async () => {
         const selected = await open({
@@ -239,8 +156,19 @@ export function PerformanceSubTab({
         return <div className="p-8 text-center text-on-surface/80">{t('performance.select_device')}</div>;
     }
 
+    const formatDelta = (deltaMs: number, unit: 'ms' | 's' | 'min' | 'h') => {
+        if (deltaMs === 0) return `+0${unit}`;
+        switch (unit) {
+            case 'ms': return `+${deltaMs}ms`;
+            case 's': return `+${(deltaMs / 1000).toFixed(3)}s`;
+            case 'min': return `+${(deltaMs / 60000).toFixed(3)}min`;
+            case 'h': return `+${(deltaMs / 3600000).toFixed(3)}h`;
+            default: return `+${deltaMs}ms`;
+        }
+    };
+
     return (
-        <div ref={containerRef} className="flex-1 min-h-[25rem] flex flex-col p-4 overflow-y-auto">
+        <div ref={containerRef} className="h-full flex-1 min-h-0 flex flex-col p-4 overflow-y-auto">
             <Section
                 title={t('performance.title')}
                 icon={Activity}
@@ -621,7 +549,7 @@ export function PerformanceSubTab({
                                                 <span className="text-sm font-medium opacity-80">{t('performance.stopwatch.laps', 'Checkpoints')}</span>
                                                 <Select
                                                     value={deltaUnit}
-                                                    onChange={(e) => setDeltaUnit(e.target.value as any)}
+                                                    onChange={(e) => setDeltaUnit?.(e.target.value as any)}
                                                     options={[
                                                         { label: 'ms', value: 'ms' },
                                                         { label: 's', value: 's' },
@@ -632,7 +560,7 @@ export function PerformanceSubTab({
                                                 />
                                             </div>
                                             {laps.length > 0 && (
-                                                <Button onClick={() => setLaps([])} variant="ghost" size="sm" className="h-6 text-xs text-error/80 hover:bg-error/10">
+                                                <Button onClick={() => setLaps?.([])} variant="ghost" size="sm" className="h-6 text-xs text-error/80 hover:bg-error/10">
                                                     {t('common.clear', 'Clear')}
                                                 </Button>
                                             )}
@@ -662,7 +590,7 @@ export function PerformanceSubTab({
                                                                 <td className="px-3 py-2 font-mono text-success">{formatDelta(lap.deltaMs, deltaUnit)}</td>
                                                                 <td className="px-3 py-2 text-right">
                                                                     <Button
-                                                                        onClick={() => handleRemoveLap(i)}
+                                                                        onClick={() => handleRemoveLap?.(i)}
                                                                         variant="ghost"
                                                                         size="sm"
                                                                         className="h-6 w-6 p-0 text-error/50 hover:text-error hover:bg-error/10 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
