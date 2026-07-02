@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { open } from "@tauri-apps/plugin-dialog";
-import { AlertTriangle, Activity, Cpu, Battery, CircuitBoard, Play, Square, Package as PackageIcon, Eye, RefreshCw, Zap, FolderSearch, Settings } from "lucide-react";
+import { AlertTriangle, Activity, Cpu, Battery, CircuitBoard, Play, Square, Package as PackageIcon, Eye, RefreshCw, Zap, FolderSearch, Settings, Trash2 } from "lucide-react";
 import clsx from "clsx";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 import { useSettings } from "@/lib/settings";
@@ -68,6 +68,28 @@ export function PerformanceSubTab({
     const keywords = settings.logcatKeywords || [];
     const [newKeyword, setNewKeyword] = useState('');
     const [laps, setLaps] = useState<{ keyword: string, timestamp: number, deltaMs: number }[]>([]);
+    const [deltaUnit, setDeltaUnit] = useState<'ms' | 's' | 'min' | 'h'>('ms');
+
+    const handleRemoveLap = (index: number) => {
+        setLaps(prev => {
+            const newLaps = prev.filter((_, i) => i !== index);
+            return newLaps.map((lap, i) => {
+                const deltaMs = i > 0 ? lap.timestamp - newLaps[i - 1].timestamp : 0;
+                return { ...lap, deltaMs };
+            });
+        });
+    };
+
+    const formatDelta = (deltaMs: number, unit: 'ms' | 's' | 'min' | 'h') => {
+        if (deltaMs === 0) return `+0${unit}`;
+        switch (unit) {
+            case 'ms': return `+${deltaMs}ms`;
+            case 's': return `+${(deltaMs / 1000).toFixed(3)}s`;
+            case 'min': return `+${(deltaMs / 60000).toFixed(3)}min`;
+            case 'h': return `+${(deltaMs / 3600000).toFixed(3)}h`;
+            default: return `+${deltaMs}ms`;
+        }
+    };
 
     const [isStopwatchRunning, setIsStopwatchRunning] = useState(false);
 
@@ -595,7 +617,20 @@ export function PerformanceSubTab({
 
                                     <div className="mt-4">
                                         <div className="flex justify-between items-center mb-2">
-                                            <span className="text-sm font-medium opacity-80">{t('performance.stopwatch.laps', 'Checkpoints')}</span>
+                                            <div className="flex items-center gap-4">
+                                                <span className="text-sm font-medium opacity-80">{t('performance.stopwatch.laps', 'Checkpoints')}</span>
+                                                <Select
+                                                    value={deltaUnit}
+                                                    onChange={(e) => setDeltaUnit(e.target.value as any)}
+                                                    options={[
+                                                        { label: 'ms', value: 'ms' },
+                                                        { label: 's', value: 's' },
+                                                        { label: 'min', value: 'min' },
+                                                        { label: 'h', value: 'h' },
+                                                    ]}
+                                                    containerClassName="w-24"
+                                                />
+                                            </div>
                                             {laps.length > 0 && (
                                                 <Button onClick={() => setLaps([])} variant="ghost" size="sm" className="h-6 text-xs text-error/80 hover:bg-error/10">
                                                     {t('common.clear', 'Clear')}
@@ -611,19 +646,31 @@ export function PerformanceSubTab({
                                                 <table className="w-full text-xs text-left">
                                                     <thead className="bg-surface-variant/30 sticky top-0">
                                                         <tr>
-                                                            <th className="px-3 py-2 font-medium opacity-70">#</th>
+                                                            <th className="px-3 py-2 font-medium opacity-70 w-10">#</th>
                                                             <th className="px-3 py-2 font-medium opacity-70">{t('performance.stopwatch.keyword', 'Keyword')}</th>
                                                             <th className="px-3 py-2 font-medium opacity-70">{t('performance.stopwatch.time', 'Time')}</th>
                                                             <th className="px-3 py-2 font-medium opacity-70">{t('performance.stopwatch.delta', 'Delta')}</th>
+                                                            <th className="px-3 py-2 font-medium opacity-70 w-10"></th>
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-outline-variant/20">
                                                         {laps.map((lap, i) => (
-                                                            <tr key={i} className="hover:bg-surface-variant/10">
+                                                            <tr key={i} className="hover:bg-surface-variant/10 group">
                                                                 <td className="px-3 py-2 opacity-50">{i + 1}</td>
                                                                 <td className="px-3 py-2 font-mono">{lap.keyword}</td>
                                                                 <td className="px-3 py-2 opacity-80">{new Date(lap.timestamp).toLocaleTimeString()}</td>
-                                                                <td className="px-3 py-2 font-mono text-success">+{lap.deltaMs}ms</td>
+                                                                <td className="px-3 py-2 font-mono text-success">{formatDelta(lap.deltaMs, deltaUnit)}</td>
+                                                                <td className="px-3 py-2 text-right">
+                                                                    <Button
+                                                                        onClick={() => handleRemoveLap(i)}
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        className="h-6 w-6 p-0 text-error/50 hover:text-error hover:bg-error/10 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                        title={t('common.remove', 'Remove')}
+                                                                    >
+                                                                        <Trash2 size={12} />
+                                                                    </Button>
+                                                                </td>
                                                             </tr>
                                                         ))}
                                                     </tbody>
