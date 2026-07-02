@@ -260,7 +260,7 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
         }
     };
 
-    const handleAiAnalyze = async (e: any, customPrompt?: string) => {
+    const handleAiAnalyze = async (_e: any, customPrompt?: string) => {
         if (logs.length === 0 || isAiLoading) return;
 
         const currentLang = i18n.language || 'en';
