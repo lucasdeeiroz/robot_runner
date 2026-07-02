@@ -7,7 +7,8 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsToolti
 import { useSettings } from "@/lib/settings";
 import { feedback } from "@/lib/feedback";
 import { WarningModal } from "@/components/organisms/WarningModal";
-
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
 import { FileSavedFeedback } from "@/components/molecules/FileSavedFeedback";
 import { Section } from "@/components/organisms/Section";
 import { DeviceStats } from "@/hooks/usePerformanceRecorder";
@@ -63,6 +64,86 @@ export function PerformanceSubTab({
     const { t } = useTranslation();
     const { settings, updateSetting } = useSettings();
     const [showHighImpactWarning, setShowHighImpactWarning] = useState(false);
+
+    const [keywords, setKeywords] = useState<string[]>([]);
+    const [newKeyword, setNewKeyword] = useState('');
+    const [laps, setLaps] = useState<{ keyword: string, timestamp: number, deltaMs: number }[]>([]);
+
+    const [isStopwatchRunning, setIsStopwatchRunning] = useState(false);
+
+    const handleToggleStopwatch = async () => {
+        if (isStopwatchRunning) {
+            try {
+                await invoke('stop_logcat', { device: selectedDevice });
+            } catch (e) {
+                console.error(e);
+            }
+            setIsStopwatchRunning(false);
+        } else {
+            setLaps([]);
+            try {
+                // Limpa o buffer do logcat no device
+                await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'logcat', '-c'] });
+
+                // Inicia o logcat através do backend otimizado (logcat.rs)
+                await invoke('start_logcat', {
+                    device: selectedDevice,
+                    filter: selectedPackage || null,
+                    level: "V",
+                    outputFile: null
+                });
+                setIsStopwatchRunning(true);
+            } catch (e: any) {
+                // Se já estiver rodando, não é um erro fatal, apenas assumimos que está rodando.
+                if (typeof e === 'string' && e.includes('already running')) {
+                    setIsStopwatchRunning(true);
+                } else {
+                    console.error(e);
+                    feedback.toast.error(String(e));
+                }
+            }
+        }
+    };
+
+    useEffect(() => {
+        let unlisten: UnlistenFn | undefined;
+        let isSubscribed = true;
+
+        if (isStopwatchRunning && keywords.length > 0 && selectedDevice) {
+            listen<{ device: string, lines: string[] }>('logcat-data', (event) => {
+                if (event.payload.device === selectedDevice) {
+                    const lines = event.payload.lines;
+                    for (const line of lines) {
+                        for (const kw of keywords) {
+                            if (line.includes(kw)) {
+                                setLaps(prev => {
+                                    const now = Date.now();
+                                    const deltaMs = prev.length > 0 ? now - prev[prev.length - 1].timestamp : 0;
+                                    return [...prev, { keyword: kw, timestamp: now, deltaMs }];
+                                });
+                            }
+                        }
+                    }
+                }
+            }).then(un => {
+                if (isSubscribed) unlisten = un;
+                else un();
+            });
+        }
+
+        return () => {
+            isSubscribed = false;
+            if (unlisten) unlisten();
+        };
+    }, [isStopwatchRunning, keywords, selectedDevice]);
+
+    useEffect(() => {
+        return () => {
+            if (isStopwatchRunning) {
+                invoke('stop_logcat', { device: selectedDevice }).catch(console.error);
+            }
+        };
+    }, [isStopwatchRunning]);
 
     const handleConfigurePath = async () => {
         const selected = await open({
@@ -379,7 +460,7 @@ export function PerformanceSubTab({
                                                     <YAxis yAxisId="left" stroke="currentColor" className="text-[10px] opacity-50" tickFormatter={(val) => (val / 1024).toFixed(0)} />
                                                     <YAxis yAxisId="right" orientation="right" stroke="currentColor" className="text-[10px] opacity-50" domain={[0, 100]} tickFormatter={(val) => `${val}%`} />
                                                     <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-10" vertical={false} />
-                                                    <RechartsTooltip 
+                                                    <RechartsTooltip
                                                         contentStyle={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-outline-variant)', borderRadius: '8px', fontSize: '12px', color: 'var(--color-on-surface)' }}
                                                         labelFormatter={(label) => new Date(label).toLocaleTimeString()}
                                                         formatter={(value: any, name: any) => {
@@ -420,7 +501,7 @@ export function PerformanceSubTab({
                                                         <YAxis yAxisId="left" stroke="currentColor" className="text-[10px] opacity-50" tickFormatter={(val) => (val / 1024).toFixed(0)} />
                                                         <YAxis yAxisId="right" orientation="right" stroke="currentColor" className="text-[10px] opacity-50" domain={[0, 120]} />
                                                         <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-10" vertical={false} />
-                                                        <RechartsTooltip 
+                                                        <RechartsTooltip
                                                             contentStyle={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-outline-variant)', borderRadius: '8px', fontSize: '12px', color: 'var(--color-on-surface)' }}
                                                             labelFormatter={(label) => new Date(label).toLocaleTimeString()}
                                                             formatter={(value: any, name: any) => {
@@ -441,6 +522,118 @@ export function PerformanceSubTab({
                                 </div>
                             </div>
                         )}
+
+                        {/* Logcat Stopwatch Section */}
+                        <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            <h3 className="text-xs font-semibold text-on-surface-variant/80 uppercase tracking-wider mb-3 ml-1 flex items-center gap-2 justify-between">
+                                <span className="flex items-center gap-2">
+                                    <Activity size={14} /> {t('performance.stopwatch.title', 'Logcat Stopwatch')}
+                                </span>
+                                <Button
+                                    onClick={handleToggleStopwatch}
+                                    variant={isStopwatchRunning ? "danger" : "primary"}
+                                    size="sm"
+                                    className="h-7 text-xs px-3"
+                                >
+                                    {isStopwatchRunning
+                                        ? (
+                                            <>
+                                                <Square size={12} className="mr-1" />
+                                                {t('performance.stopwatch.stop', 'Stop')}
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Play size={12} className="mr-1" />
+                                                {t('performance.stopwatch.start', 'Start')}
+                                            </>
+                                        )
+                                    }
+                                </Button>
+                            </h3>
+                            <Card title={t('performance.stopwatch.card_title', 'Performance Checkpoints')} icon={<Zap size={20} className="text-yellow-500" />}>
+                                <div className="space-y-4 mt-2">
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            placeholder={t('performance.stopwatch.placeholder', 'Add logcat keyword (e.g. ActivityResume)')}
+                                            value={newKeyword}
+                                            onChange={e => setNewKeyword(e.target.value)}
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter' && newKeyword.trim()) {
+                                                    setKeywords(prev => [...new Set([...prev, newKeyword.trim()])]);
+                                                    setNewKeyword('');
+                                                }
+                                            }}
+                                            className="flex-1 bg-surface border border-outline-variant rounded px-3 py-1.5 text-sm text-on-surface outline-none focus:border-primary/50"
+                                        />
+                                        <Button
+                                            onClick={() => {
+                                                if (newKeyword.trim()) {
+                                                    setKeywords(prev => [...new Set([...prev, newKeyword.trim()])]);
+                                                    setNewKeyword('');
+                                                }
+                                            }}
+                                            variant="secondary"
+                                            size="sm"
+                                        >
+                                            {t('common.add', 'Add')}
+                                        </Button>
+                                    </div>
+
+                                    {keywords.length > 0 && (
+                                        <div className="flex flex-wrap gap-2">
+                                            {keywords.map(kw => (
+                                                <div key={kw} className="bg-surface-variant/50 border border-outline-variant/30 rounded-full px-3 py-1 text-xs flex items-center gap-2">
+                                                    <span className="font-mono">{kw}</span>
+                                                    <button onClick={() => setKeywords(prev => prev.filter(k => k !== kw))} className="hover:text-error transition-colors">
+                                                        ×
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    <div className="mt-4">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-sm font-medium opacity-80">{t('performance.stopwatch.laps', 'Checkpoints')}</span>
+                                            {laps.length > 0 && (
+                                                <Button onClick={() => setLaps([])} variant="ghost" size="sm" className="h-6 text-xs text-error/80 hover:bg-error/10">
+                                                    {t('common.clear', 'Clear')}
+                                                </Button>
+                                            )}
+                                        </div>
+                                        {laps.length === 0 ? (
+                                            <div className="text-center p-4 border border-dashed border-outline-variant/30 rounded text-xs opacity-50">
+                                                {t('performance.stopwatch.waiting', 'Waiting for keywords in Logcat... (Make sure Logcat is running)')}
+                                            </div>
+                                        ) : (
+                                            <div className="max-h-60 overflow-y-auto border border-outline-variant/30 rounded custom-scrollbar">
+                                                <table className="w-full text-xs text-left">
+                                                    <thead className="bg-surface-variant/30 sticky top-0">
+                                                        <tr>
+                                                            <th className="px-3 py-2 font-medium opacity-70">#</th>
+                                                            <th className="px-3 py-2 font-medium opacity-70">{t('performance.stopwatch.keyword', 'Keyword')}</th>
+                                                            <th className="px-3 py-2 font-medium opacity-70">{t('performance.stopwatch.time', 'Time')}</th>
+                                                            <th className="px-3 py-2 font-medium opacity-70">{t('performance.stopwatch.delta', 'Delta')}</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-outline-variant/20">
+                                                        {laps.map((lap, i) => (
+                                                            <tr key={i} className="hover:bg-surface-variant/10">
+                                                                <td className="px-3 py-2 opacity-50">{i + 1}</td>
+                                                                <td className="px-3 py-2 font-mono">{lap.keyword}</td>
+                                                                <td className="px-3 py-2 opacity-80">{new Date(lap.timestamp).toLocaleTimeString()}</td>
+                                                                <td className="px-3 py-2 font-mono text-success">+{lap.deltaMs}ms</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </Card>
+                        </div>
                     </div>
                 )}
             </Section>
