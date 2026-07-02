@@ -60,6 +60,7 @@ export interface AppSettings {
         automationRoot: string;
         mappings?: string;
     };
+    logcatKeywords?: string[];
 
     // Tools
     tools: {
@@ -152,6 +153,7 @@ const getDefaultSettings = (): AppSettings => ({
         recordings: '',
         mappings: '',
     },
+    logcatKeywords: [],
     tools: {
         appiumArgs: getRemoteString('default_appium_args') || '--relaxed-security',
         scrcpyArgs: getRemoteString('default_scrcpy_args') || '-m 1024 -b 2M --max-fps=30 --no-audio --stay-awake',

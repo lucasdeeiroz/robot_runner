@@ -65,7 +65,7 @@ export function PerformanceSubTab({
     const { settings, updateSetting } = useSettings();
     const [showHighImpactWarning, setShowHighImpactWarning] = useState(false);
 
-    const [keywords, setKeywords] = useState<string[]>([]);
+    const keywords = settings.logcatKeywords || [];
     const [newKeyword, setNewKeyword] = useState('');
     const [laps, setLaps] = useState<{ keyword: string, timestamp: number, deltaMs: number }[]>([]);
 
@@ -560,7 +560,7 @@ export function PerformanceSubTab({
                                             onChange={e => setNewKeyword(e.target.value)}
                                             onKeyDown={e => {
                                                 if (e.key === 'Enter' && newKeyword.trim()) {
-                                                    setKeywords(prev => [...new Set([...prev, newKeyword.trim()])]);
+                                                    updateSetting('logcatKeywords', [...new Set([...keywords, newKeyword.trim()])]);
                                                     setNewKeyword('');
                                                 }
                                             }}
@@ -569,7 +569,7 @@ export function PerformanceSubTab({
                                         <Button
                                             onClick={() => {
                                                 if (newKeyword.trim()) {
-                                                    setKeywords(prev => [...new Set([...prev, newKeyword.trim()])]);
+                                                    updateSetting('logcatKeywords', [...new Set([...keywords, newKeyword.trim()])]);
                                                     setNewKeyword('');
                                                 }
                                             }}
@@ -585,7 +585,7 @@ export function PerformanceSubTab({
                                             {keywords.map(kw => (
                                                 <div key={kw} className="bg-surface-variant/50 border border-outline-variant/30 rounded-full px-3 py-1 text-xs flex items-center gap-2">
                                                     <span className="font-mono">{kw}</span>
-                                                    <button onClick={() => setKeywords(prev => prev.filter(k => k !== kw))} className="hover:text-error transition-colors">
+                                                    <button onClick={() => updateSetting('logcatKeywords', keywords.filter(k => k !== kw))} className="hover:text-error transition-colors">
                                                         ×
                                                     </button>
                                                 </div>
