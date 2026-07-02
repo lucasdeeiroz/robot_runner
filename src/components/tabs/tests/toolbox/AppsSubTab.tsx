@@ -384,9 +384,9 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
                                         )}
                                     </div>
                                     <div className="text-xs text-on-surface-variant/80 truncate font-mono opacity-70 flex items-center gap-2">
-                                        <span>{pkg.name}</span>
-                                        <span className="text-outline-variant px-1">•</span>
-                                        <span data-tooltip={String(pkg.path)} data-position="left" className="truncate max-w-[150px] cursor-help hover:text-on-surface/80 transition-colors">
+                                        <span className="shrink-0 truncate max-w-[50%]">{pkg.name}</span>
+                                        <span className="text-outline-variant px-1 shrink-0">•</span>
+                                        <span data-tooltip={String(pkg.path)} data-position="left" className="truncate cursor-help hover:text-on-surface/80 transition-colors">
                                             {pkg.path}
                                         </span>
                                     </div>
