@@ -49,6 +49,8 @@ macro_rules! generate_robot_runner_handler {
             crate::adb::logcat::get_logcat_details,
             crate::adb::logcat::check_ui_change,
             crate::adb::stats::get_device_stats,
+            crate::adb::stats::start_performance_stream,
+            crate::adb::stats::stop_performance_stream,
             crate::adb::scrcpy::open_scrcpy,
             crate::adb::media::save_screenshot,
             crate::adb::media::start_screen_recording,

@@ -1,21 +1,25 @@
 use crate::cmd_utils::{new_tokio_command, get_adb_program};
 use serde::Serialize;
-use tauri::AppHandle;
+use tauri::{AppHandle, State, Emitter};
 use once_cell::sync::Lazy;
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use std::time::Instant;
 use std::collections::HashMap;
 
 static FPS_CACHE: Lazy<Mutex<HashMap<String, (u64, Instant)>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
-#[derive(Debug, Serialize, Default)]
+pub struct PerformanceState(pub Mutex<HashMap<String, Arc<AtomicBool>>>);
+
+#[derive(Debug, Serialize, Default, Clone)]
 pub struct AppStats {
     pub cpu_usage: f32, // Percentage
     pub ram_used: u64,  // KB
     pub fps: u32,       // Frames per second
 }
 
-#[derive(Debug, Serialize, Default)]
+#[derive(Debug, Serialize, Default, Clone)]
 pub struct DeviceStats {
     pub cpu_usage: f32,
     pub ram_used: u64,
@@ -27,18 +31,86 @@ pub struct DeviceStats {
     pub screen_state: Option<String>,
 }
 
+#[derive(Debug, Serialize, Clone)]
+pub struct DeviceStatsPayload {
+    pub device: String,
+    pub stats: DeviceStats,
+}
+
+#[tauri::command]
+pub async fn start_performance_stream(
+    app: AppHandle,
+    state: State<'_, PerformanceState>,
+    device: String,
+    package: Option<String>,
+    interval_ms: u64,
+) -> Result<(), String> {
+    let mut map = state.0.lock().map_err(|e| e.to_string())?;
+
+    // If there is already a stream for this device, stop it first
+    if let Some(flag) = map.get(&device) {
+        flag.store(true, Ordering::Relaxed);
+    }
+
+    let cancel_flag = Arc::new(AtomicBool::new(false));
+    map.insert(device.clone(), cancel_flag.clone());
+
+    let app_clone = app.clone();
+    let device_clone = device.clone();
+
+    tokio::spawn(async move {
+        while !cancel_flag.load(Ordering::Relaxed) {
+            match get_device_stats_internal(&app_clone, &device_clone, package.clone()).await {
+                Ok(stats) => {
+                    let payload = DeviceStatsPayload {
+                        device: device_clone.clone(),
+                        stats,
+                    };
+                    let _ = app_clone.emit("device-performance", payload);
+                }
+                Err(e) => {
+                    println!("Error getting device stats: {}", e);
+                }
+            }
+            tokio::time::sleep(Duration::from_millis(interval_ms)).await;
+        }
+    });
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn stop_performance_stream(
+    state: State<'_, PerformanceState>,
+    device: String,
+) -> Result<(), String> {
+    let mut map = state.0.lock().map_err(|e| e.to_string())?;
+    if let Some(flag) = map.remove(&device) {
+        flag.store(true, Ordering::Relaxed);
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn get_device_stats(
     app: AppHandle,
     device: String,
     package: Option<String>,
 ) -> Result<DeviceStats, String> {
+    get_device_stats_internal(&app, &device, package).await
+}
+
+async fn get_device_stats_internal(
+    app: &AppHandle,
+    device: &str,
+    package: Option<String>,
+) -> Result<DeviceStats, String> {
     // 1. Prepare async tasks for base device stats
-    let battery_task = run_adb_shell(&app, &device, "dumpsys battery");
-    let meminfo_task = run_adb_shell(&app, &device, "cat /proc/meminfo");
-    let top_task = run_adb_shell(&app, &device, "dumpsys cpuinfo");
-    let activity_task = run_adb_shell(&app, &device, "dumpsys activity top");
-    let power_task = run_adb_shell(&app, &device, "dumpsys power");
+    let battery_task = run_adb_shell(app, device, "dumpsys battery");
+    let meminfo_task = run_adb_shell(app, device, "cat /proc/meminfo");
+    let top_task = run_adb_shell(app, device, "dumpsys cpuinfo");
+    let activity_task = run_adb_shell(app, device, "dumpsys activity top");
+    let power_task = run_adb_shell(app, device, "dumpsys power");
 
     // Start these in parallel
     let (bat_output, mem_output, top_output, act_output, pwr_output) = tokio::join!(battery_task, meminfo_task, top_task, activity_task, power_task);
@@ -53,9 +125,9 @@ pub async fn get_device_stats(
     let mut app_stats = None;
     if let Some(pkg) = package {
         if !pkg.is_empty() {
-            let ram_task = get_app_ram(&app, &device, &pkg);
-            let fps_task = get_app_fps(&app, &device, &pkg);
-            let cpu_task = get_app_cpu(&app, &device, &pkg, &top_output);
+            let ram_task = get_app_ram(app, device, &pkg);
+            let fps_task = get_app_fps(app, device, &pkg);
+            let cpu_task = get_app_cpu(app, device, &pkg, &top_output);
 
             let (app_ram_res, app_fps_res, app_cpu_res) = tokio::join!(ram_task, fps_task, cpu_task);
 

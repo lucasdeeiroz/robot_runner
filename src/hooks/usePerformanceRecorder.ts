@@ -50,12 +50,11 @@ export function usePerformanceRecorder(
         settingPathKey: 'logcat' // As requested: save to logcat directory
     });
 
-    // Use a ref to always call the latest fetchStats function and avoid stale closures
     const fetchStatsRef = useRef<(() => Promise<void>) | null>(null);
 
+    // Legacy fetch logic (kept as fallback or manual trigger if needed, though replaced mostly by stream)
     const fetchStats = async () => {
-        if (isLoading) return; // Prevent stacking requests
-
+        if (isLoading) return;
         setIsLoading(true);
         try {
             const data = await invoke<DeviceStats>('get_device_stats', {
@@ -70,7 +69,7 @@ export function usePerformanceRecorder(
             });
             setError(null);
         } catch (e) {
-            if (!isTestRunning) { // Suppress errors during tests to avoid spamming the UI if ADB is busy
+            if (!isTestRunning) {
                 feedback.toast.error("performance.fetch_error", e);
             }
             setError(t('performance.error'));
@@ -79,42 +78,68 @@ export function usePerformanceRecorder(
         }
     };
 
-    // Keep the ref updated with the latest fetchStats
     useEffect(() => {
         fetchStatsRef.current = fetchStats;
     }, [fetchStats]);
 
-    // Fetch Stats Loop
+    // Streaming Logic
     useEffect(() => {
-        let interval: NodeJS.Timeout;
+        let unlisten: (() => void) | undefined;
+        let isSubscribed = true;
 
-        // Condition to fetch data:
-        // 1. Device selected AND
-        // 2. (Auto-refresh + Active Screen OR Recording) AND
-        // 3. (Not a test OR allowActionsDuringTest OR forceEnable)
         const canUpdateDuringTest = allowActionsDuringTest || forceEnable;
         const shouldUpdate = selectedDevice &&
             ((autoRefresh && isActive) || isRecording) &&
             (!isTestRunning || canUpdateDuringTest);
 
-        // Slow down polling significantly during tests if forced to reduce impact
         const pollInterval = (isTestRunning && forceEnable) ? 5000 : 2000;
 
         if (shouldUpdate) {
+            // First fetch immediately for responsive UI
             if (fetchStatsRef.current) fetchStatsRef.current();
-            interval = setInterval(() => {
-                if (fetchStatsRef.current) fetchStatsRef.current();
-            }, pollInterval);
+
+            // Start the background stream in Rust
+            invoke('start_performance_stream', {
+                device: selectedDevice,
+                package: selectedPackage || null,
+                intervalMs: pollInterval
+            }).catch(e => {
+                console.error("Failed to start performance stream", e);
+            });
+
+            // Listen to stream
+            import('@tauri-apps/api/event').then(({ listen }) => {
+                listen<{ device: string, stats: DeviceStats }>('device-performance', (event) => {
+                    if (event.payload.device === selectedDevice && isSubscribed) {
+                        const data = event.payload.stats;
+                        setStats(data);
+                        setHistory(prev => {
+                            const newHistory = [...prev, { ...data, timestamp: Date.now() }];
+                            if (newHistory.length > 60) return newHistory.slice(newHistory.length - 60);
+                            return newHistory;
+                        });
+                        setError(null);
+                    }
+                }).then(un => {
+                    if (isSubscribed) unlisten = un;
+                    else un();
+                });
+            });
+
         } else if (isTestRunning && !canUpdateDuringTest && stats) {
-            // Clear stats and error if we are paused to show the correct UI
             setStats(null);
             setError(null);
         }
 
         return () => {
-            if (interval) clearInterval(interval);
+            isSubscribed = false;
+            if (unlisten) unlisten();
+            if (selectedDevice) {
+                invoke('stop_performance_stream', { device: selectedDevice }).catch(console.error);
+            }
         };
     }, [selectedDevice, autoRefresh, selectedPackage, isActive, isRecording, isTestRunning, allowActionsDuringTest, forceEnable]);
+
 
 
     const recordedLinesRef = useRef<string[]>([]);
