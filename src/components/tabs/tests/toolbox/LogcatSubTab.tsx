@@ -260,7 +260,7 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
         }
     };
 
-    const handleAiAnalyze = async () => {
+    const handleAiAnalyze = async (e: any, customPrompt?: string) => {
         if (logs.length === 0 || isAiLoading) return;
 
         const currentLang = i18n.language || 'en';
@@ -270,7 +270,13 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
         setAiResult(null);
 
         const lastLogs = logs.slice(-100).join('\n'); // Take last 100 lines for context
-        const prompt = `Analyze the following Android Logcat output. Identify potential errors, crashes, or performance bottlenecks. Provide a summary and then a detailed analysis. Respond in ${currentLang}.\n\nLOGS:\n${lastLogs}`;
+        
+        let promptStr = `Analyze the following Android Logcat output. Identify potential errors, crashes, or performance bottlenecks. Provide a summary and then a detailed analysis. Respond in ${currentLang}.`;
+        if (customPrompt) {
+            promptStr = `You have a specific instruction from the user:\n"${customPrompt}"\n\nAnalyze the following Android Logcat output based on the user instruction. Respond in ${currentLang}.`;
+        }
+        
+        const prompt = `${promptStr}\n\nLOGS:\n${lastLogs}`;
         const systemInstruction = `You are an expert Android Developer and QA Engineer. Analyze logcat snippets precisely. Always provide your response in ${currentLang}. Use the exact prefix "Summary: " followed by an EXTREMELY CONCISE one-line summary (MAXIMUM 15 WORDS).`;
 
         try {
