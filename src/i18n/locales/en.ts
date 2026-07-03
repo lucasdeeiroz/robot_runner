@@ -254,6 +254,7 @@ export const en = {
             keep: "Keep",
             keep_all: "Keep All",
             clear_all: "Clear All",
+            tip: "Tip",
 
             start: "Start",
             pause: "Pause",
@@ -1078,7 +1079,9 @@ export const en = {
                 start: "Start",
                 stop: "Stop",
                 add: "Add",
-                clear: "Clear"
+                clear: "Clear",
+                tip_keywords: "Use keywords to mark important events in Logcat.",
+                tip_delta: "The stopwatch will automatically calculate the time (Delta) between clicking the \"Start\" button and the appearance of each registered keyword in the log list."
             },
             auto: "Auto",
             na: "N/A",

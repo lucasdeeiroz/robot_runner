@@ -254,6 +254,7 @@ export const es = {
             keep: "Conservar",
             keep_all: "Conservar Todo",
             clear_all: "Borrar Todo",
+            tip: "Consejo",
 
             start: "Iniciar",
             pause: "Pausar",
@@ -1082,7 +1083,9 @@ export const es = {
                 start: "Iniciar",
                 stop: "Detener",
                 add: "Añadir",
-                clear: "Limpiar"
+                clear: "Limpiar",
+                tip_keywords: "Usa las palabras clave para marcar eventos importantes en el Logcat.",
+                tip_delta: "El cronómetro calculará automáticamente el tiempo (Delta) entre el clic en el botón \"Iniciar\" y la aparición de cada palabra clave registrada en la lista de registros."
             },
             auto: "Auto",
             na: "N/D",

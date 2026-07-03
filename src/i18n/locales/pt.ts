@@ -254,6 +254,7 @@ export const pt = {
             keep: "Manter",
             keep_all: "Manter Todos",
             clear_all: "Limpar Todos",
+            tip: "Dica",
 
             start: "Iniciar",
             pause: "Pausar",
@@ -1079,7 +1080,9 @@ export const pt = {
                 start: "Iniciar",
                 stop: "Parar",
                 add: "Adicionar",
-                clear: "Limpar"
+                clear: "Limpar",
+                tip_keywords: "Use as keywords para marcar eventos importantes no Logcat.",
+                tip_delta: "O cronômetro irá calcular automaticamente o tempo (Delta) entre o clique no botão \"Iniciar\" e o aparecimento de cada keyword registrada na lista de logs."
             },
             auto: "Auto",
             na: "N/D",

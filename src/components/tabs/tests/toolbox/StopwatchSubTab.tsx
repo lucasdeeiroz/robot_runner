@@ -134,8 +134,8 @@ export function StopwatchSubTab({ selectedDevice, isTestRunning = false, allowAc
                             disabled={isActionDisabled}
                         />
                         <div className="text-xs text-on-surface-variant/60 bg-surface-variant/10 p-3 rounded-lg border border-outline-variant/20 mt-4">
-                            <p className="mb-2"><strong>Dica:</strong> Use as keywords para marcar eventos importantes no Logcat.</p>
-                            <p>O cronômetro irá calcular automaticamente o tempo (Delta) entre o clique no botão "Iniciar" e o aparecimento de cada keyword registrada na lista de logs.</p>
+                            <p className="mb-2"><strong>{t('common.tip', 'Tip')}:</strong> {t('performance.stopwatch.tip_keywords', 'Use keywords to mark important events in Logcat.')}</p>
+                            <p>{t('performance.stopwatch.tip_delta', 'The stopwatch will automatically calculate the time (Delta) between clicking the "Start" button and the appearance of each registered keyword in the log list.')}</p>
                         </div>
                     </div>
 
