@@ -5,7 +5,7 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { readTextFile } from '@tauri-apps/plugin-fs';
 import { Button } from '@/components/atoms/Button';
 import { Section } from '@/components/organisms/Section';
-import { Upload, ShieldCheck, CheckCircle2, XCircle, Search, RefreshCcw, FileText } from 'lucide-react';
+import { Upload, ShieldCheck, CheckCircle2, XCircle, Search, RefreshCcw, FileText, ListPlus, Info } from 'lucide-react';
 import { Input } from '@/components/atoms/Input';
 import clsx from 'clsx';
 import { ExpressiveLoading } from '@/components/atoms/ExpressiveLoading';
@@ -21,12 +21,14 @@ interface PropComparison {
     expected: string;
     found: string;
     isMatch: boolean;
+    isExtra?: boolean;
 }
 
 export function CheckupSubTab({ selectedDevice, isTestRunning, allowActionsDuringTest }: CheckupSubTabProps) {
     const { t } = useTranslation();
     const [isLoading, setIsLoading] = useState(false);
     const [comparisons, setComparisons] = useState<PropComparison[]>([]);
+    const [devicePropsCache, setDevicePropsCache] = useState<Record<string, string>>({});
     const [filterDivergent, setFilterDivergent] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
 
@@ -134,6 +136,7 @@ export function CheckupSubTab({ selectedDevice, isTestRunning, allowActionsDurin
                 });
 
                 const deviceProps = parseDeviceProps(deviceOutput);
+                setDevicePropsCache(deviceProps);
 
                 const newComparisons: PropComparison[] = Object.keys(expectedProps).map(key => {
                     const expected = expectedProps[key];
@@ -151,6 +154,63 @@ export function CheckupSubTab({ selectedDevice, isTestRunning, allowActionsDurin
         } catch (error) {
             console.error('Failed to import and check props:', error);
             // TODO: show toast error
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const COMMON_PROP_PREFIXES = [
+        'ro.build.',
+        'ro.system.',
+        'ro.vendor.',
+        'ro.product.',
+        'ro.odm.',
+        'ro.boot.',
+        'ro.hardware.',
+        'ro.board.',
+        'ro.bootloader',
+        'ro.revision',
+        'ro.serialno'
+    ];
+
+    const handleLoadRemainingProps = async () => {
+        if (!selectedDevice) return;
+        setIsLoading(true);
+        try {
+            let currentDeviceProps = devicePropsCache;
+            if (!currentDeviceProps || Object.keys(currentDeviceProps).length === 0) {
+                const deviceOutput: string = await invoke('run_adb_command', {
+                    device: selectedDevice,
+                    args: ['shell', 'getprop']
+                });
+                currentDeviceProps = parseDeviceProps(deviceOutput);
+                setDevicePropsCache(currentDeviceProps);
+            }
+            
+            const existingKeys = new Set(comparisons.map(c => c.key));
+            const newComparisons: PropComparison[] = [];
+            
+            for (const [key, value] of Object.entries(currentDeviceProps)) {
+                if (!existingKeys.has(key)) {
+                    if (COMMON_PROP_PREFIXES.some(prefix => key.startsWith(prefix))) {
+                        if (value.trim() !== '') {
+                            newComparisons.push({
+                                key,
+                                expected: t('toolbox.checkup.not_found', 'Not found'),
+                                found: value,
+                                isMatch: false,
+                                isExtra: true
+                            });
+                        }
+                    }
+                }
+            }
+            
+            if (newComparisons.length > 0) {
+                setComparisons(prev => [...prev, ...newComparisons]);
+            }
+        } catch (error) {
+            console.error('Failed to load remaining props', error);
         } finally {
             setIsLoading(false);
         }
@@ -270,6 +330,17 @@ export function CheckupSubTab({ selectedDevice, isTestRunning, allowActionsDurin
                                 <Upload size={16} />
                                 {t('toolbox.checkup.upload_prop', 'Import')}
                             </Button>
+                            {selectedDevice && (
+                                <Button
+                                    variant="outline"
+                                    onClick={handleLoadRemainingProps}
+                                    disabled={disabled || isLoading}
+                                    className="flex items-center gap-2 h-9"
+                                >
+                                    <ListPlus size={16} />
+                                    {t('toolbox.checkup.load_remaining', 'Load remaining base props')}
+                                </Button>
+                            )}
                         </div>
                     }
                 >
@@ -328,14 +399,17 @@ export function CheckupSubTab({ selectedDevice, isTestRunning, allowActionsDurin
                                                 <td className="p-3 font-mono text-xs text-on-surface-variant break-all">{c.expected}</td>
                                                 <td className={clsx(
                                                     "p-3 font-mono text-xs break-all",
-                                                    c.isMatch ? "text-success" : "text-error font-semibold"
+                                                    c.isMatch ? "text-success" : (c.isExtra ? "text-warning" : "text-error font-semibold")
                                                 )}>
                                                     {c.found || <span className="italic opacity-50">{t('toolbox.checkup.not_found', 'Not found')}</span>}
                                                 </td>
                                                 <td className="p-3 text-center">
                                                     {c.isMatch
                                                         ? <CheckCircle2 size={16} className="text-success mx-auto" />
-                                                        : <XCircle size={16} className="text-error mx-auto" />
+                                                        : (c.isExtra 
+                                                            ? <Info size={16} className="text-warning mx-auto" />
+                                                            : <XCircle size={16} className="text-error mx-auto" />
+                                                        )
                                                     }
                                                 </td>
                                             </tr>

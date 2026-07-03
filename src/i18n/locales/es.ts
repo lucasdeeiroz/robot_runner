@@ -1817,6 +1817,7 @@ export const es = {
                 prop_compare: "Comparación de .prop",
                 search_placeholder: "Buscar clave...",
                 matches: "coincidencias",
+                load_remaining: "Cargar propiedades base",
                 checks: {
                     verified_boot: "Verified Boot (dm-verity)",
                     adb_default: "ADB Predeterminado Deshabilitado",

@@ -1806,6 +1806,7 @@ export const en = {
                 prop_compare: ".prop Compare",
                 search_placeholder: "Search key...",
                 matches: "matches",
+                load_remaining: "Load remaining base props",
                 checks: {
                     verified_boot: "Verified Boot (dm-verity)",
                     adb_default: "Default ADB Disabled",
