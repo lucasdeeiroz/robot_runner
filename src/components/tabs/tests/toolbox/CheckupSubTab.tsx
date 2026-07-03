@@ -43,13 +43,13 @@ export function CheckupSubTab({ selectedDevice, isTestRunning, allowActionsDurin
             expected: (out: string) => out.trim().toLowerCase() === 'green',
             foundDisplay: (out: string) => out.trim() || t('toolbox.checkup.unknown', 'Unknown')
         },
-        {
-            id: 'adb_default',
-            name: t('toolbox.checkup.checks.adb_default', 'Default ADB Disabled'),
-            command: ['shell', 'getprop', 'persist.sys.usb.config'],
-            expected: (out: string) => !out.includes('adb'),
-            foundDisplay: (out: string) => out.trim() || t('toolbox.checkup.none', 'None')
-        },
+        // {
+        //     id: 'adb_default',
+        //     name: t('toolbox.checkup.checks.adb_default', 'Default ADB Disabled'),
+        //     command: ['shell', 'getprop', 'persist.sys.usb.config'],
+        //     expected: (out: string) => !out.includes('adb'),
+        //     foundDisplay: (out: string) => out.trim() || t('toolbox.checkup.none', 'None')
+        // },
         {
             id: 'debuggable',
             name: t('toolbox.checkup.checks.debuggable', 'Developer Mode (ro.debuggable)'),
@@ -58,19 +58,62 @@ export function CheckupSubTab({ selectedDevice, isTestRunning, allowActionsDurin
             foundDisplay: (out: string) => out.trim() === '1' ? t('toolbox.checkup.active', '1 (Active)') : t('toolbox.checkup.inactive', '0 (Inactive)')
         },
         {
+            id: 'secure_os',
+            name: t('toolbox.checkup.checks.secure_os', 'Secure OS (ro.secure)'),
+            command: ['shell', 'getprop', 'ro.secure'],
+            expected: (out: string) => out.trim() === '1',
+            foundDisplay: (out: string) => out.trim() === '1' ? t('toolbox.checkup.active', '1 (Active)') : t('toolbox.checkup.inactive', '0 (Inactive)')
+        },
+        {
+            id: 'verity_mode',
+            name: t('toolbox.checkup.checks.verity_mode', 'Verity Mode'),
+            command: ['shell', 'getprop', 'ro.boot.veritymode'],
+            expected: (out: string) => out.trim() === 'enforcing',
+            foundDisplay: (out: string) => out.trim() || t('toolbox.checkup.unknown', 'Unknown')
+        },
+        {
+            id: 'adb_secure',
+            name: t('toolbox.checkup.checks.adb_secure', 'ADB Secure'),
+            command: ['shell', 'getprop', 'ro.adb.secure'],
+            expected: (out: string) => out.trim() === '1',
+            foundDisplay: (out: string) => out.trim() === '1' ? t('toolbox.checkup.active', '1 (Active)') : t('toolbox.checkup.inactive', '0 (Inactive)')
+        },
+        {
             id: 'build_tags',
             name: t('toolbox.checkup.checks.build_tags', 'Image Signature (tags)'),
             command: ['shell', 'getprop', 'ro.build.tags'],
-            expected: (out: string) => out.trim() === 'release-keys',
-            foundDisplay: (out: string) => out.trim() || t('toolbox.checkup.none', 'None')
+            expected: (out: string) => out.trim().toLowerCase() === 'release-keys',
+            foundDisplay: (out: string) => out.trim() || t('toolbox.checkup.unknown', 'Unknown')
         },
         {
             id: 'selinux',
-            name: t('toolbox.checkup.checks.selinux', 'SELinux Enforcing'),
+            name: t('toolbox.checkup.checks.selinux', 'SELinux Status'),
             command: ['shell', 'getenforce'],
             expected: (out: string) => out.trim().toLowerCase() === 'enforcing',
-            foundDisplay: (out: string) => out.trim()
+            foundDisplay: (out: string) => out.trim().toLowerCase() === 'enforcing' ? t('toolbox.checkup.enforcing', 'Enforcing') : t('toolbox.checkup.permissive', 'Permissive')
         },
+        {
+            id: 'crypto_state',
+            name: t('toolbox.checkup.checks.crypto_state', 'Device Encryption'),
+            command: ['shell', 'getprop', 'ro.crypto.state'],
+            expected: (out: string) => out.trim().toLowerCase() === 'encrypted',
+            foundDisplay: (out: string) => out.trim().toLowerCase() === 'encrypted' ? t('toolbox.checkup.encrypted', 'Encrypted') : (out.trim().toLowerCase() === 'unencrypted' ? t('toolbox.checkup.unencrypted', 'Unencrypted') : t('toolbox.checkup.unknown', 'Unknown'))
+        },
+        {
+            id: 'root_access',
+            name: t('toolbox.checkup.checks.root_access', 'Root Access (su binary)'),
+            command: ['shell', '[ -e /system/bin/su ] || [ -e /system/xbin/su ] && echo "found" || echo "not_found"'],
+            expected: (out: string) => out.trim() === 'not_found',
+            foundDisplay: (out: string) => out.trim() === 'found' ? t('toolbox.checkup.found', 'Found') : t('toolbox.checkup.not_found', 'Not found')
+        },
+        {
+            id: 'developer_options',
+            name: t('toolbox.checkup.checks.developer_options', 'Developer Options'),
+            command: ['shell', 'settings', 'get', 'global', 'development_settings_enabled'],
+            expected: (out: string) => out.trim() === '0' || out.trim() === 'null',
+            foundDisplay: (out: string) => out.trim() === '1' ? t('toolbox.checkup.active', '1 (Active)') : t('toolbox.checkup.inactive', '0 (Inactive)')
+        },
+
         {
             id: 'non_market_apps',
             name: t('toolbox.checkup.checks.non_market_apps', 'Unknown Apps Installation'),
@@ -186,10 +229,10 @@ export function CheckupSubTab({ selectedDevice, isTestRunning, allowActionsDurin
                 currentDeviceProps = parseDeviceProps(deviceOutput);
                 setDevicePropsCache(currentDeviceProps);
             }
-            
+
             const existingKeys = new Set(comparisons.map(c => c.key));
             const newComparisons: PropComparison[] = [];
-            
+
             for (const [key, value] of Object.entries(currentDeviceProps)) {
                 if (!existingKeys.has(key)) {
                     if (COMMON_PROP_PREFIXES.some(prefix => key.startsWith(prefix))) {
@@ -205,7 +248,7 @@ export function CheckupSubTab({ selectedDevice, isTestRunning, allowActionsDurin
                     }
                 }
             }
-            
+
             if (newComparisons.length > 0) {
                 setComparisons(prev => [...prev, ...newComparisons]);
             }
@@ -406,7 +449,7 @@ export function CheckupSubTab({ selectedDevice, isTestRunning, allowActionsDurin
                                                 <td className="p-3 text-center">
                                                     {c.isMatch
                                                         ? <CheckCircle2 size={16} className="text-success mx-auto" />
-                                                        : (c.isExtra 
+                                                        : (c.isExtra
                                                             ? <Info size={16} className="text-warning mx-auto" />
                                                             : <XCircle size={16} className="text-error mx-auto" />
                                                         )

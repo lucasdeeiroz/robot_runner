@@ -1815,6 +1815,10 @@ export const es = {
                 not_found: "No encontrada",
                 no_results: "No se encontraron resultados.",
                 prop_compare: "Comparación de .prop",
+                enforcing: "Enforcing",
+                permissive: "Permissive",
+                encrypted: "Encriptado",
+                unencrypted: "No Encriptado",
                 search_placeholder: "Buscar clave...",
                 matches: "coincidencias",
                 load_remaining: "Cargar propiedades base",
@@ -1823,8 +1827,12 @@ export const es = {
                     adb_default: "ADB Predeterminado Deshabilitado",
                     debuggable: "Modo Desarrollador (ro.debuggable)",
                     build_tags: "Firma de la Imagen (tags)",
-                    selinux: "SELinux Enforcing",
-                    non_market_apps: "Instalación de Apps Desconocidas"
+                    selinux: "Estado de SELinux",
+                    non_market_apps: "Instalación de Apps Desconocidas",
+                    crypto_state: "Cifrado del Dispositivo",
+                    secure_os: "OS Seguro (ro.secure)",
+                    developer_options: "Opciones de Desarrollador",
+                    root_access: "Acceso Root (binario su)"
                 }
             },
             actions: {

@@ -1805,6 +1805,10 @@ export const pt = {
                 not_found: "Não encontrada",
                 no_results: "Nenhum resultado encontrado.",
                 prop_compare: "Comparação de .prop",
+                enforcing: "Enforcing",
+                permissive: "Permissive",
+                encrypted: "Criptografado",
+                unencrypted: "Não Criptografado",
                 search_placeholder: "Pesquisar chave...",
                 matches: "coincidências",
                 load_remaining: "Carregar propriedades da base",
@@ -1813,8 +1817,12 @@ export const pt = {
                     adb_default: "ADB Padrão Desabilitado",
                     debuggable: "Modo Desenvolvedor (ro.debuggable)",
                     build_tags: "Assinatura da Imagem (tags)",
-                    selinux: "SELinux Enforcing",
-                    non_market_apps: "Instalação de Apps Desconhecidos"
+                    selinux: "Status do SELinux",
+                    non_market_apps: "Instalação de Apps Desconhecidos",
+                    crypto_state: "Criptografia de Dados",
+                    secure_os: "OS Seguro (ro.secure)",
+                    developer_options: "Opções de Desenvolvedor",
+                    root_access: "Acesso Root (binário su)"
                 }
             },
             actions: {

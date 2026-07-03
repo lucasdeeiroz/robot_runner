@@ -1804,6 +1804,10 @@ export const en = {
                 not_found: "Not found",
                 no_results: "No results found.",
                 prop_compare: ".prop Compare",
+                enforcing: "Enforcing",
+                permissive: "Permissive",
+                encrypted: "Encrypted",
+                unencrypted: "Unencrypted",
                 search_placeholder: "Search key...",
                 matches: "matches",
                 load_remaining: "Load remaining base props",
@@ -1812,8 +1816,12 @@ export const en = {
                     adb_default: "Default ADB Disabled",
                     debuggable: "Developer Mode (ro.debuggable)",
                     build_tags: "Image Signature (tags)",
-                    selinux: "SELinux Enforcing",
-                    non_market_apps: "Unknown Apps Installation"
+                    selinux: "SELinux Status",
+                    non_market_apps: "Unknown Apps Installation",
+                    crypto_state: "Device Encryption",
+                    secure_os: "Secure OS (ro.secure)",
+                    developer_options: "Developer Options",
+                    root_access: "Root Access (su binary)"
                 }
             },
             actions: {
