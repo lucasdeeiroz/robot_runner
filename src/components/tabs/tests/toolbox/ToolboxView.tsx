@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { AlignLeft, Terminal, Cpu, Cast, FileText, StopCircle, RefreshCcw, Camera, Video, Square, LayoutGrid, Minimize2, Maximize2, Package, Globe, Activity, Timer } from "lucide-react";
+import { AlignLeft, Terminal, Cpu, Cast, FileText, StopCircle, RefreshCcw, Camera, Video, Square, LayoutGrid, Minimize2, Maximize2, Package, Globe, Activity, Timer, ShieldCheck } from "lucide-react";
 import clsx from "clsx";
 import { invoke } from "@tauri-apps/api/core";
 import { useSettings } from "@/lib/settings";
@@ -12,6 +12,7 @@ import { CommandsSubTab } from "./CommandsSubTab";
 import { PerformanceSubTab } from "./PerformanceSubTab";
 import { StopwatchSubTab } from "./StopwatchSubTab";
 import { HardwareSubTab } from "./HardwareSubTab";
+import { CheckupSubTab } from "./CheckupSubTab";
 import { RunConsole } from "@/components/organisms/RunConsole";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 import { TestSession, useTestSessions } from "@/lib/testSessionStore";
@@ -31,7 +32,7 @@ interface ToolboxViewProps {
     onNavigate?: (page: string) => void;
 }
 
-type ToolTab = 'console' | 'logcat' | 'performance' | 'stopwatch' | 'commands' | 'apps' | 'webview' | 'hardware';
+type ToolTab = 'console' | 'logcat' | 'performance' | 'stopwatch' | 'commands' | 'apps' | 'webview' | 'hardware' | 'checkup';
 
 export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxViewProps) {
     const { stopSession, rerunSession, setSessionActiveTool } = useTestSessions();
@@ -45,7 +46,7 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
     );
     const [isGridView, setIsGridView] = useState(false);
     const [visibleToolsInGrid, setVisibleToolsInGrid] = useState<Set<ToolTab>>(
-        isWebMode ? new Set(['console', 'webview']) : new Set(['console', 'logcat', 'performance', 'hardware'])
+        isWebMode ? new Set(['console', 'webview']) : new Set(['console', 'logcat', 'performance', 'hardware', 'checkup'])
     );
 
     // Responsive State
@@ -358,6 +359,13 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                         icon: Cpu, // We'll change to something else if needed, like Battery or Server
                         selected: isGridView ? visibleToolsInGrid.has('hardware') : activeTool === 'hardware',
                         tooltip: (isCompact || isNarrow) ? "Hardware" : undefined
+                    },
+                    {
+                        id: 'checkup',
+                        label: (!isCompact && !isNarrow) ? t('toolbox.tabs.checkup', 'Checkup') : "",
+                        icon: ShieldCheck,
+                        selected: isGridView ? visibleToolsInGrid.has('checkup') : activeTool === 'checkup',
+                        tooltip: (isCompact || isNarrow) ? t('toolbox.tabs.checkup', 'Checkup') : undefined
                     }
                 ]}
                 activeId={activeTool}
@@ -530,7 +538,7 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                 {(() => {
                     const allTools: ToolTab[] = isWebMode
                         ? ['console', 'webview']
-                        : ['console', 'logcat', 'performance', 'stopwatch', 'commands', 'apps', 'hardware'];
+                        : ['console', 'logcat', 'performance', 'stopwatch', 'commands', 'apps', 'hardware', 'checkup'];
 
                     const visibleToolsInGridArray = allTools.filter(t =>
                         visibleToolsInGrid.has(t) && (t !== 'console' || session.type === 'test')
@@ -545,7 +553,8 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                         'stopwatch': t('toolbox.tabs.stopwatch', 'Stopwatch'),
                         'apps': t('toolbox.tabs.apps'),
                         'hardware': "Hardware",
-                        'webview': t('toolbox.tabs.webview', 'Webview')
+                        'webview': t('toolbox.tabs.webview', 'Webview'),
+                        'checkup': t('toolbox.tabs.checkup', 'Checkup')
                     };
 
                     return allTools.map((tool) => {
@@ -631,6 +640,7 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                                     )}
                                     {tool === 'apps' && <AppsSubTab isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
                                     {tool === 'hardware' && <HardwareSubTab selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
+                                    {tool === 'checkup' && <CheckupSubTab selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
                                     {tool === 'webview' && (
                                         <div className={clsx("h-full w-full flex flex-col overflow-hidden min-h-0", isGridView && "bg-surface-variant/10 p-2")}>
                                             <DeviceViewport

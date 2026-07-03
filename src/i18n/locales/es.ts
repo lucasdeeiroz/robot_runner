@@ -1749,7 +1749,8 @@ export const es = {
                 stopwatch: "Cronómetro",
                 apps: "Apps",
                 webview: "Webview",
-                hardware: "Hardware"
+                hardware: "Hardware",
+                checkup: "Checkup"
             },
             hardware: {
                 battery: {
@@ -1786,6 +1787,43 @@ export const es = {
                     send: "Enviar Broadcast",
                     success: "Broadcast enviado",
                     error: "Error al enviar broadcast"
+                }
+            },
+            checkup: {
+                title: "Checkup del Dispositivo",
+                upload_prop: "Importar Archivo .prop",
+                upload_prop_desc: "Suba un archivo build.prop o vendor.prop para comparar con el dispositivo.",
+                standard_checks: "Checks Estándar",
+                run_checks: "Ejecutar Checks Estándar",
+                expected: "Esperado",
+                found: "Encontrado",
+                status_correct: "Correcto",
+                status_incorrect: "Incorrecto",
+                show_all: "Mostrar todas las propiedades",
+                show_divergent: "Mostrar solo divergencias",
+                results_summary: "{{matched}}/{{total}} propiedades coinciden",
+                select_device: "Seleccione un dispositivo para el checkup",
+                fetching: "Obteniendo propiedades...",
+                error_fetch: "Error al obtener propiedades del dispositivo",
+                unknown: "Desconocido",
+                none: "Ninguno",
+                active: "1 (Activo)",
+                inactive: "0 (Inactivo)",
+                allowed: "Permitido (1)",
+                blocked: "Bloqueado (0)",
+                error_exec: "Error en la ejecución",
+                not_found: "No encontrada",
+                no_results: "No se encontraron resultados.",
+                prop_compare: "Comparación de .prop",
+                search_placeholder: "Buscar clave...",
+                matches: "coincidencias",
+                checks: {
+                    verified_boot: "Verified Boot (dm-verity)",
+                    adb_default: "ADB Predeterminado Deshabilitado",
+                    debuggable: "Modo Desarrollador (ro.debuggable)",
+                    build_tags: "Firma de la Imagen (tags)",
+                    selinux: "SELinux Enforcing",
+                    non_market_apps: "Instalación de Apps Desconocidas"
                 }
             },
             actions: {

@@ -1738,7 +1738,8 @@ export const en = {
                 stopwatch: "Stopwatch",
                 apps: "Apps",
                 webview: "Webview",
-                hardware: "Hardware"
+                hardware: "Hardware",
+                checkup: "Checkup"
             },
             hardware: {
                 battery: {
@@ -1775,6 +1776,43 @@ export const en = {
                     send: "Send Broadcast",
                     success: "Broadcast sent",
                     error: "Failed to send broadcast"
+                }
+            },
+            checkup: {
+                title: "Device Checkup",
+                upload_prop: "Import .prop File",
+                upload_prop_desc: "Upload a build.prop or vendor.prop file to compare with the device.",
+                standard_checks: "Standard Checks",
+                run_checks: "Run Standard Checks",
+                expected: "Expected",
+                found: "Found",
+                status_correct: "Correct",
+                status_incorrect: "Incorrect",
+                show_all: "Show all properties",
+                show_divergent: "Show only divergences",
+                results_summary: "{{matched}}/{{total}} correct properties",
+                select_device: "Select a device for the checkup",
+                fetching: "Fetching properties...",
+                error_fetch: "Failed to fetch device properties",
+                unknown: "Unknown",
+                none: "None",
+                active: "1 (Active)",
+                inactive: "0 (Inactive)",
+                allowed: "Allowed (1)",
+                blocked: "Blocked (0)",
+                error_exec: "Execution error",
+                not_found: "Not found",
+                no_results: "No results found.",
+                prop_compare: ".prop Compare",
+                search_placeholder: "Search key...",
+                matches: "matches",
+                checks: {
+                    verified_boot: "Verified Boot (dm-verity)",
+                    adb_default: "Default ADB Disabled",
+                    debuggable: "Developer Mode (ro.debuggable)",
+                    build_tags: "Image Signature (tags)",
+                    selinux: "SELinux Enforcing",
+                    non_market_apps: "Unknown Apps Installation"
                 }
             },
             actions: {
