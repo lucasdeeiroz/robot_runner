@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { open } from "@tauri-apps/plugin-dialog";
-import { AlertTriangle, Activity, Cpu, Battery, CircuitBoard, Play, Square, Package as PackageIcon, Eye, RefreshCw, Zap, FolderSearch, Settings, Trash2 } from "lucide-react";
+import { AlertTriangle, Activity, Cpu, Battery, CircuitBoard, Play, Square, Package as PackageIcon, Eye, RefreshCw, Zap, FolderSearch, Settings } from "lucide-react";
 import clsx from "clsx";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 import { useSettings } from "@/lib/settings";
@@ -36,15 +36,6 @@ interface PerformanceSubTabProps {
     forceEnable?: boolean;
     setForceEnable?: (val: boolean) => void;
     onNavigate?: (page: string) => void;
-
-    // Stopwatch State from hook
-    laps?: { keyword: string, timestamp: number, deltaMs: number }[];
-    setLaps?: (val: any) => void;
-    deltaUnit?: 'ms' | 's' | 'min' | 'h';
-    setDeltaUnit?: (val: any) => void;
-    isStopwatchRunning?: boolean;
-    handleRemoveLap?: (index: number) => void;
-    handleToggleStopwatch?: () => void;
 }
 
 export function PerformanceSubTab({
@@ -67,24 +58,11 @@ export function PerformanceSubTab({
     isLoading = false,
     forceEnable = false,
     setForceEnable,
-    onNavigate,
-
-    laps = [],
-    setLaps,
-    deltaUnit = 'ms',
-    setDeltaUnit,
-    isStopwatchRunning = false,
-    handleRemoveLap,
-    handleToggleStopwatch
+    onNavigate
 }: PerformanceSubTabProps) {
     const { t } = useTranslation();
     const { settings, updateSetting } = useSettings();
     const [showHighImpactWarning, setShowHighImpactWarning] = useState(false);
-
-    const keywords = settings.logcatKeywords || [];
-    const [newKeyword, setNewKeyword] = useState('');
-    const [logLevel, setLogLevel] = useState(settings.logcatLevel || "E");
-    const [extraTags, setExtraTags] = useState(settings.logcatExtraTags || "");
 
     const handleConfigurePath = async () => {
         const selected = await open({
@@ -157,17 +135,6 @@ export function PerformanceSubTab({
     if (!selectedDevice) {
         return <div className="p-8 text-center text-on-surface/80">{t('performance.select_device')}</div>;
     }
-
-    const formatDelta = (deltaMs: number, unit: 'ms' | 's' | 'min' | 'h') => {
-        if (deltaMs === 0) return `+0${unit}`;
-        switch (unit) {
-            case 'ms': return `+${deltaMs}ms`;
-            case 's': return `+${(deltaMs / 1000).toFixed(3)}s`;
-            case 'min': return `+${(deltaMs / 60000).toFixed(3)}min`;
-            case 'h': return `+${(deltaMs / 3600000).toFixed(3)}h`;
-            default: return `+${deltaMs}ms`;
-        }
-    };
 
     return (
         <div ref={containerRef} className="h-full flex-1 min-h-0 flex flex-col p-4 overflow-y-auto">
@@ -475,179 +442,7 @@ export function PerformanceSubTab({
                             </div>
                         )}
 
-                        {/* Logcat Stopwatch Section */}
-                        <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                            <h3 className="text-xs font-semibold text-on-surface-variant/80 uppercase tracking-wider mb-3 ml-1 flex items-center gap-2 justify-between">
-                                <span className="flex items-center gap-2">
-                                    <Activity size={14} /> {t('performance.stopwatch.title', 'Logcat Stopwatch')}
-                                </span>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-24">
-                                        <Select
-                                            options={[
-                                                { label: "Verbose", value: "V" },
-                                                { label: "Debug", value: "D" },
-                                                { label: "Info", value: "I" },
-                                                { label: "Warning", value: "W" },
-                                                { label: "Error", value: "E" },
-                                                { label: "Fatal", value: "F" },
-                                                { label: "Silent", value: "S" },
-                                            ]}
-                                            value={logLevel}
-                                            onChange={(e) => {
-                                                setLogLevel(e.target.value);
-                                                updateSetting('logcatLevel', e.target.value);
-                                            }}
-                                            containerClassName="w-full"
-                                        />
-                                    </div>
-                                    <div className="w-32">
-                                        <input 
-                                            type="text"
-                                            value={extraTags}
-                                            onChange={e => setExtraTags(e.target.value)}
-                                            onBlur={() => updateSetting('logcatExtraTags', extraTags)}
-                                            onKeyDown={e => {
-                                                if (e.key === 'Enter') {
-                                                    updateSetting('logcatExtraTags', extraTags);
-                                                }
-                                            }}
-                                            placeholder={t('logcat.custom_tags_placeholder', 'Tags (e.g. App:V)')}
-                                            className="w-full h-8 bg-surface border border-outline-variant/30 rounded-lg px-3 py-1 text-[13px] font-normal normal-case text-on-surface focus:outline-none focus:border-primary/50 transition-colors"
-                                            disabled={isStopwatchRunning}
-                                        />
-                                    </div>
-                                    <Button
-                                        onClick={handleToggleStopwatch}
-                                        variant={isStopwatchRunning ? "danger" : "primary"}
-                                        size="sm"
-                                        className="h-8 text-xs px-3"
-                                    >
-                                    {isStopwatchRunning
-                                        ? (
-                                            <>
-                                                <Square size={12} className="mr-1" />
-                                                {t('performance.stopwatch.stop', 'Stop')}
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Play size={12} className="mr-1" />
-                                                {t('performance.stopwatch.start', 'Start')}
-                                            </>
-                                        )
-                                    }
-                                </Button>
-                                </div>
-                            </h3>
-                            <Card title={t('performance.stopwatch.card_title', 'Performance Checkpoints')} icon={<Zap size={20} className="text-yellow-500" />}>
-                                <div className="space-y-4 mt-2">
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="text"
-                                            placeholder={t('performance.stopwatch.placeholder', 'Add logcat keyword (e.g. ActivityResume)')}
-                                            value={newKeyword}
-                                            onChange={e => setNewKeyword(e.target.value)}
-                                            onKeyDown={e => {
-                                                if (e.key === 'Enter' && newKeyword.trim()) {
-                                                    updateSetting('logcatKeywords', [...new Set([...keywords, newKeyword.trim()])]);
-                                                    setNewKeyword('');
-                                                }
-                                            }}
-                                            className="flex-1 bg-surface border border-outline-variant rounded px-3 py-1.5 text-sm text-on-surface outline-none focus:border-primary/50"
-                                        />
-                                        <Button
-                                            onClick={() => {
-                                                if (newKeyword.trim()) {
-                                                    updateSetting('logcatKeywords', [...new Set([...keywords, newKeyword.trim()])]);
-                                                    setNewKeyword('');
-                                                }
-                                            }}
-                                            variant="secondary"
-                                            size="sm"
-                                        >
-                                            {t('common.add', 'Add')}
-                                        </Button>
-                                    </div>
 
-                                    {keywords.length > 0 && (
-                                        <div className="flex flex-wrap gap-2">
-                                            {keywords.map(kw => (
-                                                <div key={kw} className="bg-surface-variant/50 border border-outline-variant/30 rounded-full px-3 py-1 text-xs flex items-center gap-2">
-                                                    <span className="font-mono">{kw}</span>
-                                                    <button onClick={() => updateSetting('logcatKeywords', keywords.filter(k => k !== kw))} className="hover:text-error transition-colors">
-                                                        ×
-                                                    </button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    <div className="mt-4">
-                                        <div className="flex justify-between items-center mb-2">
-                                            <div className="flex items-center gap-4">
-                                                <span className="text-sm font-medium opacity-80">{t('performance.stopwatch.laps', 'Checkpoints')}</span>
-                                                <Select
-                                                    value={deltaUnit}
-                                                    onChange={(e) => setDeltaUnit?.(e.target.value as any)}
-                                                    options={[
-                                                        { label: 'ms', value: 'ms' },
-                                                        { label: 's', value: 's' },
-                                                        { label: 'min', value: 'min' },
-                                                        { label: 'h', value: 'h' },
-                                                    ]}
-                                                    containerClassName="w-24"
-                                                />
-                                            </div>
-                                            {laps.length > 0 && (
-                                                <Button onClick={() => setLaps?.([])} variant="ghost" size="sm" className="h-6 text-xs text-error/80 hover:bg-error/10">
-                                                    {t('common.clear', 'Clear')}
-                                                </Button>
-                                            )}
-                                        </div>
-                                        {laps.length === 0 ? (
-                                            <div className="text-center p-4 border border-dashed border-outline-variant/30 rounded text-xs opacity-50">
-                                                {t('performance.stopwatch.waiting', 'Waiting for keywords in Logcat... (Make sure Logcat is running)')}
-                                            </div>
-                                        ) : (
-                                            <div className="max-h-60 overflow-y-auto border border-outline-variant/30 rounded custom-scrollbar">
-                                                <table className="w-full text-xs text-left">
-                                                    <thead className="bg-surface-variant/30 sticky top-0">
-                                                        <tr>
-                                                            <th className="px-3 py-2 font-medium opacity-70 w-10">#</th>
-                                                            <th className="px-3 py-2 font-medium opacity-70">{t('performance.stopwatch.keyword', 'Keyword')}</th>
-                                                            <th className="px-3 py-2 font-medium opacity-70">{t('performance.stopwatch.time', 'Time')}</th>
-                                                            <th className="px-3 py-2 font-medium opacity-70">{t('performance.stopwatch.delta', 'Delta')}</th>
-                                                            <th className="px-3 py-2 font-medium opacity-70 w-10"></th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-outline-variant/20">
-                                                        {laps.map((lap, i) => (
-                                                            <tr key={i} className="hover:bg-surface-variant/10 group">
-                                                                <td className="px-3 py-2 opacity-50">{i + 1}</td>
-                                                                <td className="px-3 py-2 font-mono">{lap.keyword}</td>
-                                                                <td className="px-3 py-2 opacity-80">{new Date(lap.timestamp).toLocaleTimeString()}</td>
-                                                                <td className="px-3 py-2 font-mono text-success">{formatDelta(lap.deltaMs, deltaUnit)}</td>
-                                                                <td className="px-3 py-2 text-right">
-                                                                    <Button
-                                                                        onClick={() => handleRemoveLap?.(i)}
-                                                                        variant="ghost"
-                                                                        size="sm"
-                                                                        className="h-6 w-6 p-0 text-error/50 hover:text-error hover:bg-error/10 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                        title={t('common.remove', 'Remove')}
-                                                                    >
-                                                                        <Trash2 size={12} />
-                                                                    </Button>
-                                                                </td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </Card>
-                        </div>
                     </div>
                 )}
             </Section>

@@ -1066,10 +1066,12 @@ export const en = {
             app_stats: "App Performance",
             stopwatch: {
                 title: "Logcat Stopwatch",
+                description: "Record timestamp deltas for specific logcat events.",
+                keywords: "Keywords",
                 card_title: "Performance Checkpoints",
                 placeholder: "Add logcat keyword (e.g. ActivityResume)",
                 laps: "Checkpoints",
-                waiting: "Press Start to begin tracking keywords...",
+                waiting: "Waiting for keywords in Logcat... (Make sure Logcat is running)",
                 keyword: "Keyword",
                 time: "Time",
                 delta: "Delta",
@@ -1720,6 +1722,7 @@ export const en = {
                 commands: "Commands",
                 mirror: "Mirror",
                 performance: "Performance",
+                stopwatch: "Stopwatch",
                 apps: "Apps",
                 webview: "Webview",
                 hardware: "Hardware"

@@ -1070,10 +1070,12 @@ export const es = {
             app_stats: "Rendimiento de la Aplicación",
             stopwatch: {
                 title: "Cronómetro Logcat",
+                description: "Registra deltas de tiempo para eventos específicos del logcat.",
+                keywords: "Palabras Clave",
                 card_title: "Checkpoints de Rendimiento",
                 placeholder: "Añade palabra clave (ej: ActivityResume)",
                 laps: "Checkpoints",
-                waiting: "Presiona Iniciar para monitorizar keywords...",
+                waiting: "Esperando keywords en Logcat... (Asegúrate de que Logcat esté funcionando)",
                 keyword: "Palabra Clave",
                 time: "Tiempo",
                 delta: "Delta",
@@ -1731,6 +1733,7 @@ export const es = {
                 commands: "Comandos",
                 mirror: "Espejo",
                 performance: "Rendimiento",
+                stopwatch: "Cronómetro",
                 apps: "Apps",
                 webview: "Webview",
                 hardware: "Hardware"
