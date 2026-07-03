@@ -12,6 +12,7 @@ export interface ActionCardProps {
     badge?: React.ReactNode;
     className?: string;
     centered?: boolean;
+    children?: React.ReactNode;
 }
 
 export function ActionCard({
@@ -23,7 +24,8 @@ export function ActionCard({
     orientation = 'vertical',
     badge,
     className,
-    centered = false
+    centered = false,
+    children
 }: ActionCardProps) {
     const isVertical = orientation === 'vertical';
 
@@ -65,6 +67,7 @@ export function ActionCard({
                 <p className={clsx("text-on-surface-variant/80", isVertical ? "text-sm" : "text-xs")}>
                     {description}
                 </p>
+                {children && <div className="mt-4 w-full" onClick={e => e.stopPropagation()}>{children}</div>}
             </div>
             
             {selected && !isVertical && (

@@ -1388,7 +1388,17 @@ export const es = {
                 delete: "Eliminar Perfil",
                 name_placeholder: "Nombre del Perfil",
                 confirm_delete: "¿Estás seguro de que deseas eliminar este perfil? Esto no se puede deshacer.",
-                default: "Predeterminado"
+                default: "Predeterminado",
+                creation_mode: "Modo de Creación",
+                mode_default: "Predeterminado (Vacío)",
+                mode_default_desc: "Inicia un perfil con la configuración predeterminada.",
+                mode_clone: "Clonar Perfil Actual",
+                mode_clone_desc: "Crea una copia exacta del perfil actual.",
+                mode_import: "Importar de Archivo",
+                mode_import_desc: "Carga la configuración desde un archivo .json local.",
+                select_file: "Seleccionar Archivo de Configuración",
+                file_selected: "Archivo seleccionado",
+                invalid_file_format: "Formato de archivo de configuración inválido"
             },
             action: {
                 open_file: "Abrir Archivo de Configuración",

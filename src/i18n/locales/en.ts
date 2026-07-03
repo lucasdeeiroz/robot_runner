@@ -1384,7 +1384,17 @@ export const en = {
                 delete: "Delete Profile",
                 name_placeholder: "Profile Name",
                 confirm_delete: "Are you sure you want to delete this profile? This cannot be undone.",
-                default: "Default"
+                default: "Default",
+                creation_mode: "Creation Mode",
+                mode_default: "Default (Empty)",
+                mode_default_desc: "Start a profile with the default settings.",
+                mode_clone: "Clone Current Profile",
+                mode_clone_desc: "Create an exact copy of the current profile.",
+                mode_import: "Import from File",
+                mode_import_desc: "Load settings from a local .json file.",
+                select_file: "Select Configuration File",
+                file_selected: "Selected file",
+                invalid_file_format: "Invalid configuration file format"
             },
             action: {
                 open_file: "Open Settings File",

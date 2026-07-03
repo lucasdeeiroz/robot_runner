@@ -331,7 +331,7 @@ interface SettingsContextType {
     profiles: Profile[];
     updateSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
     setMultipleSettings: (newSettings: Partial<AppSettings>) => void;
-    createProfile: (name: string) => void;
+    createProfile: (name: string, initialSettings?: Partial<AppSettings>) => void;
     switchProfile: (id: string) => void;
     renameProfile: (id: string, name: string) => void;
     deleteProfile: (id: string) => void;
@@ -588,12 +588,15 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         });
     };
 
-    const createProfile = (name: string) => {
+    const createProfile = (name: string, initialSettings?: Partial<AppSettings>) => {
         const id = uuidv4();
         const newProfile: Profile = {
             id,
             name,
-            settings: getDefaultSettings()
+            settings: {
+                ...getDefaultSettings(),
+                ...initialSettings
+            }
         };
         const newData = {
             ...storeData,

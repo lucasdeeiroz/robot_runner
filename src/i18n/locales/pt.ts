@@ -1385,7 +1385,17 @@ export const pt = {
                 delete: "Excluir Perfil",
                 name_placeholder: "Nome do Perfil",
                 confirm_delete: "Tem certeza que deseja excluir este perfil? Isso não pode ser desfeito.",
-                default: "Padrão"
+                default: "Padrão",
+                creation_mode: "Modo de Criação",
+                mode_default: "Padrão (Vazio)",
+                mode_default_desc: "Inicie um perfil com as configurações padrões.",
+                mode_clone: "Clonar Perfil Atual",
+                mode_clone_desc: "Crie uma cópia exata do perfil atual.",
+                mode_import: "Importar de Arquivo",
+                mode_import_desc: "Carregue configurações a partir de um arquivo .json local.",
+                select_file: "Selecionar Arquivo de Configuração",
+                file_selected: "Arquivo selecionado",
+                invalid_file_format: "Formato de arquivo de configuração inválido"
             },
             action: {
                 open_file: "Abrir Arquivo de Configurações",
