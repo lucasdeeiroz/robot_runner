@@ -32,7 +32,7 @@ export function useLogcatStopwatch(selectedDevice: string, selectedPackage: stri
     const handleToggleStopwatch = async () => {
         if (isStopwatchRunning) {
             try {
-                await invoke('stop_logcat', { device: selectedDevice });
+                await invoke('stop_logcat', { device: selectedDevice, sessionId: "stopwatch_tab" });
             } catch (e) {
                 console.error(e);
             }
@@ -44,6 +44,7 @@ export function useLogcatStopwatch(selectedDevice: string, selectedPackage: stri
                 await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'logcat', '-c'] });
                 await invoke('start_logcat', {
                     device: selectedDevice,
+                    sessionId: "stopwatch_tab",
                     filter: selectedPackage || null,
                     level: settings.logcatLevel || "V",
                     outputFile: null,
@@ -67,8 +68,8 @@ export function useLogcatStopwatch(selectedDevice: string, selectedPackage: stri
 
         if (isStopwatchRunning && keywords.length > 0 && selectedDevice) {
             import('@tauri-apps/api/event').then(({ listen }) => {
-                listen<{ device: string, lines: string[] }>('logcat-data', (event) => {
-                    if (event.payload.device === selectedDevice && isSubscribed) {
+                listen<{ device: string, session_id: string, lines: string[] }>('logcat-data', (event) => {
+                    if (event.payload.device === selectedDevice && event.payload.session_id === "stopwatch_tab" && isSubscribed) {
                         const lines = event.payload.lines;
                         for (const line of lines) {
                             for (const kw of keywords) {

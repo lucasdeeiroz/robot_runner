@@ -26,6 +26,7 @@ pub fn start_logcat(
     app: AppHandle,
     state: State<'_, LogcatState>,
     device: String,
+    session_id: String,
     filter: Option<String>,
     level: Option<String>,
     output_file: Option<String>,
@@ -33,7 +34,8 @@ pub fn start_logcat(
 ) -> Result<String, String> {
     let mut procs = state.0.lock().map_err(|_e| _e.to_string())?;
 
-    if procs.contains_key(&device) {
+    let process_key = format!("{}_{}", device, session_id);
+    if procs.contains_key(&process_key) {
         return Ok("Logcat already running".to_string());
     }
 
@@ -63,6 +65,7 @@ pub fn start_logcat(
 
     // Clones for the thread
     let thread_device = device.clone();
+    let thread_session_id = session_id.clone();
     let thread_filter = filter.clone();
     let thread_level = level.clone();
     let thread_buffer = buffer.clone();
@@ -150,6 +153,7 @@ pub fn start_logcat(
                         let reader_should_stop = thread_should_stop.clone();
                         let reader_app_handle = thread_app_handle.clone();
                         let reader_device_id = device_id.clone();
+                        let reader_session_id = thread_session_id.clone();
 
                         thread::spawn(move || {
                             let reader = BufReader::new(out);
@@ -165,6 +169,7 @@ pub fn start_logcat(
                             #[derive(Clone, serde::Serialize)]
                             struct LogcatPayload {
                                 device: String,
+                                session_id: String,
                                 lines: Vec<String>,
                             }
 
@@ -192,6 +197,7 @@ pub fn start_logcat(
                                     if chunk.len() >= 50 || last_emit.elapsed().as_millis() >= 200 {
                                         let payload = LogcatPayload {
                                             device: reader_device_id.clone(),
+                                            session_id: reader_session_id.clone(),
                                             lines: chunk.clone(),
                                         };
                                         let _ = reader_app_handle.emit("logcat-data", payload);
@@ -207,6 +213,7 @@ pub fn start_logcat(
                             if !chunk.is_empty() {
                                 let payload = LogcatPayload {
                                     device: reader_device_id.clone(),
+                                    session_id: reader_session_id.clone(),
                                     lines: chunk,
                                 };
                                 let _ = reader_app_handle.emit("logcat-data", payload);
@@ -289,7 +296,7 @@ pub fn start_logcat(
     });
 
     procs.insert(
-        device,
+        process_key,
         LogcatProcess {
             child: child_mutex,
             should_stop,
@@ -340,10 +347,11 @@ fn get_pid(adb_bin: &str, device: &str, pkg: &str) -> Result<Option<String>, Str
 }
 
 #[tauri::command]
-pub fn stop_logcat(state: State<'_, LogcatState>, device: String) -> Result<String, String> {
+pub fn stop_logcat(state: State<'_, LogcatState>, device: String, session_id: String) -> Result<String, String> {
     let mut procs = state.0.lock().map_err(|e| e.to_string())?;
 
-    if let Some(process) = procs.remove(&device) {
+    let process_key = format!("{}_{}", device, session_id);
+    if let Some(process) = procs.remove(&process_key) {
         // Signal stop
         process.should_stop.store(true, Ordering::Relaxed);
 
@@ -360,9 +368,10 @@ pub fn stop_logcat(state: State<'_, LogcatState>, device: String) -> Result<Stri
 }
 
 #[tauri::command]
-pub fn is_logcat_active(state: State<'_, LogcatState>, device: String) -> Result<bool, String> {
+pub fn is_logcat_active(state: State<'_, LogcatState>, device: String, session_id: String) -> Result<bool, String> {
     let procs = state.0.lock().map_err(|_e| _e.to_string())?;
-    Ok(procs.contains_key(&device))
+    let process_key = format!("{}_{}", device, session_id);
+    Ok(procs.contains_key(&process_key))
 }
 
 #[derive(serde::Serialize)]
@@ -375,10 +384,12 @@ pub struct LogcatDetails {
 pub fn get_logcat_details(
     state: State<'_, LogcatState>,
     device: String,
+    session_id: String,
 ) -> Result<LogcatDetails, String> {
     let procs = state.0.lock().map_err(|_e| _e.to_string())?;
 
-    if let Some(process) = procs.get(&device) {
+    let process_key = format!("{}_{}", device, session_id);
+    if let Some(process) = procs.get(&process_key) {
         Ok(LogcatDetails {
             is_active: true,
             output_file: process.output_file.clone(),
@@ -395,11 +406,13 @@ pub fn get_logcat_details(
 pub fn fetch_logcat_buffer(
     state: State<'_, LogcatState>,
     device: String,
+    session_id: String,
     offset: usize,
 ) -> Result<(Vec<String>, usize), String> {
     let procs = state.0.lock().map_err(|_e| _e.to_string())?;
 
-    if let Some(process) = procs.get(&device) {
+    let process_key = format!("{}_{}", device, session_id);
+    if let Some(process) = procs.get(&process_key) {
         let buf = process.buffer.lock().map_err(|_e| _e.to_string())?;
 
         let len = buf.len();

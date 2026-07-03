@@ -87,7 +87,7 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
         setLogs([]); // Explicitly clear logs when device changes (or mounts)
         if (selectedDevice) {
             // Restore state
-            invoke<{ is_active: boolean, output_file: string | null }>('get_logcat_details', { device: selectedDevice })
+            invoke<{ is_active: boolean, output_file: string | null }>('get_logcat_details', { device: selectedDevice, sessionId: "logcat_tab" })
                 .then((details) => {
                     if (details.is_active) setIsStreaming(true);
                     if (details.output_file) setCurrentDumpFile(details.output_file);
@@ -107,6 +107,7 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
             // Get history first
             invoke<[string[], number]>('fetch_logcat_buffer', {
                 device: selectedDevice,
+                sessionId: "logcat_tab",
                 offset: 0
             }).then((result) => {
                 if (!isSubscribed) return;
@@ -123,8 +124,8 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
             });
 
             // Listen for new chunks
-            listen<{ device: string, lines: string[] }>('logcat-data', (event) => {
-                if (event.payload.device === selectedDevice) {
+            listen<{ device: string, session_id: string, lines: string[] }>('logcat-data', (event) => {
+                if (event.payload.device === selectedDevice && event.payload.session_id === "logcat_tab") {
                     setLogs(prev => {
                         const updated = [...prev, ...event.payload.lines];
                         if (updated.length > 5000) return updated.slice(-5000);
@@ -218,6 +219,7 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
 
             await invoke('start_logcat', {
                 device: selectedDevice,
+                sessionId: "logcat_tab",
                 filter: activeFilter,
                 level: logLevel,
                 outputFile: dumpFile,
@@ -252,7 +254,7 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
     const stopLogcat = async () => {
 
         try {
-            await invoke('stop_logcat', { device: selectedDevice });
+            await invoke('stop_logcat', { device: selectedDevice, sessionId: "logcat_tab" });
             if (!isMounted.current) return; // Prevent state update if unmounted
             setIsStreaming(false);
             if (currentDumpFile) {

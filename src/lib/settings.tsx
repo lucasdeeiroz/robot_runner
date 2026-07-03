@@ -64,6 +64,7 @@ export interface AppSettings {
     logcatLevel?: string;
     logcatExtraTags?: string;
     logcatSelectedPackage?: string;
+    stopwatchSelectedPackage?: string;
 
     // Tools
     tools: {
@@ -159,6 +160,7 @@ const getDefaultSettings = (): AppSettings => ({
     logcatKeywords: [],
     logcatLevel: 'E',
     logcatExtraTags: '',
+    stopwatchSelectedPackage: '',
     tools: {
         appiumArgs: getRemoteString('default_appium_args') || '--relaxed-security',
         scrcpyArgs: getRemoteString('default_scrcpy_args') || '-m 1024 -b 2M --max-fps=30 --no-audio --stay-awake',

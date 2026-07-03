@@ -30,7 +30,7 @@ export function StopwatchSubTab({ selectedDevice, isTestRunning = false, allowAc
     const { settings, updateSetting } = useSettings();
     const [logLevel, setLogLevel] = useState<string>(settings.logcatLevel || "V");
     const [extraTags, setExtraTags] = useState<string>(settings.logcatExtraTags || "");
-    const selectedPackage = settings.logcatSelectedPackage || "";
+    const [selectedPackage, setSelectedPackage] = useState(() => settings.stopwatchSelectedPackage || "");
 
     const {
         laps,
@@ -54,6 +54,21 @@ export function StopwatchSubTab({ selectedDevice, isTestRunning = false, allowAc
                 warning={isActionDisabled ? t('common.actions_disabled_during_test') : undefined}
                 menus={
                     <div className="flex items-center gap-2">
+                        <div className="w-40">
+                            <Select
+                                options={[
+                                    { label: t('logcat.entire_system', 'Entire System'), value: "" },
+                                    ...(settings.tools?.appPackage ? settings.tools.appPackage.split(',') : []).map(p => ({ label: p.trim(), value: p.trim() })).filter(o => o.value)
+                                ]}
+                                value={selectedPackage}
+                                onChange={(e) => {
+                                    setSelectedPackage(e.target.value);
+                                    updateSetting('stopwatchSelectedPackage', e.target.value);
+                                }}
+                                disabled={isStopwatchRunning}
+                                containerClassName="w-full"
+                            />
+                        </div>
                         <div className="w-24">
                             <Select
                                 options={[
