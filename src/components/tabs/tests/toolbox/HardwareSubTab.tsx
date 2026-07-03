@@ -6,6 +6,7 @@ import { Button } from '@/components/atoms/Button';
 import { Input } from '@/components/atoms/Input';
 import { Switch } from '@/components/atoms/Switch';
 import { Battery, BatteryWarning, Wifi, Send, Plane, Signal } from 'lucide-react';
+import { Section } from '@/components/organisms/Section';
 
 interface HardwareSubTabProps {
     selectedDevice: string | null;
@@ -108,22 +109,20 @@ export function HardwareSubTab({ selectedDevice, isTestRunning, allowActionsDuri
     }
 
     return (
-        <div className="h-full w-full min-h-0 flex-1 overflow-y-auto">
-            <div className="p-4 flex flex-col gap-6 max-w-2xl mx-auto">
+        <div className="h-full w-full min-h-0 flex-1 overflow-y-auto custom-scrollbar">
+            <div className="p-4 grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-2 gap-6 items-start">
                 {disabled && (
-                    <div className="p-3 bg-warning-container/20 text-on-warning-container text-sm rounded-xl border border-warning/30 flex items-center gap-2">
+                    <div className="col-span-full p-3 bg-warning-container/20 text-on-warning-container text-sm rounded-xl border border-warning/30 flex items-center gap-2">
                         <BatteryWarning size={18} className="text-warning" />
                         {t('toolbox.hardware.disabled_during_test', 'Hardware controls are disabled while a test is running.')}
                     </div>
                 )}
 
                 {/* Battery Controls */}
-                <div className="bg-surface-variant/20 border border-outline-variant/30 rounded-2xl p-5 flex flex-col gap-4">
-                    <div className="flex items-center gap-3 border-b border-outline-variant/30 pb-3">
-                        <Battery className="text-primary" size={20} />
-                        <h3 className="font-semibold text-on-surface">{t('toolbox.hardware.battery.title', 'Battery Mocking')}</h3>
-                    </div>
-
+                <Section
+                    title={t('toolbox.hardware.battery.title', 'Battery Mocking')}
+                    icon={Battery}
+                >
                     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                         <div className="flex flex-col gap-2">
                             <label className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold">{t('toolbox.hardware.battery.set_level', 'Set Level (%)')}</label>
@@ -150,15 +149,13 @@ export function HardwareSubTab({ selectedDevice, isTestRunning, allowActionsDuri
                             </div>
                         </div>
                     </div>
-                </div>
+                </Section>
 
                 {/* Network & Connectivity */}
-                <div className="bg-surface-variant/20 border border-outline-variant/30 rounded-2xl p-5 flex flex-col gap-4">
-                    <div className="flex items-center gap-3 border-b border-outline-variant/30 pb-3">
-                        <Wifi className="text-primary" size={20} />
-                        <h3 className="font-semibold text-on-surface">{t('toolbox.hardware.connectivity.title', 'Connectivity')}</h3>
-                    </div>
-
+                <Section
+                    title={t('toolbox.hardware.connectivity.title', 'Connectivity')}
+                    icon={Wifi}
+                >
                     <div className="grid grid-cols-1 gap-6">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
@@ -182,26 +179,23 @@ export function HardwareSubTab({ selectedDevice, isTestRunning, allowActionsDuri
                             <Switch checked={airplaneMode} onCheckedChange={toggleAirplaneMode} disabled={disabled} />
                         </div>
                     </div>
-                </div>
+                </Section>
 
                 {/* Broadcasts & Intents */}
-                <div className="bg-surface-variant/20 border border-outline-variant/30 rounded-2xl p-5 flex flex-col gap-4">
-                    <div className="flex justify-between items-center gap-3 border-b border-outline-variant/30 pb-3">
-                        <div className="flex items-center gap-2">
-                            <Send className="text-primary" size={20} />
-                            <h3 className="font-semibold text-on-surface">{t('toolbox.hardware.broadcast.title', 'System Broadcasts')}</h3>
-                        </div>
+                <Section
+                    title={t('toolbox.hardware.broadcast.title', 'System Broadcasts')}
+                    icon={Send}
+                    actions={
                         <Button
                             variant="primary"
-                            className="self-end"
                             onClick={sendBroadcast}
                             disabled={disabled || !intentAction.trim()}
                             leftIcon={<Send size={16} />}
                         >
                             {t('toolbox.hardware.broadcast.send', 'Send Broadcast')}
                         </Button>
-                    </div>
-
+                    }
+                >
                     <div className="flex flex-col gap-3">
                         <Input
                             placeholder="e.g. android.intent.action.BOOT_COMPLETED"
@@ -218,7 +212,7 @@ export function HardwareSubTab({ selectedDevice, isTestRunning, allowActionsDuri
                             label={t('toolbox.hardware.broadcast.extras', 'Extras (Optional)')}
                         />
                     </div>
-                </div>
+                </Section>
             </div>
         </div>
     );
