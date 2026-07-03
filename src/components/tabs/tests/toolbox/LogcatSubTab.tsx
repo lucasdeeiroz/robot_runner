@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useDeferredValue } from "react";
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { open } from "@tauri-apps/plugin-dialog";
-import { Play, Square, Eraser, AlignLeft, Package as PackageIcon, FolderSearch, Settings } from "lucide-react";
+import { Play, Square, Eraser, AlignLeft, Package as PackageIcon, FolderSearch, Settings, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
@@ -153,6 +153,14 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
     });
     const [logLevel, setLogLevel] = useState(settings.logcatLevel || "E");
     const [extraTags, setExtraTags] = useState(settings.logcatExtraTags || "");
+    const [searchQuery, setSearchQuery] = useState("");
+    const deferredSearchQuery = useDeferredValue(searchQuery);
+
+    const filteredLogs = useMemo(() => {
+        if (!deferredSearchQuery) return logs;
+        const lowerQuery = deferredSearchQuery.toLowerCase();
+        return logs.filter(log => log.toLowerCase().includes(lowerQuery));
+    }, [logs, deferredSearchQuery]);
 
     const startLogcat = async () => {
         let activeLogcatPath = settings.paths.logcat;
@@ -354,7 +362,17 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
                     )}
 
                 actions={
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 items-center">
+                        <div className="w-48 relative">
+                            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant/50" />
+                            <input 
+                                type="text"
+                                placeholder={t('logcat.search_placeholder', 'Search logs...')}
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full h-8 bg-surface border border-outline-variant/30 rounded-lg pl-8 pr-3 py-1 text-[13px] font-normal normal-case text-on-surface focus:outline-none focus:border-primary/50 transition-colors"
+                            />
+                        </div>
                         <SplitButton
                             disabled={isTestRunning && !allowActionsDuringTest}
                             variant={isStreaming ? "danger" : "primary"}
@@ -379,7 +397,7 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
                             label={t('logcat.ai_analyze_button', 'Analyze with AI')}
                             variant="secondary"
                             size="sm"
-                            disabled={logs.length === 0 || isAiLoading}
+                            disabled={filteredLogs.length === 0 || isAiLoading}
                             className="bg-primary/5 border-primary/20 text-primary hover:bg-primary/10"
                             allowCustomPrompt={true}
                         />
@@ -395,18 +413,19 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
             {/* Log Viewer */}
             {/* Log Area */}
             <div className="flex-1 min-h-0 bg-surface text-on-surface/80 font-mono text-xs relative border border-outline-variant/30 rounded-2xl">
-                {logs.length === 0 ? (
+                {filteredLogs.length === 0 ? (
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-on-surface-variant/80 font-sans text-sm">
                         <AlignLeft size={32} className="opacity-20 mb-2" />
                         <p>
                             {isTestRunning ? t('logcat.status.paused_test', "Logcat paused during test") :
+                                searchQuery ? t('logcat.status.no_results', "No logs match the search query") :
                                 isStreaming ? t('logcat.status.waiting') : t('logcat.status.empty')}
                         </p>
                     </div>
                 ) : (
                     <Virtuoso
                         ref={virtuosoRef}
-                        data={logs}
+                        data={filteredLogs}
                         className="custom-scrollbar"
                         followOutput="auto"
                         atBottomThreshold={50} // If user scrolls up, stop auto-scrolling
@@ -510,9 +529,9 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
                     </div>
                 </div>
                 <div className="text-xs text-on-surface/80 flex items-center justify-end">
-                    {logs.length} {t('logcat.lines')}
+                    {searchQuery ? `${filteredLogs.length} / ${logs.length}` : logs.length} {t('logcat.lines')}
                     <Button
-                        onClick={() => { setLogs([]); }}
+                        onClick={() => { setLogs([]); setSearchQuery(""); }}
                         variant="ghost"
                         size="sm"
                         className="px-3 py-1.5 ml-2 rounded-2xl text-xs font-medium items-center justify-center gap-2 bg-surface text-on-surface/80 border border-outline-variant/30 hover:bg-surface-variant/50 transition-colors h-auto"

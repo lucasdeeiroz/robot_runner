@@ -699,8 +699,10 @@ export const pt = {
             status: {
                 paused_test: "Logcat pausado durante o teste",
                 waiting: "Aguardando logs...",
-                empty: "Nenhum log capturado"
+                empty: "Nenhum log capturado",
+                no_results: "Nenhum log corresponde à busca"
             },
+            search_placeholder: "Buscar logs...",
             saving: "Salvando logcat em",
             start: "Iniciar",
             stop: "Parar",

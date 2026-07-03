@@ -700,6 +700,7 @@ export const es = {
                 paused_test: "Logcat pausado durante la prueba",
                 waiting: "Esperando logs...",
                 empty: "No se capturaron logs",
+                no_results: "Ningún log coincide con la búsqueda",
                 loading: "Leyendo archivo...",
                 selected: "{{count}} pruebas seleccionadas",
                 load_error: "Error al cargar los casos de prueba del archivo"
@@ -708,6 +709,7 @@ export const es = {
                 appium_maven: "Nota: Para Appium/Java, todo el proyecto se ejecutará mediante Maven."
             },
             saving: "Guardando logcat en",
+            search_placeholder: "Buscar logs...",
             start: "Iniciar",
             stop: "Detener",
             filter: "Filtrar App",
