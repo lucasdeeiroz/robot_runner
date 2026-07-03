@@ -38,16 +38,16 @@ export function usePerformanceRecorder(
     allowActionsDuringTest: boolean = false
 ) {
     const { t } = useTranslation();
+    const { settings, updateSetting } = useSettings();
     const [stats, setStats] = useState<DeviceStats | null>(null);
     const [history, setHistory] = useState<(DeviceStats & { timestamp: number })[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [autoRefresh, setAutoRefresh] = useState(initialAutoRefresh);
-    const [selectedPackage, setSelectedPackage] = useState<string>("");
+    const [selectedPackage, setSelectedPackage] = useState<string>(settings?.logcatSelectedPackage || "");
     const [isLoading, setIsLoading] = useState(false);
     const [forceEnable, setForceEnable] = useState(false);
 
     // Stopwatch State
-    const { settings } = useSettings();
     const keywords = settings.logcatKeywords || [];
     const [laps, setLaps] = useState<StopwatchLap[]>([]);
     const [deltaUnit, setDeltaUnit] = useState<'ms' | 's' | 'min' | 'h'>('ms');
@@ -74,12 +74,14 @@ export function usePerformanceRecorder(
         } else {
             setLaps([]);
             try {
+                await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'logcat', '-G', '10M'] });
                 await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'logcat', '-c'] });
                 await invoke('start_logcat', {
                     device: selectedDevice,
                     filter: selectedPackage || null,
-                    level: "V",
-                    outputFile: null
+                    level: settings.logcatLevel || "V",
+                    outputFile: null,
+                    extraTags: settings.logcatExtraTags || null
                 });
                 setIsStopwatchRunning(true);
             } catch (e: any) {
@@ -323,7 +325,10 @@ export function usePerformanceRecorder(
         autoRefresh,
         setAutoRefresh,
         selectedPackage,
-        setSelectedPackage,
+        setSelectedPackage: (pkg: string) => {
+            setSelectedPackage(pkg);
+            updateSetting('logcatSelectedPackage', pkg);
+        },
         isRecording,
         toggleRecording,
         lastSaved,

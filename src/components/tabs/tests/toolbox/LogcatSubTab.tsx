@@ -146,23 +146,13 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
         };
     }, [isStreaming, selectedDevice, isTestRunning, allowActionsDuringTest]);
 
-    const [selectedPackage, setSelectedPackage] = useState("");
-    const [logLevel, setLogLevel] = useState("E");
-
-    // Parse packages from settings
-    const packages = settings.tools.appPackage
-        ? settings.tools.appPackage
-            .split(',')
-            .map(p => p.trim())
-            .filter(p => p.length > 0)
-        : [];
-
-    // Auto-select first package if available
-    useEffect(() => {
-        if (packages.length > 0 && !selectedPackage) {
-            setSelectedPackage(packages[0]);
-        }
-    }, [settings.tools.appPackage]);
+    const [selectedPackage, setSelectedPackage] = useState(() => {
+        if (settings.logcatSelectedPackage !== undefined) return settings.logcatSelectedPackage;
+        const pkgs = settings.tools.appPackage ? settings.tools.appPackage.split(',').map(p => p.trim()).filter(p => p.length > 0) : [];
+        return pkgs.length > 0 ? pkgs[0] : "";
+    });
+    const [logLevel, setLogLevel] = useState(settings.logcatLevel || "E");
+    const [extraTags, setExtraTags] = useState(settings.logcatExtraTags || "");
 
     const startLogcat = async () => {
         let activeLogcatPath = settings.paths.logcat;
@@ -203,6 +193,13 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
         try {
             setLogs([]); // Clear previous logs for clarity
 
+            // Increase buffer size to prevent circular buffer overflow during heavy test processing
+            try {
+                await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'logcat', '-G', '10M'] });
+            } catch (e) {
+                console.warn("Failed to increase logcat buffer:", e);
+            }
+
             if (clearBeforeStart) {
                 try {
                     await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'logcat', '-c'] });
@@ -215,7 +212,8 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
                 device: selectedDevice,
                 filter: activeFilter,
                 level: logLevel,
-                outputFile: dumpFile
+                outputFile: dumpFile,
+                extraTags: extraTags || null
             });
             setIsStreaming(true);
             if (dumpFile) {
@@ -270,12 +268,12 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
         setAiResult(null);
 
         const lastLogs = logs.slice(-100).join('\n'); // Take last 100 lines for context
-        
+
         let promptStr = `Analyze the following Android Logcat output. Identify potential errors, crashes, or performance bottlenecks. Provide a summary and then a detailed analysis. Respond in ${currentLang}.`;
         if (customPrompt) {
             promptStr = `You have a specific instruction from the user:\n"${customPrompt}"\n\nAnalyze the following Android Logcat output based on the user instruction. Respond in ${currentLang}.`;
         }
-        
+
         const prompt = `${promptStr}\n\nLOGS:\n${lastLogs}`;
         const systemInstruction = `You are an expert Android Developer and QA Engineer. Analyze logcat snippets precisely. Always provide your response in ${currentLang}. Use the exact prefix "Summary: " followed by an EXTREMELY CONCISE one-line summary (MAXIMUM 15 WORDS).`;
 
@@ -333,77 +331,28 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
                 variant="transparent"
                 className="pb-2 mb-2 p-2"
                 status={
-                    <div className="flex items-center gap-3">
-                        {!settings.paths.logcat && (
-                            <div className="flex items-center gap-2 px-3 py-1 bg-warning/10 text-warning rounded-2xl text-[11px] font-medium border border-warning/20">
-                                <FolderSearch size={14} />
-                                <span>{t('logcat.not_saving')}</span>
-                                <Button
-                                    onClick={handleConfigurePath}
-                                    className="underline hover:text-warning/80 ml-1"
-                                >
-                                    {t('logcat.configure_path')}
-                                </Button>
-                                {onNavigate && (
-                                    <Button
-                                        onClick={() => onNavigate?.('settings')}
-                                        className="flex items-center gap-1 hover:text-warning/80 ml-2 border-l border-warning/20 pl-2"
-                                    >
-                                        <Settings size={12} />
-                                        {t('common.go_to_settings')}
-                                    </Button>
-                                )}
-                            </div>
-                        )}
-                        <div className="text-xs text-on-surface/80">
-                            {logs.length} {t('logcat.lines')}
+                    !settings.paths.logcat && (
+                        <div className="flex items-center gap-2 px-3 py-1 bg-warning/10 text-warning rounded-2xl text-[11px] font-medium border border-warning/20">
+                            <FolderSearch size={14} />
+                            <span>{t('logcat.not_saving')}</span>
                             <Button
-                                onClick={() => { setLogs([]); }}
-                                variant="ghost"
-                                size="sm"
-                                className="px-3 py-1.5 ml-2 rounded-2xl text-xs font-medium items-center justify-center gap-2 bg-surface text-on-surface/80 border border-outline-variant/30 hover:bg-surface-variant/50 transition-colors h-auto"
-                                data-tooltip={t('logcat.clear')}
-                                data-position="left"
+                                onClick={handleConfigurePath}
+                                className="underline hover:text-warning/80 ml-1"
                             >
-                                <Eraser size={14} />
+                                {t('logcat.configure_path')}
                             </Button>
+                            {onNavigate && (
+                                <Button
+                                    onClick={() => onNavigate?.('settings')}
+                                    className="flex items-center gap-1 hover:text-warning/80 ml-2 border-l border-warning/20 pl-2"
+                                >
+                                    <Settings size={12} />
+                                    {t('common.go_to_settings')}
+                                </Button>
+                            )}
                         </div>
-                    </div>
-                }
-                menus={!isNarrow ? (
-                    <div className="flex items-center gap-2">
-                        {/* Package Selector */}
-                        <div className="w-40">
-                            <Select
-                                options={[
-                                    { label: t('logcat.entire_system'), value: "" },
-                                    ...(settings.tools?.appPackage ? settings.tools.appPackage.split(',') : []).map(p => ({ label: p.trim(), value: p.trim() })).filter(o => o.value)
-                                ]}
-                                value={selectedPackage}
-                                onChange={(e) => setSelectedPackage(e.target.value)}
-                                leftIcon={<PackageIcon size={14} />}
-                                disabled={isStreaming}
-                                containerClassName="w-full"
-                            />
-                        </div>
-                        <div className="w-28">
-                            <Select
-                                options={[
-                                    { label: "Verbose", value: "V" },
-                                    { label: "Debug", value: "D" },
-                                    { label: "Info", value: "I" },
-                                    { label: "Warning", value: "W" },
-                                    { label: "Error", value: "E" },
-                                    { label: "Fatal", value: "F" },
-                                    { label: "Silent", value: "S" },
-                                ]}
-                                value={logLevel}
-                                onChange={(e) => setLogLevel(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                ) : null
-                }
+                    )}
+
                 actions={
                     <div className="flex gap-2">
                         <SplitButton
@@ -504,6 +453,76 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
                     />
                 </div>
             </Modal>
+            <div className="flex items-center justify-between w-full mt-2">
+                <div className="flex items-center gap-2">
+                    {/* Package Selector */}
+                    <div className="w-40">
+                        <Select
+                            options={[
+                                { label: t('logcat.entire_system'), value: "" },
+                                ...(settings.tools?.appPackage ? settings.tools.appPackage.split(',') : []).map(p => ({ label: p.trim(), value: p.trim() })).filter(o => o.value)
+                            ]}
+                            value={selectedPackage}
+                            onChange={(e) => {
+                                setSelectedPackage(e.target.value);
+                                updateSetting('logcatSelectedPackage', e.target.value);
+                            }}
+                            leftIcon={<PackageIcon size={14} />}
+                            disabled={isStreaming}
+                            containerClassName="w-full"
+                            dropdownPosition="top"
+                        />
+                    </div>
+                    <div className="w-28">
+                        <Select
+                            options={[
+                                { label: "Verbose", value: "V" },
+                                { label: "Debug", value: "D" },
+                                { label: "Info", value: "I" },
+                                { label: "Warning", value: "W" },
+                                { label: "Error", value: "E" },
+                                { label: "Fatal", value: "F" },
+                                { label: "Silent", value: "S" },
+                            ]}
+                            value={logLevel}
+                            onChange={(e) => {
+                                setLogLevel(e.target.value);
+                                updateSetting('logcatLevel', e.target.value);
+                            }}
+                            dropdownPosition="top"
+                        />
+                    </div>
+                    <div className="w-48">
+                        <input 
+                            type="text"
+                            value={extraTags}
+                            onChange={e => setExtraTags(e.target.value)}
+                            onBlur={() => updateSetting('logcatExtraTags', extraTags)}
+                            onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                    updateSetting('logcatExtraTags', extraTags);
+                                }
+                            }}
+                            placeholder={t('logcat.custom_tags_placeholder', 'Tags (e.g. App:V)')}
+                            className="w-full h-8 bg-surface border border-outline-variant/30 rounded-lg px-3 py-1 text-[13px] text-on-surface focus:outline-none focus:border-primary/50 transition-colors"
+                            disabled={isStreaming}
+                        />
+                    </div>
+                </div>
+                <div className="text-xs text-on-surface/80 flex items-center justify-end">
+                    {logs.length} {t('logcat.lines')}
+                    <Button
+                        onClick={() => { setLogs([]); }}
+                        variant="ghost"
+                        size="sm"
+                        className="px-3 py-1.5 ml-2 rounded-2xl text-xs font-medium items-center justify-center gap-2 bg-surface text-on-surface/80 border border-outline-variant/30 hover:bg-surface-variant/50 transition-colors h-auto"
+                        data-tooltip={t('logcat.clear')}
+                        data-position="left"
+                    >
+                        <Eraser size={14} />
+                    </Button>
+                </div>
+            </div>
         </div >
     );
 }

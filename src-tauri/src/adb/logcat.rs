@@ -29,6 +29,7 @@ pub fn start_logcat(
     filter: Option<String>,
     level: Option<String>,
     output_file: Option<String>,
+    extra_tags: Option<String>,
 ) -> Result<String, String> {
     let mut procs = state.0.lock().map_err(|_e| _e.to_string())?;
 
@@ -66,6 +67,7 @@ pub fn start_logcat(
     let thread_level = level.clone();
     let thread_buffer = buffer.clone();
     let thread_output_file = output_file.clone();
+    let thread_extra_tags = extra_tags.clone();
     let thread_child_mutex = child_mutex.clone();
     let thread_should_stop = should_stop.clone();
     let thread_adb_program = adb_program;
@@ -117,6 +119,14 @@ pub fn start_logcat(
 
             let level_arg = format!("*:{}", lvl);
             args.push(&level_arg);
+
+            let tags = thread_extra_tags.clone();
+            if let Some(ref t) = tags {
+                let parts: Vec<&str> = t.split_whitespace().collect();
+                for part in parts {
+                    args.push(part);
+                }
+            }
 
             // Spawn
             let mut cmd = new_std_command(&adb_bin);

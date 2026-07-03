@@ -83,6 +83,8 @@ export function PerformanceSubTab({
 
     const keywords = settings.logcatKeywords || [];
     const [newKeyword, setNewKeyword] = useState('');
+    const [logLevel, setLogLevel] = useState(settings.logcatLevel || "E");
+    const [extraTags, setExtraTags] = useState(settings.logcatExtraTags || "");
 
     const handleConfigurePath = async () => {
         const selected = await open({
@@ -479,12 +481,48 @@ export function PerformanceSubTab({
                                 <span className="flex items-center gap-2">
                                     <Activity size={14} /> {t('performance.stopwatch.title', 'Logcat Stopwatch')}
                                 </span>
-                                <Button
-                                    onClick={handleToggleStopwatch}
-                                    variant={isStopwatchRunning ? "danger" : "primary"}
-                                    size="sm"
-                                    className="h-7 text-xs px-3"
-                                >
+                                <div className="flex items-center gap-2">
+                                    <div className="w-24">
+                                        <Select
+                                            options={[
+                                                { label: "Verbose", value: "V" },
+                                                { label: "Debug", value: "D" },
+                                                { label: "Info", value: "I" },
+                                                { label: "Warning", value: "W" },
+                                                { label: "Error", value: "E" },
+                                                { label: "Fatal", value: "F" },
+                                                { label: "Silent", value: "S" },
+                                            ]}
+                                            value={logLevel}
+                                            onChange={(e) => {
+                                                setLogLevel(e.target.value);
+                                                updateSetting('logcatLevel', e.target.value);
+                                            }}
+                                            containerClassName="w-full"
+                                        />
+                                    </div>
+                                    <div className="w-32">
+                                        <input 
+                                            type="text"
+                                            value={extraTags}
+                                            onChange={e => setExtraTags(e.target.value)}
+                                            onBlur={() => updateSetting('logcatExtraTags', extraTags)}
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter') {
+                                                    updateSetting('logcatExtraTags', extraTags);
+                                                }
+                                            }}
+                                            placeholder={t('logcat.custom_tags_placeholder', 'Tags (e.g. App:V)')}
+                                            className="w-full h-8 bg-surface border border-outline-variant/30 rounded-lg px-3 py-1 text-[13px] font-normal normal-case text-on-surface focus:outline-none focus:border-primary/50 transition-colors"
+                                            disabled={isStopwatchRunning}
+                                        />
+                                    </div>
+                                    <Button
+                                        onClick={handleToggleStopwatch}
+                                        variant={isStopwatchRunning ? "danger" : "primary"}
+                                        size="sm"
+                                        className="h-8 text-xs px-3"
+                                    >
                                     {isStopwatchRunning
                                         ? (
                                             <>
@@ -499,6 +537,7 @@ export function PerformanceSubTab({
                                         )
                                     }
                                 </Button>
+                                </div>
                             </h3>
                             <Card title={t('performance.stopwatch.card_title', 'Performance Checkpoints')} icon={<Zap size={20} className="text-yellow-500" />}>
                                 <div className="space-y-4 mt-2">

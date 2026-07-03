@@ -61,6 +61,9 @@ export interface AppSettings {
         mappings?: string;
     };
     logcatKeywords?: string[];
+    logcatLevel?: string;
+    logcatExtraTags?: string;
+    logcatSelectedPackage?: string;
 
     // Tools
     tools: {
@@ -154,6 +157,8 @@ const getDefaultSettings = (): AppSettings => ({
         mappings: '',
     },
     logcatKeywords: [],
+    logcatLevel: 'E',
+    logcatExtraTags: '',
     tools: {
         appiumArgs: getRemoteString('default_appium_args') || '--relaxed-security',
         scrcpyArgs: getRemoteString('default_scrcpy_args') || '-m 1024 -b 2M --max-fps=30 --no-audio --stay-awake',
