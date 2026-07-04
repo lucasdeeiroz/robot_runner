@@ -1,11 +1,12 @@
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
+import { useSettings } from '@/lib/settings';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { Button } from '@/components/atoms/Button';
 import { Section } from '@/components/organisms/Section';
-import { Upload, ShieldCheck, CheckCircle2, XCircle, Search, RefreshCcw, FileText, ListPlus, Info, Download } from 'lucide-react';
+import { Upload, ShieldCheck, CheckCircle2, XCircle, Search, FileText, ListPlus, Info, Download, Filter, FilterX, Play } from 'lucide-react';
 import { Input } from '@/components/atoms/Input';
 import clsx from 'clsx';
 import { ExpressiveLoading } from '@/components/atoms/ExpressiveLoading';
@@ -33,8 +34,9 @@ interface PackageInfo {
     is_disabled: boolean;
 }
 
-export function CheckupSubTab({ selectedDevice, isTestRunning, allowActionsDuringTest }: CheckupSubTabProps) {
+export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDuringTest }: CheckupSubTabProps) => {
     const { t } = useTranslation();
+    const { settings } = useSettings();
     const [isLoading, setIsLoading] = useState(false);
     const [comparisons, setComparisons] = useState<PropComparison[]>([]);
     const [devicePropsCache, setDevicePropsCache] = useState<Record<string, string>>({});
@@ -449,6 +451,7 @@ export function CheckupSubTab({ selectedDevice, isTestRunning, allowActionsDurin
     </style>
 </head>
 <body>
+    ${settings.customLogoLight ? `<img src="${settings.customLogoLight}" alt="Logo" style="max-height: 48px; margin-bottom: 1rem;" />` : ''}
     <h1>${t('toolbox.checkup.report_title', 'Device Checkup Report')}</h1>
     <p><strong>Device UDID:</strong> <code>${selectedDevice}</code><br><strong>Date:</strong> ${new Date().toLocaleString()}</p>
 `;
@@ -619,132 +622,56 @@ export function CheckupSubTab({ selectedDevice, isTestRunning, allowActionsDurin
     return (
         <div className="flex flex-col h-full overflow-hidden bg-surface p-4 gap-4">
 
-            <div className="flex-1 min-h-0 flex flex-col xl:flex-row gap-6">
-
-                {/* Standard Checks Panel */}
-                <Section
-                    title={t('toolbox.checkup.standard_checks', 'Standard Checklist')}
-                    icon={ShieldCheck}
-                    className="flex-1 flex flex-col min-h-0 overflow-hidden"
-                    contentClassName="flex-1 overflow-y-auto pr-2 space-y-2 min-h-0"
-                    actions={
-                        <Button
-                            variant="secondary"
-                            onClick={runStandardChecks}
-                            disabled={disabled || standardChecks.some(c => c.status === 'running')}
-                            className="flex items-center gap-2 h-9"
-                        >
-                            <RefreshCcw size={16} className={clsx(standardChecks.some(c => c.status === 'running') && "animate-spin")} />
-                            {t('toolbox.checkup.run_checks', 'Run Checks')}
-                        </Button>
-                    }
-                >
-                    {standardChecks.map(check => (
-                        <div key={check.id} className="flex flex-col p-4 rounded-xl border border-outline-variant/30 bg-surface-variant/20 text-sm">
-                            <div className="flex justify-between items-center mb-1 gap-2">
-                                <span className="font-medium text-on-surface leading-tight">{check.name}</span>
-                                {check.status === 'running' && <ExpressiveLoading variant="circular" size="sm" />}
-                                {check.status === 'correct' && <CheckCircle2 size={18} className="text-success shrink-0" />}
-                                {check.status === 'incorrect' && <XCircle size={18} className="text-error shrink-0" />}
-                            </div>
-                            {check.found && (
-                                <div className="flex justify-between items-center text-xs mt-2">
-                                    <span className="text-on-surface-variant">{t('toolbox.checkup.found', 'Found')}:</span>
-                                    <span className={clsx(
-                                        "font-mono px-2 py-0.5 rounded",
-                                        check.status === 'correct' ? "bg-success/10 text-success" : "bg-error/10 text-error"
-                                    )}>
-                                        {check.found}
-                                    </span>
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                </Section>
-
-                {/* Additional Checks */}
-                <Section
-                    title={t('toolbox.checkup.additional_checks', 'Additional Checks')}
-                    icon={ListPlus}
-                    className="flex-1 flex flex-col min-h-0 overflow-hidden"
-                    contentClassName="flex-1 overflow-y-auto pr-2 space-y-2 min-h-0"
-                    actions={
-                        <Button
-                            variant="secondary"
-                            onClick={runAdditionalChecks}
-                            disabled={disabled || additionalChecks.some(c => c.status === 'running')}
-                            className="flex items-center gap-2 h-9"
-                        >
-                            <RefreshCcw size={16} className={clsx(additionalChecks.some(c => c.status === 'running') && "animate-spin")} />
-                            {t('toolbox.checkup.run_additional_checks', 'Run Additional Checks')}
-                        </Button>
-                    }
-                >
-                    {additionalChecks.map(check => (
-                        <div key={check.id} className="flex flex-col p-4 rounded-xl border border-outline-variant/30 bg-surface-variant/20 text-sm">
-                            <div className="flex justify-between items-center mb-1 gap-2">
-                                <span className="font-medium text-on-surface leading-tight">{check.name}</span>
-                                {check.status === 'running' && <ExpressiveLoading variant="circular" size="sm" />}
-                                {check.status === 'done' && <Info size={18} className="text-primary shrink-0" />}
-                            </div>
-                            {check.found && (
-                                <div className="flex justify-between items-center text-xs mt-2">
-                                    <span className="text-on-surface-variant">{t('toolbox.checkup.found', 'Found')}:</span>
-                                    <span className="font-mono px-2 py-0.5 rounded bg-primary/10 text-primary">
-                                        {check.found}
-                                    </span>
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                </Section>
+            <div className="flex-1 min-h-0 flex flex-wrap gap-6 overflow-y-auto pb-2">
 
                 {/* Props Comparison Panel */}
                 <Section
                     title=".prop Compare"
                     icon={FileText}
-                    className="flex-[2] flex flex-col min-h-0 overflow-hidden"
+                    className="flex-[2] min-w-[350px] flex flex-col min-h-[400px] xl:min-h-0 overflow-hidden"
                     contentClassName="flex-1 overflow-y-auto pr-2 min-h-0"
                     actions={
                         <div className="flex flex-wrap items-center gap-2">
                             {selectedDevice && (
                                 <Button
                                     variant="outline"
+                                    tooltipPosition="left"
                                     onClick={handleLoadRemainingProps}
                                     disabled={disabled || isLoading}
-                                    className="flex items-center gap-2 h-9"
+                                    className="relative h-9 w-9 p-0 flex items-center justify-center shrink-0 rounded-md"
+                                    title={t('toolbox.checkup.load_remaining', 'Load remaining base props')}
                                 >
                                     <ListPlus size={16} />
-                                    {t('toolbox.checkup.load_remaining', 'Load remaining base props')}
                                 </Button>
                             )}
                             <Button
                                 variant="primary"
                                 onClick={handleImportFile}
                                 disabled={disabled || isLoading}
-                                className="flex items-center gap-2 h-9"
+                                className="flex items-center gap-2 h-9 px-3"
+                                title={t('toolbox.checkup.upload_prop', 'Import')}
                             >
                                 <Upload size={16} />
-                                {t('toolbox.checkup.upload_prop', 'Import')}
+                                <span className="hidden sm:inline">{t('toolbox.checkup.upload_prop', 'Import')}</span>
                             </Button>
                         </div>
                     }
                 >
                     <div className="flex items-center justify-end gap-2 mb-4">
                         {comparisons.length > 0 && (
-                            <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full font-medium">
+                            <span className="text-xs px-2 h-9 flex items-center justify-center bg-primary/10 text-primary rounded-full font-medium whitespace-nowrap">
                                 {matchCount} / {comparisons.length} {t('toolbox.checkup.matches', 'matches')}
                             </span>
                         )}
                         <Button
                             variant={filterDivergent ? "primary" : "ghost"}
                             size="sm"
+                            tooltipPosition="left"
                             onClick={() => setFilterDivergent(!filterDivergent)}
-                            className={clsx("h-9 text-sm px-3", filterDivergent && "bg-error/10 text-error hover:bg-error/20 hover:text-error")}
+                            className={clsx("relative h-9 w-9 p-0 flex items-center justify-center shrink-0 rounded-md", filterDivergent && "bg-error/10 text-error hover:bg-error/20 hover:text-error")}
+                            title={filterDivergent ? t('toolbox.checkup.show_all', 'Show all') : t('toolbox.checkup.show_divergent', 'Show only divergences')}
                         >
-                            {filterDivergent
-                                ? t('toolbox.checkup.show_all', 'Show all')
-                                : t('toolbox.checkup.show_divergent', 'Show only divergences')}
+                            {filterDivergent ? <FilterX size={16} /> : <Filter size={16} />}
                         </Button>
                         <div className="relative">
                             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/50" />
@@ -758,17 +685,18 @@ export function CheckupSubTab({ selectedDevice, isTestRunning, allowActionsDurin
                         {selectedDevice && (
                             <Button
                                 variant="outline"
+                                tooltipPosition="left"
                                 onClick={generateReport}
                                 disabled={disabled || isLoading}
-                                className="flex items-center gap-2 h-9"
+                                className="relative h-9 w-9 p-0 flex items-center justify-center shrink-0 rounded-md"
+                                title={t('toolbox.checkup.generate_report', 'Generate Report')}
                             >
                                 <Download size={16} />
-                                {t('toolbox.checkup.generate_report', 'Generate Report')}
                             </Button>
                         )}
                     </div>
                     <div className="flex-1 h-full min-h-0 bg-surface-variant/10 rounded-xl border border-outline-variant/30 overflow-hidden">
-                        <div className="h-full overflow-y-auto">
+                        <div className="h-full overflow-y-auto overflow-x-auto custom-scrollbar">
                             {isLoading ? (
                                 <div className="flex items-center justify-center h-full text-on-surface-variant/60 gap-3 min-h-[200px]">
                                     <ExpressiveLoading variant="circular" size="md" />
@@ -780,32 +708,32 @@ export function CheckupSubTab({ selectedDevice, isTestRunning, allowActionsDurin
                                     <p className="text-sm max-w-[250px]">{t('toolbox.checkup.upload_prop_desc', 'Import a .prop file to compare.')}</p>
                                 </div>
                             ) : (
-                                <table className="w-full text-left border-collapse text-sm">
-                                    <thead className="bg-surface/90 backdrop-blur sticky top-0 shadow-sm z-10 text-on-surface-variant">
+                                <table className="w-full min-w-[400px] text-left border-collapse text-sm table-fixed">
+                                    <thead className="bg-surface-variant/30 backdrop-blur-md sticky top-0 shadow-sm z-10 text-on-surface-variant">
                                         <tr>
-                                            <th className="p-3 font-medium border-b border-outline-variant/30">Key</th>
-                                            <th className="p-3 font-medium border-b border-outline-variant/30 w-1/4">{t('toolbox.checkup.expected', 'Expected')}</th>
-                                            <th className="p-3 font-medium border-b border-outline-variant/30 w-1/4">{t('toolbox.checkup.found', 'Found')}</th>
-                                            <th className="p-3 font-medium border-b border-outline-variant/30 w-16 text-center">Status</th>
+                                            <th className="p-3 font-medium border-b border-outline-variant/30 w-4/12 md:w-5/12">Key</th>
+                                            <th className="p-3 font-medium border-b border-outline-variant/30 w-3/12">{t('toolbox.checkup.expected', 'Expected')}</th>
+                                            <th className="p-3 font-medium border-b border-outline-variant/30 w-3/12">{t('toolbox.checkup.found', 'Found')}</th>
+                                            <th className="p-3 font-medium border-b border-outline-variant/30 w-2/12 md:w-1/12 text-center min-w-[60px]">Status</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {filteredComparisons.map(c => (
                                             <tr key={c.key} className="border-b border-outline-variant/10 hover:bg-surface-variant/20 transition-colors">
-                                                <td className="p-3 font-mono text-xs text-on-surface break-all">{c.key}</td>
-                                                <td className="p-3 font-mono text-xs text-on-surface-variant break-all">{c.expected}</td>
+                                                <td className="p-3 font-mono text-[11px] text-on-surface break-words leading-relaxed">{c.key}</td>
+                                                <td className="p-3 font-mono text-[11px] text-on-surface-variant break-words leading-relaxed">{c.expected}</td>
                                                 <td className={clsx(
-                                                    "p-3 font-mono text-xs break-all",
+                                                    "p-3 font-mono text-[11px] break-words leading-relaxed",
                                                     c.isMatch ? "text-success" : (c.isExtra ? "text-warning" : "text-error font-semibold")
                                                 )}>
                                                     {c.found || <span className="italic opacity-50">{t('toolbox.checkup.not_found', 'Not found')}</span>}
                                                 </td>
-                                                <td className="p-3 text-center">
+                                                <td className="p-3 text-center align-middle">
                                                     {c.isMatch
-                                                        ? <CheckCircle2 size={16} className="text-success mx-auto" />
+                                                        ? <CheckCircle2 size={16} className="text-success mx-auto drop-shadow-sm" />
                                                         : (c.isExtra
-                                                            ? <Info size={16} className="text-warning mx-auto" />
-                                                            : <XCircle size={16} className="text-error mx-auto" />
+                                                            ? <Info size={16} className="text-warning mx-auto drop-shadow-sm" />
+                                                            : <XCircle size={16} className="text-error mx-auto drop-shadow-sm" />
                                                         )
                                                     }
                                                 </td>
@@ -823,6 +751,86 @@ export function CheckupSubTab({ selectedDevice, isTestRunning, allowActionsDurin
                             )}
                         </div>
                     </div>
+                </Section>
+
+                {/* Standard Checks Panel */}
+                <Section
+                    title={t('toolbox.checkup.standard_checks', 'Standard Checklist')}
+                    icon={ShieldCheck}
+                    className="flex-1 min-w-[280px] flex flex-col min-h-[400px] xl:min-h-0 overflow-hidden"
+                    contentClassName="flex-1 overflow-y-auto pr-2 space-y-3 min-h-0"
+                    actions={
+                        <Button
+                            variant="secondary"
+                            tooltipPosition="left"
+                            title={t('toolbox.checkup.run_checks', 'Run Checks')}
+                            onClick={runStandardChecks}
+                            disabled={disabled || standardChecks.some(c => c.status === 'running')}
+                            className="relative h-9 w-9 p-0 flex items-center justify-center shrink-0 rounded-md"
+                        >
+                            <Play size={16} className={clsx(standardChecks.some(c => c.status === 'running') && "animate-spin")} />
+                        </Button>
+                    }
+                >
+                    {standardChecks.map(check => (
+                        <div key={check.id} className="flex flex-col p-4 rounded-xl border border-outline-variant/30 bg-surface-variant/10 backdrop-blur-md hover:bg-surface-variant/20 transition-all shadow-sm text-sm">
+                            <div className="flex justify-between items-center mb-1 gap-2">
+                                <span className="font-medium text-on-surface leading-tight drop-shadow-sm">{check.name}</span>
+                                {check.status === 'running' && <ExpressiveLoading variant="circular" size="sm" />}
+                                {check.status === 'correct' && <CheckCircle2 size={18} className="text-success shrink-0 drop-shadow-sm" />}
+                                {check.status === 'incorrect' && <XCircle size={18} className="text-error shrink-0 drop-shadow-sm" />}
+                            </div>
+                            {check.found && (
+                                <div className="flex justify-between items-center text-xs mt-3 pt-2 border-t border-outline-variant/20">
+                                    <span className="text-on-surface-variant/80 font-medium">{t('toolbox.checkup.found', 'Found')}:</span>
+                                    <span className={clsx(
+                                        "font-mono px-2 py-1 rounded-md shadow-inner",
+                                        check.status === 'correct' ? "bg-success/15 text-success" : "bg-error/15 text-error"
+                                    )}>
+                                        {check.found}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </Section>
+
+                {/* Additional Checks */}
+                <Section
+                    title={t('toolbox.checkup.additional_checks', 'Additional Checks')}
+                    icon={ListPlus}
+                    className="flex-1 min-w-[280px] flex flex-col min-h-[400px] xl:min-h-0 overflow-hidden"
+                    contentClassName="flex-1 overflow-y-auto pr-2 space-y-3 min-h-0"
+                    actions={
+                        <Button
+                            variant="secondary"
+                            tooltipPosition="left"
+                            title={t('toolbox.checkup.run_additional_checks', 'Run Additional Checks')}
+                            onClick={runAdditionalChecks}
+                            disabled={disabled || additionalChecks.some(c => c.status === 'running')}
+                            className="relative h-9 w-9 p-0 flex items-center justify-center shrink-0 rounded-md"
+                        >
+                            <Play size={16} className={clsx(additionalChecks.some(c => c.status === 'running') && "animate-spin")} />
+                        </Button>
+                    }
+                >
+                    {additionalChecks.map(check => (
+                        <div key={check.id} className="flex flex-col p-4 rounded-xl border border-outline-variant/30 bg-surface-variant/10 backdrop-blur-md hover:bg-surface-variant/20 transition-all shadow-sm text-sm">
+                            <div className="flex justify-between items-center mb-1 gap-2">
+                                <span className="font-medium text-on-surface leading-tight drop-shadow-sm">{check.name}</span>
+                                {check.status === 'running' && <ExpressiveLoading variant="circular" size="sm" />}
+                                {check.status === 'done' && <Info size={18} className="text-primary shrink-0 drop-shadow-sm" />}
+                            </div>
+                            {check.found && (
+                                <div className="flex justify-between items-center text-xs mt-3 pt-2 border-t border-outline-variant/20">
+                                    <span className="text-on-surface-variant/80 font-medium">{t('toolbox.checkup.found', 'Found')}:</span>
+                                    <span className="font-mono px-2 py-1 rounded-md shadow-inner bg-primary/15 text-primary break-all max-w-[70%] text-right">
+                                        {check.found}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    ))}
                 </Section>
 
             </div>
