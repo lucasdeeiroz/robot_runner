@@ -19,6 +19,7 @@ import { SplitButton } from "@/components/molecules/SplitButton";
 interface PackageInfo {
     name: String;
     path: String;
+    version: String;
     is_system: boolean;
     is_disabled: boolean;
 }
@@ -384,7 +385,13 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
                                         )}
                                     </div>
                                     <div className="text-xs text-on-surface-variant/80 truncate font-mono opacity-70 flex items-center gap-2">
-                                        <span className="shrink-0 truncate max-w-[50%]">{pkg.name}</span>
+                                        <span className="shrink-0 truncate max-w-[40%]">{pkg.name}</span>
+                                        {pkg.version && (
+                                            <>
+                                                <span className="text-outline-variant px-1 shrink-0">•</span>
+                                                <span className="shrink-0 text-primary">v{pkg.version}</span>
+                                            </>
+                                        )}
                                         <span className="text-outline-variant px-1 shrink-0">•</span>
                                         <span data-tooltip={String(pkg.path)} data-position="left" className="truncate cursor-help hover:text-on-surface/80 transition-colors">
                                             {pkg.path}
