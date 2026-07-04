@@ -35,6 +35,8 @@ export function CheckupSubTab({ selectedDevice, isTestRunning, allowActionsDurin
     // Standard checks based on POS Checklist
     const [checkResults, setCheckResults] = useState<Record<string, { status: 'idle' | 'running' | 'correct' | 'incorrect', found?: string }>>({});
 
+    const [additionalCheckResults, setAdditionalCheckResults] = useState<Record<string, { status: 'idle' | 'running' | 'done', found?: string }>>({});
+
     const standardChecksBase = useMemo(() => [
         {
             id: 'verified_boot',
@@ -131,6 +133,75 @@ export function CheckupSubTab({ selectedDevice, isTestRunning, allowActionsDurin
         }));
     }, [standardChecksBase, checkResults]);
 
+    const additionalChecksBase = useMemo(() => [
+        {
+            id: 'imei',
+            name: t('toolbox.checkup.additional.imei', 'IMEI (iphonesubinfo)'),
+            command: ['shell', 'service', 'call', 'iphonesubinfo', '1'],
+            foundDisplay: (out: string) => {
+                const matches = out.match(/'([^']+)'/g);
+                if (matches) {
+                    const text = matches.map(m => m.slice(1, -1)).join('');
+                    const imei = text.replace(/\D/g, '');
+                    return imei || t('toolbox.checkup.not_found', 'Not found');
+                }
+                return t('toolbox.checkup.not_found', 'Not found');
+            }
+        },
+        {
+            id: 'bluetooth_address',
+            name: t('toolbox.checkup.additional.bluetooth_address', 'Bluetooth Address'),
+            command: ['shell', 'settings', 'get', 'secure', 'bluetooth_address'],
+            foundDisplay: (out: string) => out.trim() || t('toolbox.checkup.not_found', 'Not found')
+        },
+        {
+            id: 'memory',
+            name: t('toolbox.checkup.additional.memory', 'Memory (/proc/meminfo)'),
+            command: ['shell', 'cat', '/proc/meminfo'],
+            foundDisplay: (out: string) => {
+                const totalMatch = out.match(/MemTotal:\s+(\d+)\s+kB/);
+                const availMatch = out.match(/MemAvailable:\s+(\d+)\s+kB/);
+                if (totalMatch && availMatch) {
+                    const totalMb = Math.round(parseInt(totalMatch[1]) / 1024);
+                    const availMb = Math.round(parseInt(availMatch[1]) / 1024);
+                    return `${availMb} MB / ${totalMb} MB`;
+                }
+                return out.trim() || t('toolbox.checkup.not_found', 'Not found');
+            }
+        },
+        {
+            id: 'storage',
+            name: t('toolbox.checkup.additional.storage', 'Data Storage (/data)'),
+            command: ['shell', 'df', '/data'],
+            foundDisplay: (out: string) => {
+                const lines = out.trim().split('\n');
+                if (lines.length > 1) {
+                    const parts = lines[1].trim().split(/\s+/);
+                    if (parts.length >= 5) {
+                        const totalGb = (parseInt(parts[1]) / 1024 / 1024).toFixed(1);
+                        const usePct = parts[4];
+                        return `${usePct} used of ${totalGb} GB`;
+                    }
+                }
+                return out.trim() || t('toolbox.checkup.not_found', 'Not found');
+            }
+        },
+        {
+            id: 'network_mode',
+            name: t('toolbox.checkup.additional.network_mode', 'Preferred Network Mode'),
+            command: ['shell', 'settings', 'get', 'global', 'preferred_network_mode'],
+            foundDisplay: (out: string) => out.trim() || t('toolbox.checkup.not_found', 'Not found')
+        }
+    ], [t]);
+
+    const additionalChecks = useMemo(() => {
+        return additionalChecksBase.map(base => ({
+            ...base,
+            status: additionalCheckResults[base.id]?.status || 'idle',
+            found: additionalCheckResults[base.id]?.found
+        }));
+    }, [additionalChecksBase, additionalCheckResults]);
+
     const disabled = isTestRunning && !allowActionsDuringTest;
 
     const parsePropsFile = (content: string): Record<string, string> => {
@@ -203,17 +274,34 @@ export function CheckupSubTab({ selectedDevice, isTestRunning, allowActionsDurin
     };
 
     const COMMON_PROP_PREFIXES = [
-        'ro.build.',
-        'ro.system.',
-        'ro.vendor.',
-        'ro.product.',
-        'ro.odm.',
-        'ro.boot.',
-        'ro.hardware.',
+        'gsm.version.',
+        'persist.sys.device_provisioned',
+        'persist.sys.fuse',
+        'persist.sys.usb.config',
+        'persist.vendor.connsys.',
         'ro.board.',
+        'ro.boot.hardware',
+        'ro.boot.serialno',
+        'ro.boot.vbmeta.',
+        'ro.boot.verifiedbootstate',
+        'ro.boot.veritymode',
         'ro.bootloader',
+        'ro.build.',
+        'ro.config.low_ram',
+        'ro.crypto.',
+        'ro.debuggable',
+        'ro.hardware.',
+        'ro.odm.',
+        'ro.product.',
+        'ro.secure',
         'ro.revision',
-        'ro.serialno'
+        'ro.serialno',
+        'ro.system.',
+        'ro.telephony.',
+        'ro.vendor.mediatek.',
+        'ro.vendor.wifi.',
+        'ro.zygote',
+        'sys.usb.config'
     ];
 
     const handleLoadRemainingProps = async () => {
@@ -293,6 +381,36 @@ export function CheckupSubTab({ selectedDevice, isTestRunning, allowActionsDurin
         setCheckResults(newResults);
     };
 
+    const runAdditionalChecks = async () => {
+        if (!selectedDevice) return;
+
+        const initResults: Record<string, any> = {};
+        additionalChecksBase.forEach(c => initResults[c.id] = { status: 'running' });
+        setAdditionalCheckResults(initResults);
+
+        const newResults: Record<string, any> = { ...initResults };
+        await Promise.all(additionalChecksBase.map(async (check) => {
+            try {
+                const output: string = await invoke('run_adb_command', {
+                    device: selectedDevice,
+                    args: check.command
+                });
+
+                newResults[check.id] = {
+                    status: 'done',
+                    found: check.foundDisplay(output)
+                };
+            } catch (error) {
+                newResults[check.id] = {
+                    status: 'done',
+                    found: t('toolbox.checkup.error_exec', 'Execution error')
+                };
+            }
+        }));
+
+        setAdditionalCheckResults(newResults);
+    };
+
     const filteredComparisons = comparisons.filter(c => {
         if (filterDivergent && c.isMatch) return false;
         if (searchQuery && !c.key.toLowerCase().includes(searchQuery.toLowerCase())) return false;
@@ -348,6 +466,43 @@ export function CheckupSubTab({ selectedDevice, isTestRunning, allowActionsDurin
                                         "font-mono px-2 py-0.5 rounded",
                                         check.status === 'correct' ? "bg-success/10 text-success" : "bg-error/10 text-error"
                                     )}>
+                                        {check.found}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </Section>
+
+                {/* Additional Checks */}
+                <Section
+                    title={t('toolbox.checkup.additional_checks', 'Additional Checks')}
+                    icon={ListPlus}
+                    className="flex-1 flex flex-col min-h-0 overflow-hidden"
+                    contentClassName="flex-1 overflow-y-auto pr-2 space-y-2 min-h-0"
+                    actions={
+                        <Button
+                            variant="secondary"
+                            onClick={runAdditionalChecks}
+                            disabled={disabled || additionalChecks.some(c => c.status === 'running')}
+                            className="flex items-center gap-2 h-9"
+                        >
+                            <RefreshCcw size={16} className={clsx(additionalChecks.some(c => c.status === 'running') && "animate-spin")} />
+                            {t('toolbox.checkup.run_additional_checks', 'Run Additional Checks')}
+                        </Button>
+                    }
+                >
+                    {additionalChecks.map(check => (
+                        <div key={check.id} className="flex flex-col p-4 rounded-xl border border-outline-variant/30 bg-surface-variant/20 text-sm">
+                            <div className="flex justify-between items-center mb-1 gap-2">
+                                <span className="font-medium text-on-surface leading-tight">{check.name}</span>
+                                {check.status === 'running' && <ExpressiveLoading variant="circular" size="sm" />}
+                                {check.status === 'done' && <Info size={18} className="text-primary shrink-0" />}
+                            </div>
+                            {check.found && (
+                                <div className="flex justify-between items-center text-xs mt-2">
+                                    <span className="text-on-surface-variant">{t('toolbox.checkup.found', 'Found')}:</span>
+                                    <span className="font-mono px-2 py-0.5 rounded bg-primary/10 text-primary">
                                         {check.found}
                                     </span>
                                 </div>

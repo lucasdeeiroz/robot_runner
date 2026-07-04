@@ -1785,6 +1785,8 @@ export const pt = {
                 upload_prop_desc: "Envie um arquivo build.prop ou vendor.prop para comparar com o dispositivo.",
                 standard_checks: "Checklist Padrão",
                 run_checks: "Executar Verificações Padrão",
+                additional_checks: "Checagens Adicionais",
+                run_additional_checks: "Executar Checagens Adicionais",
                 expected: "Esperado",
                 found: "Encontrado",
                 status_correct: "Correto",
@@ -1823,6 +1825,13 @@ export const pt = {
                     secure_os: "OS Seguro (ro.secure)",
                     developer_options: "Opções de Desenvolvedor",
                     root_access: "Acesso Root (binário su)"
+                },
+                additional: {
+                    imei: "IMEI (iphonesubinfo)",
+                    bluetooth_address: "Endereço Bluetooth",
+                    memory: "Memória (/proc/meminfo)",
+                    storage: "Armazenamento (/data)",
+                    network_mode: "Modo de Rede Preferido"
                 }
             },
             actions: {
