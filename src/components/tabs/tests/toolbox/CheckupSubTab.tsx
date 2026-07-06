@@ -70,6 +70,13 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
         const stored = localStorage.getItem('checkup_packageFilterPrefixes');
         return stored ? JSON.parse(stored) : ['android', 'com.android', 'com.google'];
     });
+    const [propsFilterMode, setPropsFilterMode] = useState<'exclude' | 'include'>(() => {
+        return (localStorage.getItem('checkup_propsFilterMode') as any) || 'exclude';
+    });
+    const [propsFilterPrefixes, setPropsFilterPrefixes] = useState<string[]>(() => {
+        const stored = localStorage.getItem('checkup_propsFilterPrefixes');
+        return stored ? JSON.parse(stored) : ['ro.soc.model'];
+    });
 
     useEffect(() => {
         localStorage.setItem('checkup_reportPropsCompare', reportPropsCompare);
@@ -79,9 +86,12 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
         localStorage.setItem('checkup_reportShowPackages', String(reportShowPackages));
         localStorage.setItem('checkup_packageFilterMode', packageFilterMode);
         localStorage.setItem('checkup_packageFilterPrefixes', JSON.stringify(packageFilterPrefixes));
+        localStorage.setItem('checkup_propsFilterMode', propsFilterMode);
+        localStorage.setItem('checkup_propsFilterPrefixes', JSON.stringify(propsFilterPrefixes));
     }, [
         reportPropsCompare, reportShowPropsBase, reportShowStandardChecks,
-        reportShowAdditionalChecks, reportShowPackages, packageFilterMode, packageFilterPrefixes
+        reportShowAdditionalChecks, reportShowPackages, packageFilterMode, packageFilterPrefixes,
+        propsFilterMode, propsFilterPrefixes
     ]);
 
     // Standard checks based on POS Checklist
@@ -97,13 +107,6 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
             expected: (out: string) => out.trim().toLowerCase() === 'green',
             foundDisplay: (out: string) => out.trim() || t('toolbox.checkup.unknown', 'Unknown')
         },
-        // {
-        //     id: 'adb_default',
-        //     name: t('toolbox.checkup.checks.adb_default', 'Default ADB Disabled'),
-        //     command: ['shell', 'getprop', 'persist.sys.usb.config'],
-        //     expected: (out: string) => !out.includes('adb'),
-        //     foundDisplay: (out: string) => out.trim() || t('toolbox.checkup.none', 'None')
-        // },
         {
             id: 'debuggable',
             name: t('toolbox.checkup.checks.debuggable', 'Developer Mode (ro.debuggable)'),
@@ -366,6 +369,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
         'ro.secure',
         'ro.revision',
         'ro.serialno',
+        'ro.soc.model',
         'ro.system.',
         'ro.telephony.',
         'ro.vendor.mediatek.',
@@ -497,6 +501,8 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 });
             }
 
+
+
             let html = `<!DOCTYPE html>
 <html lang="${t('language', 'en')}">
 <head>
@@ -523,67 +529,6 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
     <p><strong>Device UDID:</strong> <code>${selectedDevice}</code><br><strong>Date:</strong> ${new Date().toLocaleString()}</p>
 `;
 
-            if (comparisons.length > 0 && reportPropsCompare !== 'none') {
-                html += `
-                <div class="section">
-                    <div class="section-header">${t('toolbox.checkup.prop_compare', '.prop Compare')}</div>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Key</th>
-                                <th>${t('toolbox.checkup.expected', 'Expected')}</th>
-                                <th>${t('toolbox.checkup.found', 'Found')}</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                `;
-                const propsToRender = reportPropsCompare === 'divergent' 
-                    ? comparisons.filter(c => !c.isExtra && !c.isMatch) 
-                    : comparisons.filter(c => !c.isExtra);
-                
-                propsToRender.forEach(c => {
-                    html += `
-                            <tr>
-                                <td><code>${c.key}</code></td>
-                                <td><code>${c.expected}</code></td>
-                                <td><code class="${c.isMatch ? 'success' : 'error'}">${c.found || '-'}</code></td>
-                                <td class="${c.isMatch ? 'success' : 'error'}">${c.isMatch ? t('toolbox.checkup.status_correct', 'Correct') : t('toolbox.checkup.status_incorrect', 'Incorrect')}</td>
-                            </tr>
-                    `;
-                });
-                html += `</tbody></table></div>`;
-
-                const extraProps = comparisons.filter(c => c.isExtra);
-                if (extraProps.length > 0 && reportShowPropsBase) {
-                    html += `
-                    <div class="section">
-                        <div class="section-header">${t('toolbox.checkup.additional_checks', 'Extra Base Props')}</div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Key</th>
-                                    <th>${t('toolbox.checkup.expected', 'Expected')}</th>
-                                    <th>${t('toolbox.checkup.found', 'Found')}</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                    `;
-                    extraProps.forEach(c => {
-                        html += `
-                                <tr>
-                                    <td><code>${c.key}</code></td>
-                                    <td><code>-</code></td>
-                                    <td><code class="warning">${c.found}</code></td>
-                                    <td>-</td>
-                                </tr>
-                        `;
-                    });
-                    html += `</tbody></table></div>`;
-                }
-            }
-
             if (standardChecks.length > 0 && reportShowStandardChecks) {
                 html += `
                 <div class="section">
@@ -599,70 +544,138 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                         <tbody>
                 `;
                 standardChecks.forEach(c => {
-                let statusText = '-';
-                let statusClass = '';
-                if (c.status === 'correct') { statusText = t('toolbox.checkup.status_correct', 'Correct'); statusClass = 'success'; }
-                else if (c.status === 'incorrect') { statusText = t('toolbox.checkup.status_incorrect', 'Incorrect'); statusClass = 'error'; }
+                    let statusText = '-';
+                    let statusClass = '';
+                    if (c.status === 'correct') { statusText = t('toolbox.checkup.status_correct', 'Correct'); statusClass = 'success'; }
+                    else if (c.status === 'incorrect') { statusText = t('toolbox.checkup.status_incorrect', 'Incorrect'); statusClass = 'error'; }
 
-                html += `
+                    html += `
                         <tr>
                             <td><strong>${c.name}</strong><br><code>${c.command.join(' ')}</code></td>
                             <td><code class="${statusClass}">${c.found || '-'}</code></td>
                             <td class="${statusClass}">${statusText}</td>
                         </tr>
                 `;
-            });
+                });
                 html += `</tbody></table></div>`;
             }
 
-            if (additionalChecks.length > 0 && reportShowAdditionalChecks) {
+            if (comparisons.length > 0 && reportPropsCompare !== 'none') {
                 html += `
                 <div class="section">
-                    <div class="section-header">${t('toolbox.checkup.additional_checks', 'Additional Checks')}</div>
+                    <div class="section-header">${t('toolbox.checkup.prop_compare', '.prop Compare')}</div>
                     <table>
                         <thead>
                             <tr>
-                                <th>Check</th>
+                                <th>Key</th>
+                                <th>${t('toolbox.checkup.expected', 'Expected')}</th>
                                 <th>${t('toolbox.checkup.found', 'Found')}</th>
+                                <th>Status</th>
                             </tr>
                         </thead>
                         <tbody>
                 `;
-                additionalChecks.forEach(c => {
-                html += `
-                        <tr>
-                            <td><strong>${c.name}</strong><br><code>${c.command.join(' ')}</code></td>
-                            <td><code class="info">${c.found || '-'}</code></td>
-                        </tr>
-                `;
-            });
-            html += `</tbody></table></div>`;
+                const propsToRender = reportPropsCompare === 'divergent'
+                    ? comparisons.filter(c => !c.isExtra && !c.isMatch)
+                    : comparisons.filter(c => !c.isExtra);
+
+                propsToRender.forEach(c => {
+                    html += `
+                            <tr>
+                                <td><code>${c.key}</code></td>
+                                <td><code>${c.expected}</code></td>
+                                <td><code class="${c.isMatch ? 'success' : 'error'}">${c.found || '-'}</code></td>
+                                <td class="${c.isMatch ? 'success' : 'error'}">${c.isMatch ? t('toolbox.checkup.status_correct', 'Correct') : t('toolbox.checkup.status_incorrect', 'Incorrect')}</td>
+                            </tr>
+                    `;
+                });
+                html += `</tbody></table></div>`;
             }
 
             if (reportShowPackages) {
                 html += `
                 <div class="section">
-                    <div class="section-header">${t('toolbox.checkup.installed_packages', 'Installed Packages')}</div>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>${t('toolbox.checkup.package_name', 'Package')}</th>
-                                <th>${t('toolbox.checkup.version', 'Version')}</th>
-                                <th>Type</th>
-                            </tr>
-                        </thead>
-                        <tbody>
+                <div class="section-header">${t('toolbox.checkup.installed_packages', 'Installed Packages')}</div>
+                <table>
+                <thead>
+                <tr>
+                <th>${t('toolbox.checkup.package_name', 'Package')}</th>
+                <th>${t('toolbox.checkup.version', 'Version')}</th>
+                <th>Type</th>
+                </tr>
+                </thead>
+                <tbody>
                 `;
                 filteredPkgs.forEach(p => {
                     html += `
-                            <tr>
-                                <td><code>${p.name}</code></td>
-                                <td><code>${p.version || '-'}</code></td>
-                                <td><span class="${p.is_system ? 'warning' : 'info'}">${p.is_system ? 'System' : 'User'}</span></td>
-                            </tr>
+                    <tr>
+                    <td><code>${p.name}</code></td>
+                    <td><code>${p.version || '-'}</code></td>
+                    <td><span class="${p.is_system ? 'warning' : 'info'}">${p.is_system ? 'System' : 'User'}</span></td>
+                    </tr>
                     `;
                 });
                 html += `</tbody></table></div>`;
+            }
+
+            if (additionalChecks.length > 0 && reportShowAdditionalChecks) {
+                html += `
+                            <div class="section">
+                                <div class="section-header">${t('toolbox.checkup.additional_checks', 'Additional Checks')}</div>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Check</th>
+                                            <th>${t('toolbox.checkup.found', 'Found')}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                            `;
+                additionalChecks.forEach(c => {
+                    html += `
+                                    <tr>
+                                        <td><strong>${c.name}</strong><br><code>${c.command.join(' ')}</code></td>
+                                        <td><code class="info">${c.found || '-'}</code></td>
+                                    </tr>
+                            `;
+                });
+                html += `</tbody></table></div>`;
+            }
+
+            if (comparisons.length > 0) {
+                let extraProps = comparisons.filter(c => c.isExtra);
+
+                if (propsFilterPrefixes.length > 0) {
+                    extraProps = extraProps.filter(c => {
+                        const matchesPrefix = propsFilterPrefixes.some(prefix => c.key.startsWith(prefix));
+                        if (propsFilterMode === 'include') return matchesPrefix;
+                        return !matchesPrefix;
+                    });
+                }
+
+                if (extraProps.length > 0 && reportShowPropsBase) {
+                    html += `
+                    <div class="section">
+                        <div class="section-header">${t('toolbox.checkup.extra_props', 'Extra Base Props')}</div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Key</th>
+                                    <th>${t('toolbox.checkup.found', 'Found')}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                    `;
+                    extraProps.forEach(c => {
+                        html += `
+                                <tr>
+                                    <td><code>${c.key}</code></td>
+                                    <td><code class="warning">${c.found}</code></td>
+                                </tr>
+                        `;
+                    });
+                    html += `</tbody></table></div>`;
+                }
             }
 
             html += `</body></html>`;
@@ -708,10 +721,10 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
 
                 {/* Props Comparison Panel */}
                 <Section
-                    title=".prop Compare"
+                    title={t('toolbox.checkup.prop_compare', '.prop Compare')}
                     icon={FileText}
                     className="flex-[2] min-w-[350px] flex flex-col min-h-[400px] xl:min-h-0 overflow-hidden"
-                    contentClassName="flex-1 overflow-y-auto pr-2 min-h-0"
+                    contentClassName="flex-1 flex flex-col min-h-0 pr-2"
                     actions={
                         <div className="flex flex-wrap items-center gap-2">
                             {selectedDevice && (
@@ -739,43 +752,47 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                         </div>
                     }
                 >
-                    <div className="flex items-center justify-end gap-2 mb-4">
-                        {comparisons.length > 0 && (
-                            <span className="text-xs px-2 h-9 flex items-center justify-center bg-primary/10 text-primary rounded-full font-medium whitespace-nowrap">
-                                {matchCount} / {comparisons.length} {t('toolbox.checkup.matches', 'matches')}
-                            </span>
-                        )}
-                        <Button
-                            variant={filterDivergent ? "primary" : "ghost"}
-                            size="sm"
-                            tooltipPosition="left"
-                            onClick={() => setFilterDivergent(!filterDivergent)}
-                            className={clsx("relative h-9 w-9 p-0 flex items-center justify-center shrink-0 rounded-md", filterDivergent && "bg-error/10 text-error hover:bg-error/20 hover:text-error")}
-                            title={filterDivergent ? t('toolbox.checkup.show_all', 'Show all') : t('toolbox.checkup.show_divergent', 'Show only divergences')}
-                        >
-                            {filterDivergent ? <FilterX size={16} /> : <Filter size={16} />}
-                        </Button>
-                        <div className="relative">
-                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/50" />
-                            <Input
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder={t('toolbox.checkup.search_placeholder', 'Search key...')}
-                                className="pl-9 h-9 text-sm w-36 sm:w-48"
-                            />
-                        </div>
-                        {selectedDevice && (
+                    <div className="flex items-center justify-between gap-2 mb-4 shrink-0">
+                        <div className="flex items-center gap-2">
+                            {selectedDevice && (
+                                <Button
+                                    variant="outline"
+                                    tooltipPosition="right"
+                                    onClick={() => setIsReportModalOpen(true)}
+                                    disabled={disabled || isLoading}
+                                    className="relative h-9 w-9 p-0 flex items-center justify-center shrink-0 rounded-md"
+                                    title={t('toolbox.checkup.generate_report', 'Generate Report')}
+                                >
+                                    <Download size={16} />
+                                </Button>
+                            )}
                             <Button
-                                variant="outline"
-                                tooltipPosition="left"
-                                onClick={() => setIsReportModalOpen(true)}
-                                disabled={disabled || isLoading}
-                                className="relative h-9 w-9 p-0 flex items-center justify-center shrink-0 rounded-md"
-                                title={t('toolbox.checkup.generate_report', 'Generate Report')}
+                                variant={filterDivergent ? "primary" : "ghost"}
+                                size="sm"
+                                tooltipPosition="right"
+                                onClick={() => setFilterDivergent(!filterDivergent)}
+                                className={clsx("relative h-9 w-9 p-0 flex items-center justify-center shrink-0 rounded-md", filterDivergent && "bg-error/10 text-error hover:bg-error/20 hover:text-error")}
+                                title={filterDivergent ? t('toolbox.checkup.show_all', 'Show all') : t('toolbox.checkup.show_divergent', 'Show only divergences')}
                             >
-                                <Download size={16} />
+                                {filterDivergent ? <FilterX size={16} /> : <Filter size={16} />}
                             </Button>
-                        )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {comparisons.length > 0 && (
+                                <span className="text-xs px-2 h-9 flex items-center justify-center text-on-surface rounded-full font-medium whitespace-nowrap">
+                                    {matchCount} / {comparisons.length} {t('toolbox.checkup.matches', 'matches')}
+                                </span>
+                            )}
+                            <div className="relative">
+                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/50" />
+                                <Input
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    placeholder={t('toolbox.checkup.search_placeholder', 'Search key...')}
+                                    className="pl-9 h-9 text-sm w-36 sm:w-48"
+                                />
+                            </div>
+                        </div>
                     </div>
                     <div className="flex-1 h-full min-h-0 bg-surface-variant/10 rounded-xl border border-outline-variant/30 overflow-hidden">
                         <div className="h-full overflow-y-auto overflow-x-auto custom-scrollbar">
@@ -950,17 +967,10 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                             />
                         </div>
                     </div>
-                    
+
                     <div>
                         <h3 className="text-sm font-semibold text-on-surface mb-3">{t('toolbox.checkup.report.inclusions', 'Inclusions')}</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <ActionCard
-                                orientation="horizontal"
-                                title={t('toolbox.checkup.report.show_extra_props', 'Show Extra Base Props')}
-                                description={t('toolbox.checkup.report.show_extra_props_desc', 'Include properties from the base file that were not found on the device')}
-                                selected={reportShowPropsBase}
-                                onClick={() => setReportShowPropsBase(!reportShowPropsBase)}
-                            />
                             <ActionCard
                                 orientation="horizontal"
                                 title={t('toolbox.checkup.report.show_standard_checks', 'Show Standard Checks')}
@@ -975,41 +985,41 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                                 selected={reportShowAdditionalChecks}
                                 onClick={() => setReportShowAdditionalChecks(!reportShowAdditionalChecks)}
                             />
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 className="text-sm font-semibold text-on-surface mb-3">{t('toolbox.checkup.report.package_filter_mode', 'Package Filter Mode')}</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <ActionCard
                                 orientation="horizontal"
-                                title={t('toolbox.checkup.report.show_packages', 'Show Packages')}
-                                description={t('toolbox.checkup.report.show_packages_desc', 'Include the list of installed packages')}
-                                selected={reportShowPackages}
+                                title={t('toolbox.checkup.report.package_filter_mode_exclude', 'Show all except...')}
+                                description={t('toolbox.checkup.report.package_filter_mode_exclude_desc', 'Show all packages, excluding those that start with the prefixes below')}
+                                selected={packageFilterMode === 'exclude' && reportShowPackages}
+                                onClick={() => { setPackageFilterMode('exclude'); setReportShowPackages(true); }}
+                            />
+                            <ActionCard
+                                orientation="horizontal"
+                                title={t('toolbox.checkup.report.package_filter_mode_include', 'Show ONLY...')}
+                                description={t('toolbox.checkup.report.package_filter_mode_include_desc', 'Show ONLY the packages that start with the prefixes below')}
+                                selected={packageFilterMode === 'include' && reportShowPackages}
+                                onClick={() => { setPackageFilterMode('include'); setReportShowPackages(true); }}
+                            />
+                            <ActionCard
+                                orientation="horizontal"
+                                title={t('toolbox.checkup.report.package_filter_none', 'None')}
+                                description={t('toolbox.checkup.report.package_filter_none_desc', 'No packages will be shown')}
+                                selected={!reportShowPackages}
                                 onClick={() => setReportShowPackages(!reportShowPackages)}
                             />
                         </div>
                     </div>
-
                     {reportShowPackages && (
-                        <motion.div 
+                        <motion.div
                             initial={{ opacity: 0, height: 0 }}
                             animate={{ opacity: 1, height: 'auto' }}
                             className="bg-surface-variant/30 p-4 rounded-xl border border-outline-variant/30 flex flex-col gap-4"
                         >
-                            <div>
-                                <h3 className="text-sm font-semibold text-on-surface mb-3">{t('toolbox.checkup.report.package_filter_mode', 'Package Filter Mode')}</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    <ActionCard
-                                        orientation="horizontal"
-                                        title={t('toolbox.checkup.report.package_filter_mode_exclude', 'Show all except...')}
-                                        description={t('toolbox.checkup.report.package_filter_mode_exclude_desc', 'Show all packages, excluding those that start with the prefixes below')}
-                                        selected={packageFilterMode === 'exclude'}
-                                        onClick={() => setPackageFilterMode('exclude')}
-                                    />
-                                    <ActionCard
-                                        orientation="horizontal"
-                                        title={t('toolbox.checkup.report.package_filter_mode_include', 'Show ONLY...')}
-                                        description={t('toolbox.checkup.report.package_filter_mode_include_desc', 'Show ONLY the packages that start with the prefixes below')}
-                                        selected={packageFilterMode === 'include'}
-                                        onClick={() => setPackageFilterMode('include')}
-                                    />
-                                </div>
-                            </div>
                             <div>
                                 <TagInput
                                     label={t('toolbox.checkup.report.package_prefixes', 'Package Prefixes (e.g. com.android)')}
@@ -1021,14 +1031,57 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                         </motion.div>
                     )}
 
-                    <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-outline-variant/30">
-                        <Button variant="ghost" onClick={() => setIsReportModalOpen(false)}>
-                            {t('toolbox.checkup.report.cancel', 'Cancel')}
-                        </Button>
-                        <Button variant="primary" onClick={generateReport}>
-                            {t('toolbox.checkup.report.generate', 'Generate Report')}
-                        </Button>
+                    <div>
+                        <h3 className="text-sm font-semibold text-on-surface mb-3">{t('toolbox.checkup.report.props_filter_mode', 'Props Filter Mode')}</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <ActionCard
+                                orientation="horizontal"
+                                title={t('toolbox.checkup.report.props_filter_mode_exclude', 'Show all except...')}
+                                description={t('toolbox.checkup.report.props_filter_mode_exclude_desc', 'Show all props, excluding those that start with the prefixes below')}
+                                selected={propsFilterMode === 'exclude' && reportShowPropsBase}
+                                onClick={() => { setPropsFilterMode('exclude'); setReportShowPropsBase(true); }}
+                            />
+                            <ActionCard
+                                orientation="horizontal"
+                                title={t('toolbox.checkup.report.props_filter_mode_include', 'Show ONLY...')}
+                                description={t('toolbox.checkup.report.props_filter_mode_include_desc', 'Show ONLY the props that start with the prefixes below')}
+                                selected={propsFilterMode === 'include' && reportShowPropsBase}
+                                onClick={() => { setPropsFilterMode('include'); setReportShowPropsBase(true); }}
+                            />
+                            <ActionCard
+                                orientation="horizontal"
+                                title={t('toolbox.checkup.report.props_none', 'None')}
+                                description={t('toolbox.checkup.report.props_none_desc', 'No props will be shown')}
+                                selected={!reportShowPropsBase}
+                                onClick={() => setReportShowPropsBase(!reportShowPropsBase)}
+                            />
+                        </div>
                     </div>
+                    {reportShowPropsBase && (
+                        <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            className="bg-surface-variant/30 p-4 rounded-xl border border-outline-variant/30 flex flex-col gap-4"
+                        >
+                            <div>
+                                <TagInput
+                                    label={t('toolbox.checkup.report.props_prefixes', 'Props Prefixes (e.g. hw)')}
+                                    tags={propsFilterPrefixes}
+                                    onChange={setPropsFilterPrefixes}
+                                    placeholder={t('toolbox.checkup.report.add_prefix', 'Add prefix...')}
+                                />
+                            </div>
+                        </motion.div>
+                    )}
+                </div>
+
+                <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-outline-variant/30">
+                    <Button variant="ghost" onClick={() => setIsReportModalOpen(false)}>
+                        {t('toolbox.checkup.report.cancel', 'Cancel')}
+                    </Button>
+                    <Button variant="primary" onClick={generateReport}>
+                        {t('toolbox.checkup.report.generate', 'Generate Report')}
+                    </Button>
                 </div>
             </Modal>
         </div>
