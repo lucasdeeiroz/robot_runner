@@ -216,7 +216,10 @@ export const es = {
                 downloaded: "{{pkg}} descargado con éxito"
             },
             error: {
-                install_failed: "Fallo en la instalación: {{error}}"
+                install_failed: "Fallo en la instalación: {{error}}",
+                action_failed: "La acción falló",
+                launch_failed: "Error al iniciar aplicación",
+                download_failed: "Error al descargar APK"
             }
         },
         commands: {
@@ -251,10 +254,13 @@ export const es = {
             }
         },
         common: {
-            keep: "Conservar",
-            keep_all: "Conservar Todo",
-            clear_all: "Borrar Todo",
+            keep: "Mantener",
+            keep_all: "Mantener Todos",
+            clear_all: "Borrar Todos",
             tip: "Consejo",
+            close: "Cerrar",
+            show_details: "Ver detalles",
+            hide_details: "Ocultar detalles",
 
             start: "Iniciar",
             pause: "Pausar",
@@ -299,7 +305,6 @@ export const es = {
             select: "Seleccione...",
             minimize: "Minimizar",
             maximize: "Maximizar",
-            close: "Cerrar",
             confirm: "Confirmar",
             attention: "Atención",
             running: "Ejecutando",

@@ -372,4 +372,8 @@ button:hover .rai-letter-r-ghost,
 @keyframes expressive-linear-dash {
   0% { stroke-dashoffset: 0; }
   100% { stroke-dashoffset: -200; }
-}
+}
+/* Fix for Sonner dynamic height toasts shrinking on hover */
+[data-sonner-toaster][data-expanded="true"] [data-sonner-toast] {
+    height: auto !important;
+}

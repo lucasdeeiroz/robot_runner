@@ -216,7 +216,10 @@ export const en = {
                 downloaded: "Downloaded {{pkg}}"
             },
             error: {
-                install_failed: "Installation failed: {{error}}"
+                install_failed: "Installation failed: {{error}}",
+                action_failed: "Action failed",
+                launch_failed: "Failed to launch app",
+                download_failed: "Failed to download APK"
             }
         },
         commands: {
@@ -255,6 +258,9 @@ export const en = {
             keep_all: "Keep All",
             clear_all: "Clear All",
             tip: "Tip",
+            close: "Close",
+            show_details: "Show details",
+            hide_details: "Hide details",
 
             start: "Start",
             pause: "Pause",
@@ -299,7 +305,6 @@ export const en = {
             select: "Select...",
             minimize: "Minimize",
             maximize: "Maximize",
-            close: "Close",
             confirm: "Confirm",
             attention: "Attention",
             running: "Running",

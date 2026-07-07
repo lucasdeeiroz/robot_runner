@@ -216,7 +216,10 @@ export const pt = {
                 downloaded: "{{pkg}} baixado com sucesso"
             },
             error: {
-                install_failed: "Falha na instalação: {{error}}"
+                install_failed: "Falha na instalação: {{error}}",
+                action_failed: "Ação falhou",
+                launch_failed: "Falha ao iniciar app",
+                download_failed: "Falha ao baixar APK"
             }
         },
         commands: {
@@ -255,6 +258,9 @@ export const pt = {
             keep_all: "Manter Todos",
             clear_all: "Limpar Todos",
             tip: "Dica",
+            close: "Fechar",
+            show_details: "Ver detalhes",
+            hide_details: "Ocultar detalhes",
 
             start: "Iniciar",
             pause: "Pausar",
@@ -299,7 +305,6 @@ export const pt = {
             select: "Selecione...",
             minimize: "Minimizar",
             maximize: "Maximizar",
-            close: "Fechar",
             confirm: "Confirmar",
             attention: "Atenção",
             running: "Executando",
