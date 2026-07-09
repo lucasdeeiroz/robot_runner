@@ -226,7 +226,7 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                 setActiveTool(tool);
             }
             // Reset grid visibility
-            setVisibleToolsInGrid(isWebMode ? new Set(['console', 'webview']) : new Set(['console', 'logcat', 'commands', 'performance', 'hardware']));
+setVisibleToolsInGrid(isWebMode ? new Set(['console', 'webview']) : new Set(['console', 'logcat', 'commands', 'performance', 'hardware', 'checkup']));
         }
     }, [isGridView, visibleToolsInGrid.size, session.type, isWebMode]);
 
