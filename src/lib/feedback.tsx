@@ -22,8 +22,8 @@ const extractDetails = (args: any): string | null => {
 // Helper to render custom toast
 const showCustomToast = (type: ToastType, msg: string, args?: any) => {
     const details = extractDetails(args);
-    // Retornamos para um timeout de 10 segundos. O Sonner irá pausar o timer automaticamente
-    // enquanto o mouse estiver sobre o componente (já que corrigimos as bordas físicas do <li>).
+// Extend timeout to 10 seconds for error toasts that include details.
+// Sonner pauses the timer automatically while the mouse is over the toast.
     const duration = (type === 'error' && details) ? 10000 : undefined;
 
     return toast.custom((t) => (
