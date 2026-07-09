@@ -95,19 +95,6 @@ export const PerformanceSubTab = React.memo(function PerformanceSubTab({
         }
     }, [isRecording, recordingStartTime]);
 
-    useEffect(() => {
-        if (isRecording && recordingStartTime) {
-            const interval = setInterval(() => {
-                const diff = Date.now() - recordingStartTime;
-                const minutes = Math.floor(diff / 60000);
-                const seconds = Math.floor((diff % 60000) / 1000);
-                setElapsedTime(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
-            }, 1000);
-            return () => clearInterval(interval);
-        } else {
-            setElapsedTime('00:00');
-        }
-    }, [isRecording, recordingStartTime]);
 
     const [batteryEstimate, setBatteryEstimate] = useState<string | null>(null);
     useEffect(() => {
