@@ -73,23 +73,30 @@ export function useDeviceViewport({
         let screenshotSucceeded = false;
         try {
             const webUrlParam = targetWebUrl || (isWeb ? activeWebUrl : undefined);
-            
-            // Try screenshot (non-critical)
-            try {
-                const b64 = compressed 
-                    ? await invoke<string>('get_compressed_screenshot', { deviceId, maxWidth: 1024, maxHeight: 1024, webUrl: webUrlParam })
-                    : await invoke<string>('get_screenshot', { deviceId, webUrl: webUrlParam });
-                
+
+            const screenshotPromise = compressed 
+                ? invoke<string>('get_compressed_screenshot', { deviceId, maxWidth: 1024, maxHeight: 1024, webUrl: webUrlParam })
+                : invoke<string>('get_screenshot', { deviceId, webUrl: webUrlParam });
+
+            const xmlPromise = invoke<string>('get_xml_dump', { deviceId, webUrl: webUrlParam });
+
+            const [screenshotResult, xmlResult] = await Promise.allSettled([screenshotPromise, xmlPromise]);
+
+            if (screenshotResult.status === 'fulfilled') {
+                const b64 = screenshotResult.value;
                 const prefix = compressed ? 'data:image/jpeg;base64,' : 'data:image/png;base64,';
                 setScreenshot(b64.startsWith('data:') ? b64 : `${prefix}${b64}`);
                 screenshotSucceeded = true;
-            } catch (screenshotErr) {
-                console.warn("[Inspector] Screenshot failed, but continuing with XML dump:", screenshotErr);
+            } else {
+                console.warn("[Inspector] Screenshot failed, but continuing with XML dump:", screenshotResult.reason);
                 setScreenshot(null);
             }
 
-            // Try XML dump (critical for element interaction)
-            const xml = await invoke<string>('get_xml_dump', { deviceId, webUrl: webUrlParam });
+            if (xmlResult.status === 'rejected') {
+                throw xmlResult.reason;
+            }
+
+            const xml = xmlResult.value;
             setXmlDump(xml);
             const parser = new XMLParser({
                 ignoreAttributes: false,
