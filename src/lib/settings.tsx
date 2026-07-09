@@ -593,10 +593,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         const newProfile: Profile = {
             id,
             name,
-            settings: {
-                ...getDefaultSettings(),
-                ...initialSettings
-            }
+settings: deepMerge(getDefaultSettings(), initialSettings ?? {})
         };
         const newData = {
             ...storeData,
