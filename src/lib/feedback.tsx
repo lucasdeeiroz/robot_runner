@@ -14,11 +14,6 @@ const extractDetails = (args: any): string | null => {
         if (args.message && typeof args.message === 'string') return args.message;
         if (args.error && typeof args.error === 'string') return args.error;
         if (args.err && typeof args.err === 'string') return args.err;
-        // Se for um objeto puro sem campos mapeáveis óbvios, e não for um array vazio, retornamos stringified
-        try {
-            const str = JSON.stringify(args, null, 2);
-            if (str !== '{}' && str !== '[]') return str;
-        } catch { }
     }
     if (typeof args === 'string') return args;
     return null;
