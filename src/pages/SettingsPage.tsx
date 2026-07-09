@@ -410,9 +410,10 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                 filters: [{ name: 'JSON', extensions: ['json'] }]
             });
             if (selected) {
-                const filePath = Array.isArray(selected) ? selected[0] : selected;
-                const fileContent = await readTextFile(filePath);
-                const parsed = JSON.parse(fileContent);
+const raw = Array.isArray(selected) ? selected[0] : selected;
+const filePath = typeof raw === 'string' ? raw : raw.path;
+const fileContent = await readTextFile(filePath);
+const parsed = JSON.parse(fileContent);
                 if (typeof parsed === 'object' && parsed !== null) {
                     setImportedSettings(parsed);
                     setImportedFileName(filePath.split(/[/\\]/).pop() || 'config.json');
