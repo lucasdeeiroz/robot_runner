@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
+import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { AlertTriangle, Activity, Cpu, Battery, CircuitBoard, Play, Square, Package as PackageIcon, Eye, RefreshCw, Zap, FolderSearch, Settings } from "lucide-react";
+import { AlertTriangle, Activity, Cpu, Battery, CircuitBoard, Play, Square, Package as PackageIcon, Eye, RefreshCw, Zap, FolderSearch, Settings, ListTree, ChevronUp, ChevronDown } from "lucide-react";
 import clsx from "clsx";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 import { useSettings } from "@/lib/settings";
@@ -11,6 +12,8 @@ import { WarningModal } from "@/components/organisms/WarningModal";
 import { FileSavedFeedback } from "@/components/molecules/FileSavedFeedback";
 import { Section } from "@/components/organisms/Section";
 import { DeviceStats } from "@/hooks/usePerformanceRecorder";
+import { useProcessMonitor } from "@/hooks/useProcessMonitor";
+import { Virtuoso } from "react-virtuoso";
 import { Button } from "@/components/atoms/Button";
 import { Select } from "@/components/atoms/Select";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
@@ -64,6 +67,62 @@ export function PerformanceSubTab({
     const { settings, updateSetting } = useSettings();
     const [showHighImpactWarning, setShowHighImpactWarning] = useState(false);
 
+    // Process Monitor State
+    const [showProcessMonitor, setShowProcessMonitor] = useState(false);
+    const [autoRefreshProcessMonitor, setAutoRefreshProcessMonitor] = useState(true);
+    const processMonitor = useProcessMonitor(
+        selectedDevice,
+        showProcessMonitor,
+        autoRefreshProcessMonitor,
+        isTestRunning,
+        allowActionsDuringTest,
+        forceEnable
+    );
+
+    // Battery Audit State
+    interface BatteryAuditApp {
+        uid: string;
+        name: string;
+        usage: number;
+        details: string;
+    }
+
+    interface BatteryAuditData {
+        capacity: number;
+        computed_drain: number;
+        actual_drain: number;
+        apps: BatteryAuditApp[];
+    }
+
+    const [showBatteryAudit, setShowBatteryAudit] = useState(false);
+    const [batteryAuditData, setBatteryAuditData] = useState<BatteryAuditData | null>(null);
+    const [isBatteryAuditLoading, setIsBatteryAuditLoading] = useState(false);
+
+    const fetchBatteryAudit = async () => {
+        setIsBatteryAuditLoading(true);
+        try {
+            const data: BatteryAuditData = await invoke("get_battery_audit", { device: selectedDevice });
+            setBatteryAuditData(data);
+        } catch (e) {
+            feedback.toast.error(String(e));
+        } finally {
+            setIsBatteryAuditLoading(false);
+        }
+    };
+
+    const resetBatteryAudit = async () => {
+        setIsBatteryAuditLoading(true);
+        try {
+            await invoke("reset_battery_stats", { device: selectedDevice });
+            feedback.toast.success(t('performance.battery_reset_success', 'Battery stats reset successfully'));
+            await fetchBatteryAudit();
+        } catch (e) {
+            feedback.toast.error(String(e));
+        } finally {
+            setIsBatteryAuditLoading(false);
+        }
+    };
+
     const handleConfigurePath = async () => {
         const selected = await open({
             directory: true,
@@ -116,6 +175,19 @@ export function PerformanceSubTab({
         if (level > 20) return "text-success";
         if (level > 10) return "text-warning";
         return "text-error";
+    };
+
+    const getBatteryStatusText = (status: string, power: string) => {
+        let powerText = "";
+        if (power === "ac") powerText = ` (${t('performance.ac', 'AC')})`;
+        if (power === "usb") powerText = ` (${t('performance.usb', 'USB')})`;
+        if (power === "wireless") powerText = ` (${t('performance.wireless', 'Wireless')})`;
+
+        if (status === "charging") return `${t('performance.charging', 'Charging')}${powerText}`;
+        if (status === "discharging") return t('performance.discharging', 'Discharging');
+        if (status === "full") return `${t('performance.full', 'Full')}${powerText}`;
+        if (status === "not_charging") return `${t('performance.not_charging', 'Not Charging')}${powerText}`;
+        return "";
     };
 
     // Parse configured packages
@@ -283,7 +355,7 @@ export function PerformanceSubTab({
                                 {/* RAM Card */}
                                 <Card title={t('performance.ram')} icon={<CircuitBoard size={24} className="text-purple-500" />}>
                                     <div className="flex items-end gap-2 mt-2">
-                                        <span className="text-3xl font-bold text-on-surface/50">
+                                        <span className="text-4xl font-bold text-on-surface/50">
                                             {formatBytes(stats.ram_used, false)}
                                         </span>
                                         <span className="text-xs text-on-surface-variant/80 mb-1">
@@ -307,6 +379,9 @@ export function PerformanceSubTab({
                                         </span>
                                     </div>
                                     <ProgressBar value={stats.battery_level} max={100} color={getBatteryColor(stats.battery_level).replace("text-", "bg-")} />
+                                    <div className="text-xs text-right mt-1 text-on-surface/80">
+                                        {getBatteryStatusText(stats.battery_status || '', stats.battery_power_source || '')}
+                                    </div>
                                 </Card>
                             </div>
                         </div>
@@ -331,7 +406,7 @@ export function PerformanceSubTab({
                                     {/* App RAM */}
                                     <Card title={`${t('performance.ram')} (App)`} icon={<CircuitBoard size={24} className="text-pink-500" />}>
                                         <div className="flex items-end gap-2 mt-2">
-                                            <span className="text-3xl font-bold text-on-surface/50">
+                                            <span className="text-4xl font-bold text-on-surface/50">
                                                 {formatBytes(stats.app_stats.ram_used)}
                                             </span>
                                         </div>
@@ -442,6 +517,201 @@ export function PerformanceSubTab({
                             </div>
                         )}
 
+                        {/* Process Monitor & Battery Audit Section */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-8 animate-in fade-in duration-500">
+                            {/* Process Monitor */}
+                            <div>
+                                <div className="flex items-center justify-between mb-4 ml-1">
+                                    <h3 className="text-xs font-semibold text-on-surface-variant/80 uppercase tracking-wider flex items-center gap-2">
+                                        <ListTree size={14} className="text-primary" />
+                                        {t('performance.process_monitor', 'Process Monitor')}
+                                    </h3>
+                                    <div className="flex items-center gap-2">
+                                        <Button
+                                            onClick={() => setShowProcessMonitor(!showProcessMonitor)}
+                                            variant="secondary"
+                                            size="sm"
+                                            className={showProcessMonitor ? "bg-primary/10 text-primary border-primary/20" : ""}
+                                        >
+                                            {showProcessMonitor ? t('performance.hide', 'Hide') : t('performance.show', 'Show')}
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                {showProcessMonitor && (
+                                    <Section
+                                        title={t('performance.running_processes', 'Running Processes')}
+                                        icon={ListTree}
+                                        actions={
+                                            <>
+                                                <div
+                                                    className={clsx(
+                                                        "flex items-center gap-2 px-2 py-1 rounded-xl border border-outline-variant/30 cursor-pointer transition-colors text-xs font-medium",
+                                                        autoRefreshProcessMonitor ? "bg-primary/10 text-primary" : "text-on-surface-variant/70 hover:bg-surface-variant/50"
+                                                    )}
+                                                    onClick={() => setAutoRefreshProcessMonitor(!autoRefreshProcessMonitor)}
+                                                    title={t('performance.toggle_refresh')}
+                                                >
+                                                    <RefreshCw size={12} className={clsx(autoRefreshProcessMonitor && "animate-spin-slow")} />
+                                                    <span className="hidden sm:inline">{t('performance.auto', 'Auto')}</span>
+                                                </div>
+                                            </>
+                                        }
+                                    >
+                                        <div className="flex flex-col h-[400px] w-full mt-2 bg-surface/30 rounded-xl border border-outline-variant/30 overflow-hidden backdrop-blur-sm">
+                                            {/* Table Header */}
+                                            <div className="flex items-center p-3 border-b border-outline-variant/50 text-xs font-semibold text-on-surface-variant bg-surface/50">
+                                                <div
+                                                    className="w-16 cursor-pointer hover:text-primary transition-colors flex items-center gap-1"
+                                                    onClick={() => processMonitor.handleSort('pid')}
+                                                >
+                                                    PID {processMonitor.sortField === 'pid' && (processMonitor.sortDirection === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                                                </div>
+                                                <div
+                                                    className="flex-1 cursor-pointer hover:text-primary transition-colors flex items-center gap-1"
+                                                    onClick={() => processMonitor.handleSort('name')}
+                                                >
+                                                    {t('performance.process_name', 'Process Name')} {processMonitor.sortField === 'name' && (processMonitor.sortDirection === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                                                </div>
+                                                <div
+                                                    className="w-20 text-right cursor-pointer hover:text-primary transition-colors flex items-center justify-end gap-1"
+                                                    onClick={() => processMonitor.handleSort('cpu')}
+                                                >
+                                                    CPU % {processMonitor.sortField === 'cpu' && (processMonitor.sortDirection === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                                                </div>
+                                                <div
+                                                    className="w-24 text-right cursor-pointer hover:text-primary transition-colors flex items-center justify-end gap-1"
+                                                    onClick={() => processMonitor.handleSort('mem')}
+                                                >
+                                                    RAM {processMonitor.sortField === 'mem' && (processMonitor.sortDirection === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                                                </div>
+                                            </div>
+
+                                            {/* Virtualized List */}
+                                            <div className="flex-1 min-h-0">
+                                                {processMonitor.error ? (
+                                                    <div className="p-4 text-center text-error/80 text-sm">
+                                                        {t('performance.process_error', 'Failed to fetch process stats')}: {processMonitor.error}
+                                                    </div>
+                                                ) : processMonitor.processes.length === 0 ? (
+                                                    <div className="p-8 text-center flex flex-col items-center">
+                                                        <ExpressiveLoading size="sm" variant="circular" />
+                                                        <span className="text-xs text-on-surface-variant/80 mt-2">{t('common.loading', 'Loading...')}</span>
+                                                    </div>
+                                                ) : (
+                                                    <Virtuoso
+                                                        data={processMonitor.processes}
+                                                        className="h-full w-full custom-scrollbar"
+                                                        itemContent={(_, p) => (
+                                                            <div className="flex items-center p-3 border-b border-outline-variant/10 text-sm hover:bg-surface-variant/20 transition-colors">
+                                                                <div className="w-16 font-mono text-xs opacity-70">{p.pid}</div>
+                                                                <div className="flex-1 truncate pr-4 font-medium" title={p.command}>{p.command}</div>
+                                                                <div className="w-20 text-right font-mono text-xs text-orange-500">{p.cpu.toFixed(1)}%</div>
+                                                                <div className="w-24 text-right font-mono text-xs text-pink-500">{(p.mem / 1024).toFixed(1)} MB</div>
+                                                            </div>
+                                                        )}
+                                                    />
+                                                )}
+                                            </div>
+                                        </div>
+                                    </Section>
+                                )}
+                            </div>
+
+                            {/* Battery Audit */}
+                            <div>
+                                <div className="flex items-center justify-between mb-4 ml-1">
+                                    <h3 className="text-xs font-semibold text-on-surface-variant/80 uppercase tracking-wider flex items-center gap-2">
+                                        <Battery size={14} className="text-primary" />
+                                        {t('performance.battery_audit', 'Battery Audit')}
+                                    </h3>
+                                    <Button
+                                        onClick={() => {
+                                            if (!showBatteryAudit && !batteryAuditData) fetchBatteryAudit();
+                                            setShowBatteryAudit(!showBatteryAudit);
+                                        }}
+                                        variant="secondary"
+                                        size="sm"
+                                        className={showBatteryAudit ? "bg-primary/10 text-primary border-primary/20" : ""}
+                                    >
+                                        {showBatteryAudit ? t('performance.hide', 'Hide') : t('performance.show', 'Show')}
+                                    </Button>
+                                </div>
+
+                                {showBatteryAudit && (
+                                    <Section
+                                        title={t('performance.battery_audit', 'Battery Audit')}
+                                        icon={Battery}
+                                        actions={
+                                            <>
+                                                <Button
+                                                    variant="secondary"
+                                                    size="sm"
+                                                    onClick={fetchBatteryAudit}
+                                                    disabled={isBatteryAuditLoading}
+                                                    leftIcon={<RefreshCw size={14} className={clsx(isBatteryAuditLoading && "animate-spin")} />}
+                                                >
+                                                    {t('common.refresh', 'Refresh')}
+                                                </Button>
+                                                <Button
+                                                    variant="secondary"
+                                                    size="sm"
+                                                    onClick={resetBatteryAudit}
+                                                    disabled={isBatteryAuditLoading}
+                                                    leftIcon={<Square size={14} />}
+                                                >
+                                                    {t('performance.reset_stats', 'Reset')}
+                                                </Button>
+                                            </>
+                                        }
+                                    >
+                                        <div className="flex flex-col h-[400px] w-full mt-2 overflow-y-auto custom-scrollbar">
+                                            {isBatteryAuditLoading && !batteryAuditData ? (
+                                                <div className="flex-1 flex flex-col items-center justify-center border border-outline-variant/30 rounded-xl bg-surface/30">
+                                                    <ExpressiveLoading size="sm" variant="circular" />
+                                                </div>
+                                            ) : batteryAuditData ? (
+                                                <div className="flex flex-col gap-2">
+                                                    <div className="flex items-center gap-4 p-3 rounded-lg bg-surface-variant/30 border border-outline-variant/20 mb-2">
+                                                        <div className="flex flex-col">
+                                                            <span className="text-xs text-on-surface-variant/70 uppercase font-semibold">{t('performance.capacity', 'Capacity')}</span>
+                                                            <span className="font-mono text-sm">{batteryAuditData.capacity} mAh</span>
+                                                        </div>
+                                                        <div className="flex flex-col">
+                                                            <span className="text-xs text-on-surface-variant/70 uppercase font-semibold">{t('performance.computed_drain', 'Computed Drain')}</span>
+                                                            <span className="font-mono text-sm">{batteryAuditData.computed_drain} mAh</span>
+                                                        </div>
+                                                    </div>
+
+                                                    {batteryAuditData.apps.length > 0 ? (
+                                                        batteryAuditData.apps.map((app, i) => (
+                                                            <div key={i} className="flex flex-col p-3 rounded-lg border border-outline-variant/20 hover:border-primary/30 hover:bg-surface-variant/20 transition-all">
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="font-semibold text-sm truncate pr-2 text-on-surface-variant/90">{app.name}</span>
+                                                                    <span className="font-mono text-xs text-orange-500 font-medium whitespace-nowrap">{app.usage.toFixed(4)} mAh</span>
+                                                                </div>
+                                                                {app.uid !== app.name && <span className="text-[10px] text-on-surface-variant/50 font-mono mt-0.5">{app.uid}</span>}
+                                                                {app.details && (
+                                                                    <span className="text-[10px] text-on-surface-variant/70 mt-1.5 break-words font-mono opacity-80 leading-tight">
+                                                                        {app.details}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        ))
+                                                    ) : (
+                                                        <div className="p-8 text-center text-sm text-on-surface-variant/60">{t('performance.no_app_data', 'No app specific data available.')}</div>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <div className="flex-1 flex items-center justify-center text-sm text-on-surface-variant/60 border border-outline-variant/30 rounded-xl bg-surface/30">
+                                                    {t('common.no_data', 'No data')}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </Section>
+                                )}
+                            </div>
+                        </div>
 
                     </div>
                 )}

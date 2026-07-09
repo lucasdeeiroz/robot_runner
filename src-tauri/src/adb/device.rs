@@ -92,7 +92,7 @@ pub async fn get_connected_devices(app: AppHandle) -> Result<Vec<Device>, String
                     cmd.args(&["-s", &udid, "shell", "dumpsys", "battery"]);
                     let output = cmd.output().await;
                     if let Ok(o) = output {
-                        parse_battery_info(&String::from_utf8_lossy(&o.stdout)).map(|(lvl, _)| lvl)
+                        parse_battery_info(&String::from_utf8_lossy(&o.stdout)).map(|(lvl, _, _, _)| lvl)
                     } else {
                         None
                     }

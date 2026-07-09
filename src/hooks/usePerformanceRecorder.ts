@@ -20,6 +20,8 @@ export interface DeviceStats {
     ram_total: number;
     battery_level: number;
     temperature: number;
+    battery_status?: string;
+    battery_power_source?: string;
     app_stats?: AppStats;
     foreground_activity?: string;
 }
