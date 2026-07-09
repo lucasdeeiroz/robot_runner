@@ -46,11 +46,12 @@ export function StopwatchSubTab({ selectedDevice, isTestRunning = false, allowAc
     const isActionDisabled = isTestRunning && !allowActionsDuringTest;
 
     return (
-        <div className="h-full flex-1 min-h-0 flex flex-col p-4 overflow-y-auto custom-scrollbar">
+        <div className="h-full flex-1 min-h-0 flex flex-col p-2 relative">
             <Section
                 title={t('performance.stopwatch.title', 'Logcat Stopwatch')}
                 icon={Timer}
                 variant="transparent"
+                className="flex-1 min-h-0 flex flex-col"
                 warning={isActionDisabled ? t('common.actions_disabled_during_test') : undefined}
                 actions={
                     <Button
@@ -71,7 +72,7 @@ export function StopwatchSubTab({ selectedDevice, isTestRunning = false, allowAc
                     {t('performance.stopwatch.description', 'Record timestamp deltas for specific logcat events.')}
                 </div> */}
                 <div className="flex-1 min-h-0 bg-surface text-on-surface/80 font-mono text-xs relative border border-outline-variant/30 rounded-2xl">
-                    <div className="p-4 grid grid-cols-1 xl:grid-cols-2 gap-8 w-full h-full min-h-0">
+                    <div className="p-4 grid grid-cols-1 xl:grid-cols-2 gap-4 w-full h-full min-h-0">
                         <div className="space-y-4">
                             <TagInput
                                 label={t('performance.stopwatch.keywords', 'Keywords')}
@@ -86,7 +87,7 @@ export function StopwatchSubTab({ selectedDevice, isTestRunning = false, allowAc
                             </div>
                         </div>
 
-                        <div className="flex flex-col min-h-0 border-t xl:border-t-0 xl:border-l border-outline-variant/30 pt-6 xl:pt-0 xl:pl-8">
+                        <div className="flex flex-col min-h-0 border-t xl:border-t-0 xl:border-l border-outline-variant/30 pt-6 xl:pt-0 xl:pl-4">
                             <div className="flex justify-between items-center mb-4 shrink-0">
                                 <div className="flex items-center gap-4">
                                     <span className="text-sm font-medium opacity-80 flex items-center gap-2">
@@ -156,7 +157,7 @@ export function StopwatchSubTab({ selectedDevice, isTestRunning = false, allowAc
                     </div>
                 </div>
             </Section>
-            <div className="flex items-center justify-between w-full mt-2">
+            <div className="flex items-center justify-between w-full mt-2 shrink-0">
                 <div className="flex items-center gap-2">
                     <div className="w-40">
                         <Select
