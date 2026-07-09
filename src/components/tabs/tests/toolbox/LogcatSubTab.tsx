@@ -277,7 +277,7 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
         setAiError(null);
         setAiResult(null);
 
-        const lastLogs = logs.slice(-100).join('\n'); // Take last 100 lines for context
+const lastLogs = filteredLogs.slice(-100).join('\n'); // Take last 100 lines for context
 
         let promptStr = `Analyze the following Android Logcat output. Identify potential errors, crashes, or performance bottlenecks. Provide a summary and then a detailed analysis. Respond in ${currentLang}.`;
         if (customPrompt) {
