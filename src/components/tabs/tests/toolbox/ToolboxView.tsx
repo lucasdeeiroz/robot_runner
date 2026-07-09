@@ -529,22 +529,35 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
             />
 
             {/* Tool Content */}
-            <div className={clsx(
-                "h-full flex-1 min-h-0 overflow-hidden",
-                isGridView
-                    ? "grid grid-cols-1 md:grid-cols-2 gap-4 pb-2 auto-rows-fr"
-                    : "bg-surface border border-outline-variant/30 rounded-2xl relative"
-            )}>
-                {(() => {
-                    const allTools: ToolTab[] = isWebMode
-                        ? ['console', 'webview']
-                        : ['console', 'logcat', 'performance', 'stopwatch', 'commands', 'apps', 'hardware', 'checkup'];
+            {(() => {
+                const allTools: ToolTab[] = isWebMode
+                    ? ['console', 'webview']
+                    : ['console', 'logcat', 'performance', 'stopwatch', 'commands', 'apps', 'hardware', 'checkup'];
 
-                    const visibleToolsInGridArray = allTools.filter(t =>
-                        visibleToolsInGrid.has(t) && (t !== 'console' || session.type === 'test')
-                    );
+                const visibleToolsInGridArray = allTools.filter(t =>
+                    visibleToolsInGrid.has(t) && (t !== 'console' || session.type === 'test')
+                );
 
-                    const titleMap: Record<string, string> = {
+                const useAutoRows = visibleToolsInGridArray.length <= 3;
+                // Use 3 columns for exactly 3 items. Otherwise default to 2 columns (or 1 on small screens).
+                const isThreeCols = visibleToolsInGridArray.length === 3;
+
+                return (
+                    <div 
+                        className={clsx(
+                            "h-full flex-1 min-h-0",
+                            isGridView
+                                ? clsx(
+                                    "grid gap-4 pb-2",
+                                    isThreeCols ? "grid-cols-1 md:grid-cols-3" : "grid-cols-1 md:grid-cols-2",
+                                    useAutoRows ? "auto-rows-fr overflow-hidden" : "content-start overflow-y-auto"
+                                )
+                                : "bg-surface border border-outline-variant/30 rounded-2xl relative overflow-hidden"
+                        )}
+                        style={isGridView && !useAutoRows ? { gridAutoRows: '400px' } : undefined}
+                    >
+                        {(() => {
+                            const titleMap: Record<string, string> = {
                         'console': t('toolbox.tabs.console'),
                         'logcat': t('toolbox.tabs.logcat'),
                         'dmesg': "Kernel Logs",
@@ -562,7 +575,7 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                         const isVisibleSingle = !isGridView && activeTool === tool;
                         const isVisible = isVisibleInGrid || isVisibleSingle;
 
-                        const isOddIn2Col = isGridView && (visibleToolsInGridArray.length % 2 !== 0) && (visibleToolsInGridArray[visibleToolsInGridArray.length - 1] === tool);
+                        const isOddIn2Col = isGridView && !isThreeCols && (visibleToolsInGridArray.length % 2 !== 0) && (visibleToolsInGridArray[visibleToolsInGridArray.length - 1] === tool);
 
                         return (
                             <div
@@ -674,7 +687,9 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                         );
                     });
                 })()}
-            </div>
+                    </div>
+                );
+            })()}
         </div>
     );
 }
