@@ -111,7 +111,7 @@ export const PerformanceSubTab = React.memo(function PerformanceSubTab({
 
     const [batteryEstimate, setBatteryEstimate] = useState<string | null>(null);
     useEffect(() => {
-        if (stats?.battery_status === 'Discharging' && frozenHistory.length > 0) {
+        if (stats?.battery_status === 'discharging' && frozenHistory.length > 0) {
             const past = frozenHistory.find(h => Date.now() - h.timestamp > 30000);
             if (past && past.battery_level > stats.battery_level) {
                 const drop = past.battery_level - stats.battery_level;
@@ -124,7 +124,7 @@ export const PerformanceSubTab = React.memo(function PerformanceSubTab({
                     setBatteryEstimate(`~${hrs}h ${mins}m`);
                 }
             }
-        } else if (stats?.battery_status === 'Charging') {
+        } else if (stats?.battery_status === 'charging') {
             setBatteryEstimate(t('performance.charging', 'Charging'));
         } else {
             setBatteryEstimate(null);
