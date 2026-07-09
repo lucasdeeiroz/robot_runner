@@ -1044,6 +1044,7 @@ export const es = {
             }
         },
         performance: {
+            last_update: "Última actualización",
             fetch_error: "Error al obtener estadísticas",
             save_error: "Error al guardar datos de rendimiento",
             record_error: "Error al iniciar grabación",

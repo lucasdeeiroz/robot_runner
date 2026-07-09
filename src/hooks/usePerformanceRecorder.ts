@@ -49,6 +49,7 @@ export function usePerformanceRecorder(
 
     // Recording State
     const [isRecording, setIsRecording] = useState(false);
+    const [recordingStartTime, setRecordingStartTime] = useState<number | null>(null);
 
 
     const { saveFile, lastSavedPath: lastSaved, clearFeedback } = useFileSave({
@@ -146,7 +147,7 @@ export function usePerformanceRecorder(
                 invoke('stop_performance_stream', { device: selectedDevice }).catch(console.error);
             }
         };
-    }, [selectedDevice, autoRefresh, selectedPackage, isActive, isRecording, isTestRunning, allowActionsDuringTest, forceEnable]);
+    }, [selectedDevice, autoRefresh, selectedPackage, isActive, isRecording, recordingStartTime, isTestRunning, allowActionsDuringTest, forceEnable]);
 
 
 
@@ -159,7 +160,20 @@ export function usePerformanceRecorder(
     // Recording Logic - Accumulate Data and flush periodically to keep memory bounded
     useEffect(() => {
         if (isRecording && stats && recordingFilePathRef.current) {
-            let line = `${new Date().toISOString()},${stats.cpu_usage.toFixed(2)},${stats.ram_used},${stats.battery_level},${stats.temperature.toFixed(1)}`;
+            let elapsedStr = "00:00:00";
+            if (recordingStartTime) {
+                const diff = Date.now() - recordingStartTime;
+                const hrs = Math.floor(diff / 3600000);
+                const mins = Math.floor((diff % 3600000) / 60000);
+                const secs = Math.floor((diff % 60000) / 1000);
+                elapsedStr = `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            }
+
+            const pad = (n: number) => n.toString().padStart(2, '0');
+            const d = new Date();
+            const localTimestamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+
+            let line = `${localTimestamp},${elapsedStr},${stats.cpu_usage.toFixed(2)},${stats.ram_used},${stats.battery_level},${stats.temperature.toFixed(1)}`;
 
             // Add App stats if present, or empty placeholders to maintain column alignment
             if (stats.app_stats) {
@@ -199,6 +213,7 @@ export function usePerformanceRecorder(
             recordedLinesRef.current = [];
             recordingFilePathRef.current = null;
             recordingHasAppColumnsRef.current = false;
+            setRecordingStartTime(null);
 
             if (filePath && remainingLines.length > 0) {
                 try {
@@ -214,7 +229,7 @@ export function usePerformanceRecorder(
         } else {
             // Start Recording: Prompt for file path, write header, then begin accumulating
             const hasAppColumns = !!selectedPackage;
-            const header = "Timestamp,System_CPU_%,System_RAM_KB,Battery_%,Battery_Temp_C" +
+            const header = "Timestamp,Elapsed_Time,System_CPU_%,System_RAM_KB,Battery_%,Battery_Temp_C" +
                 (hasAppColumns ? ",App_CPU_%,App_RAM_KB,FPS" : "") + ",Foreground_Activity\n";
 
             recordedLinesRef.current = [];
@@ -228,6 +243,7 @@ export function usePerformanceRecorder(
                     recordingFilePathRef.current = savedPath;
                     recordingHasAppColumnsRef.current = hasAppColumns;
                     setIsRecording(true);
+                    setRecordingStartTime(Date.now());
                 }
                 // If savedPath is null the user cancelled the dialog — do not start recording
             } catch (e) {
@@ -248,6 +264,7 @@ export function usePerformanceRecorder(
             updateSetting('logcatSelectedPackage', pkg);
         },
         isRecording,
+        recordingStartTime,
         toggleRecording,
         lastSaved,
         setLastSaved: clearFeedback,

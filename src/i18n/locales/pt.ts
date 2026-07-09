@@ -1041,6 +1041,7 @@ export const pt = {
             }
         },
         performance: {
+            last_update: "Última atualização",
             fetch_error: "Falha ao buscar estatísticas",
             save_error: "Falha ao salvar dados de performance",
             record_error: "Falha ao iniciar gravação",

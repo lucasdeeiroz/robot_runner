@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -28,6 +28,7 @@ interface PerformanceSubTabProps {
     selectedPackage: string;
     setSelectedPackage: (val: string) => void;
     isRecording: boolean;
+    recordingStartTime?: number | null;
     toggleRecording: () => void;
     lastSaved: string | null;
     setLastSaved: (val: string | null) => void;
@@ -41,7 +42,7 @@ interface PerformanceSubTabProps {
     onNavigate?: (page: string) => void;
 }
 
-export function PerformanceSubTab({
+export const PerformanceSubTab = React.memo(function PerformanceSubTab({
     selectedDevice,
     stats,
     history,
@@ -51,6 +52,7 @@ export function PerformanceSubTab({
     selectedPackage,
     setSelectedPackage,
     isRecording,
+    recordingStartTime,
     toggleRecording,
     lastSaved,
     setLastSaved,
@@ -75,6 +77,60 @@ export function PerformanceSubTab({
     const [showDeviceStatsSection, setShowDeviceStatsSection] = useState(true);
     const [showAppStatsSection, setShowAppStatsSection] = useState(true);
     const [showChartsSection, setShowChartsSection] = useState(true);
+    const [autoRefreshCharts, setAutoRefreshCharts] = useState(true);
+    const frozenHistory = useMemo(() => history, [autoRefreshCharts ? history : null]);
+
+    const [elapsedTime, setElapsedTime] = useState('00:00');
+    useEffect(() => {
+        if (isRecording && recordingStartTime) {
+            const interval = setInterval(() => {
+                const diff = Date.now() - recordingStartTime;
+                const minutes = Math.floor(diff / 60000);
+                const seconds = Math.floor((diff % 60000) / 1000);
+                setElapsedTime(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
+            }, 1000);
+            return () => clearInterval(interval);
+        } else {
+            setElapsedTime('00:00');
+        }
+    }, [isRecording, recordingStartTime]);
+
+    useEffect(() => {
+        if (isRecording && recordingStartTime) {
+            const interval = setInterval(() => {
+                const diff = Date.now() - recordingStartTime;
+                const minutes = Math.floor(diff / 60000);
+                const seconds = Math.floor((diff % 60000) / 1000);
+                setElapsedTime(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
+            }, 1000);
+            return () => clearInterval(interval);
+        } else {
+            setElapsedTime('00:00');
+        }
+    }, [isRecording, recordingStartTime]);
+
+    const [batteryEstimate, setBatteryEstimate] = useState<string | null>(null);
+    useEffect(() => {
+        if (stats?.battery_status === 'Discharging' && frozenHistory.length > 0) {
+            const past = frozenHistory.find(h => Date.now() - h.timestamp > 30000);
+            if (past && past.battery_level > stats.battery_level) {
+                const drop = past.battery_level - stats.battery_level;
+                const timeDiff = Date.now() - past.timestamp;
+                if (timeDiff > 0 && drop > 0) {
+                    const dropRatePerMs = drop / timeDiff;
+                    const timeRemainingMs = stats.battery_level / dropRatePerMs;
+                    const hrs = Math.floor(timeRemainingMs / 3600000);
+                    const mins = Math.floor((timeRemainingMs % 3600000) / 60000);
+                    setBatteryEstimate(`~${hrs}h ${mins}m`);
+                }
+            }
+        } else if (stats?.battery_status === 'Charging') {
+            setBatteryEstimate(t('performance.charging', 'Charging'));
+        } else {
+            setBatteryEstimate(null);
+        }
+    }, [stats, frozenHistory, t]);
+
     const processMonitor = useProcessMonitor(
         selectedDevice,
         showProcessMonitor,
@@ -101,6 +157,7 @@ export function PerformanceSubTab({
 
     const [showBatteryAudit, setShowBatteryAudit] = useState(true);
     const [batteryAuditData, setBatteryAuditData] = useState<BatteryAuditData | null>(null);
+    const [batteryAuditLastUpdate, setBatteryAuditLastUpdate] = useState<number | null>(null);
     const [isBatteryAuditLoading, setIsBatteryAuditLoading] = useState(false);
 
     useEffect(() => {
@@ -114,6 +171,7 @@ export function PerformanceSubTab({
         try {
             const data: BatteryAuditData = await invoke("get_battery_audit", { device: selectedDevice });
             setBatteryAuditData(data);
+            setBatteryAuditLastUpdate(Date.now());
         } catch (e) {
             feedback.toast.error(String(e));
         } finally {
@@ -306,7 +364,7 @@ export function PerformanceSubTab({
                             data-tooltip={isRecording ? t('performance.stop_record') : t('performance.start_record')}
                             data-position="left"
                         >
-                            {!isNarrow && (isRecording ? t('performance.recording') : "REC")}
+                            {!isNarrow && (isRecording ? `${elapsedTime}` : "REC")}
                         </Button>
                     </>
                 }
@@ -361,13 +419,13 @@ export function PerformanceSubTab({
                             {showDeviceStatsSection && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {/* CPU Card */}
-                                    <Card title={t('performance.cpu')} icon={<Cpu size={24} className="text-primary" />}>
+                                    <Card title={t('performance.cpu')} icon={<Cpu size={24} className="text-blue-500" />}>
                                         <div className="flex items-end gap-2 mt-2">
                                             <span className="text-4xl font-bold text-on-surface/50">
                                                 {formatRate(stats.cpu_usage, '%', t('performance.load'))}
                                             </span>
                                         </div>
-                                        <ProgressBar value={stats.cpu_usage} max={100} color="bg-primary" />
+                                        <ProgressBar value={stats.cpu_usage} max={100} color="bg-blue-500" />
                                     </Card>
 
                                     {/* RAM Card */}
@@ -399,6 +457,7 @@ export function PerformanceSubTab({
                                         <ProgressBar value={stats.battery_level} max={100} color={getBatteryColor(stats.battery_level).replace("text-", "bg-")} />
                                         <div className="text-xs text-right mt-1 text-on-surface/80">
                                             {getBatteryStatusText(stats.battery_status || '', stats.battery_power_source || '')}
+                                            {batteryEstimate && ` • ${batteryEstimate}`}
                                         </div>
                                     </Card>
                                 </div>
@@ -454,104 +513,35 @@ export function PerformanceSubTab({
 
                         {/* Charts Section */}
                         {history.length > 1 && (
-                            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 mt-8">
-                                <button
-                                    onClick={() => setShowChartsSection(!showChartsSection)}
-                                    className="flex items-center gap-1 text-xs font-semibold text-on-surface-variant/80 uppercase tracking-wider mb-3 ml-1 hover:text-primary transition-colors cursor-pointer w-full text-left focus:outline-none"
-                                >
-                                    {showChartsSection ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                                    {t('performance.history', 'Performance History')}
-                                </button>
-                                {showChartsSection && (
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                        <Card title={t('performance.general_history', 'System History')} icon={<Activity size={20} className="text-primary" />}>
-                                            <div className="h-64 w-full mt-4">
-                                                <ResponsiveContainer width="100%" height="100%">
-                                                    <AreaChart data={history} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
-                                                        <defs>
-                                                            <linearGradient id="colorSysRam" x1="0" y1="0" x2="0" y2="1">
-                                                                <stop offset="5%" stopColor="#a855f7" stopOpacity={0.3} />
-                                                                <stop offset="95%" stopColor="#a855f7" stopOpacity={0} />
-                                                            </linearGradient>
-                                                            <linearGradient id="colorSysCpu" x1="0" y1="0" x2="0" y2="1">
-                                                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                                                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                                                            </linearGradient>
-                                                            <linearGradient id="colorBattery" x1="0" y1="0" x2="0" y2="1">
-                                                                <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
-                                                                <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
-                                                            </linearGradient>
-                                                        </defs>
-                                                        <XAxis dataKey="timestamp" tickFormatter={(tick) => new Date(tick).toLocaleTimeString([], { hour12: false, minute: '2-digit', second: '2-digit' })} stroke="currentColor" className="text-[10px] opacity-50" />
-                                                        <YAxis yAxisId="left" stroke="currentColor" className="text-[10px] opacity-50" tickFormatter={(val) => (val / 1024).toFixed(0)} />
-                                                        <YAxis yAxisId="right" orientation="right" stroke="currentColor" className="text-[10px] opacity-50" domain={[0, 100]} tickFormatter={(val) => `${val}%`} />
-                                                        <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-10" vertical={false} />
-                                                        <RechartsTooltip
-                                                            contentStyle={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-outline-variant)', borderRadius: '8px', fontSize: '12px', color: 'var(--color-on-surface)' }}
-                                                            labelFormatter={(label) => new Date(label).toLocaleTimeString()}
-                                                            formatter={(value: any, name: any) => {
-                                                                if (name === 'ram_used') return [(Number(value) / 1024).toFixed(1) + ' MB', t('performance.system_ram', 'System RAM')];
-                                                                if (name === 'cpu_usage') return [Number(value).toFixed(1) + '%', t('performance.cpu', 'CPU')];
-                                                                if (name === 'battery_level') return [Number(value).toFixed(0) + '%', t('performance.battery', 'Battery')];
-                                                                return [value, name];
-                                                            }}
-                                                        />
-                                                        <Area yAxisId="left" type="monotone" dataKey="ram_used" stroke="#a855f7" fillOpacity={1} fill="url(#colorSysRam)" isAnimationActive={false} name="ram_used" />
-                                                        <Area yAxisId="right" type="monotone" dataKey="cpu_usage" stroke="#3b82f6" fillOpacity={1} fill="url(#colorSysCpu)" isAnimationActive={false} name="cpu_usage" />
-                                                        <Area yAxisId="right" type="monotone" dataKey="battery_level" stroke="#22c55e" fillOpacity={1} fill="url(#colorBattery)" isAnimationActive={false} name="battery_level" />
-                                                    </AreaChart>
-                                                </ResponsiveContainer>
-                                            </div>
-                                        </Card>
-
-                                        {selectedPackage && (
-                                            <Card title={t('performance.app_history', 'App History')} icon={<PackageIcon size={20} className="text-pink-500" />}>
-                                                <div className="h-64 w-full mt-4">
-                                                    <ResponsiveContainer width="100%" height="100%">
-                                                        <AreaChart data={history} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
-                                                            <defs>
-                                                                <linearGradient id="colorAppRam" x1="0" y1="0" x2="0" y2="1">
-                                                                    <stop offset="5%" stopColor="#ec4899" stopOpacity={0.3} />
-                                                                    <stop offset="95%" stopColor="#ec4899" stopOpacity={0} />
-                                                                </linearGradient>
-                                                                <linearGradient id="colorAppCpu" x1="0" y1="0" x2="0" y2="1">
-                                                                    <stop offset="5%" stopColor="#f97316" stopOpacity={0.3} />
-                                                                    <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
-                                                                </linearGradient>
-                                                                <linearGradient id="colorAppFps" x1="0" y1="0" x2="0" y2="1">
-                                                                    <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
-                                                                    <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
-                                                                </linearGradient>
-                                                            </defs>
-                                                            <XAxis dataKey="timestamp" tickFormatter={(tick) => new Date(tick).toLocaleTimeString([], { hour12: false, minute: '2-digit', second: '2-digit' })} stroke="currentColor" className="text-[10px] opacity-50" />
-                                                            <YAxis yAxisId="left" stroke="currentColor" className="text-[10px] opacity-50" tickFormatter={(val) => (val / 1024).toFixed(0)} />
-                                                            <YAxis yAxisId="right" orientation="right" stroke="currentColor" className="text-[10px] opacity-50" domain={[0, 120]} />
-                                                            <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-10" vertical={false} />
-                                                            <RechartsTooltip
-                                                                contentStyle={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-outline-variant)', borderRadius: '8px', fontSize: '12px', color: 'var(--color-on-surface)' }}
-                                                                labelFormatter={(label) => new Date(label).toLocaleTimeString()}
-                                                                formatter={(value: any, name: any) => {
-                                                                    if (name === 'app_stats.ram_used') return [(Number(value) / 1024).toFixed(1) + ' MB', t('performance.app_ram', 'App RAM')];
-                                                                    if (name === 'app_stats.cpu_usage') return [Number(value).toFixed(1) + '%', t('performance.cpu', 'CPU')];
-                                                                    if (name === 'app_stats.fps') return [Math.round(Number(value)) + ' fps', t('performance.fps', 'FPS')];
-                                                                    return [value, name];
-                                                                }}
-                                                            />
-                                                            <Area yAxisId="left" type="monotone" dataKey="app_stats.ram_used" stroke="#ec4899" fillOpacity={1} fill="url(#colorAppRam)" isAnimationActive={false} name="app_stats.ram_used" />
-                                                            <Area yAxisId="right" type="monotone" dataKey="app_stats.cpu_usage" stroke="#f97316" fillOpacity={1} fill="url(#colorAppCpu)" isAnimationActive={false} name="app_stats.cpu_usage" />
-                                                            <Area yAxisId="right" type="monotone" dataKey="app_stats.fps" stroke="#22c55e" fillOpacity={1} fill="url(#colorAppFps)" isAnimationActive={false} name="app_stats.fps" />
-                                                        </AreaChart>
-                                                    </ResponsiveContainer>
-                                                </div>
-                                            </Card>
+                            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <div className="flex items-center justify-between mb-3 ml-1">
+                                    <button
+                                        onClick={() => setShowChartsSection(!showChartsSection)}
+                                        className="flex items-center gap-1 text-xs font-semibold text-on-surface-variant/80 uppercase tracking-wider hover:text-primary transition-colors cursor-pointer focus:outline-none"
+                                    >
+                                        {showChartsSection ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                        {t('performance.history', 'Performance History')}
+                                    </button>
+                                    <div
+                                        className={clsx(
+                                            "flex items-center gap-2 px-2 py-1 rounded-xl border border-outline-variant/30 cursor-pointer transition-colors text-xs font-medium",
+                                            autoRefreshCharts ? "bg-primary/10 text-primary" : "text-on-surface-variant/70 hover:bg-surface-variant/50"
                                         )}
+                                        onClick={() => setAutoRefreshCharts(!autoRefreshCharts)}
+                                        title={t('performance.toggle_refresh')}
+                                    >
+                                        <RefreshCw size={12} className={clsx(autoRefreshCharts && "animate-spin-slow")} />
+                                        <span className="hidden sm:inline">{t('performance.auto', 'Auto')}</span>
                                     </div>
+                                </div>
+                                {showChartsSection && (
+                                    <PerformanceCharts history={frozenHistory} t={t} selectedPackage={selectedPackage} />
                                 )}
                             </div>
                         )}
 
                         {/* Process Monitor & Battery Audit Section */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-8 animate-in fade-in duration-500">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-in fade-in duration-500">
                             <button
                                 onClick={() => setShowProcessMonitor(!showProcessMonitor)}
                                 className="flex items-center gap-1 text-xs font-semibold text-on-surface-variant/80 uppercase tracking-wider ml-1 hover:text-primary transition-colors cursor-pointer w-full text-left focus:outline-none"
@@ -644,8 +634,8 @@ export function PerformanceSubTab({
                                                             <div className="flex items-center p-3 border-b border-outline-variant/10 text-sm hover:bg-surface-variant/20 transition-colors">
                                                                 <div className="w-16 font-mono text-xs opacity-70">{p.pid}</div>
                                                                 <div className="flex-1 truncate pr-4 font-medium" title={p.command}>{p.command}</div>
-                                                                <div className="w-20 text-right font-mono text-xs text-orange-500">{p.cpu.toFixed(1)}%</div>
-                                                                <div className="w-24 text-right font-mono text-xs text-pink-500">{(p.mem / 1024).toFixed(1)} MB</div>
+                                                                <div className="w-20 text-right font-mono text-xs text-tertiary">{p.cpu.toFixed(1)}%</div>
+                                                                <div className="w-24 text-right font-mono text-xs text-secondary">{(p.mem / 1024).toFixed(1)} MB</div>
                                                             </div>
                                                         )}
                                                     />
@@ -665,6 +655,11 @@ export function PerformanceSubTab({
                                         icon={Battery}
                                         actions={
                                             <>
+                                                {batteryAuditLastUpdate && (
+                                                    <span className="text-[10px] text-on-surface-variant/60 font-mono tracking-tighter">
+                                                        {t('performance.last_update', 'Last update')}: {new Date(batteryAuditLastUpdate).toLocaleTimeString()}
+                                                    </span>
+                                                )}
                                                 <Button
                                                     variant="secondary"
                                                     size="sm"
@@ -709,7 +704,7 @@ export function PerformanceSubTab({
                                                             <div key={i} className="flex flex-col p-3 rounded-lg border border-outline-variant/20 hover:border-primary/30 hover:bg-surface-variant/20 transition-all">
                                                                 <div className="flex items-center justify-between">
                                                                     <span className="font-semibold text-sm truncate pr-2 text-on-surface-variant/90">{app.name}</span>
-                                                                    <span className="font-mono text-xs text-orange-500 font-medium whitespace-nowrap">{app.usage.toFixed(4)} mAh</span>
+                                                                    <span className="font-mono text-xs text-tertiary font-medium whitespace-nowrap">{app.usage.toFixed(4)} mAh</span>
                                                                 </div>
                                                                 {app.uid !== app.name && <span className="text-[10px] text-on-surface-variant/50 font-mono mt-0.5">{app.uid}</span>}
                                                                 {app.details && (
@@ -765,7 +760,7 @@ export function PerformanceSubTab({
             />
         </div>
     );
-}
+});
 
 function Card({ title, icon, children }: { title: string, icon: React.ReactNode, children: React.ReactNode }) {
     return (
@@ -790,3 +785,94 @@ function ProgressBar({ value, max, color }: { value: number, max: number, color:
         </div>
     );
 }
+
+
+const PerformanceCharts = React.memo(({ history, t, selectedPackage }: { history: any[], t: any, selectedPackage: string }) => {
+    return (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Card title={t('performance.general_history', 'System History')} icon={<Activity size={20} className="text-primary" />}>
+                <div className="h-64 w-full mt-4">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={history} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
+                            <defs>
+                                <linearGradient id="colorSysRam" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#a855f7" stopOpacity={0.3} />
+                                    <stop offset="95%" stopColor="#a855f7" stopOpacity={0} />
+                                </linearGradient>
+                                <linearGradient id="colorSysCpu" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                                </linearGradient>
+                                <linearGradient id="colorBattery" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
+                                    <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
+                                </linearGradient>
+                            </defs>
+                            <XAxis dataKey="timestamp" tickFormatter={(tick) => new Date(tick).toLocaleTimeString([], { hour12: false, minute: '2-digit', second: '2-digit' })} stroke="currentColor" className="text-[10px] opacity-50" />
+                            <YAxis yAxisId="left" stroke="currentColor" className="text-[10px] opacity-50" tickFormatter={(val) => (val / 1024).toFixed(0)} />
+                            <YAxis yAxisId="right" orientation="right" stroke="currentColor" className="text-[10px] opacity-50" domain={[0, 100]} tickFormatter={(val) => `${val}%`} />
+                            <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-10" vertical={false} />
+                            <RechartsTooltip
+                                contentStyle={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-outline-variant)', borderRadius: '8px', fontSize: '12px', color: 'var(--color-on-surface)' }}
+                                labelFormatter={(label) => new Date(label).toLocaleTimeString()}
+                                formatter={(value: any, name: any) => {
+                                    if (name === 'ram_used') return [(Number(value) / 1024).toFixed(1) + ' MB', t('performance.system_ram', 'System RAM')];
+                                    if (name === 'cpu_usage') return [Number(value).toFixed(1) + '%', t('performance.cpu', 'CPU')];
+                                    if (name === 'battery_level') return [Number(value).toFixed(0) + '%', t('performance.battery', 'Battery')];
+                                    return [value, name];
+                                }}
+                            />
+                            <Area yAxisId="left" type="monotone" dataKey="ram_used" stroke="#a855f7" fillOpacity={1} fill="url(#colorSysRam)" isAnimationActive={false} name="ram_used" />
+                            <Area yAxisId="right" type="monotone" dataKey="cpu_usage" stroke="#3b82f6" fillOpacity={1} fill="url(#colorSysCpu)" isAnimationActive={false} name="cpu_usage" />
+                            <Area yAxisId="right" type="monotone" dataKey="battery_level" stroke="#22c55e" fillOpacity={1} fill="url(#colorBattery)" isAnimationActive={false} name="battery_level" />
+                        </AreaChart>
+                    </ResponsiveContainer>
+                </div>
+            </Card>
+
+            {selectedPackage && (
+                <Card title={t('performance.app_history', 'App History')} icon={<PackageIcon size={20} className="text-secondary" />}>
+                    <div className="h-64 w-full mt-4">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={history} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
+                                <defs>
+                                    <linearGradient id="colorAppRam" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#ec4899" stopOpacity={0.3} />
+                                        <stop offset="95%" stopColor="#ec4899" stopOpacity={0} />
+                                    </linearGradient>
+                                    <linearGradient id="colorAppCpu" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#f97316" stopOpacity={0.3} />
+                                        <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                                    </linearGradient>
+                                    <linearGradient id="colorAppFps" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
+                                        <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <XAxis dataKey="timestamp" tickFormatter={(tick) => new Date(tick).toLocaleTimeString([], { hour12: false, minute: '2-digit', second: '2-digit' })} stroke="currentColor" className="text-[10px] opacity-50" />
+                                <YAxis yAxisId="left" stroke="currentColor" className="text-[10px] opacity-50" tickFormatter={(val) => (val / 1024).toFixed(0)} />
+                                <YAxis yAxisId="right" orientation="right" stroke="currentColor" className="text-[10px] opacity-50" domain={[0, 120]} />
+                                <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-10" vertical={false} />
+                                <RechartsTooltip
+                                    contentStyle={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-outline-variant)', borderRadius: '8px', fontSize: '12px', color: 'var(--color-on-surface)' }}
+                                    labelFormatter={(label) => new Date(label).toLocaleTimeString()}
+                                    formatter={(value: any, name: any) => {
+                                        if (name === 'app_stats.ram_used') return [(Number(value) / 1024).toFixed(1) + ' MB', t('performance.app_ram', 'App RAM')];
+                                        if (name === 'app_stats.cpu_usage') return [Number(value).toFixed(1) + '%', t('performance.cpu', 'CPU')];
+                                        if (name === 'app_stats.fps') return [Math.round(Number(value)) + ' fps', t('performance.fps', 'FPS')];
+                                        return [value, name];
+                                    }}
+                                />
+                                <Area yAxisId="left" type="monotone" dataKey="app_stats.ram_used" stroke="#ec4899" fillOpacity={1} fill="url(#colorAppRam)" isAnimationActive={false} name="app_stats.ram_used" />
+                                <Area yAxisId="right" type="monotone" dataKey="app_stats.cpu_usage" stroke="#f97316" fillOpacity={1} fill="url(#colorAppCpu)" isAnimationActive={false} name="app_stats.cpu_usage" />
+                                <Area yAxisId="right" type="monotone" dataKey="app_stats.fps" stroke="#22c55e" fillOpacity={1} fill="url(#colorAppFps)" isAnimationActive={false} name="app_stats.fps" />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                </Card>
+            )}
+        </div>
+    );
+}, (prevProps, nextProps) => {
+    return prevProps.history === nextProps.history && prevProps.selectedPackage === nextProps.selectedPackage;
+});

@@ -1040,6 +1040,7 @@ export const en = {
             }
         },
         performance: {
+            last_update: "Last update",
             fetch_error: "Failed to fetch stats",
             save_error: "Failed to save performance data",
             record_error: "Failed to start recording",
