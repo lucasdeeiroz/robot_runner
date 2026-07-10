@@ -186,6 +186,7 @@ export const en = {
                 disable: "Disable",
                 enable: "Enable",
                 clear: "Clear Data",
+                force_stop: "Force Stop",
                 sort_by_name: "Sort by Name",
                 sort_by_package: "Sort by Package",
                 refresh: "Refresh List",
@@ -212,14 +213,16 @@ export const en = {
                 enabled: "Package {{pkg}} enabled",
                 cleared: "Data cleared for {{pkg}}",
                 installed: "APK installed successfully",
-                launched: "Launched {{pkg}}",
-                downloaded: "Downloaded {{pkg}}"
+                launched: "Successfully launched {{pkg}}",
+                downloaded: "Successfully downloaded {{pkg}}",
+                force_stopped: "Successfully force stopped {{pkg}}"
             },
             error: {
-                install_failed: "Installation failed: {{error}}",
+                install_failed: "Install failed: {{error}}",
                 action_failed: "Action failed",
                 launch_failed: "Failed to launch app",
-                download_failed: "Failed to download APK"
+                download_failed: "Failed to download APK",
+                force_stop_failed: "Failed to force stop app"
             }
         },
         commands: {

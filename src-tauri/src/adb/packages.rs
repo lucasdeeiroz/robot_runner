@@ -208,6 +208,11 @@ pub async fn launch_package(app: AppHandle, device: String, package: String) -> 
 }
 
 #[command]
+pub async fn force_stop_package(app: AppHandle, device: String, package: String) -> Result<String, String> {
+    run_adb(&app, device, vec!["shell", "am", "force-stop", &package]).await
+}
+
+#[command]
 pub async fn set_stay_on(app: AppHandle, device: String, enabled: bool) -> Result<String, String> {
     let mode = if enabled { "3" } else { "0" }; // 3 is AC+USB, 0 is Off
     run_adb(&app, device, vec!["shell", "settings", "put", "system", "stay_on_while_plugged_in", mode]).await

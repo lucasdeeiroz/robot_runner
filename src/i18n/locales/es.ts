@@ -186,6 +186,7 @@ export const es = {
                 disable: "Deshabilitar",
                 enable: "Habilitar",
                 clear: "Borrar Datos",
+                force_stop: "Forzar Detención",
                 sort_by_name: "Ordenar por Nombre",
                 sort_by_package: "Ordenar por Paquete",
                 refresh: "Actualizar Lista",
@@ -213,13 +214,15 @@ export const es = {
                 cleared: "Datos borrados para {{pkg}}",
                 installed: "APK instalado con éxito",
                 launched: "{{pkg}} abierto con éxito",
-                downloaded: "{{pkg}} descargado con éxito"
+                downloaded: "{{pkg}} descargado con éxito",
+                force_stopped: "Proceso de {{pkg}} detenido"
             },
             error: {
                 install_failed: "Fallo en la instalación: {{error}}",
                 action_failed: "La acción falló",
                 launch_failed: "Error al iniciar aplicación",
-                download_failed: "Error al descargar APK"
+                download_failed: "Error al descargar APK",
+                force_stop_failed: "Error al forzar detención"
             }
         },
         commands: {

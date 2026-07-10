@@ -186,6 +186,7 @@ export const pt = {
                 disable: "Desativar",
                 enable: "Ativar",
                 clear: "Limpar Dados",
+                force_stop: "Forçar Parada",
                 sort_by_name: "Ordenar por Nome",
                 sort_by_package: "Ordenar por Pacote",
                 refresh: "Atualizar Lista",
@@ -213,13 +214,15 @@ export const pt = {
                 cleared: "Dados de {{pkg}} limpos",
                 installed: "APK instalado com sucesso",
                 launched: "{{pkg}} aberto com sucesso",
-                downloaded: "{{pkg}} baixado com sucesso"
+                downloaded: "{{pkg}} baixado com sucesso",
+                force_stopped: "Processo de {{pkg}} interrompido"
             },
             error: {
                 install_failed: "Falha na instalação: {{error}}",
                 action_failed: "Ação falhou",
                 launch_failed: "Falha ao iniciar app",
-                download_failed: "Falha ao baixar APK"
+                download_failed: "Falha ao baixar APK",
+                force_stop_failed: "Falha ao forçar parada"
             }
         },
         commands: {

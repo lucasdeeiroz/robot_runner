@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useTranslation } from "react-i18next";
-import { Search, Smartphone, Package, Trash2, Snowflake, PlayCircle, Eraser, Upload, ArrowDownAZ, RefreshCw, Rocket, Download } from "lucide-react";
+import { Search, Smartphone, Package, Trash2, Snowflake, PlayCircle, Eraser, Upload, ArrowDownAZ, RefreshCw, Rocket, Download, OctagonX } from "lucide-react";
 import clsx from "clsx";
 import { useTestSessions } from "@/lib/testSessionStore";
 import { open, save } from '@tauri-apps/plugin-dialog';
@@ -208,6 +208,15 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
             feedback.toast.raw.success(t('apps.success.launched', { pkg, defaultValue: `Launched ${pkg}` }));
         } catch (e) {
             feedback.toast.raw.error(t('apps.error.launch_failed', { defaultValue: 'Failed to launch app' }), e);
+        }
+    };
+
+    const handleForceStop = async (pkg: string) => {
+        try {
+            await invoke("force_stop_package", { device: activeDevice, package: pkg });
+            feedback.toast.raw.success(t('apps.success.force_stopped', { pkg, defaultValue: `Force stopped ${pkg}` }));
+        } catch (e) {
+            feedback.toast.raw.error(t('apps.error.force_stop_failed', { defaultValue: 'Failed to force stop app' }), e);
         }
     };
 
@@ -418,6 +427,10 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
                                             <Snowflake size={14} />
                                         </Button>
                                     )}
+
+                                    <Button size="icon" variant="ghost" onClick={() => handleForceStop(String(pkg.name))} className="h-7 w-7 hover:bg-error/10 text-error/80 rounded" data-tooltip={`${t('apps.actions.force_stop', "Force Stop")} (adb shell am force-stop)`} data-position="left">
+                                        <OctagonX size={14} />
+                                    </Button>
 
                                     <Button size="icon" variant="ghost" onClick={() => confirmClear(String(pkg.name))} className="h-7 w-7 hover:bg-warning/10 text-warning-container/40 rounded" data-tooltip={`${t('apps.actions.clear', "Clear Data")} (adb shell pm clear)`} data-position="left">
                                         <Eraser size={14} />
