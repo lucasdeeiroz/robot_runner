@@ -1904,6 +1904,7 @@ export const pt = {
                 },
                 additional: {
                     imei: "IMEI (iphonesubinfo)",
+                    imei_blocked: "Bloqueado pelo SO (Restrição de Shell)",
                     bluetooth_address: "Endereço Bluetooth",
                     wifi_mac_address: "Endereço MAC Wi-Fi",
                     wifi_ip_address: "Endereço IP Wi-Fi",

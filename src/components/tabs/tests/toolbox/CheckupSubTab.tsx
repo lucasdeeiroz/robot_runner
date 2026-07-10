@@ -191,15 +191,52 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
     const additionalChecksBase = useMemo(() => [
         {
             id: 'imei',
-            name: t('toolbox.checkup.additional.imei', 'IMEI (iphonesubinfo)'),
-            command: ['shell', 'service', 'call', 'iphonesubinfo', '1'],
+            name: t('toolbox.checkup.additional.imei', 'IMEI'),
+            command: ['shell', 'service call iphonesubinfo 1; service call iphonesubinfo 3; service call iphonesubinfo 4; getprop ro.ril.oem.imei; getprop ro.ril.oem.imei1; getprop persist.radio.imei; getprop ro.serialno'],
             foundDisplay: (out: string) => {
-                const matches = out.match(/'([^']+)'/g);
-                if (matches) {
-                    const text = matches.map(m => m.slice(1, -1)).join('');
-                    const imei = text.replace(/\D/g, '');
-                    return imei || t('toolbox.checkup.not_found', 'Not found');
+                // 1. Try to find a plain 14-17 digit number (from getprops)
+                const regex = /(?:^|[^\d])(\d{14,17})(?:[^\d]|$)/g;
+                let match;
+                while ((match = regex.exec(out)) !== null) {
+                    const candidate = match[1];
+                    if (!candidate.startsWith('000000')) {
+                        return candidate;
+                    }
                 }
+
+                // 2. Parse parcels individually if they exist
+                // Split the output by "Result: Parcel" so we handle each command's output separately
+                const chunks = out.split('Parcel');
+                for (const chunk of chunks) {
+                    const matches = chunk.match(/'([^']+)'/g);
+                    if (matches) {
+                        const text = matches.map(m => m.slice(1, -1)).join('');
+                        const imei = text.replace(/\D/g, '');
+                        if (imei.length >= 14 && imei.length <= 17 && !imei.startsWith('000000')) {
+                            return imei;
+                        }
+                    }
+                }
+
+                // 3. Fallback: if somehow it's just a long string of numbers (original behavior fallback)
+                const matchesAll = out.match(/'([^']+)'/g);
+                if (matchesAll) {
+                    const text = matchesAll.map(m => m.slice(1, -1)).join('');
+                    const imei = text.replace(/\D/g, '');
+                    if (imei.length >= 14 && imei.length <= 17 && !imei.startsWith('000000')) {
+                        return imei;
+                    } else if (imei.length > 17 && !imei.startsWith('000000')) {
+                        // Return the first 15 digits just in case it concatenated multiple same IMEIs
+                        return imei.substring(0, 15);
+                    }
+                }
+
+                // 4. Fallback for Android 10+ devices (like Octa400) where IMEI is blocked for Shell UID
+                if (out.includes('fffffff') || out.includes('Permission Denial') || out.includes('SecurityException')) {
+                    return t('toolbox.checkup.additional.imei_blocked', 'Blocked by OS (Shell Restriction)');
+                }
+
+                // If not found and not explicitly blocked by a known error, just return not found
                 return t('toolbox.checkup.not_found', 'Not found');
             }
         },

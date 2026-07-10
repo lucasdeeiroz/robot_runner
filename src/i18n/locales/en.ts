@@ -1903,6 +1903,7 @@ export const en = {
                 },
                 additional: {
                     imei: "IMEI (iphonesubinfo)",
+                    imei_blocked: "Blocked by OS (Shell Restriction)",
                     bluetooth_address: "Bluetooth Address",
                     wifi_mac_address: "Wi-Fi MAC Address",
                     wifi_ip_address: "Wi-Fi IP Address",
