@@ -16,9 +16,11 @@ interface DropdownMenuProps {
     trigger: ReactNode;
     items: DropdownMenuItem[];
     align?: 'left' | 'right';
+    direction?: 'up' | 'down';
+    useAnchor?: boolean;
 }
 
-export function DropdownMenu({ trigger, items, align = 'right' }: DropdownMenuProps) {
+export function DropdownMenu({ trigger, items, align = 'right', direction = 'down', useAnchor = false }: DropdownMenuProps) {
     return (
         <Menu as="div" className="relative inline-block text-left">
             <div>
@@ -37,8 +39,17 @@ export function DropdownMenu({ trigger, items, align = 'right' }: DropdownMenuPr
                 leaveTo="transform opacity-0 scale-95"
             >
                 <Menu.Items
-                    anchor={align === 'right' ? "bottom end" : "bottom start"}
-                    className="z-50 mt-2 w-56 origin-top-right rounded-2xl bg-surface border border-outline-variant/30 shadow-xl focus:outline-none overflow-hidden p-1.5 [--anchor-gap:8px]"
+                    {...(useAnchor ? {
+                        anchor: direction === 'up' 
+                            ? (align === 'right' ? 'top end' : 'top start') 
+                            : (align === 'right' ? 'bottom end' : 'bottom start')
+                    } : {})}
+                    className={clsx(
+                        "z-50 w-56 rounded-2xl bg-surface border border-outline-variant/30 shadow-xl focus:outline-none overflow-hidden p-1.5",
+                        !useAnchor && "absolute",
+                        !useAnchor && (direction === 'up' ? "bottom-full mb-2" : "top-full mt-2"),
+                        !useAnchor && (align === 'right' ? "right-0 origin-top-right" : "left-0 origin-top-left")
+                    )}
                 >
                     {items.map((item, index) => (
                         <Menu.Item key={index} disabled={item.disabled}>
