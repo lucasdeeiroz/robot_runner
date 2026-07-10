@@ -18,6 +18,7 @@ export function useLogcatStopwatch(selectedDevice: string, selectedPackage: stri
     const [deltaUnit, setDeltaUnit] = useState<'ms' | 's' | 'min' | 'h'>('ms');
     const [isStopwatchRunning, setIsStopwatchRunning] = useState(false);
     const [newKeyword, setNewKeyword] = useState("");
+    const [startTime, setStartTime] = useState<number | null>(null);
 
     const handleRemoveLap = (index: number) => {
         setLaps(prev => {
@@ -51,6 +52,7 @@ export function useLogcatStopwatch(selectedDevice: string, selectedPackage: stri
                     extraTags: settings.logcatExtraTags || null
                 });
                 setIsStopwatchRunning(true);
+                setStartTime(Date.now());
             } catch (e: any) {
                 if (typeof e === 'string' && e.includes('already running')) {
                     setIsStopwatchRunning(true);
@@ -106,6 +108,7 @@ export function useLogcatStopwatch(selectedDevice: string, selectedPackage: stri
         handleToggleStopwatch,
         keywords,
         newKeyword,
-        setNewKeyword
+        setNewKeyword,
+        startTime
     };
 }
