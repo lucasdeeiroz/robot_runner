@@ -28,14 +28,25 @@ interface LogcatSubTabProps {
     onNavigate?: (page: string) => void;
 }
 
+interface LogEntry {
+    id: number;
+    text: string;
+}
+
 export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActionsDuringTest = false, onNavigate }: LogcatSubTabProps) {
     const { t, i18n } = useTranslation();
     const [isStreaming, setIsStreaming] = useState(false);
-    const [logs, setLogs] = useState<string[]>([]);
+    const [logs, setLogs] = useState<LogEntry[]>([]);
+    const nextLogId = useRef(1);
     const virtuosoRef = useRef<VirtuosoHandle>(null);
     const { settings, updateSetting } = useSettings();
     const [currentDumpFile, setCurrentDumpFile] = useState<string | null>(null);
     const [clearBeforeStart, setClearBeforeStart] = useState(false);
+
+    const handleClearLogs = () => {
+        setLogs([]);
+        nextLogId.current = 1;
+    };
 
     const handleConfigurePath = async () => {
         const selected = await open({
@@ -84,7 +95,7 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
 
     // Check status on mount
     useEffect(() => {
-        setLogs([]); // Explicitly clear logs when device changes (or mounts)
+        handleClearLogs(); // Explicitly clear logs when device changes (or mounts)
         if (selectedDevice) {
             // Restore state
             invoke<{ is_active: boolean, output_file: string | null }>('get_logcat_details', { device: selectedDevice, sessionId: "logcat_tab" })
@@ -114,7 +125,7 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
                 const historyLines = result[0];
                 if (historyLines && historyLines.length > 0) {
                     setLogs(() => {
-                        const updated = [...historyLines];
+                        const updated = historyLines.map(line => ({ id: nextLogId.current++, text: line }));
                         if (updated.length > 5000) return updated.slice(-5000);
                         return updated;
                     });
@@ -127,7 +138,8 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
             listen<{ device: string, session_id: string, lines: string[] }>('logcat-data', (event) => {
                 if (event.payload.device === selectedDevice && event.payload.session_id === "logcat_tab") {
                     setLogs(prev => {
-                        const updated = [...prev, ...event.payload.lines];
+                        const newEntries = event.payload.lines.map(line => ({ id: nextLogId.current++, text: line }));
+                        const updated = [...prev, ...newEntries];
                         if (updated.length > 5000) return updated.slice(-5000);
                         return updated;
                     });
@@ -160,7 +172,7 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
     const filteredLogs = useMemo(() => {
         if (!deferredSearchQuery) return logs;
         const lowerQuery = deferredSearchQuery.toLowerCase();
-        return logs.filter(log => log.toLowerCase().includes(lowerQuery));
+        return logs.filter(log => log.text.toLowerCase().includes(lowerQuery));
     }, [logs, deferredSearchQuery]);
 
     const startLogcat = async () => {
@@ -200,7 +212,7 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
 
 
         try {
-            setLogs([]); // Clear previous logs for clarity
+            handleClearLogs(); // Clear previous logs for clarity
 
             // Increase buffer size to prevent circular buffer overflow during heavy test processing
             try {
@@ -228,7 +240,7 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
             setIsStreaming(true);
             if (dumpFile) {
                 // console.log("Saving logs to:", dumpFile);
-                setLogs(prev => [...prev, `--- ${t('logcat.saving')} ${dumpFile} ---`]);
+                setLogs(prev => [...prev, { id: nextLogId.current++, text: `--- ${t('logcat.saving')} ${dumpFile} ---` }]);
             }
         } catch (e) {
             feedback.toast.error("logcat.errors.start_failed", e);
@@ -258,7 +270,7 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
             if (!isMounted.current) return; // Prevent state update if unmounted
             setIsStreaming(false);
             if (currentDumpFile) {
-                setLogs(prev => [...prev, `${t('feedback.saved_to_prefix')} ${currentDumpFile}`]);
+                setLogs(prev => [...prev, { id: nextLogId.current++, text: `${t('feedback.saved_to_prefix')} ${currentDumpFile}` }]);
                 feedback.toast.success('feedback.logcat_saved');
                 setLastSavedFile(currentDumpFile);
                 setCurrentDumpFile(null);
@@ -277,7 +289,7 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
         setAiError(null);
         setAiResult(null);
 
-const lastLogs = filteredLogs.slice(-100).join('\n'); // Take last 100 lines for context
+const lastLogs = filteredLogs.slice(-100).map(l => l.text).join('\n'); // Take last 100 lines for context
 
         let promptStr = `Analyze the following Android Logcat output. Identify potential errors, crashes, or performance bottlenecks. Provide a summary and then a detailed analysis. Respond in ${currentLang}.`;
         if (customPrompt) {
@@ -432,19 +444,24 @@ const lastLogs = filteredLogs.slice(-100).join('\n'); // Take last 100 lines for
                         followOutput="auto"
                         atBottomThreshold={50} // If user scrolls up, stop auto-scrolling
                         itemContent={(_, log) => (
-                            <div className="on-primaryspace-pre-wrap hover:bg-surface-variant/30 px-2 py-0.5 break-all transition-colors">
-                                {log.startsWith(t('feedback.saved_to_prefix')) ? (
-                                    <span
-                                        className="text-primary dark:text-primary/80 underline cursor-pointer hover:opacity-80"
-                                        onClick={() => invoke('open_path', { path: log.replace(t('feedback.saved_to_prefix') + ' ', '') })}
-                                        data-tooltip={t('logcat.open_file', 'Click to open file')}
-                                        data-position="top"
-                                    >
-                                        {log}
-                                    </span>
-                                ) : (
-                                    log
-                                )}
+                            <div className="on-primaryspace-pre-wrap hover:bg-surface-variant/30 px-2 py-0.5 break-all transition-colors flex gap-2">
+                                <div className="select-none text-on-surface-variant/40 text-[10px] min-w-[36px] text-right pt-[1px] font-mono shrink-0">
+                                    {log.id}
+                                </div>
+                                <div className="flex-1">
+                                    {log.text.startsWith(t('feedback.saved_to_prefix')) ? (
+                                        <span
+                                            className="text-primary dark:text-primary/80 underline cursor-pointer hover:opacity-80"
+                                            onClick={() => invoke('open_path', { path: log.text.replace(t('feedback.saved_to_prefix') + ' ', '') })}
+                                            data-tooltip={t('logcat.open_file', 'Click to open file')}
+                                            data-position="top"
+                                        >
+                                            {log.text}
+                                        </span>
+                                    ) : (
+                                        log.text
+                                    )}
+                                </div>
                             </div>
                         )}
                         style={{ height: '100%' }}
@@ -533,7 +550,7 @@ const lastLogs = filteredLogs.slice(-100).join('\n'); // Take last 100 lines for
                 <div className="text-xs text-on-surface/80 flex items-center justify-end">
                     {searchQuery ? `${filteredLogs.length} / ${logs.length}` : logs.length} {t('logcat.lines')}
                     <Button
-                        onClick={() => { setLogs([]); setSearchQuery(""); }}
+                        onClick={() => { handleClearLogs(); setSearchQuery(""); }}
                         variant="ghost"
                         size="sm"
                         className="px-3 py-1.5 ml-2 rounded-2xl text-xs font-medium items-center justify-center gap-2 bg-surface text-on-surface/80 border border-outline-variant/30 hover:bg-surface-variant/50 transition-colors h-auto"
