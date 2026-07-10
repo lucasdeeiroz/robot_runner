@@ -11,6 +11,7 @@ import { Modal } from '@/components/organisms/Modal';
 import { ActionCard } from '@/components/atoms/ActionCard';
 import { TagInput } from '@/components/atoms/TagInput';
 import { Input } from '@/components/atoms/Input';
+import { SplitButton } from '@/components/molecules/SplitButton';
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
 import { ExpressiveLoading } from '@/components/atoms/ExpressiveLoading';
@@ -340,7 +341,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
         return props;
     };
 
-    const handleImportFile = async () => {
+    const handleImportFile = async (append = false) => {
         if (!selectedDevice) return;
         try {
             const selected = await open({
@@ -353,18 +354,19 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 const content = await readTextFile(selected);
                 const expectedProps = parsePropsFile(content);
 
-                // Fetch device props
-                const deviceOutput: string = await invoke('run_adb_command', {
-                    device: selectedDevice,
-                    args: ['shell', 'getprop']
-                });
-
-                const deviceProps = parseDeviceProps(deviceOutput);
-                setDevicePropsCache(deviceProps);
+                let currentDeviceProps = devicePropsCache;
+                if (!currentDeviceProps || Object.keys(currentDeviceProps).length === 0) {
+                    const deviceOutput: string = await invoke('run_adb_command', {
+                        device: selectedDevice,
+                        args: ['shell', 'getprop']
+                    });
+                    currentDeviceProps = parseDeviceProps(deviceOutput);
+                    setDevicePropsCache(currentDeviceProps);
+                }
 
                 const newComparisons: PropComparison[] = Object.keys(expectedProps).map(key => {
                     const expected = expectedProps[key];
-                    const found = deviceProps[key] || '';
+                    const found = currentDeviceProps[key] || '';
                     return {
                         key,
                         expected,
@@ -373,7 +375,22 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                     };
                 });
 
-                setComparisons(newComparisons);
+                if (append) {
+                    setComparisons(prev => {
+                        const merged = [...prev];
+                        for (const nc of newComparisons) {
+                            const existingIdx = merged.findIndex(c => c.key === nc.key);
+                            if (existingIdx >= 0) {
+                                merged[existingIdx] = nc;
+                            } else {
+                                merged.push(nc);
+                            }
+                        }
+                        return merged;
+                    });
+                } else {
+                    setComparisons(newComparisons);
+                }
             }
         } catch (error) {
             console.error('Failed to import and check props:', error);
@@ -764,28 +781,28 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                     contentClassName="flex-1 flex flex-col min-h-0 pr-2"
                     actions={
                         <div className="flex flex-wrap items-center gap-2">
-                            {selectedDevice && (
-                                <Button
-                                    variant="outline"
-                                    tooltipPosition="left"
-                                    onClick={handleLoadRemainingProps}
-                                    disabled={disabled || isLoading}
-                                    className="relative h-9 w-9 p-0 flex items-center justify-center shrink-0 rounded-md"
-                                    title={t('toolbox.checkup.load_remaining', 'Load remaining base props')}
-                                >
-                                    <ListPlus size={16} />
-                                </Button>
-                            )}
-                            <Button
+                            <SplitButton
                                 variant="primary"
-                                onClick={handleImportFile}
                                 disabled={disabled || isLoading}
-                                className="flex items-center gap-2 h-9 px-3"
-                                title={t('toolbox.checkup.upload_prop', 'Import')}
-                            >
-                                <Upload size={16} />
-                                <span className="hidden sm:inline">{t('toolbox.checkup.upload_prop', 'Import')}</span>
-                            </Button>
+                                primaryAction={{
+                                    label: t('toolbox.checkup.upload_prop', 'Import'),
+                                    icon: <Upload size={16} />,
+                                    onClick: () => handleImportFile(false)
+                                }}
+                                secondaryActions={[
+                                    {
+                                        label: t('toolbox.checkup.upload_additional_prop', 'Additional .prop file'),
+                                        icon: <ListPlus size={16} />,
+                                        onClick: () => handleImportFile(true)
+                                    },
+                                    {
+                                        label: t('toolbox.checkup.load_remaining', 'Load remaining base props'),
+                                        icon: <FileText size={16} />,
+                                        onClick: handleLoadRemainingProps,
+                                        disabled: !selectedDevice
+                                    }
+                                ]}
+                            />
                         </div>
                     }
                 >
