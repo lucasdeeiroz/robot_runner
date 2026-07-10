@@ -118,15 +118,41 @@ export function HardwareSubTab({ selectedDevice, isTestRunning, allowActionsDuri
                     </div>
                 )}
 
-                {/* Battery Controls */}
+                {/* Network & Connectivity */}
                 <Section
-                    title={t('toolbox.hardware.battery.title', 'Battery Mocking')}
-                    icon={Battery}
+                    title={t('toolbox.hardware.device_controls.title', 'Device Controls')}
+                    icon={Wifi}
                 >
-                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                        <div className="flex flex-col gap-2">
-                            <label className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold">{t('toolbox.hardware.battery.set_level', 'Set Level (%)')}</label>
+                    <div className="grid grid-cols-1 gap-6">
+                        <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
+                                <Wifi size={16} className="text-on-surface-variant" />
+                                <span className="text-sm font-medium">{t('toolbox.hardware.device_controls.wifi', 'WiFi')}</span>
+                            </div>
+                            <Switch checked={wifiEnabled} onCheckedChange={toggleWifi} disabled={disabled} />
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Signal size={16} className="text-on-surface-variant" />
+                                <span className="text-sm font-medium">{t('toolbox.hardware.device_controls.mobile_data', 'Mobile Data')}</span>
+                            </div>
+                            <Switch checked={dataEnabled} onCheckedChange={toggleData} disabled={disabled} />
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Plane size={16} className="text-on-surface-variant" />
+                                <span className="text-sm font-medium">{t('toolbox.hardware.device_controls.airplane_mode', 'Airplane Mode')}</span>
+                            </div>
+                            <Switch checked={airplaneMode} onCheckedChange={toggleAirplaneMode} disabled={disabled} />
+                        </div>
+                        <div className='flex items-center justify-between'>
+                            <div className='flex items-center gap-2'>
+                                <Battery size={16} className="text-on-surface-variant" />
+                                <span className="text-sm font-medium">{t('toolbox.hardware.device_controls.battery', 'Battery')}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Button size='sm' variant="secondary" onClick={resetBattery} disabled={disabled} title={t('toolbox.hardware.device_controls.reset_desc', 'Reset to physical state')}>{t('toolbox.hardware.device_controls.reset', 'Reset')}</Button>
+                                <Button size='sm' variant="secondary" onClick={unplugBattery} disabled={disabled} title={t('toolbox.hardware.device_controls.unplug_desc', 'Simulate unplugged state')}>{t('toolbox.hardware.device_controls.unplug', 'Unplug')}</Button>
                                 <Input
                                     type="number"
                                     min={0} max={100}
@@ -135,48 +161,10 @@ export function HardwareSubTab({ selectedDevice, isTestRunning, allowActionsDuri
                                     disabled={disabled}
                                     className="w-24"
                                 />
-                                <Button variant="secondary" onClick={() => setBattery(batteryLevel)} disabled={disabled}>{t('common.set', 'Set')}</Button>
+                                <Button variant="primary" size='icon' onClick={() => setBattery(batteryLevel)} disabled={disabled} title={t('common.set', 'Set')}>
+                                    <Send size={16} className="cursor-pointer m-2" />
+                                </Button>
                             </div>
-                        </div>
-
-                        <div className="flex flex-col gap-2">
-                            <label className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold">{t('toolbox.hardware.battery.quick_actions', 'Quick Actions')}</label>
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <Button variant="ghost" className="border border-outline-variant/30" onClick={() => setBattery(15)} disabled={disabled}>15%</Button>
-                                <Button variant="ghost" className="border border-outline-variant/30" onClick={() => setBattery(100)} disabled={disabled}>100%</Button>
-                                <Button variant="ghost" className="border border-outline-variant/30" onClick={unplugBattery} disabled={disabled} title={t('toolbox.hardware.battery.unplug_desc', 'Simulate unplugged state')}>{t('toolbox.hardware.battery.unplug', 'Unplug')}</Button>
-                                <Button variant="ghost" className="border border-outline-variant/30" onClick={resetBattery} disabled={disabled} title={t('toolbox.hardware.battery.reset_desc', 'Reset to physical state')}>{t('toolbox.hardware.battery.reset', 'Reset')}</Button>
-                            </div>
-                        </div>
-                    </div>
-                </Section>
-
-                {/* Network & Connectivity */}
-                <Section
-                    title={t('toolbox.hardware.connectivity.title', 'Connectivity')}
-                    icon={Wifi}
-                >
-                    <div className="grid grid-cols-1 gap-6">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <Wifi size={16} className="text-on-surface-variant" />
-                                <span className="text-sm font-medium">{t('toolbox.hardware.connectivity.wifi', 'WiFi')}</span>
-                            </div>
-                            <Switch checked={wifiEnabled} onCheckedChange={toggleWifi} disabled={disabled} />
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <Signal size={16} className="text-on-surface-variant" />
-                                <span className="text-sm font-medium">{t('toolbox.hardware.connectivity.mobile_data', 'Mobile Data')}</span>
-                            </div>
-                            <Switch checked={dataEnabled} onCheckedChange={toggleData} disabled={disabled} />
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <Plane size={16} className="text-on-surface-variant" />
-                                <span className="text-sm font-medium">{t('toolbox.hardware.connectivity.airplane_mode', 'Airplane Mode')}</span>
-                            </div>
-                            <Switch checked={airplaneMode} onCheckedChange={toggleAirplaneMode} disabled={disabled} />
                         </div>
                     </div>
                 </Section>

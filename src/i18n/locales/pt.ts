@@ -263,6 +263,7 @@ export const pt = {
             hide_details: "Ocultar detalhes",
 
             start: "Iniciar",
+            set: "Definir",
             pause: "Pausar",
             reset: "Reiniciar",
             loading_taking_too_long: "O carregamento está demorando mais que o esperado...",
@@ -1772,10 +1773,14 @@ export const pt = {
                 checkup: "Checkup"
             },
             hardware: {
-                battery: {
-                    title: "Simulação de Bateria",
+                disabled_during_test: "Os controles de hardware ficam desativados durante a execução de um teste.",
+                device_controls: {
+                    title: "Controles do Dispositivo",
+                    wifi: "WiFi",
+                    mobile_data: "Dados Móveis",
+                    airplane_mode: "Modo Avião",
+                    battery: "Bateria",
                     set_level: "Definir Nível (%)",
-                    quick_actions: "Ações Rápidas",
                     unplug: "Desconectar",
                     unplug_desc: "Simular estado desconectado (descarregando)",
                     reset: "Resetar",
@@ -1785,13 +1790,7 @@ export const pt = {
                     unplug_success: "Bateria desconectada (descarregando)",
                     unplug_error: "Falha ao desconectar bateria",
                     reset_success: "Status da bateria resetado",
-                    reset_error: "Falha ao resetar bateria"
-                },
-                connectivity: {
-                    title: "Conectividade",
-                    wifi: "WiFi",
-                    mobile_data: "Dados Móveis",
-                    airplane_mode: "Modo Avião",
+                    reset_error: "Falha ao resetar bateria",
                     wifi_success: "Status do WiFi alterado",
                     wifi_error: "Falha ao alternar WiFi",
                     data_success: "Status de Dados Móveis alterado",

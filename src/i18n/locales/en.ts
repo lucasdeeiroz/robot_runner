@@ -263,6 +263,7 @@ export const en = {
             hide_details: "Hide details",
 
             start: "Start",
+            set: "Set",
             pause: "Pause",
             reset: "Reset",
             loading_taking_too_long: "Loading is taking longer than expected...",
@@ -1771,10 +1772,14 @@ export const en = {
                 checkup: "Checkup"
             },
             hardware: {
-                battery: {
-                    title: "Battery Mocking",
+                disabled_during_test: "Hardware controls are disabled while a test is running.",
+                device_controls: {
+                    title: "Device Controls",
+                    wifi: "WiFi",
+                    mobile_data: "Mobile Data",
+                    airplane_mode: "Airplane Mode",
+                    battery: "Battery",
                     set_level: "Set Level (%)",
-                    quick_actions: "Quick Actions",
                     unplug: "Unplug",
                     unplug_desc: "Simulate unplugged state",
                     reset: "Reset",
@@ -1784,13 +1789,7 @@ export const en = {
                     unplug_success: "Battery unplugged (discharging)",
                     unplug_error: "Failed to unplug battery",
                     reset_success: "Battery status reset",
-                    reset_error: "Failed to reset battery"
-                },
-                connectivity: {
-                    title: "Connectivity",
-                    wifi: "WiFi",
-                    mobile_data: "Mobile Data",
-                    airplane_mode: "Airplane Mode",
+                    reset_error: "Failed to reset battery",
                     wifi_success: "WiFi toggled",
                     wifi_error: "Failed to toggle WiFi",
                     data_success: "Mobile Data toggled",
