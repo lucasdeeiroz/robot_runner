@@ -717,7 +717,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
     return (
         <div className="flex flex-col h-full overflow-hidden bg-surface p-4 gap-4">
 
-            <div className="flex-1 min-h-0 flex flex-wrap gap-6 overflow-y-auto pb-2">
+            <div className="flex-1 min-h-0 flex flex-wrap gap-6 overflow-y-auto">
 
                 {/* Props Comparison Panel */}
                 <Section
@@ -752,7 +752,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                         </div>
                     }
                 >
-                    <div className="flex items-center justify-between gap-2 mb-4 shrink-0">
+                    <div className="flex items-center justify-between gap-2 mb-2 shrink-0">
                         <div className="flex items-center gap-2">
                             {selectedDevice && (
                                 <Button
