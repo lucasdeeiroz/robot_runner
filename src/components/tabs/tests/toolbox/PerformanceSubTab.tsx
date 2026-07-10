@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { AlertTriangle, Activity, Cpu, Battery, CircuitBoard, Play, Square, Package as PackageIcon, Eye, RefreshCw, Zap, FolderSearch, Settings, ListTree, ChevronUp, ChevronDown, ChevronRight } from "lucide-react";
+import { AlertTriangle, Activity, Cpu, Battery, CircuitBoard, Play, Square, Package as PackageIcon, Eye, EyeOff, RefreshCw, Zap, FolderSearch, Settings, ListTree, ChevronUp, ChevronDown, ChevronRight, Columns2 } from "lucide-react";
 import clsx from "clsx";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 import { useSettings } from "@/lib/settings";
@@ -40,6 +40,7 @@ interface PerformanceSubTabProps {
     forceEnable?: boolean;
     setForceEnable?: (val: boolean) => void;
     onNavigate?: (page: string) => void;
+    onPairWithConsole?: () => void;
 }
 
 export const PerformanceSubTab = React.memo(function PerformanceSubTab({
@@ -63,7 +64,8 @@ export const PerformanceSubTab = React.memo(function PerformanceSubTab({
     isLoading = false,
     forceEnable = false,
     setForceEnable,
-    onNavigate
+    onNavigate,
+    onPairWithConsole
 }: PerformanceSubTabProps) {
     const { t } = useTranslation();
     const { settings, updateSetting } = useSettings();
@@ -72,6 +74,19 @@ export const PerformanceSubTab = React.memo(function PerformanceSubTab({
     // Process Monitor State
     const [showProcessMonitor, setShowProcessMonitor] = useState(true);
     const [autoRefreshProcessMonitor, setAutoRefreshProcessMonitor] = useState(true);
+
+    const [isKeepAwake, setIsKeepAwake] = useState(false);
+
+    useEffect(() => {
+        if (isKeepAwake) {
+            invoke('enable_keep_awake').catch(e => console.error("Failed to enable keep awake", e));
+        } else {
+            invoke('disable_keep_awake').catch(e => console.error("Failed to disable keep awake", e));
+        }
+        return () => {
+            invoke('disable_keep_awake').catch(e => console.error("Failed to disable keep awake on cleanup", e));
+        };
+    }, [isKeepAwake]);
 
     // Collapsible Sections State
     const [showDeviceStatsSection, setShowDeviceStatsSection] = useState(true);
@@ -342,6 +357,32 @@ export const PerformanceSubTab = React.memo(function PerformanceSubTab({
                 ) : null}
                 actions={
                     <>
+                        <Button
+                            onClick={() => setIsKeepAwake(!isKeepAwake)}
+                            variant="ghost"
+                            size="icon"
+                            className={clsx(
+                                "w-8 h-8 rounded-full",
+                                isKeepAwake ? "text-primary hover:text-primary/80" : "text-on-surface-variant/80 hover:text-primary"
+                            )}
+                            data-tooltip={t('run_tab.console.keep_awake', 'Keep Awake')}
+                            data-position="left"
+                        >
+                            {isKeepAwake ? <Eye size={14} /> : <EyeOff size={14} />}
+                        </Button>
+                        {onPairWithConsole && (
+                            <Button
+                                onClick={onPairWithConsole}
+                                variant="secondary"
+                                size="sm"
+                                disabled={(isTestRunning && !allowActionsDuringTest && !forceEnable)}
+                                className="h-8 text-on-surface-variant/80 hover:text-primary"
+                                data-tooltip={t('common.pair_grid', 'Split with Console')}
+                                data-position="left"
+                            >
+                                <Columns2 size={14} />
+                            </Button>
+                        )}
                         <Button
                             onClick={handleToggleRecording}
                             variant={isRecording ? "danger" : (forceEnable ? "warning" : "secondary")}

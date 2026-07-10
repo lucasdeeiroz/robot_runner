@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useDeferredValue } from "react";
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { open } from "@tauri-apps/plugin-dialog";
-import { Play, Square, Eraser, AlignLeft, Package as PackageIcon, FolderSearch, Settings, Search } from "lucide-react";
+import { Play, Square, Eraser, AlignLeft, Package as PackageIcon, FolderSearch, Settings, Search, Columns2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
@@ -26,6 +26,7 @@ interface LogcatSubTabProps {
     isTestRunning?: boolean;
     allowActionsDuringTest?: boolean;
     onNavigate?: (page: string) => void;
+    onPairWithConsole?: () => void;
 }
 
 interface LogEntry {
@@ -33,7 +34,7 @@ interface LogEntry {
     text: string;
 }
 
-export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActionsDuringTest = false, onNavigate }: LogcatSubTabProps) {
+export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActionsDuringTest = false, onNavigate, onPairWithConsole }: LogcatSubTabProps) {
     const { t, i18n } = useTranslation();
     const [isStreaming, setIsStreaming] = useState(false);
     const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -289,7 +290,7 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
         setAiError(null);
         setAiResult(null);
 
-const lastLogs = filteredLogs.slice(-100).map(l => l.text).join('\n'); // Take last 100 lines for context
+        const lastLogs = filteredLogs.slice(-100).map(l => l.text).join('\n'); // Take last 100 lines for context
 
         let promptStr = `Analyze the following Android Logcat output. Identify potential errors, crashes, or performance bottlenecks. Provide a summary and then a detailed analysis. Respond in ${currentLang}.`;
         if (customPrompt) {
@@ -377,9 +378,21 @@ const lastLogs = filteredLogs.slice(-100).map(l => l.text).join('\n'); // Take l
 
                 actions={
                     <div className="flex gap-2 items-center">
+                        {onPairWithConsole && (
+                            <Button
+                                onClick={onPairWithConsole}
+                                variant="secondary"
+                                size="sm"
+                                className="h-8 text-on-surface-variant/80 hover:text-primary"
+                                data-tooltip={t('common.pair_grid', 'Split with Console')}
+                                data-position="left"
+                            >
+                                <Columns2 size={14} />
+                            </Button>
+                        )}
                         <div className="w-48 relative">
                             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant/50" />
-                            <input 
+                            <input
                                 type="text"
                                 placeholder={t('logcat.search_placeholder', 'Search logs...')}
                                 value={searchQuery}
@@ -435,7 +448,7 @@ const lastLogs = filteredLogs.slice(-100).map(l => l.text).join('\n'); // Take l
                         <p>
                             {isTestRunning ? t('logcat.status.paused_test', "Logcat paused during test") :
                                 searchQuery ? t('logcat.status.no_results', "No logs match the search query") :
-                                isStreaming ? t('logcat.status.waiting') : t('logcat.status.empty')}
+                                    isStreaming ? t('logcat.status.waiting') : t('logcat.status.empty')}
                         </p>
                     </div>
                 ) : (
@@ -533,7 +546,7 @@ const lastLogs = filteredLogs.slice(-100).map(l => l.text).join('\n'); // Take l
                         />
                     </div>
                     <div className="w-48">
-                        <input 
+                        <input
                             type="text"
                             value={extraTags}
                             onChange={e => setExtraTags(e.target.value)}
