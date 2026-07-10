@@ -401,29 +401,29 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
                                 </div>
 
                                 <div className="flex items-center gap-1 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Button size="icon" variant="ghost" onClick={() => handleLaunch(String(pkg.name))} className="h-7 w-7 hover:bg-success/10 text-success/80 rounded" data-tooltip={t('apps.actions.launch', "Launch")} data-position="left">
+                                    <Button size="icon" variant="ghost" onClick={() => handleLaunch(String(pkg.name))} className="h-7 w-7 hover:bg-success/10 text-success/80 rounded" data-tooltip={`${t('apps.actions.launch', "Launch")} (adb shell monkey)`} data-position="left">
                                         <Rocket size={14} />
                                     </Button>
 
-                                    <Button size="icon" variant="ghost" onClick={() => handleDownload(pkg)} className="h-7 w-7 hover:bg-primary/10 text-primary/80 rounded" data-tooltip={t('apps.actions.download', "Download APK")} data-position="left">
+                                    <Button size="icon" variant="ghost" onClick={() => handleDownload(pkg)} className="h-7 w-7 hover:bg-primary/10 text-primary/80 rounded" data-tooltip={`${t('apps.actions.download', "Download APK")} (adb pull)`} data-position="left">
                                         <Download size={14} />
                                     </Button>
 
                                     {pkg.is_disabled ? (
-                                        <Button size="icon" variant="ghost" onClick={() => confirmFreeze(String(pkg.name), false)} className="h-7 w-7 hover:bg-primary/10 text-info-container/80 rounded" data-tooltip={t('apps.actions.enable', "Enable")} data-position="left">
+                                        <Button size="icon" variant="ghost" onClick={() => confirmFreeze(String(pkg.name), false)} className="h-7 w-7 hover:bg-primary/10 text-info-container/80 rounded" data-tooltip={`${t('apps.actions.enable', "Enable")} (adb shell pm enable)`} data-position="left">
                                             <PlayCircle size={14} />
                                         </Button>
                                     ) : (
-                                        <Button size="icon" variant="ghost" onClick={() => confirmFreeze(String(pkg.name), true)} className="h-7 w-7 hover:bg-sky-500/10 text-sky-400 rounded" data-tooltip={t('apps.actions.disable', "Freeze")} data-position="left">
+                                        <Button size="icon" variant="ghost" onClick={() => confirmFreeze(String(pkg.name), true)} className="h-7 w-7 hover:bg-sky-500/10 text-sky-400 rounded" data-tooltip={`${t('apps.actions.disable', "Freeze")} (adb shell pm disable-user)`} data-position="left">
                                             <Snowflake size={14} />
                                         </Button>
                                     )}
 
-                                    <Button size="icon" variant="ghost" onClick={() => confirmClear(String(pkg.name))} className="h-7 w-7 hover:bg-warning/10 text-warning-container/40 rounded" data-tooltip={t('apps.actions.clear', "Clear Data")} data-position="left">
+                                    <Button size="icon" variant="ghost" onClick={() => confirmClear(String(pkg.name))} className="h-7 w-7 hover:bg-warning/10 text-warning-container/40 rounded" data-tooltip={`${t('apps.actions.clear', "Clear Data")} (adb shell pm clear)`} data-position="left">
                                         <Eraser size={14} />
                                     </Button>
 
-                                    <Button size="icon" variant="ghost" onClick={() => confirmUninstall(String(pkg.name))} className="h-7 w-7 hover:bg-error/10 text-error-container/60 rounded" data-tooltip={t('apps.actions.uninstall', "Uninstall")} data-position="left">
+                                    <Button size="icon" variant="ghost" onClick={() => confirmUninstall(String(pkg.name))} className="h-7 w-7 hover:bg-error/10 text-error-container/60 rounded" data-tooltip={`${t('apps.actions.uninstall', "Uninstall")} (adb uninstall)`} data-position="left">
                                         <Trash2 size={14} />
                                     </Button>
                                 </div>

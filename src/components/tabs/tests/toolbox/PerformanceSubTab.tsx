@@ -653,6 +653,8 @@ export const PerformanceSubTab = React.memo(function PerformanceSubTab({
                                                     onClick={fetchBatteryAudit}
                                                     disabled={isBatteryAuditLoading}
                                                     leftIcon={<RefreshCw size={14} className={clsx(isBatteryAuditLoading && "animate-spin")} />}
+                                                    data-tooltip="adb shell dumpsys batterystats"
+                                                    data-position="left"
                                                 >
                                                     {t('common.refresh', 'Refresh')}
                                                 </Button>
@@ -662,6 +664,8 @@ export const PerformanceSubTab = React.memo(function PerformanceSubTab({
                                                     onClick={resetBatteryAudit}
                                                     disabled={isBatteryAuditLoading}
                                                     leftIcon={<Square size={14} />}
+                                                    data-tooltip="adb shell dumpsys batterystats --reset"
+                                                    data-position="left"
                                                 >
                                                     {t('performance.reset_stats', 'Reset')}
                                                 </Button>

@@ -387,23 +387,25 @@ const lastLogs = filteredLogs.slice(-100).map(l => l.text).join('\n'); // Take l
                                 className="w-full h-8 bg-surface border border-outline-variant/30 rounded-lg pl-8 pr-3 py-1 text-[13px] font-normal normal-case text-on-surface focus:outline-none focus:border-primary/50 transition-colors"
                             />
                         </div>
-                        <SplitButton
-                            disabled={isTestRunning && !allowActionsDuringTest}
-                            variant={isStreaming ? "danger" : "primary"}
-                            primaryAction={{
-                                label: !isNarrow ? t(isStreaming ? 'logcat.stop' : 'logcat.start') : "",
-                                onClick: isStreaming ? stopLogcat : startLogcat,
-                                icon: isStreaming ? <Square size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />
-                            }}
-                            secondaryActions={[
-                                {
-                                    label: t('logcat.options.clear_before_start', 'Clear logs before starting (-c)'),
-                                    type: 'checkbox',
-                                    checked: clearBeforeStart,
-                                    onClick: () => setClearBeforeStart(prev => !prev)
-                                }
-                            ]}
-                        />
+                        <div data-tooltip="adb logcat" data-position="bottom" className="inline-flex">
+                            <SplitButton
+                                disabled={isTestRunning && !allowActionsDuringTest}
+                                variant={isStreaming ? "danger" : "primary"}
+                                primaryAction={{
+                                    label: !isNarrow ? t(isStreaming ? 'logcat.stop' : 'logcat.start') : "",
+                                    onClick: isStreaming ? stopLogcat : startLogcat,
+                                    icon: isStreaming ? <Square size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />
+                                }}
+                                secondaryActions={[
+                                    {
+                                        label: t('logcat.options.clear_before_start', 'Clear logs before starting (-c)'),
+                                        type: 'checkbox',
+                                        checked: clearBeforeStart,
+                                        onClick: () => setClearBeforeStart(prev => !prev)
+                                    }
+                                ]}
+                            />
+                        </div>
                         <AiButton
                             id="logcat_analysis"
                             isLoading={isAiLoading}

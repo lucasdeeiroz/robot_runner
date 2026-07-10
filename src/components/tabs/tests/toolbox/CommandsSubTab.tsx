@@ -242,6 +242,8 @@ export function CommandsSubTab({ selectedDevice, isTestRunning = false, allowAct
                             variant="outline"
                             className="bg-surface-variant/30 hover:bg-outline-variant text-xs font-medium border-outline-variant/30 h-auto py-1.5 px-3"
                             leftIcon={action.icon}
+                            data-tooltip={`adb ${action.cmd}`}
+                            data-position="bottom"
                         >
                             {action.label}
                         </Button>

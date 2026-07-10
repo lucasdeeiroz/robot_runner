@@ -151,8 +151,8 @@ export function HardwareSubTab({ selectedDevice, isTestRunning, allowActionsDuri
                                 <span className="text-sm font-medium">{t('toolbox.hardware.device_controls.battery', 'Battery')}</span>
                             </div>
                             <div className="flex items-center gap-2">
-                                <Button size='sm' variant="secondary" onClick={resetBattery} disabled={disabled} title={t('toolbox.hardware.device_controls.reset_desc', 'Reset to physical state')}>{t('toolbox.hardware.device_controls.reset', 'Reset')}</Button>
-                                <Button size='sm' variant="secondary" onClick={unplugBattery} disabled={disabled} title={t('toolbox.hardware.device_controls.unplug_desc', 'Simulate unplugged state')}>{t('toolbox.hardware.device_controls.unplug', 'Unplug')}</Button>
+                                <Button size='sm' variant="secondary" onClick={resetBattery} disabled={disabled} title={t('toolbox.hardware.device_controls.reset_desc', 'Reset to physical state')} data-tooltip="adb shell dumpsys battery reset" data-position="bottom">{t('toolbox.hardware.device_controls.reset', 'Reset')}</Button>
+                                <Button size='sm' variant="secondary" onClick={unplugBattery} disabled={disabled} title={t('toolbox.hardware.device_controls.unplug_desc', 'Simulate unplugged state')} data-tooltip="adb shell dumpsys battery unplug" data-position="bottom">{t('toolbox.hardware.device_controls.unplug', 'Unplug')}</Button>
                                 <Input
                                     type="number"
                                     min={0} max={100}
@@ -161,7 +161,7 @@ export function HardwareSubTab({ selectedDevice, isTestRunning, allowActionsDuri
                                     disabled={disabled}
                                     className="w-24"
                                 />
-                                <Button variant="primary" size='icon' onClick={() => setBattery(batteryLevel)} disabled={disabled} title={t('common.set', 'Set')}>
+                                <Button variant="primary" size='icon' onClick={() => setBattery(batteryLevel)} disabled={disabled} title={t('common.set', 'Set')} data-tooltip="adb shell dumpsys battery set level <value>" data-position="bottom">
                                     <Send size={16} className="cursor-pointer m-2" />
                                 </Button>
                             </div>
@@ -179,6 +179,8 @@ export function HardwareSubTab({ selectedDevice, isTestRunning, allowActionsDuri
                             onClick={sendBroadcast}
                             disabled={disabled || !intentAction.trim()}
                             leftIcon={<Send size={16} />}
+                            data-tooltip="adb shell am broadcast -a <action> <extras>"
+                            data-position="left"
                         >
                             {t('toolbox.hardware.broadcast.send', 'Send Broadcast')}
                         </Button>

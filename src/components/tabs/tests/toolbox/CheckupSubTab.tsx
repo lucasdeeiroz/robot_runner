@@ -866,10 +866,10 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                                                 </td>
                                                 <td className="p-3 text-center align-middle">
                                                     {c.isMatch
-                                                        ? <CheckCircle2 size={16} className="text-success mx-auto drop-shadow-sm" />
+                                                        ? <span data-tooltip={`adb shell getprop ${c.key}`} data-position="left"><CheckCircle2 size={16} className="text-success mx-auto drop-shadow-sm" /></span>
                                                         : (c.isExtra
-                                                            ? <Info size={16} className="text-warning mx-auto drop-shadow-sm" />
-                                                            : <XCircle size={16} className="text-error mx-auto drop-shadow-sm" />
+                                                            ? <span data-tooltip={`adb shell getprop ${c.key}`} data-position="left"><Info size={16} className="text-warning mx-auto drop-shadow-sm" /></span>
+                                                            : <span data-tooltip={`adb shell getprop ${c.key}`} data-position="left"><XCircle size={16} className="text-error mx-auto drop-shadow-sm" /></span>
                                                         )
                                                     }
                                                 </td>
@@ -912,9 +912,9 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                         <div key={check.id} className="flex flex-col p-4 rounded-xl border border-outline-variant/30 bg-surface-variant/10 backdrop-blur-md hover:bg-surface-variant/20 transition-all shadow-sm text-sm">
                             <div className="flex justify-between items-center mb-1 gap-2">
                                 <span className="font-medium text-on-surface leading-tight drop-shadow-sm">{check.name}</span>
-                                {check.status === 'running' && <ExpressiveLoading variant="circular" size="sm" />}
-                                {check.status === 'correct' && <CheckCircle2 size={18} className="text-success shrink-0 drop-shadow-sm" />}
-                                {check.status === 'incorrect' && <XCircle size={18} className="text-error shrink-0 drop-shadow-sm" />}
+                                {check.status === 'running' && <span data-tooltip={`adb shell ${check.command}`} data-position="left"><ExpressiveLoading variant="circular" size="sm" /></span>}
+                                {check.status === 'correct' && <span data-tooltip={`adb shell ${check.command}`} data-position="left"><CheckCircle2 size={18} className="text-success shrink-0 drop-shadow-sm cursor-help" /></span>}
+                                {check.status === 'incorrect' && <span data-tooltip={`adb shell ${check.command}`} data-position="left"><XCircle size={18} className="text-error shrink-0 drop-shadow-sm cursor-help" /></span>}
                             </div>
                             {check.found && (
                                 <div className="flex justify-between items-center text-xs mt-3 pt-2 border-t border-outline-variant/20">
@@ -954,8 +954,8 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                         <div key={check.id} className="flex flex-col p-4 rounded-xl border border-outline-variant/30 bg-surface-variant/10 backdrop-blur-md hover:bg-surface-variant/20 transition-all shadow-sm text-sm">
                             <div className="flex justify-between items-center mb-1 gap-2">
                                 <span className="font-medium text-on-surface leading-tight drop-shadow-sm">{check.name}</span>
-                                {check.status === 'running' && <ExpressiveLoading variant="circular" size="sm" />}
-                                {check.status === 'done' && <Info size={18} className="text-primary shrink-0 drop-shadow-sm" />}
+                                {check.status === 'running' && <span data-tooltip={`adb ${check.command.join(' ')}`} data-position="left"><ExpressiveLoading variant="circular" size="sm" /></span>}
+                                {check.status === 'done' && <span data-tooltip={`adb ${check.command.join(' ')}`} data-position="left"><Info size={18} className="text-primary shrink-0 drop-shadow-sm cursor-help" /></span>}
                             </div>
                             {check.found && (
                                 <div className="flex justify-between items-center text-xs mt-3 pt-2 border-t border-outline-variant/20">
