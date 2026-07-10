@@ -4032,7 +4032,7 @@ dependencies = [
 
 [[package]]
 name = "robot_runner"
-version = "2.3.1-stable2"
+version = "2.3.2-alpha7"
 dependencies = [
  "aes-gcm",
  "base64 0.22.1",
@@ -4065,6 +4065,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
+ "tracing",
  "url",
  "walkdir",
  "zstd",

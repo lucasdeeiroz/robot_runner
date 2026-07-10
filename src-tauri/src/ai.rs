@@ -13,11 +13,7 @@ pub async fn call_claude_code_cli(
     resume_session_id: Option<String>
 ) -> AppResult<String> {
     #[cfg(target_os = "windows")]
-    let mut command = {
-        let mut cmd = crate::cmd_utils::new_tokio_command("cmd");
-        cmd.args(&["/C", "claude.cmd"]);
-        cmd
-    };
+    let mut command = crate::cmd_utils::new_tokio_command("claude");
     #[cfg(not(target_os = "windows"))]
     let mut command = crate::cmd_utils::new_tokio_command("claude");
 

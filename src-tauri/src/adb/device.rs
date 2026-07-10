@@ -61,96 +61,59 @@ pub async fn get_connected_devices(app: AppHandle) -> Result<Vec<Device>, String
             let app_clone = app.clone();
             device_tasks.push(tokio::spawn(async move {
                 let program = get_adb_program(&app_clone);
+                let mut cmd = new_tokio_command(&program);
+                let script = "getprop ro.product.model; echo '---SEP---'; getprop ro.build.version.release; echo '---SEP---'; dumpsys battery; echo '---SEP---'; cat /proc/meminfo || dumpsys meminfo; echo '---SEP---'; df -k /data";
+                cmd.args(&["-s", &udid, "shell", script]);
                 
-                // Get model
-                let model = {
-                    let mut cmd = new_tokio_command(&program);
-                    cmd.args(&["-s", &udid, "shell", "getprop", "ro.product.model"]);
-                    let output = cmd.output().await;
-                    if let Ok(o) = output {
-                        String::from_utf8_lossy(&o.stdout).trim().to_string()
-                    } else {
-                        "Unknown".to_string()
-                    }
+                let output = cmd.output().await;
+                let stdout = if let Ok(o) = output {
+                    String::from_utf8_lossy(&o.stdout).to_string()
+                } else {
+                    String::new()
                 };
 
-                // Get Android version
-                let version = {
-                    let mut cmd = new_tokio_command(&program);
-                    cmd.args(&["-s", &udid, "shell", "getprop", "ro.build.version.release"]);
-                    let output = cmd.output().await;
-                    if let Ok(o) = output {
-                        Some(String::from_utf8_lossy(&o.stdout).trim().to_string())
-                    } else {
-                        None
-                    }
-                };
+                let parts: Vec<&str> = stdout.split("---SEP---").collect();
 
-                // Get Battery
-                let battery = {
-                    let mut cmd = new_tokio_command(&program);
-                    cmd.args(&["-s", &udid, "shell", "dumpsys", "battery"]);
-                    let output = cmd.output().await;
-                    if let Ok(o) = output {
-                        parse_battery_info(&String::from_utf8_lossy(&o.stdout)).map(|(lvl, _)| lvl)
-                    } else {
-                        None
-                    }
-                };
+                let model = parts.get(0).map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).unwrap_or_else(|| "Unknown".to_string());
+                let android_version = parts.get(1).map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+                
+                let battery_level = parts.get(2)
+                    .and_then(|s| parse_battery_info(s))
+                    .map(|(lvl, _, _, _)| lvl);
 
-                // Get RAM
-                let (ram_t, ram_u) = {
-                    let mut cmd = new_tokio_command(&program);
-                    cmd.args(&["-s", &udid, "shell", "cat", "/proc/meminfo"]);
-                    let output = cmd.output().await;
-                    if let Ok(o) = output {
-                        parse_mem_info(&String::from_utf8_lossy(&o.stdout)).unwrap_or((0, 0))
-                    } else {
-                        (0, 0)
-                    }
-                };
+                let (ram_total, ram_used) = parts.get(3)
+                    .map(|s| parse_mem_info(s).unwrap_or((0, 0)))
+                    .unwrap_or((0, 0));
 
-                // Get Storage
-                let (storage_t, storage_u) = {
-                    let mut cmd = new_tokio_command(&program);
-                    cmd.args(&["-s", &udid, "shell", "df", "-k", "/data"]);
-                    let output = cmd.output().await;
-                    if let Ok(o) = output {
-                        let stdout = String::from_utf8_lossy(&o.stdout);
+                let (storage_total, storage_used) = parts.get(4)
+                    .map(|s| {
                         let mut found = None;
                         let mut is_first_line = true;
-                        for line in stdout.lines() {
-                            if line.trim().is_empty() {
-                                continue;
-                            }
-                            if is_first_line {
-                                is_first_line = false;
-                                continue;
-                            }
-                            let parts: Vec<&str> = line.split_whitespace().collect();
-                            if parts.len() >= 3 {
-                                if let (Ok(total), Ok(used)) = (parts[1].parse::<u64>(), parts[2].parse::<u64>()) {
-                                    found = Some((total, used));
+                        for line in s.lines() {
+                            if line.trim().is_empty() { continue; }
+                            if is_first_line { is_first_line = false; continue; }
+                            let p: Vec<&str> = line.split_whitespace().collect();
+                            if p.len() >= 3 {
+                                if let (Ok(t), Ok(u)) = (p[1].parse::<u64>(), p[2].parse::<u64>()) {
+                                    found = Some((t, u));
                                     break;
                                 }
                             }
                         }
                         found.unwrap_or((0, 0))
-                    } else {
-                        (0, 0)
-                    }
-                };
+                    })
+                    .unwrap_or((0, 0));
 
                 Device {
                     udid,
                     model,
                     state,
-                    android_version: version,
-                    battery_level: battery,
-                    ram_total: if ram_t > 0 { Some(ram_t) } else { None },
-                    ram_used: if ram_u > 0 { Some(ram_u) } else { None },
-                    storage_total: if storage_t > 0 { Some(storage_t) } else { None },
-                    storage_used: if storage_u > 0 { Some(storage_u) } else { None },
+                    android_version,
+                    battery_level,
+                    ram_total: if ram_total > 0 { Some(ram_total) } else { None },
+                    ram_used: if ram_used > 0 { Some(ram_used) } else { None },
+                    storage_total: if storage_total > 0 { Some(storage_total) } else { None },
+                    storage_used: if storage_used > 0 { Some(storage_used) } else { None },
                 }
             }));
         }

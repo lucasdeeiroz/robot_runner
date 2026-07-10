@@ -6,6 +6,7 @@ use tauri::command;
 pub struct PackageInfo {
     name: String,
     path: String,
+    version: String,
     is_system: bool,
     is_disabled: bool,
 }
@@ -33,6 +34,33 @@ pub async fn get_installed_packages(app: AppHandle, device: String) -> Result<Ve
         .filter_map(|line| line.strip_prefix("package:").map(|s| s.trim().to_string()))
         .collect();
 
+    // 3. Get version names via dumpsys
+    let output_dumpsys = run_adb(
+        &app,
+        device.clone(),
+        vec!["shell", "dumpsys", "package", "packages"],
+    )
+    .await
+    .unwrap_or_default();
+
+    let mut version_map = std::collections::HashMap::new();
+    let mut current_pkg = String::new();
+    for line in output_dumpsys.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("Package [") && trimmed.contains(']') {
+            if let (Some(start), Some(end)) = (trimmed.find('['), trimmed.find(']')) {
+                current_pkg = trimmed[start + 1..end].to_string();
+            }
+        } else if trimmed.starts_with("versionName=") {
+            if let Some(version) = trimmed.strip_prefix("versionName=") {
+                if !current_pkg.is_empty() {
+                    version_map.insert(current_pkg.clone(), version.to_string());
+                    current_pkg.clear();
+                }
+            }
+        }
+    }
+
     let mut packages = Vec::new();
 
     for line in output_all.lines() {
@@ -47,10 +75,12 @@ pub async fn get_installed_packages(app: AppHandle, device: String) -> Result<Ve
                     || path.starts_with("/vendor")
                     || path.starts_with("/apex");
                 let is_disabled = disabled_set.contains(&name);
+                let version = version_map.get(&name).cloned().unwrap_or_else(|| String::new());
 
                 packages.push(PackageInfo {
                     name,
                     path,
+                    version,
                     is_system,
                     is_disabled,
                 });

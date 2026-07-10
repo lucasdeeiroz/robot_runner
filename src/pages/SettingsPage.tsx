@@ -1,5 +1,5 @@
 import { useSettings } from "@/lib/settings";
-import { Moon, Sun, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2, Settings as SettingsIcon, Sparkles, FileJson, RefreshCcw, GitBranch, Link2, Briefcase, ChevronDown } from "lucide-react";
+import { Moon, Sun, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2, Settings as SettingsIcon, Sparkles, FileJson, RefreshCcw, GitBranch, Link2, Briefcase, ChevronDown, FilePlus, Copy } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -15,7 +15,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useTestSessions } from "@/lib/testSessionStore";
 import { open } from "@tauri-apps/plugin-dialog";
-import { readFile } from "@tauri-apps/plugin-fs";
+import { readFile, readTextFile } from "@tauri-apps/plugin-fs";
 import { appDataDir, join } from "@tauri-apps/api/path";
 import { openPath } from "@tauri-apps/plugin-opener";
 import clsx from "clsx";
@@ -38,6 +38,7 @@ import { Input } from "@/components/atoms/Input";
 import { Section } from "@/components/organisms/Section";
 import { PageHeader } from "@/components/organisms/PageHeader";
 import { Switch } from "@/components/atoms/Switch";
+import { ActionCard } from "@/components/atoms/ActionCard";
 
 // New Components
 import { Select } from "@/components/atoms/Select";
@@ -70,6 +71,9 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
     const [migrationPending, setMigrationPending] = useState<{ oldPath: string, newPath: string } | null>(null);
     const [isMigrating, setIsMigrating] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+    const [creationMode, setCreationMode] = useState<'default' | 'clone' | 'import'>('default');
+    const [importedSettings, setImportedSettings] = useState<any>(null);
+    const [importedFileName, setImportedFileName] = useState<string | null>(null);
 
     // Integrations Modal state
     const [showIntegrationsModal, setShowIntegrationsModal] = useState(false);
@@ -399,7 +403,28 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
         }
     };
 
-
+    const handleImportFile = async () => {
+        try {
+            const selected = await open({
+                multiple: false,
+                filters: [{ name: 'JSON', extensions: ['json'] }]
+            });
+            if (selected) {
+const raw = Array.isArray(selected) ? selected[0] : selected;
+const filePath = typeof raw === 'string' ? raw : raw.path;
+const fileContent = await readTextFile(filePath);
+const parsed = JSON.parse(fileContent);
+                if (typeof parsed === 'object' && parsed !== null) {
+                    setImportedSettings(parsed);
+                    setImportedFileName(filePath.split(/[/\\]/).pop() || 'config.json');
+                } else {
+                    feedback.toast.error(t('settings.profiles.invalid_file_format'));
+                }
+            }
+        } catch (e: any) {
+            feedback.toast.error(t('settings.profiles.invalid_file_format') + ': ' + e.message);
+        }
+    };
 
     const handleProfileSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -408,11 +433,20 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
         if (isRenaming) {
             renameProfile(activeProfileId, newProfileName);
         } else {
-            createProfile(newProfileName);
+            if (creationMode === 'clone') {
+                createProfile(newProfileName, settings);
+            } else if (creationMode === 'import' && importedSettings) {
+                createProfile(newProfileName, importedSettings);
+            } else {
+                createProfile(newProfileName);
+            }
         }
         setShowProfileModal(false);
         setNewProfileName("");
         setIsRenaming(false);
+        setCreationMode('default');
+        setImportedSettings(null);
+        setImportedFileName(null);
     };
 
     if (loading) {
@@ -1201,7 +1235,59 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                         placeholder={t('settings.profiles.name_placeholder')}
                         className="bg-surface/50"
                     />
-                    <div className="flex justify-end gap-2">
+                    
+                    {!isRenaming && (
+                        <div className="space-y-4 pt-2">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                <ActionCard
+                                    title={t('settings.profiles.mode_default')}
+                                    description={t('settings.profiles.mode_default_desc')}
+                                    icon={<FilePlus size={18} />}
+                                    selected={creationMode === 'default'}
+                                    onClick={() => setCreationMode('default')}
+                                    className="p-3"
+                                />
+                                <ActionCard
+                                    title={t('settings.profiles.mode_clone')}
+                                    description={t('settings.profiles.mode_clone_desc')}
+                                    icon={<Copy size={18} />}
+                                    selected={creationMode === 'clone'}
+                                    onClick={() => setCreationMode('clone')}
+                                    className="p-3"
+                                />
+                                <ActionCard
+                                    title={t('settings.profiles.mode_import')}
+                                    description={t('settings.profiles.mode_import_desc')}
+                                    icon={<FileJson size={18} />}
+                                    selected={creationMode === 'import'}
+                                    onClick={() => setCreationMode('import')}
+                                    className="p-3"
+                                >
+                                    {creationMode === 'import' && (
+                                        <div className="flex flex-col gap-2 mt-2">
+                                            <Button 
+                                                type="button" 
+                                                variant="outline" 
+                                                size="sm"
+                                                onClick={handleImportFile}
+                                                className="w-full flex justify-center"
+                                            >
+                                                <FileJson size={16} className="mr-2" />
+                                                {t('settings.profiles.select_file')}
+                                            </Button>
+                                            {importedFileName && (
+                                                <div className="text-[10px] text-on-surface-variant text-center mt-1">
+                                                    {t('settings.profiles.file_selected')}: <span className="font-medium truncate block max-w-full">{importedFileName}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </ActionCard>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="flex justify-end gap-2 pt-2">
                         <Button
                             type="button"
                             variant="ghost"
@@ -1212,7 +1298,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
                         </Button>
                         <Button
                             type="submit"
-                            disabled={!newProfileName.trim()}
+                            disabled={!newProfileName.trim() || (creationMode === 'import' && !importedSettings)}
                             variant="primary"
                             className="hover:bg-secondary-container"
                         >

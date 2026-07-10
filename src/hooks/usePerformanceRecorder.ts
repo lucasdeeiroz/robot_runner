@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import { feedback } from "@/lib/feedback";
 import { useFileSave } from "./useFileSave";
+import { useSettings } from "@/lib/settings";
 
 // Number of CSV lines to accumulate before flushing to disk during recording
 const FLUSH_THRESHOLD = 100;
@@ -19,9 +20,13 @@ export interface DeviceStats {
     ram_total: number;
     battery_level: number;
     temperature: number;
+    battery_status?: string;
+    battery_power_source?: string;
     app_stats?: AppStats;
     foreground_activity?: string;
 }
+
+
 
 export function usePerformanceRecorder(
     selectedDevice: string,
@@ -31,16 +36,20 @@ export function usePerformanceRecorder(
     allowActionsDuringTest: boolean = false
 ) {
     const { t } = useTranslation();
+    const { settings, updateSetting } = useSettings();
     const [stats, setStats] = useState<DeviceStats | null>(null);
     const [history, setHistory] = useState<(DeviceStats & { timestamp: number })[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [autoRefresh, setAutoRefresh] = useState(initialAutoRefresh);
-    const [selectedPackage, setSelectedPackage] = useState<string>("");
+    const [selectedPackage, setSelectedPackage] = useState<string>(settings?.logcatSelectedPackage || "");
     const [isLoading, setIsLoading] = useState(false);
     const [forceEnable, setForceEnable] = useState(false);
 
+
+
     // Recording State
     const [isRecording, setIsRecording] = useState(false);
+    const [recordingStartTime, setRecordingStartTime] = useState<number | null>(null);
 
 
     const { saveFile, lastSavedPath: lastSaved, clearFeedback } = useFileSave({
@@ -50,12 +59,11 @@ export function usePerformanceRecorder(
         settingPathKey: 'logcat' // As requested: save to logcat directory
     });
 
-    // Use a ref to always call the latest fetchStats function and avoid stale closures
     const fetchStatsRef = useRef<(() => Promise<void>) | null>(null);
 
+    // Legacy fetch logic (kept as fallback or manual trigger if needed, though replaced mostly by stream)
     const fetchStats = async () => {
-        if (isLoading) return; // Prevent stacking requests
-
+        if (isLoading) return;
         setIsLoading(true);
         try {
             const data = await invoke<DeviceStats>('get_device_stats', {
@@ -70,7 +78,7 @@ export function usePerformanceRecorder(
             });
             setError(null);
         } catch (e) {
-            if (!isTestRunning) { // Suppress errors during tests to avoid spamming the UI if ADB is busy
+            if (!isTestRunning) {
                 feedback.toast.error("performance.fetch_error", e);
             }
             setError(t('performance.error'));
@@ -79,42 +87,68 @@ export function usePerformanceRecorder(
         }
     };
 
-    // Keep the ref updated with the latest fetchStats
     useEffect(() => {
         fetchStatsRef.current = fetchStats;
     }, [fetchStats]);
 
-    // Fetch Stats Loop
+    // Streaming Logic
     useEffect(() => {
-        let interval: NodeJS.Timeout;
+        let unlisten: (() => void) | undefined;
+        let isSubscribed = true;
 
-        // Condition to fetch data:
-        // 1. Device selected AND
-        // 2. (Auto-refresh + Active Screen OR Recording) AND
-        // 3. (Not a test OR allowActionsDuringTest OR forceEnable)
         const canUpdateDuringTest = allowActionsDuringTest || forceEnable;
         const shouldUpdate = selectedDevice &&
             ((autoRefresh && isActive) || isRecording) &&
             (!isTestRunning || canUpdateDuringTest);
 
-        // Slow down polling significantly during tests if forced to reduce impact
         const pollInterval = (isTestRunning && forceEnable) ? 5000 : 2000;
 
         if (shouldUpdate) {
+            // First fetch immediately for responsive UI
             if (fetchStatsRef.current) fetchStatsRef.current();
-            interval = setInterval(() => {
-                if (fetchStatsRef.current) fetchStatsRef.current();
-            }, pollInterval);
+
+            // Start the background stream in Rust
+            invoke('start_performance_stream', {
+                device: selectedDevice,
+                package: selectedPackage || null,
+                intervalMs: pollInterval
+            }).catch(e => {
+                console.error("Failed to start performance stream", e);
+            });
+
+            // Listen to stream
+            import('@tauri-apps/api/event').then(({ listen }) => {
+                listen<{ device: string, stats: DeviceStats }>('device-performance', (event) => {
+                    if (event.payload.device === selectedDevice && isSubscribed) {
+                        const data = event.payload.stats;
+                        setStats(data);
+                        setHistory(prev => {
+                            const newHistory = [...prev, { ...data, timestamp: Date.now() }];
+                            if (newHistory.length > 60) return newHistory.slice(newHistory.length - 60);
+                            return newHistory;
+                        });
+                        setError(null);
+                    }
+                }).then(un => {
+                    if (isSubscribed) unlisten = un;
+                    else un();
+                });
+            });
+
         } else if (isTestRunning && !canUpdateDuringTest && stats) {
-            // Clear stats and error if we are paused to show the correct UI
             setStats(null);
             setError(null);
         }
 
         return () => {
-            if (interval) clearInterval(interval);
+            isSubscribed = false;
+            if (unlisten) unlisten();
+            if (selectedDevice) {
+                invoke('stop_performance_stream', { device: selectedDevice }).catch(console.error);
+            }
         };
-    }, [selectedDevice, autoRefresh, selectedPackage, isActive, isRecording, isTestRunning, allowActionsDuringTest, forceEnable]);
+    }, [selectedDevice, autoRefresh, selectedPackage, isActive, isRecording, recordingStartTime, isTestRunning, allowActionsDuringTest, forceEnable]);
+
 
 
     const recordedLinesRef = useRef<string[]>([]);
@@ -126,7 +160,20 @@ export function usePerformanceRecorder(
     // Recording Logic - Accumulate Data and flush periodically to keep memory bounded
     useEffect(() => {
         if (isRecording && stats && recordingFilePathRef.current) {
-            let line = `${new Date().toISOString()},${stats.cpu_usage.toFixed(2)},${stats.ram_used},${stats.battery_level},${stats.temperature.toFixed(1)}`;
+            let elapsedStr = "00:00:00";
+            if (recordingStartTime) {
+                const diff = Date.now() - recordingStartTime;
+                const hrs = Math.floor(diff / 3600000);
+                const mins = Math.floor((diff % 3600000) / 60000);
+                const secs = Math.floor((diff % 60000) / 1000);
+                elapsedStr = `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            }
+
+            const pad = (n: number) => n.toString().padStart(2, '0');
+            const d = new Date();
+            const localTimestamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+
+            let line = `${localTimestamp},${elapsedStr},${stats.cpu_usage.toFixed(2)},${stats.ram_used},${stats.battery_level},${stats.temperature.toFixed(1)}`;
 
             // Add App stats if present, or empty placeholders to maintain column alignment
             if (stats.app_stats) {
@@ -166,6 +213,7 @@ export function usePerformanceRecorder(
             recordedLinesRef.current = [];
             recordingFilePathRef.current = null;
             recordingHasAppColumnsRef.current = false;
+            setRecordingStartTime(null);
 
             if (filePath && remainingLines.length > 0) {
                 try {
@@ -181,7 +229,7 @@ export function usePerformanceRecorder(
         } else {
             // Start Recording: Prompt for file path, write header, then begin accumulating
             const hasAppColumns = !!selectedPackage;
-            const header = "Timestamp,System_CPU_%,System_RAM_KB,Battery_%,Battery_Temp_C" +
+            const header = "Timestamp,Elapsed_Time,System_CPU_%,System_RAM_KB,Battery_%,Battery_Temp_C" +
                 (hasAppColumns ? ",App_CPU_%,App_RAM_KB,FPS" : "") + ",Foreground_Activity\n";
 
             recordedLinesRef.current = [];
@@ -195,6 +243,7 @@ export function usePerformanceRecorder(
                     recordingFilePathRef.current = savedPath;
                     recordingHasAppColumnsRef.current = hasAppColumns;
                     setIsRecording(true);
+                    setRecordingStartTime(Date.now());
                 }
                 // If savedPath is null the user cancelled the dialog — do not start recording
             } catch (e) {
@@ -210,8 +259,12 @@ export function usePerformanceRecorder(
         autoRefresh,
         setAutoRefresh,
         selectedPackage,
-        setSelectedPackage,
+        setSelectedPackage: (pkg: string) => {
+            setSelectedPackage(pkg);
+            updateSetting('logcatSelectedPackage', pkg);
+        },
         isRecording,
+        recordingStartTime,
         toggleRecording,
         lastSaved,
         setLastSaved: clearFeedback,

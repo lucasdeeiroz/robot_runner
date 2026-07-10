@@ -5,7 +5,6 @@ import { Search, Smartphone, Package, Trash2, Snowflake, PlayCircle, Eraser, Upl
 import clsx from "clsx";
 import { useTestSessions } from "@/lib/testSessionStore";
 import { open, save } from '@tauri-apps/plugin-dialog';
-import { toast } from "sonner";
 import { Virtuoso } from "react-virtuoso";
 
 import { ConfirmationModal } from "@/components/organisms/ConfirmationModal";
@@ -19,6 +18,7 @@ import { SplitButton } from "@/components/molecules/SplitButton";
 interface PackageInfo {
     name: String;
     path: String;
+    version: String;
     is_system: boolean;
     is_disabled: boolean;
 }
@@ -152,20 +152,20 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
         try {
             if (type === 'uninstall') {
                 await invoke("uninstall_package", { device: activeDevice, package: pkg });
-                toast.success(t('apps.success.uninstalled', { pkg }));
+                feedback.toast.raw.success(t('apps.success.uninstalled', { pkg, defaultValue: `Uninstalled ${pkg}` }));
             } else if (type === 'disable') {
                 await invoke("disable_package", { device: activeDevice, package: pkg });
-                toast.success(t('apps.success.disabled', { pkg }));
+                feedback.toast.raw.success(t('apps.success.disabled', { pkg, defaultValue: `Disabled ${pkg}` }));
             } else if (type === 'enable') {
                 await invoke("enable_package", { device: activeDevice, package: pkg });
-                toast.success(t('apps.success.enabled', { pkg }));
+                feedback.toast.raw.success(t('apps.success.enabled', { pkg, defaultValue: `Enabled ${pkg}` }));
             } else if (type === 'clear') {
                 await invoke("clear_package", { device: activeDevice, package: pkg });
-                toast.success(t('apps.success.cleared', { pkg }));
+                feedback.toast.raw.success(t('apps.success.cleared', { pkg, defaultValue: `Cleared data for ${pkg}` }));
             }
             fetchPackages();
         } catch (e) {
-            toast.error(String(e));
+            feedback.toast.raw.error(t('apps.error.action_failed', { defaultValue: 'Action failed' }), e);
         } finally {
             closeConfirmation();
         }
@@ -181,7 +181,7 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
                 filters: [{ name: 'APK', extensions: ['apk'] }]
             });
             if (selected) {
-                toastId = toast.loading(t('apps.status.installing', "Installing APK..."));
+                toastId = feedback.toast.raw.loading(t('apps.status.installing', "Installing APK..."));
                 await invoke("install_package", {
                     device: activeDevice,
                     path: selected,
@@ -190,14 +190,14 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
                     allow_test: allowTest,
                     install_sdcard: installSdcard,
                 });
-                toast.success(t('apps.success.installed', "APK installed successfully"));
+                feedback.toast.raw.success(t('apps.success.installed', "APK installed successfully"));
                 fetchPackages();
             }
         } catch (e) {
             feedback.toast.error("apps.install_error", e);
         } finally {
             if (toastId !== null) {
-                toast.dismiss(toastId);
+                feedback.toast.dismiss(toastId);
             }
         }
     };
@@ -205,9 +205,9 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
     const handleLaunch = async (pkg: string) => {
         try {
             await invoke("launch_package", { device: activeDevice, package: pkg });
-            toast.success(t('apps.success.launched', { pkg, defaultValue: `Launched ${pkg}` }));
+            feedback.toast.raw.success(t('apps.success.launched', { pkg, defaultValue: `Launched ${pkg}` }));
         } catch (e) {
-            toast.error(String(e));
+            feedback.toast.raw.error(t('apps.error.launch_failed', { defaultValue: 'Failed to launch app' }), e);
         }
     };
 
@@ -218,16 +218,18 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
                 defaultPath: `${pkg.name}.apk`
             });
             if (destination) {
-                const toastId = toast.loading(t('apps.status.downloading', { pkg: pkg.name, defaultValue: `Downloading ${pkg.name}...` }));
+                const toastId = feedback.toast.raw.loading(t('apps.status.downloading', { pkg: pkg.name, defaultValue: `Downloading ${pkg.name}...` }));
                 try {
                     await invoke("pull_apk", { device: activeDevice, path: pkg.path, destination });
-                    toast.success(t('apps.success.downloaded', { pkg: pkg.name, defaultValue: `Downloaded ${pkg.name}` }), { id: toastId });
+                    feedback.toast.dismiss(toastId);
+                    feedback.toast.raw.success(t('apps.success.downloaded', { pkg: pkg.name, defaultValue: `Downloaded ${pkg.name}` }));
                 } catch (err) {
-                    toast.error(String(err), { id: toastId });
+                    feedback.toast.dismiss(toastId);
+                    feedback.toast.raw.error(t('apps.error.download_failed', { defaultValue: 'Failed to download APK' }), err);
                 }
             }
         } catch (e) {
-            toast.error(String(e));
+            feedback.toast.raw.error(t('apps.error.download_failed', { defaultValue: 'Failed to download APK' }), e);
         }
     };
 
@@ -384,9 +386,15 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
                                         )}
                                     </div>
                                     <div className="text-xs text-on-surface-variant/80 truncate font-mono opacity-70 flex items-center gap-2">
-                                        <span>{pkg.name}</span>
-                                        <span className="text-outline-variant px-1">•</span>
-                                        <span data-tooltip={String(pkg.path)} data-position="left" className="truncate max-w-[150px] cursor-help hover:text-on-surface/80 transition-colors">
+                                        <span className="shrink-0 truncate max-w-[40%]">{pkg.name}</span>
+                                        {pkg.version && (
+                                            <>
+                                                <span className="text-outline-variant px-1 shrink-0">•</span>
+                                                <span className="shrink-0 text-primary">v{pkg.version}</span>
+                                            </>
+                                        )}
+                                        <span className="text-outline-variant px-1 shrink-0">•</span>
+                                        <span data-tooltip={String(pkg.path)} data-position="left" className="truncate cursor-help hover:text-on-surface/80 transition-colors">
                                             {pkg.path}
                                         </span>
                                     </div>

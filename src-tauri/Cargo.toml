@@ -1,6 +1,6 @@
 [package]
 name = "robot_runner"
-version = "2.3.1-stable2"
+version = "2.3.2-alpha7"
 description = "The Professional Command Center for Android Automation"
 authors = ["Lucas de Eiroz Rodrigues"]
 edition = "2024"
@@ -49,6 +49,7 @@ image = "0.25"
 aes-gcm = "0.10"
 sha2 = "0.10"
 ignore = "0.4.26"
+tracing = "0.1.44"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

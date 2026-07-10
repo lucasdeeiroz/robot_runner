@@ -26,6 +26,10 @@ Internacionalização (i18n): Todo novo elemento de UI deve suportar as chaves d
 
 Diagnóstico: Sugira sempre mecanismos de feedback visual para o usuário quando um comando de backend falhar (ex: Toast notifications ou logs de erro detalhados).
 
+Observer Effect (Heisenbugs): Ao criar ferramentas de monitoramento ou profiling, tenha em mente que o próprio ato de observar muda o estado do sistema. Consultas ADB excessivas (como polling a cada segundo) podem drenar a bateria do dispositivo alvo e aumentar o consumo de CPU. Providencie opções de congelamento de estado ("Freeze State" / Auto-Refresh Toggle) e intervalos de atualização conservadores.
+
+Fallbacks para Dispositivos Restritivos: Dispositivos seguros (como POS Android) frequentemente possuem restrições rígidas (ex: acesso negado a `/proc/`). Sempre implemente mecanismos de fallback (ex: tentar usar `dumpsys` caso o acesso a `/proc/stat` ou `/proc/meminfo` retorne `Permission denied`), garantindo que a aplicação não crashe silenciosamente em diferentes fabricantes.
+
 4. Regras de Resposta:
 
 Direto ao ponto: Sem introduções longas. Forneça o trecho de código (Rust ou TS) e explique a lógica em bullet points.

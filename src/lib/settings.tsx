@@ -60,6 +60,11 @@ export interface AppSettings {
         automationRoot: string;
         mappings?: string;
     };
+    logcatKeywords?: string[];
+    logcatLevel?: string;
+    logcatExtraTags?: string;
+    logcatSelectedPackage?: string;
+    stopwatchSelectedPackage?: string;
 
     // Tools
     tools: {
@@ -152,6 +157,10 @@ const getDefaultSettings = (): AppSettings => ({
         recordings: '',
         mappings: '',
     },
+    logcatKeywords: [],
+    logcatLevel: 'E',
+    logcatExtraTags: '',
+    stopwatchSelectedPackage: '',
     tools: {
         appiumArgs: getRemoteString('default_appium_args') || '--relaxed-security',
         scrcpyArgs: getRemoteString('default_scrcpy_args') || '-m 1024 -b 2M --max-fps=30 --no-audio --stay-awake',
@@ -321,7 +330,8 @@ interface SettingsContextType {
     activeProfileId: string;
     profiles: Profile[];
     updateSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
-    createProfile: (name: string) => void;
+    setMultipleSettings: (newSettings: Partial<AppSettings>) => void;
+    createProfile: (name: string, initialSettings?: Partial<AppSettings>) => void;
     switchProfile: (id: string) => void;
     renameProfile: (id: string, name: string) => void;
     deleteProfile: (id: string) => void;
@@ -545,12 +555,45 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         });
     };
 
-    const createProfile = (name: string) => {
+    const setMultipleSettings = (newSettings: Partial<AppSettings>) => {
+        setStoreData((currentStoreData) => {
+            const activeId = currentStoreData.activeProfileId;
+            const currentProfile = currentStoreData.profiles[activeId];
+
+            if (!currentProfile) {
+                feedback.toast.error("settings.profile_not_found");
+                return currentStoreData;
+            }
+
+            const updatedSettings = deepMerge(currentProfile.settings, newSettings);
+            const updatedProfile = { ...currentProfile, settings: updatedSettings };
+
+            const newData = {
+                ...currentStoreData,
+                profiles: {
+                    ...currentStoreData.profiles,
+                    [activeId]: updatedProfile
+                }
+            };
+
+            // Fire and forget save to disk
+            saveStore(newData);
+
+            // Sync permissions if paths changed
+            if (newSettings.paths) {
+                syncWorkspaces(newSettings.paths as Record<string, string>);
+            }
+
+            return newData;
+        });
+    };
+
+    const createProfile = (name: string, initialSettings?: Partial<AppSettings>) => {
         const id = uuidv4();
         const newProfile: Profile = {
             id,
             name,
-            settings: getDefaultSettings()
+settings: deepMerge(getDefaultSettings(), initialSettings ?? {})
         };
         const newData = {
             ...storeData,
@@ -768,6 +811,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             activeProfileId: storeData.activeProfileId,
             profiles: Object.values(storeData.profiles),
             updateSetting,
+            setMultipleSettings,
             createProfile,
             switchProfile,
             renameProfile,
