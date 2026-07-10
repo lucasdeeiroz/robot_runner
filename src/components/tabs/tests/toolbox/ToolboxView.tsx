@@ -210,6 +210,11 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
         }
     };
 
+    const handlePairWithConsole = (tool: ToolTab) => {
+        setVisibleToolsInGrid(new Set(['console', tool]));
+        setIsGridView(true);
+    };
+
     // Auto-disable grid if only 1 tool left
     useEffect(() => {
         if (!isGridView) return;
@@ -628,9 +633,16 @@ setVisibleToolsInGrid(isWebMode ? new Set(['console', 'webview']) : new Set(['co
                                     !isGridView && tool === 'webview' && "bg-surface-variant/10 p-4 overflow-hidden"
                                 )}>
                                     {tool === 'console' && (
-                                        <RunConsole key={`console-${session.runId}-${session.sessionEpoch}`} runId={session.runId} logs={session.logs} isSessionRunning={session.status === 'running' || session.status === 'stopping'} testPath={session.testPath} />
+                                        <RunConsole 
+                                            key={`console-${session.runId}-${session.sessionEpoch}`} 
+                                            runId={session.runId} 
+                                            logs={session.logs} 
+                                            isSessionRunning={session.status === 'running' || session.status === 'stopping'} 
+                                            testPath={session.testPath} 
+                                            onPairWithTool={(tool) => handlePairWithConsole(tool)}
+                                        />
                                     )}
-                                    {tool === 'logcat' && <LogcatSubTab key={`logcat-${session.deviceUdid}`} selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} onNavigate={onNavigate} />}
+                                    {tool === 'logcat' && <LogcatSubTab key={`logcat-${session.deviceUdid}`} selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} onNavigate={onNavigate} onPairWithConsole={session.type === 'test' ? () => handlePairWithConsole('logcat') : undefined} />}
                                     {tool === 'commands' && <CommandsSubTab selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
                                     {tool === 'performance' && (
                                         <PerformanceSubTab
@@ -642,6 +654,7 @@ setVisibleToolsInGrid(isWebMode ? new Set(['console', 'webview']) : new Set(['co
                                             forceEnable={performanceState.forceEnable}
                                             setForceEnable={performanceState.setForceEnable}
                                             onNavigate={onNavigate}
+                                            onPairWithConsole={session.type === 'test' ? () => handlePairWithConsole('performance') : undefined}
                                         />
                                     )}
                                     {tool === 'stopwatch' && (
@@ -649,6 +662,7 @@ setVisibleToolsInGrid(isWebMode ? new Set(['console', 'webview']) : new Set(['co
                                             selectedDevice={session.deviceUdid}
                                             isTestRunning={isTestRunning}
                                             allowActionsDuringTest={settings.allowActionsDuringTest}
+                                            onPairWithConsole={session.type === 'test' ? () => handlePairWithConsole('stopwatch') : undefined}
                                         />
                                     )}
                                     {tool === 'apps' && <AppsSubTab isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
