@@ -24,8 +24,15 @@ export function useLogcatStopwatch(selectedDevice: string, selectedPackage: stri
         setLaps(prev => {
             const newLaps = prev.filter((_, i) => i !== index);
             return newLaps.map((lap, i) => {
-                const deltaMs = i > 0 ? lap.timestamp - newLaps[i - 1].timestamp : 0;
-                return { ...lap, deltaMs };
+                const prevLap = newLaps[i - 1] as any;
+                const currentLap = lap as any;
+                const usePerf = currentLap._perfTime && prevLap && prevLap._perfTime;
+
+                const deltaMsRaw = i > 0
+                    ? (usePerf ? currentLap._perfTime - prevLap._perfTime : lap.timestamp - newLaps[i - 1].timestamp)
+                    : 0;
+
+                return { ...lap, deltaMs: Number(Math.max(0, deltaMsRaw).toFixed(3)) };
             });
         });
     };
@@ -77,9 +84,10 @@ export function useLogcatStopwatch(selectedDevice: string, selectedPackage: stri
                             for (const kw of keywords) {
                                 if (line.includes(kw)) {
                                     setLaps(prev => {
-                                        const now = Date.now();
-                                        const deltaMs = prev.length > 0 ? now - prev[prev.length - 1].timestamp : 0;
-                                        return [...prev, { keyword: kw, timestamp: now, deltaMs }];
+                                        const now = performance.now();
+                                        const timestamp = Date.now(); // Keep Date.now for UI display of time
+                                        const deltaMs = prev.length > 0 ? Math.max(0, now - (prev[prev.length - 1] as any)._perfTime) : 0;
+                                        return [...prev, { keyword: kw, timestamp, deltaMs, _perfTime: now } as any];
                                     });
                                 }
                             }

@@ -11,12 +11,12 @@ import { useSettings } from "@/lib/settings";
 
 function formatDelta(deltaMs: number, unit: 'ms' | 's' | 'min' | 'h'): string {
     switch (unit) {
-        case 's': return `+${(deltaMs / 1000).toFixed(2)}s`;
+        case 's': return `+${(deltaMs / 1000).toFixed(3)}s`;
         case 'min': return `+${(deltaMs / 60000).toFixed(2)}m`;
         case 'h': return `+${(deltaMs / 3600000).toFixed(2)}h`;
         case 'ms':
         default:
-            return `+${deltaMs}ms`;
+            return `+${deltaMs.toFixed(0)}ms`;
     }
 }
 
@@ -70,13 +70,13 @@ export function StopwatchSubTab({ selectedDevice, isTestRunning = false, allowAc
 
     const handleExportCsv = () => {
         if (savedRounds.length === 0) return;
-        
+
         let csvContent = "#,";
         savedRounds.forEach((_, i) => {
             csvContent += `Round ${i + 1}${i < savedRounds.length - 1 ? ',' : ''}`;
         });
         csvContent += "\n";
-        
+
         const maxLaps = Math.max(0, ...savedRounds.map(r => r.laps.length));
         for (let i = 0; i < maxLaps; i++) {
             csvContent += `${i + 1},`;
@@ -87,13 +87,13 @@ export function StopwatchSubTab({ selectedDevice, isTestRunning = false, allowAc
             });
             csvContent += "\n";
         }
-        
+
         csvContent += "Total,";
         savedRounds.forEach((r, i) => {
             csvContent += `+${r.totalTimeMs}ms${i < savedRounds.length - 1 ? ',' : ''}`;
         });
         csvContent += "\n";
-        
+
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
@@ -102,7 +102,7 @@ export function StopwatchSubTab({ selectedDevice, isTestRunning = false, allowAc
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        
+
         feedback.toast.success(t('common.export_success', 'Exported successfully!'));
     };
 
@@ -245,18 +245,18 @@ export function StopwatchSubTab({ selectedDevice, isTestRunning = false, allowAc
                                     <div className="flex items-center justify-between mb-2">
                                         <span className="text-sm font-medium opacity-80">{t('common.saved_rounds', 'Saved Rounds')}</span>
                                         <div className="flex items-center gap-2">
-                                            <Button 
-                                                variant="ghost" 
-                                                size="sm" 
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
                                                 className="h-6 text-xs text-primary/80 hover:bg-primary/10"
                                                 onClick={handleExportCsv}
                                             >
                                                 <Download size={12} className="mr-1" />
                                                 {t('common.export', 'Export')}
                                             </Button>
-                                            <Button 
-                                                variant="ghost" 
-                                                size="sm" 
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
                                                 className="h-6 text-xs text-error/80 hover:bg-error/10"
                                                 onClick={() => setSavedRounds([])}
                                             >
