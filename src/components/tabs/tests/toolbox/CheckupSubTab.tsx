@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { useSettings } from '@/lib/settings';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
+import { tempDir, join } from '@tauri-apps/api/path';
 import { Button } from '@/components/atoms/Button';
 import { Upload, ShieldCheck, CheckCircle2, XCircle, Search, FileText, ListPlus, Info, Download, Filter, FilterX, Play } from 'lucide-react';
 import { Section } from '@/components/organisms/Section';
@@ -11,7 +12,9 @@ import { Modal } from '@/components/organisms/Modal';
 import { ActionCard } from '@/components/atoms/ActionCard';
 import { TagInput } from '@/components/atoms/TagInput';
 import { Input } from '@/components/atoms/Input';
+import { Textarea } from '@/components/atoms/Textarea';
 import { SplitButton } from '@/components/molecules/SplitButton';
+import { askAgent } from '@/lib/ai/agentService';
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
 import { ExpressiveLoading } from '@/components/atoms/ExpressiveLoading';
@@ -49,6 +52,9 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
     const [searchQuery, setSearchQuery] = useState("");
 
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+    const [isAiVerifyModalOpen, setIsAiVerifyModalOpen] = useState(false);
+    const [aiRequirementsPrompt, setAiRequirementsPrompt] = useState("");
+    const [isAiVerifying, setIsAiVerifying] = useState(false);
     const [reportPropsCompare, setReportPropsCompare] = useState<'all' | 'divergent' | 'none'>(() => {
         return (localStorage.getItem('checkup_reportPropsCompare') as any) || 'all';
     });
@@ -539,11 +545,8 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
         setAdditionalCheckResults(newResults);
     };
 
-    const generateReport = async () => {
-        if (!selectedDevice) return;
-        setIsReportModalOpen(false);
-
-        let toastId = toast.loading(t('toolbox.checkup.generating_report', 'Generating report...'));
+    const buildHtmlReport = async (): Promise<string | null> => {
+        if (!selectedDevice) return null;
         try {
             let filteredPkgs: PackageInfo[] = [];
             if (reportShowPackages) {
@@ -554,8 +557,6 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                     return !matchesPrefix; // 'exclude'
                 });
             }
-
-
 
             let html = `<!DOCTYPE html>
 <html lang="${t('language', 'en')}">
@@ -733,6 +734,21 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
             }
 
             html += `</body></html>`;
+            return html;
+        } catch (error) {
+            console.error('Failed to build HTML report', error);
+            return null;
+        }
+    };
+
+    const generateReport = async () => {
+        if (!selectedDevice) return;
+        setIsReportModalOpen(false);
+
+        let toastId = toast.loading(t('toolbox.checkup.generating_report', 'Generating report...'));
+        try {
+            const html = await buildHtmlReport();
+            if (!html) throw new Error("Failed to build HTML");
 
             const filePath = await save({
                 filters: [{ name: 'HTML Report', extensions: ['html'] }],
@@ -767,6 +783,105 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
             </div>
         );
     }
+
+    const verifyReportWithAI = async () => {
+        if (!selectedDevice || !aiRequirementsPrompt.trim()) return;
+        setIsAiVerifyModalOpen(false);
+        setIsReportModalOpen(false);
+
+        let toastId = toast.loading(t('toolbox.checkup.report.ai_verifying', 'AI is verifying the report...'));
+        setIsAiVerifying(true);
+        try {
+            const html = await buildHtmlReport();
+            if (!html) throw new Error("Failed to build base HTML for AI");
+
+            const aiSystemInstruction = `You are an expert QA and automation specialist.
+The user will provide you with a set of requirements (which could be release notes, expected behaviors, or key-value constraints) and an HTML report of a device checkup.
+Your task is to:
+1. Analyze the requirements.
+2. Compare them against the data provided in the HTML report.
+3. Determine if the device's state meets the new requirements.
+4. Modify the HTML report directly to reflect your analysis. You may add new columns (e.g., "AI Verdict", "Expected (Updated)"), change the row colors/classes (e.g., from error to success or vice-versa), and update the Status text.
+5. EXTREMELY IMPORTANT: Because the HTML is very large, you MUST NOT return the entire HTML string, or it will be truncated by output limits. Instead, you must return a JSON object containing a list of EXACT string replacements to apply to the HTML.
+
+The structure must be EXACTLY this JSON:
+{
+  "replacements": [
+    {
+      "search": "exact string snippet from the original HTML to replace",
+      "replace": "the new string snippet with your modifications"
+    }
+  ]
+}
+
+Make sure the "search" string EXACTLY matches the original HTML (including any tabs or newlines if you copy them) so the string replacement works. Do NOT include markdown code blocks or any text outside the JSON. Return ONLY the JSON object.`;
+
+            let aiPrompt = `USER REQUIREMENTS:
+${aiRequirementsPrompt}
+
+CURRENT HTML REPORT:
+${html}`;
+
+            if ((settings.aiProvider === 'claude-code' || settings.aiProvider === 'antigravity-cli') && aiPrompt.length > 7000) {
+                const tmp = await tempDir();
+                const tmpPath = await join(tmp, `checkup_prompt_${Date.now()}.txt`);
+                await writeTextFile(tmpPath, aiPrompt);
+                aiPrompt = `Please read my requirements and the HTML report from this temporary file: ${tmpPath}`;
+                console.log("[verifyReportWithAI] Prompt exceeded CLI limits. Wrote to file:", tmpPath);
+            }
+
+            console.log("[verifyReportWithAI] Triggering AI with prompt length:", aiPrompt.length);
+            console.log("[verifyReportWithAI] Requirements prompt:", aiRequirementsPrompt);
+
+            const response = await askAgent(aiPrompt, [], aiSystemInstruction, settings);
+            console.log("[verifyReportWithAI] AI Response received:", response);
+            let modifiedHtml = html;
+            
+            try {
+                const responseData = typeof response.response === 'string' ? JSON.parse(response.response) : response.response;
+                if (responseData && Array.isArray(responseData.replacements)) {
+                    for (const patch of responseData.replacements) {
+                        if (patch.search && patch.replace) {
+                            modifiedHtml = modifiedHtml.replace(patch.search, patch.replace);
+                        }
+                    }
+                } else if (responseData && responseData.reply) {
+                    // Fallback in case AI ignored the instructions and sent the full HTML anyway
+                    modifiedHtml = responseData.reply;
+                }
+            } catch (e) {
+                console.warn("[verifyReportWithAI] Failed to parse replacements, using fallback raw response.", e);
+                modifiedHtml = typeof response.response === 'string' ? response.response : JSON.stringify(response.response);
+            }
+
+            // Clean up any potential markdown formatting the AI might have still included
+            if (modifiedHtml.startsWith('\`\`\`html')) {
+                modifiedHtml = modifiedHtml.replace(/^\`\`\`html/, '').replace(/\`\`\`$/, '');
+            } else if (modifiedHtml.startsWith('\`\`\`')) {
+                modifiedHtml = modifiedHtml.replace(/^\`\`\`/, '').replace(/\`\`\`$/, '');
+            }
+
+            const filePath = await save({
+                filters: [{ name: 'HTML Report', extensions: ['html'] }],
+                defaultPath: `report_${selectedDevice.replace(/[^a-zA-Z0-9]/g, '_')}_verified_${new Date().toISOString().split('T')[0]}.html`
+            });
+
+            if (filePath) {
+                await writeTextFile(filePath, modifiedHtml);
+                toast.success(t('toolbox.checkup.report_saved', 'Report saved successfully!'), { id: toastId });
+            } else {
+                toast.dismiss(toastId);
+            }
+
+        } catch (error) {
+            console.error('[verifyReportWithAI] Failed to verify report with AI:', error);
+            console.error('[verifyReportWithAI] Error details:', JSON.stringify(error, null, 2));
+            toast.error(t('toolbox.checkup.report_error', 'Failed to generate report'), { id: toastId });
+        } finally {
+            setIsAiVerifying(false);
+            setAiRequirementsPrompt("");
+        }
+    };
 
     return (
         <div className="flex flex-col h-full overflow-hidden bg-surface p-4 gap-4">
@@ -1133,8 +1248,47 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                     <Button variant="ghost" onClick={() => setIsReportModalOpen(false)}>
                         {t('toolbox.checkup.report.cancel', 'Cancel')}
                     </Button>
-                    <Button variant="primary" onClick={generateReport}>
-                        {t('toolbox.checkup.report.generate', 'Generate Report')}
+                    <SplitButton
+                        variant="primary"
+                        primaryAction={{
+                            label: t('toolbox.checkup.report.generate', 'Generate Report'),
+                            onClick: generateReport
+                        }}
+                        secondaryActions={[
+                            {
+                                label: t('toolbox.checkup.report.verify_with_ai', 'Verify with AI'),
+                                onClick: () => setIsAiVerifyModalOpen(true)
+                            }
+                        ]}
+                    />
+                </div>
+            </Modal>
+
+            {/* AI Verify Modal */}
+            <Modal
+                isOpen={isAiVerifyModalOpen}
+                onClose={() => setIsAiVerifyModalOpen(false)}
+                title={t('toolbox.checkup.report.ai_verify_title', 'Verify with AI')}
+                className="max-w-3xl w-[90vw]"
+            >
+                <div className="flex flex-col gap-4">
+                    <p className="text-sm text-on-surface-variant">
+                        {t('toolbox.checkup.report.ai_verify_desc', 'Enter the new requirements or release notes. The AI will analyze the current report data against these requirements and generate a new modified report.')}
+                    </p>
+                    <Textarea
+                        value={aiRequirementsPrompt}
+                        onChange={(e) => setAiRequirementsPrompt(e.target.value)}
+                        placeholder={t('toolbox.checkup.report.ai_prompt_placeholder', 'Example: The expected screen resolution is now 1080x1920. The application version should be greater than 2.0.0...')}
+                        className="min-h-[200px]"
+                        disabled={isAiVerifying}
+                    />
+                </div>
+                <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-outline-variant/30">
+                    <Button variant="ghost" onClick={() => setIsAiVerifyModalOpen(false)} disabled={isAiVerifying}>
+                        {t('toolbox.checkup.report.cancel', 'Cancel')}
+                    </Button>
+                    <Button variant="primary" onClick={verifyReportWithAI} disabled={isAiVerifying || !aiRequirementsPrompt.trim()}>
+                        {isAiVerifying ? t('toolbox.checkup.report.ai_verifying', 'Verifying...') : t('toolbox.checkup.report.start_verification', 'Start Verification')}
                     </Button>
                 </div>
             </Modal>

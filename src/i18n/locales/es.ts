@@ -1905,7 +1905,13 @@ export const es = {
                     props_prefixes: "Prefijos de Propiedades (ej: ro.soc.model)",
                     add_prefix: "Añadir prefijo...",
                     cancel: "Cancelar",
-                    generate: "Generar Reporte"
+                    generate: "Generar Reporte",
+                    verify_with_ai: "Verificar con IA",
+                    ai_verify_title: "Verificar con IA",
+                    ai_verify_desc: "Ingrese los nuevos requisitos o notas de versión. La IA analizará los datos del informe actual con respecto a estos requisitos y generará un nuevo informe modificado.",
+                    ai_prompt_placeholder: "Ejemplo: La resolución esperada de la pantalla ahora es 1080x1920. La versión de la aplicación debe ser mayor a 2.0.0...",
+                    start_verification: "Iniciar Verificación",
+                    ai_verifying: "Verificando..."
                 },
                 installed_packages: "Paquetes Instalados",
                 package_name: "Paquete",

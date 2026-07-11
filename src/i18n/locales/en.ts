@@ -1896,7 +1896,13 @@ export const en = {
                     props_prefixes: "Property Prefixes (e.g. ro.soc.model)",
                     add_prefix: "Add prefix...",
                     cancel: "Cancel",
-                    generate: "Generate Report"
+                    generate: "Generate Report",
+                    verify_with_ai: "Verify with AI",
+                    ai_verify_title: "Verify with AI",
+                    ai_verify_desc: "Enter the new requirements or release notes. The AI will analyze the current report data against these requirements and generate a new modified report.",
+                    ai_prompt_placeholder: "Example: The expected screen resolution is now 1080x1920. The application version should be greater than 2.0.0...",
+                    start_verification: "Start Verification",
+                    ai_verifying: "Verifying..."
                 },
                 installed_packages: "Installed Packages",
                 package_name: "Package",
