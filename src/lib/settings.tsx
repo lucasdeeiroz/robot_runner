@@ -332,6 +332,7 @@ interface SettingsContextType {
     updateSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
     setMultipleSettings: (newSettings: Partial<AppSettings>) => void;
     createProfile: (name: string, initialSettings?: Partial<AppSettings>) => void;
+    importSettingsStore: (importedData: any) => void;
     switchProfile: (id: string) => void;
     renameProfile: (id: string, name: string) => void;
     deleteProfile: (id: string) => void;
@@ -593,7 +594,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         const newProfile: Profile = {
             id,
             name,
-settings: deepMerge(getDefaultSettings(), initialSettings ?? {})
+            settings: deepMerge(getDefaultSettings(), initialSettings ?? {})
         };
         const newData = {
             ...storeData,
@@ -602,6 +603,59 @@ settings: deepMerge(getDefaultSettings(), initialSettings ?? {})
         };
         setStoreData(newData);
         saveStore(newData);
+    };
+
+    const importSettingsStore = (importedData: any) => {
+        try {
+            if (!importedData || typeof importedData !== 'object') {
+                throw new Error("Invalid settings data.");
+            }
+            
+            let migrated: SettingsStoreData;
+            
+            if (importedData.profiles && importedData.activeProfileId) {
+                migrated = { ...importedData };
+            } else {
+                const migratedSettings = deepMerge(getDefaultSettings(), importedData as Partial<AppSettings>);
+                migratedSettings.aiChatEnabled = false;
+                migratedSettings.aiTestModeEnabled = false;
+                migrated = {
+                    activeProfileId: 'default',
+                    profiles: {
+                        'default': { id: 'default', name: 'Default', settings: migratedSettings }
+                    }
+                };
+            }
+
+            Object.keys(migrated.profiles).forEach(pid => {
+                migrated.profiles[pid].settings = deepMerge(getDefaultSettings(), migrated.profiles[pid].settings);
+                migrated.profiles[pid].settings.aiChatEnabled = false;
+                migrated.profiles[pid].settings.aiTestModeEnabled = false;
+            });
+            
+            if (!migrated.profiles[migrated.activeProfileId]) {
+                const availableIds = Object.keys(migrated.profiles);
+                if (availableIds.length > 0) {
+                    migrated.activeProfileId = availableIds[0];
+                } else {
+                    migrated.profiles = { 'default': { id: 'default', name: 'Default', settings: getDefaultSettings() } };
+                    migrated.activeProfileId = 'default';
+                }
+            }
+            
+            setStoreData(migrated);
+            saveStore(migrated);
+            
+            const activeId = migrated.activeProfileId;
+            const paths = migrated.profiles[activeId]?.settings?.paths;
+            if (paths) {
+                syncWorkspaces(paths as Record<string, string>);
+            }
+            
+        } catch (e: any) {
+            feedback.toast.error("Failed to import settings", e);
+            throw e;
+        }
     };
 
     const switchProfile = (id: string) => {
@@ -813,6 +867,7 @@ settings: deepMerge(getDefaultSettings(), initialSettings ?? {})
             updateSetting,
             setMultipleSettings,
             createProfile,
+            importSettingsStore,
             switchProfile,
             renameProfile,
             deleteProfile,

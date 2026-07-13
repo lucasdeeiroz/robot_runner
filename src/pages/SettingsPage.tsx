@@ -57,7 +57,7 @@ interface SettingsPageProps {
 }
 
 export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
-    const { settings, updateSetting, loading, profiles, activeProfileId, createProfile, switchProfile, renameProfile, deleteProfile, systemVersions, checkSystemVersions, systemCheckStatus, isNgrokEnabled, is_test_mode } = useSettings();
+    const { settings, updateSetting, loading, profiles, activeProfileId, createProfile, importSettingsStore, switchProfile, renameProfile, deleteProfile, systemVersions, checkSystemVersions, systemCheckStatus, isNgrokEnabled, is_test_mode } = useSettings();
 
     const { t } = useTranslation();
     const { sessions } = useTestSessions();
@@ -428,7 +428,7 @@ const parsed = JSON.parse(fileContent);
 
     const handleProfileSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newProfileName.trim()) return;
+        if (creationMode !== 'import' && !newProfileName.trim()) return;
 
         if (isRenaming) {
             renameProfile(activeProfileId, newProfileName);
@@ -436,7 +436,8 @@ const parsed = JSON.parse(fileContent);
             if (creationMode === 'clone') {
                 createProfile(newProfileName, settings);
             } else if (creationMode === 'import' && importedSettings) {
-                createProfile(newProfileName, importedSettings);
+                importSettingsStore(importedSettings);
+                feedback.toast.success(t('feedback.success', 'Settings imported successfully'));
             } else {
                 createProfile(newProfileName);
             }
@@ -1228,13 +1229,15 @@ const parsed = JSON.parse(fileContent);
                 title={isRenaming ? t('settings.profiles.rename') : t('settings.profiles.create')}
             >
                 <form onSubmit={handleProfileSubmit} className="space-y-4">
-                    <Input
-                        autoFocus
-                        value={newProfileName}
-                        onChange={(e) => setNewProfileName(e.target.value)}
-                        placeholder={t('settings.profiles.name_placeholder')}
-                        className="bg-surface/50"
-                    />
+                    {creationMode !== 'import' && (
+                        <Input
+                            autoFocus
+                            value={newProfileName}
+                            onChange={(e) => setNewProfileName(e.target.value)}
+                            placeholder={t('settings.profiles.name_placeholder')}
+                            className="bg-surface/50"
+                        />
+                    )}
                     
                     {!isRenaming && (
                         <div className="space-y-4 pt-2">

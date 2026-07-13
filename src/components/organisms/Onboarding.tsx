@@ -18,7 +18,7 @@ interface OnboardingProps {
 
 export function Onboarding({ onComplete }: OnboardingProps) {
     const { t, i18n } = useTranslation();
-    const { settings, updateSetting, setMultipleSettings, checkSystemVersions } = useSettings();
+    const { settings, updateSetting, setMultipleSettings, importSettingsStore, checkSystemVersions } = useSettings();
 
     const [step, setStep] = useState(1);
     const [selectedLanguage, setSelectedLanguage] = useState(settings.language || 'en_US');
@@ -28,7 +28,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
 
     // Import states
     const [showPathWarning, setShowPathWarning] = useState(false);
-    const [importedSettings, setImportedSettings] = useState<Partial<AppSettings> | null>(null);
+    const [importedSettings, setImportedSettings] = useState<any | null>(null);
     const [importing, setImporting] = useState(false);
 
     const handleImportFile = async () => {
@@ -64,8 +64,16 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             delete parsed.claudeCodeToken;
 
             // Check if we have paths
-            const hasAutomationRoot = !!(parsed.paths?.automationRoot);
-            const hasCustomAdb = !!(parsed.customAdbPath);
+            let hasAutomationRoot = false;
+            let hasCustomAdb = false;
+            if (parsed.profiles && parsed.activeProfileId) {
+                const activeSettings = parsed.profiles[parsed.activeProfileId]?.settings;
+                hasAutomationRoot = !!(activeSettings?.paths?.automationRoot);
+                hasCustomAdb = !!(activeSettings?.customAdbPath);
+            } else {
+                hasAutomationRoot = !!(parsed.paths?.automationRoot);
+                hasCustomAdb = !!(parsed.customAdbPath);
+            }
 
             setImportedSettings(parsed);
 
@@ -83,20 +91,26 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         }
     };
 
-    const applyImportedSettings = (settingsToApply: Partial<AppSettings>) => {
-        setMultipleSettings(settingsToApply);
+    const applyImportedSettings = (settingsToApply: any) => {
+        if (settingsToApply.profiles && settingsToApply.activeProfileId) {
+            importSettingsStore(settingsToApply);
+        } else {
+            setMultipleSettings(settingsToApply);
+        }
         feedback.toast.success(t('onboarding.success_import', 'Settings imported successfully'));
         setShowPathWarning(false);
         
         // Fast forward if we have valid modes
-        if (settingsToApply.usageMode) {
-            setSelectedMode(settingsToApply.usageMode);
-            if (settingsToApply.usageMode === 'automator' && settingsToApply.automationFramework) {
-                setSelectedFramework(settingsToApply.automationFramework);
+        const activeProfileSettings = settingsToApply.profiles ? settingsToApply.profiles[settingsToApply.activeProfileId]?.settings : settingsToApply;
+        
+        if (activeProfileSettings?.usageMode) {
+            setSelectedMode(activeProfileSettings.usageMode);
+            if (activeProfileSettings.usageMode === 'automator' && activeProfileSettings.automationFramework) {
+                setSelectedFramework(activeProfileSettings.automationFramework);
                 setStep(4);
                 return;
-            } else if (settingsToApply.usageMode === 'explorer' && settingsToApply.explorerPlatform) {
-                setSelectedExplorerPlatform(settingsToApply.explorerPlatform);
+            } else if (activeProfileSettings.usageMode === 'explorer' && activeProfileSettings.explorerPlatform) {
+                setSelectedExplorerPlatform(activeProfileSettings.explorerPlatform);
                 setStep(4);
                 return;
             }
@@ -108,11 +122,21 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         if (!importedSettings) return;
         const toApply = { ...importedSettings };
         
-        if (!keepAutomationRoot && toApply.paths) {
-            toApply.paths.automationRoot = '';
-        }
-        if (!keepCustomAdb) {
-            toApply.customAdbPath = '';
+        if (toApply.profiles && toApply.activeProfileId) {
+            const activeSettings = toApply.profiles[toApply.activeProfileId].settings;
+            if (!keepAutomationRoot && activeSettings.paths) {
+                activeSettings.paths.automationRoot = '';
+            }
+            if (!keepCustomAdb) {
+                activeSettings.customAdbPath = '';
+            }
+        } else {
+            if (!keepAutomationRoot && toApply.paths) {
+                toApply.paths.automationRoot = '';
+            }
+            if (!keepCustomAdb) {
+                toApply.customAdbPath = '';
+            }
         }
         
         applyImportedSettings(toApply);
@@ -246,40 +270,70 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                                 </p>
                                 
                                 <div className="space-y-4 bg-surface-variant/30 p-4 rounded-lg border border-outline-variant/30 text-sm">
-                                    {importedSettings?.paths?.automationRoot && (
+                                    {(() => {
+                                        let automationRoot = '';
+                                        if (importedSettings?.profiles && importedSettings?.activeProfileId) {
+                                            automationRoot = importedSettings.profiles[importedSettings.activeProfileId]?.settings?.paths?.automationRoot || '';
+                                        } else {
+                                            automationRoot = importedSettings?.paths?.automationRoot || '';
+                                        }
+                                        return automationRoot ? (
                                         <div className="flex flex-col gap-2 p-2 border-b border-outline-variant/30">
                                             <span className="font-semibold text-primary">{t('onboarding.path_automation_root', 'Automation Root:')}</span>
-                                            <span className="text-on-surface-variant font-mono break-all">{importedSettings.paths.automationRoot}</span>
+                                            <span className="text-on-surface-variant font-mono break-all">{automationRoot}</span>
                                             <div className="flex gap-2 mt-2">
-                                                <Button size="sm" variant="outline" onClick={() => confirmPaths(true, importedSettings?.customAdbPath === '')}>
+                                                <Button size="sm" variant="outline" onClick={() => confirmPaths(true, (importedSettings?.profiles ? importedSettings.profiles[importedSettings.activeProfileId]?.settings?.customAdbPath : importedSettings?.customAdbPath) === '')}>
                                                     <Check size={14} className="mr-1" /> {t('common.keep', 'Keep')}
                                                 </Button>
-                                                <Button size="sm" variant="ghost" className="text-error" onClick={() => confirmPaths(false, importedSettings?.customAdbPath === '')}>
+                                                <Button size="sm" variant="ghost" className="text-error" onClick={() => confirmPaths(false, (importedSettings?.profiles ? importedSettings.profiles[importedSettings.activeProfileId]?.settings?.customAdbPath : importedSettings?.customAdbPath) === '')}>
                                                     <X size={14} className="mr-1" /> {t('common.clear', 'Clear')}
                                                 </Button>
                                             </div>
                                         </div>
-                                    )}
-                                    {importedSettings?.customAdbPath && (
+                                        ) : null;
+                                    })()}
+                                    {(() => {
+                                        let customAdbPath = '';
+                                        let automationRoot = '';
+                                        if (importedSettings?.profiles && importedSettings?.activeProfileId) {
+                                            customAdbPath = importedSettings.profiles[importedSettings.activeProfileId]?.settings?.customAdbPath || '';
+                                            automationRoot = importedSettings.profiles[importedSettings.activeProfileId]?.settings?.paths?.automationRoot || '';
+                                        } else {
+                                            customAdbPath = importedSettings?.customAdbPath || '';
+                                            automationRoot = importedSettings?.paths?.automationRoot || '';
+                                        }
+                                        return customAdbPath ? (
                                         <div className="flex flex-col gap-2 p-2">
                                             <span className="font-semibold text-primary">{t('onboarding.path_custom_adb', 'Custom ADB Path:')}</span>
-                                            <span className="text-on-surface-variant font-mono break-all">{importedSettings.customAdbPath}</span>
+                                            <span className="text-on-surface-variant font-mono break-all">{customAdbPath}</span>
                                             <div className="flex gap-2 mt-2">
-                                                <Button size="sm" variant="outline" onClick={() => confirmPaths(importedSettings?.paths?.automationRoot === '', true)}>
+                                                <Button size="sm" variant="outline" onClick={() => confirmPaths(automationRoot === '', true)}>
                                                     <Check size={14} className="mr-1" /> {t('common.keep', 'Keep')}
                                                 </Button>
-                                                <Button size="sm" variant="ghost" className="text-error" onClick={() => confirmPaths(importedSettings?.paths?.automationRoot === '', false)}>
+                                                <Button size="sm" variant="ghost" className="text-error" onClick={() => confirmPaths(automationRoot === '', false)}>
                                                     <X size={14} className="mr-1" /> {t('common.clear', 'Clear')}
                                                 </Button>
                                             </div>
                                         </div>
-                                    )}
-                                    {(importedSettings?.paths?.automationRoot && importedSettings?.customAdbPath) && (
+                                        ) : null;
+                                    })()}
+                                    {(() => {
+                                        let customAdbPath = '';
+                                        let automationRoot = '';
+                                        if (importedSettings?.profiles && importedSettings?.activeProfileId) {
+                                            customAdbPath = importedSettings.profiles[importedSettings.activeProfileId]?.settings?.customAdbPath || '';
+                                            automationRoot = importedSettings.profiles[importedSettings.activeProfileId]?.settings?.paths?.automationRoot || '';
+                                        } else {
+                                            customAdbPath = importedSettings?.customAdbPath || '';
+                                            automationRoot = importedSettings?.paths?.automationRoot || '';
+                                        }
+                                        return (automationRoot && customAdbPath) ? (
                                         <div className="flex justify-center gap-4 mt-4 pt-4 border-t border-outline-variant/30">
                                             <Button size="sm" variant="primary" onClick={() => confirmPaths(true, true)}>{t('common.keep_all', 'Keep All')}</Button>
                                             <Button size="sm" variant="ghost" className="text-error" onClick={() => confirmPaths(false, false)}>{t('common.clear_all', 'Clear All')}</Button>
                                         </div>
-                                    )}
+                                        ) : null;
+                                    })()}
                                 </div>
                             </>
                         )}
