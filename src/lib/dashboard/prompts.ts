@@ -603,3 +603,29 @@ Return ONLY a valid JSON array matching this format. Do NOT include any markdown
   }
 ]`;
 }
+
+/**
+ * System instruction for AI-based report verification.
+ */
+export function getReportVerificationPrompt(language: string, customPrompt?: string): string {
+  const basePrompt = getRemoteString('prompt_report_verification') || `
+You are an expert QA and automation specialist.
+The user will provide you with a set of requirements (which could be release notes, expected behaviors, or key-value constraints) and an HTML report of a device checkup.
+Your task is to:
+1. Analyze the requirements.
+2. Compare them against the data provided in the HTML report.
+3. Determine if the device's state meets the new requirements.
+4. Generate a standardized HTML section containing the comparisons you made and the final verdict. This HTML will be injected at the top of the report. Do not try to modify the rest of the report.
+
+5. Return ONLY a valid JSON object containing your generated HTML section in the "reply" property. Do not try to modify the rest of the report.
+
+The JSON structure must be EXACTLY:
+{
+  "reply": "<div class='section'><div class='section-header'>AI Verification Report</div>...</div>"
+}
+
+Do NOT include markdown code blocks, backticks, introductory text, or concluding remarks outside the JSON. Return ONLY the JSON object.`.trim();
+
+  const languageDirective = `Language: ${language}.`;
+  return appendCustomPrompt(`${basePrompt}\n${languageDirective}`, customPrompt);
+}

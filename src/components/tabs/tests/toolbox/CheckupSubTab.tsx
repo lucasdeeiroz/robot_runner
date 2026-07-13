@@ -15,6 +15,7 @@ import { Input } from '@/components/atoms/Input';
 import { Textarea } from '@/components/atoms/Textarea';
 import { SplitButton } from '@/components/molecules/SplitButton';
 import { askAgent } from '@/lib/ai/agentService';
+import { getReportVerificationPrompt } from '@/lib/dashboard/prompts';
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
 import { ExpressiveLoading } from '@/components/atoms/ExpressiveLoading';
@@ -795,26 +796,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
             const html = await buildHtmlReport();
             if (!html) throw new Error("Failed to build base HTML for AI");
 
-            const aiSystemInstruction = `You are an expert QA and automation specialist.
-The user will provide you with a set of requirements (which could be release notes, expected behaviors, or key-value constraints) and an HTML report of a device checkup.
-Your task is to:
-1. Analyze the requirements.
-2. Compare them against the data provided in the HTML report.
-3. Determine if the device's state meets the new requirements.
-4. Modify the HTML report directly to reflect your analysis. You may add new columns (e.g., "AI Verdict", "Expected (Updated)"), change the row colors/classes (e.g., from error to success or vice-versa), and update the Status text.
-5. EXTREMELY IMPORTANT: Because the HTML is very large, you MUST NOT return the entire HTML string, or it will be truncated by output limits. Instead, you must return a JSON object containing a list of EXACT string replacements to apply to the HTML.
-
-The structure must be EXACTLY this JSON:
-{
-  "replacements": [
-    {
-      "search": "exact string snippet from the original HTML to replace",
-      "replace": "the new string snippet with your modifications"
-    }
-  ]
-}
-
-Make sure the "search" string EXACTLY matches the original HTML (including any tabs or newlines if you copy them) so the string replacement works. Do NOT include markdown code blocks or any text outside the JSON. Return ONLY the JSON object.`;
+            const aiSystemInstruction = getReportVerificationPrompt(settings.language || 'en-US');
 
             let aiPrompt = `USER REQUIREMENTS:
 ${aiRequirementsPrompt}
@@ -839,26 +821,36 @@ ${html}`;
             
             try {
                 const responseData = typeof response.response === 'string' ? JSON.parse(response.response) : response.response;
-                if (responseData && Array.isArray(responseData.replacements)) {
-                    for (const patch of responseData.replacements) {
-                        if (patch.search && patch.replace) {
-                            modifiedHtml = modifiedHtml.replace(patch.search, patch.replace);
-                        }
+                
+                // Fetch the HTML content, either from our custom property or the standard 'reply' property
+                let aiHtmlContent = responseData.ai_section_html || responseData.reply;
+                
+                if (aiHtmlContent) {
+                    // Clean up any potential markdown formatting
+                    if (aiHtmlContent.startsWith('```html')) {
+                        aiHtmlContent = aiHtmlContent.replace(/^```html\n?/, '').replace(/\n?```$/, '');
+                    } else if (aiHtmlContent.startsWith('```')) {
+                        aiHtmlContent = aiHtmlContent.replace(/^```\n?/, '').replace(/\n?```$/, '');
                     }
-                } else if (responseData && responseData.reply) {
-                    // Fallback in case AI ignored the instructions and sent the full HTML anyway
-                    modifiedHtml = responseData.reply;
+
+                    const insertPoint = modifiedHtml.indexOf('</p>');
+                    if (insertPoint !== -1) {
+                        modifiedHtml = modifiedHtml.slice(0, insertPoint + 4) + '\n\n' + aiHtmlContent + '\n\n' + modifiedHtml.slice(insertPoint + 4);
+                    } else {
+                        // Fallback if </p> is not found
+                        modifiedHtml = aiHtmlContent + modifiedHtml;
+                    }
                 }
             } catch (e) {
-                console.warn("[verifyReportWithAI] Failed to parse replacements, using fallback raw response.", e);
-                modifiedHtml = typeof response.response === 'string' ? response.response : JSON.stringify(response.response);
-            }
-
-            // Clean up any potential markdown formatting the AI might have still included
-            if (modifiedHtml.startsWith('\`\`\`html')) {
-                modifiedHtml = modifiedHtml.replace(/^\`\`\`html/, '').replace(/\`\`\`$/, '');
-            } else if (modifiedHtml.startsWith('\`\`\`')) {
-                modifiedHtml = modifiedHtml.replace(/^\`\`\`/, '').replace(/\`\`\`$/, '');
+                console.warn("[verifyReportWithAI] Failed to parse ai_section_html, injecting fallback raw response.", e);
+                let rawResponse = typeof response.response === 'string' ? response.response : JSON.stringify(response.response);
+                
+                const insertPoint = modifiedHtml.indexOf('</p>');
+                if (insertPoint !== -1) {
+                    modifiedHtml = modifiedHtml.slice(0, insertPoint + 4) + '\n\n<div class="section"><div class="section-header">AI Verification Output</div><p>Failed to parse structured response. Raw output:</p><pre>' + rawResponse + '</pre></div>\n\n' + modifiedHtml.slice(insertPoint + 4);
+                } else {
+                    modifiedHtml = rawResponse + modifiedHtml;
+                }
             }
 
             const filePath = await save({
