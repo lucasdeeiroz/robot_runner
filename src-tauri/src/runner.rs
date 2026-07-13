@@ -141,6 +141,13 @@ pub async fn run_robot_test(
     timestamp_outputs: Option<bool>,
     rerun_failed_from: Option<String>,
 ) -> AppResult<String> {
+    let output_dir = crate::cmd_utils::expand_env_vars(&output_dir);
+    let test_path = test_path.map(|p| crate::cmd_utils::expand_env_vars(&p));
+    let logs_path = logs_path.map(|p| crate::cmd_utils::expand_env_vars(&p));
+    let working_dir = working_dir.map(|p| crate::cmd_utils::expand_env_vars(&p));
+    let arguments_file = arguments_file.map(|p| crate::cmd_utils::expand_env_vars(&p));
+    let rerun_failed_from = rerun_failed_from.map(|p| crate::cmd_utils::expand_env_vars(&p));
+
     let abs_output_dir = std::fs::canonicalize(&output_dir)
         .map(|p| {
             let s = p.to_string_lossy().to_string();
@@ -335,6 +342,11 @@ pub async fn run_maestro_test(
     logs_path: Option<String>,
     timestamp_outputs: Option<bool>,
 ) -> AppResult<String> {
+    let output_dir = crate::cmd_utils::expand_env_vars(&output_dir);
+    let test_path = crate::cmd_utils::expand_env_vars(&test_path);
+    let logs_path = logs_path.map(|p| crate::cmd_utils::expand_env_vars(&p));
+    let working_dir = working_dir.map(|p| crate::cmd_utils::expand_env_vars(&p));
+
     let abs_output_dir = std::fs::canonicalize(&output_dir)
         .map(|p| p.to_string_lossy().to_string().replace(r"\\?\", ""))
         .unwrap_or_else(|_| output_dir.clone());
@@ -436,6 +448,10 @@ pub async fn run_appium_test(
     logs_path: Option<String>,
     appium_java_args: Option<String>,
 ) -> AppResult<String> {
+    let output_dir = crate::cmd_utils::expand_env_vars(&output_dir);
+    let project_path = crate::cmd_utils::expand_env_vars(&project_path);
+    let logs_path = logs_path.map(|p| crate::cmd_utils::expand_env_vars(&p));
+
     let abs_project_path = std::fs::canonicalize(&project_path)
         .map(|p| p.to_string_lossy().to_string().replace(r"\\?\", ""))
         .unwrap_or_else(|_| project_path.clone());
@@ -604,6 +620,7 @@ async fn spawn_and_monitor(
 
 #[tauri::command]
 pub async fn get_robot_test_cases(path: String) -> AppResult<Vec<String>> {
+    let path = crate::cmd_utils::expand_env_vars(&path);
     use std::fs::File;
     use std::io::{BufRead, BufReader};
     let file = File::open(&path).map_err(|e| AppError::FileSystemError(e.to_string()))?;
@@ -639,6 +656,11 @@ pub async fn run_cypress_test(
     cypress_args: Option<String>,
     working_dir: Option<String>,
 ) -> AppResult<String> {
+    let output_dir = crate::cmd_utils::expand_env_vars(&output_dir);
+    let test_path = crate::cmd_utils::expand_env_vars(&test_path);
+    let logs_path = logs_path.map(|p| crate::cmd_utils::expand_env_vars(&p));
+    let working_dir = working_dir.map(|p| crate::cmd_utils::expand_env_vars(&p));
+
     let abs_output_dir = std::fs::canonicalize(&output_dir)
         .map(|p| p.to_string_lossy().to_string().replace(r"\\?\", ""))
         .unwrap_or_else(|_| output_dir.clone());
@@ -700,6 +722,11 @@ pub async fn run_selenium_test(
     selenium_args: Option<String>,
     working_dir: Option<String>,
 ) -> AppResult<String> {
+    let output_dir = crate::cmd_utils::expand_env_vars(&output_dir);
+    let test_path = crate::cmd_utils::expand_env_vars(&test_path);
+    let logs_path = logs_path.map(|p| crate::cmd_utils::expand_env_vars(&p));
+    let working_dir = working_dir.map(|p| crate::cmd_utils::expand_env_vars(&p));
+
     let abs_output_dir = std::fs::canonicalize(&output_dir)
         .map(|p| p.to_string_lossy().to_string().replace(r"\\?\", ""))
         .unwrap_or_else(|_| output_dir.clone());

@@ -615,12 +615,18 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                 throw new Error("Invalid settings data.");
             }
 
+            let actualData = importedData;
+            // Unwrap tauri store 'app_config' key if it exists
+            if (importedData && importedData.app_config) {
+                actualData = importedData.app_config;
+            }
+
             let migrated: SettingsStoreData;
 
-            if (importedData.profiles && importedData.activeProfileId) {
-                migrated = { ...importedData };
+            if (actualData.profiles && actualData.activeProfileId) {
+                migrated = { ...actualData };
             } else {
-                const migratedSettings = deepMerge(getDefaultSettings(), importedData as Partial<AppSettings>);
+                const migratedSettings = deepMerge(getDefaultSettings(), actualData as Partial<AppSettings>);
                 migratedSettings.aiChatEnabled = false;
                 migratedSettings.aiTestModeEnabled = false;
                 migrated = {

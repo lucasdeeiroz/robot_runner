@@ -1301,7 +1301,7 @@ const parsed = JSON.parse(fileContent);
                         </Button>
                         <Button
                             type="submit"
-                            disabled={!newProfileName.trim() || (creationMode === 'import' && !importedSettings)}
+                            disabled={(creationMode !== 'import' && !newProfileName.trim()) || (creationMode === 'import' && !importedSettings)}
                             variant="primary"
                             className="hover:bg-secondary-container"
                         >

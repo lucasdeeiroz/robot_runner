@@ -49,6 +49,9 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             let parsed;
             try {
                 parsed = JSON.parse(fileContent);
+                if (parsed && parsed.app_config) {
+                    parsed = parsed.app_config;
+                }
             } catch (e) {
                 feedback.toast.error(t('onboarding.error_invalid_json', 'Invalid JSON file'));
                 setImporting(false);
@@ -56,11 +59,23 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             }
 
             // Remove AI keys for security
-            delete parsed.geminiApiKey;
-            delete parsed.antigravityApiKey;
-            delete parsed.claudeApiKey;
-            delete parsed.openaiApiKey;
-            delete parsed.claudeCodeToken;
+            if (parsed.profiles) {
+                Object.values(parsed.profiles).forEach((profile: any) => {
+                    if (profile.settings) {
+                        delete profile.settings.geminiApiKey;
+                        delete profile.settings.antigravityApiKey;
+                        delete profile.settings.claudeApiKey;
+                        delete profile.settings.openaiApiKey;
+                        delete profile.settings.claudeCodeToken;
+                    }
+                });
+            } else {
+                delete parsed.geminiApiKey;
+                delete parsed.antigravityApiKey;
+                delete parsed.claudeApiKey;
+                delete parsed.openaiApiKey;
+                delete parsed.claudeCodeToken;
+            }
 
             // Check if we have paths
             let hasAutomationRoot = false;
@@ -106,11 +121,11 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             setSelectedMode(activeProfileSettings.usageMode);
             if (activeProfileSettings.usageMode === 'automator' && activeProfileSettings.automationFramework) {
                 setSelectedFramework(activeProfileSettings.automationFramework);
-                setStep(4);
+                onComplete();
                 return;
             } else if (activeProfileSettings.usageMode === 'explorer' && activeProfileSettings.explorerPlatform) {
                 setSelectedExplorerPlatform(activeProfileSettings.explorerPlatform);
-                setStep(4);
+                onComplete();
                 return;
             }
         }
@@ -184,7 +199,12 @@ export function Onboarding({ onComplete }: OnboardingProps) {
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-surface/80 backdrop-blur-md p-4">
+        <motion.div 
+            className="fixed inset-0 z-50 flex items-center justify-center bg-surface/80 backdrop-blur-md p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+        >
             <motion.div
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -506,6 +526,6 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                     </motion.div>
                 )}
             </motion.div>
-        </div>
+        </motion.div>
     );
 }
